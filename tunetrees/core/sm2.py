@@ -23,7 +23,7 @@ class Card(object):
 
             # I use needRelearn to indicate whether the user need re-study this entry after answer() it
             # The following is copied from sm2.html,
-            # "After each repetition session of a given day repeat again all items that scored below four
+            # "After each repetition session of a given day repeat all items that scored below four
             # in the quality assessment. Continue the repetitions until all of these items score at least four."
             self.needRelearn = False
         else:
@@ -64,7 +64,7 @@ class Card(object):
             # if not, just keep it as following. According to my understanding
             # on the https://www.supermemo.com/english/ol/sm2.htm
             # It's very possible that we need use the old EF value to calculate the next interval, and the new EF value
-            # need be used in the NEXT NEXT interval's calculation
+            # need be used in the NEXT interval's calculation
             self.update_interval()
             self.update_ef(easiness)
 

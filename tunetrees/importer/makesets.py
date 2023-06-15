@@ -467,8 +467,7 @@ def print_before_after_tunes(
         for prev_tune in tune_rec.follows:
             if prev_tune.tune_id in tune_dict:
                 print(
-                    "        id: %s, name: %s, from_album: %s"
-                    % (prev_tune.tune_id, prev_tune.tune_name, prev_tune.from_album)
+                    f"        id: {prev_tune.tune_id}, name: {prev_tune.tune_name}, from_album: {prev_tune.from_album}"
                 )
 
         print("    This tune goes into:")

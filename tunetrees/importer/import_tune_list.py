@@ -2,14 +2,11 @@ import json
 from dataclasses import dataclass
 from http.client import HTTPResponse
 from pathlib import Path
+from time import sleep
 from typing import Dict, TypedDict, List
 from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-
-from time import sleep
-
-from bs4 import BeautifulSoup
 
 
 def login_irishtune_info(
@@ -98,7 +95,7 @@ def get_headers():
         # "Origin": "https://www.irishtune.info",
         "Connection": "keep-alive",
         # "Referer": "https://www.irishtune.info/my/login.php",
-        "Cookie": "MyIrishTuneInfo=b2dcbda34d41f29b2967f917e89fd77b",
+        "Cookie": "MyIrishTuneInfo=b2dcbda34d41f29b2967f917e89fd77b",  # noqa
         # "Upgrade-Insecure-Requests": "1",
         # "Sec-Fetch-Dest": "document",
         # "Sec-Fetch-Mode": "navigate",
