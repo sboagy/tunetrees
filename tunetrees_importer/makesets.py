@@ -1,18 +1,16 @@
+import pickle
+import re
 import sys
+import time
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
+from typing import List, Dict, Optional
 from urllib.error import URLError
 from urllib.request import Request, urlopen
-from typing import List, Dict, Optional
 
 # import the Beautiful soup functions to parse the data returned from the website
 from bs4 import BeautifulSoup
-from enum import Enum
-import time
-
-
-import pickle
-import re
 
 SETS_RESULTS_TXT = "sets_results.txt"
 
@@ -69,7 +67,7 @@ class TuneSet:
     from_album: Optional[str] = None
 
 
-regex = r"#(?P<tune_id>[0-9]+)\[(?P<tune_name>[A-z0-9 \']+).*\]"
+regex = r'#(?P<tune_id>\d+)\[(?P<tune_name>[A-z0-9 \']+).*\]'
 
 
 class FollowsOrGoesInto(Enum):
@@ -121,7 +119,6 @@ def process_set_link_list(  # sourcery skip: low-code-quality
     which: FollowsOrGoesInto,
     match_albums: bool = True,
 ):
-
     for sibling in siblings:
         if sibling.tune_id in tune_dict:
             for tunes_set in set_list:
@@ -390,7 +387,6 @@ def main():
                 if set_list[set_id_top] is None:
                     # Then we've already processed it, continue to next tune
                     changes_made += 1
-                    continue
 
         set_list = clean_nulls_from_list(set_list)
 
@@ -452,9 +448,8 @@ def main():
                 sequence_id += 1
                 if sequence_id < len(tune_list):
                     f.write("/")
-                else:
-                    pass
-                    # print(" from_album: %s" % tune_set.from_album)
+                # else:
+                #    print(" from_album: %s" % tune_set.from_album)
             f.write("</p>\n")
         f.write("</html>\n")
 
@@ -483,5 +478,6 @@ def print_before_after_tunes(
                     f"        id: {goes_into_tune.tune_id}, name: {goes_into_tune.tune_name}, from_album: {goes_into_tune.from_album}"
                 )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

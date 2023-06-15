@@ -7,10 +7,9 @@ import yaml
 
 def main():
     parser = argparse.ArgumentParser(
-        prog='to_yaml',
-        description='converts json to yaml',
-        epilog='Go for it')
-    parser.add_argument('filename')
+        prog="to_yaml", description="converts json to yaml", epilog="Go for it"
+    )
+    parser.add_argument("filename")
     args = parser.parse_args()
     assert args.filename
     print(args.filename)
@@ -25,6 +24,5 @@ def main():
         yaml.dump(json_object, f_out)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

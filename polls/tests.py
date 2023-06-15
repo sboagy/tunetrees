@@ -1,6 +1,7 @@
 import datetime
-from django.urls import reverse
+
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from .models import Question
@@ -16,7 +17,7 @@ class QuestionViewTests(TestCase):
         """
         If no questions exist, an appropriate message should be displayed.
         """
-        response = self.client.get(reverse('polls:index'))
+        response = self.client.get(reverse("polls:index"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No polls are available.")
-        self.assertQuerysetEqual(response.context['latest_question_list'], [])
+        self.assertQuerysetEqual(response.context["latest_question_list"], [])
