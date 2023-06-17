@@ -67,7 +67,7 @@ class TuneSet:
     from_album: Optional[str] = None
 
 
-regex = r'#(?P<tune_id>\d+)\[(?P<tune_name>[A-z0-9 \']+).*\]'
+regex = r"#(?P<tune_id>\d+)\[(?P<tune_name>[A-z0-9 \']+).*\]"
 
 
 class FollowsOrGoesInto(Enum):

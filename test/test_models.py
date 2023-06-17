@@ -15,7 +15,7 @@ def test_basic_connect_and_read():
         # filtered = [tune for tune in tunes if tune.ID == 36]
         assert filtered
         r36 = filtered[0]
-        assert r36.Title == " Lilting Fisherman"
+        assert r36.Title == "Lilting Fisherman"
         print(
             f"\n{r36.ID=}, {r36.Title=}, {r36.Type=}, {r36.Mode=}, {r36.Structure=}, {r36.Incipit=}"
         )

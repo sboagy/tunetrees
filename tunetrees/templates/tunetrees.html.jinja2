@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>TuneTrees</title>
+</head>
+<body>
+<h1>TuneTrees Practice List</h1>
+<form action="/tunetrees/practice/feedback">
+    <p>Please select tune to practice:</p>
+    {% for tune in tunes_scheduled %}
+        <input type="radio" id="t{{ tune.ID }}" name="selected_tune" value="{{ tune.ID }}">
+        <label for="t{{ tune.ID }}">{{ tune.ID }}</label>
+        <a href="https://www.irishtune.info/tune/{{ tune.ID }}/">{{ tune.Title }}</a>
+        <br/>
+    {% endfor %}
+    <br/>
+    <hr/>
+    <label for="vote_types">Then evaluate your recall:</label>
+    <br/><br/>
+    <select id="vote_type" name="vote_type">
+        <option value="not_set" selected>Enter Recall Evaluation</option>
+        <option value="failed">Failed (no recall)</option>
+        <option value="barely">Barely Remembered Some (perhaps A part but not B part)</option>
+        <option value="struggled">Remembered with Some Mistakes (and needed verification)</option>
+        <option value="recalled">Recalled with Some Work (but without help)</option>
+        <option value="trivial">Not Bad (but maybe not session ready)</option>
+        <option value="perfect">Good (could perform solo or lead in session) </option>
+    </select>
+    <br/><br/>
+    <hr/>
+    <input type="submit" value="Submit" formmethod="post">
+    <br/><br/>
+    <p>Most recent tunes practiced:</p>
+    <ul>
+    {% for tune in tunes_recently_played %}
+        <li><a href="https://www.irishtune.info/tune/{{ tune.ID }}/">{{ tune.Title }}</a></li>
+    {% endfor %}
+    </ul>
+
+</form>
+
+{#    <ul>#}
+{#    {% for tune in tunes %}#}
+{#        <li><a href="https://www.irishtune.info/tune/{{ tune.ID }}/">{{ tune.Title }}</a></li>#}
+{#    {% endfor %}#}
+{#    </ul>#}
+
+{#    {{ a_variable }}#}
+
+{# a comment #}
+</body>
+</html>
