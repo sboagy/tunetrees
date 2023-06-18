@@ -1,7 +1,7 @@
 from typing import List
 
 from tunetrees.app.database import SessionLocal
-from tunetrees.models.query import get_tune_table, get_practice_record_table
+from tunetrees.app.queries import get_practice_record_table, get_tune_table
 from tunetrees.models.tunetrees import Tune, PracticeRecord
 
 

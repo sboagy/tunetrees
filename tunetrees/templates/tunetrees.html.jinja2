@@ -2,21 +2,59 @@
 <html lang="en">
 <head>
     <title>TuneTrees</title>
+    <style>
+        table {
+            font-family: inherit;
+            font-weight: normal;
+            font-size: smaller;
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        td, th {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 4px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #dddddd;
+        }
+    </style>
 </head>
 <body>
 <h1>TuneTrees Practice List</h1>
 <form action="/tunetrees/practice/feedback">
     <p>Please select tune to practice:</p>
-    {% for tune in tunes_scheduled %}
-        <input type="radio" id="t{{ tune.ID }}" name="selected_tune" value="{{ tune.ID }}">
-        <label for="t{{ tune.ID }}">{{ tune.ID }}</label>
-        <a href="https://www.irishtune.info/tune/{{ tune.ID }}/">{{ tune.Title }}</a>
-        <br/>
-    {% endfor %}
+    <table>
+        <tr>
+            <th>Tune Name</th>
+            <th style="width:8ch">Tune ID</th>
+            <th style="width:30ch">Note Private</th>
+            <th style="width:30ch">Note Public</th>
+            <th style="width:20ch">Tags</th>
+            <th>External Link</th>
+        </tr>
+        {% for tune in tunes_scheduled %}
+            <tr>
+                <td>
+                    <input type="radio" id="t{{ tune.ID }}" name="selected_tune" value="{{ tune.ID }}">
+                    <label for="t{{ tune.ID }}">{{ tune.Title }}</label>
+                </td>
+                <td>{{ tune.ID }}</td>
+                <td>{{ tune.NotePrivate }}</td>
+                <td>{{ tune.NotePublic }} </td>
+                <td>{{ tune.Tags }}</td>
+                <td>
+                    <a href="https://www.irishtune.info/tune/{{ tune.ID }}/">{{ tune.Title }}</a>
+                </td>
+            </tr>
+        {% endfor %}
+    </table>
     <br/>
     <hr/>
-    <label for="vote_types">Then evaluate your recall:</label>
-    <br/><br/>
+    <br/>
+    <label for="vote_type">Then evaluate your recall:</label>
     <select id="vote_type" name="vote_type">
         <option value="not_set" selected>Enter Recall Evaluation</option>
         <option value="failed">Failed (no recall)</option>
@@ -24,17 +62,17 @@
         <option value="struggled">Remembered with Some Mistakes (and needed verification)</option>
         <option value="recalled">Recalled with Some Work (but without help)</option>
         <option value="trivial">Not Bad (but maybe not session ready)</option>
-        <option value="perfect">Good (could perform solo or lead in session) </option>
+        <option value="perfect">Good (could perform solo or lead in session)</option>
     </select>
     <br/><br/>
-    <hr/>
     <input type="submit" value="Submit" formmethod="post">
     <br/><br/>
+    <hr/>
     <p>Most recent tunes practiced:</p>
     <ul>
-    {% for tune in tunes_recently_played %}
-        <li><a href="https://www.irishtune.info/tune/{{ tune.ID }}/">{{ tune.Title }}</a></li>
-    {% endfor %}
+        {% for tune in tunes_recently_played %}
+            <li><a href="https://www.irishtune.info/tune/{{ tune.ID }}/">{{ tune.Title }}</a></li>
+        {% endfor %}
     </ul>
 
 </form>
