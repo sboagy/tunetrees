@@ -10,6 +10,7 @@ from tunetrees.models.tunetrees import (
     PracticeRecord,
     t_practice_list_joined,
 )
+from datetime import datetime, timedelta
 
 
 def query_result_to_diagnostic_dict(rows, table_name) -> List[Dict[str, Any]]:
@@ -50,14 +51,25 @@ def get_practice_list_scheduled(
     db: Session, skip: int = 0, limit: int = 10, print_table=False
 ) -> List[t_practice_list_joined]:
     query: Query[Any] = db.query(t_practice_list_joined)
-    rows = (
-        query.order_by(
+    scheduled_rows = (
+        query.
+        filter(func.DATE(t_practice_list_joined.columns.get("ReviewDate")) <= (datetime.today()-timedelta(days=3))).
+        order_by(
             func.DATE(t_practice_list_joined.columns.get("ReviewDate")).asc()
         )
         .offset(skip)
         .limit(limit)
         .all()
     )
+    aged_rows = (
+        query.order_by(
+            func.DATE(t_practice_list_joined.columns.get("ReviewDate")).asc()
+        )
+        .offset(skip)
+        .limit(limit-len(scheduled_rows))
+        .all()
+    )
+    rows = scheduled_rows+aged_rows
 
     if print_table:
         print("\n--------")
