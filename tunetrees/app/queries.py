@@ -53,7 +53,8 @@ def get_practice_list_scheduled(
     query: Query[Any] = db.query(t_practice_list_joined)
     scheduled_rows = (
         query.
-        filter(func.DATE(t_practice_list_joined.columns.get("ReviewDate")) >= (datetime.today()-timedelta(days=3))).
+        filter(func.DATE(t_practice_list_joined.columns.get("ReviewDate")) > (datetime.today()-timedelta(days=5))).
+        filter(func.DATE(t_practice_list_joined.columns.get("ReviewDate")) <= (datetime.today())).
         order_by(
             func.DATE(t_practice_list_joined.columns.get("ReviewDate")).asc()
         )
