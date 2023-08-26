@@ -59,7 +59,7 @@ def get_practice_list_scheduled(
             func.DATE(t_practice_list_joined.columns.get("ReviewDate")).desc()
         )
         .offset(skip)
-        .limit(5)
+        .limit(15)
         .all()
     )
     aged_rows = (
