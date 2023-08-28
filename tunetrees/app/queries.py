@@ -52,25 +52,30 @@ def get_practice_list_scheduled(
 ) -> List[t_practice_list_joined]:
     query: Query[Any] = db.query(t_practice_list_joined)
     scheduled_rows = (
-        query.
-        filter(func.DATE(t_practice_list_joined.columns.get("ReviewDate")) > (datetime.today()-timedelta(days=14))).
-        filter(func.DATE(t_practice_list_joined.columns.get("ReviewDate")) <= (datetime.today())).
-        order_by(
-            func.DATE(t_practice_list_joined.columns.get("ReviewDate")).desc()
+        query.filter(
+            func.DATE(t_practice_list_joined.columns.get("ReviewDate"))
+            > (datetime.today() - timedelta(days=14))
         )
+        .filter(
+            func.DATE(t_practice_list_joined.columns.get("ReviewDate"))
+            <= (datetime.today())
+        )
+        .order_by(func.DATE(t_practice_list_joined.columns.get("ReviewDate")).desc())
         .offset(skip)
         .limit(15)
         .all()
     )
+    # aged_limit = limit-len(scheduled_rows)
+    # if aged_limit <= 0:
+    #     aged_limit = 2
+    aged_limit = 2
     aged_rows = (
-        query.order_by(
-            func.DATE(t_practice_list_joined.columns.get("Practiced")).asc()
-        )
+        query.order_by(func.DATE(t_practice_list_joined.columns.get("Practiced")).asc())
         .offset(skip)
-        .limit(limit-len(scheduled_rows))
+        .limit(aged_limit)
         .all()
     )
-    rows = scheduled_rows+aged_rows
+    rows = scheduled_rows + aged_rows
 
     if print_table:
         print("\n--------")
