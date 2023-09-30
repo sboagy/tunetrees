@@ -8,8 +8,17 @@ from starlette.responses import HTMLResponse, RedirectResponse
 from tunetrees.app.practice import render_practice_page
 from tunetrees.app.schedule import submit_review, query_and_print_tune_by_id
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 async def root():
