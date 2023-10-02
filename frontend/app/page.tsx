@@ -21,7 +21,7 @@ export default function Home() {
 
   return (
     <div>
-      Greeting: {greeting}
+      {greeting}
       <br />
       --------
       <Practice />

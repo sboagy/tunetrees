@@ -1,12 +1,18 @@
 import logging
-from typing import Annotated
+from typing import Annotated, List
 
 import starlette.status as status
 from fastapi import FastAPI, Form
 from starlette.responses import HTMLResponse, RedirectResponse
+from fastapi.encoders import jsonable_encoder
+
 
 from tunetrees.app.practice import render_practice_page
+from tunetrees.app.queries import get_practice_list_scheduled
 from tunetrees.app.schedule import submit_review, query_and_print_tune_by_id
+
+from tunetrees.app.database import SessionLocal
+from tunetrees.models.tunetrees import Tune
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -35,6 +41,34 @@ async def tunetrees():
     html_result = await render_practice_page()
     return html_result
 
+@app.get("/tunetrees/get_practice_list_scheduled")
+async def get_scheduled():
+    db = None
+    try:
+        db = SessionLocal()
+        tunes_scheduled: List[Tune] = get_practice_list_scheduled(db, limit=10)
+        tunes_list = [str(tune) for tune in tunes_scheduled]
+        return tunes_list
+    except:
+        return "Unable to fetch scheduled practice list."
+    finally:
+        db.close()
+
+@app.get("/tunetrees/get_recently_played")
+async def get_recently_played():
+    db = None
+    try:
+        db = SessionLocal()
+        tunes_recently_played: List[Tune] = get_practice_list_recently_played(
+            db, limit=25
+        )
+        tunes_list = [str(tune) for tune in tunes_recently_played]
+        return tunes_list
+    except:
+        return "Unable to fetch scheduled practice list."
+    finally:
+        db.close()
+
 
 @app.post("/tunetrees/practice/feedback")
 async def feedback(
@@ -52,3 +86,5 @@ async def feedback(
         "/tunetrees/practice", status_code=status.HTTP_302_FOUND
     )
     return html_result
+
+
