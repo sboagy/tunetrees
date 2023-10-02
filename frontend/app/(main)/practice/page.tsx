@@ -3,9 +3,11 @@ import React, { useEffect, useState } from 'react'
 import { getPracticeListScheduled, getRecentlyPracticed } from './queries'
 import { Tune } from './types'
 import { CircularProgress, Box } from '@mui/material'
+import { josefinSans } from '@/app/layout'
 
-import ScheduledTunes from './ScheduledTunes';
-import RecentlyPracticed from './RecentlyPracticed';
+import ScheduledTunes from './components/ScheduledTunes';
+import RecentlyPracticed from './components/RecentlyPracticed';
+import WarmUpTimer from './components/WarmUpTimer'
 
 export default function Practice() {
 
@@ -29,11 +31,17 @@ export default function Practice() {
   }, [])
 
 
-  return (
+  return (  
     <>
-      {scheduled ? <ScheduledTunes tunes={scheduled} /> : <CircularProgress />}
-      <Box sx={{height: 20}}></Box>
-      {recentlyPracticed ? <RecentlyPracticed tunes={recentlyPracticed} /> : <CircularProgress />}
+      <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', mx: 4}}>
+        <h1 className={josefinSans.className}>tunetrees</h1>
+        <WarmUpTimer />
+      </Box>
+      <Box sx={{mx: 4}}>
+        {scheduled ? <ScheduledTunes tunes={scheduled} /> : <CircularProgress />}
+        <Box sx={{height: 20}}></Box>
+        {recentlyPracticed ? <RecentlyPracticed tunes={recentlyPracticed} /> : <CircularProgress />}
+      </Box>
     </>
   )
 }

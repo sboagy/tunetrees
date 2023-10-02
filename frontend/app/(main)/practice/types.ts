@@ -1,4 +1,4 @@
-export interface Tune {
+export type Tune = {
     id: number
     title: string
     type: string
