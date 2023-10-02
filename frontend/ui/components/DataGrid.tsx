@@ -12,7 +12,7 @@ interface DataGridType {
 export default function DataGrid({rows, columns, pageSize=10}: DataGridType) {
 
   return (
-    <Box sx={{ height: 400, width: '100%' }}>
+    <Box sx={{ height: pageSize*64, width: '100%' }}>
       <MUIDataGrid
         rows={rows}
         columns={columns}
@@ -26,6 +26,7 @@ export default function DataGrid({rows, columns, pageSize=10}: DataGridType) {
         pageSizeOptions={[pageSize]}
         checkboxSelection
         disableRowSelectionOnClick
+        hideFooterSelectedRowCount
       />
     </Box>
   );

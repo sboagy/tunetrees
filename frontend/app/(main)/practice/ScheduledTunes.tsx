@@ -4,8 +4,6 @@ import DataGrid from '@/ui/components/DataGrid';
 
 //TODO why is my type so cranky here
 export default function ScheduledTunes({tunes}: any) {
-    console.log(tunes)
-
     const scheduledTunesColumns: GridColDef[] = [
         {
             field: 'title',
@@ -50,7 +48,10 @@ export default function ScheduledTunes({tunes}: any) {
       
 
   return (
+    <>
+    <h4>Scheduled for practice:</h4>
     <DataGrid rows={tunes} columns={scheduledTunesColumns} pageSize={10} />
+    </>
 
   )
 }
