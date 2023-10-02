@@ -15,14 +15,16 @@ export default function Practice() {
     getScheduled()
   }, [])
 
-  tune
+  
   return (
     <>
     <br />
     {scheduled && scheduled.map((tune, index) => {
       return (
         <div key={index}>
-          {tune["tune_name"]}
+          Tune Name: {tune["tune_name"]}
+          <br />
+          Tune ID: {tune["tune_id"]}
           <br/>
           -----
           <br />

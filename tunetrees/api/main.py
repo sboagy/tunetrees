@@ -4,11 +4,11 @@ from typing import Annotated, List
 import starlette.status as status
 from fastapi import FastAPI, Form
 from starlette.responses import HTMLResponse, RedirectResponse
-from fastapi.encoders import jsonable_encoder
+from tunetrees.api.mappers.tunes_mapper import tunes_mapper
 
 
 from tunetrees.app.practice import render_practice_page
-from tunetrees.app.queries import get_practice_list_scheduled
+from tunetrees.app.queries import get_practice_list_recently_played, get_practice_list_scheduled
 from tunetrees.app.schedule import submit_review, query_and_print_tune_by_id
 
 from tunetrees.app.database import SessionLocal
@@ -48,27 +48,30 @@ async def get_scheduled():
         db = SessionLocal()
         tunes_scheduled: List[Tune] = get_practice_list_scheduled(db, limit=10)
         tune_list = []
-        #TODO build mapper to handle this 
         for tune in tunes_scheduled:
-            tune_each = {}
-            tune_each["tune_id"]= tune[0]
-            tune_each["tune_name"] = tune[1]
-            tune_each["tune_type"] = tune[2]       
-            tune_each["tune_key"] = tune[4]
-            tune_each["tune_incipit"] = tune[5]
-            tune_each["scheduled"] = tune[6]
-            tune_each["last_practiced"] = tune[7]
-            tune_each["notes_private"] = tune[14]
-            tune_each["notes_public"] = tune[15]
-            tune_each["tags"] = tune[16]
-            tune_list.append(tune_each)
-        print(tunes_scheduled[0])
+            tune_list.append(tunes_mapper(tune))
         return tune_list
     except:
         return "Unable to fetch scheduled practice list."
     finally:
         db.close()
 
+@app.get("/tunetrees/get_tunes_recently_played")
+async def get_recently_played():
+    db = None
+    try:
+        db = SessionLocal()
+        tunes_recently_played: List[Tune] = get_practice_list_recently_played(
+            db, limit=25
+        )
+        tune_list = []
+        for tune in tunes_recently_played:
+            tune_list.append(tunes_mapper(tune))
+        return tune_list
+    except:
+        return "Unable to fetch recently played tunes."
+    finally:
+        db.close()
 
 
 
