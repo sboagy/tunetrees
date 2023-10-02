@@ -15,7 +15,20 @@ export default function Practice() {
     getScheduled()
   }, [])
 
+  tune
   return (
-    <div>Here are the scheduled tunes: {scheduled || "Hmm."}</div>
+    <>
+    <br />
+    {scheduled && scheduled.map((tune, index) => {
+      return (
+        <div key={index}>
+          {tune["tune_name"]}
+          <br/>
+          -----
+          <br />
+        </div>
+      )
+    })}
+    </>
   )
 }

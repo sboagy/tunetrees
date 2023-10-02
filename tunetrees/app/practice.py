@@ -32,5 +32,3 @@ async def render_practice_page() -> str:
     finally:
         db.close()
     return html_result
-
-a
