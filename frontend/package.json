@@ -9,10 +9,14 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.11",
+    "@mui/material": "^5.14.11",
+    "@mui/x-data-grid": "^6.16.0",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest",
-    "tailwindcss": "^3.3.3"
+    "react-dom": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
@@ -21,7 +25,6 @@
     "autoprefixer": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
-    "postcss": "latest",
     "typescript": "latest"
   }
 }

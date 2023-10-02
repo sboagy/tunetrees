@@ -6,3 +6,9 @@ export const getPracticeListScheduled = async () => {
     let data = await response.json()
     return data
 }
+
+export const getRecentlyPracticed = async () => {
+    let response = await fetch(`${BASE_URL}/tunetrees/get_tunes_recently_played`)
+    let data = await response.json()
+    return data
+}
