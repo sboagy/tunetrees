@@ -37,7 +37,7 @@ export default function Practice() {
         <h1 className={josefinSans.className}>tunetrees</h1>
         <WarmUpTimer />
       </Box>
-      <Box sx={{mx: 4}}>
+      <Box sx={{m: 4}}>
         {scheduled ? <ScheduledTunes tunes={scheduled} /> : <CircularProgress />}
         <Box sx={{height: 20}}></Box>
         {recentlyPracticed ? <RecentlyPracticed tunes={recentlyPracticed} /> : <CircularProgress />}

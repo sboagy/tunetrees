@@ -1,18 +1,20 @@
 import * as React from 'react';
 import Box from '@mui/material/Box';
-import { DataGrid as MUIDataGrid } from '@mui/x-data-grid';
+import { GridEventListener, GridEventLookup, DataGrid as MUIDataGrid, gridClasses } from '@mui/x-data-grid';
 
-//TODO fix any to real type
+//TODO fix any to real types!!!!
 interface DataGridType {
     rows: any
     columns: any
     pageSize: number 
+    rowClick?: any
 }
 
-export default function DataGrid({rows, columns, pageSize=10}: DataGridType) {
+export default function DataGrid({rows, columns, pageSize=10, rowClick}: DataGridType) {
+
 
   return (
-    <Box>
+    <Box sx={{height: pageSize*64}}>
       <MUIDataGrid
         rows={rows}
         columns={columns}
@@ -23,10 +25,18 @@ export default function DataGrid({rows, columns, pageSize=10}: DataGridType) {
             },
           },
         }}
+        sx={{
+          [`& .${gridClasses.cell}:focus, & .${gridClasses.cell}:focus-within`]: {
+            outline: 'none',
+          },
+          [`& .${gridClasses.columnHeader}:focus, & .${gridClasses.columnHeader}:focus-within`]:
+            {
+              outline: 'none',
+            },
+        }}
         pageSizeOptions={[pageSize]}
-        disableRowSelectionOnClick
         hideFooterSelectedRowCount
-        autoPageSize
+        onRowClick={rowClick}
       />
     </Box>
   );

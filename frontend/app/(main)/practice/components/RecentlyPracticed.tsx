@@ -1,13 +1,20 @@
 import DataGrid from '@/ui/components/DataGrid';
+import { Radio } from '@mui/material';
 import { GridColDef } from '@mui/x-data-grid';
 import React from 'react'
+import { Tune } from '../types';
 
-export default function RecentlyPracticed({tunes}: any) {
+interface RecentlyPracticedType {
+  tunes: Tune[]
+}
+
+export default function RecentlyPracticed({tunes}: RecentlyPracticedType) {
   const recentlyPracticedColumns: GridColDef[] = [
+
     {
         field: 'title',
         headerName: 'Tune Name',
-        width: 150,
+        width: 300,
     },
     { 
         field: 'id', 
@@ -38,7 +45,7 @@ export default function RecentlyPracticed({tunes}: any) {
   return (
     <>
     <h4>Most recent tunes practiced:</h4>
-    <DataGrid rows={tunes} columns={recentlyPracticedColumns} pageSize={10} />
+    <DataGrid rows={tunes} columns={recentlyPracticedColumns} pageSize={10} rowClickAction={() => console.log("you clicked me")} />
     </>
   )
 }
