@@ -1,6 +1,6 @@
 import DataGrid from '@/ui/components/DataGrid';
 import { Radio } from '@mui/material';
-import { GridColDef } from '@mui/x-data-grid';
+import { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import React from 'react'
 import { Tune } from '../types';
 
@@ -12,18 +12,17 @@ export default function RecentlyPracticed({tunes}: RecentlyPracticedType) {
   const recentlyPracticedColumns: GridColDef[] = [
 
     {
-        field: 'title',
-        headerName: 'Tune Name',
-        width: 300,
+      field: 'externalLink',
+      headerName: 'External Link',
+      width: 160,
+      renderCell: (params: GridRenderCellParams) => {
+        return <a href={`https://www.irishtune.info/tune/${params.row.id}`} target="_blank">{params.row.title}</a>
+      }
     },
-    { 
-        field: 'id', 
-        headerName: 'ID', 
-        width: 90 },
     {
         field: 'type',
         headerName: 'Type',
-        width: 150,
+        width: 100,
     },
     {
         field: 'practiced',

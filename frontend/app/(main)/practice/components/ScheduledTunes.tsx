@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { GridColDef, GridEventListener } from '@mui/x-data-grid';
+import { GridColDef, GridEventListener, GridRenderCellParams, GridValueGetterParams } from '@mui/x-data-grid';
 import DataGrid from '@/ui/components/DataGrid';
 import { Tune } from '../types';
 import { Box, Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
@@ -36,7 +36,7 @@ export default function ScheduledTunes({tunes}: ScheduledTunesType) {
         {
             field: 'type',
             headerName: 'Type',
-            width: 150,
+            width: 100,
         },
         {
             field: 'practiced',
@@ -61,7 +61,20 @@ export default function ScheduledTunes({tunes}: ScheduledTunesType) {
           {
             field: 'tags',
             headerName: 'Tags',
-            width: 150,
+            width: 90,
+          },
+          {
+            field: 'incipit', 
+            headerName: 'Incipit',
+            width: 150
+          },
+          {
+            field: 'externalLink',
+            headerName: 'External Link',
+            width: 160,
+            renderCell: (params: GridRenderCellParams) => {
+              return <a href={`https://www.irishtune.info/tune/${params.row.id}`} target="_blank">{params.row.title}</a>
+            }
           },
       ]
 
