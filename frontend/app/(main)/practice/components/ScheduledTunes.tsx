@@ -2,8 +2,8 @@ import React, { useState } from 'react'
 import { GridColDef, GridEventListener } from '@mui/x-data-grid';
 import DataGrid from '@/ui/components/DataGrid';
 import { Tune } from '../types';
-import { Box, Button, FormControl, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
-import { ErrorMessage, Field, Form, Formik, FormikProps, useFormikContext } from 'formik';
+import { Box, Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import { Form, Formik, FormikProps } from 'formik';
 
 interface ScheduledTunesType {
   tunes: Tune[]
@@ -18,7 +18,6 @@ export default function ScheduledTunes({tunes}: ScheduledTunesType) {
 
     const [selectedTune, setSelectedTune] = useState<Tune>()
   
-
     const scheduledTunesColumns: GridColDef[] = [
         {
             field: 'title',
@@ -72,8 +71,6 @@ export default function ScheduledTunes({tunes}: ScheduledTunesType) {
     feedback: ''
   }
 
-  
-
   return (
     <>
     <h4>Scheduled for practice:</h4>
@@ -86,7 +83,8 @@ export default function ScheduledTunes({tunes}: ScheduledTunesType) {
             onSubmit={(values) => console.log(values)}
           >
             {({ values, handleBlur, setFieldValue }: FormikProps<Values>) => {
-              values.id === "" && setFieldValue("id", selectedTune.id)
+              const tuneId = selectedTune.id.toString()
+              tuneId !== values.id && setFieldValue("id", tuneId)
               return (
                 <Form>
                   <Box sx={{display: "flex", flexDirection: "column"}}>  
@@ -104,7 +102,7 @@ export default function ScheduledTunes({tunes}: ScheduledTunesType) {
                         value={values.feedback}
                         onBlur={handleBlur}
                         onChange={(e) => setFieldValue('feedback', e.target.value as string)}
-                        sx={{width: "75%"}}
+                        sx={{width: "50%"}}
                         label="Choose Recall Evaluation"
                         >
                           <MenuItem value="failed">Failed (no recall)</MenuItem>
