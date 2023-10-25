@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { GridColDef, GridEventListener, GridRenderCellParams } from '@mui/x-data-grid';
+import React from 'react'
+import { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import DataGrid from '@/ui/components/DataGrid';
 import { Tune } from '../types';
 
@@ -12,19 +12,15 @@ interface ScheduledTunesType {
   tunes: Tune[]
 }
 
+export interface Values {
+  id: string
+  feedback: string
+}
 
 
 export default function ScheduledTunes({tunes}: ScheduledTunesType) {
 
   const valuesArray =  {}
-
-  const handleSubmit = (values: Values) => {
-    console.log(values)
-    const {id, feedback} = values
-    const idInt = parseInt(id)
-    submitPracticeFeedback({id, feedback})
-  }
-
 
     const scheduledTunesColumns: GridColDef[] = [
         {
@@ -87,18 +83,22 @@ export default function ScheduledTunes({tunes}: ScheduledTunesType) {
       ]
 
       const handleClick = () => {
-        console.log('handleClick for main submit')
-        console.log(valuesArray)
-      }
+        for (const [key, value] of Object.entries(valuesArray)) {
+          const id = parseInt(key)
+          const feedback = value as string
+          submitPracticeFeedback({id, feedback})
+        }
 
- 
-      //So I think Formik can take each tune and add it to an array, and then map the array to send each tune to the backend 
-   
+      }
 
       return (
         <>
           <h4>Scheduled for practice:</h4>
-          <Button type='submit' variant='outlined' onClick={handleClick} sx={{mb: 2}}>Submit Practiced Tunes</Button>
+          <Button 
+            type='submit' 
+            variant='outlined' 
+            onClick={handleClick} sx={{mb: 2}}>Submit Practiced Tunes
+          </Button>
           <DataGrid rows={tunes} columns={scheduledTunesColumns} pageSize={10} />
         </>
 

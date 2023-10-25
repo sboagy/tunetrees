@@ -2,13 +2,15 @@ import React from 'react'
 import { Box, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import { Form, Formik, FormikProps } from 'formik';
 import * as Yup from "yup";
+import { Values } from './ScheduledTunesGrid';
 
-interface Values {
-    id: string
-    feedback: string
-  }
+interface RecallEvalProps {
+  tuneId: string
+  //TODO not sure how to type the values array correctly
+  valuesArray: any
+}
 
-export default function RecallEvaluationForm({tuneId, valuesArray}) {
+export default function RecallEvaluationForm({tuneId, valuesArray}:RecallEvalProps) {
 
     const initialValues = {
         id: '',
@@ -19,14 +21,6 @@ export default function RecallEvaluationForm({tuneId, valuesArray}) {
         id: Yup.string().required(),
         feedback: Yup.string().required()
       })
-
-    const isNotInValues = (id: string) => {
-       const check = valuesArray.filter((tune:string) => id === tune[0])
-       if (check.length > 0){
-        return false
-       }
-       return true
-    }
 
   return (
     <Formik

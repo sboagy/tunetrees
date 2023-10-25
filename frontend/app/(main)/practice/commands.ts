@@ -5,7 +5,7 @@ const client = axios.create({
   });
 
 interface PracticeFeedbackProps {
-    id: string
+    id: number
     feedback: string
 }
 
