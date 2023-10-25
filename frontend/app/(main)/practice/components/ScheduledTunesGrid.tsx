@@ -16,6 +16,8 @@ interface ScheduledTunesType {
 
 export default function ScheduledTunes({tunes}: ScheduledTunesType) {
 
+  const valuesArray =  {}
+
   const handleSubmit = (values: Values) => {
     console.log(values)
     const {id, feedback} = values
@@ -45,16 +47,16 @@ export default function ScheduledTunes({tunes}: ScheduledTunesType) {
             headerName: 'Scheduled',
             width: 150,
           },
-          {
-            field: 'note_private',
-            headerName: 'Note Private',
-            width: 150,
-          },
-          {
-            field: 'note_public',
-            headerName: 'Note Public',
-            width: 150,
-          },
+          // {
+          //   field: 'note_private',
+          //   headerName: 'Note Private',
+          //   width: 150,
+          // },
+          // {
+          //   field: 'note_public',
+          //   headerName: 'Note Public',
+          //   width: 150,
+          // },
           {
             field: 'tags',
             headerName: 'Tags',
@@ -78,23 +80,26 @@ export default function ScheduledTunes({tunes}: ScheduledTunesType) {
               headerName: 'Recall Evaluation',
               width: 500,
               renderCell: (params: GridRenderCellParams) => {
-                return <Box sx={{width: "100%"}}><RecallEvaluationForm tuneId={params.row.id}/></Box>
+                return <Box sx={{width: "100%"}}><RecallEvaluationForm tuneId={params.row.id} valuesArray={valuesArray}/></Box>
               }
             },
           
       ]
 
+      const handleClick = () => {
+        console.log('handleClick for main submit')
+        console.log(valuesArray)
+      }
+
  
-      //So I think Formik can take each tune and add it to an array, and then we'll have the submit button send the array to the backend
-      //We'll need to update the backend api to take an array of tunes vs. the singular tune
+      //So I think Formik can take each tune and add it to an array, and then map the array to send each tune to the backend 
    
 
       return (
         <>
           <h4>Scheduled for practice:</h4>
+          <Button type='submit' variant='outlined' onClick={handleClick} sx={{mb: 2}}>Submit Practiced Tunes</Button>
           <DataGrid rows={tunes} columns={scheduledTunesColumns} pageSize={10} />
-          <Button>Submit Practiced Tunes</Button>
-
         </>
 
           )

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import { Box, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import { Form, Formik, FormikProps } from 'formik';
 import * as Yup from "yup";
 
@@ -8,11 +8,11 @@ interface Values {
     feedback: string
   }
 
-export default function RecallEvaluationForm({tuneId}) {
+export default function RecallEvaluationForm({tuneId, valuesArray}) {
 
     const initialValues = {
         id: '',
-        feedback: ''
+        feedback: 'initial'
       }
 
     const TunePracticeFeedbackSchema = Yup.object().shape({
@@ -20,11 +20,19 @@ export default function RecallEvaluationForm({tuneId}) {
         feedback: Yup.string().required()
       })
 
+    const isNotInValues = (id: string) => {
+       const check = valuesArray.filter((tune:string) => id === tune[0])
+       if (check.length > 0){
+        return false
+       }
+       return true
+    }
+
   return (
     <Formik
                 initialValues={initialValues}
                 validationSchema={TunePracticeFeedbackSchema}
-                onSubmit={(values) => console.log(values)}
+                onSubmit={() => {}}
               >
                 {({ values, handleBlur, setFieldValue }: FormikProps<Values>) => {
                   tuneId !== values.id && setFieldValue("id", tuneId)
@@ -42,7 +50,10 @@ export default function RecallEvaluationForm({tuneId}) {
                             name="feedback"
                             value={values.feedback}
                             onBlur={handleBlur}
-                            onChange={(e) => setFieldValue('feedback', e.target.value as string)}
+                            onChange={(e) => {
+                              setFieldValue('feedback', e.target.value)
+                              valuesArray[values.id] = e.target.value
+                            }}
                             sx={{width: "50%"}}
                             label="Choose Recall Evaluation"
                             >
