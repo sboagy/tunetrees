@@ -14,8 +14,23 @@ export const submitPracticeFeedback = async ({id, feedback}: PracticeFeedbackPro
         const stringified = JSON.stringify({
             selected_tune: id, vote_type: feedback
         })
+        console.log(id, feedback)
 
-        await client.post("/practice/feedback", {body: stringified})
+        axios({
+            method: 'post',
+            url: '/practice/feedback',
+            data: stringified,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+        })
+        .then(response => {
+            console.log(response);
+        })
+        .catch(error => {
+            console.error(error);
+        });
     }
     catch(e: any) {
         console.log("Unable to post feedback.")

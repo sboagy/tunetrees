@@ -3,18 +3,18 @@ from typing import Annotated, List
 
 import starlette.status as status
 from fastapi import FastAPI, Form
-from starlette.responses import HTMLResponse, RedirectResponse
-from tunetrees.api.mappers.tunes_mapper import tunes_mapper
-
-
-from tunetrees.app.practice import render_practice_page
-from tunetrees.app.queries import get_practice_list_recently_played, get_practice_list_scheduled
-from tunetrees.app.schedule import submit_review, query_and_print_tune_by_id
-
-from tunetrees.app.database import SessionLocal
-from tunetrees.models.tunetrees import Tune
-
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import HTMLResponse, RedirectResponse
+
+from tunetrees.api.mappers.tunes_mapper import tunes_mapper
+from tunetrees.app.database import SessionLocal
+from tunetrees.app.practice import render_practice_page
+from tunetrees.app.queries import (
+    get_practice_list_recently_played,
+    get_practice_list_scheduled,
+)
+from tunetrees.app.schedule import submit_review, query_and_print_tune_by_id
+from tunetrees.models.tunetrees import Tune
 
 app = FastAPI()
 
@@ -25,6 +25,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.get("/")
 async def root():
@@ -41,6 +42,7 @@ async def tunetrees():
     html_result = await render_practice_page()
     return html_result
 
+
 @app.get("/tunetrees/get_practice_list_scheduled")
 async def get_scheduled():
     db = None
@@ -55,6 +57,7 @@ async def get_scheduled():
         return "Unable to fetch scheduled practice list."
     finally:
         db.close()
+
 
 @app.get("/tunetrees/get_tunes_recently_played")
 async def get_recently_played():
@@ -74,7 +77,6 @@ async def get_recently_played():
         db.close()
 
 
-
 @app.post("/tunetrees/practice/feedback")
 async def feedback(
     selected_tune: Annotated[int, Form()], vote_type: Annotated[str, Form()]
@@ -91,5 +93,3 @@ async def feedback(
         "/tunetrees/practice", status_code=status.HTTP_302_FOUND
     )
     return html_result
-
-
