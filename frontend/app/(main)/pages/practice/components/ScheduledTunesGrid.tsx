@@ -6,6 +6,7 @@ import { Tune } from '../types';
 import { submitPracticeFeedback } from '../commands';
 import RecallEvaluationForm from './RecallEvaluationForm';
 import { Box, Button } from '@mui/material';
+import { useRouter } from 'next/router';
 
 
 interface ScheduledTunesType {
@@ -19,6 +20,8 @@ export interface Values {
 
 
 export default function ScheduledTunes({tunes}: ScheduledTunesType) {
+
+  // const router = useRouter()
 
   const valuesArray =  {}
 
@@ -87,6 +90,7 @@ export default function ScheduledTunes({tunes}: ScheduledTunesType) {
           const id = parseInt(key)
           const feedback = value as string
           submitPracticeFeedback({id, feedback})
+          // router.reload()
         }
 
       }

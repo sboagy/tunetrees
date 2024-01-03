@@ -1,5 +1,5 @@
 'use client'
-import Practice from "./(main)/practice/page"
+import Practice from "./(main)/pages/practice/page"
 
 export default function index() {
   return (

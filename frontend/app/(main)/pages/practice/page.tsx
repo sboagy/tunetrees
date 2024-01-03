@@ -36,24 +36,6 @@ export default function Practice() {
     getRecent()
   }, [])
 
-  /////ORIGINAL RETURN BLOCK/////
-
-  // return (  
-  //   <>
-  //     <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', mx: 4}}>
-  //       <h1 className={josefinSans.className}>tunetrees</h1>
-  //       <WarmUpTimer />
-  //     </Box>
-  //     <Box sx={{m: 4}}>
-  //       {scheduled ? <ScheduledTunes tunes={scheduled} /> : <CircularProgress />}
-  //       <Box sx={{height: 20}}></Box>
-  //       {recentlyPracticed ? <RecentlyPracticed tunes={recentlyPracticed} /> : <CircularProgress />}
-  //     </Box>
-  //   </>
-  // )
-
-  /////TABS START HERE/////
-
   function CustomTabPanel(props: TabPanelProps) {
     const { children, value, index, ...other } = props;
   

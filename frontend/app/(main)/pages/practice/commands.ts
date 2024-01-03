@@ -14,7 +14,6 @@ export const submitPracticeFeedback = async ({id, feedback}: PracticeFeedbackPro
         const stringified = JSON.stringify({
             selected_tune: id, vote_type: feedback
         })
-        console.log(id, feedback)
 
         axios({
             method: 'post',
