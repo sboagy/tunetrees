@@ -1,3 +1,4 @@
+'use client'
 import React from 'react'
 import { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import DataGrid from '@/ui/components/DataGrid';
@@ -6,7 +7,7 @@ import { Tune } from '../types';
 import { submitPracticeFeedback } from '../commands';
 import RecallEvaluationForm from './RecallEvaluationForm';
 import { Box, Button } from '@mui/material';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 
 
 interface ScheduledTunesType {
@@ -21,7 +22,9 @@ export interface Values {
 
 export default function ScheduledTunes({tunes}: ScheduledTunesType) {
 
-  // const router = useRouter()
+  console.log('Tunes incoming to scheduled tunes', tunes)
+
+  const router = useRouter()
 
   const valuesArray =  {}
 

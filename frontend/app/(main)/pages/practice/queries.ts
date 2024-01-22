@@ -9,6 +9,7 @@ export const getPracticeListScheduled = async () => {
     try {
         let response = await client.get(`/get_practice_list_scheduled`)
         let data = await response.data
+        console.log('data in query', data)
         return data
     }
     catch(e: any) {
