@@ -15,7 +15,7 @@ So far my intent is to make the initial app be able to run under a single contai
 technologies are...
 
 1. SQLite for the database, to keep it dirt simple, and avoid the need to deploy a separate database process.  
-2. Probably Django for the webserver, initially without a client framework such as React.
+2. Eventually a React front end.
 
 The overall design looks like this:
 
