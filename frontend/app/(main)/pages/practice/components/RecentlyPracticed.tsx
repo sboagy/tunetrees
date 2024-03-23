@@ -44,7 +44,7 @@ export default function RecentlyPracticed({tunes}: RecentlyPracticedType) {
   return (
     <>
     <h4>Most recent tunes practiced:</h4>
-    <DataGrid rows={tunes} columns={recentlyPracticedColumns} pageSize={10} rowClickAction={() => console.log("you clicked me")} />
+    <DataGrid rows={tunes} columns={recentlyPracticedColumns} pageSize={10}  />
     </>
   )
 }
