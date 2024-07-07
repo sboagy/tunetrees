@@ -30,5 +30,6 @@ async def render_practice_page() -> str:
             tunes_scheduled=tunes_scheduled, tunes_recently_played=tunes_recently_played
         )
     finally:
-        db.close()
+        if db is not None:
+            db.close()
     return html_result
