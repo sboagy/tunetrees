@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import List
 
-from sqlalchemy import select, update
+import sqlalchemy
+from sqlalchemy import Column, select, update
 from tabulate import tabulate
 
-from supermemo2 import SMTwo
+from supermemo2 import sm_two
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
     get_practice_record_table,
@@ -12,6 +13,10 @@ from tunetrees.app.queries import (
 )
 from tunetrees.models.quality import quality_lookup
 from tunetrees.models.tunetrees import PracticeRecord
+
+import logging
+
+log = logging.getLogger()
 
 TT_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -26,8 +31,7 @@ def backup_practiced_dates():  # sourcery skip: extract-method
         )
 
         for practice_record in practice_records:
-            if practice_record.Practiced:
-                practice_record.BackupPracticed = practice_record.Practiced
+            practice_record.BackupPracticed = practice_record.Practiced
 
             print(
                 f"{practice_record.tune.Title=}, {practice_record.playlist.instrument=}, "
@@ -39,7 +43,8 @@ def backup_practiced_dates():  # sourcery skip: extract-method
         db.flush(objects=practice_records)
 
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 def initialize_review_records_from_practiced(
@@ -65,21 +70,23 @@ def initialize_review_records_from_practiced(
             #     Interval: The gap/space between your next review.
             #     Repetitions: The count of correct response (quality >= 3) you have in a row.
 
-            practiced_str = (
+            practiced_str: Column[str] = (
                 row.BackupPracticed if from_backup_practiced else row.Practiced
             )
-            if not practiced_str:
+            if practiced_str is None:
                 continue
             row.Practiced = practiced_str
+
+            # TODO: Get rid of these "type: ignore" escapes!
             quality = 1  # could calculate from how recent, or??  Otherwise, ¯\_(ツ)_/¯
-            practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
-            review = SMTwo.first_review(quality, practiced)
-            row.Easiness = review.easiness
-            row.Interval = review.interval
-            row.Repetitions = review.repetitions
-            review_date_str = datetime.strftime(review.review_date, TT_DATE_FORMAT)
-            row.ReviewDate = review_date_str
-            row.Quality = quality
+            practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)  # type: ignore
+            review = sm_two.first_review(quality, practiced)
+            row.Easiness = review.easiness  # type: ignore
+            row.Interval = review.interval  # type: ignore
+            row.Repetitions = review.repetitions  # type: ignore
+            review_date_str = datetime.strftime(review.review_date, TT_DATE_FORMAT)  # type: ignore
+            row.ReviewDate = review_date_str  # type: ignore
+            row.Quality = quality  # type: ignore
 
         db.commit()
         db.flush(objects=rows)
@@ -92,7 +99,8 @@ def initialize_review_records_from_practiced(
             print(tabulate(rows_list, headers="keys"))
 
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 class BadTuneID(Exception):
@@ -102,9 +110,9 @@ class BadTuneID(Exception):
 def submit_review(tune_id: int, feedback: str):
     db = None
     quality = quality_lookup.get(feedback)
-    if quality < 0:
+    if quality is None or quality < 0:
         return
-    assert quality <= quality_lookup.get("perfect")
+    assert quality <= quality_lookup.get("perfect", -1)
     try:
         db = SessionLocal()
 
@@ -114,16 +122,28 @@ def submit_review(tune_id: int, feedback: str):
         stmt = select(PracticeRecord).where(PracticeRecord.TUNE_REF == tune_id)
         row = db.execute(stmt).one()[0]
 
-        review = SMTwo(row.Easiness, row.Interval, row.Repetitions).review(quality, practiced)
-        review_date_str = datetime.strftime(review.review_date, TT_DATE_FORMAT)
+        foo = row.Easiness
+
+        review = sm_two.review(
+            quality, row.Easiness, row.Interval, row.Repetitions, practiced
+        )
+
+        review_date = review.get("review_datetime")
+        if isinstance(review_date, datetime):
+            review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
+        elif isinstance(review_date, str):
+            review_date_str = review_date
+        else:
+            log.error("review_date_str is a unknown format")
+            review_date_str = None
 
         db.execute(
             update(PracticeRecord)
             .where(PracticeRecord.TUNE_REF == tune_id)
             .values(
-                Easiness=review.easiness,
-                Interval=review.interval,
-                Repetitions=review.repetitions,
+                Easiness=review.get("easiness"),
+                Interval=review.get("interval"),
+                Repetitions=review.get("repetitions"),
                 ReviewDate=review_date_str,
                 Quality=quality,
                 Practiced=practiced_str,

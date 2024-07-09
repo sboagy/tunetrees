@@ -3,4 +3,8 @@
         "fastapi",
         "starlette"
     ]
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.autoImportCompletions": true,
+    "python.languageServer": "Default",
+    "editor.formatOnSave": true,
 }
