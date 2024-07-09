@@ -1,4 +1,5 @@
 import logging
+from os import environ
 from typing import Annotated
 
 import starlette.status as status
@@ -7,6 +8,8 @@ from starlette.responses import HTMLResponse, RedirectResponse
 
 from tunetrees.app.practice import render_practice_page
 from tunetrees.app.schedule import submit_review, query_and_print_tune_by_id
+
+from datetime import datetime
 
 app = FastAPI()
 
@@ -21,9 +24,19 @@ async def say_hello(name: str):
     return {"message": f"Hello {name}"}
 
 
+tt_review_sitdown_date_str = environ.get("TT_REVIEW_SITDOWN_DATE", None)
+
+
 @app.get("/tunetrees/practice", response_class=HTMLResponse)
 async def tunetrees():
-    html_result = await render_practice_page()
+
+    tt_review_sitdown_date = (
+        datetime.fromisoformat(tt_review_sitdown_date_str)
+        if tt_review_sitdown_date_str
+        else None
+    )
+
+    html_result = await render_practice_page(review_sitdown_date=tt_review_sitdown_date)
     return html_result
 
 
