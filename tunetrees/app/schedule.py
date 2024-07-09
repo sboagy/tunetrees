@@ -5,7 +5,7 @@ import sqlalchemy
 from sqlalchemy import Column, select, update
 from tabulate import tabulate
 
-from supermemo2 import SMTwo
+from supermemo2 import sm_two
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
     get_practice_record_table,
@@ -13,6 +13,10 @@ from tunetrees.app.queries import (
 )
 from tunetrees.models.quality import quality_lookup
 from tunetrees.models.tunetrees import PracticeRecord
+
+import logging
+
+log = logging.getLogger()
 
 TT_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -76,7 +80,7 @@ def initialize_review_records_from_practiced(
             # TODO: Get rid of these "type: ignore" escapes!
             quality = 1  # could calculate from how recent, or??  Otherwise, ¯\_(ツ)_/¯
             practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)  # type: ignore
-            review = SMTwo.first_review(quality, practiced)
+            review = sm_two.first_review(quality, practiced)
             row.Easiness = review.easiness  # type: ignore
             row.Interval = review.interval  # type: ignore
             row.Repetitions = review.repetitions  # type: ignore
@@ -120,24 +124,26 @@ def submit_review(tune_id: int, feedback: str):
 
         foo = row.Easiness
 
-        sm_two = SMTwo()
-        sm_two.easiness = row.Easiness
-        sm_two.interval = row.Interval
-        sm_two.repetitions = row.Repetitions
+        review = sm_two.review(
+            quality, row.Easiness, row.Interval, row.Repetitions, practiced
+        )
 
-        review = sm_two.review(quality, practiced)
-
-        review_date = review.review_date
-        assert isinstance(review_date, datetime)
-        review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
+        review_date = review.get("review_datetime")
+        if isinstance(review_date, datetime):
+            review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
+        elif isinstance(review_date, str):
+            review_date_str = review_date
+        else:
+            log.error("review_date_str is a unknown format")
+            review_date_str = None
 
         db.execute(
             update(PracticeRecord)
             .where(PracticeRecord.TUNE_REF == tune_id)
             .values(
-                Easiness=review.easiness,
-                Interval=review.interval,
-                Repetitions=review.repetitions,
+                Easiness=review.get("easiness"),
+                Interval=review.get("interval"),
+                Repetitions=review.get("repetitions"),
                 ReviewDate=review_date_str,
                 Quality=quality,
                 Practiced=practiced_str,

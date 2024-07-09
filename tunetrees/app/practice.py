@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -9,13 +9,16 @@ from tunetrees.app.queries import (
     get_practice_list_scheduled,
 )
 from tunetrees.models.tunetrees import Tune
+from datetime import datetime
 
 
-async def render_practice_page() -> str:
+async def render_practice_page(review_sitdown_date: Optional[datetime] = None) -> str:
     db = None
     try:
         db = SessionLocal()
-        tunes_scheduled: List[Tune] = get_practice_list_scheduled(db, limit=10)
+        tunes_scheduled: List[Tune] = get_practice_list_scheduled(
+            db, limit=10, review_sitdown_date=review_sitdown_date
+        )
         tunes_recently_played: List[Tune] = get_practice_list_recently_played(
             db, limit=25
         )
