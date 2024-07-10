@@ -21,9 +21,12 @@ def test_tunetrees_template():
         assert templates_folder.joinpath("tunetrees.html.jinja2").exists()
         environment = Environment(loader=FileSystemLoader(templates_folder.absolute()))
         template = environment.get_template(name="tunetrees.html.jinja2")
-        html_result = template.render(tunes_scheduled=tunes_scheduled, tunes_recently_played=tunes_recently_played)
+        html_result = template.render(
+            tunes_scheduled=tunes_scheduled, tunes_recently_played=tunes_recently_played
+        )
         assert ">Alasdruim's March<" in html_result
         print(html_result)
 
     finally:
-        db.close()
+        if db is not None:
+            db.close()
