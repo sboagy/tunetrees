@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { getPracticeListScheduled, getRecentlyPracticed } from './queries'
 import { Tune } from './types'
 import { CircularProgress, Box, Tab, Tabs, Typography } from '@mui/material'
-import { josefinSans } from '@/app/layout'
+import { josefinSans } from '@/app/font'
 
 import ScheduledTunesGrid from './components/ScheduledTunesGrid';
 import RecentlyPracticed from './components/RecentlyPracticed';
@@ -38,7 +38,7 @@ export default function Practice() {
 
   function CustomTabPanel(props: TabPanelProps) {
     const { children, value, index, ...other } = props;
-  
+
     return (
       <div
         role="tabpanel"
@@ -55,24 +55,24 @@ export default function Practice() {
       </div>
     );
   }
-  
+
   const [tabValue, setTabValue] = React.useState(0);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
-  
+
   return (
     <>
-      <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', mx: 4}}>
-         <h1 className={josefinSans.className}>tunetrees</h1>
-         <WarmUpTimer />
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mx: 4 }}>
+        <h1 className={josefinSans.className}>tunetrees</h1>
+        <WarmUpTimer />
       </Box>
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-      <Tabs value={tabValue} onChange={handleTabChange} aria-label="basic tabs example">
-        <Tab label="Scheduled for Practice"  />
-        <Tab label="Recently Practiced" />
-      </Tabs>
+        <Tabs value={tabValue} onChange={handleTabChange} aria-label="basic tabs example">
+          <Tab label="Scheduled for Practice" />
+          <Tab label="Recently Practiced" />
+        </Tabs>
       </Box>
       <CustomTabPanel value={tabValue} index={0}>
         {scheduled ? <ScheduledTunesGrid tunes={scheduled} /> : <CircularProgress />}
