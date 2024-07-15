@@ -15,7 +15,6 @@ FROM node:${NODE_VERSION}-alpine AS base
 # Set working directory for all build stages.
 WORKDIR /usr/src/app
 
-
 ################################################################################
 # Create a stage for installing production dependecies.
 FROM base AS deps
@@ -54,6 +53,10 @@ FROM base AS final
 # Use production node environment by default.
 ENV NODE_ENV=production
 
+# Do this before we change the user.  Curl is added for developer fooling around 
+# in terminal.  Maybe do this only in a dev container later.
+RUN apk --no-cache add curl
+
 # Run the application as a non-root user.
 USER node
 
@@ -65,6 +68,7 @@ COPY package.json .
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/.next ./.next
 
+ENV NEXT_PUBLIC_TT_BASE_URL="http://host-not-found:8000/tunetrees"
 
 # Expose the port that the application listens on.
 EXPOSE 3000

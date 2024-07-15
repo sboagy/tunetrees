@@ -16,3 +16,32 @@ Su Mo Tu We Th Fr Sa
 14 15 16 17 18 19 20  
 21 22 23 24 25 26 27  
 28 29 30 31  
+
+variable "platforms" {
+  default = ["linux/amd64", "linux/arm64"]
+}
+
+
+target "server" {
+  dockerfile = "Dockerfile"
+  platforms = platforms
+  output = ["type=local,dest=bin"]
+}
+
+target "frontend" {
+  dockerfile = "Dockerfile"
+  platforms = platforms
+  output = ["type=local,dest=bin"]
+}
+
+
+FROM --platform=$BUILDPLATFORM python:${PYTHON_VERSION}-slim as base
+
+TT_BASE_URL: "http://127.0.0.1:8000/tunetrees"
+
+baseURL: process.env.TT_BASE_URL
+
+
+publicRuntimeConfig: {
+    baseURL: process.env.TT_BASE_URL
+}

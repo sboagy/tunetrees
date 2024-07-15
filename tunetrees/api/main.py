@@ -66,10 +66,11 @@ async def get_scheduled():
         for tune in tunes_scheduled:
             tune_list.append(tunes_mapper(tune))
         return tune_list
-    except:
-        return "Unable to fetch scheduled practice list."
+    except Exception as e:
+        return {"error": f"Unable to fetch scheduled practice list: {e}"}
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 @app.get("/tunetrees/get_tunes_recently_played")
@@ -84,10 +85,11 @@ async def get_recently_played():
         for tune in tunes_recently_played:
             tune_list.append(tunes_mapper(tune))
         return tune_list
-    except:
-        return "Unable to fetch recently played tunes."
+    except Exception as e:
+        return {"error": f"Unable to fetch recently played tunes: {e}"}
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 @app.post("/tunetrees/practice/feedback")
