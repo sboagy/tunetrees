@@ -249,3 +249,13 @@ fabric.properties
 scratch.txt
 
 archive
+
+# At some point, may want to checking in IDE files, but not right now.
+.idea
+.vscode
+
+.DS_Store
+
+# Some of scott's working files
+orig_nginx.conf
+scratch.md
