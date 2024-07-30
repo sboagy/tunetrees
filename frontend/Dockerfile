@@ -32,6 +32,8 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 # Create a stage for building the application.
 FROM deps AS build
 
+# ENV NEXT_PUBLIC_TT_BASE_URL="http://server:8000/tunetrees"
+
 # Download additional development dependencies before building, as some projects require
 # "devDependencies" to be installed to build. If you don't need this, remove this step.
 RUN --mount=type=bind,source=package.json,target=package.json \
@@ -68,7 +70,7 @@ COPY package.json .
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/.next ./.next
 
-ENV NEXT_PUBLIC_TT_BASE_URL="http://host-not-found:8000/tunetrees"
+# ENV NEXT_PUBLIC_TT_BASE_URL="http://server:8000/tunetrees"
 
 # Expose the port that the application listens on.
 EXPOSE 3000

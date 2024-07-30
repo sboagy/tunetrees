@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const client = axios.create({
+    // baseURL: process.env.TT_API_BASE_URL
     baseURL: process.env.NEXT_PUBLIC_TT_BASE_URL
     // baseURL: "http://tunetrees.com:3000"
     // baseURL: "http://server:8000/tunetrees"
@@ -16,9 +17,8 @@ export const getPracticeListScheduled = async () => {
         let data = await response.data
         console.log('data in query', data)
         return data
-    }
-    catch (e: any) {
-        console.log(e.console.error())
+    } catch (e: any) {
+        console.log(console.error())
     }
 }
 
@@ -27,8 +27,7 @@ export const getRecentlyPracticed = async () => {
         let response = await client.get(`/get_tunes_recently_played`)
         let data = await response.data
         return data
-    }
-    catch (e: any) {
-        console.log(e.console.error())
+    } catch (e: any) {
+        console.log(console.error())
     }
 }
