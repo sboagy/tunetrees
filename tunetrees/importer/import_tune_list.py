@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from http.client import HTTPResponse
 from pathlib import Path
 from time import sleep
-from typing import Dict, TypedDict, List
+from typing import Dict, List, TypedDict
 from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen

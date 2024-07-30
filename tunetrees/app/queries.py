@@ -1,16 +1,17 @@
-from typing import List, Any, Dict, Optional
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func
-from sqlalchemy.orm import Session, Query
+from sqlalchemy import func, select
+from sqlalchemy.orm import Query, Session
 from tabulate import tabulate
 
+from tunetrees.api.auth import User
 from tunetrees.app.database import SessionLocal
 from tunetrees.models.tunetrees import (
-    Tune,
     PracticeRecord,
+    Tune,
     t_practice_list_joined,
 )
-from datetime import datetime, timedelta
 
 
 def query_result_to_diagnostic_dict(rows, table_name) -> List[Dict[str, Any]]:
@@ -162,6 +163,11 @@ def get_practice_list_recently_played(
         print(tabulate(rows, headers=t_practice_list_joined.columns.keys()))
 
     return rows
+
+
+def get_user(db: Session, id: str) -> User:
+    stmt = select(User).where(User.id == id)
+    result = db.execute(stmt)
 
 
 def _run_experiment():

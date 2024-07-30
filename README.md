@@ -1,6 +1,6 @@
 # TuneTrees
 
-TuneTrees, is aimed at folk musician memorization of repertoire, which involves motor skills, non-trivial items to
+TuneTrees is aimed at folk musician memorization of repertoire, which involves motor skills, non-trivial items to
 memorize, and memory entanglement. The application is meant to be an aid to human memory training, using a
 combination of techniques including spaced repetition, mnemonics, and spacial/navigational techniques. Down the line it
 may employ modern neural networks and reinforcement learning techniques. The idea is to make music practice more

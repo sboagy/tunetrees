@@ -2,7 +2,7 @@ from typing import List
 
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import get_practice_record_table, get_tune_table
-from tunetrees.models.tunetrees import Tune, PracticeRecord
+from tunetrees.models.tunetrees import PracticeRecord, Tune
 
 
 def clean_tune_data():  # sourcery skip: extract-method

@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -9,7 +10,6 @@ from tunetrees.app.queries import (
     get_practice_list_scheduled,
 )
 from tunetrees.models.tunetrees import Tune
-from datetime import datetime
 
 
 async def render_practice_page(review_sitdown_date: Optional[datetime] = None) -> str:

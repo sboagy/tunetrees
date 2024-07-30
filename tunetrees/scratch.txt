@@ -45,3 +45,16 @@ baseURL: process.env.TT_BASE_URL
 publicRuntimeConfig: {
     baseURL: process.env.TT_BASE_URL
 }
+
+
+===== July 17 =====
+
+webserver    | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+webserver    | /docker-entrypoint.sh: Configuration complete; ready for start up
+webserver    | 2024/07/17 18:18:03 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/conf.d/nginx.conf:17
+webserver    | nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/conf.d/nginx.conf:17
+webserver    | 2024/07/17 18:18:03 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/conf.d/nginx.conf:18
+webserver    | nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/conf.d/nginx.conf:18
+webserver    | 2024/07/17 18:18:03 [emerg] 1#1: host not found in upstream "nodejs" in /etc/nginx/conf.d/nginx.conf:47
+webserver    | nginx: [emerg] host not found in upstream "nodejs" in /etc/nginx/conf.d/nginx.conf:47
+webserver exited with code 1

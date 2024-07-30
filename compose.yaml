@@ -42,6 +42,60 @@ services:
     networks:
       - backend
 
+  webserver:
+    image: nginx:mainline-alpine
+    container_name: webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./nginx-conf:/etc/nginx/conf.d
+      - ./certbot-etc:/etc/letsencrypt
+      - ./certbot-var:/var/lib/letsencrypt
+      - dhparam:/etc/ssl/certs
+    depends_on:
+      - frontend
+    networks:
+      - backend
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./certbot-etc:/etc/letsencrypt
+      - ./certbot-var:/var/lib/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    depends_on:
+      - webserver
+    # stdin_open: true # docker run -i
+    # tty: true # docker run -t
+    # command: sh
+    # command: certonly --email sboagy@gmail.com --agree-tos --no-eff-email --staging -d tunetrees.com  -d www.tunetrees.com
+    # command: certonly --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
+    #
+    command: certonly --webroot --webroot-path=/var/www/certbot --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal --staging -d tunetrees.com  -d www.tunetrees.com
+    # command: certonly --webroot --webroot-path=/var/www/certbot --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
+    # command: certonly --webroot --webroot-path=/var/www/certbot --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
+
+volumes:
+  # certbot-etc:
+  # certbot-var:
+
+  # web-root:
+  #   driver: local
+  #   driver_opts:
+  #     type: none
+  #     device: /home/sboag/tunetrees/views
+  #     o: bind
+  dhparam:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/sboag/tunetrees/dhparam/
+      o: bind
+
 networks:
   backend:
     driver: bridge

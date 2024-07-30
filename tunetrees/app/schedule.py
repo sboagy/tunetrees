@@ -1,7 +1,7 @@
+import logging
 from datetime import datetime
 from typing import List
 
-import sqlalchemy
 from sqlalchemy import Column, select, update
 from tabulate import tabulate
 
@@ -13,8 +13,6 @@ from tunetrees.app.queries import (
 )
 from tunetrees.models.quality import quality_lookup
 from tunetrees.models.tunetrees import PracticeRecord
-
-import logging
 
 log = logging.getLogger()
 
