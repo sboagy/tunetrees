@@ -1,7 +1,7 @@
 'use client'
 import React from 'react'
 import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid';
-import DataGrid from '@/ui/components/DataGrid';
+import DataGrid from '@/components/ui/DataGrid';
 import {Tune} from '../types';
 
 import {submitPracticeFeedback} from '../commands';

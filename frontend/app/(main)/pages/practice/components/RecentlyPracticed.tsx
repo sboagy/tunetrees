@@ -1,4 +1,4 @@
-import DataGrid from '@/ui/components/DataGrid';
+import DataGrid from '@/components/ui/DataGrid';
 import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid';
 import React from 'react'
 import {Tune} from '../types';
