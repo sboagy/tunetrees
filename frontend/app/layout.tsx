@@ -1,28 +1,33 @@
-import "./globals.css"
-import type {Metadata} from "next"
-import {Inter} from "next/font/google"
-import Footer from "@/components/footer"
-import Header from "@/components/header"
-import { ThemeProvider } from "@/components/theme-provider"
+import "@radix-ui/themes/styles.css";
+import "./globals.css";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import Footer from "@/components/footer";
+import Header from "@/components/header";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Theme } from "@radix-ui/themes";
 
-const inter = Inter({subsets: ["latin"]})
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-    title: "TuneTrees",
-    description:
-        "TuneTrees is an app make music repertoire practice more efficient, and the tunes better retained in long term memory.",
-}
+  title: "TuneTrees",
+  description:
+    "TuneTrees is an app make music repertoire practice more efficient, and the tunes better retained in long term memory.",
+};
 
-export default async function RootLayout({children}: React.PropsWithChildren) {
-    return (
-      <html lang="en">
-        <body className={inter.className}>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            enableSystem
-            disableTransitionOnChange
-          >
+export default async function RootLayout({
+  children,
+}: React.PropsWithChildren) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Theme>
             <div className="flex flex-col justify-between w-full h-full min-h-screen">
               <Header />
               <main className="flex-auto w-full max-w-8xl px-4 py-4 mx-auto sm:px-6 md:py-6">
@@ -30,12 +35,12 @@ export default async function RootLayout({children}: React.PropsWithChildren) {
               </main>
               <Footer />
             </div>
-          </ThemeProvider>{" "}
-        </body>
-      </html>
-    );
+          </Theme>
+        </ThemeProvider>{" "}
+      </body>
+    </html>
+  );
 }
-
 
 // import "./globals.css"
 // import { Lato } from "next/font/google"
@@ -68,7 +73,6 @@ export default async function RootLayout({children}: React.PropsWithChildren) {
 //     "TuneTrees is an app make music repertoire practice more efficient, and the tunes better retained in long term memory.",
 // }
 
-
 // export default function RootLayout({ children }: React.PropsWithChildren) {
 //   return (
 //     <html lang="en">
@@ -84,5 +88,3 @@ export default async function RootLayout({children}: React.PropsWithChildren) {
 //     </html>
 //   )
 // }
-
-

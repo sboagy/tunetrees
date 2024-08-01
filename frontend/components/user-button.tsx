@@ -10,6 +10,7 @@ import {
 } from "./ui/dropdown-menu";
 import { DemoUser, NewUser, SignIn, SignOut } from "./auth-components";
 import { ModeToggle } from "./ui/mode-toggle";
+import { ThemePanel } from "@radix-ui/themes";
 
 export default async function UserButton() {
   console.log("here in the user button");
@@ -25,6 +26,7 @@ export default async function UserButton() {
         <NewUser />
         <DemoUser />
         <ModeToggle />
+        {/* <ThemePanel /> */}
       </div>
     );
   }
