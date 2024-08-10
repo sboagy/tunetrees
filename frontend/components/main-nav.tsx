@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import profilePic from "/public/logo.png";
 
 import {cn} from "@/lib/utils"
 import CustomLink from "./custom-link"
@@ -21,11 +22,11 @@ export function MainNav() {
             <CustomLink href="/">
                 <Button variant="ghost" className="p-0">
                     <Image
-                        src="/logo.png"
+                        src={profilePic}
                         alt="Home"
                         width="32"
                         height="32"
-                        className="min-w-8"
+                        //   className="min-w-8"
                     />
                 </Button>
             </CustomLink>
@@ -60,7 +61,7 @@ export function MainNav() {
                 </NavigationMenuList>
             </NavigationMenu>
         </div>
-    )
+    );
 }
 
 const ListItem = React.forwardRef<

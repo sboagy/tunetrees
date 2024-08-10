@@ -1,7 +1,6 @@
-import { Blockquote, Box, Flex, Heading, Reset, Text } from "@radix-ui/themes";
-import Practice from "./(main)/pages/practice/page";
-import { auth } from "auth";
-import { SessionProvider } from "next-auth/react";
+import {Blockquote, Flex, Heading, Text} from "@radix-ui/themes";
+import {auth} from "auth";
+import {redirect} from "next/navigation";
 
 export default async function index() {
   const session = await auth();
@@ -25,9 +24,9 @@ export default async function index() {
         </Blockquote>
 
         <Text as="p">
-          TuneTrees is an app for music practice, focusing on folk
-          musicians. It assists with memorization of repertoire, training of
-          musical instrument motor skills, and musical wiring of the brain.
+            TuneTrees is an app for music practice, focusing on folk musicians. It
+            assists with memorization of repertoire, training of musical
+            instrument motor skills, and musical wiring of the brain.
         </Text>
 
         <Blockquote>
@@ -46,18 +45,13 @@ export default async function index() {
 
         <Text as="p">
           TuneTrees uses a combination of techniques including spaced
-          repetition, mnemonics, and spacial/navigational techniques. Down the
-          line it may employ modern neural networks and reinforcement learning
-          techniques. The idea is to make music practice more efficient, and
-          retained for longer.
+            repetition, mnemonics, and spacial/navigational techniques.
+            The idea is to make music practice more efficient, with better
+            long term retention.
         </Text>
       </Flex>
     );
   } else {
-    return (
-      <SessionProvider basePath={"/auth"} session={session}>
-        <Practice />
-      </SessionProvider>
-    );
+      return redirect("/home");
   }
 }

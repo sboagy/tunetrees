@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import CustomLink from "./custom-link"
+import {Toaster} from "./ui/toaster"
 
 export default function Footer() {
     return (
@@ -14,6 +15,7 @@ export default function Footer() {
                     Source on GitHub
                 </CustomLink>
                 <CustomLink href="/policy">Policy</CustomLink>
+                <Toaster/>
             </div>
             {/* <div className="flex gap-2 justify-start items-center">
         <img

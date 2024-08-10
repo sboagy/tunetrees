@@ -1,9 +1,11 @@
-"use server";
+// "use server";
 // import { useEffect, useState } from "react";
 // import { getCsrfToken } from "next-auth/react";
 import {cookies} from "next/headers";
 
-export async function CSRFInput() {
+import {Input} from "@mui/material";
+
+export function CSRFInput() {
     // const [csrfToken, setCsrfToken] = useState("");
 
     // useEffect(() => {
@@ -14,9 +16,16 @@ export async function CSRFInput() {
     //   new Promise((resolve) => setTimeout(resolve, ms));
 
     let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
+    // let csrfToken = "abcdef";
     console.log("CSRFInput(): csrfToken: %s", csrfToken);
 
     return (
-        <input type="hidden" name="csrfToken" defaultValue={csrfToken}/>
+        <Input
+            type="hidden"
+            // required={false}
+            name="csrfToken"
+            defaultValue={csrfToken}
+            // value={csrfToken}
+        />
     );
 }

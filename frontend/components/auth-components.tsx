@@ -11,6 +11,7 @@ export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
                 // const session = await auth();
                 console.log("Handling SignIn request");
                 await signIn();
+                // redirect("/auth/login");
             }}
         >
             <Button {...props}>Sign In</Button>
@@ -18,7 +19,10 @@ export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
     );
 }
 
-export function NewUser(props: React.ComponentPropsWithRef<typeof Button>) {
+export function NewUser(
+    props: React.ComponentPropsWithRef<typeof Button>,
+    crsf_token: string
+) {
     console.log("Constructing the NewUser button");
     return (
         <form

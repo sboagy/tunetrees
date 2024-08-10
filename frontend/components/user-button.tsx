@@ -1,35 +1,42 @@
-import { Avatar, AvatarImage } from "./ui/avatar";
-import { Button } from "./ui/button";
-import { auth } from "auth";
+import {Avatar, AvatarImage} from "./ui/avatar";
+import {Button} from "./ui/button";
+import {auth} from "auth";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { DemoUser, NewUser, SignIn, SignOut } from "./auth-components";
-import { ModeToggle } from "./ui/mode-toggle";
-import { ThemePanel } from "@radix-ui/themes";
+import {DemoUser, NewUser, SignIn, SignOut} from "./auth-components";
+import {ModeToggle} from "./ui/mode-toggle";
 
 export default async function UserButton() {
   console.log("here in the user button");
   // debugger
   const session = await auth();
+    if (!session) {
+        console.log("No session found (UserButton)");
+    } else {
+        console.log("Session found (UserButton)");
+    }
   if (!session?.user) {
     ("use server");
+
+      console.log("No user found in session (UserButton)");
     // let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
     // const csrfToken = cookies().get("authjs.csrf-token")?.value ?? "";
     return (
       <div className="flex gap-2 items-center">
         <SignIn />
-        <NewUser />
+          <NewUser/>
         <DemoUser />
         <ModeToggle />
         {/* <ThemePanel /> */}
       </div>
     );
   }
+    console.log("Session found! (UserButton)");
   return (
     <div className="flex gap-2 items-center">
       <span className="hidden text-sm sm:inline-flex">

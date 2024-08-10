@@ -3,9 +3,9 @@ from datetime import datetime
 from typing import List
 
 from sqlalchemy import Column, select, update
+from supermemo2 import sm_two
 from tabulate import tabulate
 
-from supermemo2 import sm_two
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
     get_practice_record_table,

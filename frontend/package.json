@@ -30,6 +30,7 @@
     "@radix-ui/themes": "^3.1.1",
     "@simplewebauthn/server": "^9.0.3",
     "axios": "^1.5.1",
+    "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
@@ -37,9 +38,10 @@
     "formik": "^2.4.5",
     "lucide-react": "^0.274.0",
     "next": "^14.1.4",
-    "next-auth": "5.0.0-beta.19",
+    "next-auth": "^5.0.0-beta.19",
     "next-auth-http-adapter": "^0.3.0",
     "next-themes": "^0.3.0",
+    "node-pre-gyp": "^0.17.0",
     "nvm": "^0.0.4",
     "react": "latest",
     "react-countdown-circle-timer": "^3.2.1",
@@ -53,6 +55,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",

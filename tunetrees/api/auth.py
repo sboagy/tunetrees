@@ -6,11 +6,13 @@
 import datetime
 import logging
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
+from cruft import update
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import Result, Row, Select, select
+from sqlalchemy.orm.query import Query
 from sqlalchemy.orm.session import Session as SqlAlchemySession
 
 from tunetrees.app.database import SessionLocal
@@ -42,12 +44,38 @@ class User(BaseModel):
         None  # date and time value, may be null
     )
     image: Optional[str] = None
+    hash: Optional[str] = None  # password hash
 
 
 class AccountType(str, Enum):
     oauth = "oauth"
+    oidc = "oidc"
     email = "email"
     credentials = "credentials"
+
+
+# id
+# userId
+# type
+# provider
+# providerAccountId
+# refresh_token
+# access_token
+# expires_at
+# token_type
+# scope
+# id_token
+# session_state
+
+# access_token ='ya29.a0AcM612wD4MjR6munqu8g8SdapPhmtwOB_XsqtoSxgPA3axEB8ZsNFNWbVCneRZp5zcC92ADy1dc_psLUlkG8X6hn89ggrpWBV17hqlbZwY3ZnyIv5RDCz4IcbLMcOVBKykpbPWyUGjK6xBgArpRYHFfMga7R8P8ypwaCgYKAZESARMSFQHGX2MiPNko26CctBnKmsxM_CTMqQ0169'
+# expires_at =1722822259
+# id_token ='eyJhbGciOiJSUzI1NiIsImtpZCI6IjQ1MjljNDA5Zjc3YTEwNmZiNjdlZTFhODVkMTY4ZmQyY2ZiN2MwYjciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIxODI0MTYyMDI4NjktcmJzYWMzY2VqdG80OGxzMmg5dXEwdW02NWJhY2k3bHUuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIxODI0MTYyMDI4NjktcmJzYWMzY2VqdG80OGxzMmg5dXEwdW02NWJhY2k3bHUuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDIzMzI1MTY2NjgyOTQxODI0MjIiLCJlbWFpbCI6InNib2FneUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXRfaGFzaCI6IjJUaUpOU0Jn…EtmWUNfQlNzb25xU3I4TXZsck1XOTdINF91MEQ0aDZ3PXM5Ni1jIiwiZ2l2ZW5fbmFtZSI6IlNjb3R0IiwiZmFtaWx5X25hbWUiOiJCb2FnIiwiaWF0IjoxNzIyODE4NjYwLCJleHAiOjE3MjI4MjIyNjB9.gyhZJD_djSQpNd6y4qr0iJMAjjfAb9AgoD64biBQXz_KSZbhL0iU2V6q2fSGks6kjFNSky5fEls3Vbi77hz9Ivq4cHkzsDC0NOqRwZUI4p8FiTFKFA5SuNVMHcKB00vav-htmL4cqUIQ4uAIgSNuKCFn8ivYLLXjAe-jAw6CQnVXI8cNyffsQHkWXG4-YKRvE2UJRrwtEiXVKUWIamdYyVl9AGkV-h5YZJxwxcUcEmr99tzsYbBBRXF4HPd7O0RyvC3Lrn5T4my2XfCY8cGhcXEL9PdJcR19_k2t8R4jzUT3jkomRiwvE9mrGs0PH6y5vHDZWjlfWE339TAieXZSrg'
+# provider ='google'
+# providerAccountId ='102332516668294182422'
+# scope ='https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid'
+# token_type ='bearer'
+# type ='oidc'
+# userId ='15'
 
 
 class Account(BaseModel):
@@ -58,16 +86,23 @@ class Account(BaseModel):
     access_token: Optional[str] = None
     token_type: Optional[str] = None
     id_token: Optional[str] = None
-    refresh_token: Optional[str] = None
     scope: Optional[str] = None
     expires_at: Optional[int] = None
-    session_state: Optional[str] = None
+    session_state: Optional[str]
+    refresh_token: Optional[str]
 
 
 class Session(BaseModel):
-    expires: datetime.date
+    expires: datetime.datetime
     sessionToken: str
     userId: str
+
+
+# {
+#     "expires": "Tue Sep 03 2024 23:45:08 GMT-0400 (Eastern Daylight Time)",
+#     "sessionToken": "098af529-f6dd-42c8-b7ea-7d79f5bf582f",
+#     "userId": "19"
+# }
 
 
 class Token(BaseModel):
@@ -101,11 +136,12 @@ async def create_user(user: User) -> Optional[User]:
         db = SessionLocal()
 
         orm_user = orm.User(
-            ID=user.name,  # The DB will need to set this
-            user_name=user.name,
+            # id=user.name,  # The DB will need to set this
+            name=user.name,
             email=user.email,
             email_verified=user.emailVerified,
             image=user.image,
+            hash=user.hash,
         )
 
         db.add(orm_user)
@@ -116,7 +152,7 @@ async def create_user(user: User) -> Optional[User]:
 
         # For right now, query the user again just to make sure the update was applied.
         # We might want to not do this in the future.
-        user_query = select(orm.User).where(orm.User.ID == orm_user.ID)
+        user_query = select(orm.User).where(orm.User.email == orm_user.email)
         updated_user = query_user_to_auth_user(user_query, db)
 
         return updated_user
@@ -137,25 +173,42 @@ async def create_user(user: User) -> Optional[User]:
 )
 async def get_user(id: str) -> Optional[User]:
     try:
-        stmt = select(orm.User).where(orm.User.user_name == id)
+        stmt = select(orm.User).where(orm.User.id == id)
         auth_user = query_user_to_auth_user(stmt)
         return auth_user
     except HTTPException as e:
-        logger.error("HTTPException (secondary catch): %s" % e)
+        if e.status_code == 404:
+            logger.warning(
+                "User Not Found (get_user(%s))",
+                id,
+            )
+        else:
+            logger.error("HTTPException (secondary catch): %s" % e)
         raise
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
 
 
-@router.get("/get-user-by-email/{email}", response_model=Optional[User])
+@router.get(
+    "/get-user-by-email/{email}",
+    response_model=Optional[User],
+    response_model_exclude_none=True,
+)
 async def get_user_by_email(email: str) -> Optional[User]:
     try:
         stmt = select(orm.User).where(orm.User.email == email)
         auth_user = query_user_to_auth_user(stmt)
+        logger.info(f"get_user_by_email {auth_user=}")
         return auth_user
     except HTTPException as e:
-        logger.error("HTTPException (secondary catch): %s" % e)
+        if e.status_code == 404:
+            logger.warning(
+                "User Not Found (get_user_by_email(%s))",
+                email,
+            )
+        else:
+            logger.error("HTTPException (secondary catch): %s" % e)
         raise
     except Exception as e:
         logger.error("Unknown error: %s" % e)
@@ -164,7 +217,9 @@ async def get_user_by_email(email: str) -> Optional[User]:
 
 # auth/get-user-by-account/{provider}/{providerAccountId}/
 @router.get(
-    "/get-user-by-account/{provider}/{providerAccountId}", response_model=Optional[User]
+    "/get-user-by-account/{provider}/{providerAccountId}",
+    response_model=Optional[User],
+    response_model_exclude_none=True,
 )
 async def get_user_by_account(provider: str, providerAccountId: str) -> Optional[User]:
     db = None
@@ -182,14 +237,21 @@ async def get_user_by_account(provider: str, providerAccountId: str) -> Optional
             account: orm.Account = which_row[0]
 
             # There's probably a way to do with with a single query
-            user_query = select(orm.User).where(orm.User.ID == account.i)
+            user_query = select(orm.User).where(orm.User.id == account.user_id)
             auth_user = query_user_to_auth_user(user_query, db)
 
             return auth_user
         else:
             raise HTTPException(status_code=404, detail="User Not Found")
     except HTTPException as e:
-        logger.error("HTTPException (secondary catch): %s" % e)
+        if e.status_code == 404:
+            logger.warning(
+                "User Not Found (get_user_by_account(%s, %s))",
+                provider,
+                providerAccountId,
+            )
+        else:
+            logger.error("HTTPException (secondary catch): %s" % e)
         raise
     except Exception as e:
         logger.error("Unknown error: %s" % e)
@@ -205,12 +267,27 @@ async def update_user(user: User) -> Optional[User]:
     try:
         db = SessionLocal()
 
-        update_dict = {}
+        user_dict = user.dict(exclude_unset=True)
 
-        update_dict["user_name"] = user.name
-        update_dict["email"] = user.email
-        update_dict["email_verified"] = user.emailVerified
-        update_dict["image"] = user.image
+        stmt = select(orm.User).where(orm.User.id == id)
+        result: Result = db.execute(stmt)
+        which_row: Optional[Row[orm.User]] = result.fetchone()
+        if which_row:
+            orm_user: orm.User = which_row[0]
+        else:
+            raise HTTPException(status_code=404, detail="User Not Found for Update")
+
+        update_dict: dict[Any, Any] = {
+            "id": orm_user.id,
+            "name": orm_user.name,
+            "email": orm_user.email,
+            "email_verified": orm_user.emailVerified,
+            "image": orm_user.image,
+            "hash": orm_user.hash,
+        }
+
+        for k in user_dict:
+            update_dict[k] = user_dict[k]
 
         db.query(orm.User).filter_by(id=user.id).update(update_dict)
 
@@ -261,29 +338,49 @@ async def link_account(account: Account) -> Account:
     try:
         db = SessionLocal()
 
-        orm_account = orm.Account(
-            user_id=account.userId,
-            provider_account_id=account.providerAccountId,
-            provider=account.provider,
-            type=account.type,
-            access_token=account.access_token,
-            token_type=account.token_type,
-            id_token=account.id_token,
-            refresh_token=account.refresh_token,
-            scope=account.scope,
-            expires_at=account.expires_at,
-            session_state=account.session_state,
-        )
-
-        db.add(orm_account)
-
-        # We won't have an ID until the DB does it's thing.
-        db.commit()
-        db.flush(orm_account)
+        existing = db.query(orm.Account).filter_by(user_id=account.userId)
+        if existing is not None and existing.count() > 0:
+            # Why on earth do I need to do and update with a dictionary?
+            # and why is this so hard?  Isn't the orm supposed to make this easier?
+            existing.update(
+                {
+                    "user_id": account.userId,
+                    "provider_account_id": account.providerAccountId,
+                    "provider": account.provider,
+                    "type": account.type,
+                    "access_token": account.access_token,
+                    "token_type": account.token_type,
+                    "id_token": account.id_token,
+                    "scope": account.scope,
+                    "expires_at": account.expires_at,
+                    "refresh_token": account.refresh_token,
+                    "session_state": account.session_state,
+                }
+            )
+            db.commit()
+            db.flush()
+        else:
+            orm_account = orm.Account(
+                user_id=account.userId,
+                provider_account_id=account.providerAccountId,
+                provider=account.provider,
+                type=account.type,
+                access_token=account.access_token,
+                token_type=account.token_type,
+                id_token=account.id_token,
+                scope=account.scope,
+                expires_at=account.expires_at,
+                refresh_token=account.refresh_token,
+                session_state=account.session_state,
+            )
+            db.add(orm_account)
+            # We won't have an ID until the DB does it's thing.
+            db.commit()
+            db.flush(orm_account)
 
         stmt = select(orm.Account).where(
-            orm.Account.user_id == orm_account.user_id,
-            orm.Account.provider_account_id == orm_account.provider_account_id,
+            orm.Account.user_id == account.userId,
+            orm.Account.provider_account_id == account.providerAccountId,
         )
 
         result: Result = db.execute(stmt)
@@ -308,7 +405,7 @@ async def link_account(account: Account) -> Account:
                 refresh_token=str(found_orm_account.refresh_token),
                 scope=str(found_orm_account.scope),
                 expires_at=expires_at,
-                session_state=str(found_orm_account.session_state0),
+                session_state=str(found_orm_account.session_state),
             )
 
             return auth_account
@@ -362,7 +459,7 @@ async def unlink_account(provider: str, providerAccountId: str) -> None:
             db.close()
 
 
-@router.post("/create-session/", response_model=User)
+@router.post("/create-session/", response_model=Session)
 async def create_session(session: Session) -> Session:
     db = None
     try:
@@ -413,7 +510,11 @@ async def create_session(session: Session) -> Session:
             db.close()
 
 
-@router.get("/get-session/{sessionToken}", response_model=Optional[SessionAndUser])
+@router.get(
+    "/get-session/{sessionToken}",
+    response_model=Optional[SessionAndUser],
+    response_model_exclude_none=True,
+)
 async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUser]:
     db = None
     try:
@@ -424,7 +525,7 @@ async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUser]:
         if which_row and len(which_row) > 0:
             orm_session: orm.Session = which_row[0]
             user_id = str(orm_session.user_id)
-            stmt = select(orm.User).where(orm.User.ID == user_id)
+            stmt = select(orm.User).where(orm.User.id == user_id)
             auth_user = query_user_to_auth_user(stmt, db)
             auth_session = Session(
                 expires=orm_session.expires,
@@ -433,7 +534,8 @@ async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUser]:
             )
 
             if auth_session is not None and auth_user is not None:
-                return SessionAndUser(session=auth_session, user=auth_user)
+                session_and_user = SessionAndUser(session=auth_session, user=auth_user)
+                return session_and_user
             else:
                 return None
 
@@ -636,10 +738,11 @@ def query_user_to_auth_user(
             user: orm.User = which_row[0]
 
             auth_user = User(
-                id=str(user.user_name),
-                name=str(user.user_name),
+                id=str(user.id),
+                name=str(user.name),
                 email=str(user.email),
                 emailVerified=datetime.datetime.now(),  # for the moment
+                hash=user.hash,
                 image=None,  # for the moment
             )
             return auth_user

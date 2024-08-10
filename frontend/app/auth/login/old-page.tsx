@@ -1,3 +1,5 @@
+// Not used at the moment.  -sb
+
 import {providerMap, signIn} from "@/auth";
 import Image from "next/image";
 // import { cookies } from "next/headers";

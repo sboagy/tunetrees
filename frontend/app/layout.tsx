@@ -1,11 +1,11 @@
 import "@radix-ui/themes/styles.css";
 import "./globals.css";
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type {Metadata} from "next";
+import {Inter} from "next/font/google";
 import Footer from "@/components/footer";
 import Header from "@/components/header";
-import { ThemeProvider } from "@/components/theme-provider";
-import { Theme } from "@radix-ui/themes";
+import {ThemeProvider} from "@/components/theme-provider";
+import {Theme} from "@radix-ui/themes";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,7 +30,7 @@ export default async function RootLayout({
           <Theme>
             <div className="flex flex-col justify-between w-full h-full min-h-screen">
               <Header />
-              <main className="flex-auto w-full max-w-8xl px-4 py-4 mx-auto sm:px-6 md:py-6">
+              <main className="flex-auto w-full max-w-8xl px-4 py-2 mx-auto sm:px-6 md:pt-4">
                 {children}
               </main>
               <Footer />

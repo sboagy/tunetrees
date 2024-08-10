@@ -1,6 +1,6 @@
 import * as React from 'react';
 import Box from '@mui/material/Box';
-import { GridEventListener, GridEventLookup, DataGrid as MUIDataGrid, gridClasses } from '@mui/x-data-grid';
+import {DataGrid as MUIDataGrid, gridClasses} from '@mui/x-data-grid';
 
 //TODO fix any to real types!!!!
 interface DataGridType {
@@ -10,6 +10,7 @@ interface DataGridType {
     rowClick?: any
 }
 
+// TODO: #49 Refactor DataGrid to use radix-ui/shadcn-ui
 export default function DataGrid({rows, columns, pageSize=10, rowClick}: DataGridType) {
 
 
