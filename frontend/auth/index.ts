@@ -85,10 +85,6 @@ const providers: Provider[] = [
       password: { label: "Password", type: "password" },
     },
     async authorize(credentials, req) {
-      // csrfToken =("d64a0b6f904d301ec118722ac7d80842a9bbff5075fbfc0878baab77bde523f0");
-      // password = "yadayada";
-      // username = "sboagy@gmail.com";
-      // debugger;
 
       //   assertIsDefined(ttHttpAdapter.getUserByEmail);
 
