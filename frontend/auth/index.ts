@@ -14,7 +14,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 // import Discord from "next-auth/providers/discord";
 // import Dropbox from "next-auth/providers/dropbox";
 // import Facebook from "next-auth/providers/facebook";
-import GitHub from "next-auth/providers/github";
+import GitHubProvider from "next-auth/providers/github";
 // import GitLab from "next-auth/providers/gitlab";
 import GoogleProvider from "next-auth/providers/google";
 // import Hubspot from "next-auth/providers/hubspot";
@@ -82,7 +82,7 @@ const providers: Provider[] = [
         type: "text",
         placeholder: "jsmith@example.com",
       },
-      password: {label: "Password", type: "password"},
+      password: { label: "Password", type: "password" },
     },
     async authorize(credentials, req) {
       // csrfToken =("d64a0b6f904d301ec118722ac7d80842a9bbff5075fbfc0878baab77bde523f0");
@@ -129,6 +129,7 @@ const providers: Provider[] = [
       }
     },
   }),
+
   // Apple,
   // Auth0,
   // AzureB2C({
@@ -149,9 +150,23 @@ const providers: Provider[] = [
   // Facebook,
 
   // TODO: #46 Wire up the GitHub provider @sboagy
-  GitHub,
+  GitHubProvider({
+    clientId: process.env.GITHUB_CLIENT_ID ?? "",
+    clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+
+    // allowDangerousEmailAccountLinking: true,
+
+    authorization: {
+      params: {
+        prompt: "consent",
+        access_type: "offline",
+        response_type: "code",
+      },
+    },
+  }),
 
   // GitLab,
+
   GoogleProvider({
     clientId: process.env.GOOGLE_CLIENT_ID ?? "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
@@ -165,12 +180,8 @@ const providers: Provider[] = [
         response_type: "code",
       },
     },
-    // profile: (profile) => {
-    //   return {
-    //     id: profile.sub, // <-- In my case, adding this line solved my problem
-    //   };
-    // },
   }),
+
   // Hubspot,
   // Keycloak({ name: "Keycloak (bob/bob)" }),
   // LinkedIn,
