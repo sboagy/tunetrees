@@ -1,8 +1,12 @@
 import {httpAdapter} from "next-auth-http-adapter";
-import {AdapterSession, AdapterUser} from "next-auth/adapters";
+import {
+  AdapterAccount,
+  AdapterSession,
+  AdapterUser,
+  VerificationToken,
+} from "next-auth/adapters";
 import {z} from "zod";
 import {ofetch} from "ofetch";
-
 export const adapterSessionSchema = z.object({
   expires: z.date(),
   sessionToken: z.string(),
@@ -93,6 +97,19 @@ async function userAndSessionSerializer(
 
 }
 
+function verificationTokenSerializer(res: VerificationToken | null | undefined) {
+  let expires = null;
+  if (res?.expires) {
+    expires = new Date(res.expires);
+  }
+
+  return {
+    identifier: res?.identifier,
+    token: res?.token,
+    expires: expires,
+  };
+}
+
 const _baseURL = process.env.NEXT_BASE_URL;
 
 // The createUser method of ttHttpAdapter will strip the hash off, 
@@ -117,89 +134,148 @@ export async function getUserExtendedByEmail(email: string) {
   return await getUserExtendedByEmailSchema.parseAsync(serialize(res));
 }
 
-export const ttHttpAdapter = httpAdapter({
+export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
   baseURL: _baseURL, // or any other base url
   headers: {
-    Authorization: process.env.REMOTE_AUTH_RPC_TOKEN!,
+    "x-auth-secret": process.env.NEXTAUTH_SECRET || "",
+    "Content-Type": "application/json",
+    // Authorization: process.env.REMOTE_AUTH_RPC_TOKEN!,
     // or set any global headers to be able to authenticate your requests to your backend
   },
   // you can provide any other
   adapterProcedures: {
-    createUser(user: AdapterUser) {
+    createUser(user: Omit<AdapterUser, "id">): AdapterProcedure {
       return {
         path: "auth/signup/",
         method: "POST",
         body: user,
-        select: userSerializer as any,
+        select: userSerializer,
       };
     },
-    getUserById: (id: string) => ({
-      path: `auth/get-user/${id}/`,
-      method: "GET",
-      select: userSerializer as any,
-    }),
-    getUserByEmail: (email: string) => ({
-      path: `auth/get-user-by-email/${email}/`,
-      method: "GET",
-      select: userSerializer as any,
-    }),
-    getUserByAccount: ({providerAccountId, provider}) => ({
-      path: `auth/get-user-by-account/${encodeURIComponent(
+    getUserById(id: string): AdapterProcedure {
+      return {
+        path: `auth/get-user/${id}/`,
+        method: "GET",
+        select: userSerializer,
+      };
+    },
+    getUserByEmail(email: string): AdapterProcedure {
+      return {
+        path: `auth/get-user-by-email/${email}/`,
+        method: "GET",
+        select: userSerializer,
+      };
+    },
+    getUserByAccount(params: {
+      providerAccountId: string;
+      provider: string;
+    }): AdapterProcedure {
+      const { providerAccountId, provider } = params;
+      return {
+        path: `auth/get-user-by-account/${encodeURIComponent(
           provider
-      )}/${encodeURIComponent(providerAccountId)}/`,
-      method: "GET",
-      select: userSerializer as any,
-    }),
-    updateUser: (user) => ({
-      path: "auth/update-user/",
-      method: "PATCH",
-      select: userSerializer as any,
-    }),
-    deleteUser: (id) => ({
-      path: `auth/delete-user/${id}/`,
-      method: "DELETE",
-    }),
-    linkAccount: (account) => ({
-      path: "auth/link-account/",
-      method: "POST",
-      body: account,
-    }),
-    unlinkAccount: ({provider, providerAccountId}) => ({
-      path: `auth/unlink-account/${encodeURIComponent(
+        )}/${encodeURIComponent(providerAccountId)}/`,
+        method: "GET",
+        select: userSerializer,
+      };
+    },
+    updateUser(
+      user: Partial<AdapterUser> & Pick<AdapterUser, "id">
+    ): AdapterProcedure {
+      return {
+        path: "auth/update-user/",
+        method: "PATCH",
+        body: user,
+        select: userSerializer,
+      };
+    },
+    deleteUser(id: string): AdapterProcedure {
+      return {
+        path: `auth/delete-user/${id}/`,
+        method: "DELETE",
+      };
+    },
+    linkAccount(account): AdapterProcedure {
+      return {
+        path: "auth/link-account/",
+        method: "POST",
+        body: account,
+      };
+    },
+    unlinkAccount(params: {
+      provider: string;
+      providerAccountId: string;
+    }): AdapterProcedure {
+      const { provider, providerAccountId } = params;
+      return {
+        path: `auth/unlink-account/${encodeURIComponent(
           provider
-      )}/${encodeURIComponent(providerAccountId)}/`,
-      method: "DELETE",
-    }),
-    createSession: (session) => ({
-      path: "auth/create-session/",
-      method: "POST",
-      body: session,
-      select: sessionSerializer as any,
-    }),
-    getSessionAndUser: (sessionToken) => ({
-      path: `auth/get-session/${sessionToken}`,
-      method: "GET",
-      select: userAndSessionSerializer as any,
-    }),
-    updateSession: (session) => ({
-      path: "auth/update-session/",
-      method: "PATCH",
-      body: session,
-      select: sessionSerializer as any
-    }),
-    deleteSession: (sessionToken) => ({
-      path: `auth/delete-session/${sessionToken}/`,
-      method: "DELETE",
-    }),
-    createVerificationToken: (verificationToken) => ({
-      path: "auth/create-verification-token/",
-      method: "POST",
-      body: verificationToken,
-    }),
-    useVerificationToken: (params) => ({
-      path: "auth/use-verification-token/",
-      method: "POST",
-      body: params,
-    }),
+        )}/${encodeURIComponent(providerAccountId)}/`,
+        method: "DELETE",
+      };
+    },
+    createSession(session: AdapterSession): AdapterProcedure {
+      return {
+        path: "auth/create-session/",
+        method: "POST",
+        body: session,
+        select: sessionSerializer as any,
+      };
+    },
+    getSessionAndUser(sessionToken: string): AdapterProcedure {
+      return {
+        path: `auth/get-session/${sessionToken}`,
+        method: "GET",
+        select: userAndSessionSerializer as any,
+      };
+    },
+    updateSession(
+      session: Partial<AdapterSession> & Pick<AdapterSession, "sessionToken">
+    ): AdapterProcedure {
+      return {
+        path: "auth/update-session/",
+        method: "PATCH",
+        body: session,
+        select: sessionSerializer,
+      };
+    },
+    deleteSession(sessionToken: string): AdapterProcedure {
+      return {
+        path: `auth/delete-session/${sessionToken}/`,
+        method: "DELETE",
+      };
+    },
+    createVerificationToken(
+      verificationToken: VerificationToken
+    ): AdapterProcedure {
+      return {
+        path: "auth/create-verification-token/",
+        method: "POST",
+        body: verificationToken,
+      };
+    },
+    useVerificationToken(params: {
+      identifier: string;
+      token: string;
+    }): AdapterProcedure {
+      const { identifier, token } = params;
+      return {
+        path: "auth/use-verification-token/",
+        method: "POST",
+        body: { identifier, token },
+        select: verificationTokenSerializer,
+      };
+    },
   },
 });
+
+interface AdapterProcedure {
+  path: string;
+  method: string;
+  body?: any;
+  select?: (res: any) => any;
+}
+
+interface AdapterProcedures {
+  [key: string]: (session: Partial<AdapterSession> & Pick<AdapterSession, "sessionToken">) => AdapterProcedure;
+}

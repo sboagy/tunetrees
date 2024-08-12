@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import tunetrees.api.auth as auth
 import tunetrees.api.tunetrees as tunetrees_api
 
-app = FastAPI()
+app = FastAPI(debug=True)
 
 app.include_router(auth.router)
 app.include_router(tunetrees_api.router)
@@ -27,3 +27,5 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+auth.register_exception(app)

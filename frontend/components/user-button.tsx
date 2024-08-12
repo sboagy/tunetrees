@@ -29,8 +29,10 @@ export default async function UserButton() {
     return (
       <div className="flex gap-2 items-center">
         <SignIn />
-          <NewUser/>
-        <DemoUser />
+        {/* For right now I think that new user login may just be part of the login flow */}
+        {/* <NewUser/> */}
+        {/* And demo user may also be just another login button?  Or should it be more obviously visible? */}
+        {/* <DemoUser /> */}
         <ModeToggle />
         {/* <ThemePanel /> */}
       </div>

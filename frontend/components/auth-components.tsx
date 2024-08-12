@@ -14,7 +14,7 @@ export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
                 // redirect("/auth/login");
             }}
         >
-            <Button {...props}>Sign In</Button>
+            <Button {...props}>Log In</Button>
         </form>
     );
 }

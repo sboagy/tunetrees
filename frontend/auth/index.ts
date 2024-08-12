@@ -2,55 +2,18 @@ import type {Account, NextAuthConfig, Profile, Session, User,} from "next-auth";
 import NextAuth, {AuthError} from "next-auth";
 import "next-auth/jwt";
 
-// import Apple from "next-auth/providers/apple";
-// import Auth0 from "next-auth/providers/auth0";
-// import AzureB2C from "next-auth/providers/azure-ad-b2c";
-// import BankIDNorway from "next-auth/providers/bankid-no"
-// import BoxyHQSAML from "next-auth/providers/boxyhq-saml";
 import CredentialsProvider from "next-auth/providers/credentials";
-
-// import Cognito from "next-auth/providers/cognito";
-// import Coinbase from "next-auth/providers/coinbase";
-// import Discord from "next-auth/providers/discord";
-// import Dropbox from "next-auth/providers/dropbox";
-// import Facebook from "next-auth/providers/facebook";
 import GitHubProvider from "next-auth/providers/github";
-// import GitLab from "next-auth/providers/gitlab";
 import GoogleProvider from "next-auth/providers/google";
-// import Hubspot from "next-auth/providers/hubspot";
-// import Keycloak from "next-auth/providers/keycloak";
-// import LinkedIn from "next-auth/providers/linkedin";
-// import Netlify from "next-auth/providers/netlify";
-// import Okta from "next-auth/providers/okta";
-// import Passage from "next-auth/providers/passage";
-// import Passkey from "next-auth/providers/passkey";
-// import Pinterest from "next-auth/providers/pinterest";
-// import Reddit from "next-auth/providers/reddit";
-// import Slack from "next-auth/providers/slack";
-// import Spotify from "next-auth/providers/spotify";
-// import Twitch from "next-auth/providers/twitch";
-// import Twitter from "next-auth/providers/twitter";
-// import WorkOS from "next-auth/providers/workos";
-// import Zoom from "next-auth/providers/zoom";
-// import memoryDriver from "unstorage/drivers/memory"
-// import vercelKVDriver from "unstorage/drivers/vercel-kv"
+import SendgridProvider from "next-auth/providers/sendgrid";
+
 import {getUserExtendedByEmail, ttHttpAdapter} from "./auth_tt_adapter";
 import type {CredentialInput, Provider} from "next-auth/providers";
 import {JWT, JWTOptions} from "next-auth/jwt";
 import {Adapter, AdapterUser} from "next-auth/adapters";
 import {NextRequest} from "next/server";
 import {matchPasswordWithHash} from "./password-match";
-
-// const storage = createStorage({
-//   driver: process.env.VERCEL
-//     ? vercelKVDriver({
-//       url: process.env.AUTH_KV_REST_API_URL,
-//       token: process.env.AUTH_KV_REST_API_TOKEN,
-//       env: false,
-//     })
-//     : memoryDriver(),
-// })
-// const storage = createStorage();
+import { sendVerificationRequest } from "@/lib/authSendRequest";
 
 export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
   if (value === undefined || value === null) {
@@ -69,83 +32,77 @@ function logObject(obj: any, expand: boolean) {
 export const BASE_PATH = "/auth";
 
 const providers: Provider[] = [
-  CredentialsProvider({
-    // The name to display on the sign in form (e.g. "Sign in with...")
-    name: "Credentials",
-    // `credentials` is used to generate a form on the sign in page.
-    // You can specify which fields should be submitted, by adding keys to the `credentials` object.
-    // e.g. domain, username, password, 2FA token, etc.
-    // You can pass any HTML attribute to the <input> tag through the object.
-    credentials: {
-      email: {
-        label: "Email",
-        type: "text",
-        placeholder: "jsmith@example.com",
-      },
-      password: { label: "Password", type: "password" },
-    },
-    async authorize(credentials, req) {
+  // ===========================================================================================================
+  // Please do not delete this commented out code, at least for now.  It implements password-based authentication,
+  // which I'm not yet sure I want or not.  I'm keeping it here for possible future implementation.
+  // On way to do this would be to allow them to click on the email field, then give them a choice
+  // of logging in with a password if they set it, or logging in with email magic link if they did or didn't.
+  // Then a profile page could allow them to set a password if they want to, along with other profile settings.
+  // ===========================================================================================================
+  // CredentialsProvider({
+  //   // The name to display on the sign in form (e.g. "Sign in with...")
+  //   name: "Credentials",
+  //   // `credentials` is used to generate a form on the sign in page.
+  //   // You can specify which fields should be submitted, by adding keys to the `credentials` object.
+  //   // e.g. domain, username, password, 2FA token, etc.
+  //   // You can pass any HTML attribute to the <input> tag through the object.
+  //   credentials: {
+  //     email: {
+  //       label: "Email",
+  //       type: "text",
+  //       placeholder: "jsmith@example.com",
+  //     },
+  //     password: { label: "Password", type: "password" },
+  //   },
+  //   async authorize(credentials, req) {
+  //     //   assertIsDefined(ttHttpAdapter.getUserByEmail);
 
-      //   assertIsDefined(ttHttpAdapter.getUserByEmail);
+  //     let email = credentials.email as string;
 
-      let email = credentials.email as string;
+  //     let secret = process.env.NEXTAUTH_SECRET;
 
-      let secret = process.env.NEXTAUTH_SECRET;
+  //     // Unfortunately, this will strip off the hash
+  //     // let user = await ttHttpAdapter.getUserByEmail(email);
 
-      // Unfortunately, this will strip off the hash
-      // let user = await ttHttpAdapter.getUserByEmail(email);
+  //     // So instead we use a customized variant
+  //     let user = await getUserExtendedByEmail(email);
 
-      // So instead we use a customized variant
-      let user = await getUserExtendedByEmail(email);
+  //     // const user = { id: "1", name: "J Smith", email: "jsmith@example.com" };
+  //     // debugger;
+  //     if (user) {
+  //       if (!credentials.password) {
+  //         throw new Error("Empty Password!");
+  //       }
+  //       let password = credentials.password as string;
+  //       let match = await matchPasswordWithHash(password, user.hash);
+  //       if (match) {
+  //         // Any object returned will be saved in `user` property of the JWT
+  //         return user;
+  //       } else {
+  //         // redirect("/auth/password-no-match");
+  //         // throw new Error("Password does not match");
+  //         throw new AuthError("Password does not match");
+  //         //   return null;
+  //       }
+  //     } else {
+  //       // No user found, so this is their first attempt to login
+  //       // meaning this is also the place you could do registration
+  //       // ...If you return null then an error will be displayed advising the user to check their details.
+  //       throw new Error("User not found.");
 
-      // const user = { id: "1", name: "J Smith", email: "jsmith@example.com" };
-      // debugger;
-      if (user) {
-        if (!credentials.password) {
-          throw new Error("Empty Password!");
-        }
-        let password = credentials.password as string;
-        let match = await matchPasswordWithHash(password, user.hash);
-        if (match) {
-          // Any object returned will be saved in `user` property of the JWT
-          return user;
-        } else {
-          // redirect("/auth/password-no-match");
-          // throw new Error("Password does not match");
-          throw new AuthError("Password does not match");
-          //   return null;
-        }
-      } else {
-        // No user found, so this is their first attempt to login
-        // meaning this is also the place you could do registration
-        // ...If you return null then an error will be displayed advising the user to check their details.
-        throw new Error("User not found.");
+  //       // You can also Reject this callback with an Error thus the user will be sent to the error page with the error message as a query parameter
+  //     }
+  //   },
+  // }),
 
-        // You can also Reject this callback with an Error thus the user will be sent to the error page with the error message as a query parameter
-      }
-    },
+  SendgridProvider({
+    // If your environment variable is named differently than default
+    apiKey: process.env.TT_AUTH_SENDGRID_API_KEY,
+    from: "admin@tunetrees.com",
+    name: "Email",
+    sendVerificationRequest,
   }),
 
-  // Apple,
-  // Auth0,
-  // AzureB2C({
-  //   clientId: process.env.AUTH_AZURE_AD_B2C_ID,
-  //   clientSecret: process.env.AUTH_AZURE_AD_B2C_SECRET,
-  //   issuer: process.env.AUTH_AZURE_AD_B2C_ISSUER,
-  // }),
-  // // BankIDNorway,
-  // BoxyHQSAML({
-  //   clientId: "dummy",
-  //   clientSecret: "dummy",
-  //   issuer: process.env.AUTH_BOXYHQ_SAML_ISSUER,
-  // }),
-  // Cognito,
-  // Coinbase,
-  // Discord,
-  // Dropbox,
-  // Facebook,
-
-  // TODO: #46 Wire up the GitHub provider @sboagy
   GitHubProvider({
     clientId: process.env.GITHUB_CLIENT_ID ?? "",
     clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
@@ -161,8 +118,6 @@ const providers: Provider[] = [
     },
   }),
 
-  // GitLab,
-
   GoogleProvider({
     clientId: process.env.GOOGLE_CLIENT_ID ?? "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
@@ -177,32 +132,6 @@ const providers: Provider[] = [
       },
     },
   }),
-
-  // Hubspot,
-  // Keycloak({ name: "Keycloak (bob/bob)" }),
-  // LinkedIn,
-  // Netlify,
-  // Okta,
-  // Passkey({
-  //   formFields: {
-  //     email: {
-  //       label: "Username",
-  //       required: true,
-  //       autocomplete: "username webauthn",
-  //     },
-  //   },
-  // }),
-  // Passage,
-  // Pinterest,
-  // Reddit,
-  // Slack,
-  // Spotify,
-  // Twitch,
-  // Twitter,
-  // WorkOS({
-  //   connection: process.env.AUTH_WORKOS_CONNECTION!,
-  // }),
-  // Zoom,
 ];
 
 export const providerMap = providers.map((provider) => {

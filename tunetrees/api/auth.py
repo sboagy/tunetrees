@@ -5,18 +5,43 @@
 
 import datetime
 import logging
+import traceback
 from enum import Enum
 from typing import Any, Optional, Tuple
 
-from cruft import update
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from idna import valid_contextj
 from pydantic import BaseModel, Field
 from sqlalchemy import Result, Row, Select, select
-from sqlalchemy.orm.query import Query
 from sqlalchemy.orm.session import Session as SqlAlchemySession
 
+from tunetrees import app
 from tunetrees.app.database import SessionLocal
 from tunetrees.models import tunetrees as orm
+
+
+class StatusCode(object):
+    success = 10000
+
+    bad_request = 40000
+    unauthorized = 40100
+    forbidden = 40300
+    not_found = 40400
+    method_not_allowed = 40500
+    not_acceptable = 40600
+    request_timeout = 40800
+    length_required = 41100
+    entity_too_large = 41300
+    request_uri_too_long = 41400
+    validator_error = 42200
+    locked = 42300
+    header_fields_too_large = 43100
+
+    server_error = 45000
+    unknown_error = 45001
+
 
 # from tunetrees.app.database import SessionLocal
 
@@ -30,6 +55,32 @@ router = APIRouter(
 )
 
 
+def register_exception(app: FastAPI):
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ):
+        """catch FastAPI RequestValidationError"""
+
+        exc_str = f"{exc}".replace("\n", " ").replace("   ", " ")
+        logger.error(request.method, request.url, exc)
+        # content = exc.errors()
+        content = {"code": StatusCode.validator_error, "message": exc_str, "data": None}
+        return JSONResponse(
+            content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+
+    @app.exception_handler(Exception)
+    async def exception_handle(request: Request, exc: Exception):
+        """catch other exception"""
+
+        logger.error(request.method, request.url, traceback.format_exc())
+        content = {"code": StatusCode.server_error, "message": str(exc), "data": None}
+        return JSONResponse(
+            content=content, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 class User(BaseModel):
     id: Optional[str] = Field(
         doc="This will be assigned and will be ignored for create or update",
@@ -39,12 +90,12 @@ class User(BaseModel):
         doc="For now assume this is the user name.  It's exact meaning is a little ambigious at the moment",
         default=None,
     )
-    email: Optional[str] = None  # Needs validator?
-    emailVerified: Optional[datetime.datetime] = (
-        None  # date and time value, may be null
+    email: Optional[str] = Field(default=None)
+    emailVerified: Optional[datetime.datetime] = Field(
+        default=None, alias="emailVerified"
     )
-    image: Optional[str] = None
-    hash: Optional[str] = None  # password hash
+    image: Optional[str] = Field(default=None, alias="image")
+    hash: Optional[str] = Field(default=None, alias="hash")
 
 
 class AccountType(str, Enum):
@@ -122,7 +173,7 @@ class VerificationToken(BaseModel):
     expires: str
 
 
-class Params(BaseModel):
+class VerificationTokenParams(BaseModel):
     identifier: str
     token: str
 
@@ -261,46 +312,47 @@ async def get_user_by_account(provider: str, providerAccountId: str) -> Optional
             db.close()
 
 
-@router.patch("/update-user/", response_model=Optional[User])
-async def update_user(user: User) -> Optional[User]:
+@router.patch(
+    "/update-user/",
+    response_model=User,
+    response_model_exclude_none=True,
+)
+async def update_user(user: User) -> User:
     db = None
     try:
         db = SessionLocal()
 
         user_dict = user.dict(exclude_unset=True)
 
-        stmt = select(orm.User).where(orm.User.id == id)
-        result: Result = db.execute(stmt)
-        which_row: Optional[Row[orm.User]] = result.fetchone()
-        if which_row:
-            orm_user: orm.User = which_row[0]
-        else:
-            raise HTTPException(status_code=404, detail="User Not Found for Update")
-
-        update_dict: dict[Any, Any] = {
-            "id": orm_user.id,
-            "name": orm_user.name,
-            "email": orm_user.email,
-            "email_verified": orm_user.emailVerified,
-            "image": orm_user.image,
-            "hash": orm_user.hash,
-        }
+        update_dict: dict[Any, Any] = {}
 
         for k in user_dict:
-            update_dict[k] = user_dict[k]
+            if "emailVerified" == k:
+                update_dict["email_verified"] = user_dict[k]
+            else:
+                update_dict[k] = user_dict[k]
 
-        db.query(orm.User).filter_by(id=user.id).update(update_dict)
+        existing = db.query(orm.User).filter_by(id=user.id)
+        if existing is not None and existing.count() > 0:
+            existing.update(update_dict)
 
-        # For right now, query the user again to flush the update,
-        # and just to make sure the update was applied.  Good chance
-        # we'll want to not do this in the future.
-        user_query = select(orm.User).where(orm.User.ID == user.id)
+        db.commit()
+        db.flush()
+
+        user_query = select(orm.User).where(orm.User.id == user.id)
         updated_user = query_user_to_auth_user(user_query, db)
+
+        if updated_user is None:
+            raise HTTPException(status_code=404, detail="User Not Found after update")
 
         return updated_user
 
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
+        raise
+
+    except Exception as e:
+        logger.error("Unexpected Exception: %s" % e)
         raise
 
     finally:
@@ -638,7 +690,7 @@ async def create_verification_token(
         orm_verification_token = orm.VerificationToken(
             identifier=verification_token.identifier,
             token=verification_token.token,
-            expires=verification_token.token,
+            expires=verification_token.expires,
         )
 
         db.add(orm_verification_token)
@@ -657,7 +709,7 @@ async def create_verification_token(
             updated_verification_toke = VerificationToken(
                 identifier=orm_verification_token_new.identifier,
                 token=orm_verification_token_new.token,
-                expires=orm_verification_token_new.token,
+                expires=orm_verification_token_new.expires,
             )
 
             return updated_verification_toke
@@ -677,8 +729,8 @@ async def create_verification_token(
             db.close()
 
 
-@router.post("/get-use-verification-token/", response_model=VerificationToken)
-async def use_verification_token(params: Params) -> VerificationToken:
+@router.post("/use-verification-token/", response_model=VerificationToken)
+async def use_verification_token(params: VerificationTokenParams) -> VerificationToken:
     db = None
     try:
         db = SessionLocal()
@@ -686,27 +738,31 @@ async def use_verification_token(params: Params) -> VerificationToken:
             stmt = select(orm.VerificationToken).where(
                 orm.VerificationToken.identifier == params.identifier
             )
-        elif params.token:
-            stmt = select(orm.VerificationToken).where(
-                orm.VerificationToken.token == params.token
-            )
         else:
-            raise HTTPException(
-                status_code=422, detail="params must have identifier or token"
-            )
+            raise HTTPException(status_code=422, detail="params must have identifier")
 
         result: Result = db.execute(stmt)
         which_row: Optional[Row[orm.VerificationToken]] = result.fetchone()
         if which_row and len(which_row) > 0:
             orm_verification_token: orm.VerificationToken = which_row[0]
-            auth_verification_token = VerificationToken(
-                identifier=orm_verification_token.identifier,
-                token=orm_verification_token.token,
-                expires=orm_verification_token.token,
-            )
-            db.delete(orm_verification_token)
+            try:
+                if orm_verification_token.token != params.token:
+                    # I assume this is the right thing to do if the tokens don't match?
+                    raise HTTPException(
+                        status_code=404,  # Not sure if this is the right status code
+                        detail="Verification token in storage does not match submitted token",
+                    )
+                auth_verification_token = VerificationToken(
+                    identifier=orm_verification_token.identifier,
+                    token=orm_verification_token.token,
+                    expires=orm_verification_token.expires,
+                )
 
-            return auth_verification_token
+                return auth_verification_token
+            finally:
+                db.delete(orm_verification_token)
+                db.commit()
+                db.flush(orm_verification_token)
 
         else:
             logger.error(f"Could not find session for params: {params}")

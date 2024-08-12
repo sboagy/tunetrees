@@ -31,15 +31,22 @@
       ],
       "auth": [
         "./auth/"
-      ]
-    }
+      ],
+      // "next-auth-http-adapter": [
+      //   "./../../../gitmisc/next-auth-http-adapter/src"
+      // ]
+    },
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/**/*.tsx"
+    ".next/**/*.tsx",
+    "/Users/sboag/gitmisc/next-auth/**/*.ts",
+    "/Users/sboag/gitmisc/next-auth/**/*.tsx",
+    // "/Users/sboag/gitmisc/next-auth-http-adapter/**/*.ts",
+    // "/Users/sboag/gitmisc/next-auth-http-adapter/**/*.tsx"
   ],
   "exclude": [
     "node_modules"
