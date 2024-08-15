@@ -1,115 +1,206 @@
-'use client'
-import React from 'react'
-import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid';
-import DataGrid from '@/components/ui/DataGrid';
-import {Tune} from '../types';
+"use client";
 
-import {submitPracticeFeedback} from '../commands';
-import RecallEvaluationForm from './RecallEvaluationForm';
-import {Box, Button} from '@mui/material';
-import {useRouter} from 'next/navigation';
+import * as React from "react";
+import {
+  ColumnFiltersState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+  VisibilityState,
+} from "@tanstack/react-table";
+import {ArrowUpDown, ChevronDown} from "lucide-react";
 
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table";
+
+import {Tune} from "../types";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {columns} from "@/app/(main)/pages/practice/components/TuneColumns";
 
 interface ScheduledTunesType {
-    tunes: Tune[]
+  tunes: Tune[];
 }
 
-export interface Values {
-    id: string
-    feedback: string
-}
+export default function ScheduledTunes({
+  tunes,
+}: ScheduledTunesType): JSX.Element {
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  );
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({
+      id: true,
+      title: true,
+      type: true,
+      structure: false,
+      mode: false,
+      incipit: true,
+      learned: false,
+      practiced: true,
+      quality: false,
+      easiness: false,
+      interval: false,
+      repetitions: false,
+      review_date: false,
+      backup_practiced: false,
+      note_private: false,
+      note_public: false,
+      tags: false,
+    });
+  const [rowSelection, setRowSelection] = React.useState({});
 
+  const table = useReactTable({
+    data: tunes,
+    columns: columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      rowSelection,
+      columnVisibility,
+    },
+    // initialState: {
+    //   columnVisibility: columnVisibility,
+    // },
+  });
 
-export default function ScheduledTunes({tunes}: ScheduledTunesType) {
+  return (
+    <div className="w-full">
+      <div className="flex items-center py-4">
+        {/* <Input
+          placeholder="Filter by type..."
+          value={(table.getColumn("type")?.getFilterValue() as string) ?? ""}
+          onChange={(event) =>
+            table.getColumn("type")?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm"
+        /> */}
+        <div className="flex-row items-center">
+          {/* <h1>Scheduled for practice:</h1> */}
+          <Button type="submit" variant="outline">
+            Submit Practiced Tunes
+          </Button>
+        </div>
 
-    console.log('Tunes incoming to scheduled tunes', tunes)
-
-    const router = useRouter()
-
-    const valuesArray = {}
-
-    const scheduledTunesColumns: GridColDef[] = [
-        {
-            field: 'title',
-            headerName: 'Tune Name',
-            width: 250,
-        },
-        {
-            field: 'type',
-            headerName: 'Type',
-            width: 100,
-        },
-        {
-            field: 'practiced',
-            headerName: 'Last Practiced',
-            width: 150,
-        },
-        {
-            field: 'review_date',
-            headerName: 'Scheduled',
-            width: 150,
-        },
-        // {
-        //   field: 'note_private',
-        //   headerName: 'Note Private',
-        //   width: 150,
-        // },
-        // {
-        //   field: 'note_public',
-        //   headerName: 'Note Public',
-        //   width: 150,
-        // },
-        {
-            field: 'tags',
-            headerName: 'Tags',
-            width: 90,
-        },
-        {
-            field: 'incipit',
-            headerName: 'Incipit',
-            width: 150
-        },
-        {
-            field: 'externalLink',
-            headerName: 'External Link',
-            width: 160,
-            renderCell: (params: GridRenderCellParams) => {
-                return <a href={`https://www.irishtune.info/tune/${params.row.id}`}
-                          target="_blank">{params.row.title}</a>
-            }
-        },
-        {
-            field: 'recallEval',
-            headerName: 'Recall Evaluation',
-            width: 500,
-            renderCell: (params: GridRenderCellParams) => {
-                return <Box sx={{width: "100%"}}><RecallEvaluationForm tuneId={params.row.id}
-                                                                       valuesArray={valuesArray}/></Box>
-            }
-        },
-
-    ]
-
-    const handleClick = () => {
-        for (const [key, value] of Object.entries(valuesArray)) {
-            const id = parseInt(key)
-            const feedback = value as string
-            submitPracticeFeedback({id, feedback})
-            // router.reload()
-        }
-
-    }
-
-    return (
-        <>
-            <h4>Scheduled for practice:</h4>
-            <Button
-                type='submit'
-                variant='outlined'
-                onClick={handleClick} sx={{mb: 2}}>Submit Practiced Tunes
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Columns <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
-            <DataGrid rows={tunes} columns={scheduledTunesColumns} pageSize={10}/>
-        </>
-
-    )
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => {
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {column.id}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <div className="flex-1 text-sm text-muted-foreground">
+          {table.getFilteredSelectedRowModel().rows.length} of{" "}
+          {table.getFilteredRowModel().rows.length} row(s) selected.
+        </div>
+        <div className="space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }

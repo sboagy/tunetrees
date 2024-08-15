@@ -12,12 +12,10 @@ from typing import Any, Optional, Tuple
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from idna import valid_contextj
 from pydantic import BaseModel, Field
 from sqlalchemy import Result, Row, Select, select
 from sqlalchemy.orm.session import Session as SqlAlchemySession
 
-from tunetrees import app
 from tunetrees.app.database import SessionLocal
 from tunetrees.models import tunetrees as orm
 

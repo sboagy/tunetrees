@@ -31,6 +31,9 @@ def backup_practiced_dates():  # sourcery skip: extract-method
         for practice_record in practice_records:
             practice_record.BackupPracticed = practice_record.Practiced
 
+            assert practice_record.tune
+            assert practice_record.playlist
+
             print(
                 f"{practice_record.tune.Title=}, {practice_record.playlist.instrument=}, "
                 f"{practice_record.PLAYLIST_REF=}, {practice_record.TUNE_REF=}, "
@@ -118,9 +121,7 @@ def submit_review(tune_id: int, feedback: str):
         practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
 
         stmt = select(PracticeRecord).where(PracticeRecord.TUNE_REF == tune_id)
-        row = db.execute(stmt).one()[0]
-
-        foo = row.Easiness
+        row: PracticeRecord = db.execute(stmt).one()[0]
 
         review = sm_two.review(
             quality, row.Easiness, row.Interval, row.Repetitions, practiced

@@ -79,18 +79,60 @@ export function DemoUser(props: React.ComponentPropsWithRef<typeof Button>) {
 export function SignOut(props: React.ComponentPropsWithRef<typeof Button>) {
     console.log("Constructing the SignOut button");
     return (
-        <form
-            action={async () => {
-                "use server";
-                // const session = await auth();
-                console.log("Handling SignOut request");
-                await signOut();
-            }}
-            className="w-full"
-        >
-            <Button variant="ghost" className="w-full p-0" {...props}>
-                Sign Out
-            </Button>
-        </form>
+      <form
+        action={async () => {
+          "use server";
+          // const session = await auth();
+          console.log("Handling SignOut request");
+          await signOut();
+        }}
+        className="w-full"
+      >
+        <Button variant="ghost" {...props}>
+          Sign Out
+        </Button>
+      </form>
     );
+}
+
+export function UserSettingsMenuItem(
+  props: React.ComponentPropsWithRef<typeof Button>
+) {
+  console.log("Constructing the UserSettingsMenuItem button");
+  return (
+    <form
+      action={async () => {
+        "use server";
+        // const session = await auth();
+        console.log("Handling User Settings request");
+        redirect("/user-settings");
+      }}
+      className="w-full"
+    >
+      <Button variant="ghost" {...props}>
+        User Settings
+      </Button>
+    </form>
+  );
+}
+
+export function ManagePlaylistMenuItem(
+  props: React.ComponentPropsWithRef<typeof Button>
+) {
+  console.log("Constructing the ManagePlaylist button");
+  return (
+    <form
+      action={async () => {
+        "use server";
+        // const session = await auth();
+        console.log("Handling User Settings request");
+        redirect("/user-settings");
+      }}
+      className="w-full"
+    >
+      <Button variant="ghost" {...props}>
+        Manage Playlist
+      </Button>
+    </form>
+  );
 }
