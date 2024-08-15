@@ -60,18 +60,6 @@ The project could be further extended by having the app "listen" to the review t
 and then calculating the spacing interval based on how well the tune was played.  This would, in essence, begin to 
 turn the app into a music teacher of sorts. 
 
-### General Memorization App
-
-Ultimately, a more general memorization app could be created, similar to Anki and other flashcard software, but 
-providing an ecosystem of AI plug-ins, with a DRL learning base.  This would be more useful for e-learning 
-than the current crop of flashcard software.
- 
-To get an idea of areas in Anatomy, Biology, Chemistry, Geography, History, Law, Math, Music, Pathology, and Physics 
-where this could be applied, it is useful to browse the [AnkiWeb shared catalog](https://ankiweb.net/shared/decks/) \[
-this will require an AnkiWeb login\].
-
-![ankiweb-catalog](ankiweb-catalog.png)
-
 ## Partnerships?
 
 * Potentially: MIT McGovern Institute for Brain Research,\
