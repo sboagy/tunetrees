@@ -1,17 +1,67 @@
-import { CellContext, ColumnDef } from "@tanstack/react-table";
+import { CellContext, Column, ColumnDef } from "@tanstack/react-table";
 import { Tune } from "@/app/(main)/pages/practice/types";
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RecallEvalComboBox";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, Filter, EyeOff, Columns, ArrowUpDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
-function sortableHeader(column: any, title: string) {
+function columnControlMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger>
+        <Button variant="ghost" className="text-black">
+          {" "}
+          <span className="font-bold">&#8942;</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        {/* <DropdownMenuLabel>Column Control</DropdownMenuLabel> */}
+        <DropdownMenuItem>
+          <ArrowUp className="mr-2 h-4 w-4" />
+          <span>Sort ascending</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <ArrowDown className="mr-2 h-4 w-4" />
+          <span>Sort descending</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <ArrowUpDown className="mr-2 h-4 w-4" />
+          <span>Unsort</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>
+          <Filter className="mr-2 h-4 w-4" />
+          <span>Filter...</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>
+          <EyeOff className="mr-2 h-4 w-4" />
+          <span>Hide Column</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Columns className="mr-2 h-4 w-4" />
+          <span>Manage Columns...</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function sortableHeader<TData, TValue>(column: Column<TData, TValue>, title: string) {
   console.log("column: ", column);
+  const is_sorted = column.getIsSorted();
   return (
     <div
       className="flex items-center"
       onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
     >
       {title}
-      <ArrowUpDown className="ml-2 h-4 w-4" />
+      {is_sorted === "asc" ? (
+        <ArrowUp className="ml-2 h-4 w-4" />
+      ) : (
+        <ArrowDown className="ml-2 h-4 w-4" />
+      )}
+      {columnControlMenu()}
     </div>
   );
 }
