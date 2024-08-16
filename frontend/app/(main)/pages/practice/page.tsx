@@ -1,16 +1,6 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { getPracticeListScheduled, getRecentlyPracticed } from "./queries";
@@ -18,8 +8,7 @@ import { getPracticeListScheduled, getRecentlyPracticed } from "./queries";
 import { Tune } from "./types";
 
 import ScheduledTunesGrid from "./components/ScheduledTunesGrid";
-import ScheduledTunesGridOld from "./components/ScheduledTunesGridOld";
-import RecentlyPracticed from "./components/RecentlyPracticed";
+import RepertoireGrid from "./components/RepertoireGrid";
 
 function CircularProgress() {
   return (
@@ -55,7 +44,6 @@ export default function Practice() {
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="scheduled">Scheduled for Practice</TabsTrigger>
         <TabsTrigger value="repertoire">Repertoire</TabsTrigger>
-        {/* <TabsTrigger value="xxx">Material-ui Grid</TabsTrigger> */}
       </TabsList>
       <TabsContent value="scheduled">
         <Card>
@@ -83,32 +71,13 @@ export default function Practice() {
           </CardHeader> */}
           <CardContent className="space-y-2">
             {recentlyPracticed ? (
-              <RecentlyPracticed tunes={recentlyPracticed} />
+              <RepertoireGrid tunes={recentlyPracticed} />
             ) : (
               <CircularProgress />
             )}
           </CardContent>
           {/* <CardFooter>
             <Button>Save password</Button>
-          </CardFooter> */}
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="xxx">
-        <Card>
-          {/* <CardHeader>
-            <CardTitle>Scheduled for Practice (Material-ui Grid)</CardTitle>
-            <CardDescription>Older grid for reference.</CardDescription>
-          </CardHeader> */}
-          <CardContent className="space-y-2">
-            {scheduled ? (
-              <ScheduledTunesGridOld tunes={scheduled} />
-            ) : (
-              <CircularProgress />
-            )}
-          </CardContent>
-          {/* <CardFooter>
-            <Button>Save changes</Button>
           </CardFooter> */}
         </Card>
       </TabsContent>

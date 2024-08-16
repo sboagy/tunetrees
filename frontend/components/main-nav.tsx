@@ -5,7 +5,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 import Image from "next/image";
-import profilePic from "/public/logo.png";
+import profilePic from "/public/logo4.png";
 
 import CustomLink from "./custom-link";
 import { Button } from "./ui/button";
@@ -20,15 +20,15 @@ import {
 
 export function MainNav() {
   return (
-    <div className="flex gap-4 items-center">
+    <div className="flex items-center py-4">
       <CustomLink href="/">
-        <Button variant="ghost" className="p-0">
+        <Button variant="ghost" className="h-16 py-2 mt-1">
           <Image
             src={profilePic}
             alt="Home"
-            width="32"
-            height="32"
-            //   className="min-w-8"
+            width="52"
+            height="52"
+            className="items-center py-0"
           />
         </Button>
       </CustomLink>
@@ -38,18 +38,18 @@ export function MainNav() {
             <NavigationMenuTrigger className="px-2">
               TuneTrees
             </NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
-                <ListItem href="/server-example" title="Blah">
-                  Blah blah blah
-                </ListItem>
-                <ListItem href="/middleware-example" title="Yada">
-                  Yada yada yada
-                </ListItem>
-                <ListItem href="/api-example" title="What">
-                  Whatever
-                </ListItem>
-              </ul>
+            <NavigationMenuContent >
+                <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
+                  <ListItem href="/server-example" title="Blah">
+                    Blah blah blah
+                  </ListItem>
+                  <ListItem href="/middleware-example" title="Yada">
+                    Yada yada yada
+                  </ListItem>
+                  <ListItem href="/api-example" title="What">
+                    Whatever
+                  </ListItem>
+                </ul>
             </NavigationMenuContent>
           </NavigationMenuItem>
           {/* <NavigationMenuItem>

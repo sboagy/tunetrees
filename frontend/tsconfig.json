@@ -39,8 +39,12 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "auth/**/*.ts",
+    "lib/**/*.ts",
     ".next/types/**/*.ts",
     ".next/**/*.tsx",
     "/Users/sboag/gitmisc/next-auth/**/*.ts",
@@ -49,6 +53,7 @@
     // "/Users/sboag/gitmisc/next-auth-http-adapter/**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "archive"
   ]
 }

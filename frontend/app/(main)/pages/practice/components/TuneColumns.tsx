@@ -1,8 +1,21 @@
 import { CellContext, Column, ColumnDef } from "@tanstack/react-table";
 import { Tune } from "@/app/(main)/pages/practice/types";
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RecallEvalComboBox";
-import { ArrowDown, ArrowUp, Filter, EyeOff, Columns, ArrowUpDown } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  ArrowDown,
+  ArrowUp,
+  Filter,
+  EyeOff,
+  Columns,
+  ArrowUpDown,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
 function columnControlMenu() {
@@ -47,7 +60,10 @@ function columnControlMenu() {
   );
 }
 
-function sortableHeader<TData, TValue>(column: Column<TData, TValue>, title: string) {
+function sortableHeader<TData, TValue>(
+  column: Column<TData, TValue>,
+  title: string
+) {
   console.log("column: ", column);
   const is_sorted = column.getIsSorted();
   return (
@@ -66,7 +82,7 @@ function sortableHeader<TData, TValue>(column: Column<TData, TValue>, title: str
   );
 }
 
-export const columns: ColumnDef<Tune>[] = [
+const columns: ColumnDef<Tune>[] = [
   {
     id: "id",
     // header: ({ column }) => sortableHeader(column, "Id"),
@@ -231,3 +247,7 @@ export const columns: ColumnDef<Tune>[] = [
     cell: RecallEvalComboBox,
   },
 ];
+
+export function get_columns(): ColumnDef<Tune>[] {
+  return columns;
+}

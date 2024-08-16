@@ -30,7 +30,7 @@ export default async function RootLayout({
           <Theme>
             <div className="flex flex-col justify-between w-full h-full min-h-screen">
               <Header />
-              <main className="flex-auto w-full max-w-8xl px-4 py-2 mx-auto sm:px-6 md:pt-4">
+              <main className="flex-auto w-full max-w-8xl px-4 py-2 mx-auto sm:px-6 md:pt-0">
                 {children}
               </main>
               <Footer />

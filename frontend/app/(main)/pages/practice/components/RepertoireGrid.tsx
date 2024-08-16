@@ -1,11 +1,11 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
-import ColumnsMenu from "./ColumnsMenu";
-import TunesGrid, { ScheduledTunesType, TunesTable } from "./TunesGrid";
 import { Button } from "@/components/ui/button";
 
-export default function ScheduledTunesGrid({
+import ColumnsMenu from "./ColumnsMenu";
+import TunesGrid, { ScheduledTunesType, TunesTable } from "./TunesGrid";
+
+export default function RepertoireGrid({
   tunes,
 }: ScheduledTunesType): JSX.Element {
   const table = TunesTable({ tunes });
@@ -21,13 +21,6 @@ export default function ScheduledTunesGrid({
           }
           className="max-w-sm"
         /> */}
-        <div className="flex-row items-center">
-          {/* <h1>Scheduled for practice:</h1> */}
-          <Button type="submit" variant="outline">
-            Submit Practiced Tunes
-          </Button>
-        </div>
-
         <ColumnsMenu table={table} />
       </div>
       <TunesGrid table={table} />

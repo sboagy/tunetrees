@@ -163,7 +163,7 @@ const config = {
   theme: {
     colorScheme: "auto", // "auto" | "dark" | "light"
     // brandColor: "", // Hex color code
-    logo: "/logo.png", // Absolute URL to image
+    logo: "/logo4.png", // Absolute URL to image
     // buttonText: "", // Hex color code
   },
   basePath: BASE_PATH,

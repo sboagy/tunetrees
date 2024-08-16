@@ -20,13 +20,13 @@ export default async function index() {
             The Skeptic — showeth me —<br />
             “No Sir! In Thee!” <br />
           </i>
-          -- Emily Dickinson
+          -- Emily Dickinson, “To Hear an Oriole Sing”
         </Blockquote>
 
         <Text as="p">
-            TuneTrees is an app for music practice, focusing on folk musicians. It
-            assists with memorization of repertoire, training of musical
-            instrument motor skills, and musical wiring of the brain.
+          TuneTrees is an app for music practice, focusing on folk musicians. It
+          assists with memorization of repertoire, training of musical
+          instrument motor skills, and musical wiring of the brain.
         </Text>
 
         <Blockquote>
@@ -45,9 +45,9 @@ export default async function index() {
 
         <Text as="p">
           TuneTrees uses a combination of techniques including spaced
-            repetition, mnemonics, and spacial/navigational techniques.
-            The idea is to make music practice more efficient, with better
-            long term retention.
+          repetition, mnemonics, and spacial/navigational techniques. The idea
+          is to make music practice more efficient, with better long term
+          retention.
         </Text>
       </Flex>
     );

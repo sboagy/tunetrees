@@ -1,6 +1,4 @@
 "use server";
-import Image from "next/image";
-import Logout from "@/components/logout";
 import { auth } from "@/auth";
 
 import { redirect } from "next/navigation";

@@ -2,7 +2,7 @@
 
 import {providerMap, signIn} from "@/auth";
 import Image from "next/image";
-import profilePic from "/public/logo.png";
+import profilePic from "/public/logo4.png";
 
 // import { useSession } from "next-auth/react";
 import {useCallback} from "react";
