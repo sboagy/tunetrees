@@ -199,8 +199,9 @@ Then remove the extra `from sqlalchemy.orm.base import Mapped` line from the gen
 
 Finally, make sure the new code is properly formatted for the project.
 
-[!NOTE]
-For the moment, both `black` and `ruff` are invoked, which is just me trying to hedge my bets.
+> [!NOTE]
+> For the moment, both `black` and `ruff` are being invoked, which is just the author 
+> trying to hedge his bets.
 
 ```bash
 black tunetrees/models/tunetrees.py &&  ruff check --fix --select I tunetrees/models/tunetrees.py && ruff check --fix tunetrees 
