@@ -1,0 +1,119 @@
+classDiagram
+direction BT
+class account {
+   text provider
+   text type
+   text access_token
+   text id_token
+   text refresh_token
+   text scope
+   integer expires_at
+   text session_state
+   text token_type
+   text user_id
+   text provider_account_id
+}
+class external_ref {
+   text url
+   text ref_type
+   integer tune_ref
+   integer id
+}
+class playlist {
+   integer USER_REF
+   text instrument
+   integer PLAYLIST_ID
+}
+class playlist_tune {
+   text Current
+   text Learned
+   integer PLAYLIST_REF
+   text TUNE_REF
+}
+class practice_list_joined {
+   integer ID
+   text Title
+   text Type
+   text Structure
+   text Mode
+   text Incipit
+   text Learned
+   text Practiced
+   text Quality
+   real Easiness
+   integer Interval
+   integer Repetitions
+   integer ReviewDate
+   text BackupPracticed
+   text NotePrivate
+   text NotePublic
+   text Tags
+}
+class practice_record {
+   integer PLAYLIST_REF
+   text TUNE_REF
+   text Practiced
+   text Quality
+   real Easiness
+   integer Interval
+   integer Repetitions
+   integer ReviewDate
+   text BackupPracticed
+   integer ID
+}
+class session {
+   text expires
+   text user_id
+   text session_token
+}
+class sqlite_master {
+   text type
+   text name
+   text tbl_name
+   int rootpage
+   text sql
+}
+class sqlite_sequence {
+   unknown name
+   unknown seq
+}
+class tune {
+   text Type
+   text Structure
+   text Title
+   text Mode
+   text Incipit
+   integer ID
+}
+class user {
+   text hash
+   text name
+   text email
+   text email_verified
+   text image
+   text view_settings
+   integer id
+}
+class user_annotation_set {
+   text NotePrivate
+   text NotePublic
+   text Tags
+   text TUNE_REF
+   integer USER_REF
+}
+class verification_token {
+   text token
+   text expires
+   text identifier
+}
+
+account  -->  user : user_id
+external_ref  -->  tune : tune_ref
+playlist  -->  user : USER_REF
+playlist_tune  -->  playlist : PLAYLIST_REF
+playlist_tune  -->  tune : TUNE_REF
+practice_record  -->  playlist : PLAYLIST_REF
+practice_record  -->  tune : TUNE_REF
+session  -->  user : user_id
+user_annotation_set  -->  tune : TUNE_REF
+user_annotation_set  -->  user : USER_REF

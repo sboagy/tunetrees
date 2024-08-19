@@ -81,16 +81,22 @@ class account {
    text user_id
    text provider_account_id
 }
+class external_ref {
+   text url
+   text ref_type
+   integer tune_ref
+   integer id
+}
 class playlist {
    integer USER_REF
    text instrument
    integer PLAYLIST_ID
 }
 class playlist_tune {
-   integer PLAYLIST_REF
-   text TUNE_REF
    text Current
    text Learned
+   integer PLAYLIST_REF
+   text TUNE_REF
 }
 class practice_list_joined {
    integer ID
@@ -149,20 +155,18 @@ class tune {
 }
 class user {
    text hash
-   text first_name
-   text middle_name
-   text last_name
+   text name
    text email
-   text user_name
    text email_verified
    text image
-   integer ID
+   text view_settings
+   integer id
 }
 class user_annotation_set {
-   text TUNE_REF
    text NotePrivate
    text NotePublic
    text Tags
+   text TUNE_REF
    integer USER_REF
 }
 class verification_token {
@@ -172,6 +176,7 @@ class verification_token {
 }
 
 account  -->  user : user_id
+external_ref  -->  tune : tune_ref
 playlist  -->  user : USER_REF
 playlist_tune  -->  playlist : PLAYLIST_REF
 playlist_tune  -->  tune : TUNE_REF
