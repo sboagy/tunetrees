@@ -1,12 +1,11 @@
-import {httpAdapter} from "next-auth-http-adapter";
+import { httpAdapter } from "next-auth-http-adapter";
 import {
-  AdapterAccount,
   AdapterSession,
   AdapterUser,
-  VerificationToken,
+  VerificationToken
 } from "next-auth/adapters";
-import {z} from "zod";
-import {ofetch} from "ofetch";
+import { z } from "zod";
+import { ofetch } from "ofetch";
 export const adapterSessionSchema = z.object({
   expires: z.date(),
   sessionToken: z.string(),
