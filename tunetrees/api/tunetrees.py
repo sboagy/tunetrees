@@ -1,9 +1,10 @@
 import logging
 from datetime import datetime
 from os import environ
-from typing import Annotated, List
+from typing import Annotated, Any, List
 
 from fastapi import APIRouter, Form
+from sqlalchemy.engine.row import Row
 from starlette import status as status
 from starlette.responses import HTMLResponse, RedirectResponse
 
@@ -27,7 +28,6 @@ tt_review_sitdown_date_str = environ.get("TT_REVIEW_SITDOWN_DATE", None)
 
 @router.get("/practice", response_class=HTMLResponse)
 async def practice_page():
-
     tt_review_sitdown_date = (
         datetime.fromisoformat(tt_review_sitdown_date_str)
         if tt_review_sitdown_date_str
@@ -43,10 +43,8 @@ async def get_scheduled():
     db = None
     try:
         db = SessionLocal()
-        tunes_scheduled: List[Tune] = get_practice_list_scheduled(db, limit=10)
-        tune_list = []
-        for tune in tunes_scheduled:
-            tune_list.append(tunes_mapper(tune))
+        tunes_scheduled: List[Row[Any]] = get_practice_list_scheduled(db, limit=10)
+        tune_list = [tunes_mapper(tune) for tune in tunes_scheduled]
         return tune_list
     except Exception as e:
         return {"error": f"Unable to fetch scheduled practice list: {e}"}

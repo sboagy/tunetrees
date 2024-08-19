@@ -3,8 +3,6 @@ from typing import List, Optional
 from sqlalchemy import Column, Float, ForeignKey, Index, Integer, Table, Text, text
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 
-# from sqlalchemy.orm.base import Mapped
-
 Base = declarative_base()
 metadata = Base.metadata
 
@@ -58,6 +56,9 @@ class Tune(Base):
     Mode = mapped_column(Text)
     Incipit = mapped_column(Text)
 
+    external_ref: Mapped[List["ExternalRef"]] = relationship(
+        "ExternalRef", uselist=True, back_populates="tune"
+    )
     practice_record: Mapped[List["PracticeRecord"]] = relationship(
         "PracticeRecord", uselist=True, back_populates="tune"
     )
@@ -72,6 +73,7 @@ class User(Base):
     email = mapped_column(Text)
     email_verified = mapped_column(Text, server_default=text("NULL"))
     image = mapped_column(Text)
+    view_settings = mapped_column(Text)
 
     playlist: Mapped[List["Playlist"]] = relationship(
         "Playlist", uselist=True, back_populates="user"
@@ -87,6 +89,17 @@ class VerificationToken(Base):
     identifier = mapped_column(Text, primary_key=True)
     token = mapped_column(Text)
     expires = mapped_column(Text)
+
+
+class ExternalRef(Base):
+    __tablename__ = "external_ref"
+
+    id = mapped_column(Integer, primary_key=True)
+    url = mapped_column(Text, nullable=False)
+    tune_ref = mapped_column(ForeignKey("tune.ID"), nullable=False)
+    ref_type = mapped_column(Text)
+
+    tune: Mapped["Tune"] = relationship("Tune", back_populates="external_ref")
 
 
 class Playlist(Base):
