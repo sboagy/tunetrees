@@ -1,25 +1,33 @@
 from typing import List, Optional
 
-from sqlalchemy import Float, ForeignKey, Index, Integer, Text, text
+from sqlalchemy import Column, Float, ForeignKey, Index, Integer, Table, Text, text
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 
 Base = declarative_base()
+metadata = Base.metadata
 
 
-class Account(Base):
-    __tablename__ = "account"
-
-    user_id = mapped_column(Text, primary_key=True, nullable=False)
-    provider_account_id = mapped_column(Text, primary_key=True)
-    provider = mapped_column(Text)
-    type = mapped_column(Text)
-    access_token = mapped_column(Text)
-    id_token = mapped_column(Text)
-    refresh_token = mapped_column(Text)
-    scope = mapped_column(Text)
-    expires_at = mapped_column(Integer)
-    session_state = mapped_column(Text)
-    token_type = mapped_column(Text)
+t_practice_list_joined = Table(
+    "practice_list_joined",
+    metadata,
+    Column("ID", Integer),
+    Column("Title", Text),
+    Column("Type", Text),
+    Column("Structure", Text),
+    Column("Mode", Text),
+    Column("Incipit", Text),
+    Column("Learned", Text),
+    Column("Practiced", Text),
+    Column("Quality", Text),
+    Column("Easiness", Float),
+    Column("Interval", Integer),
+    Column("Repetitions", Integer),
+    Column("ReviewDate", Integer),
+    Column("BackupPracticed", Text),
+    Column("NotePrivate", Text),
+    Column("NotePublic", Text),
+    Column("Tags", Text),
+)
 
 
 class Tune(Base):
@@ -57,6 +65,9 @@ class User(Base):
     image = mapped_column(Text)
     view_settings = mapped_column(Text)
 
+    account: Mapped[List["Account"]] = relationship(
+        "Account", uselist=True, back_populates="user"
+    )
     playlist: Mapped[List["Playlist"]] = relationship(
         "Playlist", uselist=True, back_populates="user"
     )
@@ -74,6 +85,24 @@ class VerificationToken(Base):
     identifier = mapped_column(Text, primary_key=True)
     token = mapped_column(Text)
     expires = mapped_column(Text)
+
+
+class Account(Base):
+    __tablename__ = "account"
+
+    user_id = mapped_column(ForeignKey("user.id"), primary_key=True, nullable=False)
+    provider_account_id = mapped_column(Text, primary_key=True)
+    provider = mapped_column(Text)
+    type = mapped_column(Text)
+    access_token = mapped_column(Text)
+    id_token = mapped_column(Text)
+    refresh_token = mapped_column(Text)
+    scope = mapped_column(Text)
+    expires_at = mapped_column(Integer)
+    session_state = mapped_column(Text)
+    token_type = mapped_column(Text)
+
+    user: Mapped["User"] = relationship("User", back_populates="account")
 
 
 class ExternalRef(Base):

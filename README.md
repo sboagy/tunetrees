@@ -50,10 +50,12 @@ graph LR
         A(FastAPI Server)
         C(SM2 Algorithm)
         H(Auth adapter)
-        A --> C
+        J(SQLAlchemy)
+        A --> J
         A --> H
-        C --> B
-        H --> B
+        J --> B
+        C --> J
+        H --> J
     end
     subgraph Frontend
         direction LR
@@ -181,3 +183,35 @@ erDiagram
 
 1. Down the line, I can switch to MySQL or PostgreSQL if needed.
 2. For the front end, I may experiment with a Kotlin frontend at some point.
+
+## Development Processes
+
+### Generation of ORM code
+
+The SQLAlchemy ORM code is contained in the `tunetrees/models` package in the `tunetrees.py` 
+module.  It should always be generated with the following procedure:
+
+```bash
+sqlacodegen_v2 sqlite:///tunetrees.sqlite3 > tunetrees/models/tunetrees.py
+```
+
+Then remove the extra `from sqlalchemy.orm.base import Mapped` line from the generated code.
+
+Finally, make sure the new code is properly formatted for the project.
+
+[!NOTE]
+For the moment, both `black` and `ruff` are invoked, which is just me trying to hedge my bets.
+
+```bash
+black tunetrees/models/tunetrees.py &&  ruff check --fix --select I tunetrees/models/tunetrees.py && ruff check --fix tunetrees 
+```
+
+## Credits
+
+TuneTrees is a collaborative project developed by a team of dedicated musicians and software engineers. The following individuals have made contributions to the project:
+
+- Scott Boag: Project Owner
+- Caitlin Rich: Developer
+- Joanne Boag: Consultation
+
+If you would like to contribute to TuneTrees, please visit [GitHub repository](https://github.com/your-username/tunetrees) for more information.
