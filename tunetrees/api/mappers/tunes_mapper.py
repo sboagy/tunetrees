@@ -1,6 +1,7 @@
-from typing import Any, List
+from typing import Any
 
 from sqlalchemy.engine.row import Row
+
 from tunetrees.models.practice_list_joined import (
     practice_list_columns,
 )

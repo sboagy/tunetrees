@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func
-from sqlalchemy.orm import Query, Session
+from sqlalchemy import desc, func
 from sqlalchemy.engine.row import Row
+from sqlalchemy.orm import Query, Session
 from tabulate import tabulate
 
 from tunetrees.app.database import SessionLocal
@@ -12,6 +12,7 @@ from tunetrees.models.practice_list_joined import (
     practice_list_columns,
 )
 from tunetrees.models.tunetrees import (
+    Playlist,
     PracticeRecord,
     Tune,
 )
@@ -51,42 +52,39 @@ def get_practice_record_table(
     return rows
 
 
-def get_most_recent_review_date(db: Session) -> datetime:
-    # query: Query[Any] = db.query(t_practice_list_joined)
-    # most_recent_schedualed = query.order_by(
-    #     func.DATE(t_practice_list_joined.columns.get("Practiced")).desc()
-    # ).limit(1)
-
-    # review_date_column_name = "ReviewDate"
-    # review_date = t_practice_list_joined.columns.get(review_date_column_name)
-    # assert review_date is not None
-    # review_date_column_index = list(t_practice_list_joined.columns.keys()).index(
-    #     review_date_column_name
-    # )
-    # most_recent_review_date_str = most_recent_schedualed[0][review_date_column_index]
-    # most_recent_review_date = datetime.fromisoformat(most_recent_review_date_str)
-    # return most_recent_review_date
-    return datetime.today()
+def get_playlist_ids_for_user(session: Session, USER_REF) -> List[int]:
+    playlist_ids = (
+        session.query(Playlist.PLAYLIST_ID).filter(Playlist.USER_REF == USER_REF).all()
+    )
+    return [playlist_id[0] for playlist_id in playlist_ids]
 
 
-def get_most_recent_practice_date(db: Session) -> datetime:
-    # query: Query[Any] = db.query(t_practice_list_joined)
-    # most_recent_schedualed = query.order_by(
-    #     func.DATE(t_practice_list_joined.columns.get("Practiced")).desc()
-    # ).limit(1)
+def get_most_recent_review_date(session: Session, playlist_ref: int) -> None | datetime:
+    most_recent_review_date = (
+        session.query(PracticeRecord)
+        .filter(PracticeRecord.PLAYLIST_REF == playlist_ref)
+        .order_by(desc(PracticeRecord.ReviewDate))
+        .first()
+    )
+    if most_recent_review_date is None:
+        return None
+    most_recent_review_date_str = most_recent_review_date.ReviewDate
+    most_recent_review_date = datetime.fromisoformat(most_recent_review_date_str)
+    return most_recent_review_date
 
-    # practice_date_column_name = "Practiced"
-    # practice_date = t_practice_list_joined.columns.get(practice_date_column_name)
-    # assert practice_date is not None
-    # practice_date_column_index = list(t_practice_list_joined.columns.keys()).index(
-    #     practice_date_column_name
-    # )
-    # most_recent_practice_date_str = most_recent_schedualed[0][
-    #     practice_date_column_index
-    # ]
-    # most_recent_practice_date = datetime.fromisoformat(most_recent_practice_date_str)
-    # return most_recent_practice_date
-    return datetime.today()
+
+def get_most_recent_practiced(session: Session, playlist_ref: int):
+    most_recent_practice = (
+        session.query(PracticeRecord)
+        .filter(PracticeRecord.PLAYLIST_REF == playlist_ref)
+        .order_by(desc(PracticeRecord.Practiced))
+        .first()
+    )
+    if most_recent_practice is None:
+        return None
+    most_recent_practice_date_str = most_recent_practice.Practiced
+    most_recent_practice_date = datetime.fromisoformat(most_recent_practice_date_str)
+    return most_recent_practice_date
 
 
 def get_practice_list_scheduled(
@@ -96,6 +94,8 @@ def get_practice_list_scheduled(
     print_table=False,
     review_sitdown_date: Optional[datetime] = None,
     acceptable_delinquency_window=7,
+    playlist_ref=1,
+    user_ref=1,
 ) -> List[Row[Any]]:
     """Get a list of tunes to practice on the review_sitdown_date.
 
@@ -116,28 +116,31 @@ def get_practice_list_scheduled(
         review_sitdown_date = datetime.today()
     assert isinstance(review_sitdown_date, datetime)
 
-    practice_list_query = get_practice_list_query(db, playlist_ref=1, user_ref=1)
+    practice_list_query = get_practice_list_query(db, playlist_ref, user_ref)
 
     scheduled_rows: List[Row] = (
-        practice_list_query.where(PracticeRecord.ReviewDate <= review_sitdown_date)
+        practice_list_query.where(
+            PracticeRecord.ReviewDate
+            > review_sitdown_date - timedelta(acceptable_delinquency_window)
+        )
+        .where(PracticeRecord.ReviewDate <= review_sitdown_date)
         .order_by(func.DATE(PracticeRecord.ReviewDate).desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
 
-    rows = scheduled_rows
-    # aged_limit = limit-len(scheduled_rows)
-    # if aged_limit <= 0:
-    #     aged_limit = 2
-    # aged_limit = 2
-    # aged_rows: List[Tune] = (
-    #     query.order_by(func.DATE(t_practice_list_joined.columns.get("Practiced")).asc())
-    #     .offset(skip)
-    #     .limit(aged_limit)
-    #     .all()
-    # )
-    # rows = scheduled_rows + aged_rows
+    aged_limit = limit - len(scheduled_rows)
+    if aged_limit <= 0:
+        aged_limit = 2
+    aged_limit = 2
+    aged_rows: List[Tune] = (
+        practice_list_query.order_by(func.DATE(PracticeRecord.Practiced).asc())
+        .offset(skip)
+        .limit(aged_limit)
+        .all()
+    )
+    rows = scheduled_rows + aged_rows
 
     # if print_table:
     #     print("\n--------")
@@ -147,24 +150,27 @@ def get_practice_list_scheduled(
 
 
 def get_practice_list_recently_played(
-    db: Session, skip: int = 0, limit: int = 100, print_table=False
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    print_table=False,
+    playlist_ref=1,
+    user_ref=1,
 ) -> List[Tune]:
-    # query: Query[Any] = db.query(t_practice_list_joined)
-    # rows: List[Tune] = (
-    #     query.order_by(
-    #         func.DATE(t_practice_list_joined.columns.get("Practiced")).desc()
-    #     )
-    #     .offset(skip)
-    #     .limit(limit)
-    #     .all()
-    # )
+    query = get_practice_list_query(db, playlist_ref, user_ref)
+    rows: List[Tune] = (
+        query.order_by(func.DATE(PracticeRecord.Practiced).desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
+    # TODO: make a decent print_table function
     # if print_table:
     #     print("\n--------")
     #     print(tabulate(rows, headers=t_practice_list_joined.columns.keys()))
 
-    # return rows
-    return []
+    return rows
 
 
 def _run_experiment():
