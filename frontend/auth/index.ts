@@ -309,6 +309,20 @@ const config = {
           token,
           user
       );
+
+      // Bit of a hack to get the user id into the session  
+      if ((!session.userId) && ttHttpAdapter && ttHttpAdapter.getUserByEmail) {
+        const user_record = await ttHttpAdapter.getUserByEmail(session.user.email as string);
+        console.log("user_record: ", user_record);
+        if (user_record?.id) {
+          session.userId = user_record?.id;
+          session.user.id = user_record?.id;
+        }
+        else {
+          console.error("User not found via getUserByEmail");
+        }
+      }
+
       // session.user = token.user as AdapterUser;
       return session;
     },

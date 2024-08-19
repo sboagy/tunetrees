@@ -38,12 +38,16 @@ async def practice_page():
     return html_result
 
 
-@router.get("/get_practice_list_scheduled")
-async def get_scheduled():
+@router.get("/get_practice_list_scheduled/{user_id}/{playlist_ref}")
+async def get_scheduled(
+    user_id: str, playlist_ref: str
+) -> List[dict[str, Any]] | dict[str, str]:
     db = None
     try:
         db = SessionLocal()
-        tunes_scheduled: List[Row[Any]] = get_practice_list_scheduled(db, limit=10)
+        tunes_scheduled = get_practice_list_scheduled(
+            db, limit=10, user_ref=int(user_id), playlist_ref=int(playlist_ref)
+        )
         tune_list = [tunes_mapper(tune) for tune in tunes_scheduled]
         return tune_list
     except Exception as e:
@@ -53,13 +57,13 @@ async def get_scheduled():
             db.close()
 
 
-@router.get("/get_tunes_recently_played")
-async def get_recently_played():
+@router.get("/get_tunes_recently_played/{user_id}/{playlist_ref}")
+async def get_recently_played(user_id: str, playlist_ref: str):
     db = None
     try:
         db = SessionLocal()
         tunes_recently_played: List[Tune] = get_practice_list_recently_played(
-            db, limit=25
+            db, limit=25, user_ref=int(user_id), playlist_ref=int(playlist_ref)
         )
         tune_list = []
         for tune in tunes_recently_played:

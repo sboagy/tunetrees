@@ -18,14 +18,19 @@ function CircularProgress() {
   );
 }
 
-export default function Practice() {
+type PracticeProps = {
+  user_id: string;
+  playlist_id: string;
+};
+
+export default function Practice({ user_id, playlist_id }: PracticeProps): JSX.Element {
   let [scheduled, setScheduled] = useState<Tune[]>();
   let [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
   // const [progress, setProgress] = React.useState(13);
 
   useEffect(() => {
     const getScheduled = async () => {
-      const data = await getPracticeListScheduled();
+      const data = await getPracticeListScheduled(user_id, playlist_id);
       setScheduled(data);
     };
     getScheduled();
@@ -33,7 +38,7 @@ export default function Practice() {
 
   useEffect(() => {
     const getRecent = async () => {
-      const data = await getRecentlyPracticed();
+      const data = await getRecentlyPracticed(user_id, playlist_id);
       setRecentlyPracticed(data);
     };
     getRecent();

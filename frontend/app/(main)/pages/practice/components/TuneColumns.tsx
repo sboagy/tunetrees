@@ -64,7 +64,7 @@ function sortableHeader<TData, TValue>(
   column: Column<TData, TValue>,
   title: string
 ) {
-  console.log("column: ", column);
+  // console.log("column: ", column);
   const is_sorted = column.getIsSorted();
   return (
     <div
