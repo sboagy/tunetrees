@@ -1,4 +1,4 @@
-# Introducing TuneTrees: Digital Repertoire Companion
+# Introducing TuneTrees: Tune Repertoire Practice Assistant
 
 Are you a folk or traditional musician struggling to keep track of your vast repertoire? TuneKeeper is here to help. This app is designed to simplify the process of memorizing and practicing large collections of tunes, making it easier than ever to hone your skills and and be ready to play in spontaneous group settings.
 
