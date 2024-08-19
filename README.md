@@ -9,38 +9,64 @@ to get some insight into the vision of the project.
 
 TuneTrees is a web application with a backend server that manages user data and schedules reviews. The backend securely stores all data in a database, while the frontend handles user interactions like login, account management, and practicing tunes. The frontend communicates with the backend using an HTTP API to access and update user data. Both the frontend and backend are packaged as containers and deployed together using Docker Compose on a DigitalOcean server.
 
+### System Structure
+
+This diagram provides a high-level overview of the TuneTree architecture.
+
 ```mermaid
 flowchart LR
-    subgraph Backend
+    subgraph "Backend (container)"
         direction LR
         A(Backend Server) --> B(Database)
         A --> C(Review Scheduler)
     end
-    subgraph Frontend
+    subgraph "Frontend (container)"
         direction LR
         D(Frontend) --> E(HTTP API)
     end
+    subgraph "Client"
+        direction LR
+        I(Browser) --> D
+    end
+
     E --> A
     D --> F(User Management)
     D --> G(Tune Practice)
     D --> H(Login/Logout)
 ```
 
-Note: This diagram provides a high-level overview of the app's architecture. Specific implementation details may evolve.
+### Technology Usage
+
+This diagram maps out the basic technology used. Specific implementation details may evolve.
 
 ```mermaid
-flowchart LR
+graph LR
+    subgraph Database
+        direction LR
+        B(SQLite Database)
+    end
     subgraph Backend
         direction LR
-        A(FastAPI Server) --> B(SQLite Database)
-        A --> C(SM2 Algorithm)
+        A(FastAPI Server)
+        C(SM2 Algorithm)
+        H(Auth adapter)
+        A --> C
+        A --> H
+        C --> B
+        H --> B
     end
     subgraph Frontend
         direction LR
-        D(React) --> E(Next.js)
-        E --> F(NextAuth.js)
+        D(React)
+        E(Next.js/shadcn/tailwind)
+        F(NextAuth.js)
+        G(next-auth-http-adapter)
+        D --> E
+        E --> F
+        F --> G
     end
-    A --> E
+    E --> A
+    G --> A
 ```
 
 #### Frontend:
@@ -64,125 +90,91 @@ The database is organized as follows: Each user can have multiple playlists, and
 The complete entity relationship diagram is illustrated by the following diagram:
 
 ```mermaid
-classDiagram
-direction BT
-class account {
-   text provider
-   text type
-   text access_token
-   text id_token
-   text refresh_token
-   text scope
-   integer expires_at
-   text session_state
-   text token_type
-   text user_id
-   text provider_account_id
-}
-class external_ref {
-   text url
-   text ref_type
-   integer tune_ref
-   integer id
-}
-class playlist {
-   integer USER_REF
-   text instrument
-   integer PLAYLIST_ID
-}
-class playlist_tune {
-   text Current
-   text Learned
-   integer PLAYLIST_REF
-   text TUNE_REF
-}
-class practice_list_joined {
-   integer ID
-   text Title
-   text Type
-   text Structure
-   text Mode
-   text Incipit
-   text Learned
-   text Practiced
-   text Quality
-   real Easiness
-   integer Interval
-   integer Repetitions
-   integer ReviewDate
-   text BackupPracticed
-   text NotePrivate
-   text NotePublic
-   text Tags
-}
-class practice_record {
-   integer PLAYLIST_REF
-   text TUNE_REF
-   text Practiced
-   text Quality
-   real Easiness
-   integer Interval
-   integer Repetitions
-   integer ReviewDate
-   text BackupPracticed
-   integer ID
-}
-class session {
-   text expires
-   text user_id
-   text session_token
-}
-class sqlite_master {
-   text type
-   text name
-   text tbl_name
-   int rootpage
-   text sql
-}
-class sqlite_sequence {
-   unknown name
-   unknown seq
-}
-class tune {
-   text Type
-   text Structure
-   text Title
-   text Mode
-   text Incipit
-   integer ID
-}
-class user {
-   text hash
-   text name
-   text email
-   text email_verified
-   text image
-   text view_settings
-   integer id
-}
-class user_annotation_set {
-   text NotePrivate
-   text NotePublic
-   text Tags
-   text TUNE_REF
-   integer USER_REF
-}
-class verification_token {
-   text token
-   text expires
-   text identifier
-}
+erDiagram
+    ACCOUNT {
+        TEXT user_id
+        TEXT provider_account_id
+        TEXT provider
+        TEXT type
+        TEXT access_token
+        TEXT id_token
+        TEXT refresh_token
+        TEXT scope
+        integer expires_at
+        TEXT session_state
+        TEXT token_type
+    }
 
-account  -->  user : user_id
-external_ref  -->  tune : tune_ref
-playlist  -->  user : USER_REF
-playlist_tune  -->  playlist : PLAYLIST_REF
-playlist_tune  -->  tune : TUNE_REF
-practice_record  -->  playlist : PLAYLIST_REF
-practice_record  -->  tune : TUNE_REF
-session  -->  user : user_id
-user_annotation_set  -->  tune : TUNE_REF
-user_annotation_set  -->  user : USER_REF
+    EXTERNAL_REF {
+        integer id
+        TEXT url
+        TEXT ref_type
+        integer tune_ref
+    }
+
+    PLAYLIST {
+        integer PLAYLIST_ID
+        integer USER_REF
+        TEXT instrument
+    }
+
+    PRACTICE_RECORD {
+        integer PLAYLIST_REF
+        TEXT TUNE_REF
+        TEXT Practiced
+        TEXT Quality
+        integer ID
+        REAL Easiness
+        integer Interval
+        integer Repetitions
+        integer ReviewDate
+        TEXT BackupPracticed
+    }
+
+    SESSION {
+        TEXT expires
+        TEXT session_token
+        TEXT user_id
+    }
+
+    TUNE {
+        integer ID
+        TEXT Type
+        TEXT Structure
+        TEXT Title
+        TEXT Mode
+        TEXT Incipit
+    }
+
+    USER {
+        integer ID
+        TEXT Name
+        TEXT Email
+        TEXT Password
+    }
+
+    USER_ANNOTATION_SET {
+        integer id
+        integer user_id
+        TEXT Content
+    }
+
+    VERIFICATION_TOKEN {
+        integer id
+        integer user_id
+        TEXT token
+        integer expires_at
+    }
+
+    %% Relationships
+    ACCOUNT }|--|| USER : "references"
+    USER_ANNOTATION_SET }|--|| USER : "belongs to"
+    VERIFICATION_TOKEN }|--|| USER : "belongs to"
+    SESSION }|--|| USER : "references"
+    EXTERNAL_REF }|--|| TUNE : "references"
+    PRACTICE_RECORD }|--|| PLAYLIST : "belongs to"
+    PRACTICE_RECORD }|--|| TUNE : "references"
+    PLAYLIST }|--|| USER : "belongs to"
 ```
 
 ### Alternatives or Potential Technology Evolution
