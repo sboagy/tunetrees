@@ -1,6 +1,4 @@
-# Introducing TuneTrees: Tune Repertoire Practice Assistant
-
-Are you a folk or traditional musician struggling to keep track of your vast repertoire? TuneKeeper is here to help. This app is designed to simplify the process of memorizing and practicing large collections of tunes, making it easier than ever to hone your skills and and be ready to play in spontaneous group settings.
+# TuneTrees: Tune Repertoire Practice Assistant
 
 TuneTrees is designed to help folk musicians efficiently memorize and retain a large repertoire of tunes. By combining proven memory techniques like spaced repetition, mnemonics, and spatial navigation, the app assists in training musical memory. In the future, TuneTrees may explore the use of advanced technologies like neural networks and reinforcement learning to further enhance the memorization process.
 
@@ -45,12 +43,6 @@ flowchart LR
     A --> E
 ```
 
-#### Backend:
-
-Handles user data management, review scheduling, and API requests.
-- Database: Stores user data, including tunes, practice history, and review schedules.
-- Review Scheduler: Determines when tunes should be reviewed based on the user's progress.
-
 #### Frontend:
 
 Handles user interactions, including login, account management, and tune practice.
@@ -58,6 +50,12 @@ Handles user interactions, including login, account management, and tune practic
 - User Management: Handles user registration, login, and account settings.
 - Tune Practice: Provides tools for practicing tunes and tracking progress.
 - Login/Logout: Implements authentication and authorization.
+
+#### Backend:
+
+Handles user data management, review scheduling, and API requests.
+- Database: Stores user data, including tunes, practice history, and review schedules.
+- Review Scheduler: Determines when tunes should be reviewed based on the user's progress.
 
 ### Schema:
 
