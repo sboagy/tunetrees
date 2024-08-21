@@ -11,9 +11,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { CellContext } from "@tanstack/react-table";
+import type { CellContext } from "@tanstack/react-table";
 
-import { Tune } from "../types";
+import type { Tune } from "../types";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function RecallEvalRadioGroup(info: CellContext<Tune, unknown>) {

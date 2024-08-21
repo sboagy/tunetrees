@@ -4,7 +4,6 @@ from os import environ
 from typing import Annotated, Any, List
 
 from fastapi import APIRouter, Form
-from sqlalchemy.engine.row import Row
 from starlette import status as status
 from starlette.responses import HTMLResponse, RedirectResponse
 

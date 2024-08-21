@@ -1,7 +1,7 @@
 "use client";
 
 import ColumnsMenu from "./ColumnsMenu";
-import TunesGrid, { ScheduledTunesType, TunesTable } from "./TunesGrid";
+import TunesGrid, { type ScheduledTunesType, TunesTable } from "./TunesGrid";
 
 export default function RepertoireGrid({
   tunes,

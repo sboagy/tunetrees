@@ -1,7 +1,7 @@
 "use server";
 
-import { signIn } from "../auth";
 import { AuthError } from "next-auth";
+import { signIn } from "../auth";
 
 export async function googleAuthenticate(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

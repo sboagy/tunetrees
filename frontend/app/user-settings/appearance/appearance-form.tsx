@@ -5,7 +5,6 @@ import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Form,
@@ -18,6 +17,7 @@ import {
 } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
 
 const appearanceFormSchema = z.object({
   theme: z.enum(["light", "dark"], {

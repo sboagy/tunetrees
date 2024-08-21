@@ -1,6 +1,6 @@
 import { signIn, signOut } from "auth";
-import { Button } from "./ui/button";
 import { redirect } from "next/navigation";
+import { Button } from "./ui/button";
 
 export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
   console.log("Constructing the SignIn button");

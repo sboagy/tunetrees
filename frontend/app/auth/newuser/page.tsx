@@ -4,10 +4,8 @@ import { providerMap, signIn } from "@/auth";
 import Image from "next/image";
 import profilePic from "/public/logo4.png";
 
-// import { useSession } from "next-auth/react";
-import { useCallback } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Icons } from "@/components/icons";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -17,9 +15,18 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { zodResolver } from "@hookform/resolvers/zod";
+// import { useSession } from "next-auth/react";
+import { useCallback } from "react";
 import { useForm } from "react-hook-form";
 
+// import { cookies } from "next/headers";
+import {
+  type AccountFormValues,
+  accountFormSchema,
+  defaultValues,
+} from "@/app/auth/newuser/account-form";
+import { PasswordInput } from "@/components/password-input";
 import {
   Card,
   CardContent,
@@ -27,13 +34,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { PasswordInput } from "@/components/password-input";
-// import { cookies } from "next/headers";
-import {
-  accountFormSchema,
-  AccountFormValues,
-  defaultValues,
-} from "@/app/auth/newuser/account-form";
 import { newUser } from "./newuser-action";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

@@ -1,8 +1,14 @@
-import { Avatar, AvatarImage } from "./ui/avatar";
-import { Button } from "./ui/button";
 import { auth } from "auth";
 import defaultAvatar from "/public/avatars/flute.png";
+import { Avatar, AvatarImage } from "./ui/avatar";
+import { Button } from "./ui/button";
 
+import {
+  ManagePlaylistMenuItem,
+  SignIn,
+  SignOut,
+  UserSettingsMenuItem,
+} from "./auth-components";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,12 +17,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import {
-  ManagePlaylistMenuItem,
-  SignIn,
-  SignOut,
-  UserSettingsMenuItem,
-} from "./auth-components";
 import { ModeToggle } from "./ui/mode-toggle";
 
 export default async function UserButton() {
@@ -98,9 +98,8 @@ export default async function UserButton() {
                   <DropdownMenuSeparator />
                 </>
               );
-            } else {
-              return null;
             }
+            return null;
           })()}
           <DropdownMenuItem className="h-8">
             <UserSettingsMenuItem />

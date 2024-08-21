@@ -1,8 +1,8 @@
 "use client";
 
-import ColumnsMenu from "./ColumnsMenu";
-import TunesGrid, { ScheduledTunesType, TunesTable } from "./TunesGrid";
 import { Button } from "@/components/ui/button";
+import ColumnsMenu from "./ColumnsMenu";
+import TunesGrid, { type ScheduledTunesType, TunesTable } from "./TunesGrid";
 
 export default function ScheduledTunesGrid({
   tunes,

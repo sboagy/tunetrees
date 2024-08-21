@@ -10,8 +10,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Table } from "@tanstack/react-table";
-import { Tune } from "../types";
+import type { Table } from "@tanstack/react-table";
+import type { Tune } from "../types";
 
 const ColumnsMenu = ({ table }: { table: Table<Tune> }) => {
   return (

@@ -1,14 +1,6 @@
-import type { CellContext, Column, ColumnDef } from "@tanstack/react-table";
-import type { Tune } from "@/app/(main)/pages/practice/types";
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RecallEvalComboBox";
-import {
-  ArrowDown,
-  ArrowUp,
-  Filter,
-  EyeOff,
-  Columns,
-  ArrowUpDown,
-} from "lucide-react";
+import type { Tune } from "@/app/(main)/pages/practice/types";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +8,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+import type { CellContext, Column, ColumnDef } from "@tanstack/react-table";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Columns,
+  EyeOff,
+  Filter,
+} from "lucide-react";
 
 function columnControlMenu() {
   return (

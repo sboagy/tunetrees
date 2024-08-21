@@ -1,0 +1,24 @@
+databaseType = "Sqlite"
+id = "50216f8d-4b62-4ca2-aec4-aabd94b523a4"
+name = "tunetrees_flyway"
+
+[flyway]
+locations = [ "filesystem:migrations" ]
+mixed = true
+outOfOrder = true
+schemaModelLocation = "schema-model"
+validateMigrationNaming = true
+
+  [flyway.check]
+  majorTolerance = 0
+
+[flywayDesktop]
+developmentEnvironment = "development"
+schemaModel = "schema-model"
+shadowEnvironment = "shadow"
+
+[redgateCompare]
+filterFile = "filter.rgf"
+
+[environments."tunetrees.sqlite3"]
+url = "jdbc:sqlite:/Users/sboag/gittt/tunetrees/tunetrees.sqlite3"

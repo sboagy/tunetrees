@@ -63,7 +63,6 @@ class User(Base):
     email = mapped_column(Text)
     email_verified = mapped_column(Text, server_default=text("NULL"))
     image = mapped_column(Text)
-    view_settings = mapped_column(Text)
 
     account: Mapped[List["Account"]] = relationship(
         "Account", uselist=True, back_populates="user"

@@ -1,7 +1,7 @@
 "use client";
-import React from "react";
-import { useSearchParams } from "next/navigation";
 import Head from "next/head";
+import { useSearchParams } from "next/navigation";
+import type React from "react";
 
 const VerifyRequest: React.FC = () => {
   const searchParams = useSearchParams();

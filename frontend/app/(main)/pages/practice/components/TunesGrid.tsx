@@ -1,19 +1,19 @@
 "use client";
 
-import * as React from "react";
 import {
-  ColumnFiltersState,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  SortingState,
   useReactTable,
-  VisibilityState,
 } from "@tanstack/react-table";
+import * as React from "react";
 
-import { Table as TanstackTable } from "@tanstack/react-table";
+import type { Table as TanstackTable } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -25,8 +25,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { Tune } from "../types";
 import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns";
+import type { Tune } from "../types";
 
 export interface ScheduledTunesType {
   tunes: Tune[];

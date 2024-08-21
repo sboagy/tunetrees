@@ -1,19 +1,19 @@
 "use client";
-import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useState } from "react";
 
 import { getPracticeListScheduled, getRecentlyPracticed } from "./queries";
 
-import { Tune } from "./types";
+import type { Tune } from "./types";
 
-import ScheduledTunesGrid from "./components/ScheduledTunesGrid";
 import RepertoireGrid from "./components/RepertoireGrid";
+import ScheduledTunesGrid from "./components/ScheduledTunesGrid";
 
 function CircularProgress() {
   return (
     <div className="flex justify-center items-center h-32">
-      <div className="w-12 h-12 border-t-2 border-b-2 border-gray-900 rounded-full animate-spin"></div>
+      <div className="w-12 h-12 border-t-2 border-b-2 border-gray-900 rounded-full animate-spin" />
     </div>
   );
 }
@@ -32,6 +32,7 @@ export default function Practice({
   // const [progress, setProgress] = React.useState(13);
 
   //  wrap with useEffect to avoid infinite loop (apparently)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Not sure how to fix this, or if it's a real issue
   useEffect(() => {
     const getScheduled = async (user_id: string, playlist_id: string) => {
       const data = await getPracticeListScheduled(user_id, playlist_id);
@@ -40,6 +41,7 @@ export default function Practice({
     getScheduled(user_id, playlist_id);
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Not sure how to fix this, or if it's a real issue
   useEffect(() => {
     const getRecent = async (user_id: string, playlist_id: string) => {
       const data = await getRecentlyPracticed(user_id, playlist_id);

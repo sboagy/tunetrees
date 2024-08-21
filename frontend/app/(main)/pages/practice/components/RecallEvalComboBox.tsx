@@ -1,9 +1,9 @@
+import { Check, ChevronsUpDown } from "lucide-react";
 // RecallEvalRadioGroup.tsx
 import React from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 import {
   Command,
@@ -18,9 +18,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-import { CellContext } from "@tanstack/react-table";
+import type { CellContext } from "@tanstack/react-table";
 
-import { Tune } from "../types";
+import type { Tune } from "../types";
 
 const qualityList = [
   {

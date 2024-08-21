@@ -1,8 +1,11 @@
 "use server";
 
-import { AccountFormValues } from "@/app/auth/newuser/account-form";
+import type { AccountFormValues } from "@/app/auth/newuser/account-form";
 import { assertIsDefined } from "@/auth";
-import { ExtendedAdapterUser, ttHttpAdapter } from "@/auth/auth_tt_adapter";
+import {
+  type ExtendedAdapterUser,
+  ttHttpAdapter,
+} from "@/auth/auth_tt_adapter";
 
 export const newUser = async (data: AccountFormValues) => {
   console.log("newUser data: ", data);

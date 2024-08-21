@@ -1,11 +1,12 @@
 import { httpAdapter } from "next-auth-http-adapter";
-import {
+import type {
   AdapterSession,
   AdapterUser,
   VerificationToken,
 } from "next-auth/adapters";
-import { z } from "zod";
 import { ofetch } from "ofetch";
+import { z } from "zod";
+import type { AdapterProcedure } from "./adapter_procedure";
 export const adapterSessionSchema = z.object({
   expires: z.date(),
   sessionToken: z.string(),
@@ -29,7 +30,6 @@ export const getSessionAndUserSchema = z
 
 export interface ExtendedAdapterUser extends AdapterUser {
   hash: string;
-  view_settings: string;
 }
 
 const userExtendedAdapterSchema = z.object({
@@ -57,7 +57,6 @@ function userSerializer(res: ExtendedAdapterUser | null) {
     image: res?.image,
     emailVerified: email_verified,
     hash: res?.hash, // ugh, "next-auth-http-adapter" will strip this
-    view_settings: res?.view_settings,
   };
   return serialized_user;
 }
@@ -129,6 +128,7 @@ export async function getUserExtendedByEmail(email: string) {
   const res = await ofetch(path, {
     baseURL: _baseURL, // or any other base url
     headers: {
+      // biome-ignore lint/style/noNonNullAssertion: Not acutally sure about this assertion suppression
       Authorization: process.env.REMOTE_AUTH_RPC_TOKEN!,
     },
     body: null,
@@ -272,17 +272,3 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
     },
   },
 });
-
-interface AdapterProcedure {
-  path: string;
-  method: string;
-  body?: object;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  select?: (res: any) => any;
-}
-
-// interface AdapterProcedures {
-//   [key: string]: (
-//     session: Partial<AdapterSession> & Pick<AdapterSession, "sessionToken">,
-//   ) => AdapterProcedure;
-// }

@@ -1,3 +1,32 @@
+/**
+ * TuneTrees - Tune Repertoire Practice Assistant
+ *
+ * Copyright (c) 2024 TuneTrees Software
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+// Note there is a lot of commented code in here right now.  This is because I'm still very much in the
+// process of figuring out how to do things.  I'm keeping the commented out code in here for now, because
+// it's easier for me to see at at a glance what I've tried and what I haven't tried yet, and what my
+// options are.  I'm not sure if I want to keep the commented out code in here or not for very long.
+
 import type {
   Account,
   NextAuthConfig,
@@ -13,13 +42,13 @@ import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import SendgridProvider from "next-auth/providers/sendgrid";
 
-import { getUserExtendedByEmail, ttHttpAdapter } from "./auth_tt_adapter";
-import type { CredentialInput, Provider } from "next-auth/providers";
-import type { JWT, JWTOptions } from "next-auth/jwt";
-import type { Adapter, AdapterUser } from "next-auth/adapters";
-import type { NextRequest } from "next/server";
-import { sendVerificationRequest } from "@/lib/authSendRequest";
 import { viewSettingsDefault } from "@/app/user-settings/view-settings-default";
+import { sendVerificationRequest } from "@/lib/authSendRequest";
+import type { Adapter, AdapterUser } from "next-auth/adapters";
+import type { JWT, JWTOptions } from "next-auth/jwt";
+import type { CredentialInput, Provider } from "next-auth/providers";
+import type { NextRequest } from "next/server";
+import { getUserExtendedByEmail, ttHttpAdapter } from "./auth_tt_adapter";
 
 export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
   if (value === undefined || value === null) {
@@ -297,18 +326,21 @@ const config = {
       // so that they can be later transferred to the session, in the
       // session callback.
       const email = params.token?.email as string;
-      if (email && (!params.token.user_id || !params.token.view_settings)) {
+      if (email && !params.token.user_id) {
         const user_record = await getUserExtendedByEmail(email);
         if (user_record?.id) {
           params.token.user_id = user_record?.id;
-
-          const view_settings_string = user_record?.view_settings;
-          if (view_settings_string) {
-            params.token.view_settings = JSON.parse(view_settings_string);
-          } else {
-            params.token.view_settings = viewSettingsDefault;
-          }
         }
+      }
+
+      // This is a bit hokey right now, but it's a start.
+      // Still not sure if I want to store the user settings in the cookie,
+      // in keep them in the database. or both.
+      // If in the database, then it needs to be in its own table, not
+      // in the user table.
+      const view_settings_string = params.token.view_settings;
+      if (!view_settings_string) {
+        params.token.view_settings = viewSettingsDefault;
       }
 
       return params.token;

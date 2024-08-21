@@ -51,7 +51,6 @@ export default async function index() {
         </Text>
       </Flex>
     );
-  } else {
-    return redirect("/home");
   }
+  return redirect("/home");
 }
