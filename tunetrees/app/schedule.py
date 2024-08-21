@@ -122,8 +122,6 @@ def submit_review(tune_id: int, feedback: str):
         stmt = select(PracticeRecord).where(PracticeRecord.TUNE_REF == tune_id)
         row = db.execute(stmt).one()[0]
 
-        foo = row.Easiness
-
         review = sm_two.review(
             quality, row.Easiness, row.Interval, row.Repetitions, practiced
         )
