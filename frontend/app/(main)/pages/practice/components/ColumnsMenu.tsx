@@ -1,53 +1,19 @@
 "use client";
 
-import * as React from "react";
-import {
-  ColumnFiltersState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  SortingState,
-  useReactTable,
-  VisibilityState,
-} from "@tanstack/react-table";
 import { ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
-import { Table as TansTable } from "@tanstack/react-table";
-
-import { Tune } from "../types";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns";
+import { Table } from "@tanstack/react-table";
+import { Tune } from "../types";
 
-type Props = {
-  table: any;
-};
-
-const ColumnsMenu = (props: Props) => {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  );
-  const table = props.table;
-
-  const columns = get_columns();
-
+const ColumnsMenu = ({ table }: { table: Table<Tune> }) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -58,8 +24,8 @@ const ColumnsMenu = (props: Props) => {
       <DropdownMenuContent align="end">
         {table
           .getAllColumns()
-          .filter((column: any) => column.getCanHide())
-          .map((column: any) => {
+          .filter((column) => column.getCanHide())
+          .map((column) => {
             return (
               <DropdownMenuCheckboxItem
                 key={column.id}

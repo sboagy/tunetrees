@@ -13,6 +13,7 @@
 // }
 
 export default async function ErrorPage({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   searchParams,
 }: {
   searchParams: { [key: string]: string | string[] | undefined };

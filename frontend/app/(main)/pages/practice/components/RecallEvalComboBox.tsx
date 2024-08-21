@@ -1,5 +1,5 @@
 // RecallEvalRadioGroup.tsx
-import React from 'react';
+import React from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -9,7 +9,6 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
@@ -19,9 +18,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-import {
-  CellContext,
-} from "@tanstack/react-table";
+import { CellContext } from "@tanstack/react-table";
 
 import { Tune } from "../types";
 
@@ -52,9 +49,10 @@ const qualityList = [
   },
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function RecallEvalComboBox(info: CellContext<Tune, unknown>) {
-    const [open, setOpen] = React.useState(false);
-    const [value, setValue] = React.useState("");
+  const [open, setOpen] = React.useState(false);
+  const [value, setValue] = React.useState("");
 
   return (
     <Popover>
@@ -91,7 +89,7 @@ export function RecallEvalComboBox(info: CellContext<Tune, unknown>) {
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value === qualityList.value ? "opacity-100" : "opacity-0"
+                      value === qualityList.value ? "opacity-100" : "opacity-0",
                     )}
                   />
                   {qualityList.label}

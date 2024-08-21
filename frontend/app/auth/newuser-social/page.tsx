@@ -1,25 +1,41 @@
 "use client";
 
-import {providerMap, signIn} from "@/auth";
+import { providerMap, signIn } from "@/auth";
 import Image from "next/image";
 import profilePic from "/public/logo4.png";
 
 // import { useSession } from "next-auth/react";
-import {useCallback, useState} from "react";
-import {zodResolver} from "@hookform/resolvers/zod";
-import {Icons} from "@/components/icons";
-import {toast} from "@/components/ui/use-toast";
-import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage,} from "@/components/ui/form";
-import {Input} from "@/components/ui/input";
-import {Button} from "@/components/ui/button";
-import {useForm} from "react-hook-form";
+import { useCallback } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Icons } from "@/components/icons";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useForm } from "react-hook-form";
 
-import {Card, CardContent, CardFooter, CardHeader, CardTitle,} from "@/components/ui/card";
-import {PasswordInput} from "@/components/password-input";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 // import { cookies } from "next/headers";
-import {accountFormSchema, AccountFormValues, defaultValues} from "@/app/auth/newuser/account-form";
+import {
+  accountFormSchema,
+  AccountFormValues,
+  defaultValues,
+} from "@/app/auth/newuser/account-form";
 import { newUser } from "./newuser-action";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const languages = [
   { label: "English", value: "en" },
   { label: "French", value: "fr" },
@@ -44,7 +60,7 @@ export default function SignInPage() {
 
   const onSubmit = useCallback(async (data: AccountFormValues) => {
     const result = await newUser(data);
-    console.log(result)
+    console.log(result);
     // do something with result
   }, []);
 
@@ -61,7 +77,7 @@ export default function SignInPage() {
   // }
 
   // let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
-  let _crsfToken = "abcdef";
+  const _crsfToken = "abcdef";
   // const _crsfToken = getCsrfToken();
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
 

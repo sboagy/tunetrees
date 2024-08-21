@@ -1,5 +1,5 @@
 // RecallEvalRadioGroup.tsx
-import React from 'react';
+import React from "react";
 
 import {
   DropdownMenu,
@@ -11,13 +11,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import {
-  CellContext,
-} from "@tanstack/react-table";
+import { CellContext } from "@tanstack/react-table";
 
 import { Tune } from "../types";
 
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function RecallEvalRadioGroup(info: CellContext<Tune, unknown>) {
   const [position, setPosition] = React.useState("...");
 

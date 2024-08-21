@@ -1,4 +1,5 @@
 {
+  "extends": "./node_modules/gts/tsconfig-google.json",
   "compilerOptions": {
     //    "target": "es5",
     "lib": [
@@ -19,7 +20,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "inlineSourceMap": true,
+    // "inlineSourceMap": true,
     "plugins": [
       {
         "name": "next"
@@ -54,6 +55,6 @@
   ],
   "exclude": [
     "node_modules",
-    "archive"
+    "archive/**/*.ts"
   ]
 }

@@ -1,13 +1,13 @@
-import { Metadata } from "next"
-import Image from "next/image"
+import { Metadata } from "next";
+import Image from "next/image";
 
-import { Separator } from "@/components/ui/separator"
-import { SidebarNav } from "./components/sidebar-nav"
+import { Separator } from "@/components/ui/separator";
+import { SidebarNav } from "./components/sidebar-nav";
 
 export const metadata: Metadata = {
   title: "Forms",
   description: "Advanced form example using react-hook-form and Zod.",
-}
+};
 
 const sidebarNavItems = [
   {
@@ -33,7 +33,7 @@ const sidebarNavItems = [
 ];
 
 interface SettingsLayoutProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 export default function SettingsLayout({ children }: SettingsLayoutProps) {
@@ -71,5 +71,5 @@ export default function SettingsLayout({ children }: SettingsLayoutProps) {
         </div>
       </div>
     </>
-  )
+  );
 }

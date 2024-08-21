@@ -6,7 +6,17 @@
     "dev": "next dev  --experimental-https",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "glint": "gts lint",
+    "clean": "gts clean",
+    "compile": "tsc",
+    "fix": "gts fix",
+    "prepare": "npm run compile",
+    "pretest": "npm run compile",
+    "posttest": "npm run lint"
+  },
+  "engines": {
+    "node": ">=20.16.0"
   },
   "dependencies": {
     "@auth/unstorage-adapter": "^2.0.0",
@@ -46,6 +56,8 @@
     "next-themes": "^0.3.0",
     "node-pre-gyp": "^0.17.0",
     "nvm": "^0.0.4",
+    "ofetch": "^1.1.1",
+    "package.json": "^0.0.0",
     "react": "latest",
     "react-countdown-circle-timer": "^3.2.1",
     "react-day-picker": "^8.10.1",
@@ -66,6 +78,7 @@
     "autoprefixer": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
+    "gts": "^5.3.1",
     "postcss": "^8.4.29",
     "tailwindcss": "^3.3.3",
     "typescript": "latest"

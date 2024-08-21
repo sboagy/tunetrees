@@ -5,9 +5,9 @@ import { AuthError } from "next-auth";
 
 export async function doSocialLogin(formData: FormData) {
   const action = formData.get("action");
-//   if (action === null){
-//     throw Error("No action provided");
-//   }
+  //   if (action === null){
+  //     throw Error("No action provided");
+  //   }
   try {
     await signIn(action as string, { redirectTo: "/home" });
   } catch (error) {

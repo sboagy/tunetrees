@@ -2,7 +2,7 @@ import { httpAdapter } from "next-auth-http-adapter";
 import {
   AdapterSession,
   AdapterUser,
-  VerificationToken
+  VerificationToken,
 } from "next-auth/adapters";
 import { z } from "zod";
 import { ofetch } from "ofetch";
@@ -20,17 +20,16 @@ const userAdapterSchema = z.object({
   image: z.string().optional(),
 });
 
-
 export const getSessionAndUserSchema = z
-    .object({
-      session: adapterSessionSchema,
-      user: userAdapterSchema,
-    })
-    .nullable();
-
+  .object({
+    session: adapterSessionSchema,
+    user: userAdapterSchema,
+  })
+  .nullable();
 
 export interface ExtendedAdapterUser extends AdapterUser {
   hash: string;
+  view_settings: string;
 }
 
 const userExtendedAdapterSchema = z.object({
@@ -40,23 +39,25 @@ const userExtendedAdapterSchema = z.object({
   emailVerified: z.date().nullable(),
   name: z.string().optional().nullable(),
   image: z.string().optional(),
+  view_settings: z.string().optional(),
 });
 
-export const getUserExtendedByEmailSchema = userExtendedAdapterSchema.nullable();
-
+export const getUserExtendedByEmailSchema =
+  userExtendedAdapterSchema.nullable();
 
 function userSerializer(res: ExtendedAdapterUser | null) {
   let email_verified = null;
   if (res?.emailVerified) {
     email_verified = new Date(res.emailVerified);
   }
-  let serialized_user = {
+  const serialized_user = {
     id: res?.id,
     name: res?.name,
     email: res?.email,
     image: res?.image,
     emailVerified: email_verified,
     hash: res?.hash, // ugh, "next-auth-http-adapter" will strip this
+    view_settings: res?.view_settings,
   };
   return serialized_user;
 }
@@ -74,14 +75,14 @@ function sessionSerializer(res: AdapterSession | null | undefined) {
 }
 
 async function userAndSessionSerializer(
-    res: Promise<{ session: AdapterSession; user: AdapterUser } | null>
+  res: Promise<{ session: AdapterSession; user: AdapterUser } | null>,
 ) {
-  const user_and_session_obj = await res
+  const user_and_session_obj = await res;
   const user = userSerializer(
-      (user_and_session_obj?.user) as ExtendedAdapterUser
+    user_and_session_obj?.user as ExtendedAdapterUser,
   );
   const session = sessionSerializer(user_and_session_obj?.session);
-  const seassion_tweaked = {user, session};
+  const seassion_tweaked = { user, session };
   return seassion_tweaked;
   // try{
   //   let parsed = await getSessionAndUserSchema.parseAsync(seassion_tweaked);
@@ -93,10 +94,11 @@ async function userAndSessionSerializer(
   //   console.error(e);
   //   throw e
   // }
-
 }
 
-function verificationTokenSerializer(res: VerificationToken | null | undefined) {
+function verificationTokenSerializer(
+  res: VerificationToken | null | undefined,
+) {
   let expires = null;
   if (res?.expires) {
     expires = new Date(res.expires);
@@ -111,8 +113,8 @@ function verificationTokenSerializer(res: VerificationToken | null | undefined) 
 
 const _baseURL = process.env.NEXT_BASE_URL;
 
-// The createUser method of ttHttpAdapter will strip the hash off, 
-// unfortunately, which we need for authentication.  So use this 
+// The createUser method of ttHttpAdapter will strip the hash off,
+// unfortunately, which we need for authentication.  So use this
 // custom function instead.
 export async function getUserExtendedByEmail(email: string) {
   const {
@@ -129,8 +131,11 @@ export async function getUserExtendedByEmail(email: string) {
     headers: {
       Authorization: process.env.REMOTE_AUTH_RPC_TOKEN!,
     },
+    body: null,
+    ...fetchOptions,
   });
-  return await getUserExtendedByEmailSchema.parseAsync(serialize(res));
+  // return await getUserExtendedByEmailSchema.parseAsync(serialize(res));
+  return serialize(res);
 }
 
 export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
@@ -172,14 +177,14 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
       const { providerAccountId, provider } = params;
       return {
         path: `auth/get-user-by-account/${encodeURIComponent(
-          provider
+          provider,
         )}/${encodeURIComponent(providerAccountId)}/`,
         method: "GET",
         select: userSerializer,
       };
     },
     updateUser(
-      user: Partial<AdapterUser> & Pick<AdapterUser, "id">
+      user: Partial<AdapterUser> & Pick<AdapterUser, "id">,
     ): AdapterProcedure {
       return {
         path: "auth/update-user/",
@@ -208,7 +213,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
       const { provider, providerAccountId } = params;
       return {
         path: `auth/unlink-account/${encodeURIComponent(
-          provider
+          provider,
         )}/${encodeURIComponent(providerAccountId)}/`,
         method: "DELETE",
       };
@@ -218,18 +223,18 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
         path: "auth/create-session/",
         method: "POST",
         body: session,
-        select: sessionSerializer as any,
+        select: sessionSerializer,
       };
     },
     getSessionAndUser(sessionToken: string): AdapterProcedure {
       return {
         path: `auth/get-session/${sessionToken}`,
         method: "GET",
-        select: userAndSessionSerializer as any,
+        select: userAndSessionSerializer,
       };
     },
     updateSession(
-      session: Partial<AdapterSession> & Pick<AdapterSession, "sessionToken">
+      session: Partial<AdapterSession> & Pick<AdapterSession, "sessionToken">,
     ): AdapterProcedure {
       return {
         path: "auth/update-session/",
@@ -245,7 +250,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
       };
     },
     createVerificationToken(
-      verificationToken: VerificationToken
+      verificationToken: VerificationToken,
     ): AdapterProcedure {
       return {
         path: "auth/create-verification-token/",
@@ -271,10 +276,13 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
 interface AdapterProcedure {
   path: string;
   method: string;
-  body?: any;
+  body?: object;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   select?: (res: any) => any;
 }
 
-interface AdapterProcedures {
-  [key: string]: (session: Partial<AdapterSession> & Pick<AdapterSession, "sessionToken">) => AdapterProcedure;
-}
+// interface AdapterProcedures {
+//   [key: string]: (
+//     session: Partial<AdapterSession> & Pick<AdapterSession, "sessionToken">,
+//   ) => AdapterProcedure;
+// }

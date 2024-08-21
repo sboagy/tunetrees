@@ -12,9 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import {
-  DemoUser,
   ManagePlaylistMenuItem,
-  NewUser,
   SignIn,
   SignOut,
   UserSettingsMenuItem,
@@ -80,14 +78,14 @@ export default async function UserButton() {
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           {(() => {
-            if (session.user.name && session.user.name != "None") {
+            if (session.user.name && session.user.name !== "None") {
               return (
                 <>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">
                         {session.user.name
-                          ? session.user.name == "None"
+                          ? session.user.name === "None"
                             ? unknownUserNameString
                             : session.user.name
                           : unknownUserNameString}
@@ -100,6 +98,8 @@ export default async function UserButton() {
                   <DropdownMenuSeparator />
                 </>
               );
+            } else {
+              return null;
             }
           })()}
           <DropdownMenuItem className="h-8">

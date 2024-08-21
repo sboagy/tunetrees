@@ -23,32 +23,37 @@ type PracticeProps = {
   playlist_id: string;
 };
 
-export default function Practice({ user_id, playlist_id }: PracticeProps): JSX.Element {
-  let [scheduled, setScheduled] = useState<Tune[]>();
-  let [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
+export default function Practice({
+  user_id,
+  playlist_id,
+}: PracticeProps): JSX.Element {
+  const [scheduled, setScheduled] = useState<Tune[]>();
+  const [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
   // const [progress, setProgress] = React.useState(13);
 
+  //  wrap with useEffect to avoid infinite loop (apparently)
   useEffect(() => {
-    const getScheduled = async () => {
+    const getScheduled = async (user_id: string, playlist_id: string) => {
       const data = await getPracticeListScheduled(user_id, playlist_id);
       setScheduled(data);
     };
-    getScheduled();
+    getScheduled(user_id, playlist_id);
   }, []);
 
   useEffect(() => {
-    const getRecent = async () => {
+    const getRecent = async (user_id: string, playlist_id: string) => {
       const data = await getRecentlyPracticed(user_id, playlist_id);
       setRecentlyPracticed(data);
     };
-    getRecent();
+    getRecent(user_id, playlist_id);
   }, []);
 
   return (
     <Tabs defaultValue="scheduled" className="flex h-full w-full flex-col">
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="scheduled">Scheduled for Practice</TabsTrigger>
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="scheduled">Practice</TabsTrigger>
         <TabsTrigger value="repertoire">Repertoire</TabsTrigger>
+        <TabsTrigger value="analysis">Analysis</TabsTrigger>
       </TabsList>
       <TabsContent value="scheduled">
         <Card>
@@ -80,6 +85,22 @@ export default function Practice({ user_id, playlist_id }: PracticeProps): JSX.E
             ) : (
               <CircularProgress />
             )}
+          </CardContent>
+          {/* <CardFooter>
+            <Button>Save password</Button>
+          </CardFooter> */}
+        </Card>
+      </TabsContent>
+      <TabsContent value="analysis">
+        <Card>
+          {/* <CardHeader>
+            <CardTitle>Analysis</CardTitle>
+            <CardDescription>Overall analysis.</CardDescription>
+          </CardHeader> */}
+          <CardContent className="space-y-2">
+            <p>
+              Coming soon: Analysis, will hold visualizations and statistics
+            </p>
           </CardContent>
           {/* <CardFooter>
             <Button>Save password</Button>

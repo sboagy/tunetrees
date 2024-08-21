@@ -12,15 +12,15 @@ const HomePage = async () => {
     console.log("No session found (HomePage)");
     redirect("/");
   }
-    
+
   if (!session?.user) {
     console.log("No user found (HomePage)");
-    redirect("/")
-  };
+    redirect("/");
+  }
 
   console.log("Session found! (HomePage)");
 
-  const user_id = session?.user?.id as string ?? "1";
+  const user_id = (session?.user?.id as string) ?? "1";
   const playlist_id = "1";
 
   return (

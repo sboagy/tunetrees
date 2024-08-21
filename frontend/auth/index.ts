@@ -1,19 +1,25 @@
-import type {Account, NextAuthConfig, Profile, Session, User,} from "next-auth";
-import NextAuth, {AuthError} from "next-auth";
+import type {
+  Account,
+  NextAuthConfig,
+  NextAuthResult,
+  Profile,
+  Session,
+  User,
+} from "next-auth";
+import NextAuth from "next-auth";
 import "next-auth/jwt";
 
-import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import SendgridProvider from "next-auth/providers/sendgrid";
 
-import {getUserExtendedByEmail, ttHttpAdapter} from "./auth_tt_adapter";
-import type {CredentialInput, Provider} from "next-auth/providers";
-import {JWT, JWTOptions} from "next-auth/jwt";
-import {Adapter, AdapterUser} from "next-auth/adapters";
-import {NextRequest} from "next/server";
-import {matchPasswordWithHash} from "./password-match";
+import { getUserExtendedByEmail, ttHttpAdapter } from "./auth_tt_adapter";
+import type { CredentialInput, Provider } from "next-auth/providers";
+import { JWT, JWTOptions } from "next-auth/jwt";
+import { Adapter, AdapterUser } from "next-auth/adapters";
+import { NextRequest } from "next/server";
 import { sendVerificationRequest } from "@/lib/authSendRequest";
+import { viewSettingsDefault } from "@/app/user-settings/view-settings-default";
 
 export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
   if (value === undefined || value === null) {
@@ -21,7 +27,7 @@ export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
   }
 }
 
-function logObject(obj: any, expand: boolean) {
+function logObject(obj: unknown, expand: boolean) {
   if (expand) {
     return JSON.stringify(obj, null, 4);
   } else {
@@ -137,9 +143,9 @@ const providers: Provider[] = [
 export const providerMap = providers.map((provider) => {
   if (typeof provider === "function") {
     const providerData = provider();
-    return {id: providerData.id, name: providerData.name};
+    return { id: providerData.id, name: providerData.name };
   } else {
-    return {id: provider.id, name: provider.name};
+    return { id: provider.id, name: provider.name };
   }
 });
 
@@ -178,9 +184,9 @@ const config = {
       console.log("event: signIn -- ", logObject(message, false));
     },
     signOut(
-        message:
-            | { session: Awaited<ReturnType<Required<Adapter>["deleteSession"]>> }
-            | { token: Awaited<ReturnType<JWTOptions["decode"]>> }
+      message:
+        | { session: Awaited<ReturnType<Required<Adapter>["deleteSession"]>> }
+        | { token: Awaited<ReturnType<JWTOptions["decode"]>> },
     ) {
       console.log("event: signOut -- ", logObject(message, false));
     },
@@ -276,18 +282,35 @@ const config = {
       profile?: Profile;
       trigger?: "signIn" | "signUp" | "update";
       isNewUser?: boolean;
-      session?: any;
+      session?: Session | null;
     }) {
       console.log("callback: jwt -- ", logObject(params, false));
       if (params.trigger === "update" && params.session) {
-        params.token = {...params.token, user: params.session};
+        params.token = { ...params.token, user: params.session };
         return params.token;
-      } else if (params.trigger === "update") {
+      } else if (params.trigger === "update" && params.session?.user) {
         params.token.name = params.session.user.name;
       }
-
       if (params.account?.provider === "keycloak") {
-        return {...params.token, accessToken: params.account.access_token};
+        return { ...params.token, accessToken: params.account.access_token };
+      }
+
+      // If it's a new jwt, add the user id and view settings to the token,
+      // so that they can be later transferred to the session, in the
+      // session callback.
+      const email = params.token?.email as string;
+      if (email && (!params.token.user_id || !params.token.view_settings)) {
+        const user_record = await getUserExtendedByEmail(email);
+        if (user_record?.id) {
+          params.token.user_id = user_record?.id;
+
+          const view_settings_string = user_record?.view_settings;
+          if (view_settings_string) {
+            params.token.view_settings = JSON.parse(view_settings_string);
+          } else {
+            params.token.view_settings = viewSettingsDefault;
+          }
+        }
       }
 
       return params.token;
@@ -302,29 +325,27 @@ const config = {
     //   console.log("redirect: jwt -- ", logObject(params, false));
     //   return params.baseUrl;
     // },
-    async session({session, token, user}) {
+    async session(params: {
+      session: Session & { userId?: string; view_settings?: string };
+      token: JWT & { user_id?: string; view_settings?: string };
+      user: User | AdapterUser;
+    }) {
       console.log(
-          "callback: session -- ",
-          logObject(session, false),
-          token,
-          user
+        "callback: session -- ",
+        logObject(params.session, false),
+        params.token,
+        params.user,
       );
 
-      // Bit of a hack to get the user id into the session  
-      if ((!session.userId) && ttHttpAdapter && ttHttpAdapter.getUserByEmail) {
-        const user_record = await ttHttpAdapter.getUserByEmail(session.user.email as string);
-        console.log("user_record: ", user_record);
-        if (user_record?.id) {
-          session.userId = user_record?.id;
-          session.user.id = user_record?.id;
-        }
-        else {
-          console.error("User not found via getUserByEmail");
-        }
+      params.session.userId = params.token.user_id as string;
+      if (params.session.user) {
+        params.session.user.id = params.token.user_id as string;
+      }
+      if (params.token.view_settings) {
+        params.session.view_settings = params.token.view_settings;
       }
 
-      // session.user = token.user as AdapterUser;
-      return session;
+      return params.session;
     },
     // async session(
     //   params: ({
@@ -362,12 +383,19 @@ const config = {
   debug: true,
 } satisfies NextAuthConfig;
 
-export const {
-  handlers: {GET, POST},
-  auth,
-  signIn,
-  signOut,
-} = NextAuth(config);
+// export const {
+//   handlers: { GET, POST },
+//   auth,
+//   signIn,
+//   signOut,
+// }: NextAuthResult = NextAuth(config);
+
+const nextAuth = NextAuth(config);
+
+export const handlers: NextAuthResult["handlers"] = nextAuth.handlers;
+export const auth: NextAuthResult["auth"] = nextAuth.auth;
+export const signIn: NextAuthResult["signIn"] = nextAuth.signIn;
+export const signOut: NextAuthResult["signOut"] = nextAuth.signOut;
 
 // declare module "next-auth" {
 //   interface Session {

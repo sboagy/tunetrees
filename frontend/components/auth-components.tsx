@@ -1,59 +1,59 @@
-import {signIn, signOut} from "auth";
-import {Button} from "./ui/button";
-import {redirect} from "next/navigation";
+import { signIn, signOut } from "auth";
+import { Button } from "./ui/button";
+import { redirect } from "next/navigation";
 
 export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
-    console.log("Constructing the SignIn button");
-    return (
-        <form
-            action={async () => {
-                "use server";
-                // const session = await auth();
-                console.log("Handling SignIn request");
-                await signIn();
-                // redirect("/auth/login");
-            }}
-        >
-            <Button {...props}>Log In</Button>
-        </form>
-    );
+  console.log("Constructing the SignIn button");
+  return (
+    <form
+      action={async () => {
+        "use server";
+        // const session = await auth();
+        console.log("Handling SignIn request");
+        await signIn();
+        // redirect("/auth/login");
+      }}
+    >
+      <Button {...props}>Log In</Button>
+    </form>
+  );
 }
 
 export function NewUser(
-    props: React.ComponentPropsWithRef<typeof Button>,
-    crsf_token: string
+  props: React.ComponentPropsWithRef<typeof Button>,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  crsf_token: string,
 ) {
-    console.log("Constructing the NewUser button");
-    return (
-        <form
-            action={async () => {
-                "use server";
-                // const session = await auth();
-                console.log("Handling New User request");
-                redirect("/auth/newuser");
-            }}
-        >
-            <Button {...props}>New User</Button>
-        </form>
-    );
+  console.log("Constructing the NewUser button");
+  return (
+    <form
+      action={async () => {
+        "use server";
+        // const session = await auth();
+        console.log("Handling New User request");
+        redirect("/auth/newuser");
+      }}
+    >
+      <Button {...props}>New User</Button>
+    </form>
+  );
 }
 
 export function DemoUser(props: React.ComponentPropsWithRef<typeof Button>) {
-    console.log("Constructing the DemoUser button");
-    return (
-        <form
-            action={async () => {
-                "use server";
-                // const session = await auth();
-                console.log("Handling Demo User request");
-                await signIn();
-            }}
-        >
-            <Button {...props}>Demo User</Button>
-        </form>
-    );
+  console.log("Constructing the DemoUser button");
+  return (
+    <form
+      action={async () => {
+        "use server";
+        // const session = await auth();
+        console.log("Handling Demo User request");
+        await signIn();
+      }}
+    >
+      <Button {...props}>Demo User</Button>
+    </form>
+  );
 }
-
 
 // export function SignIn() {
 //   return (
@@ -77,26 +77,26 @@ export function DemoUser(props: React.ComponentPropsWithRef<typeof Button>) {
 // }
 
 export function SignOut(props: React.ComponentPropsWithRef<typeof Button>) {
-    console.log("Constructing the SignOut button");
-    return (
-      <form
-        action={async () => {
-          "use server";
-          // const session = await auth();
-          console.log("Handling SignOut request");
-          await signOut();
-        }}
-        className="w-full"
-      >
-        <Button variant="ghost" {...props}>
-          Sign Out
-        </Button>
-      </form>
-    );
+  console.log("Constructing the SignOut button");
+  return (
+    <form
+      action={async () => {
+        "use server";
+        // const session = await auth();
+        console.log("Handling SignOut request");
+        await signOut();
+      }}
+      className="w-full"
+    >
+      <Button variant="ghost" {...props}>
+        Sign Out
+      </Button>
+    </form>
+  );
 }
 
 export function UserSettingsMenuItem(
-  props: React.ComponentPropsWithRef<typeof Button>
+  props: React.ComponentPropsWithRef<typeof Button>,
 ) {
   console.log("Constructing the UserSettingsMenuItem button");
   return (
@@ -117,7 +117,7 @@ export function UserSettingsMenuItem(
 }
 
 export function ManagePlaylistMenuItem(
-  props: React.ComponentPropsWithRef<typeof Button>
+  props: React.ComponentPropsWithRef<typeof Button>,
 ) {
   console.log("Constructing the ManagePlaylist button");
   return (

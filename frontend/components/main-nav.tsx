@@ -38,18 +38,18 @@ export function MainNav() {
             <NavigationMenuTrigger className="px-2">
               TuneTrees
             </NavigationMenuTrigger>
-            <NavigationMenuContent >
-                <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
-                  <ListItem href="/server-example" title="Blah">
-                    Blah blah blah
-                  </ListItem>
-                  <ListItem href="/middleware-example" title="Yada">
-                    Yada yada yada
-                  </ListItem>
-                  <ListItem href="/api-example" title="What">
-                    Whatever
-                  </ListItem>
-                </ul>
+            <NavigationMenuContent>
+              <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
+                <ListItem href="/server-example" title="Blah">
+                  Blah blah blah
+                </ListItem>
+                <ListItem href="/middleware-example" title="Yada">
+                  Yada yada yada
+                </ListItem>
+                <ListItem href="/api-example" title="What">
+                  Whatever
+                </ListItem>
+              </ul>
             </NavigationMenuContent>
           </NavigationMenuItem>
           {/* <NavigationMenuItem>
@@ -77,7 +77,7 @@ const ListItem = React.forwardRef<
           ref={ref}
           className={cn(
             "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-            className
+            className,
           )}
           {...props}
         >

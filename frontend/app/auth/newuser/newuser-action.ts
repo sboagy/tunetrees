@@ -12,12 +12,13 @@ export const newUser = async (data: AccountFormValues) => {
 
   const bcrypt = require("bcryptjs");
 
-  let user: ExtendedAdapterUser = {
+  const user: ExtendedAdapterUser = {
     id: "",
     name: data.name,
-    email: data.email,
+    email: email,
     emailVerified: null,
     hash: bcrypt.hashSync(data.password, bcrypt.genSaltSync()),
+    view_settings: "",
   };
 
   ttHttpAdapter.createUser(user);

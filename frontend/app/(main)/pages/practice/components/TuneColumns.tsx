@@ -62,7 +62,7 @@ function columnControlMenu() {
 
 function sortableHeader<TData, TValue>(
   column: Column<TData, TValue>,
-  title: string
+  title: string,
 ) {
   // console.log("column: ", column);
   const is_sorted = column.getIsSorted();

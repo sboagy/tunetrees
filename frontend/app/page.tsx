@@ -1,6 +1,6 @@
-import {Blockquote, Flex, Heading, Text} from "@radix-ui/themes";
-import {auth} from "auth";
-import {redirect} from "next/navigation";
+import { Blockquote, Flex, Heading, Text } from "@radix-ui/themes";
+import { auth } from "auth";
+import { redirect } from "next/navigation";
 
 export default async function index() {
   const session = await auth();
@@ -52,6 +52,6 @@ export default async function index() {
       </Flex>
     );
   } else {
-      return redirect("/home");
+    return redirect("/home");
   }
 }

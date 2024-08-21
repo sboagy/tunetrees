@@ -8,19 +8,19 @@
 // ): Promise<boolean>
 
 function is_server() {
-  return !(typeof window != "undefined" && window.document);
+  return !(typeof window !== "undefined" && window.document);
 }
 
 export const matchPasswordWithHash = async (
   rawPassword: string,
-  hashedPassword: string
+  hashedPassword: string,
 ) => {
   if (!is_server()) {
     throw new Error("Why is this not running on the server!!!");
   }
   const bcrypt = require("bcryptjs");
 
-  let match = await bcrypt.compare(rawPassword, hashedPassword);
+  const match = await bcrypt.compare(rawPassword, hashedPassword);
   return match;
 };
 

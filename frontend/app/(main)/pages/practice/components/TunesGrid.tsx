@@ -13,6 +13,8 @@ import {
   VisibilityState,
 } from "@tanstack/react-table";
 
+import { Table as TanstackTable } from "@tanstack/react-table";
+
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -33,7 +35,7 @@ export interface ScheduledTunesType {
 export function TunesTable({ tunes }: ScheduledTunesType) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    [],
   );
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({
@@ -59,7 +61,7 @@ export function TunesTable({ tunes }: ScheduledTunesType) {
 
   const columns = get_columns();
 
-  const table = useReactTable({
+  const table: TanstackTable<Tune> = useReactTable({
     data: tunes,
     columns: columns,
     onSortingChange: setSorting,
@@ -85,7 +87,7 @@ export function TunesTable({ tunes }: ScheduledTunesType) {
 }
 
 type Props = {
-  table: any;
+  table: TanstackTable<Tune>;
 };
 
 const TunesGrid = (props: Props) => {
@@ -96,16 +98,16 @@ const TunesGrid = (props: Props) => {
       <div className="rounded-md border">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup: any) => (
+            {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header: any) => {
+                {headerGroup.headers.map((header) => {
                   return (
                     <TableHead key={header.id}>
                       {header.isPlaceholder
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )}
                     </TableHead>
                   );
@@ -115,17 +117,17 @@ const TunesGrid = (props: Props) => {
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row: any) => (
+              table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                   // className="hover:bg-gray-100"
                 >
-                  {row.getVisibleCells().map((cell: any) => (
+                  {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="max-h-1 py-0">
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}
