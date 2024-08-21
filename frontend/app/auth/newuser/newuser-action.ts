@@ -1,8 +1,12 @@
 "use server";
 
-import { AccountFormValues } from "@/app/auth/newuser/account-form";
+import type { AccountFormValues } from "@/app/auth/newuser/account-form";
+import { viewSettingsDefaultString } from "@/app/user-settings/view-settings-default";
 import { assertIsDefined } from "@/auth";
-import { ExtendedAdapterUser, ttHttpAdapter } from "@/auth/auth_tt_adapter";
+import {
+  type ExtendedAdapterUser,
+  ttHttpAdapter,
+} from "@/auth/auth_tt_adapter";
 
 export const newUser = async (data: AccountFormValues) => {
   const email = data.email;
@@ -18,7 +22,7 @@ export const newUser = async (data: AccountFormValues) => {
     email: email,
     emailVerified: null,
     hash: bcrypt.hashSync(data.password, bcrypt.genSaltSync()),
-    view_settings: "",
+    view_settings: viewSettingsDefaultString,
   };
 
   ttHttpAdapter.createUser(user);

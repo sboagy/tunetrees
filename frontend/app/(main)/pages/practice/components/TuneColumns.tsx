@@ -1,5 +1,5 @@
-import { CellContext, Column, ColumnDef } from "@tanstack/react-table";
-import { Tune } from "@/app/(main)/pages/practice/types";
+import type { CellContext, Column, ColumnDef } from "@tanstack/react-table";
+import type { Tune } from "@/app/(main)/pages/practice/types";
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RecallEvalComboBox";
 import {
   ArrowDown,
@@ -70,6 +70,9 @@ function sortableHeader<TData, TValue>(
     <div
       className="flex items-center"
       onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      onKeyDown={() => {}}
+      onKeyUp={() => {}}
+      onKeyPress={() => {}}
     >
       {title}
       {is_sorted === "asc" ? (

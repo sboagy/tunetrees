@@ -1,5 +1,5 @@
-import { EmailConfig } from "next-auth/providers";
-import { Theme } from "../../../../gitmisc/next-auth/packages/core/src/types";
+import type { EmailConfig } from "next-auth/providers";
+import type { Theme } from "../../../../gitmisc/next-auth/packages/core/src/types";
 
 // (params: { identifier: string; url: string; expires: Date; provider: EmailConfig;
 // token: string; theme: Theme; request: Request; }) => Awaitable<void>
@@ -31,7 +31,7 @@ export async function sendVerificationRequest(params: {
     }),
   });
 
-  if (!res.ok) throw new Error("Sendgrid error: " + (await res.text()));
+  if (!res.ok) throw new Error(`Sendgrid error: ${await res.text()}`);
 }
 
 function html(params: { url: string; host: string; theme: Theme }) {

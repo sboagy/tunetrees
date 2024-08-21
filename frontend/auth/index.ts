@@ -15,9 +15,9 @@ import SendgridProvider from "next-auth/providers/sendgrid";
 
 import { getUserExtendedByEmail, ttHttpAdapter } from "./auth_tt_adapter";
 import type { CredentialInput, Provider } from "next-auth/providers";
-import { JWT, JWTOptions } from "next-auth/jwt";
-import { Adapter, AdapterUser } from "next-auth/adapters";
-import { NextRequest } from "next/server";
+import type { JWT, JWTOptions } from "next-auth/jwt";
+import type { Adapter, AdapterUser } from "next-auth/adapters";
+import type { NextRequest } from "next/server";
 import { sendVerificationRequest } from "@/lib/authSendRequest";
 import { viewSettingsDefault } from "@/app/user-settings/view-settings-default";
 
@@ -30,9 +30,8 @@ export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
 function logObject(obj: unknown, expand: boolean) {
   if (expand) {
     return JSON.stringify(obj, null, 4);
-  } else {
-    return String(obj);
   }
+  return String(obj);
 }
 
 export const BASE_PATH = "/auth";
@@ -144,9 +143,8 @@ export const providerMap = providers.map((provider) => {
   if (typeof provider === "function") {
     const providerData = provider();
     return { id: providerData.id, name: providerData.name };
-  } else {
-    return { id: provider.id, name: provider.name };
   }
+  return { id: provider.id, name: provider.name };
 });
 
 const config = {
@@ -285,11 +283,11 @@ const config = {
       session?: Session | null;
     }) {
       console.log("callback: jwt -- ", logObject(params, false));
-      if (params.trigger === "update" && params.session) {
+      if (params.trigger === "update" && params.session?.user) {
+        params.token.name = params.session.user.name;
+      } else if (params.trigger === "update" && params.session) {
         params.token = { ...params.token, user: params.session };
         return params.token;
-      } else if (params.trigger === "update" && params.session?.user) {
-        params.token.name = params.session.user.name;
       }
       if (params.account?.provider === "keycloak") {
         return { ...params.token, accessToken: params.account.access_token };
