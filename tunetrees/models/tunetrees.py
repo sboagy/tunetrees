@@ -27,6 +27,8 @@ t_practice_list_joined = Table(
     Column("NotePrivate", Text),
     Column("NotePublic", Text),
     Column("Tags", Text),
+    Column("USER_REF", Integer),
+    Column("PLAYLIST_REF", Integer),
 )
 
 
