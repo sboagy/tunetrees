@@ -1,4 +1,5 @@
-"use client";
+"use server";
+
 import axios from "axios";
 
 const baseURL = process.env.TT_API_BASE_URL;
@@ -11,25 +12,29 @@ interface PracticeFeedbackProps {
 export const submitPracticeFeedback = async ({
   id,
   feedback,
-}: PracticeFeedbackProps) => {
+}: PracticeFeedbackProps): Promise<void> => {
+  if (!baseURL) {
+    console.error("Base URL is not defined");
+    return;
+  }
+
   try {
-    axios({
+    const response = await axios({
       method: "post",
-      url: `${baseURL}/practice/feedback`,
+      url: `${baseURL}/practice/submit_feedback`,
       data: { selected_tune: id, vote_type: feedback },
       headers: {
         key: "Access-Control-Allow-Origin",
         Accept: "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
       },
-    })
-      .then((response) => {
-        console.log(response);
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  } catch (e) {
-    console.log("Unable to post feedback.");
+    });
+    console.log("Feedback submitted successfully:", response.data);
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error("Axios error:", error.response?.data || error.message);
+    } else {
+      console.error("Unexpected error:", error);
+    }
   }
 };

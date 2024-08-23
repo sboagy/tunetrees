@@ -86,6 +86,27 @@ export function TunesTable({ tunes }: ScheduledTunesType) {
   return table;
 }
 
+export const getColorForEvaluation = (review_status: string) => {
+  switch (review_status) {
+    case "":
+      return "";
+    case "blackout":
+      return "bg-red-100 dark:bg-red-900";
+    case "failed":
+      return "bg-orange-100 dark:bg-orange-900";
+    case "barely":
+      return "bg-yellow-100 dark:bg-yellow-900";
+    case "struggled":
+      return "bg-blue-100 dark:bg-blue-900";
+    case "trivial":
+      return "bg-purple-100 dark:bg-purple-900";
+    case "perfect":
+      return "bg-green-100 dark:bg-green-900";
+    default:
+      return "";
+  }
+};
+
 type Props = {
   table: TanstackTable<Tune>;
 };
@@ -93,6 +114,7 @@ type Props = {
 const TunesGrid = (props: Props) => {
   const table = props.table;
   const columns = get_columns();
+
   return (
     <>
       <div className="rounded-md border">
@@ -121,6 +143,7 @@ const TunesGrid = (props: Props) => {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className={`${getColorForEvaluation(row.original.recallEval)}`}
                   // className="hover:bg-gray-100"
                 >
                   {row.getVisibleCells().map((cell) => (

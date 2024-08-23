@@ -64,7 +64,7 @@
     "react-day-picker": "^8.10.1",
     "react-dom": "latest",
     "react-hook-form": "^7.52.1",
-    "supports-color": "^9.4.0",
+    "supports-color": "^8.1.1",
     "tailwind-merge": "^1.14.0",
     "tailwindcss-animate": "^1.0.7",
     "unstorage": "^1.10.1",

@@ -19,11 +19,11 @@ export default async function RootLayout({
   children,
 }: React.PropsWithChildren) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
@@ -36,7 +36,7 @@ export default async function RootLayout({
               <Footer />
             </div>
           </Theme>
-        </ThemeProvider>{" "}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -413,19 +413,18 @@ const config = {
   debug: true,
 } satisfies NextAuthConfig;
 
-// export const {
-//   handlers: { GET, POST },
-//   auth,
-//   signIn,
-//   signOut,
-// }: NextAuthResult = NextAuth(config);
-
 const nextAuth = NextAuth(config);
 
-export const handlers: NextAuthResult["handlers"] = nextAuth.handlers;
+export const {
+  handlers: { GET, POST },
+  signIn,
+  signOut,
+}: NextAuthResult = nextAuth;
+
+// export const handlers: NextAuthResult["handlers"] = nextAuth.handlers;
 export const auth: NextAuthResult["auth"] = nextAuth.auth;
-export const signIn: NextAuthResult["signIn"] = nextAuth.signIn;
-export const signOut: NextAuthResult["signOut"] = nextAuth.signOut;
+// export const signIn: NextAuthResult["signIn"] = nextAuth.signIn;
+// export const signOut: NextAuthResult["signOut"] = nextAuth.signOut;
 
 // declare module "next-auth" {
 //   interface Session {

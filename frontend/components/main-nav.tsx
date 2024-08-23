@@ -29,6 +29,7 @@ export function MainNav() {
             width="52"
             height="52"
             className="items-center py-0"
+            priority={true}
           />
         </Button>
       </CustomLink>

@@ -1,3 +1,5 @@
+"use client";
+
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RecallEvalComboBox";
 import type { Tune } from "@/app/(main)/pages/practice/types";
 import { Button } from "@/components/ui/button";
@@ -244,7 +246,7 @@ const columns: ColumnDef<Tune>[] = [
     enableHiding: true,
   },
   {
-    id: "recallEval",
+    accessorKey: "recallEval",
     header: "Recall Evaluation",
     enableHiding: false,
     cell: RecallEvalComboBox,

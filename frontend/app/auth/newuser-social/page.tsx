@@ -93,6 +93,7 @@ export default function SignInPage() {
               height={48}
               // height={48}
               className="min-w-8"
+              priority={true}
             />
           </CardTitle>
 

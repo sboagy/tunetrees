@@ -21,53 +21,100 @@ import {
 import type { CellContext } from "@tanstack/react-table";
 
 import type { Tune } from "../types";
+import { getColorForEvaluation } from "./TunesGrid";
+
+// #     Quality: The quality of recalling the answer from a scale of 0 to 5.
+// #         5: perfect response.
+// #         4: correct response after a hesitation.
+// #         3: correct response recalled with serious difficulty.
+// #         2: incorrect response; where the correct one seemed easy to recall.
+// #         1: incorrect response; the correct one remembered.
+// #         0: complete blackout.
 
 const qualityList = [
   {
     value: "",
     label: "(Not Set)",
+    label2: "(Not Set)",
+    int_value: -1,
+  },
+  {
+    value: "blackout",
+    label: "Blackout (no recall, even with hint)",
+    label2: "0: complete blackout",
+    int_value: 0,
   },
   {
     value: "failed",
-    label: "Failed (no recall)",
+    label: "Failed (but remembered after hint)",
+    label2: "1: incorrect response; the correct one remembered",
+    int_value: 1,
   },
   {
     value: "barely",
     label: "Barely Remembered Some (perhaps A part but not B part)",
+    label2:
+      "2: incorrect response; where the correct one seemed easy to recall",
+    int_value: 2,
   },
   {
     value: "struggled",
     label: "Remembered with Some Mistakes (and needed verification)",
+    label2: "3: correct response recalled with serious difficulty",
+    int_value: 3,
   },
   {
     value: "trivial",
     label: "Not Bad (but maybe not session ready)",
+    label2: "4: correct response after a hesitation",
+    int_value: 4,
   },
   {
     value: "perfect",
     label: "Good (could perform solo or lead in session)",
+    label2: "5: perfect response",
+    int_value: 5,
   },
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function RecallEvalComboBox(info: CellContext<Tune, unknown>) {
-  const [open, setOpen] = React.useState(false);
-  const [value, setValue] = React.useState("");
+export function RecallEvalComboBox(info: CellContext<Tune, string>) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [value, setValue] = React.useState<string>("");
+  const [, updateState] = React.useState({});
+
+  const forceClose = () => {
+    setIsOpen(false);
+  };
 
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
-          aria-expanded={open}
-          className="w-[18em] justify-between"
-          style={{ textAlign: "left" }}
+          aria-expanded={isOpen}
+          className={`w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(info.row.original.recallEval)}`}
+          style={{
+            textAlign: "left",
+          }}
         >
-          {value
-            ? qualityList.find((qualityList) => qualityList.value === value)
-                ?.label
-            : "Recall Quality..."}
+          <span
+            style={{
+              width: "18em",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              display: "block",
+              textAlign: "left",
+              textWrap: "nowrap",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {value
+              ? qualityList.find((qualityList) => qualityList.value === value)
+                  ?.label2
+              : "Recall Quality..."}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
         </Button>
       </PopoverTrigger>
@@ -77,13 +124,29 @@ export function RecallEvalComboBox(info: CellContext<Tune, unknown>) {
           <CommandList>
             <CommandEmpty>Recall Eval...</CommandEmpty>
             <CommandGroup>
-              {qualityList.map((qualityList) => (
+              {qualityList.slice(1).map((qualityList) => (
                 <CommandItem
                   key={qualityList.value}
                   value={qualityList.value}
                   onSelect={(currentValue) => {
-                    setValue(currentValue === value ? "" : currentValue);
-                    setOpen(false);
+                    console.log("value, currentValue: ", value, currentValue);
+                    const newValue = currentValue === value ? "" : currentValue;
+                    setValue(newValue);
+                    info.row.original.recallEval = newValue;
+                    // This toggleSelected forces the row to re-render, maybe there's a better way?
+                    // info.row.renderValue("recallEval");
+                    forceClose();
+
+                    // This will just update the button, but not the row.
+                    // Leaving it here for reference, and also, maybe we shouldn't
+                    // change the color of the entire row based on the recallEval?
+                    updateState({});
+
+                    // This toggleSelected hack forces the whole row to re-render.
+                    // Maybe there's a better way?
+                    const original_selection_state = info.row.getIsSelected();
+                    info.row.toggleSelected();
+                    info.row.toggleSelected(original_selection_state);
                   }}
                 >
                   <Check
@@ -92,7 +155,7 @@ export function RecallEvalComboBox(info: CellContext<Tune, unknown>) {
                       value === qualityList.value ? "opacity-100" : "opacity-0",
                     )}
                   />
-                  {qualityList.label}
+                  {qualityList.label2}
                 </CommandItem>
               ))}
             </CommandGroup>

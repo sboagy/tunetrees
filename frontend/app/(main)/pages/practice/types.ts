@@ -16,4 +16,5 @@ export type Tune = {
   note_private: string;
   note_public: string;
   tags: string;
+  recallEval: string;
 };
