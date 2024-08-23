@@ -99,6 +99,8 @@ export function RecallEvalComboBox(info: CellContext<Tune, string>) {
             textAlign: "left",
           }}
         >
+          {/* This span is the only way I could get the overflow with ellipsis to work in  */
+          /* the button.  Per suggestion from Stack Overflow. */}
           <span
             style={{
               width: "18em",
