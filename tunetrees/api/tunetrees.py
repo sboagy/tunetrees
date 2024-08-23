@@ -75,8 +75,8 @@ async def get_recently_played(user_id: str, playlist_ref: str):
             db.close()
 
 
-@router.post("/practice/feedback")
-async def feedback(
+@router.post("/practice/submit_feedback")
+async def submit_feedback(
     selected_tune: Annotated[int, Form()], vote_type: Annotated[str, Form()]
 ):
     logger = logging.getLogger("tunetrees.api")
@@ -85,7 +85,27 @@ async def feedback(
 
     submit_review(selected_tune, vote_type)
 
+    return status.HTTP_302_FOUND
+
+
+@router.post("/practice/feedback")
+async def feedback(
+    selected_tune: Annotated[int, Form()], vote_type: Annotated[str, Form()]
+):
+    """Submit feedback for a tune for the direct use of the backend server.
+    If successful, redirect to the practice page.
+    """
+    logger = logging.getLogger("tunetrees.api")
+    logger.debug(f"{selected_tune=}, {vote_type=}")
     query_and_print_tune_by_id(634)
 
+    submit_review(selected_tune, vote_type)
+
+    query_and_print_tune_by_id(634)
+
+    # I think this redirect is here in order to redirect to the practice page after
+    # submitting feedback when the feedback was submitted via a form when using
+    # the backend server directly. -sb
+    #
     html_result = RedirectResponse("/practice", status_code=status.HTTP_302_FOUND)
     return html_result
