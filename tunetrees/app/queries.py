@@ -98,7 +98,7 @@ def find_dict_index(data: list, key, value):
 def get_practice_list_scheduled(
     db: Session,
     skip: int = 0,
-    limit: int = 10,
+    limit: int = 16,
     print_table=False,
     review_sitdown_date: Optional[datetime] = None,
     acceptable_delinquency_window=7,
@@ -153,7 +153,8 @@ def get_practice_list_scheduled(
     scheduled_rows_query_sorted = practice_list_query.order_by(
         func.DATE(t_practice_list_joined.c.ReviewDate).desc()
     )
-    scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
+    # scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
+    scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip)
 
     scheduled_rows: List[Row] = scheduled_rows_query_clipped.all()
 

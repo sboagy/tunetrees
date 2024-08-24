@@ -261,3 +261,6 @@ archive
 # Some of scott's working files
 orig_nginx.conf
 scratch.md
+
+# Ignore my practice backups
+backup_practice*.sqlite
