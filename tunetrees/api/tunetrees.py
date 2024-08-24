@@ -87,7 +87,7 @@ async def submit_feedback(
     logger.debug(f"{selected_tune=}, {vote_type=}")
     # query_and_print_tune_by_id(634)
 
-    update_practice_record(selected_tune, vote_type, playlist_id)
+    update_practice_record(f"{selected_tune}", vote_type, playlist_id)
 
     return status.HTTP_302_FOUND
 
@@ -107,7 +107,7 @@ async def feedback(
     logger.debug(f"{selected_tune=}, {vote_type=}")
     query_and_print_tune_by_id(634)
 
-    update_practice_record(selected_tune, vote_type, playlist_id)
+    update_practice_record(f"{selected_tune}", vote_type, playlist_id)
 
     query_and_print_tune_by_id(634)
 
