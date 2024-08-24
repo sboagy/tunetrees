@@ -14,7 +14,7 @@ from tunetrees.app.queries import (
     get_practice_list_recently_played,
     get_practice_list_scheduled,
 )
-from tunetrees.app.schedule import query_and_print_tune_by_id, submit_review
+from tunetrees.app.schedule import query_and_print_tune_by_id, update_practice_record
 from tunetrees.models.tunetrees import Tune
 
 router = APIRouter(
@@ -77,29 +77,37 @@ async def get_recently_played(user_id: str, playlist_ref: str):
 
 @router.post("/practice/submit_feedback")
 async def submit_feedback(
-    selected_tune: Annotated[int, Form()], vote_type: Annotated[str, Form()]
+    selected_tune: Annotated[int, Form()],
+    vote_type: Annotated[str, Form()],
+    user_id: Annotated[str, Form()],
+    playlist_id: Annotated[str, Form()],
 ):
+    assert user_id
     logger = logging.getLogger("tunetrees.api")
     logger.debug(f"{selected_tune=}, {vote_type=}")
-    query_and_print_tune_by_id(634)
+    # query_and_print_tune_by_id(634)
 
-    submit_review(selected_tune, vote_type)
+    update_practice_record(selected_tune, vote_type, playlist_id)
 
     return status.HTTP_302_FOUND
 
 
 @router.post("/practice/feedback")
 async def feedback(
-    selected_tune: Annotated[int, Form()], vote_type: Annotated[str, Form()]
+    selected_tune: Annotated[int, Form()],
+    vote_type: Annotated[str, Form()],
+    user_id: Annotated[str, Form()],
+    playlist_id: Annotated[str, Form()],
 ):
     """Submit feedback for a tune for the direct use of the backend server.
     If successful, redirect to the practice page.
     """
+    assert user_id
     logger = logging.getLogger("tunetrees.api")
     logger.debug(f"{selected_tune=}, {vote_type=}")
     query_and_print_tune_by_id(634)
 
-    submit_review(selected_tune, vote_type)
+    update_practice_record(selected_tune, vote_type, playlist_id)
 
     query_and_print_tune_by_id(634)
 

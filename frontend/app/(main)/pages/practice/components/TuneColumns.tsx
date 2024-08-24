@@ -23,7 +23,7 @@ import {
 function columnControlMenu() {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="text-black">
           {" "}
           <span className="font-bold">&#8942;</span>

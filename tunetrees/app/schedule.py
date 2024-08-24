@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import List
 
-from sqlalchemy import Column, select, update
+from sqlalchemy import Column, and_, select, update
 from supermemo2 import sm_two
 from tabulate import tabulate
 
@@ -108,57 +108,81 @@ class BadTuneID(Exception):
     """Tune not found."""
 
 
-def submit_review(tune_id: int, feedback: str):
-    db = None
-    quality = quality_lookup.get(feedback)
-    if quality is None or quality < 0:
-        return
-    assert quality <= quality_lookup.get("perfect", -1)
+def update_practice_record(
+    tune_id: str,
+    quality: str,
+    playlist_ref: str,
+):
+    db = SessionLocal()
     try:
-        db = SessionLocal()
-
-        practiced_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
-        practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
-
-        stmt = select(PracticeRecord).where(PracticeRecord.TUNE_REF == tune_id)
-        row: PracticeRecord = db.execute(stmt).one()[0]
-
-        review = sm_two.review(
-            quality, row.Easiness, row.Interval, row.Repetitions, practiced
+        stmt = select(PracticeRecord).where(
+            and_(
+                PracticeRecord.TUNE_REF == tune_id,
+                PracticeRecord.PLAYLIST_REF == playlist_ref,
+            )
         )
+        row_result = db.execute(stmt).one_or_none()
 
-        review_date = review.get("review_datetime")
-        if isinstance(review_date, datetime):
-            review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
-        elif isinstance(review_date, str):
-            review_date_str = review_date
+        if row_result:
+            practice_record: PracticeRecord = row_result[0]
+            quality_int = quality_lookup.get(quality, -1)
+            if quality_int == -1:
+                raise ValueError(f"Unexpected quality value: {quality}")
+
+            practiced_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
+            practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
+
+            review = sm_two.review(
+                quality_int,
+                practice_record.Easiness,
+                practice_record.Interval,
+                practice_record.Repetitions,
+                practiced,
+            )
+
+            review_date = review.get("review_datetime")
+            if isinstance(review_date, datetime):
+                review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
+            elif isinstance(review_date, str):
+                review_date_str = review_date
+            else:
+                raise ValueError(
+                    f"Unexpected review_date type: {type(review_date)}: {review_date}"
+                )
+
+            # Update the PracticeRecord with the new review data
+            practice_record.ReviewDate = review_date_str
+
+            db.execute(
+                update(PracticeRecord)
+                .where(
+                    and_(
+                        PracticeRecord.TUNE_REF == tune_id,
+                        PracticeRecord.PLAYLIST_REF == playlist_ref,
+                    )
+                )
+                .values(
+                    Easiness=review.get("easiness"),
+                    Interval=review.get("interval"),
+                    Repetitions=review.get("repetitions"),
+                    ReviewDate=review_date_str,
+                    Quality=quality,
+                    Practiced=practiced_str,
+                ),
+                execution_options={"synchronize_session": False},
+            )
+
+            db.commit()
+            db.flush()
         else:
-            log.error("review_date_str is a unknown format")
-            review_date_str = None
-
-        db.execute(
-            update(PracticeRecord)
-            .where(PracticeRecord.TUNE_REF == tune_id)
-            .values(
-                Easiness=review.get("easiness"),
-                Interval=review.get("interval"),
-                Repetitions=review.get("repetitions"),
-                ReviewDate=review_date_str,
-                Quality=quality,
-                Practiced=practiced_str,
-            ),
-            execution_options={"synchronize_session": False},
-        )
-
-        db.commit()
-        db.flush()
+            # Handle the case where no PracticeRecord is found
+            print("No PracticeRecord found for the given tune_id and playlist_ref")
 
     except Exception as e:
-        print(f"Exception occurred when updating practice record {e}")
-        raise
+        db.rollback()
+        raise e
     finally:
-        if db:
-            db.close()
+        db.close()
 
 
 def query_and_print_tune_by_id(tune_id: int, print_table=True):

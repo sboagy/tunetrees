@@ -133,7 +133,8 @@ def get_practice_list_scheduled(
     # day to the review_sitdown_date to get this to agree with the
     # older code. I don't know why this is necessary!  Probably
     # a bad hack.
-    review_sitdown_date = review_sitdown_date + timedelta(days=1)
+    # review_sitdown_date = review_sitdown_date + timedelta(days=1)
+    print("review_sitdown_date: ", review_sitdown_date)
 
     lower_bound_date = review_sitdown_date - timedelta(
         days=acceptable_delinquency_window
@@ -190,84 +191,84 @@ def get_practice_list_scheduled(
     return rows
 
 
-def get_practice_list_scheduled_dynamic_view_construction(
-    db: Session,
-    skip: int = 0,
-    limit: int = 10,
-    print_table=False,
-    review_sitdown_date: Optional[datetime] = None,
-    acceptable_delinquency_window=7,
-    playlist_ref=1,
-    user_ref=1,
-) -> List[Row[Any]]:
-    """Get a list of tunes to practice on the review_sitdown_date.
-    (This version constructs a view via the get_practice_list_query function
-    instead of the practice_list_joined view.)
-    (Note: This version of the function is not used at this time.)
+# def get_practice_list_scheduled_dynamic_view_construction(
+#     db: Session,
+#     skip: int = 0,
+#     limit: int = 10,
+#     print_table=False,
+#     review_sitdown_date: Optional[datetime] = None,
+#     acceptable_delinquency_window=7,
+#     playlist_ref=1,
+#     user_ref=1,
+# ) -> List[Row[Any]]:
+#     """Get a list of tunes to practice on the review_sitdown_date.
+#     (This version constructs a view via the get_practice_list_query function
+#     instead of the practice_list_joined view.)
+#     (Note: This version of the function is not used at this time.)
 
-    Get all tunes scheduled between the acceptable_delinquency_window and review_sitdown_date, but limit number to the `limit` var.
+#     Get all tunes scheduled between the acceptable_delinquency_window and review_sitdown_date, but limit number to the `limit` var.
 
-    Args:
-        db (Session): _description_
-        skip (int, optional): _description_. Defaults to 0.
-        limit (int, optional): _description_. Defaults to 10.
-        print_table (bool, optional): _description_. Defaults to False.
-        review_sitdown_date (_type_, optional): _description_. Defaults to datetime.today().
-        acceptable_delinquency_window (int, optional): _description_. Defaults to 7 days.
-        playlist_ref (int, optional): The playlist ID to filter on. Defaults to 1.
-        user_ref (int, optional): The user ID to filter on. Defaults to 1.
+#     Args:
+#         db (Session): _description_
+#         skip (int, optional): _description_. Defaults to 0.
+#         limit (int, optional): _description_. Defaults to 10.
+#         print_table (bool, optional): _description_. Defaults to False.
+#         review_sitdown_date (_type_, optional): _description_. Defaults to datetime.today().
+#         acceptable_delinquency_window (int, optional): _description_. Defaults to 7 days.
+#         playlist_ref (int, optional): The playlist ID to filter on. Defaults to 1.
+#         user_ref (int, optional): The user ID to filter on. Defaults to 1.
 
-    Returns:
-        List[Tune]: tunes scheduled between the acceptable_delinquency_window and review_sitdown_date, but limit number to the `limit` var.
-    """
-    if review_sitdown_date is None:
-        review_sitdown_date = datetime.today()
-        print("review_sitdown_date is None, using today: ", review_sitdown_date)
-    assert isinstance(review_sitdown_date, datetime)
+#     Returns:
+#         List[Tune]: tunes scheduled between the acceptable_delinquency_window and review_sitdown_date, but limit number to the `limit` var.
+#     """
+#     if review_sitdown_date is None:
+#         review_sitdown_date = datetime.today()
+#         print("review_sitdown_date is None, using today: ", review_sitdown_date)
+#     assert isinstance(review_sitdown_date, datetime)
 
-    # This is really strange, but it seems to be necessary to add a
-    # day to the review_sitdown_date to get this to agree with the
-    # older code. I don't know why this is necessary.
-    review_sitdown_date = review_sitdown_date + timedelta(days=1)
+#     # This is really strange, but it seems to be necessary to add a
+#     # day to the review_sitdown_date to get this to agree with the
+#     # older code. I don't know why this is necessary.
+#     review_sitdown_date = review_sitdown_date + timedelta(days=1)
 
-    practice_list_query = get_practice_list_query(db, playlist_ref, user_ref)
+#     practice_list_query = get_practice_list_query(db, playlist_ref, user_ref)
 
-    practice_list_query_scheduled = practice_list_query.where(
-        and_(
-            PracticeRecord.ReviewDate
-            > (review_sitdown_date - timedelta(acceptable_delinquency_window)),
-            PracticeRecord.ReviewDate <= review_sitdown_date,
-        )
-    )
-    scheduled_rows_query_sorted = practice_list_query_scheduled.order_by(
-        func.DATE(PracticeRecord.ReviewDate).desc()
-    )
-    scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
+#     practice_list_query_scheduled = practice_list_query.where(
+#         and_(
+#             PracticeRecord.ReviewDate
+#             > (review_sitdown_date - timedelta(acceptable_delinquency_window)),
+#             PracticeRecord.ReviewDate <= review_sitdown_date,
+#         )
+#     )
+#     scheduled_rows_query_sorted = practice_list_query_scheduled.order_by(
+#         func.DATE(PracticeRecord.ReviewDate).desc()
+#     )
+#     scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
 
-    scheduled_rows: List[Row] = scheduled_rows_query_clipped.all()
+#     scheduled_rows: List[Row] = scheduled_rows_query_clipped.all()
 
-    tune_type_column_index = find_dict_index(
-        scheduled_rows_query_clipped.column_descriptions, "name", "TuneType"
-    )
-    scheduled_rows = sorted(scheduled_rows, key=lambda row: row[tune_type_column_index])
+#     tune_type_column_index = find_dict_index(
+#         scheduled_rows_query_clipped.column_descriptions, "name", "TuneType"
+#     )
+#     scheduled_rows = sorted(scheduled_rows, key=lambda row: row[tune_type_column_index])
 
-    aged_limit = limit - len(scheduled_rows)
-    if aged_limit <= 0:
-        aged_limit = 2
-    aged_limit = 2
-    aged_rows: List[Tune] = (
-        practice_list_query.order_by(func.DATE(PracticeRecord.Practiced).asc())
-        .offset(skip)
-        .limit(aged_limit)
-        .all()
-    )
-    rows = scheduled_rows + aged_rows
+#     aged_limit = limit - len(scheduled_rows)
+#     if aged_limit <= 0:
+#         aged_limit = 2
+#     aged_limit = 2
+#     aged_rows: List[Tune] = (
+#         practice_list_query.order_by(func.DATE(PracticeRecord.Practiced).asc())
+#         .offset(skip)
+#         .limit(aged_limit)
+#         .all()
+#     )
+#     rows = scheduled_rows + aged_rows
 
-    # if print_table:
-    #     print("\n--------")
-    #     print(tabulate(rows, headers=t_practice_list_joined.columns.keys()))
+#     # if print_table:
+#     #     print("\n--------")
+#     #     print(tabulate(rows, headers=t_practice_list_joined.columns.keys()))
 
-    return rows
+#     return rows
 
 
 def get_practice_list_recently_played(

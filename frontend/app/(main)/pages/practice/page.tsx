@@ -27,6 +27,8 @@ export default function Practice({
   user_id,
   playlist_id,
 }: PracticeProps): JSX.Element {
+  const [playlist_ref] = useState<string>(playlist_id);
+  const [user_ref] = useState<string>(user_id);
   const [scheduled, setScheduled] = useState<Tune[]>();
   const [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
   // const [progress, setProgress] = React.useState(13);
@@ -65,7 +67,11 @@ export default function Practice({
           </CardHeader> */}
           <CardContent className="space-y-2">
             {scheduled ? (
-              <ScheduledTunesGrid tunes={scheduled} />
+              <ScheduledTunesGrid
+                tunes={scheduled}
+                user_id={user_ref}
+                playlist_id={playlist_ref}
+              />
             ) : (
               <CircularProgress />
             )}
@@ -83,7 +89,11 @@ export default function Practice({
           </CardHeader> */}
           <CardContent className="space-y-2">
             {recentlyPracticed ? (
-              <RepertoireGrid tunes={recentlyPracticed} />
+              <RepertoireGrid
+                tunes={recentlyPracticed}
+                user_id={user_ref}
+                playlist_id={playlist_ref}
+              />
             ) : (
               <CircularProgress />
             )}

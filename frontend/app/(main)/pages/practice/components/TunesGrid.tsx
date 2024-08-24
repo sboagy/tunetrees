@@ -30,9 +30,17 @@ import type { Tune } from "../types";
 
 export interface ScheduledTunesType {
   tunes: Tune[];
+  user_id: string;
+  playlist_id: string;
 }
 
-export function TunesTable({ tunes }: ScheduledTunesType) {
+export function TunesTable({
+  tunes,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  user_id,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  playlist_id,
+}: ScheduledTunesType) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     [],
@@ -78,9 +86,6 @@ export function TunesTable({ tunes }: ScheduledTunesType) {
       rowSelection,
       columnVisibility,
     },
-    // initialState: {
-    //   columnVisibility: columnVisibility,
-    // },
   });
 
   return table;
