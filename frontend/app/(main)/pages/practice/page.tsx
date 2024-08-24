@@ -1,93 +1,124 @@
-'use client'
-import React, {useEffect, useState} from 'react'
-import {getPracticeListScheduled, getRecentlyPracticed} from './queries'
-import {Tune} from './types'
-import {Box, CircularProgress, Tab, Tabs, Typography} from '@mui/material'
+"use client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useState } from "react";
 
-import ScheduledTunesGrid from './components/ScheduledTunesGrid';
-import RecentlyPracticed from './components/RecentlyPracticed';
+import { getPracticeListScheduled, getRecentlyPracticed } from "./queries";
 
-interface TabPanelProps {
-    children?: React.ReactNode;
-    index: number;
-    value: number;
+import type { Tune } from "./types";
+
+import RepertoireGrid from "./components/RepertoireGrid";
+import ScheduledTunesGrid from "./components/ScheduledTunesGrid";
+
+function CircularProgress() {
+  return (
+    <div className="flex justify-center items-center h-32">
+      <div className="w-12 h-12 border-t-2 border-b-2 border-gray-900 rounded-full animate-spin" />
+    </div>
+  );
 }
 
-type WarmupState = {
-    x: number
-}
+type PracticeProps = {
+  user_id: string;
+  playlist_id: string;
+};
 
-export default function Practice() {
+export default function Practice({
+  user_id,
+  playlist_id,
+}: PracticeProps): JSX.Element {
+  const [playlist_ref] = useState<string>(playlist_id);
+  const [user_ref] = useState<string>(user_id);
+  const [scheduled, setScheduled] = useState<Tune[]>();
+  const [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
+  // const [progress, setProgress] = React.useState(13);
 
-    // let [warmup, setWarmup] = useState<WarmupState>()
-    let [scheduled, setScheduled] = useState<Tune[]>()
-    let [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>()
-
-    useEffect(() => {
-        const getScheduled = async () => {
-            const data = await getPracticeListScheduled()
-            setScheduled(data)
-        }
-        getScheduled()
-    }, [])
-
-    useEffect(() => {
-        const getRecent = async () => {
-            const data = await getRecentlyPracticed()
-            setRecentlyPracticed(data)
-        }
-        getRecent()
-    }, [])
-
-    function CustomTabPanel(props: TabPanelProps) {
-        const {children, value, index, ...other} = props;
-
-        return (
-            <div
-                role="tabpanel"
-                hidden={value !== index}
-                id={`simple-tabpanel-${index}`}
-                aria-labelledby={`simple-tab-${index}`}
-                {...other}
-            >
-                {value === index && (
-                    <Box sx={{p: 3}}>
-                        <Typography component={'div'}>{children}</Typography>
-                    </Box>
-                )}
-            </div>
-        );
-    }
-
-    const [tabValue, setTabValue] = React.useState(0);
-
-    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-        setTabValue(newValue);
+  //  wrap with useEffect to avoid infinite loop (apparently)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Not sure how to fix this, or if it's a real issue
+  useEffect(() => {
+    const getScheduled = async (user_id: string, playlist_id: string) => {
+      const data = await getPracticeListScheduled(user_id, playlist_id);
+      setScheduled(data);
     };
+    getScheduled(user_id, playlist_id);
+  }, []);
 
-    return (
-        <>
-            {/* <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mx: 4 }}>
-        <h1 className={josefinSans.className}>tunetrees</h1>
-        <WarmUpTimer />
-      </Box> */}
-            <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
-                <Tabs value={tabValue} onChange={handleTabChange} aria-label="basic tabs example">
-                    {/* <Tab label="Warmup" /> */}
-                    <Tab label="Scheduled for Practice"/>
-                    <Tab label="Recently Practiced"/>
-                </Tabs>
-            </Box>
-            {/* <CustomTabPanel value={tabValue} index={0}>
-        {warmup ? <WarmUpTimer /> : <CircularProgress />}
-      </CustomTabPanel> */}
-            <CustomTabPanel value={tabValue} index={0}>
-                {scheduled ? <ScheduledTunesGrid tunes={scheduled}/> : <CircularProgress/>}
-            </CustomTabPanel>
-            <CustomTabPanel value={tabValue} index={1}>
-                {recentlyPracticed ? <RecentlyPracticed tunes={recentlyPracticed}/> : <CircularProgress/>}
-            </CustomTabPanel>
-        </>
-    )
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Not sure how to fix this, or if it's a real issue
+  useEffect(() => {
+    const getRecent = async (user_id: string, playlist_id: string) => {
+      const data = await getRecentlyPracticed(user_id, playlist_id);
+      setRecentlyPracticed(data);
+    };
+    getRecent(user_id, playlist_id);
+  }, []);
 
+  return (
+    <Tabs defaultValue="scheduled" className="flex h-full w-full flex-col">
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="scheduled">Practice</TabsTrigger>
+        <TabsTrigger value="repertoire">Repertoire</TabsTrigger>
+        <TabsTrigger value="analysis">Analysis</TabsTrigger>
+      </TabsList>
+      <TabsContent value="scheduled">
+        <Card>
+          {/* <CardHeader>
+            <CardTitle>Scheduled for Practice</CardTitle>
+            <CardDescription>Daily Review.</CardDescription>
+          </CardHeader> */}
+          <CardContent className="space-y-2">
+            {scheduled ? (
+              <ScheduledTunesGrid
+                tunes={scheduled}
+                user_id={user_ref}
+                playlist_id={playlist_ref}
+              />
+            ) : (
+              <CircularProgress />
+            )}
+          </CardContent>
+          {/* <CardFooter>
+            <Button>Save changes</Button>
+          </CardFooter> */}
+        </Card>
+      </TabsContent>
+      <TabsContent value="repertoire">
+        <Card>
+          {/* <CardHeader>
+            <CardTitle>Repertoire</CardTitle>
+            <CardDescription>Overall repertoire.</CardDescription>
+          </CardHeader> */}
+          <CardContent className="space-y-2">
+            {recentlyPracticed ? (
+              <RepertoireGrid
+                tunes={recentlyPracticed}
+                user_id={user_ref}
+                playlist_id={playlist_ref}
+              />
+            ) : (
+              <CircularProgress />
+            )}
+          </CardContent>
+          {/* <CardFooter>
+            <Button>Save password</Button>
+          </CardFooter> */}
+        </Card>
+      </TabsContent>
+      <TabsContent value="analysis">
+        <Card>
+          {/* <CardHeader>
+            <CardTitle>Analysis</CardTitle>
+            <CardDescription>Overall analysis.</CardDescription>
+          </CardHeader> */}
+          <CardContent className="space-y-2">
+            <p>
+              Coming soon: Analysis, will hold visualizations and statistics
+            </p>
+          </CardContent>
+          {/* <CardFooter>
+            <Button>Save password</Button>
+          </CardFooter> */}
+        </Card>
+      </TabsContent>
+    </Tabs>
+  );
 }

@@ -20,7 +20,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/
 lib64/
 parts/
 sdist/
@@ -247,6 +247,8 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 
 scratch.txt
+scratch.json
+scratch.md
 
 archive
 
@@ -259,3 +261,6 @@ archive
 # Some of scott's working files
 orig_nginx.conf
 scratch.md
+
+# Ignore my practice backups
+backup_practice*.sqlite

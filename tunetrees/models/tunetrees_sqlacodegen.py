@@ -1,8 +1,7 @@
 from typing import List, Optional
 
 from sqlalchemy import Column, Float, ForeignKey, Index, Integer, Table, Text, text
-from sqlalchemy.orm import declarative_base, mapped_column, relationship
-from sqlalchemy.orm.base import Mapped
+from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 
 Base = declarative_base()
 metadata = Base.metadata
@@ -57,6 +56,9 @@ class Tune(Base):
     Mode = mapped_column(Text)
     Incipit = mapped_column(Text)
 
+    external_ref: Mapped[List["ExternalRef"]] = relationship(
+        "ExternalRef", uselist=True, back_populates="tune"
+    )
     practice_record: Mapped[List["PracticeRecord"]] = relationship(
         "PracticeRecord", uselist=True, back_populates="tune"
     )
@@ -65,13 +67,10 @@ class Tune(Base):
 class User(Base):
     __tablename__ = "user"
 
-    ID = mapped_column(Integer, primary_key=True)
+    id = mapped_column(Integer, primary_key=True)
     hash = mapped_column(Text)
-    first_name = mapped_column(Text)
-    middle_name = mapped_column(Text)
-    last_name = mapped_column(Text)
+    name = mapped_column(Text)
     email = mapped_column(Text)
-    user_name = mapped_column(Text)
     email_verified = mapped_column(Text, server_default=text("NULL"))
     image = mapped_column(Text)
 
@@ -91,6 +90,17 @@ class VerificationToken(Base):
     expires = mapped_column(Text)
 
 
+class ExternalRef(Base):
+    __tablename__ = "external_ref"
+
+    id = mapped_column(Integer, primary_key=True)
+    url = mapped_column(Text, nullable=False)
+    tune_ref = mapped_column(ForeignKey("tune.ID"), nullable=False)
+    ref_type = mapped_column(Text)
+
+    tune: Mapped["Tune"] = relationship("Tune", back_populates="external_ref")
+
+
 class Playlist(Base):
     __tablename__ = "playlist"
     __table_args__ = (
@@ -99,7 +109,7 @@ class Playlist(Base):
     )
 
     PLAYLIST_ID = mapped_column(Integer, primary_key=True)
-    USER_REF = mapped_column(ForeignKey("user.ID"))
+    USER_REF = mapped_column(ForeignKey("user.id"))
     instrument = mapped_column(Text)
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="playlist")
@@ -113,7 +123,7 @@ class Session(Base):
 
     expires = mapped_column(Text)
     session_token = mapped_column(Text, primary_key=True)
-    user_id = mapped_column(ForeignKey("user.ID"))
+    user_id = mapped_column(ForeignKey("user.id"))
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="session")
 
@@ -125,7 +135,7 @@ t_user_annotation_set = Table(
     Column("NotePrivate", Text),
     Column("NotePublic", Text),
     Column("Tags", Text),
-    Column("USER_REF", ForeignKey("user.ID"), nullable=False, server_default=text("1")),
+    Column("USER_REF", ForeignKey("user.id"), nullable=False, server_default=text("1")),
 )
 
 

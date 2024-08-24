@@ -1,66 +1,114 @@
+import { auth } from "auth";
+import defaultAvatar from "/public/avatars/flute.png";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import { auth } from "auth";
+
+import {
+  ManagePlaylistMenuItem,
+  SignIn,
+  SignOut,
+  UserSettingsMenuItem,
+} from "./auth-components";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { DemoUser, NewUser, SignIn, SignOut } from "./auth-components";
 import { ModeToggle } from "./ui/mode-toggle";
-import { ThemePanel } from "@radix-ui/themes";
 
 export default async function UserButton() {
   console.log("here in the user button");
   // debugger
   const session = await auth();
+  if (!session) {
+    console.log("No session found (UserButton)");
+  } else {
+    console.log("Session found (UserButton)");
+  }
   if (!session?.user) {
     ("use server");
+
+    console.log("No user found in session (UserButton)");
     // let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
     // const csrfToken = cookies().get("authjs.csrf-token")?.value ?? "";
     return (
       <div className="flex gap-2 items-center">
         <SignIn />
-        <NewUser />
-        <DemoUser />
+        {/* For right now I think that new user login may just be part of the login flow */}
+        {/* <NewUser/> */}
+        {/* And demo user may also be just another login button?  Or should it be more obviously visible? */}
+        {/* <DemoUser /> */}
         <ModeToggle />
         {/* <ThemePanel /> */}
       </div>
     );
   }
+  console.log("Session found! (UserButton)");
+  const unknownUserNameString = "";
   return (
-    <div className="flex gap-2 items-center">
-      <span className="hidden text-sm sm:inline-flex">
-        {session.user.email}
-      </span>
+    <div className="flex items-center">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative w-8 h-8 rounded-full">
-            <Avatar className="w-8 h-8">
-              <AvatarImage
+          <Button
+            variant="ghost"
+            className="focus-visible:ring-0 focus-visible:ring-offset-0"
+          >
+            <div className="flex items-center space-x-3 ">
+              <span className="hidden text-sm sm:inline-flex">
+                {session.user.email}
+              </span>
+              <Avatar className="w-8 h-8">
+                <AvatarImage
+                  src={defaultAvatar.src}
+                  alt={session.user.name ?? ""}
+                />
+                {/* <AvatarImage
                 src={
                   session.user.image ??
                   "https://source.boringavatars.com/marble/120"
                 }
                 alt={session.user.name ?? ""}
-              />
-            </Avatar>
+              /> */}
+              </Avatar>
+            </div>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-56" align="end" forceMount>
-          <DropdownMenuLabel className="font-normal">
-            <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">
-                {session.user.name}
-              </p>
-              <p className="text-xs leading-none text-muted-foreground">
+        <DropdownMenuContent>
+          {(() => {
+            if (session.user.name && session.user.name !== "None") {
+              return (
+                <>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        {session.user.name
+                          ? session.user.name === "None"
+                            ? unknownUserNameString
+                            : session.user.name
+                          : unknownUserNameString}
+                      </p>
+                      {/* <p className="text-xs leading-none text-muted-foreground">
                 {session.user.email}
-              </p>
-            </div>
-          </DropdownMenuLabel>
-          <DropdownMenuItem>
+              </p> */}
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                </>
+              );
+            }
+            return null;
+          })()}
+          <DropdownMenuItem className="h-8">
+            <UserSettingsMenuItem />
+          </DropdownMenuItem>
+          <DropdownMenuItem className="h-8">
+            <ManagePlaylistMenuItem />
+          </DropdownMenuItem>
+          {/* <DropdownMenuSeparator className="my-2 border-t border-dark-gray-200" /> */}
+          <DropdownMenuItem className="h-8">
             <SignOut />
           </DropdownMenuItem>
         </DropdownMenuContent>

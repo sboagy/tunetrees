@@ -1,115 +1,83 @@
-'use client'
-import React from 'react'
-import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid';
-import DataGrid from '@/components/ui/DataGrid';
-import {Tune} from '../types';
+"use client";
 
-import {submitPracticeFeedback} from '../commands';
-import RecallEvaluationForm from './RecallEvaluationForm';
-import {Box, Button} from '@mui/material';
-import {useRouter} from 'next/navigation';
+import { Button } from "@/components/ui/button";
+import ColumnsMenu from "./ColumnsMenu";
+import TunesGrid, { type ScheduledTunesType, TunesTable } from "./TunesGrid";
+import { submitPracticeFeedback } from "../commands";
+import type { Table as TanstackTable } from "@tanstack/react-table";
+import type { Tune } from "../types";
+import { useState } from "react";
+import { getPracticeListScheduled } from "../queries";
 
+export default function ScheduledTunesGrid({
+  tunes,
+  user_id,
+  playlist_id,
+}: ScheduledTunesType): JSX.Element {
+  const [scheduled, setScheduled] = useState<Tune[]>(tunes);
 
-interface ScheduledTunesType {
-    tunes: Tune[]
-}
+  const table: TanstackTable<Tune> = TunesTable({
+    tunes: scheduled,
+    user_id,
+    playlist_id,
+  });
 
-export interface Values {
-    id: string
-    feedback: string
-}
+  // const valuesArray = {};
 
+  const submitPracticeFeedbackHandler = () => {
+    console.log("handleClick!");
 
-export default function ScheduledTunes({tunes}: ScheduledTunesType) {
+    for (let i = 0; i < scheduled.length; i++) {
+      const tune = scheduled[i];
+      const id: number = tune.id;
+      const row = table.getRow(i.toString());
 
-    console.log('Tunes incoming to scheduled tunes', tunes)
+      const feedback: string = row.renderValue("recallEval");
 
-    const router = useRouter()
-
-    const valuesArray = {}
-
-    const scheduledTunesColumns: GridColDef[] = [
-        {
-            field: 'title',
-            headerName: 'Tune Name',
-            width: 250,
-        },
-        {
-            field: 'type',
-            headerName: 'Type',
-            width: 100,
-        },
-        {
-            field: 'practiced',
-            headerName: 'Last Practiced',
-            width: 150,
-        },
-        {
-            field: 'review_date',
-            headerName: 'Scheduled',
-            width: 150,
-        },
-        // {
-        //   field: 'note_private',
-        //   headerName: 'Note Private',
-        //   width: 150,
-        // },
-        // {
-        //   field: 'note_public',
-        //   headerName: 'Note Public',
-        //   width: 150,
-        // },
-        {
-            field: 'tags',
-            headerName: 'Tags',
-            width: 90,
-        },
-        {
-            field: 'incipit',
-            headerName: 'Incipit',
-            width: 150
-        },
-        {
-            field: 'externalLink',
-            headerName: 'External Link',
-            width: 160,
-            renderCell: (params: GridRenderCellParams) => {
-                return <a href={`https://www.irishtune.info/tune/${params.row.id}`}
-                          target="_blank">{params.row.title}</a>
-            }
-        },
-        {
-            field: 'recallEval',
-            headerName: 'Recall Evaluation',
-            width: 500,
-            renderCell: (params: GridRenderCellParams) => {
-                return <Box sx={{width: "100%"}}><RecallEvaluationForm tuneId={params.row.id}
-                                                                       valuesArray={valuesArray}/></Box>
-            }
-        },
-
-    ]
-
-    const handleClick = () => {
-        for (const [key, value] of Object.entries(valuesArray)) {
-            const id = parseInt(key)
-            const feedback = value as string
-            submitPracticeFeedback({id, feedback})
-            // router.reload()
-        }
-
+      if (feedback) {
+        console.log("id, feedback", id, feedback);
+        const results = submitPracticeFeedback({
+          id,
+          feedback,
+          user_id,
+          playlist_id,
+        });
+        console.log("results from submitPracticeFeedback: ", results);
+        row.original.recallEval = "";
+      }
+      const getScheduled = async (user_id: string, playlist_id: string) => {
+        const data = await getPracticeListScheduled(user_id, playlist_id);
+        setScheduled(data);
+      };
+      getScheduled(user_id, playlist_id);
     }
+  };
 
-    return (
-        <>
-            <h4>Scheduled for practice:</h4>
-            <Button
-                type='submit'
-                variant='outlined'
-                onClick={handleClick} sx={{mb: 2}}>Submit Practiced Tunes
-            </Button>
-            <DataGrid rows={tunes} columns={scheduledTunesColumns} pageSize={10}/>
-        </>
+  return (
+    <div className="w-full">
+      <div className="flex items-center py-4">
+        {/* <Input
+          placeholder="Filter by type..."
+          value={(table.getColumn("type")?.getFilterValue() as string) ?? ""}
+          onChange={(event) =>
+            table.getColumn("type")?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm"
+        /> */}
+        <div className="flex-row items-center">
+          {/* <h1>Scheduled for practice:</h1> */}
+          <Button
+            type="submit"
+            variant="outline"
+            onClick={submitPracticeFeedbackHandler}
+          >
+            Submit Practiced Tunes
+          </Button>
+        </div>
 
-    )
+        <ColumnsMenu table={table} />
+      </div>
+      <TunesGrid table={table} />
+    </div>
+  );
 }

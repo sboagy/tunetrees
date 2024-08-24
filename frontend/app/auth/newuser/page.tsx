@@ -2,11 +2,10 @@
 
 import { providerMap, signIn } from "@/auth";
 import Image from "next/image";
+import profilePic from "/public/logo4.png";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Icons } from "@/components/icons";
-import { toast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -16,18 +15,28 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { zodResolver } from "@hookform/resolvers/zod";
+// import { useSession } from "next-auth/react";
+import { useCallback } from "react";
 import { useForm } from "react-hook-form";
 
+// import { cookies } from "next/headers";
+import {
+  type AccountFormValues,
+  accountFormSchema,
+  defaultValues,
+} from "@/app/auth/newuser/account-form";
+import { PasswordInput } from "@/components/password-input";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { newUser } from "./newuser-action";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const languages = [
   { label: "English", value: "en" },
   { label: "French", value: "fr" },
@@ -40,62 +49,7 @@ const languages = [
   { label: "Chinese", value: "zh" },
 ] as const;
 
-const accountFormSchema = z.object({
-  username: z
-    .string()
-    .min(2, {
-      message: "User Name must be at least 2 characters.",
-    })
-    .max(30, {
-      message: "User Name must not be longer than 30 characters.",
-    }),
-  password: z
-    .string()
-    .min(2, {
-      message: "Password must be at least 2 characters.",
-    })
-    .max(30, {
-      message: "Password must not be longer than 30 characters.",
-    }),
-  repeat_password: z
-    .string()
-    .min(2, {
-      message: "Repeated password must match password.",
-    })
-    .max(30, {
-      message: "Repeated password must match password.",
-    }),
-  email: z
-    .string()
-    .min(2, {
-      message: "Email must be at least 2 characters.",
-    })
-    .max(30, {
-      message: "Email must not be longer than 30 characters.",
-    }),
-  name: z
-    .string()
-    .min(2, {
-      message: "Name must be at least 2 characters.",
-    })
-    .max(30, {
-      message: "Name must not be longer than 30 characters.",
-    }),
-  //   dob: z.date({
-  //     required_error: "A date of birth is required.",
-  //   }),
-  //   language: z.string({
-  //     required_error: "Please select a language.",
-  //   }),
-});
-
-type AccountFormValues = z.infer<typeof accountFormSchema>;
-
-// This can come from your database or API.
-const defaultValues: Partial<AccountFormValues> = {
-  // name: "Your name",
-  // dob: new Date("2023-01-23"),
-};
+// const _crsfToken = client
 
 export default function SignInPage() {
   const form = useForm<AccountFormValues>({
@@ -103,28 +57,44 @@ export default function SignInPage() {
     defaultValues,
   });
 
-  function onSubmit(data: AccountFormValues) {
-    toast({
-      title: "You submitted the following values:",
-      description: (
-        <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-          <code className="text-white">{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
-  }
+  // const [password, setPassword] = useState("");
+
+  const onSubmit = useCallback(async (data: AccountFormValues) => {
+    const result = await newUser(data);
+    console.log(result);
+    // do something with result
+  }, []);
+
+  // function onSubmit(data: AccountFormValues) {
+  //   console.log("In onSubmit in the newuser page", { data });
+  //   toast({
+  //     title: "You submitted the following values:",
+  //     description: (
+  //       <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
+  //         <code className="text-white">{JSON.stringify(data, null, 2)}</code>
+  //       </pre>
+  //     ),
+  //   });
+  // }
+
+  // let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
+  const _crsfToken = "abcdef";
+  // const _crsfToken = getCsrfToken();
+  console.log("SignInPage(): csrfToken: %s", _crsfToken);
 
   return (
-    <div className="flex items-center justify-center">
-      <Card className="w-[350px]">
+    <div className="flex items-center justify-center mb-0">
+      <Card className="w-[24em]">
         <CardHeader>
           <CardTitle className="flex justify-center">
             <Image
-              src="/logo.png"
+              src={profilePic}
               alt="Home"
-              width="48"
-              height="48"
+              width={48}
+              height={48}
+              // height={48}
               className="min-w-8"
+              priority={true}
             />
           </CardTitle>
 
@@ -136,6 +106,26 @@ export default function SignInPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
+                name="csrfToken"
+                defaultValue={_crsfToken}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        placeholder="csrfToken"
+                        type="hidden"
+                        defaultValue="abcdef"
+                        {...field}
+                      />
+                      {/* <CSRFInput /> */}
+                    </FormControl>
+                    {/* <FormDescription>TuneTrees user name.</FormDescription> */}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {/* <FormField
+                control={form.control}
                 name="username"
                 render={({ field }) => (
                   <FormItem>
@@ -143,11 +133,10 @@ export default function SignInPage() {
                     <FormControl>
                       <Input placeholder="username" {...field} />
                     </FormControl>
-                    {/* <FormDescription>TuneTrees user name.</FormDescription> */}
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              /> */}
               <FormField
                 control={form.control}
                 name="email"
@@ -168,36 +157,52 @@ export default function SignInPage() {
                 control={form.control}
                 name="password"
                 render={({ field }) => (
-                  <>
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="password"
-                          type="password"
-                          {...field}
-                        />
-                      </FormControl>
-                      {/* <FormDescription>
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      {/* <Input
+                        placeholder="password"
+                        type="password"
+                        {...field}
+                      /> */}
+                      <PasswordInput
+                        id="password"
+                        placeholder="password"
+                        autoComplete="new-password"
+                        {...field}
+                      />
+                    </FormControl>
+                    {/* <FormDescription>
                       Must be a valid email address.
                     </FormDescription> */}
-                      <FormMessage />
-                    </FormItem>
-                    <FormItem>
-                      {/* <FormLabel>Repeat Password</FormLabel> */}
-                      <FormControl>
-                        <Input
-                          placeholder="repeat_password"
-                          type="repeat_password"
-                          {...field}
-                        />
-                      </FormControl>
-                      {/* <FormDescription>
-                      Must be a valid email address.
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password_confirmation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm Password</FormLabel>
+                    <FormControl>
+                      {/* <Input
+                        placeholder="password"
+                        type="password"
+                        {...field}
+                      /> */}
+                      <PasswordInput
+                        id="password_confirmation"
+                        placeholder="repeat password"
+                        autoComplete="new-password"
+                        {...field}
+                      />
+                    </FormControl>
+                    {/* <FormDescription>
+                      Repeat password, must match previous field.
                     </FormDescription> */}
-                      <FormMessage />
-                    </FormItem>
-                  </>
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
               <FormField
@@ -217,12 +222,12 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
-              <Button
+              <button
                 type="submit"
                 className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12 text-base font-light text-white rounded transition focus:ring-2 focus:ring-offset-2 focus:outline-none bg-zinc-800 hover:bg-zinc-900 focus:ring-zinc-800"
               >
                 Sign Up
-              </Button>
+              </button>
             </form>
             <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
               <div className="flex-1 bg-neutral-300 h-[1px]" />
