@@ -1,0 +1,86 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Next: Node",
+      "request": "launch",
+      "runtimeArgs": [
+        "dev",
+        "--experimental-https"
+      ],
+      "runtimeExecutable": "next",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "node"
+      // "preLaunchTask": "tsc: build - tsconfig.json",
+      // "outFiles": [
+      //     "${workspaceFolder}/.next/**/*.js",
+      // ],
+      // "resolveSourceMapLocations": [
+      //     "${workspaceFolder}/.next/**/*",
+      //     "${workspaceFolder}/node_modules/**/*"
+      // ],
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Next: Chrome",
+      "url": "https://localhost:3000/home",
+      "webRoot": "${workspaceFolder}"
+      // "preLaunchTask": "tsc: build - tsconfig.json",
+      // "outFiles": [
+      //     "${workspaceFolder}/.next/**/*.js",
+      // ],
+      // "resolveSourceMapLocations": [
+      //     "${workspaceFolder}/.next/**/*",
+      //     "${workspaceFolder}/node_modules/**/*"
+      // ],
+    },
+    {
+      "name": "Launch",
+      "request": "launch",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "node",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/.next/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/.next/**/*",
+        "${workspaceFolder}/node_modules/**/*"
+      ]
+    },
+    {
+      "name": "Attach",
+      "port": 9229,
+      "request": "attach",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "node",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/.next/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/.next/**/*",
+        "${workspaceFolder}/xnode_modules/**/*"
+      ]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Next: Full",
+      "configurations": [
+        "Next: Node",
+        "Next: Chrome"
+      ]
+    }
+  ]
+}
