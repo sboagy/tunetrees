@@ -1,14 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { EmailConfig } from "next-auth/providers";
-import type { Theme } from "../../../../gitmisc/next-auth/packages/core/src/types";
 
-// (params: { identifier: string; url: string; expires: Date; provider: EmailConfig;
 // token: string; theme: Theme; request: Request; }) => Awaitable<void>
 export async function sendVerificationRequest(params: {
   identifier: string;
   url: string;
   expires: Date;
   provider: EmailConfig;
-  theme: Theme;
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  theme: any;
   token: string;
   request: Request;
 }) {
@@ -34,7 +34,12 @@ export async function sendVerificationRequest(params: {
   if (!res.ok) throw new Error(`Sendgrid error: ${await res.text()}`);
 }
 
-function html(params: { url: string; host: string; theme: Theme }) {
+function html(params: {
+  url: string;
+  host: string;
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  theme: any;
+}) {
   const { url, host, theme } = params;
 
   const escapedHost = host.replace(/\./g, "&#8203;.");
@@ -46,7 +51,7 @@ function html(params: { url: string; host: string; theme: Theme }) {
     mainBackground: "#fff",
     buttonBackground: brandColor,
     buttonBorder: brandColor,
-    buttonText: theme.buttonText || "#fff",
+    buttonText: (theme as { buttonText?: string }).buttonText || "#fff",
   };
 
   return `

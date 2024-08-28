@@ -93,7 +93,8 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: /home/sboag/tunetrees/dhparam/
+      # device: /home/sboag/tunetrees/dhparam/
+      device: /Users/sboag/gittt/tunetrees/dhparam
       o: bind
 
 networks:

@@ -30,6 +30,7 @@ export const getSessionAndUserSchema = z
 
 export interface ExtendedAdapterUser extends AdapterUser {
   hash: string;
+  view_settings?: string;
 }
 
 const userExtendedAdapterSchema = z.object({

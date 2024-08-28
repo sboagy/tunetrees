@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import Practice from "../(main)/pages/practice/page";
 
 const HomePage = async () => {
-  console.log("In the HomePage function");
+  // console.log("In the HomePage function");
   const session = await auth();
 
   if (!session) {

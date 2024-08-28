@@ -1,12 +1,26 @@
 "use client";
 import Head from "next/head";
-import { useSearchParams } from "next/navigation";
+// import { useSearchParams } from "next/navigation";
 import type React from "react";
+// import { Suspense, useEffect, useState } from "react";
 
 const VerifyRequest: React.FC = () => {
-  const searchParams = useSearchParams();
-  const provider = searchParams.get("provider");
-  const type = searchParams.get("type");
+  // function message() {
+  //   const [type, setType] = useState<string | null>(null);
+  //   const [provider, setProvider] = useState<string | null>(null);
+  //   const searchParams = useSearchParams();
+
+  //   useEffect(() => {
+  //     setType(searchParams.get("type"));
+  //     setProvider(searchParams.get("provider"));
+  //   }, [searchParams]);
+  //   return (
+  //     <p>
+  //       A {type} link has been sent to your email address via
+  //       {provider}. Please check your email and click the link to proceed.
+  //     </p>
+  //   );
+  // }
 
   return (
     <div>
@@ -15,9 +29,10 @@ const VerifyRequest: React.FC = () => {
       </Head>
       <main>
         <h1>Please check Your Email to log in</h1>
+        {/* <Suspense>{message()}</Suspense> */}
         <p>
-          A {type} link has been sent to your email address via {provider}.
-          Please check your email and click the link to proceed.
+          A link has been sent to your email address via the Email provider you
+          specified. Please check your email and click the link to proceed.
         </p>
       </main>
       <style jsx>{`

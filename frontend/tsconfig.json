@@ -2,7 +2,7 @@
   "extends": "./node_modules/gts/tsconfig-google.json",
   "compilerOptions": {
     //    "target": "es5",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": ["es2015", "dom", "dom.iterable", "esnext"],
     // "sourceMap": true,
     "outDir": ".next",
     "allowJs": true,
@@ -24,7 +24,8 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "auth": ["./auth/"]
+      "auth": ["./auth/"],
+      "components": ["./components/"]
       // "next-auth-http-adapter": [
       //   "./../../../gitmisc/next-auth-http-adapter/src"
       // ]
@@ -40,10 +41,6 @@
     "lib/**/*.ts",
     ".next/types/**/*.ts",
     ".next/**/*.tsx",
-    "/Users/sboag/gitmisc/next-auth/**/*.ts",
-    "/Users/sboag/gitmisc/next-auth/**/*.tsx"
-    // "/Users/sboag/gitmisc/next-auth-http-adapter/**/*.ts",
-    // "/Users/sboag/gitmisc/next-auth-http-adapter/**/*.tsx"
   ],
   "exclude": ["node_modules", "archive/**/*.ts"]
 }

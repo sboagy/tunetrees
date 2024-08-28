@@ -1,6 +1,5 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import type * as React from "react";
 import { DayPicker } from "react-day-picker";
 
@@ -53,12 +52,13 @@ function Calendar({
         day_hidden: "invisible",
         ...classNames,
       }}
-      components={{
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
-      }}
+      // TODO: Not sure what's going on here.  Maybe this component needs to be updated?
+      // components={{
+      //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      //   IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
+      //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      //   IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+      // }}
       {...props}
     />
   );

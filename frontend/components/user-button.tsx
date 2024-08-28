@@ -20,7 +20,7 @@ import {
 import { ModeToggle } from "./ui/mode-toggle";
 
 export default async function UserButton() {
-  console.log("here in the user button");
+  // console.log("here in the user button");
   // debugger
   const session = await auth();
   if (!session) {

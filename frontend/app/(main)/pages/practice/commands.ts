@@ -1,7 +1,6 @@
 "use server";
 
 import axios from "axios";
-import { string } from "zod";
 
 const baseURL = process.env.TT_API_BASE_URL;
 

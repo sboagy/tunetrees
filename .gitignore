@@ -252,9 +252,11 @@ scratch.md
 
 archive
 
-# At some point, may want to checking in IDE files, but not right now.
+# For right now, don't check in jetbrains workspace configuration
 .idea
-.vscode
+
+# But do check in the .vscode workspace configuration
+# .vscode
 
 .DS_Store
 
@@ -264,3 +266,9 @@ scratch.md
 
 # Ignore my practice backups
 backup_practice*.sqlite
+
+dhparam
+id_rsa_ttdroplet
+id_rsa_ttdroplet.pub
+
+certbot*
