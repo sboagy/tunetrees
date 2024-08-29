@@ -349,7 +349,7 @@ For local deployment to Docker containers, these instructions have been tested w
 > [!NOTE]
 > The author has chosen not to use [Rancher Desktop](https://rancherdesktop.io/) at the moment because he believes it may have limitations when it comes to cross-compiling to platform-specific containers. However, it is quite possible that there is a way to configure Rancher Desktop for cross-compilation. Other desktop container options such as [Podman](https://podman.io/) may also be feasible. 
 
-##### 3.3.1.1. Make local certificates
+##### ***3.3.1.1. Make local certificates***
 
 We recommend using `mkcert` to generate self-signed certificates into a local 
 `dhparam` directory.  To install `mkcert` follow these steps:
@@ -397,7 +397,7 @@ mkcert localhost
 
 This will generate the `localhost.pem` and `localhost-key.pem` files in the `dhparam` directory.
 
-##### 3.3.1.2. Use Docker Compose to deploy using webserver_local
+##### ***3.3.1.2. Use Docker Compose to deploy using webserver_local***
 
 To deploy the application locally using Docker Compose with a local https ngnx proxy, follow these steps:
 
