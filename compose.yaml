@@ -34,11 +34,33 @@ services:
     container_name: tt-frontend
     build:
       context: frontend
+    env_file:
+      - frontend/.env.local
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_TT_BASE_URL: ${NEXT_PUBLIC_TT_BASE_URL}
+      # NEXT_PUBLIC_TT_BASE_URL: ${NEXT_PUBLIC_TT_BASE_URL}
+      NEXT_BASE_URL: "http://server:8000"
+      NEXT_PUBLIC_TT_BASE_URL: "http://server:8000/tunetrees"
+      TT_API_BASE_URL: "http://server:8000/tunetrees"
+      # AUTH_TRUST_HOST: ${AUTH_TRUST_HOST}
     ports:
       - 3000:3000
+    networks:
+      - backend
+
+  webserver_local:
+    image: nginx:mainline-alpine
+    container_name: webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # - ./nginx-conf:/etc/nginx/conf.d
+      - ./nginx-conf/nginx_local.conf:/etc/nginx/conf.d/default.conf
+      - ./dhparam:/etc/ssl/certs
+    depends_on:
+      - frontend
     networks:
       - backend
 
@@ -76,8 +98,10 @@ services:
     # command: certonly --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
     #
     command: certonly --webroot --webroot-path=/var/www/certbot --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal --staging -d tunetrees.com  -d www.tunetrees.com
+    #
     # command: certonly --webroot --webroot-path=/var/www/certbot --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
     # command: certonly --webroot --webroot-path=/var/www/certbot --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
+
 
 volumes:
   # certbot-etc:
@@ -96,6 +120,18 @@ volumes:
       # device: /home/sboag/tunetrees/dhparam/
       device: /Users/sboag/gittt/tunetrees/dhparam
       o: bind
+  # certbot:
+  #   driver: local
+  #   driver_opts:
+  #     type: none
+  #     device: /Users/sboag/gittt/tunetrees/certbot
+  #     o: bind
+  # certs:
+  #   driver: local
+  #   driver_opts:
+  #     type: none
+  #     device: /Users/sboag/gittt/tunetrees/certs
+  #     o: bind
 
 networks:
   backend:
