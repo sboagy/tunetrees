@@ -132,9 +132,9 @@ const TunesGrid = (props: Props) => {
                       {header.isPlaceholder
                         ? null
                         : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
                     </TableHead>
                   );
                 })}
@@ -148,7 +148,7 @@ const TunesGrid = (props: Props) => {
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                   className={`${getColorForEvaluation(row.original.recallEval || null)}`}
-                // className="hover:bg-gray-100"
+                  // className="hover:bg-gray-100"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="max-h-1 py-0">

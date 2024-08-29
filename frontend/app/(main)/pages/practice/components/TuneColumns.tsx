@@ -72,9 +72,9 @@ function sortableHeader<TData, TValue>(
     <div
       className="flex items-center"
       onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      onKeyDown={() => { }}
-      onKeyUp={() => { }}
-      onKeyPress={() => { }}
+      onKeyDown={() => {}}
+      onKeyUp={() => {}}
+      onKeyPress={() => {}}
     >
       {title}
       {is_sorted === "asc" ? (
