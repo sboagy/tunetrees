@@ -94,7 +94,7 @@ export function RecallEvalComboBox(info: CellContext<Tune, string>) {
           variant="outline"
           role="combobox"
           aria-expanded={isOpen}
-          className={`w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(info.row.original.recallEval)}`}
+          className={`w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(info.row.original.recallEval ?? null)}`}
           style={{
             textAlign: "left",
           }}
