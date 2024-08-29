@@ -7,7 +7,7 @@
 # Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
 
 ARG PYTHON_VERSION=3.12.2
-FROM python:${PYTHON_VERSION}-slim AS base
+FROM --platform=$BUILDPLATFORM python:${PYTHON_VERSION}-slim AS base
 
 # Prevents Python from writing pyc files.
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -42,7 +42,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 USER appuser
 
 # Copy the source code into the container.
-COPY . .
+COPY tunetrees tunetrees
+COPY requirements.txt requirements.txt
 
 # Expose the port that the application listens on.
 EXPOSE 8000
