@@ -335,12 +335,18 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
 
 ### 3.3. Deploy
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+This section provides step-by-step instructions for deploying TuneTrees using Docker containers. The deployment process covers both local Docker container management on a laptop and deployment on a DigitalOcean droplet where the app is hosted. To ensure HTTPS protection, a proxy server container is used, which requires access to PEM certificates.
 
-#### 3.3.1. Local
+Please note that when we refer to "deploying," we mean running the application in Docker containers rather than in a development environment. While it is possible to deploy for production in a non-containerized environment, this project currently focuses on containerized deployments.
 
-For local deployment, these instructions have been tested with Docker Desktop on 
-a MacBook Pro with an M3 chip and 48 gigibytes of memory.
+If you are not already familiar with Docker and Docker Compose, we recommend familiarizing yourself with the basics of these technologies before proceeding with the deployment process.
+
+#### 3.3.1. Deploy to Local Docker
+
+For local deployment to Docker containers, these instructions have been tested with [Docker Desktop](https://www.docker.com/products/docker-desktop) on a MacBook Pro with an M3 chip and 48 gigibytes of memory.  
+
+> [!NOTE]
+> For the moment, the author is choosing not to use Rancher Desktop at this time because it doesn't seem to do as well with cross-compilation to platform specific containers..
 
 ##### 3.3.1.1. Make local certificates
 
@@ -390,8 +396,61 @@ mkcert localhost
 
 This will generate the `localhost.pem` and `localhost-key.pem` files in the `dhparam` directory.
 
+##### 3.3.1.2. Use Docker Compose to deploy using webserver_local
 
-#### 3.3.2. Digital Ocean Droplet
+##### 3.3.1.2. Use Docker Compose to deploy using webserver_local
+
+To deploy the application locally using Docker Compose with a local https ngnx proxy, follow these steps:
+
+1. Make sure you have Docker and Docker Compose installed on your machine.
+
+2. Open a terminal or command prompt and navigate to the root directory of the project.
+
+3. Create a `.env.local` file in the `frontend` directory based on the [frontend/template.env.local](https://github.com/sboagy/tunetrees/tree/main/frontend/template.env.local) template.  Replace 
+the IDs and secrets, specifid by the angle-bracketed values, with the correct secrets.  You can supply
+your own secrets, or, if working as part of the project, you can obtain these secrets from the 
+1Password vault assigned to the project, or get them directly from this project's administrator.
+
+Obviously ensure that no secrets are ever checked into the github repository.
+
+4. Build the Docker images by running the following command:
+
+    ```bash
+    docker compose build
+    ```
+
+5. Start the Docker containers in detached mode by running the following command:
+
+    ```bash
+    docker compose up server frontend webserver_local -d
+    ```
+
+    This command will start the `server`, `frontend` and `webserver_local` services defined in the `compose.yaml` file.
+
+6. Wait for the containers to start up. You can check the logs by running the following command:
+
+    ```bash
+    docker-compose logs -f
+    ```
+
+    This will display the logs from both the `server` and `webserver_local` containers.
+
+7. Once the containers are up and running, you can access the TuneTrees application by opening a web browser and navigating to [http://localhost:8000](http://localhost:8000).
+
+    Note: The `webserver_local` service acts as a reverse proxy and forwards requests to the `server` service running on port 8000.
+
+8. To stop the containers, run the following command:
+
+    ```bash
+    docker-compose down
+    ```
+
+    This will stop and remove the containers, but preserve the data in the SQLite database.
+
+By following these steps, you will be able to deploy the TuneTrees application locally using Docker Compose with the `webserver_local` service.
+
+
+#### 3.3.2. Deploy to Digital Ocean Droplet
 
 - dhparam.
 - local.
