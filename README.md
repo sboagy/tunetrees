@@ -207,7 +207,7 @@ Finally, make sure the new code is properly formatted for the project.
 black tunetrees/models/tunetrees.py &&  ruff check --fix --select I tunetrees/models/tunetrees.py && ruff check --fix tunetrees 
 ```
 
-#### VSCode Processes  (:construction: This Section a Work in Progress :construction:)
+#### VSCode Processes  (🚧 This Section a Work in Progress 🚧)
 
 To install and set up Visual Studio Code (VSCode) for this project, follow these steps:
 
@@ -260,7 +260,7 @@ To install and set up Visual Studio Code (VSCode) for this project, follow these
 Now you have VSCode installed and set up for the TuneTrees project. You can start coding and contributing to the project using the powerful features of VSCode.
 
 
-#### Run and Debug in VSCode  (:construction: This Section a Work in Progress :construction:)
+#### Run and Debug in VSCode  (🚧 This Section a Work in Progress 🚧)
 
 To run and debug your project using `.vscode/launch.json`, follow these steps:
 
@@ -287,7 +287,7 @@ To run and debug your project using `.vscode/launch.json`, follow these steps:
 By following these steps and configuring the `launch.json` file, you can easily run and debug your project in Visual Studio Code.
 
 
-## Build and Deploy (:construction: This Section a Work in Progress :construction:)
+## Build and Deploy (🚧 This Section a Work in Progress 🚧)
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
@@ -364,7 +364,7 @@ This will generate the `localhost.pem` and `localhost-key.pem` files in the `dhp
 - local
 - remote DigitalOcean droplet
 
-## Authentication and User Management (:construction: This Section a Work in Progress :construction:)
+## Authentication and User Management (🚧 This Section a Work in Progress 🚧)
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
