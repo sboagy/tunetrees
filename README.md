@@ -1,17 +1,42 @@
 # TuneTrees: Tune Repertoire Practice Assistant
 
-## Introduction
-
 TuneTrees is designed to help folk musicians efficiently memorize and retain a large repertoire of tunes. By combining proven memory techniques like spaced repetition, mnemonics, and spatial navigation, the app assists in training musical memory. In the future, TuneTrees may explore the use of advanced technologies like neural networks and reinforcement learning to further enhance the memorization process.
 
 See the [Tune Trees Project Whitepaper](docs/core-proposal.md#tune-trees-project-whitepaper)
 to get some insight into the vision of the project.
 
-## Design and Intent
+**Table of Contents**
+
+<!-- TOC -->
+- [1. Design and Intent](#1-design-and-intent)
+    - [1.1. System Structure](#11-system-structure)
+    - [1.2. Technology Usage](#12-technology-usage)
+        - [1.2.1. Frontend:](#121-frontend)
+        - [1.2.2. Backend:](#122-backend)
+    - [1.3. Schema:](#13-schema)
+    - [1.4. Alternatives or Potential Technology Evolution](#14-alternatives-or-potential-technology-evolution)
+- [2. Development Processes](#2-development-processes)
+    - [2.1. Generation of ORM code](#21-generation-of-orm-code)
+        - [2.1.1. VSCode Processes  (🚧 This Section a Work in Progress 🚧)](#211-vscode-processes---this-section-a-work-in-progress-)
+        - [2.1.2. Run and Debug in VSCode  (🚧 This Section a Work in Progress 🚧)](#212-run-and-debug-in-vscode---this-section-a-work-in-progress-)
+- [3. Build and Deploy (🚧 This Section a Work in Progress 🚧)](#3-build-and-deploy--this-section-a-work-in-progress-)
+    - [3.1. Basics](#31-basics)
+    - [3.2. Build](#32-build)
+    - [3.3. Deploy](#33-deploy)
+        - [3.3.1. Local](#331-local)
+            - [3.3.1.1. Make local certificates](#3311-make-local-certificates)
+        - [3.3.2. Digital Ocean Droplet](#332-digital-ocean-droplet)
+- [4. Authentication and User Management (🚧 This Section a Work in Progress 🚧)](#4-authentication-and-user-management--this-section-a-work-in-progress-)
+    - [4.1. Mail verification mechanism](#41-mail-verification-mechanism)
+- [5. Credits](#5-credits)
+<!-- /TOC -->
+
+
+## 1. Design and Intent
 
 TuneTrees is a web application with a backend server that manages user data and schedules reviews. The backend securely stores all data in a database, while the frontend handles user interactions like login, account management, and practicing tunes. The frontend communicates with the backend using an HTTP API to access and update user data. Both the frontend and backend are packaged as containers and deployed together using Docker Compose on a DigitalOcean server.
 
-### System Structure
+### 1.1. System Structure
 
 This diagram provides a high-level overview of the TuneTree architecture.
 
@@ -37,7 +62,7 @@ flowchart LR
     D --> H(Login/Logout)
 ```
 
-### Technology Usage
+### 1.2. Technology Usage
 
 This diagram maps out the basic technology used. Specific implementation details may evolve.
 
@@ -73,7 +98,7 @@ graph LR
     G --> A
 ```
 
-#### Frontend:
+#### 1.2.1. Frontend:
 
 Handles user interactions, including login, account management, and tune practice.
 - HTTP API: Communicates with the backend to access and update user data.
@@ -81,13 +106,13 @@ Handles user interactions, including login, account management, and tune practic
 - Tune Practice: Provides tools for practicing tunes and tracking progress.
 - Login/Logout: Implements authentication and authorization.
 
-#### Backend:
+#### 1.2.2. Backend:
 
 Handles user data management, review scheduling, and API requests.
 - Database: Stores user data, including tunes, practice history, and review schedules.
 - Review Scheduler: Determines when tunes should be reviewed based on the user's progress.
 
-### Schema:
+### 1.3. Schema:
 
 The database is organized as follows: Each user can have multiple playlists, and each playlist is associated with a specific musical instrument. These playlists contain tunes, which are stored separately and shared across all users. TuneTrees doesn't aim to be a complete tune repository, so it only stores basic tune information. For more detailed details, users can refer to external resources.
 
@@ -181,14 +206,16 @@ erDiagram
     PLAYLIST }|--|| USER : "belongs to"
 ```
 
-### Alternatives or Potential Technology Evolution
+### 1.4. Alternatives or Potential Technology Evolution
 
 1. Down the line, I can switch to MySQL or PostgreSQL if needed.
 2. For the front end, I may experiment with a Kotlin frontend at some point.
 
-## Development Processes
+## 2. Development Processes
 
-### Generation of ORM code
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+### 2.1. Generation of ORM code
 
 The SQLAlchemy ORM code is contained in the `tunetrees/models` package in the `tunetrees.py` 
 module.  It should always be generated with the following procedure:
@@ -209,7 +236,7 @@ Finally, make sure the new code is properly formatted for the project.
 black tunetrees/models/tunetrees.py &&  ruff check --fix --select I tunetrees/models/tunetrees.py && ruff check --fix tunetrees 
 ```
 
-#### VSCode Processes  (🚧 This Section a Work in Progress 🚧)
+#### 2.1.1. VSCode Processes  (🚧 This Section a Work in Progress 🚧)
 
 To install and set up Visual Studio Code (VSCode) for this project, follow these steps:
 
@@ -262,7 +289,7 @@ To install and set up Visual Studio Code (VSCode) for this project, follow these
 Now you have VSCode installed and set up for the TuneTrees project. You can start coding and contributing to the project using the powerful features of VSCode.
 
 
-#### Run and Debug in VSCode  (🚧 This Section a Work in Progress 🚧)
+#### 2.1.2. Run and Debug in VSCode  (🚧 This Section a Work in Progress 🚧)
 
 To run and debug your project using `.vscode/launch.json`, follow these steps:
 
@@ -289,30 +316,33 @@ To run and debug your project using `.vscode/launch.json`, follow these steps:
 By following these steps and configuring the `launch.json` file, you can easily run and debug your project in Visual Studio Code.
 
 
-## Build and Deploy (🚧 This Section a Work in Progress 🚧)
+## 3. Build and Deploy (🚧 This Section a Work in Progress 🚧)
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
-### Basics
-    - Docker
+### 3.1. Basics
+
+    - Docker.
     - Multi-Platform Cross Compilation
     - Docker Compose
     - buildx bake
 
-### Build
+### 3.2. Build
+
     - docker buildx bake
     - docker buildx bake frontend
     - docker buildx bake server
 
+### 3.3. Deploy
 
-### Deploy
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
-#### Local
+#### 3.3.1. Local
 
 For local deployment, these instructions have been tested with Docker Desktop on 
 a MacBook Pro with an M3 chip and 48 gigibytes of memory.
 
-##### Make local certificates
+##### 3.3.1.1. Make local certificates
 
 We recommend using `mkcert` to generate self-signed certificates into a local 
 `dhparam` directory.  To install `mkcert` follow these steps:
@@ -361,20 +391,21 @@ mkcert localhost
 This will generate the `localhost.pem` and `localhost-key.pem` files in the `dhparam` directory.
 
 
-#### Digital Ocean Droplet
-- dhparam
-- local
-- remote DigitalOcean droplet
+#### 3.3.2. Digital Ocean Droplet
 
-## Authentication and User Management (🚧 This Section a Work in Progress 🚧)
+- dhparam.
+- local.
+- remote DigitalOcean droplet.
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-### Mail verification mechanism
+## 4. Authentication and User Management (🚧 This Section a Work in Progress 🚧)
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
-## Credits
+### 4.1. Mail verification mechanism
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+## 5. Credits
 
 TuneTrees is a collaborative project developed by a team of dedicated musicians and software engineers. The following individuals have made contributions to the project:
 
