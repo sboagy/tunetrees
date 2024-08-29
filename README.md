@@ -23,9 +23,10 @@ to get some insight into the vision of the project.
     - [3.1. Basics](#31-basics)
     - [3.2. Build](#32-build)
     - [3.3. Deploy](#33-deploy)
-        - [3.3.1. Local](#331-local)
+        - [3.3.1. Deploy to Local Docker](#331-deploy-to-local-docker)
             - [3.3.1.1. Make local certificates](#3311-make-local-certificates)
-        - [3.3.2. Digital Ocean Droplet](#332-digital-ocean-droplet)
+            - [3.3.1.2. Use Docker Compose to deploy using webserver_local](#3312-use-docker-compose-to-deploy-using-webserver_local)
+        - [3.3.2. Deploy to Digital Ocean Droplet](#332-deploy-to-digital-ocean-droplet)
 - [4. Authentication and User Management (🚧 This Section a Work in Progress 🚧)](#4-authentication-and-user-management--this-section-a-work-in-progress-)
     - [4.1. Mail verification mechanism](#41-mail-verification-mechanism)
 - [5. Credits](#5-credits)
@@ -346,7 +347,7 @@ If you are not already familiar with Docker and Docker Compose, we recommend fam
 For local deployment to Docker containers, these instructions have been tested with [Docker Desktop](https://www.docker.com/products/docker-desktop) on a MacBook Pro with an M3 chip and 48 gigibytes of memory.  
 
 > [!NOTE]
-> For the moment, the author is choosing not to use Rancher Desktop at this time because it doesn't seem to do as well with cross-compilation to platform specific containers..
+> The author has chosen not to use [Rancher Desktop](https://rancherdesktop.io/) at the moment because he believes it may have limitations when it comes to cross-compiling to platform-specific containers. However, it is quite possible that there is a way to configure Rancher Desktop for cross-compilation. Other desktop container options such as [Podman](https://podman.io/) may also be feasible. 
 
 ##### 3.3.1.1. Make local certificates
 
@@ -395,8 +396,6 @@ mkcert localhost
 ```
 
 This will generate the `localhost.pem` and `localhost-key.pem` files in the `dhparam` directory.
-
-##### 3.3.1.2. Use Docker Compose to deploy using webserver_local
 
 ##### 3.3.1.2. Use Docker Compose to deploy using webserver_local
 
