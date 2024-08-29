@@ -219,7 +219,7 @@ const columns: ColumnDef<Tune>[] = [
     enableHiding: true,
   },
   {
-    accessorKey: "note_private",
+    accessorKey: "notes_private",
     header: "Private Note",
     cell: (info) => {
       return info.getValue();
@@ -228,7 +228,7 @@ const columns: ColumnDef<Tune>[] = [
     enableHiding: true,
   },
   {
-    accessorKey: "note_public",
+    accessorKey: "notes_public",
     header: "Public Note",
     cell: (info) => {
       return info.getValue();

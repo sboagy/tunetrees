@@ -61,8 +61,8 @@ export function TunesTable({
       repetitions: false,
       review_date: false,
       backup_practiced: false,
-      note_private: false,
-      note_public: false,
+      notes_private: false,
+      notes_public: false,
       tags: false,
     });
   const [rowSelection, setRowSelection] = React.useState({});
@@ -91,10 +91,8 @@ export function TunesTable({
   return table;
 }
 
-export const getColorForEvaluation = (review_status: string) => {
+export const getColorForEvaluation = (review_status: string | null): string => {
   switch (review_status) {
-    case "":
-      return "";
     case "blackout":
       return "bg-red-100 dark:bg-red-900";
     case "failed":
@@ -148,7 +146,7 @@ const TunesGrid = (props: Props) => {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={`${getColorForEvaluation(row.original.recallEval)}`}
+                  className={`${getColorForEvaluation(row.original.recallEval || null)}`}
                   // className="hover:bg-gray-100"
                 >
                   {row.getVisibleCells().map((cell) => (

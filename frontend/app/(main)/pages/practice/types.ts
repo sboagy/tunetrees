@@ -13,8 +13,8 @@ export type Tune = {
   repetitions: number;
   review_date: string;
   backup_practiced: string;
-  note_private: string;
-  note_public: string;
+  notes_private: string;
+  notes_public: string;
   tags: string;
   recallEval: string;
 };
