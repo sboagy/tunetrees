@@ -1,7 +1,5 @@
 # TuneTrees: Tune Repertoire Practice Assistant
 
-## Table of Contents
-
 ## Introduction
 
 TuneTrees is designed to help folk musicians efficiently memorize and retain a large repertoire of tunes. By combining proven memory techniques like spaced repetition, mnemonics, and spatial navigation, the app assists in training musical memory. In the future, TuneTrees may explore the use of advanced technologies like neural networks and reinforcement learning to further enhance the memorization process.
