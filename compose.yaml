@@ -28,6 +28,8 @@ services:
       - 8000:8000
     networks:
       - backend
+    volumes:
+      - ./tunetrees.sqlite3:/app/tunetrees.sqlite3
 
   frontend:
     image: docker.io/sboagy/tunetrees-frontend:latest
