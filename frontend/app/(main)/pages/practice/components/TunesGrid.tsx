@@ -50,19 +50,20 @@ export function TunesTable({
       id: true,
       title: true,
       type: true,
-      structure: false,
+      structure: true,
       mode: false,
-      incipit: true,
+      incipit: false,
       learned: false,
       practiced: true,
       quality: false,
       easiness: false,
       interval: false,
       repetitions: false,
-      review_date: false,
+      review_date: true,
       backup_practiced: false,
-      notes_private: false,
-      notes_public: false,
+      external_ref: false,
+      notes_private: true,
+      notes_public: true,
       tags: false,
     });
   const [rowSelection, setRowSelection] = React.useState({});
@@ -131,9 +132,9 @@ const TunesGrid = (props: Props) => {
                       {header.isPlaceholder
                         ? null
                         : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
                     </TableHead>
                   );
                 })}
@@ -147,7 +148,7 @@ const TunesGrid = (props: Props) => {
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                   className={`${getColorForEvaluation(row.original.recallEval || null)}`}
-                  // className="hover:bg-gray-100"
+                // className="hover:bg-gray-100"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="max-h-1 py-0">

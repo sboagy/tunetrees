@@ -1,13 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import type { Table as TanstackTable } from "@tanstack/react-table";
+import { useState } from "react";
+import { submitPracticeFeedback } from "../commands";
+import { getPracticeListScheduled } from "../queries";
+import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import TunesGrid, { type ScheduledTunesType, TunesTable } from "./TunesGrid";
-import { submitPracticeFeedback } from "../commands";
-import type { Table as TanstackTable } from "@tanstack/react-table";
-import type { Tune } from "../types";
-import { useState } from "react";
-import { getPracticeListScheduled } from "../queries";
 
 export default function ScheduledTunesGrid({
   tunes,
@@ -46,7 +46,10 @@ export default function ScheduledTunesGrid({
         row.original.recallEval = "";
       }
       const getScheduled = async (user_id: string, playlist_id: string) => {
-        const data = await getPracticeListScheduled(user_id, playlist_id);
+        const data: Tune[] = await getPracticeListScheduled(
+          user_id,
+          playlist_id,
+        );
         setScheduled(data);
       };
       getScheduled(user_id, playlist_id);
