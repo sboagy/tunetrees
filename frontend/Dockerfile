@@ -116,7 +116,7 @@ ENV NODE_ENV=production
 
 # # Do this before we change the user.  Curl is added for developer fooling around 
 # # in terminal.  Maybe do this only in a dev container later.
-# RUN apk --no-cache add curl
+RUN apk --no-cache add curl
 
 # Run the application as a non-root user.
 USER node
