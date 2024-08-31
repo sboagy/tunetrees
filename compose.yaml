@@ -113,8 +113,8 @@ services:
     # command: certonly --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
     #
     # command: sh -c "sleep infinity"
-    # command: certonly -v --webroot --webroot-path=/var/www/certbot --email admin@tunetrees.com --agree-tos --no-eff-email --force-renewal --staging -d tunetrees.com  -d www.tunetrees.com
-    command: certonly -v --webroot --webroot-path=/var/www/certbot --email admin@tunetrees.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com -d www.tunetrees.com
+    command: certonly -v --webroot --webroot-path=/var/www/certbot --email admin@tunetrees.com --agree-tos --no-eff-email --force-renewal --staging -d tunetrees.com  -d www.tunetrees.com
+    # command: certonly -v --webroot --webroot-path=/var/www/certbot --email admin@tunetrees.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com -d www.tunetrees.com
     #
     # command: certonly --webroot --webroot-path=/var/www/certbot --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
     # command: certonly --webroot --webroot-path=/var/www/certbot --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
