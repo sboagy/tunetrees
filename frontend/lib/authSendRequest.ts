@@ -14,6 +14,9 @@ export async function sendVerificationRequest(params: {
 }) {
   const { identifier: to, provider, url, theme } = params;
   const { host } = new URL(url);
+  console.log("sendVerificationRequest: to: %s", to);
+  console.log("sendVerificationRequest: url: %s", url);
+  console.log("sendVerificationRequest: host: %s", host);
   const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: {
