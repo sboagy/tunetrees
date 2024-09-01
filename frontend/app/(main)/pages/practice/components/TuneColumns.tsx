@@ -216,7 +216,7 @@ const columns: ColumnDef<Tune>[] = [
   },
   {
     accessorKey: "review_date",
-    header: "Scheduled",
+    header: ({ column }) => sortableHeader(column, "Scheduled"),
     cell: (info) => {
       return new Date(info.getValue() as string).toLocaleDateString();
     },
