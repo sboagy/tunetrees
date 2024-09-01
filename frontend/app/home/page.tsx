@@ -2,7 +2,7 @@
 import { auth } from "@/auth";
 
 import { redirect } from "next/navigation";
-import Practice from "../(main)/pages/practice/page";
+import Practice from "../(main)/pages/practice/Practice";
 
 const HomePage = async () => {
   // console.log("In the HomePage function");
