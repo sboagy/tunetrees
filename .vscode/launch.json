@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "env": {
-                "PYTHONPATH": "/Users/sboag/gittt/tunetrees"
+                "PYTHONPATH": "${workspaceFolder}"
             }
         },
         {
@@ -19,6 +19,11 @@
             "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "TUNETREES_DB": "${workspaceFolder}/tunetrees.sqlite3",
+                "TUNETREES_DEPLOY_BASE_DIR": "${workspaceFolder}"
+            },
             "args": [
                 "tunetrees.api.main:app",
                 "--reload"
