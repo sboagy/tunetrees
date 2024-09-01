@@ -50,6 +50,8 @@ async def get_scheduled(
         tune_list = [tunes_mapper(tune) for tune in tunes_scheduled]
         return tune_list
     except Exception as e:
+        logger = logging.getLogger("tunetrees.api")
+        logger.error(f"Unable to fetch scheduled practice list: {e}")
         return {"error": f"Unable to fetch scheduled practice list: {e}"}
     finally:
         if db is not None:
