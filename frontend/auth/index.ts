@@ -360,12 +360,12 @@ const config = {
       token: JWT & { user_id?: string; view_settings?: string };
       user: User | AdapterUser;
     }) {
-      console.log(
-        "callback: session -- ",
-        logObject(params.session, false),
-        params.token,
-        params.user,
-      );
+      // console.log(
+      //   "callback: session -- ",
+      //   logObject(params.session, false),
+      //   params.token,
+      //   params.user,
+      // );
 
       params.session.userId = params.token.user_id as string;
       if (params.session.user) {
