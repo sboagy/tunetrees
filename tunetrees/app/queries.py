@@ -271,7 +271,7 @@ def get_practice_list_scheduled(
 def get_practice_list_recently_played(
     db: Session,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 100000,
     print_table=False,
     playlist_ref=1,
     user_ref=1,
@@ -282,13 +282,9 @@ def get_practice_list_recently_played(
             t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
         )
     )
+    query_sorted = query.order_by(func.DATE(t_practice_list_staged.c.ReviewDate).desc())
 
-    rows: List[Tune] = (
-        query.order_by(func.DATE(PracticeRecord.Practiced).desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    rows: List[Tune] = query_sorted.offset(skip).limit(limit).all()
 
     # TODO: make a decent print_table function
     # if print_table:
