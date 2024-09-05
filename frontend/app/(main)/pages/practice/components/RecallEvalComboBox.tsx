@@ -20,8 +20,9 @@ import {
 
 import type { CellContext } from "@tanstack/react-table";
 
-import type { Tune } from "../types";
+import type { TablePurpose, Tune } from "../types";
 import { getColorForEvaluation } from "./TunesGrid";
+import { createOrUpdateTableTransientData } from "../settings";
 
 // #     Quality: The quality of recalling the answer from a scale of 0 to 5.
 // #         5: perfect response.
@@ -78,10 +79,38 @@ const qualityList = [
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function RecallEvalComboBox(info: CellContext<Tune, string>) {
+export function RecallEvalComboBox(
+  info: CellContext<Tune, string>,
+  userId: number,
+  playlistId: number,
+  purpose: TablePurpose,
+) {
+  const saveData = async (changed_value: string) => {
+    try {
+      if (changed_value === "") {
+        return;
+      }
+      await createOrUpdateTableTransientData(
+        userId,
+        info.row.original.id,
+        playlistId,
+        purpose,
+        info.row.original.notes_private ?? null,
+        info.row.original.notes_public ?? null,
+        changed_value,
+      );
+      console.log("State saved:", changed_value);
+    } catch (error) {
+      console.error("Failed to save state:", error);
+    }
+    console.log("State saved:", changed_value);
+  };
+
+  // This simply isn't working.  I'm not sure why after a few hours of trying.
+  // const [recallEvalValue, setRecallEvalValue] = React.useState<string>("");
   const [isOpen, setIsOpen] = React.useState(false);
-  const [value, setValue] = React.useState<string>("");
-  const [, updateState] = React.useState({});
+  // const [, updateState] = React.useState({});
+  // const [isUpdated, setIsUpdated] = React.useState(false);
 
   const forceClose = () => {
     setIsOpen(false);
@@ -94,7 +123,7 @@ export function RecallEvalComboBox(info: CellContext<Tune, string>) {
           variant="outline"
           role="combobox"
           aria-expanded={isOpen}
-          className={`w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(info.row.original.recallEval ?? null)}`}
+          className={`w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(info.row.original.recall_eval ?? null)}`}
           style={{
             textAlign: "left",
           }}
@@ -112,9 +141,11 @@ export function RecallEvalComboBox(info: CellContext<Tune, string>) {
               textOverflow: "ellipsis",
             }}
           >
-            {value
-              ? qualityList.find((qualityList) => qualityList.value === value)
-                  ?.label2
+            {info.row.original.recall_eval
+              ? qualityList.find(
+                  (qualityList) =>
+                    qualityList.value === info.row.original.recall_eval,
+                )?.label2
               : "Recall Quality..."}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
@@ -131,30 +162,67 @@ export function RecallEvalComboBox(info: CellContext<Tune, string>) {
                   key={qualityList.value}
                   value={qualityList.value}
                   onSelect={(currentValue) => {
-                    console.log("value, currentValue: ", value, currentValue);
-                    const newValue = currentValue === value ? "" : currentValue;
-                    setValue(newValue);
-                    info.row.original.recallEval = newValue;
+                    console.log(
+                      "value, currentValue: ",
+                      info.row.original.recall_eval,
+                      currentValue,
+                    );
+                    const newValue =
+                      currentValue === info.row.original.recall_eval
+                        ? ""
+                        : currentValue;
+                    // setRecallEvalValue(newValue);
+
+                    // setIsUpdated(!isUpdated);
+
+                    info.row.original.recall_eval = newValue;
+
                     // This toggleSelected forces the row to re-render, maybe there's a better way?
-                    // info.row.renderValue("recallEval");
+                    // info.row.renderValue("recall_eval");
                     forceClose();
+
+                    const selectedRowModels =
+                      info.table.getSelectedRowModel().rowsById;
+                    console.log("selectedRowModels: ", selectedRowModels);
+
+                    for (const rowId in selectedRowModels) {
+                      const rowModel = selectedRowModels[rowId];
+                      rowModel.toggleSelected(false);
+                    }
+
+                    // for (let i = 0; i < nrows; i++) {
+                    //   const cell = info.table.getSelectedRowModel(i));
+                    //   cell.row.toggleSelected(false);
+                    // }
 
                     // This will just update the button, but not the row.
                     // Leaving it here for reference, and also, maybe we shouldn't
-                    // change the color of the entire row based on the recallEval?
-                    updateState({});
+                    // change the color of the entire row based on the recall_eval?
+                    // updateState({});
+
+                    // const original_selection_state = info.row.getIsSelected();
+                    // info.row.toggleSelected(!original_selection_state);
+
+                    const table_state = info.table.getState();
+                    info.table.setState(table_state);
+
+                    saveData(newValue);
+
+                    // info.row.toggleSelected(original_selection_state);
 
                     // This toggleSelected hack forces the whole row to re-render.
                     // Maybe there's a better way?
-                    const original_selection_state = info.row.getIsSelected();
-                    info.row.toggleSelected();
-                    info.row.toggleSelected(original_selection_state);
+                    // const original_selection_state = info.row.getIsSelected();
+                    // info.row.toggleSelected();
+                    // info.row.toggleSelected(original_selection_state);
                   }}
                 >
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value === qualityList.value ? "opacity-100" : "opacity-0",
+                      info.row.original.recall_eval === qualityList.value
+                        ? "opacity-100"
+                        : "opacity-0",
                     )}
                   />
                   {qualityList.label2}

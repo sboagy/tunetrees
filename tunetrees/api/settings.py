@@ -1,0 +1,391 @@
+import logging
+from typing import Annotated, Optional
+
+from fastapi import APIRouter, Body, HTTPException, Path
+from starlette import status as status
+
+from tunetrees.app.database import SessionLocal
+from tunetrees.models.tunetrees import TableState, TableTransientData
+from pydantic import BaseModel
+
+settings_router = APIRouter(prefix="/settings", tags=["settings"])
+
+
+@settings_router.post(
+    "/table_state/{user_id}/{screen_size}/{purpose}",
+    summary="Create a new datagrid table state for a user, for a specific screen size and purpose",
+    description="Create a new column setting with specific configurations.  The "
+    "column setting entries correspond to the columns in the practice_list_joined view.  Each time the "
+    "user changes a column setting, it should be reflected in this table, so the settings can "
+    "be persisted between sessions and devices.",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_table_state(
+    user_id: Annotated[
+        int,
+        Path(
+            description="Should be a valid user id that corresponds to a user in the user table",
+        ),
+    ],
+    screen_size: Annotated[
+        str,
+        Path(
+            enum_values=["small", "full"],
+            description="Associated screen size, one of 'small' or 'full'",
+        ),
+    ],
+    purpose: Annotated[
+        str,
+        Path(
+            enum_values=["practice", "repertoire", "suggestions"],
+            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+        ),
+    ],
+    settings: str = Body(...),
+):
+    db = SessionLocal()
+    try:
+        table_state = TableState(
+            user_id=user_id,
+            screen_size=screen_size,
+            purpose=purpose,
+            settings=settings,
+        )
+        db.add(table_state)
+        db.commit()
+        db.refresh(table_state)
+        return {"status": "success", "code": 201}
+    except HTTPException as e:
+        if e.status_code == 404:
+            logging.getLogger().warning(
+                "table state Not Found (create_table_state(%s, %s, %s))",
+                user_id,
+                screen_size,
+                purpose,
+            )
+        else:
+            logging.getLogger().error("HTTPException (secondary catch): %s" % e)
+        raise
+    except Exception as e:
+        logging.getLogger().error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occured")
+    finally:
+        if db is not None:
+            db.close()
+
+
+@settings_router.put(
+    "/table_state/{user_id}/{screen_size}/{purpose}",
+    summary="Update a datagrid table state for a user, for a specific screen size and purpose",
+    description="Update a column setting.  The "
+    "column setting entries correspond to the columns in the practice_list_joined view.  Each time the "
+    "user changes a column setting, it should be reflected in this table, so the settings can "
+    "be persisted between sessions and devices.",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def update_table_state(
+    user_id: Annotated[
+        int,
+        Path(
+            description="Should be a valid user id that corresponds to a user in the user table",
+        ),
+    ],
+    screen_size: Annotated[
+        str,
+        Path(
+            enum_values=["small", "full"],
+            description="Associated screen size, one of 'small' or 'full'",
+        ),
+    ],
+    purpose: Annotated[
+        str,
+        Path(
+            enum_values=["practice", "repertoire", "suggestions"],
+            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+        ),
+    ],
+    settings: str,
+):
+    db = SessionLocal()
+    try:
+        table_state = TableState(
+            user_id=user_id,
+            screen_size=screen_size,
+            purpose=purpose,
+            settings=settings,
+        )
+        existing_table_state = (
+            db.query(TableState)
+            .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
+            .first()
+        )
+
+        if not existing_table_state:
+            raise HTTPException(status_code=404, detail="Column setting not found")
+
+        existing_table_state.settings = table_state.settings
+        db.commit()
+        db.refresh(existing_table_state)
+        return {"status": "success", "code": 204}
+    except HTTPException as e:
+        if e.status_code == 404:
+            logging.getLogger().warning(
+                "table state Not Found (update_table_state(%s, %s, %s))",
+                user_id,
+                screen_size,
+                purpose,
+            )
+        else:
+            logging.getLogger().error("HTTPException (secondary catch): %s" % e)
+        raise
+    except Exception as e:
+        logging.getLogger().error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occured")
+    finally:
+        if db is not None:
+            db.close()
+
+
+@settings_router.get(
+    "/table_state/{user_id}/{screen_size}/{purpose}",
+    summary="Retrieve the stored datagrid table state for a user, for a specific screen size and purpose",
+    description="Retrieve the column setting with specific configurations.  The "
+    "column setting entries correspond to the columns in the practice_list_joined view.",
+    status_code=status.HTTP_200_OK,
+)
+def get_table_states(
+    user_id: Annotated[
+        int,
+        Path(
+            description="Should be a valid user id that corresponds to a user in the user table",
+        ),
+    ],
+    screen_size: Annotated[
+        str,
+        Path(
+            enum_values=["small", "full"],
+            description="Associated screen size, one of 'small' or 'full'",
+        ),
+    ],
+    purpose: Annotated[
+        str,
+        Path(
+            enum_values=["practice", "repertoire", "suggestions"],
+            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+        ),
+    ],
+) -> str:
+    db = SessionLocal()
+    try:
+        table_state: TableState | None = (
+            db.query(TableState)
+            .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
+            .first()
+        )
+
+        if not table_state:
+            raise HTTPException(status_code=404, detail="Column setting not found")
+
+        return table_state.settings
+    except HTTPException as e:
+        if e.status_code == 404:
+            logging.getLogger().warning(
+                "table state Not Found (get_table_state(%s, %s, %s))",
+                user_id,
+                screen_size,
+                purpose,
+            )
+        else:
+            logging.getLogger().error("HTTPException (secondary catch): %s" % e)
+        raise
+    except Exception as e:
+        logging.getLogger().error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occured")
+    finally:
+        if db is not None:
+            db.close()
+
+
+class TableTransientDataFields(BaseModel):
+    notes_private: Optional[str]
+    notes_public: Optional[str]
+    recall_eval: Optional[str]
+
+
+@settings_router.post(
+    "/table_transient_data/{user_id}/{tune_id}/{playlist_id}/{purpose}",
+    summary="Create or update new table transient data entry",
+    description="Create a new entry or update existing in the table_transient_data table",
+    status_code=status.HTTP_201_CREATED,
+)
+def stage_table_transient_data(
+    user_id: Annotated[
+        int,
+        Path(
+            description="Should be a valid user id that corresponds to a user in the user table",
+        ),
+    ],
+    tune_id: Annotated[
+        int,
+        Path(
+            description="The tune id that corresponds to a tune data being staged",
+        ),
+    ],
+    playlist_id: Annotated[
+        int,
+        Path(
+            description="The playlist id that corresponds to a tune data being staged",
+        ),
+    ],
+    purpose: Annotated[
+        str,
+        Path(
+            enum_values=["practice", "repertoire", "suggestions"],
+            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+        ),
+    ],
+    field_data: TableTransientDataFields = Body(...),
+):
+    db = SessionLocal()
+    try:
+        table_transient_data = TableTransientData(
+            user_id=user_id,
+            tune_id=tune_id,
+            playlist_id=playlist_id,
+            purpose=purpose,
+            notes_private=field_data.notes_private,
+            notes_public=field_data.notes_public,
+            recall_eval=field_data.recall_eval,
+        )
+        db.add(table_transient_data)
+        db.commit()
+        db.refresh(table_transient_data)
+        return {"status": "success", "code": 201}
+    except Exception as e:
+        logging.getLogger().error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occurred")
+    finally:
+        if db is not None:
+            db.close()
+
+
+@settings_router.get(
+    "/table_transient_data/{user_id}/{tune_id}/{playlist_id}/{purpose}",
+    summary="Retrieve a table transient data entry",
+    description="Retrieve an entry from the table_transient_data table",
+    status_code=status.HTTP_200_OK,
+)
+def get_table_transient_data(
+    user_id: Annotated[
+        int,
+        Path(
+            description="Should be a valid user id that corresponds to a user in the user table",
+        ),
+    ],
+    tune_id: Annotated[
+        int,
+        Path(
+            description="The tune id that corresponds to a tune data being staged",
+        ),
+    ],
+    playlist_id: Annotated[
+        int,
+        Path(
+            description="The playlist id that corresponds to a tune data being staged",
+        ),
+    ],
+    purpose: Annotated[
+        str,
+        Path(
+            enum_values=["practice", "repertoire", "suggestions"],
+            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+        ),
+    ],
+):
+    db = SessionLocal()
+    try:
+        table_transient_data: TableTransientData | None = (
+            db.query(TableTransientData)
+            .filter_by(
+                user_id=user_id,
+                tune_id=tune_id,
+                playlist_id=playlist_id,
+                purpose=purpose,
+            )
+            .first()
+        )
+
+        if not table_transient_data:
+            raise HTTPException(
+                status_code=404, detail="Table transient data not found"
+            )
+
+        return table_transient_data
+    except Exception as e:
+        logging.getLogger().error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occurred")
+    finally:
+        if db is not None:
+            db.close()
+
+
+@settings_router.delete(
+    "/table_transient_data/{user_id}/{tune_id}/{playlist_id}/{purpose}",
+    summary="Delete a table transient data entry",
+    description="Delete an entry from the table_transient_data table",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_table_transient_data(
+    user_id: Annotated[
+        int,
+        Path(
+            description="Should be a valid user id that corresponds to a user in the user table",
+        ),
+    ],
+    tune_id: Annotated[
+        int,
+        Path(
+            description="The tune id that corresponds to a tune data being staged",
+        ),
+    ],
+    playlist_id: Annotated[
+        int,
+        Path(
+            description="The playlist id that corresponds to a tune data being staged",
+        ),
+    ],
+    purpose: Annotated[
+        str,
+        Path(
+            enum_values=["practice", "repertoire", "suggestions"],
+            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+        ),
+    ],
+):
+    db = SessionLocal()
+    try:
+        table_transient_data = (
+            db.query(TableTransientData)
+            .filter_by(
+                user_id=user_id,
+                tune_id=tune_id,
+                playlist_id=playlist_id,
+                purpose=purpose,
+            )
+            .first()
+        )
+
+        if not table_transient_data:
+            raise HTTPException(
+                status_code=404, detail="Table transient data not found"
+            )
+
+        db.delete(table_transient_data)
+        db.commit()
+        return {"status": "success", "code": 204}
+    except Exception as e:
+        logging.getLogger().error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occurred")
+    finally:
+        if db is not None:
+            db.close()

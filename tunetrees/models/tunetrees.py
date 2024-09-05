@@ -1,6 +1,16 @@
 from typing import List, Optional
 
-from sqlalchemy import Column, Float, ForeignKey, Index, Integer, Table, Text, text
+from sqlalchemy import (
+    Column,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    Table,
+    Text,
+    text,
+)
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 
 Base = declarative_base()
@@ -32,6 +42,36 @@ t_practice_list_joined = Table(
 )
 
 
+t_practice_list_staged = Table(
+    "practice_list_staged",
+    metadata,
+    Column("ID", Integer),
+    Column("Title", Text),
+    Column("Type", Text),
+    Column("Structure", Text),
+    Column("Mode", Text),
+    Column("Incipit", Text),
+    Column("Learned", Text),
+    Column("USER_REF", Integer),
+    Column("PLAYLIST_REF", Integer),
+    Column("Instrument", Text),
+    Column("Practiced", Text),
+    Column("Quality", Text),
+    Column("Easiness", Float),
+    Column("Interval", Integer),
+    Column("Repetitions", Integer),
+    Column("ReviewDate", Integer),
+    Column("BackupPracticed", Text),
+    Column("NotePrivate", Text),
+    Column("NotePublic", Text),
+    Column("Tags", Text),
+    Column("Purpose", Text),
+    Column("StagedNotesPrivate", Text),
+    Column("StagedNotesPublic", Text),
+    Column("StagedRecallEval", Text),
+)
+
+
 class Tune(Base):
     __tablename__ = "tune"
 
@@ -54,6 +94,9 @@ class Tune(Base):
     practice_record: Mapped[List["PracticeRecord"]] = relationship(
         "PracticeRecord", uselist=True, back_populates="tune"
     )
+    table_transient_data: Mapped[List["TableTransientData"]] = relationship(
+        "TableTransientData", uselist=True, back_populates="tune"
+    )
 
 
 class User(Base):
@@ -75,8 +118,14 @@ class User(Base):
     session: Mapped[List["Session"]] = relationship(
         "Session", uselist=True, back_populates="user"
     )
+    table_state: Mapped[List["TableState"]] = relationship(
+        "TableState", uselist=True, back_populates="user"
+    )
     user_annotation_set: Mapped[List["UserAnnotationSet"]] = relationship(
         "UserAnnotationSet", uselist=True, back_populates="user"
+    )
+    table_transient_data: Mapped[List["TableTransientData"]] = relationship(
+        "TableTransientData", uselist=True, back_populates="user"
     )
 
 
@@ -135,6 +184,9 @@ class Playlist(Base):
     practice_record: Mapped[List["PracticeRecord"]] = relationship(
         "PracticeRecord", uselist=True, back_populates="playlist"
     )
+    table_transient_data: Mapped[List["TableTransientData"]] = relationship(
+        "TableTransientData", uselist=True, back_populates="playlist"
+    )
 
 
 class Session(Base):
@@ -145,6 +197,19 @@ class Session(Base):
     user_id = mapped_column(ForeignKey("user.id"))
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="session")
+
+
+class TableState(Base):
+    __tablename__ = "table_state"
+
+    user_id = mapped_column(ForeignKey("user.id"), primary_key=True, nullable=False)
+    screen_size = mapped_column(Enum("small", "full"), primary_key=True, nullable=False)
+    purpose = mapped_column(
+        Enum("practice", "repertoire", "suggestions"), primary_key=True, nullable=False
+    )
+    settings = mapped_column(Text)
+
+    user: Mapped["User"] = relationship("User", back_populates="table_state")
 
 
 class UserAnnotationSet(Base):
@@ -203,3 +268,25 @@ class PracticeRecord(Base):
     tune: Mapped[Optional["Tune"]] = relationship(
         "Tune", back_populates="practice_record"
     )
+
+
+class TableTransientData(Base):
+    __tablename__ = "table_transient_data"
+
+    user_id = mapped_column(ForeignKey("user.id"), primary_key=True, nullable=False)
+    tune_id = mapped_column(ForeignKey("tune.ID"), primary_key=True, nullable=False)
+    playlist_id = mapped_column(
+        ForeignKey("playlist.PLAYLIST_ID"), primary_key=True, nullable=False
+    )
+    purpose = mapped_column(
+        Enum("practice", "repertoire", "suggestions"), primary_key=True
+    )
+    notes_private = mapped_column(Text)
+    notes_public = mapped_column(Text)
+    recall_eval = mapped_column(Text)
+
+    playlist: Mapped["Playlist"] = relationship(
+        "Playlist", back_populates="table_transient_data"
+    )
+    tune: Mapped["Tune"] = relationship("Tune", back_populates="table_transient_data")
+    user: Mapped["User"] = relationship("User", back_populates="table_transient_data")

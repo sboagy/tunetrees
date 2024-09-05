@@ -17,5 +17,25 @@ export type Tune = {
   notes_private?: string | null;
   notes_public?: string | null;
   tags?: string | null;
-  recallEval?: string | null;
+  recall_eval?: string | null;
+};
+
+export type ScreenSize = "small" | "full";
+
+export type TablePurpose = "practice" | "repertoire" | "suggestions";
+
+export type TableTransientData = {
+  user_id: number;
+  tune_id: number;
+  playlist_id: number;
+  purpose: string;
+  notes_private: string | null;
+  notes_public: string | null;
+  recall_eval: string | null;
+};
+
+export type TableTransientDataFields = {
+  notes_private: string | null;
+  notes_public: string | null;
+  recall_eval: string | null;
 };

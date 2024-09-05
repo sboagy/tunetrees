@@ -9,9 +9,14 @@ export default function RepertoireGrid(tunes: ScheduledTunesType): JSX.Element {
   return (
     <div className="w-full">
       <div className="flex items-center py-4">
-        <ColumnsMenu table={table} />
+        <ColumnsMenu user_id={tunes.user_id} table={table} />
       </div>
-      <TunesGrid table={table} />
+      <TunesGrid
+        table={table}
+        userId={Number.parseInt(tunes.user_id)}
+        playlistId={Number.parseInt(tunes.playlist_id)}
+        purpose={tunes.table_purpose}
+      />
     </div>
   );
 }

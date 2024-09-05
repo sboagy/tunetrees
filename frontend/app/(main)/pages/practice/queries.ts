@@ -27,7 +27,7 @@ const ERROR_TUNE: Tune[] = [
     notes_private: "Error", // Optional property, should't need to be set
     notes_public: "Error", // Optional property, should't need to be set
     tags: "Error", // Optional property, should't need to be set
-    recallEval: "Error", // Optional property, should't need to be set
+    recall_eval: "Error", // Optional property, should't need to be set
   },
 ];
 

@@ -6,16 +6,12 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Query, Session
 from tabulate import tabulate
 
-from tunetrees.app.database import SessionLocal
-from tunetrees.models.practice_list_joined import (
-    get_practice_list_query,
-    practice_list_columns,
-)
+
 from tunetrees.models.tunetrees import (
     Playlist,
     PracticeRecord,
     Tune,
-    t_practice_list_joined,
+    t_practice_list_staged,
 )
 
 
@@ -141,17 +137,17 @@ def get_practice_list_scheduled(
     )
 
     # Create the query
-    practice_list_query = db.query(t_practice_list_joined).filter(
+    practice_list_query = db.query(t_practice_list_staged).filter(
         and_(
-            t_practice_list_joined.c.USER_REF == user_ref,
-            t_practice_list_joined.c.PLAYLIST_REF == playlist_ref,
-            t_practice_list_joined.c.ReviewDate > lower_bound_date,
-            t_practice_list_joined.c.ReviewDate <= review_sitdown_date,
+            t_practice_list_staged.c.USER_REF == user_ref,
+            t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
+            t_practice_list_staged.c.ReviewDate > lower_bound_date,
+            t_practice_list_staged.c.ReviewDate <= review_sitdown_date,
         )
     )
 
     scheduled_rows_query_sorted = practice_list_query.order_by(
-        func.DATE(t_practice_list_joined.c.ReviewDate).desc()
+        func.DATE(t_practice_list_staged.c.ReviewDate).desc()
     )
     # scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
     scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip)
@@ -168,16 +164,16 @@ def get_practice_list_scheduled(
         aged_limit = 2
     aged_limit = 2
 
-    practice_list_query2 = db.query(t_practice_list_joined).filter(
+    practice_list_query2 = db.query(t_practice_list_staged).filter(
         and_(
-            t_practice_list_joined.c.USER_REF == user_ref,
-            t_practice_list_joined.c.PLAYLIST_REF == playlist_ref,
+            t_practice_list_staged.c.USER_REF == user_ref,
+            t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
         )
     )
 
     aged_rows: List[Tune] = (
         practice_list_query2.order_by(
-            func.DATE(t_practice_list_joined.c.Practiced).asc()
+            func.DATE(t_practice_list_staged.c.Practiced).asc()
         )
         .offset(skip)
         .limit(aged_limit)
@@ -187,7 +183,7 @@ def get_practice_list_scheduled(
 
     # if print_table:
     #     print("\n--------")
-    #     print(tabulate(rows, headers=t_practice_list_joined.columns.keys()))
+    #     print(tabulate(rows, headers=t_practice_list_staged.columns.keys()))
 
     return rows
 
@@ -267,7 +263,7 @@ def get_practice_list_scheduled(
 
 #     # if print_table:
 #     #     print("\n--------")
-#     #     print(tabulate(rows, headers=t_practice_list_joined.columns.keys()))
+#     #     print(tabulate(rows, headers=t_practice_list_staged.columns.keys()))
 
 #     return rows
 
@@ -280,7 +276,13 @@ def get_practice_list_recently_played(
     playlist_ref=1,
     user_ref=1,
 ) -> List[Tune]:
-    query = get_practice_list_query(db, playlist_ref, user_ref)
+    query = db.query(t_practice_list_staged).filter(
+        and_(
+            t_practice_list_staged.c.USER_REF == user_ref,
+            t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
+        )
+    )
+
     rows: List[Tune] = (
         query.order_by(func.DATE(PracticeRecord.Practiced).desc())
         .offset(skip)
@@ -291,27 +293,27 @@ def get_practice_list_recently_played(
     # TODO: make a decent print_table function
     # if print_table:
     #     print("\n--------")
-    #     print(tabulate(rows, headers=t_practice_list_joined.columns.keys()))
+    #     print(tabulate(rows, headers=t_practice_list_staged.columns.keys()))
 
     return rows
 
 
-def _run_experiment():
-    db = None
-    try:
-        db = SessionLocal()
-        tunes = get_practice_list_scheduled(db, limit=10, print_table=True)
-        for tune in tunes:
-            for column_name in practice_list_columns:
-                column_index = practice_list_columns[column_name]
-                if column_index != 0:
-                    print("   ", end="")
-                print(f"{column_name}: {tune[column_index]}")
-                # assert tunes
-    finally:
-        if db:
-            db.close()
+# def _run_experiment():
+#     db = None
+#     try:
+#         db = SessionLocal()
+#         tunes = get_practice_list_scheduled(db, limit=10, print_table=True)
+#         for tune in tunes:
+#             for column_name in practice_list_columns:
+#                 column_index = practice_list_columns[column_name]
+#                 if column_index != 0:
+#                     print("   ", end="")
+#                 print(f"{column_name}: {tune[column_index]}")
+#                 # assert tunes
+#     finally:
+#         if db:
+#             db.close()
 
 
-if __name__ == "__main__":
-    _run_experiment()
+# if __name__ == "__main__":
+#     _run_experiment()

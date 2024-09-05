@@ -2,7 +2,7 @@
 import { auth } from "@/auth";
 
 import { redirect } from "next/navigation";
-import Practice from "../(main)/pages/practice/Practice";
+import TabGroupMain from "../(main)/pages/practice/components/TabGroupMain";
 
 const HomePage = async () => {
   // console.log("In the HomePage function");
@@ -24,7 +24,7 @@ const HomePage = async () => {
   const playlist_id = "1";
 
   return (
-    <Practice user_id={user_id} playlist_id={playlist_id} />
+    <TabGroupMain user_id={user_id} playlist_id={playlist_id} />
     // Practice(user_id, playlist_id)
     // <div className="flex flex-col items-center m-4">
     //   <h1 className="text-3xl my-2">Welcome, {session?.user?.name}</h1>

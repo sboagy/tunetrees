@@ -81,11 +81,11 @@ def register_exception(app: FastAPI):
 
 class User(BaseModel):
     id: Optional[str] = Field(
-        doc="This will be assigned and will be ignored for create or update",
+        description="This will be assigned and will be ignored for create or update",
         default=None,
     )
     name: Optional[str] = Field(
-        doc="For now assume this is the user name.  It's exact meaning is a little ambigious at the moment",
+        description="For now assume this is the user name.  It's exact meaning is a little ambigious at the moment",
         default=None,
     )
     email: Optional[str] = Field(default=None)
