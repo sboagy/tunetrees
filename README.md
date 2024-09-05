@@ -221,6 +221,14 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
 The SQLAlchemy ORM code is contained in the `tunetrees/models` package in the `tunetrees.py` 
 module.  It should always be generated with the following procedure:
 
+First, make sure you have [sqlacodegen-v2](https://pypi.org/project/sqlacodegen-v2/) installed:
+
+```bash
+pip install "sqlacodegen-v2 ~= 0.1.4"
+```
+
+Then, generate the `tunetrees.py` python file which will contain the TuneTrees ORM code.
+
 ```bash
 sqlacodegen_v2 sqlite:///tunetrees.sqlite3 > tunetrees/models/tunetrees.py
 ```

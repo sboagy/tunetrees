@@ -13,7 +13,12 @@ import {
 } from "@tanstack/react-table";
 import * as React from "react";
 
-import type { Table as TanstackTable } from "@tanstack/react-table";
+import type {
+  PaginationState,
+  RowSelectionState,
+  TableState,
+  Table as TanstackTable,
+} from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,49 +31,109 @@ import {
 } from "@/components/ui/table";
 
 import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns";
-import type { Tune } from "../types";
+import type { TablePurpose, Tune } from "../types";
+import { createOrUpdateTableState, getTableState } from "../settings";
 
 export interface ScheduledTunesType {
   tunes: Tune[];
   user_id: string;
   playlist_id: string;
+  table_purpose: TablePurpose;
 }
 
 export function TunesTable({
   tunes,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   user_id,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   playlist_id,
+  table_purpose,
 }: ScheduledTunesType) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    [],
-  );
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({
-      id: true,
-      title: true,
-      type: true,
-      structure: true,
-      mode: false,
-      incipit: false,
-      learned: false,
-      practiced: true,
-      quality: false,
-      easiness: false,
-      interval: false,
-      repetitions: false,
-      review_date: true,
-      backup_practiced: false,
-      external_ref: false,
-      notes_private: true,
-      notes_public: true,
-      tags: false,
-    });
-  const [rowSelection, setRowSelection] = React.useState({});
+  const [table_state_from_db, setTableStateFromDB] =
+    React.useState<TableState | null>(null);
 
-  const columns = get_columns();
+  const [sorting, setSorting] = React.useState<SortingState>(
+    table_state_from_db ? table_state_from_db.sorting : [],
+  );
+  const originalSetSortingRef = React.useRef(setSorting);
+
+  React.useEffect(() => {
+    // Interception logic here
+    originalSetSortingRef.current = setSorting;
+  }, []);
+
+  // For the moment am not using columnFilters
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    table_state_from_db ? table_state_from_db.columnFilters : [],
+  );
+  const originalColumnFiltersRef = React.useRef(setColumnFilters);
+
+  React.useEffect(() => {
+    // Interception logic here
+    originalColumnFiltersRef.current = setColumnFilters;
+  }, []);
+
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>(
+      table_state_from_db
+        ? table_state_from_db.columnVisibility
+        : {
+            id: true,
+            title: true,
+            type: true,
+            structure: true,
+            mode: false,
+            incipit: false,
+            learned: false,
+            practiced: true,
+            quality: false,
+            easiness: false,
+            interval: false,
+            repetitions: false,
+            review_date: true,
+            backup_practiced: false,
+            external_ref: false,
+            notes_private: true,
+            notes_public: true,
+            tags: false,
+          },
+    );
+
+  const originalSetColumnVisibilityRef = React.useRef(setColumnVisibility);
+
+  React.useEffect(() => {
+    // Interception logic here
+    originalSetColumnVisibilityRef.current = setColumnVisibility;
+  }, []);
+
+  const [rowSelection, setRowSelection] = React.useState(
+    table_state_from_db ? table_state_from_db.rowSelection : {},
+  );
+  const originalSetRowSelectionRef = React.useRef(setRowSelection);
+
+  React.useEffect(() => {
+    // Interception logic here
+    originalSetRowSelectionRef.current = setRowSelection;
+  }, []);
+
+  const [pagination, setPaginationState] = React.useState<PaginationState>(
+    table_state_from_db
+      ? table_state_from_db.pagination
+      : {
+          pageIndex: 0,
+          pageSize: 15, //optionally customize the initial pagination state.
+        },
+  );
+  const originalSetPaginationState = React.useRef(setPaginationState);
+
+  React.useEffect(() => {
+    // Interception logic here
+    originalSetPaginationState.current = setPaginationState;
+  }, []);
+
+  const columns = get_columns(
+    Number.parseInt(user_id),
+    Number.parseInt(playlist_id),
+    table_purpose,
+  );
 
   const table: TanstackTable<Tune> = useReactTable({
     data: tunes,
@@ -86,8 +151,143 @@ export function TunesTable({
       columnFilters,
       rowSelection,
       columnVisibility,
+      pagination,
     },
   });
+
+  React.useEffect(() => {
+    const fetchTableState = async () => {
+      try {
+        const user_id_int = Number.parseInt(user_id);
+        const table_state_from_db = await getTableState(
+          user_id_int,
+          "full",
+          table_purpose,
+        );
+        if (table_state_from_db) {
+          setTableStateFromDB(table_state_from_db);
+          table.setPagination(table_state_from_db.pagination);
+          table.setRowSelection(table_state_from_db.rowSelection);
+          table.setColumnVisibility(table_state_from_db.columnVisibility);
+          table.setColumnFilters(table_state_from_db.columnFilters);
+          table.setSorting(table_state_from_db.sorting);
+        }
+      } catch (error) {
+        console.error(error);
+        throw error;
+      }
+    };
+
+    fetchTableState();
+  }, [user_id, table_purpose, table]);
+
+  const saveTableState = async (
+    table: TanstackTable<Tune>,
+    user_id: string,
+    table_purpose: TablePurpose,
+  ) => {
+    const table_state: TableState = table.getState();
+
+    try {
+      const response = await createOrUpdateTableState(
+        Number.parseInt(user_id),
+        "full",
+        table_purpose,
+        table_state,
+      );
+      // Handle the response as needed
+      console.log("Server response:", response);
+    } catch (error) {
+      console.error("Error calling server function:", error);
+    } finally {
+      // setIsLoading(false);
+    }
+  };
+
+  // Intercept the state changes.  I should be able to do this in a more generic way
+  // with just onStateChange, but I couldn't get that to work.  Maybe I'll try again later.
+  // The functions below are just wrapping each of the change events, and then saving the
+  // entire table state to the database.
+
+  const interceptedRowSelectionChange = (
+    newRowSelectionState:
+      | RowSelectionState
+      | ((state: RowSelectionState) => RowSelectionState),
+  ): void => {
+    const resolvedRowSelectionState: RowSelectionState =
+      newRowSelectionState instanceof Function
+        ? newRowSelectionState(rowSelection)
+        : newRowSelectionState;
+
+    originalSetRowSelectionRef.current(resolvedRowSelectionState);
+
+    saveTableState(table, user_id, table_purpose);
+  };
+
+  const interceptedOnColumnFiltersChange = (
+    newColumnFiltersState:
+      | ColumnFiltersState
+      | ((state: ColumnFiltersState) => ColumnFiltersState),
+  ): void => {
+    const resolvedColumnFiltersState: ColumnFiltersState =
+      newColumnFiltersState instanceof Function
+        ? newColumnFiltersState(columnFilters)
+        : newColumnFiltersState;
+
+    originalColumnFiltersRef.current(resolvedColumnFiltersState);
+
+    saveTableState(table, user_id, table_purpose);
+  };
+
+  const interceptedSetSorting = (
+    newSorting: SortingState | ((state: SortingState) => SortingState),
+  ): void => {
+    const resolvedSorting: SortingState =
+      newSorting instanceof Function ? newSorting(sorting) : newSorting;
+
+    originalSetSortingRef.current(resolvedSorting);
+
+    saveTableState(table, user_id, table_purpose);
+  };
+
+  const interceptedSetColumnVisibility = (
+    newVisibilityState:
+      | VisibilityState
+      | ((state: VisibilityState) => VisibilityState),
+  ): void => {
+    const resolvedVisibilityState: VisibilityState =
+      newVisibilityState instanceof Function
+        ? newVisibilityState(columnVisibility)
+        : newVisibilityState;
+
+    originalSetColumnVisibilityRef.current(resolvedVisibilityState);
+
+    saveTableState(table, user_id, table_purpose);
+  };
+
+  const interceptedSetPagination = (
+    newPaginationState:
+      | PaginationState
+      | ((state: PaginationState) => PaginationState),
+  ): void => {
+    const resolvedPaginationState: PaginationState =
+      newPaginationState instanceof Function
+        ? newPaginationState(pagination)
+        : newPaginationState;
+
+    originalSetPaginationState.current(resolvedPaginationState);
+
+    saveTableState(table, user_id, table_purpose);
+  };
+
+  table.setOptions((prev) => ({
+    ...prev, //preserve any other options that we have set up above
+    onSortingChange: interceptedSetSorting,
+    onColumnFiltersChange: interceptedOnColumnFiltersChange,
+    onRowSelectionChange: interceptedRowSelectionChange,
+    onColumnVisibilityChange: interceptedSetColumnVisibility,
+    onPaginationChange: interceptedSetPagination,
+  }));
 
   return table;
 }
@@ -113,11 +313,14 @@ export const getColorForEvaluation = (review_status: string | null): string => {
 
 type Props = {
   table: TanstackTable<Tune>;
+  userId: number;
+  playlistId: number;
+  purpose: TablePurpose;
 };
 
 const TunesGrid = (props: Props) => {
   const table = props.table;
-  const columns = get_columns();
+  const columns = get_columns(props.userId, props.playlistId, props.purpose);
 
   return (
     <>
@@ -147,7 +350,7 @@ const TunesGrid = (props: Props) => {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={`${getColorForEvaluation(row.original.recallEval || null)}`}
+                  className={`${getColorForEvaluation(row.original.recall_eval || null)}`}
                   // className="hover:bg-gray-100"
                 >
                   {row.getVisibleCells().map((cell) => (

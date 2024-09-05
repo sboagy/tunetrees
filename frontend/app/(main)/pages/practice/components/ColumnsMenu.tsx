@@ -13,7 +13,14 @@ import {
 import type { Table } from "@tanstack/react-table";
 import type { Tune } from "../types";
 
-const ColumnsMenu = ({ table }: { table: Table<Tune> }) => {
+const ColumnsMenu = ({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  user_id,
+  table,
+}: {
+  user_id: string;
+  table: Table<Tune>;
+}) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

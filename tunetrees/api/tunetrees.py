@@ -15,7 +15,7 @@ from tunetrees.app.queries import (
     get_practice_list_scheduled,
 )
 from tunetrees.app.schedule import query_and_print_tune_by_id, update_practice_record
-from tunetrees.models.tunetrees import Tune
+from tunetrees.models.tunetrees import Tune, t_practice_list_staged
 
 router = APIRouter(
     prefix="/tunetrees",
@@ -47,7 +47,9 @@ async def get_scheduled(
         tunes_scheduled = get_practice_list_scheduled(
             db, limit=10, user_ref=int(user_id), playlist_ref=int(playlist_ref)
         )
-        tune_list = [tunes_mapper(tune) for tune in tunes_scheduled]
+        tune_list = [
+            tunes_mapper(tune, t_practice_list_staged) for tune in tunes_scheduled
+        ]
         return tune_list
     except Exception as e:
         logger = logging.getLogger("tunetrees.api")
@@ -68,7 +70,7 @@ async def get_recently_played(user_id: str, playlist_ref: str):
         )
         tune_list = []
         for tune in tunes_recently_played:
-            tune_list.append(tunes_mapper(tune))
+            tune_list.append(tunes_mapper(tune, t_practice_list_staged))
         return tune_list
     except Exception as e:
         return {"error": f"Unable to fetch recently played tunes: {e}"}

@@ -8,6 +8,7 @@ import { getPracticeListScheduled } from "../queries";
 import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import TunesGrid, { type ScheduledTunesType, TunesTable } from "./TunesGrid";
+import { deleteTableTransientData } from "../settings";
 
 export default function ScheduledTunesGrid({
   tunes,
@@ -20,6 +21,7 @@ export default function ScheduledTunesGrid({
     tunes: scheduled,
     user_id,
     playlist_id,
+    table_purpose: "practice",
   });
 
   // const valuesArray = {};
@@ -32,7 +34,7 @@ export default function ScheduledTunesGrid({
       const id: number = tune.id;
       const row = table.getRow(i.toString());
 
-      const feedback: string = row.renderValue("recallEval");
+      const feedback: string = row.renderValue("recall_eval");
 
       if (feedback) {
         console.log("id, feedback", id, feedback);
@@ -43,7 +45,13 @@ export default function ScheduledTunesGrid({
           playlist_id,
         });
         console.log("results from submitPracticeFeedback: ", results);
-        row.original.recallEval = "";
+        row.original.recall_eval = "";
+        deleteTableTransientData(
+          Number.parseInt(user_id),
+          id,
+          Number.parseInt(playlist_id),
+          "practice",
+        );
       }
       const getScheduled = async (user_id: string, playlist_id: string) => {
         const data: Tune[] = await getPracticeListScheduled(
@@ -78,9 +86,14 @@ export default function ScheduledTunesGrid({
           </Button>
         </div>
 
-        <ColumnsMenu table={table} />
+        <ColumnsMenu user_id={user_id} table={table} />
       </div>
-      <TunesGrid table={table} />
+      <TunesGrid
+        table={table}
+        userId={Number.parseInt(user_id)}
+        playlistId={Number.parseInt(playlist_id)}
+        purpose={"practice"}
+      />
     </div>
   );
 }
