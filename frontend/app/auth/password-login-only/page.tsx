@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import Image from "next/image";
 import { z } from "zod";
 import { authorizeWithPassword } from "./validate-signin";
-import { getSession, signIn, useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 
 const emailSchema = z.string().email("Invalid email address");
 
@@ -32,7 +32,7 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  const validateEmail = (email: string): boolean => {
+  const validateEmail = useCallback((email: string): boolean => {
     // TODO: implement token validation logic
     const result = emailSchema.safeParse(email);
     if (!result.success) {
@@ -41,11 +41,11 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
     }
     setEmailError(null);
     return true;
-  };
+  }, []);
 
   useEffect(() => {
     validateEmail(email);
-  }, [email]);
+  }, [email, validateEmail]);
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newEmail = e.target.value;
