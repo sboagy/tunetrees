@@ -14,17 +14,44 @@ export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
         // redirect("/auth/login");
       }}
     >
-      <Button {...props}>Log In</Button>
+      <Button variant="outline" {...props}>
+        Sign in
+      </Button>
     </form>
   );
 }
+
+// export function NewUser(props: React.ComponentPropsWithRef<typeof Button>) {
+//   console.log("Constructing the SignIn button");
+//   return (
+//     <form
+//       action={async () => {
+//         "use server";
+//         // const session = await auth();
+//         console.log("Handling SignIn request");
+//         await signIn("credentials", {
+//           callbackUrl: "http://localhost:3000/home",
+//         });
+//         // redirect("/auth/login");
+//       }}
+//     >
+//       <Button variant="outline" {...props}>
+//         Sign in
+//       </Button>
+//     </form>
+//   );
+// }
 
 export function NewUser(
   props: React.ComponentPropsWithRef<typeof Button>,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   crsf_token: string,
 ) {
-  console.log("Constructing the NewUser button");
+  console.log("Constructing the New User button");
+  // Consider "Sign Up" instead of "New User".  AI prefers "Sign Up".
+  // But it feels like "New User" better conveys the intent of becoming
+  // a new TuneTrees user, other than "sign up" for a subscription
+  // or something.  Also, "New user" contrasts better with "Sign In".
   return (
     <form
       action={async () => {
@@ -34,7 +61,9 @@ export function NewUser(
         redirect("/auth/newuser");
       }}
     >
-      <Button {...props}>New User</Button>
+      <Button variant="outline" {...props}>
+        New user
+      </Button>
     </form>
   );
 }
@@ -50,7 +79,9 @@ export function DemoUser(props: React.ComponentPropsWithRef<typeof Button>) {
         await signIn();
       }}
     >
-      <Button {...props}>Demo User</Button>
+      <Button variant="outline" {...props}>
+        Demo user
+      </Button>
     </form>
   );
 }

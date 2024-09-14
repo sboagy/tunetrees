@@ -795,7 +795,7 @@ def query_user_to_auth_user(
                 id=str(user.id),
                 name=str(user.name),
                 email=str(user.email),
-                emailVerified=datetime.datetime.now(),  # for the moment
+                emailVerified=user.email_verified,  # for the moment
                 hash=user.hash,
                 image=None,  # for the moment
             )

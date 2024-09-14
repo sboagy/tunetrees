@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 // import { useSession } from "next-auth/react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 
 // import { cookies } from "next/headers";
@@ -34,6 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
 import { newUser } from "./newuser-action";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -57,13 +58,33 @@ export default function SignInPage() {
     defaultValues,
   });
 
-  // const [password, setPassword] = useState("");
+  // if I don't get the router via useState, I get a huge error,
+  // but, I don't need or want to call setRouter, so this seems
+  // really goofy.  There must be a better way.
+  const [router, setRouter] = useState(useRouter());
+  console.log("SignInPage(): setRouter: ", setRouter);
 
-  const onSubmit = useCallback(async (data: AccountFormValues) => {
-    const result = await newUser(data);
-    console.log(result);
-    // do something with result
-  }, []);
+  const onSubmit = useCallback(
+    async (data: AccountFormValues) => {
+      const host = window.location.host;
+      // const response = await fetch("/api/user", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ data, host }),
+      // });
+
+      const result = await newUser(data, host);
+
+      // const result = await response.json();
+      console.log(result);
+
+      router.push("/auth/verify-request");
+
+      // Redirect to a success page or handle the result as needed
+      // redirect("/auth/verify-request");
+    },
+    [router],
+  );
 
   // function onSubmit(data: AccountFormValues) {
   //   console.log("In onSubmit in the newuser page", { data });
@@ -77,21 +98,41 @@ export default function SignInPage() {
   //   });
   // }
 
+  // const { data: session } = useSession
+  // console.log("SignInPage(): session
+  // console.log("SignInPage(): session
+  // console.log("SignInPage(): session
+  // console.log("SignInPage(): session
+
   // let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
-  const _crsfToken = "abcdef";
-  // const _crsfToken = getCsrfToken();
+  const [_crsfToken, setCrsfToken] = useState("abcdef");
+  console.log("SignInPage(): setCrsfToken:", setCrsfToken);
+
+  // useEffect(() => {
+  //   const fetchCrsfToken = async () => {
+  //     try {
+  //       const response = await fetch("/api/get-csrf-token");
+  //       const data = await response.json();
+  //       setCrsfToken(data.csrfToken);
+  //     } catch (error) {
+  //       console.error("Failed to fetch CSRF token:", error);
+  //     }
+  //   };
+
+  //   fetchCrsfToken();
+  // }, []);
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
 
   return (
-    <div className="flex items-center justify-center mb-0">
+    <div className="flex items-center justify-center mb-0 mt-20">
       <Card className="w-[24em]">
         <CardHeader>
           <CardTitle className="flex justify-center">
             <Image
               src={profilePic}
               alt="Home"
-              width={48}
-              height={48}
+              width={75}
+              height={75}
               // height={48}
               className="min-w-8"
               priority={true}
@@ -111,12 +152,7 @@ export default function SignInPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Input
-                        placeholder="csrfToken"
-                        type="hidden"
-                        defaultValue="abcdef"
-                        {...field}
-                      />
+                      <Input placeholder="csrfToken" type="hidden" {...field} />
                       {/* <CSRFInput /> */}
                     </FormControl>
                     {/* <FormDescription>TuneTrees user name.</FormDescription> */}
@@ -222,12 +258,13 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
-              <button
+              <Button
                 type="submit"
-                className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12 text-base font-light text-white rounded transition focus:ring-2 focus:ring-offset-2 focus:outline-none bg-zinc-800 hover:bg-zinc-900 focus:ring-zinc-800"
+                variant="secondary"
+                className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
               >
                 Sign Up
-              </button>
+              </Button>
             </form>
             <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
               <div className="flex-1 bg-neutral-300 h-[1px]" />
@@ -240,7 +277,10 @@ export default function SignInPage() {
         </CardContent>
         <CardFooter className="flex justify-between">
           {Object.values(providerMap)
-            .filter((provider) => provider.id !== "credentials")
+            .filter(
+              (provider) =>
+                provider.id !== "credentials" && provider.id !== "sendgrid",
+            )
             .map((provider) => (
               <form
                 key={provider.id}
@@ -259,10 +299,7 @@ export default function SignInPage() {
                   }
                 }}
               >
-                <Button
-                  type="submit"
-                  className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12 text-base font-light text-white rounded transition focus:ring-2 focus:ring-offset-2 focus:outline-none bg-zinc-800 hover:bg-zinc-900 focus:ring-zinc-800"
-                >
+                <Button type="submit" variant="secondary">
                   {provider.id === "github" && (
                     <>
                       <Icons.gitHub className="mr-2 h-4 w-4" />

@@ -28,8 +28,11 @@ export async function sendVerificationRequest(params: {
       from: { email: provider.from },
       subject: `Sign in to ${host}`,
       content: [
-        { type: "text/plain", value: text({ url, host }) },
-        { type: "text/html", value: html({ url, host, theme }) },
+        { type: "text/plain", value: verification_mail_text({ url, host }) },
+        {
+          type: "text/html",
+          value: verification_mail_html({ url, host, theme }),
+        },
       ],
     }),
   });
@@ -37,7 +40,7 @@ export async function sendVerificationRequest(params: {
   if (!res.ok) throw new Error(`Sendgrid error: ${await res.text()}`);
 }
 
-function html(params: {
+export function verification_mail_html(params: {
   url: string;
   host: string;
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
@@ -72,7 +75,7 @@ function html(params: {
         <table border="0" cellspacing="0" cellpadding="0">
           <tr>
             <td align="center" style="border-radius: 5px;" bgcolor="${color.buttonBackground}"><a href="${url}"
-                target="_blank"
+                target="_self"
                 style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${color.buttonText}; text-decoration: none; border-radius: 5px; padding: 10px 20px; border: 1px solid ${color.buttonBorder}; display: inline-block; font-weight: bold;">Sign
                 in</a></td>
           </tr>
@@ -91,6 +94,12 @@ function html(params: {
 }
 
 // Email Text body (fallback for email clients that don't render HTML, e.g. feature phones)
-function text({ url, host }: { url: string; host: string }) {
+export function verification_mail_text({
+  url,
+  host,
+}: {
+  url: string;
+  host: string;
+}) {
   return `Sign in to ${host}\n${url}\n\n`;
 }

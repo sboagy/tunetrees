@@ -467,6 +467,55 @@ By following these steps, you will be able to deploy the TuneTrees application l
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
+```mermaid
+flowchart LR
+    subgraph User Interface
+        A(Login Screen)
+    end
+    subgraph Authentication
+        B(Email/Password Login) --> C(Email Validation)
+        C --> D(Password Verification)
+        D --> E(Session Creation)
+        D --> F("Verification Token (Optional)")
+        B --> G("Social Login (Google, GitHub)")
+        G --> H(Redirect)
+        H --> I(Callback)
+        I --> J(Token Exchange)
+        J --> K(User Information)
+        K --> L(Create/Update User)
+        L --> M(Session Creation)
+    end
+    subgraph "Verification (Optional)"
+        F --> N(Email Verification)
+        N --> O(Verification Success)
+        N --> P(Verification Failure)
+    end
+    subgraph Password Setting
+        O --> Q(Password Input)
+        Q --> R(Password Hashing)
+        R --> S(Password Storage)
+    end
+    subgraph Session Management
+        M --> T(Session Cookie)
+        T --> U(Session Expiry)
+        U --> V(Session Check)
+        V --> W(Session Invalid)
+        W --> A
+    end
+    subgraph Password Change
+        X(Password Change) --> Y(Authentication)
+        Y --> Z(New Password)
+        Z --> AA(Password Validation)
+        AA --> BB(Password Update)
+    end
+    subgraph Error Handling
+        P --> CC(Verification Error)
+        W --> DD(Session Expired)
+        Y --> EE(Authentication Failure)
+        AA --> FF(Password Validation Failure)
+    end
+```
+
 ### 4.1. Mail verification mechanism
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
