@@ -29,7 +29,7 @@ export const getSessionAndUserSchema = z
   .nullable();
 
 export interface ExtendedAdapterUser extends AdapterUser {
-  hash: string;
+  hash?: string | null;
   view_settings?: string;
 }
 
@@ -47,6 +47,9 @@ export const getUserExtendedByEmailSchema =
   userExtendedAdapterSchema.nullable();
 
 function userSerializer(res: ExtendedAdapterUser | null) {
+  if (res === null) {
+    return null;
+  }
   let email_verified = null;
   if (res?.emailVerified) {
     email_verified = new Date(res.emailVerified);

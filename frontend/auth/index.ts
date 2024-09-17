@@ -35,20 +35,27 @@ import type {
   Session,
   User,
 } from "next-auth";
-import NextAuth from "next-auth";
+import NextAuth, { AuthError } from "next-auth";
 import "next-auth/jwt";
 
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import SendgridProvider from "next-auth/providers/sendgrid";
+import CredentialsProvider from "next-auth/providers/credentials";
 
 import { viewSettingsDefault } from "@/app/user-settings/view-settings-default";
-import { sendVerificationRequest } from "@/lib/authSendRequest";
+import {
+  sendVerificationRequest,
+  verification_mail_html,
+  verification_mail_text,
+} from "./authSendRequest";
 import type { Adapter, AdapterUser } from "next-auth/adapters";
 import type { JWT, JWTOptions } from "next-auth/jwt";
 import type { CredentialInput, Provider } from "next-auth/providers";
 import type { NextRequest } from "next/server";
 import { getUserExtendedByEmail, ttHttpAdapter } from "./auth_tt_adapter";
+import { matchPasswordWithHash } from "./password-match";
+import { sendGrid } from "./helpers";
 
 export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
   if (value === undefined || value === null) {
@@ -65,83 +72,141 @@ function logObject(obj: unknown, expand: boolean) {
 
 export const BASE_PATH = "/auth";
 
-const providers: Provider[] = [
-  // ===========================================================================================================
-  // Please do not delete this commented out code, at least for now.  It implements password-based authentication,
-  // which I'm not yet sure I want or not.  I'm keeping it here for possible future implementation.
-  // On way to do this would be to allow them to click on the email field, then give them a choice
-  // of logging in with a password if they set it, or logging in with email magic link if they did or didn't.
-  // Then a profile page could allow them to set a password if they want to, along with other profile settings.
-  // ===========================================================================================================
-  // CredentialsProvider({
-  //   // The name to display on the sign in form (e.g. "Sign in with...")
-  //   name: "Credentials",
-  //   // `credentials` is used to generate a form on the sign in page.
-  //   // You can specify which fields should be submitted, by adding keys to the `credentials` object.
-  //   // e.g. domain, username, password, 2FA token, etc.
-  //   // You can pass any HTML attribute to the <input> tag through the object.
-  //   credentials: {
-  //     email: {
-  //       label: "Email",
-  //       type: "text",
-  //       placeholder: "jsmith@example.com",
-  //     },
-  //     password: { label: "Password", type: "password" },
-  //   },
-  //   async authorize(credentials, req) {
-  //     //   assertIsDefined(ttHttpAdapter.getUserByEmail);
+export const providers: Provider[] = [
+  CredentialsProvider({
+    id: "credentials",
+    // The name to display on the sign in form (e.g. "Sign in with...")
+    name: "Email and Password",
+    // `credentials` is used to generate a form on the sign in page.
+    // You can specify which fields should be submitted, by adding keys to the `credentials` object.
+    // e.g. domain, username, password, 2FA token, etc.
+    // You can pass any HTML attribute to the <input> tag through the object.
+    credentials: {
+      email: {
+        label: "Email",
+        type: "text",
+        placeholder: "jsmith@example.com",
+        autofocus: true,
+      },
+      password: {
+        label: "Password",
+        type: "password",
+      },
+    },
+    async authorize(credentials, req) {
+      //   assertIsDefined(ttHttpAdapter.getUserByEmail);
 
-  //     let email = credentials.email as string;
+      const email = credentials.email as string;
 
-  //     let secret = process.env.NEXTAUTH_SECRET;
+      if (!email) {
+        throw new Error("Empty Email.");
+      }
 
-  //     // Unfortunately, this will strip off the hash
-  //     // let user = await ttHttpAdapter.getUserByEmail(email);
+      // const secret = process.env.NEXTAUTH_SECRET;
 
-  //     // So instead we use a customized variant
-  //     let user = await getUserExtendedByEmail(email);
+      // Unfortunately, this will strip off the hash
+      // let user = await ttHttpAdapter.getUserByEmail(email);
 
-  //     // const user = { id: "1", name: "J Smith", email: "jsmith@example.com" };
-  //     // debugger;
-  //     if (user) {
-  //       if (!credentials.password) {
-  //         throw new Error("Empty Password!");
-  //       }
-  //       let password = credentials.password as string;
-  //       let match = await matchPasswordWithHash(password, user.hash);
-  //       if (match) {
-  //         // Any object returned will be saved in `user` property of the JWT
-  //         return user;
-  //       } else {
-  //         // redirect("/auth/password-no-match");
-  //         // throw new Error("Password does not match");
-  //         throw new AuthError("Password does not match");
-  //         //   return null;
-  //       }
-  //     } else {
-  //       // No user found, so this is their first attempt to login
-  //       // meaning this is also the place you could do registration
-  //       // ...If you return null then an error will be displayed advising the user to check their details.
-  //       throw new Error("User not found.");
+      // So instead we use a customized variant
+      const user = await getUserExtendedByEmail(email);
 
-  //       // You can also Reject this callback with an Error thus the user will be sent to the error page with the error message as a query parameter
-  //     }
-  //   },
-  // }),
+      // psuedo-logic:
+      // is there any password set?  (if not, then this is a new user, goto "no" below, but with
+      //                              a null initial callback.)
+      // is there a hash?
+      //    yes:  does the password match the hash?
+      //         yes:  return the user object
+      //         no:   Inform the user that the password does not match.
+      //               (AuthError("Password does not match.") does not seem to work)
+      //    no:  new user, send email verification
+      //         on verification, make them repeat the password,
+      //                        using double entry to avoid typos, with first edit box filled in,
+      //                        and then hash it and save it.  This allows them to change their
+      //                        password to something new, if they want to.)
+      //
+      // Alternatives:
+      // 1.  Have a separate "Sign up" entry, that just has the email.  But this gets confusing
+      //     with single email sign-in.  Also, probably would also need the custom login page
+      //     for this.
+      //
+      // Issues:
+      // 1. What should be the best explanitory message for the user in the sign-in
+      //      dialog box?
+      // 2. How to set that message?  Do we need to go back to trying to get a custom
+      //    signin page to work?
+
+      const host = req.headers.get("host");
+
+      if (!user) {
+        // No user found, so this is their first attempt to login
+        // meaning this is also the place we can do registration
+        // ...If you return null then an error will be displayed advising the user to check their details.
+        await sendGrid({
+          to: email,
+          from: "admin@tunetrees.com",
+          subject: "Email Verification",
+          html: verification_mail_html({
+            url: `https://${host}/verify?email=${email}`,
+            host: `https://${host}`,
+            theme: { colorScheme: "auto", logo: "/logo4.png" },
+          }),
+          text: verification_mail_text({
+            url: `https://${host}/verify?email=${email}`,
+            host: `https://${host}:3000`,
+          }),
+          dynamicTemplateData: {
+            verificationLink: `https://${host}/verify?email=${credentials.email}`,
+          },
+        });
+      }
+
+      // const user = { id: "1", name: "J Smith", email: "jsmith@example.com" };
+      // debugger;
+      if (user) {
+        if (!credentials.password) {
+          throw new Error("Empty Password.");
+        }
+        const password = credentials.password as string;
+        if (user.hash === undefined || user.hash === null) {
+          throw new Error("No password hash found for user.");
+        }
+
+        if (user.emailVerified === null) {
+          throw new Error("User's email has not been verified.");
+        }
+
+        const match = await matchPasswordWithHash(password, user.hash);
+        if (match) {
+          // Any object returned will be saved in `user` property of the JWT
+          return user;
+        }
+        // redirect("/auth/password-no-match");
+        // throw new Error("Password does not match");
+        throw new AuthError("Password does not match.");
+      }
+      // No user found, so this is their first attempt to login
+      // meaning this is also the place you could do registration
+      // ...If you return null then an error will be displayed advising the user to check their details.
+      throw new Error("User not found.");
+    },
+  }),
 
   SendgridProvider({
+    id: "sendgrid",
     // If your environment variable is named differently than default
     apiKey: process.env.TT_AUTH_SENDGRID_API_KEY,
     from: "admin@tunetrees.com",
     name: "Email",
     sendVerificationRequest,
+    maxAge: 24 * 60 * 60, // How long the email verification link is valid for (default 24h)
   }),
 
   GitHubProvider({
     clientId: process.env.GITHUB_CLIENT_ID ?? "",
     clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
 
-    // allowDangerousEmailAccountLinking: true,
+    // See comment in the google provider config below.
+    allowDangerousEmailAccountLinking: true,
 
     authorization: {
       params: {
@@ -156,7 +221,16 @@ const providers: Provider[] = [
     clientId: process.env.GOOGLE_CLIENT_ID ?? "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
 
-    // allowDangerousEmailAccountLinking: true,
+    // This is enabled right now, not so I can link the email address
+    // to multiple providers, but so that logout/login works with social
+    // logins.  This is due to some strange behavior in nextauth's
+    // handleLoginOrRegister function, where the user is not logged in
+    // and it throws an error if the user is found via the getUserByEmail
+    // function in the adapter, with seemingly no way to catch and recover
+    // from the error.  This may be a bug in nextauth, or it may be a
+    // misunderstanding on my part of how to use it.  And it may become a
+    // non-issue if I can get the db to be used instead of the jwt.
+    allowDangerousEmailAccountLinking: true,
 
     authorization: {
       params: {
@@ -168,12 +242,25 @@ const providers: Provider[] = [
   }),
 ];
 
-export const providerMap = providers.map((provider) => {
-  if (typeof provider === "function") {
-    const providerData = provider();
-    return { id: providerData.id, name: providerData.name };
-  }
-  return { id: provider.id, name: provider.name };
+export type ProviderDict = {
+  id: string;
+  name: string;
+  type: string;
+  signinUrl: string;
+};
+
+export type ProviderMap = Array<ProviderDict>;
+
+export const providerMap: ProviderMap = providers.map((provider) => {
+  const providerData = typeof provider === "function" ? provider() : provider;
+
+  const signinUrl = "";
+  return {
+    id: providerData.id,
+    name: providerData.name,
+    type: providerData.type,
+    signinUrl: signinUrl,
+  };
 });
 
 const config = {
@@ -186,8 +273,9 @@ const config = {
   providers: providers,
   // skipCSRFCheck: skipCSRFCheck, // nope
   pages: {
+    verifyRequest: "/auth/verify-request",
     // Right now I can't get custom pages to work because of the csrf token issue.
-    // signIn: "/auth/login",
+    signIn: "/auth/login",
     // signOut: "/auth/signout",
     // error: "/auth/error", // Error code passed in query string as ?error=
     //   verifyRequest: "/auth/verify-request", // (used for check email message)
@@ -258,7 +346,8 @@ const config = {
       credentials?: Record<string, CredentialInput>;
     }) {
       // See https://next-auth.js.org/configuration/callbacks#sign-in-callback
-      console.log("callback: signIn -- ", logObject(params, false));
+      // console.log("callback: signIn -- ", logObject(params, false));
+      console.log("callback: signIn -- ", typeof params);
 
       // if (
       //   req.url?.includes("callback") &&
@@ -345,27 +434,27 @@ const config = {
 
       return params.token;
     },
-    // async redirect(params: {
-    //   /** URL provided as callback URL by the client */
-    //   url: string;
-    //   /** Default base URL of site (can be used as fallback) */
-    //   baseUrl: string;
-    // }) {
-    //   // See https://next-auth.js.org/configuration/callbacks#redirect-callback
-    //   console.log("redirect: jwt -- ", logObject(params, false));
-    //   return params.baseUrl;
-    // },
+    async redirect(params: {
+      /** URL provided as callback URL by the client */
+      url: string;
+      /** Default base URL of site (can be used as fallback) */
+      baseUrl: string;
+    }) {
+      // See https://next-auth.js.org/configuration/callbacks#redirect-callback
+      console.log("redirect callback: -- ", logObject(params, true));
+      return params.baseUrl;
+    },
     async session(params: {
       session: Session & { userId?: string; view_settings?: string };
       token: JWT & { user_id?: string; view_settings?: string };
       user: User | AdapterUser;
     }) {
-      // console.log(
-      //   "callback: session -- ",
-      //   logObject(params.session, false),
-      //   params.token,
-      //   params.user,
-      // );
+      console.log(
+        "callback: session -- ",
+        logObject(params.session, false),
+        params.token,
+        params.user,
+      );
 
       params.session.userId = params.token.user_id as string;
       if (params.session.user) {
@@ -409,8 +498,8 @@ const config = {
   // experimental: {
   //   enableWebAuthn: true,
   // },
-  // debug: process.env.NODE_ENV !== "production",
-  debug: true,
+  debug: process.env.NODE_ENV !== "production",
+  // debug: true,
 } satisfies NextAuthConfig;
 
 const nextAuth = NextAuth(config);

@@ -4,7 +4,9 @@ import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 
 import {
+  DemoUser,
   ManagePlaylistMenuItem,
+  NewUser,
   SignIn,
   SignOut,
   UserSettingsMenuItem,
@@ -37,10 +39,10 @@ export default async function UserButton() {
     return (
       <div className="flex gap-2 items-center">
         <SignIn />
-        {/* For right now I think that new user login may just be part of the login flow */}
-        {/* <NewUser/> */}
-        {/* And demo user may also be just another login button?  Or should it be more obviously visible? */}
-        {/* <DemoUser /> */}
+        {/* <span className="text-muted-foreground">or</span> */}
+        <NewUser />
+        {/* <span className="text-muted-foreground">or</span> */}
+        <DemoUser />
         <ModeToggle />
         {/* <ThemePanel /> */}
       </div>

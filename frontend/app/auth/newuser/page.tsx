@@ -1,10 +1,8 @@
 "use client";
 
-import { providerMap, signIn } from "@/auth";
 import Image from "next/image";
 import profilePic from "/public/logo4.png";
 
-import { Icons } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -17,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 // import { useSession } from "next-auth/react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 // import { cookies } from "next/headers";
@@ -34,7 +32,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { newUser } from "./newuser-action";
+import { useRouter } from "next/navigation";
+import { newUser } from "./newuser-actions";
+import { emailSchema, type LoginDialogProps } from "../login/page";
+import { getUser } from "../password-login-only/validate-signin";
+import { SocialLoginButtons } from "@/components/auth-social-login";
+import { providerMap } from "@/auth";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const languages = [
@@ -51,19 +54,130 @@ const languages = [
 
 // const _crsfToken = client
 
-export default function SignInPage() {
+export default function SignInPage({ email = "" }: LoginDialogProps) {
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
     defaultValues,
   });
 
-  // const [password, setPassword] = useState("");
+  if (email === "" && typeof window !== "undefined") {
+    const searchParams = new URLSearchParams(window.location.search);
+    email = searchParams.get("email") || email;
+  }
 
-  const onSubmit = useCallback(async (data: AccountFormValues) => {
-    const result = await newUser(data);
-    console.log(result);
-    // do something with result
+  const [user_email, setUserEmail] = useState(email);
+  const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordConfirmationError, setPasswordConfirmationError] = useState<
+    string | null
+  >(null);
+  const [user_name, setUserName] = useState("");
+
+  const validateEmail = useCallback((email: string): boolean => {
+    if (email === "") {
+      // setEmailError("Email cannot be empty");
+      setEmailError(null);
+      return false;
+    }
+
+    // TODO: implement token validation logic
+    const result = emailSchema.safeParse(email);
+    if (!result.success) {
+      setEmailError(result.error.issues[0].message);
+      return false;
+    }
+    setEmailError(null);
+    return true;
   }, []);
+
+  useEffect(() => {
+    validateEmail(email);
+  }, [email, validateEmail]);
+
+  const handleEmailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setUserEmail(newEmail);
+    validateEmail(newEmail);
+
+    const user = await getUser(newEmail);
+    if (user) {
+      setEmailError("Email already in use");
+    }
+    form.setValue("email", newEmail);
+  };
+
+  function check_password(pw: string, pwc: string) {
+    if (!pw || !pwc) {
+      setPasswordError(null);
+      setPasswordConfirmationError(null);
+    } else if (pw === pwc) {
+      setPasswordError(null);
+      setPasswordConfirmationError(null);
+    } else {
+      // setPasswordError("Password confirmation does not match");
+      setPasswordConfirmationError("Passwords do not match");
+    }
+  }
+
+  const handlePasswordChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const pw = e.target.value;
+    setPassword(pw);
+    check_password(pw, passwordConfirmation);
+    form.trigger("password");
+    form.setValue("password", pw);
+    // form.trigger("password");
+  };
+
+  const handlePasswordConfirmationChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const pwc = e.target.value;
+    setPasswordConfirmation(pwc);
+    check_password(password, pwc);
+    form.setValue("password_confirmation", pwc);
+    // form.trigger("password_confirmation");
+  };
+
+  const handleUserNameChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const user_name_value = e.target.value;
+    setUserName(user_name_value);
+    form.setValue("name", user_name_value);
+    // form.trigger("password_confirmation");
+  };
+
+  // if I don't get the router via useState, I get a huge error,
+  // but, I don't need or want to call setRouter, so this seems
+  // really goofy.  There must be a better way.
+  const [router, setRouter] = useState(useRouter());
+  console.log("SignInPage(): setRouter: ", setRouter);
+
+  const onSubmit = useCallback(
+    async (data: AccountFormValues) => {
+      const host = window.location.host;
+      // const response = await fetch("/api/user", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ data, host }),
+      // });
+
+      const result = await newUser(data, host);
+
+      // const result = await response.json();
+      console.log(result);
+
+      router.push("/auth/verify-request");
+
+      // Redirect to a success page or handle the result as needed
+      // redirect("/auth/verify-request");
+    },
+    [router],
+  );
 
   // function onSubmit(data: AccountFormValues) {
   //   console.log("In onSubmit in the newuser page", { data });
@@ -77,21 +191,41 @@ export default function SignInPage() {
   //   });
   // }
 
+  // const { data: session } = useSession
+  // console.log("SignInPage(): session
+  // console.log("SignInPage(): session
+  // console.log("SignInPage(): session
+  // console.log("SignInPage(): session
+
   // let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
-  const _crsfToken = "abcdef";
-  // const _crsfToken = getCsrfToken();
+  const [_crsfToken, setCrsfToken] = useState("abcdef");
+  console.log("SignInPage(): setCrsfToken:", setCrsfToken);
+
+  // useEffect(() => {
+  //   const fetchCrsfToken = async () => {
+  //     try {
+  //       const response = await fetch("/api/get-csrf-token");
+  //       const data = await response.json();
+  //       setCrsfToken(data.csrfToken);
+  //     } catch (error) {
+  //       console.error("Failed to fetch CSRF token:", error);
+  //     }
+  //   };
+
+  //   fetchCrsfToken();
+  // }, []);
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
 
   return (
-    <div className="flex items-center justify-center mb-0">
+    <div className="flex items-center justify-center mb-0 mt-20">
       <Card className="w-[24em]">
         <CardHeader>
           <CardTitle className="flex justify-center">
             <Image
               src={profilePic}
               alt="Home"
-              width={48}
-              height={48}
+              width={75}
+              height={75}
               // height={48}
               className="min-w-8"
               priority={true}
@@ -111,12 +245,7 @@ export default function SignInPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Input
-                        placeholder="csrfToken"
-                        type="hidden"
-                        defaultValue="abcdef"
-                        {...field}
-                      />
+                      <Input placeholder="csrfToken" type="hidden" {...field} />
                       {/* <CSRFInput /> */}
                     </FormControl>
                     {/* <FormDescription>TuneTrees user name.</FormDescription> */}
@@ -124,19 +253,6 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
-              {/* <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="username" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              /> */}
               <FormField
                 control={form.control}
                 name="email"
@@ -144,7 +260,11 @@ export default function SignInPage() {
                   <FormItem>
                     <FormLabel>EMail</FormLabel>
                     <FormControl>
-                      <Input placeholder="person@example.com" {...field} />
+                      <Input
+                        placeholder="person@example.com"
+                        {...field}
+                        onChange={handleEmailChange}
+                      />
                     </FormControl>
                     {/* <FormDescription>
                       Must be a valid email address.
@@ -153,6 +273,11 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
+              {emailError && (
+                <p className="text-red-500 text-sm" role="alert">
+                  {emailError}
+                </p>
+              )}
               <FormField
                 control={form.control}
                 name="password"
@@ -170,6 +295,7 @@ export default function SignInPage() {
                         placeholder="password"
                         autoComplete="new-password"
                         {...field}
+                        onChange={handlePasswordChange}
                       />
                     </FormControl>
                     {/* <FormDescription>
@@ -179,6 +305,11 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
+              {passwordError && (
+                <p className="text-red-500 text-sm" role="alert">
+                  {passwordError}
+                </p>
+              )}
               <FormField
                 control={form.control}
                 name="password_confirmation"
@@ -196,6 +327,7 @@ export default function SignInPage() {
                         placeholder="repeat password"
                         autoComplete="new-password"
                         {...field}
+                        onChange={handlePasswordConfirmationChange}
                       />
                     </FormControl>
                     {/* <FormDescription>
@@ -205,6 +337,11 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
+              {passwordConfirmationError && (
+                <p className="text-red-500 text-sm" role="alert">
+                  {passwordConfirmationError}
+                </p>
+              )}
               <FormField
                 control={form.control}
                 name="name"
@@ -212,7 +349,11 @@ export default function SignInPage() {
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Your name" {...field} />
+                      <Input
+                        placeholder="Your name"
+                        {...field}
+                        onChange={handleUserNameChange}
+                      />
                     </FormControl>
                     {/* <FormDescription>
                       This is the name that will be displayed on your profile
@@ -222,12 +363,22 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
-              <button
+              <Button
                 type="submit"
-                className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12 text-base font-light text-white rounded transition focus:ring-2 focus:ring-offset-2 focus:outline-none bg-zinc-800 hover:bg-zinc-900 focus:ring-zinc-800"
+                variant="secondary"
+                disabled={
+                  !!emailError ||
+                  !!passwordError ||
+                  !!passwordConfirmationError ||
+                  !password ||
+                  !passwordConfirmation ||
+                  !user_email ||
+                  !user_name
+                }
+                className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
               >
                 Sign Up
-              </button>
+              </Button>
             </form>
             <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
               <div className="flex-1 bg-neutral-300 h-[1px]" />
@@ -239,58 +390,7 @@ export default function SignInPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex justify-between">
-          {Object.values(providerMap)
-            .filter((provider) => provider.id !== "credentials")
-            .map((provider) => (
-              <form
-                key={provider.id}
-                action={(formData) => {
-                  console.log("credentials button pushed: %s", formData);
-                  if (provider.id === "credentials") {
-                    console.log("credentials button pushed");
-                    console.log(formData);
-                    signIn(provider.id, {
-                      redirectTo: "/",
-                      username: formData.get("username"),
-                      password: formData.get("password"),
-                    });
-                  } else {
-                    signIn(provider.id, { redirectTo: "/" });
-                  }
-                }}
-              >
-                <Button
-                  type="submit"
-                  className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12 text-base font-light text-white rounded transition focus:ring-2 focus:ring-offset-2 focus:outline-none bg-zinc-800 hover:bg-zinc-900 focus:ring-zinc-800"
-                >
-                  {provider.id === "github" && (
-                    <>
-                      <Icons.gitHub className="mr-2 h-4 w-4" />
-                      Github
-                    </>
-                  )}
-                  {provider.id === "google" && (
-                    <>
-                      <Icons.google className="mr-2 h-4 w-4" />
-                      google
-                    </>
-                  )}
-                  {/* <span>Sign in with {provider.name}</span> */}
-                </Button>
-              </form>
-            ))}
-          {/* <Button variant="outline">Cancel</Button>
-          <Button>Deploy</Button> */}
-          {/* <div className="grid grid-cols-2 gap-6">
-            <Button variant="outline">
-              <Icons.gitHub className="mr-2 h-4 w-4" />
-              Github
-            </Button>
-            <Button variant="outline">
-              <Icons.google className="mr-2 h-4 w-4" />
-              Google
-            </Button>
-          </div> */}
+          {SocialLoginButtons(providerMap)}
         </CardFooter>
       </Card>
     </div>

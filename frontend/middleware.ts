@@ -8,8 +8,12 @@ export default auth((req) => {
   // const forwardedFor = req.headers["x-forwarded-for"];
   // const protocol = req.headers["x-forwarded-proto"];
 
+  // const current_href = window.location.href;
+  // console.log("middleware: current_href: %s", current_href);
+
   const reqUrl = new URL(req.url);
   console.log("middleware: reqUrl: %s", reqUrl);
+  console.log("what now? (middleware)");
   // console.log("middleware: %s, auth: ", reqUrl, req.auth);
   // console.log("forwardedFor:", forwardedFor);
   // console.log("protocol:", protocol);

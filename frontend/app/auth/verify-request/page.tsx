@@ -22,6 +22,20 @@ const VerifyRequest: React.FC = () => {
   //   );
   // }
 
+  // useEffect(() => {
+  //   // Your JavaScript snippet here
+  //   console.log(
+  //     "VerifyRequest (1), window.location.href: %s",
+  //     window.location.href,
+  //   );
+  //   // window.location.href = "https://localhost:3000";
+  //   // You can add any other JavaScript code you need to run on page load
+  //   console.log(
+  //     "VerifyRequest (2), changed window.location.href: %s",
+  //     window.location.href,
+  //   );
+  // }, []); // Empty dependency array ensures this runs only once on mount
+
   return (
     <div>
       <Head>
