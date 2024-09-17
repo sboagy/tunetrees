@@ -11,9 +11,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
-import { authorizeWithPassword } from "./validate-signin";
+import { z } from "zod";
 import axios from "axios";
-import { emailSchema, type LoginDialogProps } from "../login/page";
+import { authorizeWithPassword } from "../password-login-only/validate-signin";
+import { SocialLoginButtons } from "@/components/auth-social-login";
+import { providerMap } from "@/auth";
+
+export const emailSchema = z.string().email("Invalid email address");
+
+export interface LoginDialogProps {
+  email?: string;
+}
 
 export default function LoginDialog({ email = "" }: LoginDialogProps) {
   if (email === "" && typeof window !== "undefined") {
@@ -27,6 +35,11 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const validateEmail = useCallback((email: string): boolean => {
+    if (email === "") {
+      // setEmailError("Email cannot be empty");
+      setEmailError(null);
+      return false;
+    }
     // TODO: implement token validation logic
     const result = emailSchema.safeParse(email);
     if (!result.success) {
@@ -135,7 +148,6 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoFocus
                   required
                 />
                 {passwordError && (
@@ -145,17 +157,25 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
                 )}
               </div>
             </form>
-          </CardContent>
-          <CardFooter>
             <Button
               className="w-full"
               type="submit"
               onClick={handleSubmit}
               disabled={!!emailError}
-              variant="outline"
+              variant="secondary"
             >
               Sign In
             </Button>
+            <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
+              <div className="flex-1 bg-neutral-300 h-[1px]" />
+              <span className="text-xs leading-4 uppercase text-neutral-500">
+                or sign in with
+              </span>
+              <div className="flex-1 bg-neutral-300 h-[1px]" />
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            {SocialLoginButtons(providerMap)}
           </CardFooter>
         </Card>
       </div>

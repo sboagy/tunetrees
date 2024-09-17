@@ -1,6 +1,6 @@
 "use server";
 // import type { NextApiRequest, NextApiResponse } from "next";
-import { newUser } from "../../auth/newuser/newuser-action";
+import { newUser } from "../../auth/newuser/newuser-actions";
 
 import { type NextRequest, NextResponse } from "next/server";
 

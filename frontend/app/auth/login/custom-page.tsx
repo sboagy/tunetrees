@@ -1,6 +1,7 @@
 // Not used at the moment.  -sb
 
-import { providerMap, signIn } from "@/auth";
+import { signIn } from "@/auth";
+import { providerMap } from "@/auth/provider-map";
 import Image from "next/image";
 // import { cookies } from "next/headers";
 import { CSRFInput } from "../../../components/csrf_token";

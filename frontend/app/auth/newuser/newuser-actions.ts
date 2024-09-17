@@ -92,22 +92,25 @@ export const newUser = async (data: AccountFormValues, host: string) => {
   // const email_to = email;
   const email_to = "sboagy@gmail.com";
 
+  // const linkBackURL = `https://${host}/api/verify-user?email=${email}&password=${data.password}`;
+  const linkBackURL = `https://${host}/auth/password-login-only?email=${email}`;
+
   const send_grid_response = await sendGrid({
     to: email_to,
     from: "admin@tunetrees.com",
     subject: "Email Verification",
     html: verification_mail_html({
-      url: `https://${host}/api/verify-user?email=${email}&password=${data.password}`,
+      url: linkBackURL,
       host: `https://${host}`,
       theme: { colorScheme: "auto", logo: "/logo4.png" },
     }),
     text: verification_mail_text({
-      url: `https://${host}/api/verify-user?email=${email}&password=${data.password}`,
+      url: linkBackURL,
       host: `https://${host}:3000`,
     }),
-    dynamicTemplateData: {
-      verificationLink: `https://${host}/api/verify-user?email=${email}&password=${data.password}`,
-    },
+    // dynamicTemplateData: {
+    //   verificationLink: linkBackURL,
+    // },
   });
   console.log("Email sent:", send_grid_response);
 

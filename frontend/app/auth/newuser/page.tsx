@@ -1,10 +1,8 @@
 "use client";
 
-import { providerMap, signIn } from "@/auth";
 import Image from "next/image";
 import profilePic from "/public/logo4.png";
 
-import { Icons } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -17,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 // import { useSession } from "next-auth/react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 // import { cookies } from "next/headers";
@@ -35,7 +33,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
-import { newUser } from "./newuser-action";
+import { newUser } from "./newuser-actions";
+import { emailSchema, type LoginDialogProps } from "../login/page";
+import { getUser } from "../password-login-only/validate-signin";
+import { SocialLoginButtons } from "@/components/auth-social-login";
+import { providerMap } from "@/auth";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const languages = [
@@ -52,11 +54,102 @@ const languages = [
 
 // const _crsfToken = client
 
-export default function SignInPage() {
+export default function SignInPage({ email = "" }: LoginDialogProps) {
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
     defaultValues,
   });
+
+  if (email === "" && typeof window !== "undefined") {
+    const searchParams = new URLSearchParams(window.location.search);
+    email = searchParams.get("email") || email;
+  }
+
+  const [user_email, setUserEmail] = useState(email);
+  const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordConfirmationError, setPasswordConfirmationError] = useState<
+    string | null
+  >(null);
+  const [user_name, setUserName] = useState("");
+
+  const validateEmail = useCallback((email: string): boolean => {
+    if (email === "") {
+      // setEmailError("Email cannot be empty");
+      setEmailError(null);
+      return false;
+    }
+
+    // TODO: implement token validation logic
+    const result = emailSchema.safeParse(email);
+    if (!result.success) {
+      setEmailError(result.error.issues[0].message);
+      return false;
+    }
+    setEmailError(null);
+    return true;
+  }, []);
+
+  useEffect(() => {
+    validateEmail(email);
+  }, [email, validateEmail]);
+
+  const handleEmailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setUserEmail(newEmail);
+    validateEmail(newEmail);
+
+    const user = await getUser(newEmail);
+    if (user) {
+      setEmailError("Email already in use");
+    }
+    form.setValue("email", newEmail);
+  };
+
+  function check_password(pw: string, pwc: string) {
+    if (!pw || !pwc) {
+      setPasswordError(null);
+      setPasswordConfirmationError(null);
+    } else if (pw === pwc) {
+      setPasswordError(null);
+      setPasswordConfirmationError(null);
+    } else {
+      // setPasswordError("Password confirmation does not match");
+      setPasswordConfirmationError("Passwords do not match");
+    }
+  }
+
+  const handlePasswordChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const pw = e.target.value;
+    setPassword(pw);
+    check_password(pw, passwordConfirmation);
+    form.trigger("password");
+    form.setValue("password", pw);
+    // form.trigger("password");
+  };
+
+  const handlePasswordConfirmationChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const pwc = e.target.value;
+    setPasswordConfirmation(pwc);
+    check_password(password, pwc);
+    form.setValue("password_confirmation", pwc);
+    // form.trigger("password_confirmation");
+  };
+
+  const handleUserNameChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const user_name_value = e.target.value;
+    setUserName(user_name_value);
+    form.setValue("name", user_name_value);
+    // form.trigger("password_confirmation");
+  };
 
   // if I don't get the router via useState, I get a huge error,
   // but, I don't need or want to call setRouter, so this seems
@@ -160,19 +253,6 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
-              {/* <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="username" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              /> */}
               <FormField
                 control={form.control}
                 name="email"
@@ -180,7 +260,11 @@ export default function SignInPage() {
                   <FormItem>
                     <FormLabel>EMail</FormLabel>
                     <FormControl>
-                      <Input placeholder="person@example.com" {...field} />
+                      <Input
+                        placeholder="person@example.com"
+                        {...field}
+                        onChange={handleEmailChange}
+                      />
                     </FormControl>
                     {/* <FormDescription>
                       Must be a valid email address.
@@ -189,6 +273,11 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
+              {emailError && (
+                <p className="text-red-500 text-sm" role="alert">
+                  {emailError}
+                </p>
+              )}
               <FormField
                 control={form.control}
                 name="password"
@@ -206,6 +295,7 @@ export default function SignInPage() {
                         placeholder="password"
                         autoComplete="new-password"
                         {...field}
+                        onChange={handlePasswordChange}
                       />
                     </FormControl>
                     {/* <FormDescription>
@@ -215,6 +305,11 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
+              {passwordError && (
+                <p className="text-red-500 text-sm" role="alert">
+                  {passwordError}
+                </p>
+              )}
               <FormField
                 control={form.control}
                 name="password_confirmation"
@@ -232,6 +327,7 @@ export default function SignInPage() {
                         placeholder="repeat password"
                         autoComplete="new-password"
                         {...field}
+                        onChange={handlePasswordConfirmationChange}
                       />
                     </FormControl>
                     {/* <FormDescription>
@@ -241,6 +337,11 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
+              {passwordConfirmationError && (
+                <p className="text-red-500 text-sm" role="alert">
+                  {passwordConfirmationError}
+                </p>
+              )}
               <FormField
                 control={form.control}
                 name="name"
@@ -248,7 +349,11 @@ export default function SignInPage() {
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Your name" {...field} />
+                      <Input
+                        placeholder="Your name"
+                        {...field}
+                        onChange={handleUserNameChange}
+                      />
                     </FormControl>
                     {/* <FormDescription>
                       This is the name that will be displayed on your profile
@@ -261,6 +366,15 @@ export default function SignInPage() {
               <Button
                 type="submit"
                 variant="secondary"
+                disabled={
+                  !!emailError ||
+                  !!passwordError ||
+                  !!passwordConfirmationError ||
+                  !password ||
+                  !passwordConfirmation ||
+                  !user_email ||
+                  !user_name
+                }
                 className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
               >
                 Sign Up
@@ -276,58 +390,7 @@ export default function SignInPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex justify-between">
-          {Object.values(providerMap)
-            .filter(
-              (provider) =>
-                provider.id !== "credentials" && provider.id !== "sendgrid",
-            )
-            .map((provider) => (
-              <form
-                key={provider.id}
-                action={(formData) => {
-                  console.log("credentials button pushed: %s", formData);
-                  if (provider.id === "credentials") {
-                    console.log("credentials button pushed");
-                    console.log(formData);
-                    signIn(provider.id, {
-                      redirectTo: "/",
-                      username: formData.get("username"),
-                      password: formData.get("password"),
-                    });
-                  } else {
-                    signIn(provider.id, { redirectTo: "/" });
-                  }
-                }}
-              >
-                <Button type="submit" variant="secondary">
-                  {provider.id === "github" && (
-                    <>
-                      <Icons.gitHub className="mr-2 h-4 w-4" />
-                      Github
-                    </>
-                  )}
-                  {provider.id === "google" && (
-                    <>
-                      <Icons.google className="mr-2 h-4 w-4" />
-                      google
-                    </>
-                  )}
-                  {/* <span>Sign in with {provider.name}</span> */}
-                </Button>
-              </form>
-            ))}
-          {/* <Button variant="outline">Cancel</Button>
-          <Button>Deploy</Button> */}
-          {/* <div className="grid grid-cols-2 gap-6">
-            <Button variant="outline">
-              <Icons.gitHub className="mr-2 h-4 w-4" />
-              Github
-            </Button>
-            <Button variant="outline">
-              <Icons.google className="mr-2 h-4 w-4" />
-              Google
-            </Button>
-          </div> */}
+          {SocialLoginButtons(providerMap)}
         </CardFooter>
       </Card>
     </div>

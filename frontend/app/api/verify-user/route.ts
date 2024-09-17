@@ -1,5 +1,5 @@
 "use server";
-import { getUserExtendedByEmail, ttHttpAdapter } from "@/auth/auth_tt_adapter";
+import { getUserExtendedByEmail } from "@/auth/auth_tt_adapter";
 import { signIn } from "auth";
 import axios from "axios";
 // import type { NextApiRequest, NextApiResponse } from "next";
@@ -54,7 +54,8 @@ export async function GET(req: NextRequest) {
       { message: `User not found for email: ${email}` },
       { status: 404 },
     );
-  } else if (user.emailVerified === null) {
+  }
+  if (user.emailVerified === null) {
     user.emailVerified = new Date();
     const stringify_user = JSON.stringify(user);
 
@@ -72,9 +73,8 @@ export async function GET(req: NextRequest) {
 
   await signIn("credentials", {
     email,
-    password: password,
+    password,
     callbackUrl: "http://localhost:3000",
-    emailVerified: true,
   });
   return NextResponse.json({ message: "ok" }, { status: 200 });
 }

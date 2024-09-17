@@ -56,7 +56,6 @@ import type { NextRequest } from "next/server";
 import { getUserExtendedByEmail, ttHttpAdapter } from "./auth_tt_adapter";
 import { matchPasswordWithHash } from "./password-match";
 import { sendGrid } from "./helpers";
-import { boolean } from "zod";
 
 export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
   if (value === undefined || value === null) {
@@ -73,7 +72,7 @@ function logObject(obj: unknown, expand: boolean) {
 
 export const BASE_PATH = "/auth";
 
-const providers: Provider[] = [
+export const providers: Provider[] = [
   CredentialsProvider({
     id: "credentials",
     // The name to display on the sign in form (e.g. "Sign in with...")
@@ -206,7 +205,8 @@ const providers: Provider[] = [
     clientId: process.env.GITHUB_CLIENT_ID ?? "",
     clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
 
-    // allowDangerousEmailAccountLinking: true,
+    // See comment in the google provider config below.
+    allowDangerousEmailAccountLinking: true,
 
     authorization: {
       params: {
@@ -221,7 +221,16 @@ const providers: Provider[] = [
     clientId: process.env.GOOGLE_CLIENT_ID ?? "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
 
-    // allowDangerousEmailAccountLinking: true,
+    // This is enabled right now, not so I can link the email address
+    // to multiple providers, but so that logout/login works with social
+    // logins.  This is due to some strange behavior in nextauth's
+    // handleLoginOrRegister function, where the user is not logged in
+    // and it throws an error if the user is found via the getUserByEmail
+    // function in the adapter, with seemingly no way to catch and recover
+    // from the error.  This may be a bug in nextauth, or it may be a
+    // misunderstanding on my part of how to use it.  And it may become a
+    // non-issue if I can get the db to be used instead of the jwt.
+    allowDangerousEmailAccountLinking: true,
 
     authorization: {
       params: {
@@ -233,12 +242,25 @@ const providers: Provider[] = [
   }),
 ];
 
-export const providerMap = providers.map((provider) => {
-  if (typeof provider === "function") {
-    const providerData = provider();
-    return { id: providerData.id, name: providerData.name };
-  }
-  return { id: provider.id, name: provider.name };
+export type ProviderDict = {
+  id: string;
+  name: string;
+  type: string;
+  signinUrl: string;
+};
+
+export type ProviderMap = Array<ProviderDict>;
+
+export const providerMap: ProviderMap = providers.map((provider) => {
+  const providerData = typeof provider === "function" ? provider() : provider;
+
+  const signinUrl = "";
+  return {
+    id: providerData.id,
+    name: providerData.name,
+    type: providerData.type,
+    signinUrl: signinUrl,
+  };
 });
 
 const config = {
@@ -253,11 +275,11 @@ const config = {
   pages: {
     verifyRequest: "/auth/verify-request",
     // Right now I can't get custom pages to work because of the csrf token issue.
-    // signIn: "/auth/login",
+    signIn: "/auth/login",
     // signOut: "/auth/signout",
     // error: "/auth/error", // Error code passed in query string as ?error=
     //   verifyRequest: "/auth/verify-request", // (used for check email message)
-    newUser: "/auth/newuser", // New users will be directed here on first sign in (leave the property out if not of interest)
+    // newUser: "/auth/newuser", // New users will be directed here on first sign in (leave the property out if not of interest)
   },
   theme: {
     colorScheme: "auto", // "auto" | "dark" | "light"
@@ -324,7 +346,8 @@ const config = {
       credentials?: Record<string, CredentialInput>;
     }) {
       // See https://next-auth.js.org/configuration/callbacks#sign-in-callback
-      console.log("callback: signIn -- ", logObject(params, false));
+      // console.log("callback: signIn -- ", logObject(params, false));
+      console.log("callback: signIn -- ", typeof params);
 
       // if (
       //   req.url?.includes("callback") &&
@@ -411,16 +434,16 @@ const config = {
 
       return params.token;
     },
-    // async redirect(params: {
-    //   /** URL provided as callback URL by the client */
-    //   url: string;
-    //   /** Default base URL of site (can be used as fallback) */
-    //   baseUrl: string;
-    // }) {
-    //   // See https://next-auth.js.org/configuration/callbacks#redirect-callback
-    //   console.log("redirect: jwt -- ", logObject(params, false));
-    //   return params.baseUrl;
-    // },
+    async redirect(params: {
+      /** URL provided as callback URL by the client */
+      url: string;
+      /** Default base URL of site (can be used as fallback) */
+      baseUrl: string;
+    }) {
+      // See https://next-auth.js.org/configuration/callbacks#redirect-callback
+      console.log("redirect callback: -- ", logObject(params, true));
+      return params.baseUrl;
+    },
     async session(params: {
       session: Session & { userId?: string; view_settings?: string };
       token: JWT & { user_id?: string; view_settings?: string };

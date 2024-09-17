@@ -10,8 +10,8 @@ export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
         "use server";
         // const session = await auth();
         console.log("Handling SignIn request");
-        await signIn();
-        // redirect("/auth/login");
+        // await signIn();
+        redirect("/auth/login");
       }}
     >
       <Button variant="outline" {...props}>

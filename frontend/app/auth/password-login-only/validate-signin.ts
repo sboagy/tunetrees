@@ -1,7 +1,41 @@
 "use server";
 
-import { getUserExtendedByEmail } from "@/auth/auth_tt_adapter";
+import {
+  getUserExtendedByEmail,
+  type ExtendedAdapterUser,
+} from "@/auth/auth_tt_adapter";
 import { matchPasswordWithHash } from "@/auth/password-match";
+import axios from "axios";
+
+const _baseURL = process.env.NEXT_BASE_URL;
+
+export async function updateUserEmailVerification(user: ExtendedAdapterUser) {
+  user.emailVerified = new Date();
+  const stringify_user = JSON.stringify(user);
+
+  const update_user_response = await axios.patch(
+    `${_baseURL}/auth/update-user/`,
+    stringify_user,
+    {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  console.log("update_user_response: ", update_user_response);
+}
+
+export async function getUser(
+  email: string,
+): Promise<ExtendedAdapterUser | null> {
+  if (!email) {
+    throw new Error("Empty Email.");
+  }
+
+  const user = await getUserExtendedByEmail(email);
+
+  return user;
+}
 
 export async function authorizeWithPassword(email: string, password: string) {
   //   assertIsDefined(ttHttpAdapter.getUserByEmail);

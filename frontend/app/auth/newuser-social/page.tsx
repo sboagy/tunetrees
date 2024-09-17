@@ -1,6 +1,7 @@
 "use client";
 
-import { providerMap, signIn } from "@/auth";
+import { signIn } from "@/auth";
+import { providerMap } from "@/auth/provider-map";
 import Image from "next/image";
 import profilePic from "/public/logo4.png";
 
