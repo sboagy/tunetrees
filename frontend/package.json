@@ -53,7 +53,7 @@
     "formik": "^2.4.6",
     "gts": "^5.3.1",
     "lucide-react": "^0.437.0",
-    "next": "^14.2.11",
+    "next": "^14.2.12",
     "next-auth": "^5.0.0-beta.20",
     "next-auth-http-adapter": "^0.3.0",
     "next-themes": "^0.3.0",

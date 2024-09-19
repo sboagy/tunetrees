@@ -345,7 +345,7 @@ def delete_table_transient_data(
     tune_id: Annotated[
         int,
         Path(
-            description="The tune id that corresponds to a tune data being staged",
+            description="The tune id that corresponds to a tune data being staged, use -1 for all tunes",
         ),
     ],
     playlist_id: Annotated[
@@ -364,23 +364,35 @@ def delete_table_transient_data(
 ):
     db = SessionLocal()
     try:
-        table_transient_data = (
-            db.query(TableTransientData)
-            .filter_by(
-                user_id=user_id,
-                tune_id=tune_id,
-                playlist_id=playlist_id,
-                purpose=purpose,
+        if tune_id == -1:
+            table_transient_data = (
+                db.query(TableTransientData)
+                .filter_by(
+                    user_id=user_id,
+                    playlist_id=playlist_id,
+                    purpose=purpose,
+                )
+                .delete()
             )
-            .first()
-        )
-
-        if not table_transient_data:
-            raise HTTPException(
-                status_code=404, detail="Table transient data not found"
+        else:
+            table_transient_data = (
+                db.query(TableTransientData)
+                .filter_by(
+                    user_id=user_id,
+                    tune_id=tune_id,
+                    playlist_id=playlist_id,
+                    purpose=purpose,
+                )
+                .first()
             )
 
-        db.delete(table_transient_data)
+            if not table_transient_data:
+                raise HTTPException(
+                    status_code=404, detail="Table transient data not found"
+                )
+
+            db.delete(table_transient_data)
+
         db.commit()
         return {"status": "success", "code": 204}
     except Exception as e:

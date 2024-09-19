@@ -3,12 +3,12 @@
 import { Button } from "@/components/ui/button";
 import type { Table as TanstackTable } from "@tanstack/react-table";
 import { useState } from "react";
-import { submitPracticeFeedback } from "../commands";
-import { getPracticeListScheduled } from "../queries";
+import { submitPracticeFeedbacks, type TuneUpdate } from "../commands";
 import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import TunesGrid, { type ScheduledTunesType, TunesTable } from "./TunesGrid";
 import { deleteTableTransientData } from "../settings";
+import { getPracticeListScheduled } from "../queries";
 
 export default function ScheduledTunesGrid({
   tunes,
@@ -26,42 +26,59 @@ export default function ScheduledTunesGrid({
 
   // const valuesArray = {};
 
-  const submitPracticeFeedbackHandler = () => {
+  const submitPracticeFeedbacksHandler = () => {
     console.log("handleClick!");
+
+    const updates: { [key: string]: TuneUpdate } = {};
 
     for (let i = 0; i < scheduled.length; i++) {
       const tune = scheduled[i];
-      const id: number = tune.id;
+      const id_string = `${tune.id}`;
       const row = table.getRow(i.toString());
 
       const feedback: string = row.renderValue("recall_eval");
 
       if (feedback) {
-        console.log("id, feedback", id, feedback);
-        const results = submitPracticeFeedback({
-          id,
-          feedback,
-          user_id,
-          playlist_id,
-        });
-        console.log("results from submitPracticeFeedback: ", results);
-        row.original.recall_eval = "";
-        deleteTableTransientData(
-          Number.parseInt(user_id),
-          id,
-          Number.parseInt(playlist_id),
-          "practice",
-        );
+        updates[id_string] = { feedback: feedback };
       }
-      const getScheduled = async (user_id: string, playlist_id: string) => {
-        const data: Tune[] = await getPracticeListScheduled(
-          user_id,
-          playlist_id,
-        );
-        setScheduled(data);
-      };
-      getScheduled(user_id, playlist_id);
     }
+
+    // TODO: Put up a spinner while waiting for the response
+
+    const promise_result = submitPracticeFeedbacks({
+      playlist_id,
+      updates,
+    });
+    promise_result
+      .then((result) => {
+        console.log("submitPracticeFeedbacks result:", result);
+      })
+      .catch((error) => {
+        console.error("Error submit_practice_feedbacks_result:", error);
+        throw error;
+      });
+
+    const promise_result2 = deleteTableTransientData(
+      Number.parseInt(user_id),
+      -1,
+      Number.parseInt(playlist_id),
+      "practice",
+    );
+    promise_result2
+      .then((result) => {
+        console.log("deleteTableTransientData successful:", result);
+      })
+      .catch((error) => {
+        console.error("Error submitting feedbacks:", error);
+        throw error;
+      });
+
+    const getScheduled = async (user_id: string, playlist_id: string) => {
+      const data: Tune[] = await getPracticeListScheduled(user_id, playlist_id);
+      setScheduled(data);
+    };
+    // For this one, we don't need to wait for the response
+    getScheduled(user_id, playlist_id);
   };
 
   return (
@@ -80,7 +97,7 @@ export default function ScheduledTunesGrid({
           <Button
             type="submit"
             variant="outline"
-            onClick={submitPracticeFeedbackHandler}
+            onClick={submitPracticeFeedbacksHandler}
           >
             Submit Practiced Tunes
           </Button>

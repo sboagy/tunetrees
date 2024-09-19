@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from os import environ
-from typing import Annotated, Any, List
+from typing import Annotated, Any, Dict, List, TypedDict
 
 from fastapi import APIRouter, Form
 from starlette import status as status
@@ -14,7 +14,11 @@ from tunetrees.app.queries import (
     get_practice_list_recently_played,
     get_practice_list_scheduled,
 )
-from tunetrees.app.schedule import query_and_print_tune_by_id, update_practice_record
+from tunetrees.app.schedule import (
+    query_and_print_tune_by_id,
+    update_practice_record,
+    update_practice_records,
+)
 from tunetrees.models.tunetrees import Tune, t_practice_list_staged
 
 router = APIRouter(
@@ -94,6 +98,23 @@ async def submit_feedback(
     # query_and_print_tune_by_id(634)
 
     update_practice_record(f"{selected_tune}", vote_type, playlist_id)
+
+    return status.HTTP_302_FOUND
+
+
+class TuneUpdate(TypedDict):
+    feedback: str
+
+
+@router.post("/practice/submit_feedbacks/{playlist_id}")
+async def submit_feedbacks(
+    playlist_id: str,
+    tune_updates: Dict[str, TuneUpdate],
+):
+    logger = logging.getLogger("tunetrees.api")
+    logger.debug(f"{tune_updates=}")
+
+    update_practice_records(tune_updates, playlist_id)
 
     return status.HTTP_302_FOUND
 

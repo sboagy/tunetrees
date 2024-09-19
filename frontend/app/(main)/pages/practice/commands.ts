@@ -52,3 +52,52 @@ export const submitPracticeFeedback = async ({
     }
   }
 };
+
+export interface TuneUpdate {
+  feedback: string;
+}
+
+interface PracticeFeedbacksProps {
+  playlist_id: string;
+  updates: { [key: string]: TuneUpdate };
+}
+
+export const submitPracticeFeedbacks = async ({
+  playlist_id,
+  updates,
+}: PracticeFeedbacksProps): Promise<string> => {
+  if (!baseURL) {
+    console.error("Base URL is not defined");
+    return "Error: Base URL is not defined";
+  }
+  const url = `${baseURL}/practice/submit_feedbacks`;
+  console.log(
+    `Submitting feedbacks for user_id: ${playlist_id}, updates: ${updates} url: ${url}`,
+  );
+
+  try {
+    const response = await axios({
+      method: "post",
+      url: `${baseURL}/practice/submit_feedbacks/${playlist_id}`,
+      data: updates,
+      headers: {
+        key: "Access-Control-Allow-Origin",
+        Accept: "application/json",
+        // "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
+      },
+    });
+    console.log("Feedbacks submitted successfully:", response.data);
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error("Axios error:", error.response?.data || error.message);
+    } else {
+      console.error("Unexpected error:", error);
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return "Error: An unknown error occurred";
+  }
+};

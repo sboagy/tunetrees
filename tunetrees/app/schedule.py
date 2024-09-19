@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List
+from typing import Dict, List, TypedDict
 
 from sqlalchemy import Column, and_, select, update
 from supermemo2 import sm_two
@@ -177,6 +177,131 @@ def update_practice_record(
         else:
             # Handle the case where no PracticeRecord is found
             print("No PracticeRecord found for the given tune_id and playlist_ref")
+
+    except Exception as e:
+        db.rollback()
+        raise e
+    finally:
+        db.close()
+
+
+class TuneUpdate(TypedDict):
+    feedback: str
+
+
+def update_practice_records(
+    user_tune_updates: dict[str, TuneUpdate], playlist_ref: str
+):
+    db = SessionLocal()
+    try:
+        # Prepare data for bulk update
+        # quality_int_lookup = {
+        #     tune_id: quality_lookup.get(update_dict.get("feedback"), -1)
+        #     for tune_id, update_dict in user_tune_updates.items()
+        # }
+        # quality_feedback_lookup = {
+        #     tune_update["tune_id"]: tune_update.get("feedback")
+        #     for tune_update in user_tune_updates
+        # }
+        stmt = select(
+            PracticeRecord.TUNE_REF,
+            PracticeRecord.Easiness,
+            PracticeRecord.Interval,
+            PracticeRecord.Repetitions,
+        ).where(
+            and_(
+                PracticeRecord.TUNE_REF.in_(
+                    [int(tune_id) for tune_id in user_tune_updates]
+                ),
+                PracticeRecord.PLAYLIST_REF == playlist_ref,
+            )
+        )
+        row_results = db.execute(stmt).all()
+
+        data_to_update = []
+        for row_result in row_results:
+            tune_id, easiness, interval, repetitions = row_result
+            assert isinstance(tune_id, str)
+            tune_update = user_tune_updates.get(tune_id)
+            assert tune_update is not None
+            quality = tune_update.get("feedback")
+            assert quality is not None
+            assert isinstance(user_tune_updates, Dict)
+            quality_int = quality_lookup.get(quality, -1)
+            if quality_int == -1:
+                raise ValueError(f"Unexpected quality value: {quality_int}")
+
+            practiced_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
+            practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
+
+            review = sm_two.review(
+                quality_int,
+                easiness,
+                interval,
+                repetitions,
+                practiced,
+            )
+
+            review_date = review.get("review_datetime")
+            if isinstance(review_date, datetime):
+                review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
+            elif isinstance(review_date, str):
+                review_date_str = review_date
+            else:
+                raise ValueError(
+                    f"Unexpected review_date type: {type(review_date)}: {review_date}"
+                )
+
+            data_to_update.append(
+                {
+                    "TUNE_REF": tune_id,
+                    "PLAYLIST_REF": playlist_ref,
+                    "Interval": review.get("interval"),
+                    "Easiness": review.get("easiness"),
+                    "Repetitions": review.get("repetitions"),
+                    "ReviewDate": review_date_str,
+                    "Quality": quality,
+                    "Practiced": practiced_str,
+                }
+            )
+
+        # Execute bulk update
+        # stmt = update(PracticeRecord).values(data_to_update)
+        # If I just execute the above statement, I get:
+        # InvalidRequestError('UPDATE construct does not support multiple parameter sets.')
+
+        # So, after the good intentions of trying to batch the updates, just do them one at a time
+        # for now.  At least it's basically set up for full batch updates in the future,
+        # and this looping is hidden from the rest of the code.
+        for data in data_to_update:
+            stmt = (
+                update(PracticeRecord)
+                .where(PracticeRecord.TUNE_REF == data["TUNE_REF"])
+                .values(data)
+            )
+            db.execute(stmt)
+
+        # But I might be able to try something like this in the future,
+        # not sure how much faster it would be though, or if it really
+        # matters for the limited number of updates we're likely to be doing
+        # here.
+        #
+        # # Assuming we have a 'tune_id' field in your data_to_update
+        # stmt = (
+        #     update(PracticeRecord)
+        #     .join(
+        #         data_to_update,
+        #         PracticeRecord.TUNE_REF == data_to_update.c.TUNE_REF,
+        #     )
+        #     .values(
+        #         PracticeRecord.ReviewDate=data_to_update.c.ReviewDate,
+        #         PracticeRecord.Quality=data_to_update.c.Quality,
+        #         PracticeRecord.Practiced=data_to_update.c.Practiced,
+        #     )
+        # )
+        # db.execute(stmt)
+
+        db.commit()
 
     except Exception as e:
         db.rollback()
