@@ -273,3 +273,6 @@ id_rsa_ttdroplet
 id_rsa_ttdroplet.pub
 
 certbot*
+
+.*.drawio.bkp
+design/.*.drawio.bkp
