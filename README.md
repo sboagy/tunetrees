@@ -40,9 +40,9 @@ TuneTrees is a web application with a backend server that manages user data and 
 
 ### 1.1. User-centric Functional Overview
 
-The following diagram illustrates a high-level and abstract user-view functional (or feature) overview.  The blue boxes illustrate intent and are not yet implemented.
+The following sketch illustrates a high-level and abstract _user view_ functional (or feature) overview.  In this rough diagram, boxes are the main intent, and the arrows just imply major relations, with the direction implying general data flow.  The blue boxes illustrate intent and are not yet implemented.
 
-![tunetrees_design-Functional Breakdown](design/tunetrees_design-Functional%20Breakdown.drawio.svg)
+![TuneTrees User-centric Functional Overview](design/tunetrees_functional_overview.drawio.svg)
 
 ### 1.2. System Structure
 
