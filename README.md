@@ -9,12 +9,13 @@ to get some insight into the vision of the project.
 
 <!-- TOC -->
 - [1. Design and Intent](#1-design-and-intent)
-    - [1.1. System Structure](#11-system-structure)
-    - [1.2. Technology Usage](#12-technology-usage)
-        - [1.2.1. Frontend:](#121-frontend)
-        - [1.2.2. Backend:](#122-backend)
-    - [1.3. Schema:](#13-schema)
-    - [1.4. Alternatives or Potential Technology Evolution](#14-alternatives-or-potential-technology-evolution)
+    - [1.1. User-centric Functional Overview](#11-user-centric-functional-overview)
+    - [1.2. System Structure](#12-system-structure)
+    - [1.3. Technology Usage](#13-technology-usage)
+        - [1.3.1. Frontend:](#131-frontend)
+        - [1.3.2. Backend:](#132-backend)
+    - [1.4. Schema:](#14-schema)
+    - [1.5. Alternatives or Potential Technology Evolution](#15-alternatives-or-potential-technology-evolution)
 - [2. Development Processes](#2-development-processes)
     - [2.1. Generation of ORM code](#21-generation-of-orm-code)
         - [2.1.1. VSCode Processes  (🚧 This Section a Work in Progress 🚧)](#211-vscode-processes---this-section-a-work-in-progress-)
@@ -24,8 +25,8 @@ to get some insight into the vision of the project.
     - [3.2. Build](#32-build)
     - [3.3. Deploy](#33-deploy)
         - [3.3.1. Deploy to Local Docker](#331-deploy-to-local-docker)
-            - [3.3.1.1. Make local certificates](#3311-make-local-certificates)
-            - [3.3.1.2. Use Docker Compose to deploy using webserver_local](#3312-use-docker-compose-to-deploy-using-webserver_local)
+            - [3.3.1.1. ***3.3.1.1. Make local certificates***](#3311-3311-make-local-certificates)
+            - [3.3.1.2. ***3.3.1.2. Use Docker Compose to deploy using webserver_local***](#3312-3312-use-docker-compose-to-deploy-using-webserver_local)
         - [3.3.2. Deploy to Digital Ocean Droplet](#332-deploy-to-digital-ocean-droplet)
 - [4. Authentication and User Management (🚧 This Section a Work in Progress 🚧)](#4-authentication-and-user-management--this-section-a-work-in-progress-)
     - [4.1. Mail verification mechanism](#41-mail-verification-mechanism)
@@ -37,7 +38,13 @@ to get some insight into the vision of the project.
 
 TuneTrees is a web application with a backend server that manages user data and schedules reviews. The backend securely stores all data in a database, while the frontend handles user interactions like login, account management, and practicing tunes. The frontend communicates with the backend using an HTTP API to access and update user data. Both the frontend and backend are packaged as containers and deployed together using Docker Compose on a DigitalOcean server.
 
-### 1.1. System Structure
+### 1.1. User-centric Functional Overview
+
+The following diagram illustrates a high-level and abstract user-view functional (or feature) overview.  The blue boxes illustrate intent and are not yet implemented.
+
+![tunetrees_design-Functional Breakdown](design/tunetrees_design-Functional%20Breakdown.drawio.svg)
+
+### 1.2. System Structure
 
 This diagram provides a high-level overview of the TuneTree architecture.
 
@@ -63,7 +70,7 @@ flowchart LR
     D --> H(Login/Logout)
 ```
 
-### 1.2. Technology Usage
+### 1.3. Technology Usage
 
 This diagram maps out the basic technology used. Specific implementation details may evolve.
 
@@ -99,7 +106,7 @@ graph LR
     G --> A
 ```
 
-#### 1.2.1. Frontend:
+#### 1.3.1. Frontend:
 
 Handles user interactions, including login, account management, and tune practice.
 - HTTP API: Communicates with the backend to access and update user data.
@@ -107,13 +114,13 @@ Handles user interactions, including login, account management, and tune practic
 - Tune Practice: Provides tools for practicing tunes and tracking progress.
 - Login/Logout: Implements authentication and authorization.
 
-#### 1.2.2. Backend:
+#### 1.3.2. Backend:
 
 Handles user data management, review scheduling, and API requests.
 - Database: Stores user data, including tunes, practice history, and review schedules.
 - Review Scheduler: Determines when tunes should be reviewed based on the user's progress.
 
-### 1.3. Schema:
+### 1.4. Schema:
 
 The database is organized as follows: Each user can have multiple playlists, and each playlist is associated with a specific musical instrument. These playlists contain tunes, which are stored separately and shared across all users. TuneTrees doesn't aim to be a complete tune repository, so it only stores basic tune information. For more detailed details, users can refer to external resources.
 
@@ -207,7 +214,7 @@ erDiagram
     PLAYLIST }|--|| USER : "belongs to"
 ```
 
-### 1.4. Alternatives or Potential Technology Evolution
+### 1.5. Alternatives or Potential Technology Evolution
 
 1. Down the line, I can switch to MySQL or PostgreSQL if needed.
 2. For the front end, I may experiment with a Kotlin frontend at some point.
@@ -357,7 +364,7 @@ For local deployment to Docker containers, these instructions have been tested w
 > [!NOTE]
 > The author has chosen not to use [Rancher Desktop](https://rancherdesktop.io/) at the moment because he believes it may have limitations when it comes to cross-compiling to platform-specific containers. However, it is quite possible that there is a way to configure Rancher Desktop for cross-compilation. Other desktop container options such as [Podman](https://podman.io/) may also be feasible. 
 
-##### ***3.3.1.1. Make local certificates***
+##### 3.3.1.1. ***3.3.1.1. Make local certificates***
 
 We recommend using `mkcert` to generate self-signed certificates into a local 
 `dhparam` directory.  To install `mkcert` follow these steps:
@@ -405,7 +412,7 @@ mkcert localhost
 
 This will generate the `localhost.pem` and `localhost-key.pem` files in the `dhparam` directory.
 
-##### ***3.3.1.2. Use Docker Compose to deploy using webserver_local***
+##### 3.3.1.2. ***3.3.1.2. Use Docker Compose to deploy using webserver_local***
 
 To deploy the application locally using Docker Compose with a local https ngnx proxy, follow these steps:
 
