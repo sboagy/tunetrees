@@ -34,3 +34,10 @@ Spaced repetition is a powerful learning technique that helps you retain informa
 - Flashcard effect: Overconfidence and decreased retention due to repeated exposure.
 - Forgetting curve equation: A mathematical equation modeling the forgetting curve.
 - Interpolated intervals: Intervals adjusted based on learner performance in previous reviews.
+
+
+Here are a few terms commonly used to describe items that have aged out in space repetition systems:
+
+- Dormant items: This term implies that the items are inactive or sleeping until they need to be reviewed again.
+- Stale items: This term suggests that the items have become outdated or irrelevant due to a lack of review.
+- Decayed items: This term indicates that the items have lost their memorability over time and need to be refreshed.
