@@ -159,27 +159,28 @@ def get_practice_list_scheduled(
     )
     scheduled_rows = sorted(scheduled_rows, key=lambda row: row[tune_type_column_index])
 
-    aged_limit = limit - len(scheduled_rows)
-    if aged_limit <= 0:
-        aged_limit = 2
-    aged_limit = 2
+    # aged_limit = limit - len(scheduled_rows)
+    # if aged_limit <= 0:
+    #     aged_limit = 2
+    # aged_limit = 2
 
-    practice_list_query2 = db.query(t_practice_list_staged).filter(
-        and_(
-            t_practice_list_staged.c.USER_REF == user_ref,
-            t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
-        )
-    )
+    # practice_list_query2 = db.query(t_practice_list_staged).filter(
+    #     and_(
+    #         t_practice_list_staged.c.USER_REF == user_ref,
+    #         t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
+    #     )
+    # )
 
-    aged_rows: List[Tune] = (
-        practice_list_query2.order_by(
-            func.DATE(t_practice_list_staged.c.Practiced).asc()
-        )
-        .offset(skip)
-        .limit(aged_limit)
-        .all()
-    )
-    rows = scheduled_rows + aged_rows
+    # aged_rows: List[Tune] = (
+    #     practice_list_query2.order_by(
+    #         func.DATE(t_practice_list_staged.c.Practiced).asc()
+    #     )
+    #     .offset(skip)
+    #     .limit(aged_limit)
+    #     .all()
+    # )
+    # rows = scheduled_rows + aged_rows
+    rows = scheduled_rows
 
     # if print_table:
     #     print("\n--------")
