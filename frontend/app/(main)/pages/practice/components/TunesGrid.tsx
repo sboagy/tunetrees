@@ -20,7 +20,6 @@ import type {
   Table as TanstackTable,
 } from "@tanstack/react-table";
 
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -39,14 +38,31 @@ export interface ScheduledTunesType {
   user_id: string;
   playlist_id: string;
   table_purpose: TablePurpose;
+  // setRecentlyPracticedCallback?: (tunes: Tune[]) => void;
+  handleFilterChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-export function TunesTable({
-  tunes,
-  user_id,
-  playlist_id,
-  table_purpose,
-}: ScheduledTunesType) {
+export const TableContext = React.createContext<TanstackTable<Tune> | null>(
+  null,
+);
+
+export const useTableContext = () => {
+  const context = React.useContext(TableContext);
+  // if (!context) {
+  //   throw new Error("useTableContext must be used within a TableProvider");
+  // }
+  return context;
+};
+
+export function TunesTable(
+  { tunes, user_id, playlist_id, table_purpose }: ScheduledTunesType,
+  selectionChangedCallback:
+    | ((
+        table: TanstackTable<Tune>,
+        rowSelectionState: RowSelectionState,
+      ) => void)
+    | null = null,
+) {
   const [table_state_from_db, setTableStateFromDB] =
     React.useState<TableState | null>(null);
 
@@ -222,6 +238,9 @@ export function TunesTable({
     originalSetRowSelectionRef.current(resolvedRowSelectionState);
 
     saveTableState(table, user_id, table_purpose);
+    if (selectionChangedCallback) {
+      selectionChangedCallback(table, resolvedRowSelectionState);
+    }
   };
 
   const interceptedOnColumnFiltersChange = (
@@ -325,63 +344,65 @@ const TunesGrid = (props: Props) => {
   return (
     <>
       <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  className={`${getColorForEvaluation(row.original.recall_eval || null)}`}
-                  // className="hover:bg-gray-100"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="max-h-1 py-0">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
+        <TableContext.Provider value={table}>
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-12 text-center"
-                >
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    className={`${getColorForEvaluation(row.original.recall_eval || null)}`}
+                    // className="hover:bg-gray-100"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="max-h-1 py-0">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-12 text-center"
+                  >
+                    No results.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContext.Provider>
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
           {table.getFilteredSelectedRowModel().rows.length} of{" "}
           {table.getFilteredRowModel().rows.length} row(s) selected.
         </div>
-        <div className="space-x-2">
+        {/* <div className="space-x-2">
           <Button
             variant="outline"
             size="sm"
@@ -398,7 +419,7 @@ const TunesGrid = (props: Props) => {
           >
             Next
           </Button>
-        </div>
+        </div> */}
       </div>
     </>
   );

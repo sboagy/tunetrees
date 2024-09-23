@@ -9,6 +9,8 @@ import ColumnsMenu from "./ColumnsMenu";
 import TunesGrid, { type ScheduledTunesType, TunesTable } from "./TunesGrid";
 import { deleteTableTransientData } from "../settings";
 import { getPracticeListScheduled } from "../queries";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export default function ScheduledTunesGrid({
   tunes,
@@ -27,7 +29,7 @@ export default function ScheduledTunesGrid({
   // const valuesArray = {};
 
   const submitPracticeFeedbacksHandler = () => {
-    console.log("handleClick!");
+    console.log("submitPracticeFeedbacksHandler!");
 
     const updates: { [key: string]: TuneUpdate } = {};
 
@@ -81,9 +83,15 @@ export default function ScheduledTunesGrid({
     getScheduled(user_id, playlist_id);
   };
 
+  const [mode, setMode] = useState("grid");
+
+  const handleModeChange = () => {
+    setMode(mode === "grid" ? "flashcard" : "grid");
+  };
+
   return (
     <div className="w-full">
-      <div className="flex items-center py-4">
+      <div className="flex items-center justify-between py-4">
         {/* <Input
           placeholder="Filter by type..."
           value={(table.getColumn("type")?.getFilterValue() as string) ?? ""}
@@ -102,15 +110,43 @@ export default function ScheduledTunesGrid({
             Submit Practiced Tunes
           </Button>
         </div>
-
-        <ColumnsMenu user_id={user_id} table={table} />
+        <div className="flex items-center space-x-4">
+          <Label htmlFor="flashcard-mode">Flashcard Mode</Label>
+          <Switch
+            checked={mode === "flashcard"}
+            onCheckedChange={handleModeChange}
+          />
+        </div>
+        <div className="flex items-center space-x-4 mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Next
+          </Button>
+          <ColumnsMenu user_id={user_id} table={table} />
+        </div>
       </div>
-      <TunesGrid
-        table={table}
-        userId={Number.parseInt(user_id)}
-        playlistId={Number.parseInt(playlist_id)}
-        purpose={"practice"}
-      />
+      {mode === "grid" ? (
+        <TunesGrid
+          table={table}
+          userId={Number.parseInt(user_id)}
+          playlistId={Number.parseInt(playlist_id)}
+          purpose={"practice"}
+        />
+      ) : (
+        <div />
+      )}
     </div>
   );
 }

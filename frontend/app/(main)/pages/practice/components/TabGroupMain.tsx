@@ -32,6 +32,21 @@ const TabGroupMain: NextPage<PracticeProps> = ({
   const [user_ref] = useState<string>(user_id);
   const [scheduled, setScheduled] = useState<Tune[]>();
   const [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
+  const [origRecentlyPracticed, setOrigRecentlyPracticed] = useState<Tune[]>();
+
+  const handleFilterChange = (filter: React.ChangeEvent<HTMLInputElement>) => {
+    if (origRecentlyPracticed === undefined) return;
+    const filterValue = filter.target.value;
+
+    const filteredData = origRecentlyPracticed.filter((item) =>
+      Object.values(item).some((value) =>
+        value
+          ? value.toString().toLowerCase().includes(filterValue.toLowerCase())
+          : false,
+      ),
+    );
+    setRecentlyPracticed(filteredData);
+  };
 
   useEffect(() => {
     const getScheduled = async (user_id: string, playlist_id: string) => {
@@ -45,17 +60,54 @@ const TabGroupMain: NextPage<PracticeProps> = ({
     const getRecent = async (user_id: string, playlist_id: string) => {
       const data = await getRecentlyPracticed(user_id, playlist_id);
       setRecentlyPracticed(data);
+      setOrigRecentlyPracticed(data);
     };
     getRecent(user_id, playlist_id);
   }, [user_id, playlist_id]);
 
+  const tabSpec = [
+    {
+      id: "scheduled",
+      name: "Practice",
+      content: "Review and practice your scheduled tunes.",
+    },
+    {
+      id: "repertoire",
+      name: "Repertoire",
+      content: "Manage your repertoire.",
+    },
+    {
+      id: "analysis",
+      name: "Analysis",
+      content: "Practice Analytics.",
+    },
+  ];
+
+  const [activeTab, setActiveTab] = useState(tabSpec[0].id);
+
   return (
-    <Tabs defaultValue="scheduled" className="flex h-full w-full flex-col">
-      <TabsList className="grid w-full grid-cols-3">
+    <Tabs
+      defaultValue="scheduled"
+      onValueChange={setActiveTab}
+      className="flex h-full w-full flex-col"
+    >
+      <TabsList className="grid w-full grid-cols-3 rounded-none bg-transparent p-0 gap-2">
+        {tabSpec.map((tab) => (
+          <TabsTrigger
+            key={tab.id}
+            value={tab.id}
+            className={`rounded-t-lg border-t border-l border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors duration-200
+                ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
+          >
+            {tab.name}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {/* <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="scheduled">Practice</TabsTrigger>
         <TabsTrigger value="repertoire">Repertoire</TabsTrigger>
         <TabsTrigger value="analysis">Analysis</TabsTrigger>
-      </TabsList>
+      </TabsList> */}
       <TabsContent value="scheduled">
         <Card>
           <CardContent className="space-y-2">
@@ -81,6 +133,7 @@ const TabGroupMain: NextPage<PracticeProps> = ({
                 user_id={user_ref}
                 playlist_id={playlist_ref}
                 table_purpose="repertoire"
+                handleFilterChange={handleFilterChange}
               />
             ) : (
               <CircularProgress />

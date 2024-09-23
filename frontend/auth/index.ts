@@ -400,7 +400,7 @@ const config = {
       isNewUser?: boolean;
       session?: Session | null;
     }) {
-      console.log("callback: jwt -- ", logObject(params, false));
+      // console.log("callback: jwt -- ", logObject(params, false));
       if (params.trigger === "update" && params.session?.user) {
         params.token.name = params.session.user.name;
       } else if (params.trigger === "update" && params.session) {
@@ -441,7 +441,7 @@ const config = {
       baseUrl: string;
     }) {
       // See https://next-auth.js.org/configuration/callbacks#redirect-callback
-      console.log("redirect callback: -- ", logObject(params, true));
+      // console.log("redirect callback: -- ", logObject(params, true));
       return params.baseUrl;
     },
     async session(params: {
@@ -449,12 +449,12 @@ const config = {
       token: JWT & { user_id?: string; view_settings?: string };
       user: User | AdapterUser;
     }) {
-      console.log(
-        "callback: session -- ",
-        logObject(params.session, false),
-        params.token,
-        params.user,
-      );
+      // console.log(
+      //   "callback: session -- ",
+      //   logObject(params.session, false),
+      //   params.token,
+      //   params.user,
+      // );
 
       params.session.userId = params.token.user_id as string;
       if (params.session.user) {

@@ -39,3 +39,17 @@ export type TableTransientDataFields = {
   notes_public: string | null;
   recall_eval: string | null;
 };
+
+// Define the type for the function parameters
+export type FilteredDataParams = {
+  data: Tune[];
+  criteria: (item: Tune) => boolean;
+};
+
+// Define the return type of the function
+export type FilteredDataReturnType = Tune[];
+
+// Create the type definition for the filteredData function
+export type FilteredDataType = (
+  params: FilteredDataParams,
+) => FilteredDataReturnType;
