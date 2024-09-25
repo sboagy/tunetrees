@@ -11,6 +11,9 @@ import { deleteTableTransientData } from "../settings";
 import { getPracticeListScheduled } from "../queries";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import FlashcardPanel from "./FlashcardPanel";
+
+type ReviewMode = "grid" | "flashcard";
 
 export default function ScheduledTunesGrid({
   tunes,
@@ -83,7 +86,7 @@ export default function ScheduledTunesGrid({
     getScheduled(user_id, playlist_id);
   };
 
-  const [mode, setMode] = useState("grid");
+  const [mode, setMode] = useState<ReviewMode>("grid");
 
   const handleModeChange = () => {
     setMode(mode === "grid" ? "flashcard" : "grid");
@@ -123,6 +126,7 @@ export default function ScheduledTunesGrid({
             size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
+            style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
           >
             Previous
           </Button>
@@ -131,10 +135,15 @@ export default function ScheduledTunesGrid({
             size="sm"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
+            style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
           >
             Next
           </Button>
-          <ColumnsMenu user_id={user_id} table={table} />
+          <div
+            style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
+          >
+            <ColumnsMenu user_id={user_id} table={table} />
+          </div>
         </div>
       </div>
       {mode === "grid" ? (
@@ -145,7 +154,12 @@ export default function ScheduledTunesGrid({
           purpose={"practice"}
         />
       ) : (
-        <div />
+        <FlashcardPanel
+          table={table}
+          userId={Number.parseInt(user_id)}
+          playlistId={Number.parseInt(playlist_id)}
+          purpose={"practice"}
+        />
       )}
     </div>
   );

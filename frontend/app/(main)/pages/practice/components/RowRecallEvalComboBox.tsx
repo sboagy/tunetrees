@@ -80,11 +80,13 @@ const qualityList = [
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function RecallEvalComboBox(
-  info: CellContext<Tune, string>,
+  info: CellContext<Tune, string | null>,
   userId: number,
   playlistId: number,
   purpose: TablePurpose,
 ) {
+  const [isOpen, setIsOpen] = React.useState(false);
+
   const saveData = async (changed_value: string) => {
     try {
       if (changed_value === "") {
@@ -105,12 +107,6 @@ export function RecallEvalComboBox(
     }
     console.log("State saved:", changed_value);
   };
-
-  // This simply isn't working.  I'm not sure why after a few hours of trying.
-  // const [recallEvalValue, setRecallEvalValue] = React.useState<string>("");
-  const [isOpen, setIsOpen] = React.useState(false);
-  // const [, updateState] = React.useState({});
-  // const [isUpdated, setIsUpdated] = React.useState(false);
 
   const forceClose = () => {
     setIsOpen(false);

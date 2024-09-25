@@ -219,14 +219,14 @@ export function get_columns(
           accessorKey: "recall_eval",
           header: ({ column }) => sortableHeader(column, "Title"),
           enableHiding: false,
-          cell: (info: CellContext<Tune, string>) =>
+          cell: (info: CellContext<Tune, string | unknown>) =>
             RecallEvalComboBox(info, userId, playlistId, purpose),
         }
       : {
           accessorKey: "select",
           header: ({ column, table }) => selectionHeader(column, table),
           enableHiding: false,
-          cell: (info: CellContext<Tune, string>) =>
+          cell: (info: CellContext<Tune, string | unknown>) =>
             RowSelectedCheckBox(info, userId, playlistId, purpose),
         },
     {
@@ -257,7 +257,7 @@ export function get_columns(
     {
       accessorKey: "title",
       header: ({ column }) => sortableHeader(column, "Title"),
-      cell: (info: CellContext<Tune, string>) => {
+      cell: (info: CellContext<Tune, string | unknown>) => {
         return info.getValue();
       },
       enableSorting: true,
@@ -376,7 +376,7 @@ export function get_columns(
     {
       accessorKey: "external_ref",
       header: "External Ref",
-      cell: (info: CellContext<Tune, string>) => {
+      cell: (info: CellContext<Tune, string | unknown>) => {
         // return info.getValue();
         if (!info.row.original.external_ref) {
           return (
