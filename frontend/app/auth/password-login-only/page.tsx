@@ -21,7 +21,7 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
     email = searchParams.get("email") || email;
   }
 
-  const [user_email, setUserEmail] = useState(email);
+  const [userEmail, setUserEmail] = useState(email);
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -49,12 +49,12 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateEmail(user_email)) {
+    if (validateEmail(userEmail)) {
       // Handle login logic here
-      console.log("Sign in attempt with:", { user_email, password });
+      console.log("Sign in attempt with:", { user_email: userEmail, password });
       try {
         // const user = authorizeWithPassword(user_email, password);
-        const user = await authorizeWithPassword(user_email, password);
+        const user = await authorizeWithPassword(userEmail, password);
         if (!user) {
           setPasswordError("Sign in failed");
         } else {
@@ -63,7 +63,7 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
           if (typeof window !== "undefined") {
             const response = await axios.get("/api/verify-user", {
               params: {
-                email: user_email,
+                email: userEmail,
                 password: password,
               },
             });
@@ -116,7 +116,7 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
                   name="user_email"
                   type="email"
                   placeholder="m@example.com"
-                  value={user_email}
+                  value={userEmail}
                   onChange={handleEmailChange}
                   required
                   className={emailError ? "border-red-500" : ""}

@@ -77,7 +77,7 @@ function sortableHeader<TData, TValue>(
   title: string,
 ) {
   // console.log("column: ", column);
-  const is_sorted = column.getIsSorted();
+  const isSorted = column.getIsSorted();
   return (
     <div
       className="flex items-center"
@@ -87,7 +87,7 @@ function sortableHeader<TData, TValue>(
       onKeyPress={() => {}}
     >
       {title}
-      {is_sorted === "asc" ? (
+      {isSorted === "asc" ? (
         <ArrowUp className="ml-2 h-4 w-4" />
       ) : (
         <ArrowDown className="ml-2 h-4 w-4" />
@@ -109,14 +109,14 @@ export function get_columns(
     user_id: string,
     table_purpose: TablePurpose,
   ) => {
-    const table_state: TableState = table.getState();
+    const tableState: TableState = table.getState();
 
     try {
       const response = await createOrUpdateTableState(
         Number.parseInt(user_id),
         "full",
         table_purpose,
-        table_state,
+        tableState,
       );
       // Handle the response as needed
       console.log("Server response:", response);

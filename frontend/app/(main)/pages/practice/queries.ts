@@ -2,34 +2,12 @@
 
 import axios from "axios";
 import type { Tune } from "./types";
+import { ERROR_TUNE } from "./components/mocks";
 
 const client = axios.create({
   // baseURL: process.env.TT_API_BASE_URL
   baseURL: process.env.NEXT_PUBLIC_TT_BASE_URL,
 });
-
-const ERROR_TUNE: Tune[] = [
-  {
-    id: 0,
-    title: "Error",
-    type: "Error",
-    structure: "Error",
-    mode: "Error",
-    incipit: "Error",
-    learned: "Error",
-    practiced: "Error",
-    quality: "Error",
-    easiness: 0,
-    interval: 0,
-    repetitions: 0,
-    review_date: "Error",
-    backup_practiced: "Error",
-    notes_private: "Error", // Optional property, should't need to be set
-    notes_public: "Error", // Optional property, should't need to be set
-    tags: "Error", // Optional property, should't need to be set
-    recall_eval: "Error", // Optional property, should't need to be set
-  },
-];
 
 export async function getPracticeListScheduled(
   user_id: string,

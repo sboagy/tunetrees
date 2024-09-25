@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import ColumnsMenu from "./ColumnsMenu";
-import TunesGrid, { type ScheduledTunesType, TunesTable } from "./TunesGrid";
+import TunesGrid, { type IScheduledTunesType, TunesTable } from "./TunesGrid";
 import {
   Select,
   SelectContent,
@@ -19,7 +19,9 @@ import type {
 } from "@tanstack/react-table";
 import type { Tune } from "../types";
 
-export default function RepertoireGrid(tunes: ScheduledTunesType): JSX.Element {
+export default function RepertoireGrid(
+  tunes: IScheduledTunesType,
+): JSX.Element {
   const [isAddToReviewQueueEnabled, setIsAddToReviewQueueEnabled] =
     useState(false);
   const selectionChangedCallback = (

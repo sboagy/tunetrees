@@ -33,7 +33,7 @@ import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns"
 import type { TablePurpose, Tune } from "../types";
 import { createOrUpdateTableState, getTableState } from "../settings";
 
-export interface ScheduledTunesType {
+export interface IScheduledTunesType {
   tunes: Tune[];
   user_id: string;
   playlist_id: string;
@@ -42,12 +42,12 @@ export interface ScheduledTunesType {
   handleFilterChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-export const TableContext = React.createContext<TanstackTable<Tune> | null>(
+export const tableContext = React.createContext<TanstackTable<Tune> | null>(
   null,
 );
 
 export const useTableContext = () => {
-  const context = React.useContext(TableContext);
+  const context = React.useContext(tableContext);
   // if (!context) {
   //   throw new Error("useTableContext must be used within a TableProvider");
   // }
@@ -55,7 +55,7 @@ export const useTableContext = () => {
 };
 
 export function TunesTable(
-  { tunes, user_id, playlist_id, table_purpose }: ScheduledTunesType,
+  { tunes, user_id, playlist_id, table_purpose }: IScheduledTunesType,
   selectionChangedCallback:
     | ((
         table: TanstackTable<Tune>,
@@ -63,11 +63,11 @@ export function TunesTable(
       ) => void)
     | null = null,
 ) {
-  const [table_state_from_db, setTableStateFromDB] =
+  const [tableStateFromDb, setTableStateFromDb] =
     React.useState<TableState | null>(null);
 
   const [sorting, setSorting] = React.useState<SortingState>(
-    table_state_from_db ? table_state_from_db.sorting : [],
+    tableStateFromDb ? tableStateFromDb.sorting : [],
   );
   const originalSetSortingRef = React.useRef(setSorting);
 
@@ -78,7 +78,7 @@ export function TunesTable(
 
   // For the moment am not using columnFilters
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    table_state_from_db ? table_state_from_db.columnFilters : [],
+    tableStateFromDb ? tableStateFromDb.columnFilters : [],
   );
   const originalColumnFiltersRef = React.useRef(setColumnFilters);
 
@@ -89,8 +89,8 @@ export function TunesTable(
 
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>(
-      table_state_from_db
-        ? table_state_from_db.columnVisibility
+      tableStateFromDb
+        ? tableStateFromDb.columnVisibility
         : {
             id: true,
             title: true,
@@ -121,7 +121,7 @@ export function TunesTable(
   }, []);
 
   const [rowSelection, setRowSelection] = React.useState(
-    table_state_from_db ? table_state_from_db.rowSelection : {},
+    tableStateFromDb ? tableStateFromDb.rowSelection : {},
   );
   const originalSetRowSelectionRef = React.useRef(setRowSelection);
 
@@ -131,8 +131,8 @@ export function TunesTable(
   }, []);
 
   const [pagination, setPaginationState] = React.useState<PaginationState>(
-    table_state_from_db
-      ? table_state_from_db.pagination
+    tableStateFromDb
+      ? tableStateFromDb.pagination
       : {
           pageIndex: 0,
           pageSize: 15, //optionally customize the initial pagination state.
@@ -174,19 +174,19 @@ export function TunesTable(
   React.useEffect(() => {
     const fetchTableState = async () => {
       try {
-        const user_id_int = Number.parseInt(user_id);
-        const table_state_from_db = await getTableState(
-          user_id_int,
+        const userIdInt = Number.parseInt(user_id);
+        const tableStateFromDb = await getTableState(
+          userIdInt,
           "full",
           table_purpose,
         );
-        if (table_state_from_db) {
-          setTableStateFromDB(table_state_from_db);
-          table.setPagination(table_state_from_db.pagination);
-          table.setRowSelection(table_state_from_db.rowSelection);
-          table.setColumnVisibility(table_state_from_db.columnVisibility);
-          table.setColumnFilters(table_state_from_db.columnFilters);
-          table.setSorting(table_state_from_db.sorting);
+        if (tableStateFromDb) {
+          setTableStateFromDb(tableStateFromDb);
+          table.setPagination(tableStateFromDb.pagination);
+          table.setRowSelection(tableStateFromDb.rowSelection);
+          table.setColumnVisibility(tableStateFromDb.columnVisibility);
+          table.setColumnFilters(tableStateFromDb.columnFilters);
+          table.setSorting(tableStateFromDb.sorting);
         }
       } catch (error) {
         console.error(error);
@@ -202,14 +202,14 @@ export function TunesTable(
     user_id: string,
     table_purpose: TablePurpose,
   ) => {
-    const table_state: TableState = table.getState();
+    const tableState: TableState = table.getState();
 
     try {
       const response = await createOrUpdateTableState(
         Number.parseInt(user_id),
         "full",
         table_purpose,
-        table_state,
+        tableState,
       );
       // Handle the response as needed
       console.log("Server response:", response);
@@ -344,7 +344,7 @@ const TunesGrid = (props: Props) => {
   return (
     <>
       <div className="rounded-md border">
-        <TableContext.Provider value={table}>
+        <tableContext.Provider value={table}>
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -395,7 +395,7 @@ const TunesGrid = (props: Props) => {
               )}
             </TableBody>
           </Table>
-        </TableContext.Provider>
+        </tableContext.Provider>
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">

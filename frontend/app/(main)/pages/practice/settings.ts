@@ -163,3 +163,33 @@ export async function deleteTableTransientData(
     return 500;
   }
 }
+
+export async function deleteTableTransientDataSync(
+  userId: number,
+  tuneId: number,
+  playlistId: number,
+  purpose: TablePurpose,
+): Promise<number> {
+  try {
+    const promiseResult = deleteTableTransientData(
+      userId,
+      tuneId,
+      playlistId,
+      purpose,
+    );
+    promiseResult
+      .then((result) => {
+        console.log("deleteTableTransientData successful:", result);
+        return result;
+      })
+      .catch((error) => {
+        console.error("Error submitting feedbacks:", error);
+        return 500;
+      });
+    return 500;
+  } catch (error) {
+    // Handle error
+    console.error("deleteTableTransientData: ", error);
+    return 500;
+  }
+}

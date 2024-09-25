@@ -4,7 +4,7 @@ import axios from "axios";
 
 const baseURL = process.env.TT_API_BASE_URL;
 
-interface PracticeFeedbackProps {
+interface IPracticeFeedbackProps {
   id: number;
   feedback: string;
   user_id: string;
@@ -16,7 +16,7 @@ export const submitPracticeFeedback = async ({
   feedback,
   user_id,
   playlist_id,
-}: PracticeFeedbackProps): Promise<void> => {
+}: IPracticeFeedbackProps): Promise<void> => {
   if (!baseURL) {
     console.error("Base URL is not defined");
     return;
@@ -53,19 +53,19 @@ export const submitPracticeFeedback = async ({
   }
 };
 
-export interface TuneUpdate {
+export interface ITuneUpdate {
   feedback: string;
 }
 
-interface PracticeFeedbacksProps {
+interface IPracticeFeedbacksProps {
   playlist_id: string;
-  updates: { [key: string]: TuneUpdate };
+  updates: { [key: string]: ITuneUpdate };
 }
 
 export const submitPracticeFeedbacks = async ({
   playlist_id,
   updates,
-}: PracticeFeedbacksProps): Promise<string> => {
+}: IPracticeFeedbacksProps): Promise<string> => {
   if (!baseURL) {
     console.error("Base URL is not defined");
     return "Error: Base URL is not defined";

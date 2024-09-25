@@ -3,10 +3,10 @@
 import { Button } from "@/components/ui/button";
 import type { Table as TanstackTable } from "@tanstack/react-table";
 import { useState } from "react";
-import { submitPracticeFeedbacks, type TuneUpdate } from "../commands";
+import { submitPracticeFeedbacks, type ITuneUpdate } from "../commands";
 import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
-import TunesGrid, { type ScheduledTunesType, TunesTable } from "./TunesGrid";
+import TunesGrid, { type IScheduledTunesType, TunesTable } from "./TunesGrid";
 import { deleteTableTransientData } from "../settings";
 import { getPracticeListScheduled } from "../queries";
 import { Switch } from "@/components/ui/switch";
@@ -19,7 +19,7 @@ export default function ScheduledTunesGrid({
   tunes,
   user_id,
   playlist_id,
-}: ScheduledTunesType): JSX.Element {
+}: IScheduledTunesType): JSX.Element {
   const [scheduled, setScheduled] = useState<Tune[]>(tunes);
 
   const table: TanstackTable<Tune> = TunesTable({
@@ -34,27 +34,27 @@ export default function ScheduledTunesGrid({
   const submitPracticeFeedbacksHandler = () => {
     console.log("submitPracticeFeedbacksHandler!");
 
-    const updates: { [key: string]: TuneUpdate } = {};
+    const updates: { [key: string]: ITuneUpdate } = {};
 
     for (let i = 0; i < scheduled.length; i++) {
       const tune = scheduled[i];
-      const id_string = `${tune.id}`;
+      const idString = `${tune.id}`;
       const row = table.getRow(i.toString());
 
       const feedback: string = row.renderValue("recall_eval");
 
       if (feedback) {
-        updates[id_string] = { feedback: feedback };
+        updates[idString] = { feedback: feedback };
       }
     }
 
     // TODO: Put up a spinner while waiting for the response
 
-    const promise_result = submitPracticeFeedbacks({
+    const promiseResult = submitPracticeFeedbacks({
       playlist_id,
       updates,
     });
-    promise_result
+    promiseResult
       .then((result) => {
         console.log("submitPracticeFeedbacks result:", result);
       })
@@ -63,13 +63,13 @@ export default function ScheduledTunesGrid({
         throw error;
       });
 
-    const promise_result2 = deleteTableTransientData(
+    const promiseResult2 = deleteTableTransientData(
       Number.parseInt(user_id),
       -1,
       Number.parseInt(playlist_id),
       "practice",
     );
-    promise_result2
+    promiseResult2
       .then((result) => {
         console.log("deleteTableTransientData successful:", result);
       })

@@ -416,9 +416,9 @@ const config = {
       // session callback.
       const email = params.token?.email as string;
       if (email && !params.token.user_id) {
-        const user_record = await getUserExtendedByEmail(email);
-        if (user_record?.id) {
-          params.token.user_id = user_record?.id;
+        const userRecord = await getUserExtendedByEmail(email);
+        if (userRecord?.id) {
+          params.token.user_id = userRecord?.id;
         }
       }
 
@@ -427,8 +427,8 @@ const config = {
       // in keep them in the database. or both.
       // If in the database, then it needs to be in its own table, not
       // in the user table.
-      const view_settings_string = params.token.view_settings;
-      if (!view_settings_string) {
+      const viewSettingsString = params.token.view_settings;
+      if (!viewSettingsString) {
         params.token.view_settings = viewSettingsDefault;
       }
 

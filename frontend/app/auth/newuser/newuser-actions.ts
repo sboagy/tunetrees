@@ -31,9 +31,9 @@ export const newUser = async (data: AccountFormValues, host: string) => {
   // let user = await ttHttpAdapter.getUserByEmail(email);
 
   // So instead we use a customized variant
-  const existing_user = await getUserExtendedByEmail(email);
+  const existingUser = await getUserExtendedByEmail(email);
 
-  if (existing_user) {
+  if (existingUser) {
     // TODO:  This should be an dialog box, to the user, giving them the
     // option to reset their password, or to have the email resent.
     throw new Error(`User already exists for ${email}.`);
@@ -56,7 +56,7 @@ export const newUser = async (data: AccountFormValues, host: string) => {
     hash: bcrypt.hashSync(data.password, bcrypt.genSaltSync()),
   };
 
-  const stringify_user = JSON.stringify(user);
+  const stringifiedUser = JSON.stringify(user);
 
   try {
     // Calling fetch or the ttHttpAdapter.createUser method will
@@ -69,35 +69,35 @@ export const newUser = async (data: AccountFormValues, host: string) => {
     //     accept: "application/json",
     //     "Content-Type": "application/json",
     //   },
-    //   body: stringify_user,
+    //   body: stringifiedUser,
     // });
     // const data = await create_user_response.json();
     // console.log(data);
     // const create_user_response = await ttHttpAdapter.createUser(user);
 
-    const create_user_response = await axios.post(
+    const createUserResponse = await axios.post(
       `${_baseURL}/auth/signup/`,
-      stringify_user,
+      stringifiedUser,
       {
         headers: {
           "Content-Type": "application/json",
         },
       },
     );
-    console.log("create_user_response: ", create_user_response);
+    console.log("createUserResponse: ", createUserResponse);
   } catch (e) {
     console.error(e);
     throw e;
   }
 
   // const email_to = email;
-  const email_to = "sboagy@gmail.com";
+  const emailTo = "sboagy@gmail.com";
 
   // const linkBackURL = `https://${host}/api/verify-user?email=${email}&password=${data.password}`;
   const linkBackURL = `https://${host}/auth/password-login-only?email=${email}`;
 
-  const send_grid_response = await sendGrid({
-    to: email_to,
+  const sendGridResponse = await sendGrid({
+    to: emailTo,
     from: "admin@tunetrees.com",
     subject: "Email Verification",
     html: verification_mail_html({
@@ -113,7 +113,7 @@ export const newUser = async (data: AccountFormValues, host: string) => {
     //   verificationLink: linkBackURL,
     // },
   });
-  console.log("Email sent:", send_grid_response);
+  console.log("Email sent:", sendGridResponse);
 
   return {
     status: `User created successfully.  Verification email sent to ${email}.`,

@@ -65,7 +65,7 @@ export default function SignInPage({ email = "" }: LoginDialogProps) {
     email = searchParams.get("email") || email;
   }
 
-  const [user_email, setUserEmail] = useState(email);
+  const [userEmail, setUserEmail] = useState(email);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -73,7 +73,7 @@ export default function SignInPage({ email = "" }: LoginDialogProps) {
   const [passwordConfirmationError, setPasswordConfirmationError] = useState<
     string | null
   >(null);
-  const [user_name, setUserName] = useState("");
+  const [userName, setUserName] = useState("");
 
   const validateEmail = useCallback((email: string): boolean => {
     if (email === "") {
@@ -145,9 +145,9 @@ export default function SignInPage({ email = "" }: LoginDialogProps) {
   const handleUserNameChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const user_name_value = e.target.value;
-    setUserName(user_name_value);
-    form.setValue("name", user_name_value);
+    const userNameValue = e.target.value;
+    setUserName(userNameValue);
+    form.setValue("name", userNameValue);
     // form.trigger("password_confirmation");
   };
 
@@ -372,8 +372,8 @@ export default function SignInPage({ email = "" }: LoginDialogProps) {
                   !!passwordConfirmationError ||
                   !password ||
                   !passwordConfirmation ||
-                  !user_email ||
-                  !user_name
+                  !userEmail ||
+                  !userName
                 }
                 className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
               >

@@ -31,8 +31,6 @@ export default async function UserButton() {
     console.log("Session found (UserButton)");
   }
   if (!session?.user) {
-    ("use server");
-
     console.log("No user found in session (UserButton)");
     // let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
     // const csrfToken = cookies().get("authjs.csrf-token")?.value ?? "";

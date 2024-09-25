@@ -19,17 +19,17 @@ function CircularProgress() {
   );
 }
 
-interface PracticeProps {
+interface IPracticeProps {
   user_id: string;
   playlist_id: string;
 }
 
-const TabGroupMain: NextPage<PracticeProps> = ({
+const tabGroupMain: NextPage<IPracticeProps> = ({
   user_id,
   playlist_id,
 }): JSX.Element => {
-  const [playlist_ref] = useState<string>(playlist_id);
-  const [user_ref] = useState<string>(user_id);
+  const [playlistRef] = useState<string>(playlist_id);
+  const [userRef] = useState<string>(user_id);
   const [scheduled, setScheduled] = useState<Tune[]>();
   const [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
   const [origRecentlyPracticed, setOrigRecentlyPracticed] = useState<Tune[]>();
@@ -114,8 +114,8 @@ const TabGroupMain: NextPage<PracticeProps> = ({
             {scheduled ? (
               <ScheduledTunesGrid
                 tunes={scheduled}
-                user_id={user_ref}
-                playlist_id={playlist_ref}
+                user_id={userRef}
+                playlist_id={playlistRef}
                 table_purpose="practice"
               />
             ) : (
@@ -130,8 +130,8 @@ const TabGroupMain: NextPage<PracticeProps> = ({
             {recentlyPracticed ? (
               <RepertoireGrid
                 tunes={recentlyPracticed}
-                user_id={user_ref}
-                playlist_id={playlist_ref}
+                user_id={userRef}
+                playlist_id={playlistRef}
                 table_purpose="repertoire"
                 handleFilterChange={handleFilterChange}
               />
@@ -154,4 +154,4 @@ const TabGroupMain: NextPage<PracticeProps> = ({
   );
 };
 
-export default TabGroupMain;
+export default tabGroupMain;

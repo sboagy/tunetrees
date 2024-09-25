@@ -1,2 +1,6 @@
 build/
 node_modules/next-auth-http-adapter
+node_modules/
+.next/
+.next/*
+.next/cache/
