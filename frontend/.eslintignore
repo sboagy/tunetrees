@@ -4,3 +4,12 @@ node_modules/
 .next/
 .next/*
 .next/cache/
+archive/
+components/ui/button.tsx
+components/ui/form.tsx
+images.d.ts
+postcss.config.js
+middleware.ts
+tailwind.config.js
+next.config.js
+next.config.mjs

@@ -83,7 +83,7 @@ export default function ScheduledTunesGrid({
       setScheduled(data);
     };
     // For this one, we don't need to wait for the response
-    getScheduled(user_id, playlist_id);
+    void getScheduled(user_id, playlist_id);
   };
 
   const [mode, setMode] = useState<ReviewMode>("grid");

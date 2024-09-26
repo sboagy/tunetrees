@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { newUser } from "./newuser-actions";
-import { emailSchema, type LoginDialogProps } from "../login/page";
+import { emailSchema, type ILoginDialogProps } from "../login/page";
 import { getUser } from "../password-login-only/validate-signin";
 import { SocialLoginButtons } from "@/components/auth-social-login";
 import { providerMap } from "@/auth";
@@ -54,7 +54,7 @@ const languages = [
 
 // const _crsfToken = client
 
-export default function SignInPage({ email = "" }: LoginDialogProps) {
+export default function SignInPage({ email = "" }: ILoginDialogProps) {
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
     defaultValues,
@@ -121,18 +121,16 @@ export default function SignInPage({ email = "" }: LoginDialogProps) {
     }
   }
 
-  const handlePasswordChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const pw = e.target.value;
     setPassword(pw);
     check_password(pw, passwordConfirmation);
-    form.trigger("password");
+    void form.trigger("password");
     form.setValue("password", pw);
     // form.trigger("password");
   };
 
-  const handlePasswordConfirmationChange = async (
+  const handlePasswordConfirmationChange = (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const pwc = e.target.value;
@@ -142,9 +140,7 @@ export default function SignInPage({ email = "" }: LoginDialogProps) {
     // form.trigger("password_confirmation");
   };
 
-  const handleUserNameChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleUserNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const userNameValue = e.target.value;
     setUserName(userNameValue);
     form.setValue("name", userNameValue);
@@ -237,7 +233,10 @@ export default function SignInPage({ email = "" }: LoginDialogProps) {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form
+              onSubmit={void form.handleSubmit(onSubmit)}
+              className="space-y-6"
+            >
               <FormField
                 control={form.control}
                 name="csrfToken"
@@ -263,7 +262,7 @@ export default function SignInPage({ email = "" }: LoginDialogProps) {
                       <Input
                         placeholder="person@example.com"
                         {...field}
-                        onChange={handleEmailChange}
+                        onChange={void handleEmailChange}
                       />
                     </FormControl>
                     {/* <FormDescription>

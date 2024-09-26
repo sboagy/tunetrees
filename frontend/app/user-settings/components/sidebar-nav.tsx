@@ -6,14 +6,14 @@ import { usePathname } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
+interface ISidebarNavProps extends React.HTMLAttributes<HTMLElement> {
   items: {
     href: string;
     title: string;
   }[];
 }
 
-export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
+export function SidebarNav({ className, items, ...props }: ISidebarNavProps) {
   const pathname = usePathname();
 
   return (

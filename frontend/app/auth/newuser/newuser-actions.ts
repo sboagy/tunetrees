@@ -1,9 +1,8 @@
 "use server";
 
 import type { AccountFormValues } from "@/app/auth/newuser/account-form";
-import { assertIsDefined } from "@/auth";
 import {
-  type ExtendedAdapterUser,
+  type IExtendedAdapterUser,
   getUserExtendedByEmail,
   ttHttpAdapter,
 } from "@/auth/auth_tt_adapter";
@@ -39,20 +38,23 @@ export const newUser = async (data: AccountFormValues, host: string) => {
     throw new Error(`User already exists for ${email}.`);
   }
 
-  assertIsDefined(ttHttpAdapter.createUser);
+  if (!ttHttpAdapter.createUser) {
+    throw new Error("ttHttpAdapter.createUser is not defined.");
+  }
 
   // Since we are creating a new user, we need to hash the password.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
   const bcrypt = require("bcryptjs");
 
   // We'll go ahead and create the user in the database, with the hashed password,
   //  but we'll leave the emailVerified field null, until the user verifies their email.
   // And we won't allow logging in until the email is verified.
-  const user: ExtendedAdapterUser = {
+  const user: IExtendedAdapterUser = {
     id: "",
     name: data.name,
     email: email,
     emailVerified: null,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     hash: bcrypt.hashSync(data.password, bcrypt.genSaltSync()),
   };
 

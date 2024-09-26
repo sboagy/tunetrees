@@ -6,8 +6,7 @@ export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
   console.log("Constructing the SignIn button");
   return (
     <form
-      action={async () => {
-        "use server";
+      action={() => {
         // const session = await auth();
         console.log("Handling SignIn request");
         // await signIn();
@@ -54,9 +53,9 @@ export function NewUser(
   // or something.  Also, "New user" contrasts better with "Sign In".
   return (
     <form
-      action={async () => {
-        "use server";
-        // const session = await auth();
+      action="/auth/newuser"
+      onSubmit={(event) => {
+        event.preventDefault();
         console.log("Handling New User request");
         redirect("/auth/newuser");
       }}
@@ -72,11 +71,11 @@ export function DemoUser(props: React.ComponentPropsWithRef<typeof Button>) {
   console.log("Constructing the DemoUser button");
   return (
     <form
-      action={async () => {
-        "use server";
+      onSubmit={(event) => {
+        event.preventDefault();
         // const session = await auth();
         console.log("Handling Demo User request");
-        await signIn();
+        void signIn();
       }}
     >
       <Button variant="outline" {...props}>
@@ -111,11 +110,10 @@ export function SignOut(props: React.ComponentPropsWithRef<typeof Button>) {
   console.log("Constructing the SignOut button");
   return (
     <form
-      action={async () => {
-        "use server";
+      action={() => {
         // const session = await auth();
         console.log("Handling SignOut request");
-        await signOut();
+        void signOut();
       }}
       className="w-full"
     >
@@ -132,8 +130,7 @@ export function UserSettingsMenuItem(
   console.log("Constructing the UserSettingsMenuItem button");
   return (
     <form
-      action={async () => {
-        "use server";
+      action={() => {
         // const session = await auth();
         console.log("Handling User Settings request");
         redirect("/user-settings");
@@ -153,8 +150,7 @@ export function ManagePlaylistMenuItem(
   console.log("Constructing the ManagePlaylist button");
   return (
     <form
-      action={async () => {
-        "use server";
+      action={() => {
         // const session = await auth();
         console.log("Handling User Settings request");
         redirect("/user-settings");

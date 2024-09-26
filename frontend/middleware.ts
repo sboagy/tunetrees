@@ -1,32 +1,17 @@
+import { NextResponse } from "next/server";
 import { auth } from "./auth";
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/protected-routes/:path*"], // Adjust the matcher to match your protected routes
 };
 
 export default auth((req) => {
-  // const forwardedFor = req.headers["x-forwarded-for"];
-  // const protocol = req.headers["x-forwarded-proto"];
+  // Check if the user is authenticated
+  if (!req.auth || !req.auth.user) {
+    // Redirect to the login page
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
 
-  // const current_href = window.location.href;
-  // console.log("middleware: current_href: %s", current_href);
-
-  const reqUrl = new URL(req.url);
-  console.log("middleware: reqUrl: %s", reqUrl);
-  console.log("what now? (middleware)");
-  // console.log("middleware: %s, auth: ", reqUrl, req.auth);
-  // console.log("forwardedFor:", forwardedFor);
-  // console.log("protocol:", protocol);
-  // console.log(JSON.stringify(req, null, 2));
-  // This is where we should guard for authentication.
-  // if (!req.auth && reqUrl?.pathname !== "/") {
-  //   return NextResponse.redirect(
-  //     new URL(
-  //       `${BASE_PATH}/signin?callbackUrl=${encodeURIComponent(
-  //         reqUrl?.pathname
-  //       )}`,
-  //       req.url
-  //     )
-  //   );
-  // }
+  // If the user is authenticated, allow access to the protected route
+  return NextResponse.next();
 });

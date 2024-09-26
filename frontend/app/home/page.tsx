@@ -20,11 +20,11 @@ const HomePage = async () => {
 
   console.log("Session found! (HomePage)");
 
-  const user_id = (session?.user?.id as string) ?? "1";
-  const playlist_id = "1";
+  const userId = (session?.user?.id as string) ?? "1";
+  const playlistId = "1";
 
   return (
-    <TabGroupMain user_id={user_id} playlist_id={playlist_id} />
+    <TabGroupMain user_id={userId} playlist_id={playlistId} />
     // Practice(user_id, playlist_id)
     // <div className="flex flex-col items-center m-4">
     //   <h1 className="text-3xl my-2">Welcome, {session?.user?.name}</h1>

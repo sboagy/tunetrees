@@ -2,7 +2,7 @@ import { doLogout } from "@/app/actions";
 
 const Logout = () => {
   return (
-    <form action={doLogout}>
+    <form action={void doLogout}>
       <button className="bg-blue-400 my-2 text-white p-1 rounded" type="submit">
         Logout
       </button>

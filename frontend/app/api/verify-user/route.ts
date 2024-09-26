@@ -57,18 +57,18 @@ export async function GET(req: NextRequest) {
   }
   if (user.emailVerified === null) {
     user.emailVerified = new Date();
-    const stringify_user = JSON.stringify(user);
+    const stringifyUser = JSON.stringify(user);
 
-    const update_user_response = await axios.patch(
+    const updateUserResponse = await axios.patch(
       `${_baseURL}/auth/update-user/`,
-      stringify_user,
+      stringifyUser,
       {
         headers: {
           "Content-Type": "application/json",
         },
       },
     );
-    console.log("update_user_response: ", update_user_response);
+    console.log("update_user_response: ", updateUserResponse);
   }
 
   await signIn("credentials", {

@@ -43,11 +43,12 @@ export async function getSocialLoginURLs(providerMap: ProviderMap) {
   for (const provider of Object.values(providerMap).filter(
     (provider) => provider.id !== "credentials" && provider.id !== "sendgrid",
   )) {
-    const redirect_url = await signIn(provider.id, {
+    // Not absolutely sure the return from signIn is a string
+    const redirectUrl: string = (await signIn(provider.id, {
       redirectTo: "/home",
       redirect: false,
-    });
-    signInURLs[provider.id] = redirect_url;
+    })) as string;
+    signInURLs[provider.id] = redirectUrl;
   }
   console.log("signInURLs", signInURLs);
   return signInURLs;

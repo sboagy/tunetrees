@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 
-interface CustomLinkProps extends React.LinkHTMLAttributes<HTMLAnchorElement> {
+interface ICustomLinkProps extends React.LinkHTMLAttributes<HTMLAnchorElement> {
   href: string;
 }
 
@@ -11,7 +11,7 @@ const CustomLink = ({
   children,
   className,
   ...rest
-}: CustomLinkProps) => {
+}: ICustomLinkProps) => {
   const isInternalLink = href.startsWith("/");
   const isAnchorLink = href.startsWith("#");
 

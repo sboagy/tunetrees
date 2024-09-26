@@ -72,7 +72,7 @@ export const submitPracticeFeedbacks = async ({
   }
   const url = `${baseURL}/practice/submit_feedbacks`;
   console.log(
-    `Submitting feedbacks for user_id: ${playlist_id}, updates: ${updates} url: ${url}`,
+    `Submitting feedbacks for user_id: ${playlist_id}, updates: ${JSON.stringify(updates)} url: ${url}`,
   );
 
   try {
@@ -88,7 +88,7 @@ export const submitPracticeFeedbacks = async ({
       },
     });
     console.log("Feedbacks submitted successfully:", response.data);
-    return response.data;
+    return response.data as string;
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error("Axios error:", error.response?.data || error.message);

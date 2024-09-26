@@ -199,10 +199,10 @@ export function RecallEvalComboBox(
                     // const original_selection_state = info.row.getIsSelected();
                     // info.row.toggleSelected(!original_selection_state);
 
-                    const table_state = info.table.getState();
-                    info.table.setState(table_state);
+                    const tableState = info.table.getState();
+                    info.table.setState(tableState);
 
-                    saveData(newValue);
+                    void saveData(newValue);
 
                     // info.row.toggleSelected(original_selection_state);
 

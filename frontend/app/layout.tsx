@@ -15,9 +15,7 @@ export const metadata: Metadata = {
     "TuneTrees is an app make music repertoire practice more efficient, and the tunes better retained in long term memory.",
 };
 
-export default async function RootLayout({
-  children,
-}: React.PropsWithChildren) {
+export default function RootLayout({ children }: React.PropsWithChildren) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>

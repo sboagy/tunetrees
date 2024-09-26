@@ -7,12 +7,21 @@ export async function sendVerificationRequest(params: {
   url: string;
   expires: Date;
   provider: EmailConfig;
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  theme: any;
+  theme: { brandColor?: string; buttonText?: string };
   token: string;
   request: Request;
 }) {
-  const { identifier: to, provider, url, theme } = params;
+  const {
+    identifier: to,
+    provider,
+    url,
+    theme,
+  }: {
+    identifier: string;
+    provider: EmailConfig;
+    url: string;
+    theme: { brandColor?: string; buttonText?: string };
+  } = params;
   const { host } = new URL(url);
   console.log("sendVerificationRequest: to: %s", to);
   console.log("sendVerificationRequest: url: %s", url);
@@ -43,8 +52,7 @@ export async function sendVerificationRequest(params: {
 export function verification_mail_html(params: {
   url: string;
   host: string;
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  theme: any;
+  theme: { brandColor?: string; buttonText?: string };
 }) {
   const { url, host, theme } = params;
 

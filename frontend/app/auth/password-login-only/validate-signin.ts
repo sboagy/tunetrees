@@ -2,32 +2,32 @@
 
 import {
   getUserExtendedByEmail,
-  type ExtendedAdapterUser,
+  type IExtendedAdapterUser,
 } from "@/auth/auth_tt_adapter";
 import { matchPasswordWithHash } from "@/auth/password-match";
 import axios from "axios";
 
 const _baseURL = process.env.NEXT_BASE_URL;
 
-export async function updateUserEmailVerification(user: ExtendedAdapterUser) {
+export async function updateUserEmailVerification(user: IExtendedAdapterUser) {
   user.emailVerified = new Date();
-  const stringify_user = JSON.stringify(user);
+  const stringifyUser = JSON.stringify(user);
 
-  const update_user_response = await axios.patch(
+  const updateUserResponse = await axios.patch(
     `${_baseURL}/auth/update-user/`,
-    stringify_user,
+    stringifyUser,
     {
       headers: {
         "Content-Type": "application/json",
       },
     },
   );
-  console.log("update_user_response: ", update_user_response);
+  console.log("update_user_response: ", updateUserResponse);
 }
 
 export async function getUser(
   email: string,
-): Promise<ExtendedAdapterUser | null> {
+): Promise<IExtendedAdapterUser | null> {
   if (!email) {
     throw new Error("Empty Email.");
   }
@@ -37,7 +37,10 @@ export async function getUser(
   return user;
 }
 
-export async function authorizeWithPassword(email: string, password: string) {
+export async function authorizeWithPassword(
+  email: string,
+  password: string,
+): Promise<IExtendedAdapterUser> {
   //   assertIsDefined(ttHttpAdapter.getUserByEmail);
 
   if (!email) {

@@ -75,8 +75,9 @@ export async function getTableState(
       `/table_state/${userId}/${screenSize}/${purpose}`,
     );
     // Handle successful response
-    const tableStatesStr = response.data;
-    const tableStates = JSON.parse(tableStatesStr);
+    const tableStatesStr: string = response.data as string;
+    // Not very confident about this reconstitution of TableState
+    const tableStates: TableState = JSON.parse(tableStatesStr) as TableState;
     console.error("getTableState response status: ", response.status);
     return tableStates;
   } catch (error) {
@@ -130,8 +131,11 @@ export async function getTableTransientData(
       `/table_transient_data/${userId}/${tuneId}/${playlistId}/${purpose}`,
     );
     // Handle successful response
-    const transientDataStr = response.data;
-    const transientData = JSON.parse(transientDataStr);
+    const transientDataStr: string = response.data as string;
+    // Not very confident about this reconstitution of TableTransientData
+    const transientData: TableTransientData = JSON.parse(
+      transientDataStr,
+    ) as TableTransientData;
     console.error("getTableTransientData response status: ", response.status);
     return transientData;
   } catch (error) {
@@ -164,32 +168,32 @@ export async function deleteTableTransientData(
   }
 }
 
-export async function deleteTableTransientDataSync(
-  userId: number,
-  tuneId: number,
-  playlistId: number,
-  purpose: TablePurpose,
-): Promise<number> {
-  try {
-    const promiseResult = deleteTableTransientData(
-      userId,
-      tuneId,
-      playlistId,
-      purpose,
-    );
-    promiseResult
-      .then((result) => {
-        console.log("deleteTableTransientData successful:", result);
-        return result;
-      })
-      .catch((error) => {
-        console.error("Error submitting feedbacks:", error);
-        return 500;
-      });
-    return 500;
-  } catch (error) {
-    // Handle error
-    console.error("deleteTableTransientData: ", error);
-    return 500;
-  }
-}
+// export function deleteTableTransientDataSync(
+//   userId: number,
+//   tuneId: number,
+//   playlistId: number,
+//   purpose: TablePurpose,
+// ): number {
+//   try {
+//     const promiseResult = deleteTableTransientData(
+//       userId,
+//       tuneId,
+//       playlistId,
+//       purpose,
+//     );
+//     promiseResult
+//       .then((result) => {
+//         console.log("deleteTableTransientData successful:", result);
+//         return result;
+//       })
+//       .catch((error) => {
+//         console.error("Error submitting feedbacks:", error);
+//         return 500;
+//       });
+//     return 500;
+//   } catch (error) {
+//     // Handle error
+//     console.error("deleteTableTransientData: ", error);
+//     return 500;
+//   }
+// }

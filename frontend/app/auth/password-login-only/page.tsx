@@ -13,9 +13,9 @@ import { Label } from "@/components/ui/label";
 import Image from "next/image";
 import { authorizeWithPassword } from "./validate-signin";
 import axios from "axios";
-import { emailSchema, type LoginDialogProps } from "../login/page";
+import { emailSchema, type ILoginDialogProps } from "../login/page";
 
-export default function LoginDialog({ email = "" }: LoginDialogProps) {
+export default function LoginDialog({ email = "" }: ILoginDialogProps) {
   if (email === "" && typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
     email = searchParams.get("email") || email;
@@ -82,7 +82,7 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
           }
         }
       } catch (error) {
-        setPasswordError(`${error}`);
+        setPasswordError(`${(error as Error).message}`);
         console.error((error as Error).message);
       }
 
@@ -108,7 +108,7 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
             <CardTitle className="text-2xl text-center">Sign in</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={void handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="user_email">Email</Label>
                 <Input
@@ -150,7 +150,7 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
             <Button
               className="w-full"
               type="submit"
-              onClick={handleSubmit}
+              onClick={void handleSubmit}
               disabled={!!emailError}
               variant="outline"
             >

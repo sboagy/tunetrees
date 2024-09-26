@@ -12,7 +12,7 @@ export async function signOut() {
   await naSignOut();
 }
 
-interface DynamicTemplateData {
+interface IDynamicTemplateData {
   verificationLink: string;
   // Add other properties as needed
 }
@@ -24,13 +24,13 @@ export async function sendGrid(options: {
   text?: string;
   html?: string;
   templateId?: string;
-  dynamicTemplateData?: DynamicTemplateData;
+  dynamicTemplateData?: IDynamicTemplateData;
 }): Promise<void> {
-  const sendgrid_api_key = process.env.TT_AUTH_SENDGRID_API_KEY;
-  if (!sendgrid_api_key) {
+  const sendgridApiKey = process.env.TT_AUTH_SENDGRID_API_KEY;
+  if (!sendgridApiKey) {
     throw new Error("TT_AUTH_SENDGRID_API_KEY not set.");
   }
-  sgMail.setApiKey(sendgrid_api_key);
+  sgMail.setApiKey(sendgridApiKey);
 
   const mailData: MailDataRequired = {
     to: options.to,

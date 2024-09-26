@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "glint": "gts lint",
+    "eslint": "eslint .",
     "eslint:fix": "eslint --fix .",
     "clean": "gts clean",
     "compile": "tsc",
@@ -88,8 +89,9 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.7",
+    "eslint-plugin-react": "^7.36.1",
     "postcss": "^8.4.42",
     "tailwindcss": "^3.4.10",
-    "typescript": "^5.5.4"
+    "typescript": "^5.6.2"
   }
 }

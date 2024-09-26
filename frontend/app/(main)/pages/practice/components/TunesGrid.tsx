@@ -194,7 +194,7 @@ export function TunesTable(
       }
     };
 
-    fetchTableState();
+    void fetchTableState();
   }, [user_id, table_purpose, table]);
 
   const saveTableState = async (
@@ -237,7 +237,7 @@ export function TunesTable(
 
     originalSetRowSelectionRef.current(resolvedRowSelectionState);
 
-    saveTableState(table, user_id, table_purpose);
+    void saveTableState(table, user_id, table_purpose);
     if (selectionChangedCallback) {
       selectionChangedCallback(table, resolvedRowSelectionState);
     }
@@ -255,7 +255,7 @@ export function TunesTable(
 
     originalColumnFiltersRef.current(resolvedColumnFiltersState);
 
-    saveTableState(table, user_id, table_purpose);
+    void saveTableState(table, user_id, table_purpose);
   };
 
   const interceptedSetSorting = (
@@ -266,7 +266,7 @@ export function TunesTable(
 
     originalSetSortingRef.current(resolvedSorting);
 
-    saveTableState(table, user_id, table_purpose);
+    void saveTableState(table, user_id, table_purpose);
   };
 
   const interceptedSetColumnVisibility = (
@@ -281,7 +281,7 @@ export function TunesTable(
 
     originalSetColumnVisibilityRef.current(resolvedVisibilityState);
 
-    saveTableState(table, user_id, table_purpose);
+    void saveTableState(table, user_id, table_purpose);
   };
 
   const interceptedSetPagination = (
@@ -296,7 +296,7 @@ export function TunesTable(
 
     originalSetPaginationState.current(resolvedPaginationState);
 
-    saveTableState(table, user_id, table_purpose);
+    void saveTableState(table, user_id, table_purpose);
   };
 
   table.setOptions((prev) => ({

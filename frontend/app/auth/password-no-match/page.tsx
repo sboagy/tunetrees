@@ -12,7 +12,7 @@
 //   );
 // }
 
-export default async function ErrorPage({
+export default function ErrorPage({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   searchParams,
 }: {

@@ -141,7 +141,7 @@ export function get_columns(
 
     const rowSelection = table.getState().rowSelection;
     console.log("rowSelection: ", rowSelection);
-    saveTableState(table, userId.toString(), purpose);
+    void saveTableState(table, userId.toString(), purpose);
   };
 
   // const isIndeterminate = () => {
@@ -187,22 +187,20 @@ export function get_columns(
       info.row.toggleSelected();
       info.table.getState().rowSelection[info.row.id] = true;
       const promise = saveTableState(info.table, userId.toString(), purpose);
-      if (promise) {
-        promise
-          .then((result) => {
-            console.log(
-              "handleItemCheckboxChange - saveTableState result: ",
-              result,
-            );
-          })
-          .catch((error) => {
-            console.error(
-              "handleItemCheckboxChange - Error saveTableState: ",
-              error,
-            );
-            throw error;
-          });
-      }
+      promise
+        .then((result) => {
+          console.log(
+            "handleItemCheckboxChange - saveTableState result: ",
+            result,
+          );
+        })
+        .catch((error) => {
+          console.error(
+            "handleItemCheckboxChange - Error saveTableState: ",
+            error,
+          );
+          throw error;
+        });
     };
 
     return (
@@ -219,14 +217,14 @@ export function get_columns(
           accessorKey: "recall_eval",
           header: ({ column }) => sortableHeader(column, "Title"),
           enableHiding: false,
-          cell: (info: CellContext<Tune, string | unknown>) =>
+          cell: (info: CellContext<Tune, string | undefined>) =>
             RecallEvalComboBox(info, userId, playlistId, purpose),
         }
       : {
           accessorKey: "select",
           header: ({ column, table }) => selectionHeader(column, table),
           enableHiding: false,
-          cell: (info: CellContext<Tune, string | unknown>) =>
+          cell: (info: CellContext<Tune, string | undefined>) =>
             RowSelectedCheckBox(info, userId, playlistId, purpose),
         },
     {
@@ -257,7 +255,7 @@ export function get_columns(
     {
       accessorKey: "title",
       header: ({ column }) => sortableHeader(column, "Title"),
-      cell: (info: CellContext<Tune, string | unknown>) => {
+      cell: (info: CellContext<Tune, string | undefined>) => {
         return info.getValue();
       },
       enableSorting: true,
@@ -376,7 +374,7 @@ export function get_columns(
     {
       accessorKey: "external_ref",
       header: "External Ref",
-      cell: (info: CellContext<Tune, string | unknown>) => {
+      cell: (info: CellContext<Tune, string | undefined>) => {
         // return info.getValue();
         if (!info.row.original.external_ref) {
           return (

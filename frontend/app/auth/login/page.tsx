@@ -19,17 +19,17 @@ import { providerMap } from "@/auth";
 
 export const emailSchema = z.string().email("Invalid email address");
 
-export interface LoginDialogProps {
+export interface ILoginDialogProps {
   email?: string;
 }
 
-export default function LoginDialog({ email = "" }: LoginDialogProps) {
+export default function LoginDialog({ email = "" }: ILoginDialogProps) {
   if (email === "" && typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
     email = searchParams.get("email") || email;
   }
 
-  const [user_email, setUserEmail] = useState(email);
+  const [userEmail, setUserEmail] = useState(email);
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -60,47 +60,50 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
     validateEmail(newEmail);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateEmail(user_email)) {
+    if (validateEmail(userEmail)) {
       // Handle login logic here
-      console.log("Sign in attempt with:", { user_email, password });
-      try {
-        // const user = authorizeWithPassword(user_email, password);
-        const user = await authorizeWithPassword(user_email, password);
-        if (!user) {
-          setPasswordError("Sign in failed");
-        } else {
-          console.log("Sign in successful");
-          // Redirect to the home page
-          if (typeof window !== "undefined") {
-            const response = await axios.get("/api/verify-user", {
-              params: {
-                email: user_email,
-                password: password,
-              },
-            });
-            console.log("verify-user response:", response);
-            if (response.status === 200) {
-              // Redirect to the home page
-              window.location.href = "/";
-            } else {
-              setPasswordError(response.statusText);
-              console.log("Could not sign in user");
-            }
+      console.log("Sign in attempt with:", { user_email: userEmail, password });
+      authorizeWithPassword(userEmail, password)
+        .then((user) => {
+          if (!user) {
+            setPasswordError("Sign in failed");
           } else {
-            // Hopefully this never happens??
-            setPasswordError("Problem redirecting to home page");
-            console.log("Sign in successful, but window is undefined");
+            console.log("Sign in successful");
+            // Redirect to the home page
+            if (typeof window !== "undefined") {
+              axios
+                .get("/api/verify-user", {
+                  params: {
+                    email: userEmail,
+                    password: password,
+                  },
+                })
+                .then((response) => {
+                  if (response.status === 200) {
+                    // Redirect to the home page
+                    window.location.href = "/";
+                  } else {
+                    setPasswordError(response.statusText);
+                    console.log("Could not sign in user");
+                  }
+                })
+                .catch((error) => {
+                  setPasswordError(`${error}`);
+                  console.error(error);
+                });
+            } else {
+              // Hopefully this never happens??
+              setPasswordError("Problem redirecting to home page");
+              console.log("Sign in successful, but window is undefined");
+            }
           }
-        }
-      } catch (error) {
-        setPasswordError(`${error}`);
-        console.error((error as Error).message);
-      }
-
-      // TODO: Implement password check and authorization logic, then redirect
-      // to the to the home page.
+        })
+        .catch((error) => {
+          setPasswordError(`${error}`);
+          console.error(error);
+        });
     }
   };
 
@@ -129,7 +132,7 @@ export default function LoginDialog({ email = "" }: LoginDialogProps) {
                   name="user_email"
                   type="email"
                   placeholder="m@example.com"
-                  value={user_email}
+                  value={userEmail}
                   onChange={handleEmailChange}
                   required
                   className={emailError ? "border-red-500" : ""}

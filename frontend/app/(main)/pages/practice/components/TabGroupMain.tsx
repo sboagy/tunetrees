@@ -53,7 +53,7 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
       const data = await getPracticeListScheduled(user_id, playlist_id);
       setScheduled(data);
     };
-    getScheduled(user_id, playlist_id);
+    void getScheduled(user_id, playlist_id);
   }, [user_id, playlist_id]);
 
   useEffect(() => {
@@ -62,7 +62,7 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
       setRecentlyPracticed(data);
       setOrigRecentlyPracticed(data);
     };
-    getRecent(user_id, playlist_id);
+    void getRecent(user_id, playlist_id);
   }, [user_id, playlist_id]);
 
   const tabSpec = [

@@ -59,7 +59,7 @@ import { sendGrid } from "./helpers";
 
 export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
   if (value === undefined || value === null) {
-    throw new Error(`Assertion error: ${value} is not defined`);
+    throw new Error("Assertion error: value is not NonNullable");
   }
 }
 
@@ -148,14 +148,15 @@ export const providers: Provider[] = [
           html: verification_mail_html({
             url: `https://${host}/verify?email=${email}`,
             host: `https://${host}`,
-            theme: { colorScheme: "auto", logo: "/logo4.png" },
+            // theme: { colorScheme: "auto", logo: "/logo4.png" },
+            theme: { brandColor: "auto", buttonText: "Verify Email" },
           }),
           text: verification_mail_text({
             url: `https://${host}/verify?email=${email}`,
             host: `https://${host}:3000`,
           }),
           dynamicTemplateData: {
-            verificationLink: `https://${host}/verify?email=${credentials.email}`,
+            verificationLink: `https://${host}/verify?email=${credentials.email as string}`,
           },
         });
       }
@@ -323,7 +324,7 @@ const config = {
     },
   },
   callbacks: {
-    async signIn(params: {
+    signIn(params: {
       user: User | AdapterUser;
       account: Account | null;
       /**
@@ -434,7 +435,7 @@ const config = {
 
       return params.token;
     },
-    async redirect(params: {
+    redirect(params: {
       /** URL provided as callback URL by the client */
       url: string;
       /** Default base URL of site (can be used as fallback) */
@@ -444,7 +445,7 @@ const config = {
       // console.log("redirect callback: -- ", logObject(params, true));
       return params.baseUrl;
     },
-    async session(params: {
+    session(params: {
       session: Session & { userId?: string; view_settings?: string };
       token: JWT & { user_id?: string; view_settings?: string };
       user: User | AdapterUser;

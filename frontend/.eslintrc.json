@@ -1,13 +1,20 @@
 {
+  "parser": "@typescript-eslint/parser",
   "extends": [
     "./node_modules/gts/",
     "eslint:recommended",
-    "plugin:@typescript-eslint/recommended"
-    // "plugin:@typescript-eslint/recommended-requiring-type-checking"
+    // "plugin:prettier/recommended",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react/jsx-runtime", // Use this config for React 17+
+    "plugin:@typescript-eslint/recommended-requiring-type-checking"
     // Add this line
     // ... other configurations
   ],
-  "parser": "@typescript-eslint/parser",
+  "plugins": [
+    "@typescript-eslint",
+    "react"
+  ],
   "parserOptions": {
     "ecmaVersion": "latest",
     "sourceType": "module",
@@ -18,6 +25,15 @@
     // Crucial for type-aware linting
   },
   "rules": {
+    // Enforce PascalCase for component files
+    "react/jsx-filename-extension": [
+      "warn",
+      {
+        "extensions": [
+          ".tsx"
+        ]
+      }
+    ],
     "@typescript-eslint/naming-convention": [
       "warn",
       {
@@ -95,50 +111,11 @@
         }
       }
     ],
-    // eslint-disable-line
     "quotes": "off"
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
   }
 }
-// {
-//   "extends": [
-//     "eslint:recommended",
-//     "plugin:@typescript-eslint/recommended",
-//     "plugin:@typescript-eslint/recommended-requiring-type-checking",
-//     // For stronger type-checking rules
-//     "plugin:react/recommended", // Or "next/core-web-vitals" if applicable 
-//     "prettier"
-//   ],
-//   "plugins": [
-//     "@typescript-eslint",
-//     "react"
-//   ], // Or "next"
-//   "parser": "@typescript-eslint/parser",
-//   "parserOptions": {
-//     "ecmaVersion": "latest",
-//     "sourceType": "module",
-//     "ecmaFeatures": {
-//       "jsx": true
-//     },
-//     "project": "./tsconfig.json"
-//     // Crucial for type-aware linting
-//   },
-//   "rules": {
-//     // TypeScript-specific rules:
-//     "@typescript-eslint/no-unused-vars": "error",
-//     "@typescript-eslint/explicit-function-return-type": "warn", // Or "error" for stricter enforcement
-//     "@typescript-eslint/no-explicit-any": "warn", // Encourage explicit typing
-//     // ...other rules
-//     "@typescript-eslint/naming-convention": [
-//       "error",
-//       {
-//         "selector": "variable",
-//         "format": [
-//           "camelCase",
-//           "UPPER_CASE"
-//         ], // Allow camelCase and UPPER_CASE for variables
-//         "leadingUnderscore": "allow" // Allow leading underscores for certain cases (e.g., private variables)
-//       }
-//       // ... other naming convention rules
-//     ]
-//   }
-// }

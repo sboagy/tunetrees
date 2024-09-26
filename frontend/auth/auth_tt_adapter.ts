@@ -6,7 +6,7 @@ import type {
 } from "next-auth/adapters";
 import { ofetch } from "ofetch";
 import { z } from "zod";
-import type { AdapterProcedure } from "./adapter_procedure";
+import type { IAdapterProcedure } from "./adapter_procedure";
 export const adapterSessionSchema = z.object({
   expires: z.date(),
   sessionToken: z.string(),
@@ -28,7 +28,7 @@ export const getSessionAndUserSchema = z
   })
   .nullable();
 
-export interface ExtendedAdapterUser extends AdapterUser {
+export interface IExtendedAdapterUser extends AdapterUser {
   hash?: string | null;
   view_settings?: string;
 }
@@ -46,23 +46,23 @@ const userExtendedAdapterSchema = z.object({
 export const getUserExtendedByEmailSchema =
   userExtendedAdapterSchema.nullable();
 
-function userSerializer(res: ExtendedAdapterUser | null) {
+function userSerializer(res: IExtendedAdapterUser | null) {
   if (res === null) {
     return null;
   }
-  let email_verified = null;
+  let emailVerified = null;
   if (res?.emailVerified) {
-    email_verified = new Date(res.emailVerified);
+    emailVerified = new Date(res.emailVerified);
   }
-  const serialized_user = {
+  const serializedUser = {
     id: res?.id,
     name: res?.name,
     email: res?.email,
     image: res?.image,
-    emailVerified: email_verified,
+    emailVerified: emailVerified,
     hash: res?.hash, // ugh, "next-auth-http-adapter" will strip this
   };
-  return serialized_user;
+  return serializedUser;
 }
 
 function sessionSerializer(res: AdapterSession | null | undefined) {
@@ -80,13 +80,11 @@ function sessionSerializer(res: AdapterSession | null | undefined) {
 async function userAndSessionSerializer(
   res: Promise<{ session: AdapterSession; user: AdapterUser } | null>,
 ) {
-  const user_and_session_obj = await res;
-  const user = userSerializer(
-    user_and_session_obj?.user as ExtendedAdapterUser,
-  );
-  const session = sessionSerializer(user_and_session_obj?.session);
-  const seassion_tweaked = { user, session };
-  return seassion_tweaked;
+  const userAndSessionObj = await res;
+  const user = userSerializer(userAndSessionObj?.user as IExtendedAdapterUser);
+  const session = sessionSerializer(userAndSessionObj?.session);
+  const seassionTweaked = { user, session };
+  return seassionTweaked;
   // try{
   //   let parsed = await getSessionAndUserSchema.parseAsync(seassion_tweaked);
   //   console.log("userAndSessionSerializer, parsed:");
@@ -119,7 +117,9 @@ const _baseURL = process.env.NEXT_BASE_URL;
 // The createUser method of ttHttpAdapter will strip the hash off,
 // unfortunately, which we need for authentication.  So use this
 // custom function instead.
-export async function getUserExtendedByEmail(email: string) {
+export async function getUserExtendedByEmail(
+  email: string,
+): Promise<IExtendedAdapterUser | null> {
   const {
     path,
     select: serialize = userSerializer,
@@ -129,10 +129,10 @@ export async function getUserExtendedByEmail(email: string) {
     method: "GET",
     select: userSerializer,
   };
-  const res = await ofetch(path, {
+  const res: IExtendedAdapterUser = await ofetch(path, {
     baseURL: _baseURL, // or any other base url
     headers: {
-      // biome-ignore lint/style/noNonNullAssertion: Not acutally sure about this assertion suppression
+      // biome-ignore lint/style/noNonNullAssertion: Not actually sure about this assertion suppression
       Authorization: process.env.REMOTE_AUTH_RPC_TOKEN!,
     },
     body: null,
@@ -152,7 +152,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
   },
   // you can provide any other
   adapterProcedures: {
-    createUser(user: Omit<AdapterUser, "id">): AdapterProcedure {
+    createUser(user: Omit<AdapterUser, "id">): IAdapterProcedure {
       return {
         path: "auth/signup/",
         method: "POST",
@@ -160,14 +160,14 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
         select: userSerializer,
       };
     },
-    getUserById(id: string): AdapterProcedure {
+    getUserById(id: string): IAdapterProcedure {
       return {
         path: `auth/get-user/${id}/`,
         method: "GET",
         select: userSerializer,
       };
     },
-    getUserByEmail(email: string): AdapterProcedure {
+    getUserByEmail(email: string): IAdapterProcedure {
       return {
         path: `auth/get-user-by-email/${email}/`,
         method: "GET",
@@ -177,7 +177,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
     getUserByAccount(params: {
       providerAccountId: string;
       provider: string;
-    }): AdapterProcedure {
+    }): IAdapterProcedure {
       const { providerAccountId, provider } = params;
       return {
         path: `auth/get-user-by-account/${encodeURIComponent(
@@ -189,7 +189,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
     },
     updateUser(
       user: Partial<AdapterUser> & Pick<AdapterUser, "id">,
-    ): AdapterProcedure {
+    ): IAdapterProcedure {
       return {
         path: "auth/update-user/",
         method: "PATCH",
@@ -197,13 +197,17 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
         select: userSerializer,
       };
     },
-    deleteUser(id: string): AdapterProcedure {
+    deleteUser(id: string): IAdapterProcedure {
       return {
         path: `auth/delete-user/${id}/`,
         method: "DELETE",
       };
     },
-    linkAccount(account): AdapterProcedure {
+    linkAccount(account: {
+      provider: string;
+      providerAccountId: string;
+      userId: string;
+    }): IAdapterProcedure {
       return {
         path: "auth/link-account/",
         method: "POST",
@@ -213,7 +217,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
     unlinkAccount(params: {
       provider: string;
       providerAccountId: string;
-    }): AdapterProcedure {
+    }): IAdapterProcedure {
       const { provider, providerAccountId } = params;
       return {
         path: `auth/unlink-account/${encodeURIComponent(
@@ -222,7 +226,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
         method: "DELETE",
       };
     },
-    createSession(session: AdapterSession): AdapterProcedure {
+    createSession(session: AdapterSession): IAdapterProcedure {
       return {
         path: "auth/create-session/",
         method: "POST",
@@ -230,7 +234,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
         select: sessionSerializer,
       };
     },
-    getSessionAndUser(sessionToken: string): AdapterProcedure {
+    getSessionAndUser(sessionToken: string): IAdapterProcedure {
       return {
         path: `auth/get-session/${sessionToken}`,
         method: "GET",
@@ -239,7 +243,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
     },
     updateSession(
       session: Partial<AdapterSession> & Pick<AdapterSession, "sessionToken">,
-    ): AdapterProcedure {
+    ): IAdapterProcedure {
       return {
         path: "auth/update-session/",
         method: "PATCH",
@@ -247,7 +251,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
         select: sessionSerializer,
       };
     },
-    deleteSession(sessionToken: string): AdapterProcedure {
+    deleteSession(sessionToken: string): IAdapterProcedure {
       return {
         path: `auth/delete-session/${sessionToken}/`,
         method: "DELETE",
@@ -255,7 +259,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
     },
     createVerificationToken(
       verificationToken: VerificationToken,
-    ): AdapterProcedure {
+    ): IAdapterProcedure {
       return {
         path: "auth/create-verification-token/",
         method: "POST",
@@ -265,7 +269,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
     useVerificationToken(params: {
       identifier: string;
       token: string;
-    }): AdapterProcedure {
+    }): IAdapterProcedure {
       const { identifier, token } = params;
       return {
         path: "auth/use-verification-token/",

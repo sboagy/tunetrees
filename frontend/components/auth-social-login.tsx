@@ -18,7 +18,7 @@ export function SocialLoginButtons(providerMap: ProviderMap) {
             provider.id !== "credentials" && provider.id !== "sendgrid",
         )
         .map((provider) => (
-          <form key={provider.id} action={async () => doSocialLogin2(provider)}>
+          <form key={provider.id} action={() => void doSocialLogin2(provider)}>
             <Button type="submit" variant="secondary">
               <>
                 <img

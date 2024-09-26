@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export interface AdapterProcedure {
+export interface IAdapterProcedure {
   path: string;
   method: string;
   body?: object;

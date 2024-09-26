@@ -12,7 +12,7 @@
 //   );
 // }
 
-export default async function ErrorPage({
+export default function ErrorPage({
   searchParams,
 }: {
   searchParams: { [key: string]: string | string[] | undefined };
