@@ -1,5 +1,3 @@
-"use server";
-
 // import { useSearchParams } from "next/navigation";
 
 // enum Error {

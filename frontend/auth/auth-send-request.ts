@@ -56,7 +56,7 @@ export function verification_mail_html(params: {
 }) {
   const { url, host, theme } = params;
 
-  const escapedHost = host.replace(/\./g, "&#8203;.");
+  const escapedHost = host.replaceAll(".", "&#8203;.");
 
   const brandColor = theme.brandColor || "#346df1";
   const color = {

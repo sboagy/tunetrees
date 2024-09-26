@@ -3,7 +3,7 @@
 import {
   getUserExtendedByEmail,
   type IExtendedAdapterUser,
-} from "@/auth/auth_tt_adapter";
+} from "@/auth/auth-tt-adapter";
 import { matchPasswordWithHash } from "@/auth/password-match";
 import axios from "axios";
 

@@ -36,8 +36,7 @@ export default function ScheduledTunesGrid({
 
     const updates: { [key: string]: ITuneUpdate } = {};
 
-    for (let i = 0; i < scheduled.length; i++) {
-      const tune = scheduled[i];
+    for (const [i, tune] of scheduled.entries()) {
       const idString = `${tune.id}`;
       const row = table.getRow(i.toString());
 

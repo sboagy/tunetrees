@@ -48,12 +48,12 @@ import {
   sendVerificationRequest,
   verification_mail_html,
   verification_mail_text,
-} from "./authSendRequest";
+} from "./auth-send-request";
 import type { Adapter, AdapterUser } from "next-auth/adapters";
 import type { JWT, JWTOptions } from "next-auth/jwt";
 import type { CredentialInput, Provider } from "next-auth/providers";
 import type { NextRequest } from "next/server";
-import { getUserExtendedByEmail, ttHttpAdapter } from "./auth_tt_adapter";
+import { getUserExtendedByEmail, ttHttpAdapter } from "./auth-tt-adapter";
 import { matchPasswordWithHash } from "./password-match";
 import { sendGrid } from "./helpers";
 

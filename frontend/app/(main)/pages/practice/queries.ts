@@ -22,10 +22,10 @@ export async function getPracticeListScheduled(
     );
     const data = response.data;
     return data;
-  } catch (e) {
-    console.error("Error in getPracticeListScheduled: ", e);
+  } catch (error) {
+    console.error("Error in getPracticeListScheduled: ", error);
     // Return a dummy Tune object to avoid breaking the UI
-    return Promise.resolve<Tune[]>(ERROR_TUNE);
+    return ERROR_TUNE;
   }
 }
 
@@ -39,9 +39,9 @@ export async function getRecentlyPracticed(
     );
     const data = response.data;
     return data;
-  } catch (e) {
-    console.error("Error in getRecentlyPracticed: ", e);
+  } catch (error) {
+    console.error("Error in getRecentlyPracticed: ", error);
     // Return a dummy Tune object to avoid breaking the UI
-    return Promise.resolve<Tune[]>(ERROR_TUNE);
+    return ERROR_TUNE;
   }
 }

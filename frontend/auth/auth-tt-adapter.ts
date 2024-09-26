@@ -6,7 +6,7 @@ import type {
 } from "next-auth/adapters";
 import { ofetch } from "ofetch";
 import { z } from "zod";
-import type { IAdapterProcedure } from "./adapter_procedure";
+import type { IAdapterProcedure } from "./adapter-procedure";
 export const adapterSessionSchema = z.object({
   expires: z.date(),
   sessionToken: z.string(),

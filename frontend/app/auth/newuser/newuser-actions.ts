@@ -2,14 +2,15 @@
 
 import type { AccountFormValues } from "@/app/auth/newuser/account-form";
 import {
-  type IExtendedAdapterUser,
-  getUserExtendedByEmail,
-  ttHttpAdapter,
-} from "@/auth/auth_tt_adapter";
-import {
   verification_mail_html,
   verification_mail_text,
-} from "@/auth/authSendRequest";
+} from "@/auth/auth-send-request";
+import {
+  getUserExtendedByEmail,
+  type IExtendedAdapterUser,
+  ttHttpAdapter,
+} from "@/auth/auth-tt-adapter";
+
 import { sendGrid } from "@/auth/helpers";
 import axios from "axios";
 // import { redirect } from "next/navigation";
@@ -87,9 +88,9 @@ export const newUser = async (data: AccountFormValues, host: string) => {
       },
     );
     console.log("createUserResponse: ", createUserResponse);
-  } catch (e) {
-    console.error(e);
-    throw e;
+  } catch (error) {
+    console.error(error);
+    throw error;
   }
 
   // const email_to = email;
@@ -105,7 +106,8 @@ export const newUser = async (data: AccountFormValues, host: string) => {
     html: verification_mail_html({
       url: linkBackURL,
       host: `https://${host}`,
-      theme: { colorScheme: "auto", logo: "/logo4.png" },
+      theme: { brandColor: "#000000", buttonText: "Verify Email" },
+      // theme: { colorScheme: "auto", logo: "/logo4.png" },
     }),
     text: verification_mail_text({
       url: linkBackURL,

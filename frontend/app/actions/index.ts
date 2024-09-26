@@ -22,3 +22,9 @@ export async function doSocialLogin(formData: FormData) {
 export async function doLogout() {
   await signOut({ redirectTo: "/" });
 }
+
+export async function doSignOut() {
+  // const session = await auth();
+  console.log("Handling SignOut request");
+  await signOut();
+}

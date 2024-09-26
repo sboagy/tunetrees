@@ -1,5 +1,5 @@
 "use server";
-import { getUserExtendedByEmail } from "@/auth/auth_tt_adapter";
+import { getUserExtendedByEmail } from "@/auth/auth-tt-adapter";
 import { signIn } from "auth";
 import axios from "axios";
 // import type { NextApiRequest, NextApiResponse } from "next";
