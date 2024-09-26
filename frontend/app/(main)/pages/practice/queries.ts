@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import type { Tune } from "./types";
-import { ERROR_TUNE } from "./components/mocks";
+import { ERROR_TUNE } from "./mocks";
 
 const client = axios.create({
   // baseURL: process.env.TT_API_BASE_URL

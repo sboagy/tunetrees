@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import profilePic from "/public/logo4.png";
 
-import CustomLink from "./custom-link";
+import CustomLink from "./CustomLink";
 import { Button } from "./ui/button";
 import {
   NavigationMenu,

@@ -14,8 +14,8 @@ import Image from "next/image";
 import { z } from "zod";
 import axios from "axios";
 import { authorizeWithPassword } from "../password-login-only/validate-signin";
-import { SocialLoginButtons } from "@/components/auth-social-login";
 import { providerMap } from "@/auth";
+import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 
 export const emailSchema = z.string().email("Invalid email address");
 

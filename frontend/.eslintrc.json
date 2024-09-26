@@ -33,8 +33,8 @@
       "error", // Or "warn" if you prefer
       {
         "cases": {
-          "kebabCase": true,
-          "pascalCase": true // Allow PascalCase for React components (if needed)
+          "kebabCase": true
+          // "pascalCase": true // Allow PascalCase for React components (if needed)
         },
         "ignore": [
           "layout.tsx",
@@ -179,6 +179,42 @@
     ],
     "quotes": "off"
   },
+  "overrides": [
+    {
+      "files": [
+        // for components/ui allowed to be kebab-case (the default)
+        // given shadcn convention.
+        "components/*.tsx",
+        "app/(main)/pages/practice/components/**/*.tsx"
+      ],
+      "rules": {
+        "unicorn/filename-case": [
+          "error",
+          {
+            "cases": {
+              "pascalCase": true
+            }
+          }
+        ]
+      }
+    }
+    // {
+    //   "files": [
+    //     "app/**/*.ts",
+    //     "src/pages/**/*.tsx"
+    //   ],
+    //   "rules": {
+    //     "unicorn/filename-case": [
+    //       "error",
+    //       {
+    //         "cases": {
+    //           "kebabCase": true
+    //         }
+    //       }
+    //     ]
+    //   }
+    // }
+  ],
   "settings": {
     "react": {
       "version": "detect"

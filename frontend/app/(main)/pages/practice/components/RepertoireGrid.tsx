@@ -82,6 +82,7 @@ export default function RepertoireGrid(
               <SelectValue placeholder="Presets" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="oldest">Show All</SelectItem>
               <SelectItem value="oldest">Show Oldest Not Played</SelectItem>
               <SelectItem value="lapsed">Show Recently Lapsed</SelectItem>
               <SelectItem value="selected">Show Only Selected</SelectItem>

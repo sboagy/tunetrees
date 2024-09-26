@@ -1,4 +1,4 @@
-import CustomLink from "./custom-link";
+import CustomLink from "./CustomLink";
 import { Toaster } from "./ui/toaster";
 
 export default function Footer() {

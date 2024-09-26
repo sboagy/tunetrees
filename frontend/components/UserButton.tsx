@@ -11,7 +11,7 @@ import {
   SignIn,
   SignOut,
   UserSettingsMenuItem,
-} from "./auth-components";
+} from "./AuthComponents";
 import {
   DropdownMenu,
   DropdownMenuContent,
