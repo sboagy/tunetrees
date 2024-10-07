@@ -267,6 +267,7 @@ scratch.md
 
 # Ignore my practice backups
 backup_practice*.sqlite
+backup_practice*.sqlite3
 tunetrees_*.sqlite3.bak
 
 dhparam
