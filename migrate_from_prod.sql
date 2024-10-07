@@ -1,5 +1,7 @@
 -- Attach the source database
-ATTACH DATABASE '/Users/sboag/gittt2/tunetrees/tunetrees.sqlite3' AS source_db;
+-- ATTACH DATABASE '/Users/sboag/gittt/tunetrees/backup_practice_sep_20.sqlite' AS source_db;
+PRAGMA foreign_keys = ON;
+ATTACH DATABASE :source_db AS source_db;
 
 -- Tune Table Migration
 INSERT OR REPLACE INTO main.tune (ID, Type, Structure, Title, Mode, Incipit)
@@ -8,7 +10,7 @@ FROM source_db.tune;
 
 -- User Table Migration
 INSERT OR REPLACE INTO main.user (id, hash, name, email)
-SELECT ID, hash, first_name || ' ' || (CASE WHEN middle_name IS NOT NULL THEN middle_name || ' ' ELSE '' END) || last_name, email
+SELECT ID, hash, name, email
 FROM source_db.user;
 
 -- Playlist Table Migration

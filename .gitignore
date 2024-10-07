@@ -267,6 +267,7 @@ scratch.md
 
 # Ignore my practice backups
 backup_practice*.sqlite
+tunetrees_*.sqlite3.bak
 
 dhparam
 id_rsa_ttdroplet
