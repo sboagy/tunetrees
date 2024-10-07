@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Get the current date in the format "Month_Day" (e.g., "Oct_07")
-backup_file="backup_practice_$(date +%b_%d).sqlite"
+backup_file="backup_practice_$(date +%b_%d).sqlite3"
 
 # Copy the remote database to a local backup file
 scp -i ~/.ssh/id_rsa_ttdroplet -r sboag@165.227.182.140:tunetrees/tunetrees.sqlite3 "$backup_file"

@@ -9,9 +9,9 @@ SELECT ID, Type, Structure, Title, Mode, Incipit
 FROM source_db.tune;
 
 -- User Table Migration
-INSERT OR REPLACE INTO main.user (id, hash, name, email)
-SELECT ID, hash, name, email
-FROM source_db.user;
+-- INSERT OR REPLACE INTO main.user (id, hash, name, email)
+-- SELECT ID, hash, name, email
+-- FROM source_db.user;
 
 -- Playlist Table Migration
 INSERT OR REPLACE INTO main.playlist (PLAYLIST_ID, USER_REF, instrument)
