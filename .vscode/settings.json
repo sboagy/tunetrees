@@ -7,9 +7,4 @@
     "python.analysis.autoImportCompletions": true,
     "python.languageServer": "Default",
     "editor.formatOnSave": true,
-    "python.testing.pytestEnabled": true,
-    "python.testing.pytestArgs": [],
-    "python.testing.unittestEnabled": false,
-    "python.testing.cwd": "${workspaceFolder}/test",
-    "python.testing.autoTestDiscoverOnSaveEnabled": true,
 }
