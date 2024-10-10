@@ -269,6 +269,8 @@ scratch.md
 backup_practice*.sqlite
 backup_practice*.sqlite3
 tunetrees_*.sqlite3.bak
+tsconfig.json.bak
+babel.config.js.bak
 
 dhparam
 id_rsa_ttdroplet
