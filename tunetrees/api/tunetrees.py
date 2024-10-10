@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from os import environ
-from typing import Annotated, Any, Dict, List, TypedDict
+from typing import Annotated, Any, Dict, List
 
 from fastapi import APIRouter, Form
 from starlette import status as status
@@ -11,13 +11,17 @@ from tunetrees.api.mappers.tunes_mapper import tunes_mapper
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.practice import render_practice_page
 from tunetrees.app.queries import (
-    get_practice_list_recently_played,
-    get_practice_list_scheduled,
+    query_practice_list_recently_played,
+    query_practice_list_scheduled,
+    query_tune_staged,
 )
 from tunetrees.app.schedule import (
+    TuneScheduleUpdate,
+    TuneFeedbackUpdate,
     query_and_print_tune_by_id,
     update_practice_record,
-    update_practice_records,
+    update_practice_feedbacks,
+    update_practice_schedules,
 )
 from tunetrees.models.tunetrees import Tune, t_practice_list_staged
 
@@ -48,7 +52,7 @@ async def get_scheduled(
     db = None
     try:
         db = SessionLocal()
-        tunes_scheduled = get_practice_list_scheduled(
+        tunes_scheduled = query_practice_list_scheduled(
             db, limit=10, user_ref=int(user_id), playlist_ref=int(playlist_ref)
         )
         tune_list = [
@@ -71,8 +75,32 @@ async def get_recently_played(
     db = None
     try:
         db = SessionLocal()
-        tunes_recently_played: List[Tune] = get_practice_list_recently_played(
+        tunes_recently_played: List[Tune] = query_practice_list_recently_played(
             db, user_ref=int(user_id), playlist_ref=int(playlist_ref)
+        )
+        tune_list = []
+        for tune in tunes_recently_played:
+            tune_list.append(tunes_mapper(tune, t_practice_list_staged))
+        return tune_list
+    except Exception as e:
+        return {"error": f"Unable to fetch recently played tunes: {e}"}
+    finally:
+        if db is not None:
+            db.close()
+
+
+@router.get("/get_tune_staged/{user_id}/{playlist_ref}/{tune_id}")
+async def get_tune_staged(
+    user_id: str, playlist_ref: str, tune_id: str
+) -> List[dict[str, Any]] | dict[str, str]:
+    db = None
+    try:
+        db = SessionLocal()
+        tunes_recently_played: List[Tune] = query_tune_staged(
+            db,
+            user_ref=int(user_id),
+            playlist_ref=int(playlist_ref),
+            tune_id=int(tune_id),
         )
         tune_list = []
         for tune in tunes_recently_played:
@@ -102,19 +130,28 @@ async def submit_feedback(
     return status.HTTP_302_FOUND
 
 
-class TuneUpdate(TypedDict):
-    feedback: str
+@router.post("/practice/submit_schedules/{playlist_id}")
+async def submit_schedules(
+    playlist_id: str,
+    tune_updates: Dict[str, TuneScheduleUpdate],
+):
+    logger = logging.getLogger("tunetrees.api")
+    logger.debug(f"{tune_updates=}")
+
+    update_practice_schedules(tune_updates, playlist_id)
+
+    return status.HTTP_302_FOUND
 
 
 @router.post("/practice/submit_feedbacks/{playlist_id}")
 async def submit_feedbacks(
     playlist_id: str,
-    tune_updates: Dict[str, TuneUpdate],
+    tune_updates: Dict[str, TuneFeedbackUpdate],
 ):
     logger = logging.getLogger("tunetrees.api")
     logger.debug(f"{tune_updates=}")
 
-    update_practice_records(tune_updates, playlist_id)
+    update_practice_feedbacks(tune_updates, playlist_id)
 
     return status.HTTP_302_FOUND
 

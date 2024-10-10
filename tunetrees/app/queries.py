@@ -91,7 +91,7 @@ def find_dict_index(data: list, key, value):
     return -1
 
 
-def get_practice_list_scheduled(
+def query_practice_list_scheduled(
     db: Session,
     skip: int = 0,
     limit: int = 16,
@@ -269,7 +269,7 @@ def get_practice_list_scheduled(
 #     return rows
 
 
-def get_practice_list_recently_played(
+def query_practice_list_recently_played(
     db: Session,
     skip: int = 0,
     limit: int = 100000,
@@ -291,6 +291,40 @@ def get_practice_list_recently_played(
     # if print_table:
     #     print("\n--------")
     #     print(tabulate(rows, headers=t_practice_list_staged.columns.keys()))
+
+    return rows
+
+
+def query_tune_staged(
+    db: Session,
+    playlist_ref=1,
+    user_ref=1,
+    tune_id: int = 0,
+) -> List[Tune]:
+    """Get a single tune from the practice_list_staged table.  Even though the tune_id is unique,
+    the playlist and user refs are still needed for the user-specific view of the tune, which
+    includes the user's practice record, as well as the user's notes, and other data.  (The user_ref
+    is maybe not strictly necessary, but it is included for consistency).
+
+    Args:
+        db (Session): Database session handle.
+        tune_id (int, optional): Unique ID to the tune. Defaults to 0.
+        playlist_ref (int, optional): Playlist ID for user-specific tune info. Defaults to 1.
+        user_ref (int, optional): User reference which the playlist is associated to, included for
+                    consistency. Defaults to 1.
+
+    Returns:
+        List[Tune]: A list of one tune, or an empty list if the tune is not found.
+    """
+    query = db.query(t_practice_list_staged).filter(
+        and_(
+            t_practice_list_staged.c.ID == tune_id,
+            t_practice_list_staged.c.USER_REF == user_ref,
+            t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
+        )
+    )
+
+    rows: List[Tune] = query.all()
 
     return rows
 
