@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import Image from "next/image";
@@ -24,7 +25,7 @@ import {
   accountFormSchema,
   defaultValues,
 } from "@/app/auth/newuser/account-form";
-import { PasswordInput } from "@/components/password-input";
+import { PasswordInput } from "@/components/PasswordInput";
 import {
   Card,
   CardContent,
@@ -34,10 +35,10 @@ import {
 } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { newUser } from "./newuser-actions";
-import { emailSchema, type ILoginDialogProps } from "../login/page";
 import { getUser } from "../password-login-only/validate-signin";
-import { SocialLoginButtons } from "@/components/auth-social-login";
+import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 import { providerMap } from "@/auth";
+import { emailSchema } from "../auth-types";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const languages = [
@@ -54,7 +55,9 @@ const languages = [
 
 // const _crsfToken = client
 
-export default function SignInPage({ email = "" }: ILoginDialogProps) {
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+export default function SignInPage(props: any): JSX.Element {
+  let email = props.searchParams.email || "";
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
     defaultValues,

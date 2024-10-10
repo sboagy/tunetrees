@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,19 +12,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
-import { z } from "zod";
 import axios from "axios";
 import { authorizeWithPassword } from "../password-login-only/validate-signin";
 import { providerMap } from "@/auth";
 import { SocialLoginButtons } from "@/components/AuthSocialLogin";
+import { emailSchema } from "../auth-types";
 
-export const emailSchema = z.string().email("Invalid email address");
-
-export interface ILoginDialogProps {
-  email?: string;
-}
-
-export default function LoginDialog({ email = "" }: ILoginDialogProps) {
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+function LoginDialog(props: any): JSX.Element {
+  let email = props.searchParams.email || "";
   if (email === "" && typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
     email = searchParams.get("email") || email;
@@ -185,3 +182,5 @@ export default function LoginDialog({ email = "" }: ILoginDialogProps) {
     </div>
   );
 }
+
+export default LoginDialog;

@@ -12,13 +12,12 @@
 //   );
 // }
 
-export default function ErrorPage({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default async function ErrorPage({
   searchParams,
 }: {
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
-  // const error = searchParams["error"] ?? "1"; // default value is "1"
+  const error = await Promise.resolve(searchParams.error ?? "1"); // default value is "1"
 
-  return <div>Password does not match</div>;
+  return <div>Password does not match. Error code: {error}</div>;
 }

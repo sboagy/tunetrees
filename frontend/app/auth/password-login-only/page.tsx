@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,9 +14,12 @@ import { Label } from "@/components/ui/label";
 import Image from "next/image";
 import { authorizeWithPassword } from "./validate-signin";
 import axios from "axios";
-import { emailSchema, type ILoginDialogProps } from "../login/page";
+import { emailSchema } from "../auth-types";
 
-export default function LoginDialog({ email = "" }: ILoginDialogProps) {
+// export default function LoginDialog({ email = "" }: ILoginDialogProps) {
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+export default function LoginDialog(props: any): JSX.Element {
+  let email = props.searchParams.email || "";
   if (email === "" && typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
     email = searchParams.get("email") || email;
@@ -134,6 +138,7 @@ export default function LoginDialog({ email = "" }: ILoginDialogProps) {
                   name="password"
                   type="password"
                   value={password}
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
                   onChange={(e) => setPassword(e.target.value)}
                   autoFocus
                   required

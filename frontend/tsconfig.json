@@ -52,6 +52,7 @@
     "lib/**/*.ts",
     ".next/types/**/*.ts",
     ".next/**/*.tsx",
+    "auth/auth-types.ts",
   ],
   "exclude": [
     "node_modules",

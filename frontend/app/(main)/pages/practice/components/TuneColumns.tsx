@@ -14,6 +14,8 @@ import type {
   CellContext,
   Column,
   ColumnDef,
+  Row,
+  SortingFn,
   TableState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
@@ -72,16 +74,42 @@ function columnControlMenu() {
   );
 }
 
+const datetimeTextSortingFn: SortingFn<Tune> = (
+  rowA: Row<Tune>,
+  rowB: Row<Tune>,
+  columnId: string,
+) => {
+  const dateA = new Date(rowA.getValue(columnId));
+  const dateB = new Date(rowB.getValue(columnId));
+
+  const sortSpec = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+  return sortSpec;
+  // return -1; //-1, 0, or 1 - access any row dat using rowA.original and rowB.original
+};
+
+function rotateSorting<TData, TValue>(column: Column<TData, TValue>) {
+  if (column.getIsSorted() === "desc") {
+    column.clearSorting();
+  } else if (column.getIsSorted() === "asc") {
+    column.toggleSorting(true, true);
+  } else {
+    column.toggleSorting(false, true);
+  }
+  console.log("column.getIsSorted(): ", column.getIsSorted());
+  // column.toggleSorting(column.getIsSorted() === "asc");
+}
+
 function sortableHeader<TData, TValue>(
   column: Column<TData, TValue>,
   title: string,
 ) {
   // console.log("column: ", column);
   const isSorted = column.getIsSorted();
+  column.getCanMultiSort();
   return (
     <div
       className="flex items-center"
-      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      onClick={() => rotateSorting(column)}
       onKeyDown={() => {}}
       onKeyUp={() => {}}
       onKeyPress={() => {}}
@@ -89,8 +117,10 @@ function sortableHeader<TData, TValue>(
       {title}
       {isSorted === "asc" ? (
         <ArrowUp className="ml-2 h-4 w-4" />
-      ) : (
+      ) : isSorted === "desc" ? (
         <ArrowDown className="ml-2 h-4 w-4" />
+      ) : (
+        <ArrowUpDown className="ml-2 h-4 w-4" />
       )}
       {columnControlMenu()}
     </div>
@@ -307,6 +337,7 @@ export function get_columns(
       },
       enableSorting: true,
       enableHiding: true,
+      sortingFn: datetimeTextSortingFn,
     },
     {
       accessorKey: "practiced",
@@ -316,6 +347,7 @@ export function get_columns(
       },
       enableSorting: true,
       enableHiding: true,
+      sortingFn: datetimeTextSortingFn,
     },
     {
       accessorKey: "quality",
@@ -361,6 +393,7 @@ export function get_columns(
       },
       enableSorting: true,
       enableHiding: true,
+      sortingFn: datetimeTextSortingFn,
     },
     {
       accessorKey: "backup_practiced",

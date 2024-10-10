@@ -17,6 +17,7 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "./ui/navigation-menu";
+import { Label } from "./ui/label";
 
 export function MainNav() {
   return (
@@ -31,9 +32,10 @@ export function MainNav() {
             className="items-center py-0"
             priority={true}
           />
+          <Label className="ml-[1ch] text-lg">TuneTrees</Label>
         </Button>
       </CustomLink>
-      <NavigationMenu>
+      <NavigationMenu className="hidden">
         <NavigationMenuList>
           <NavigationMenuItem>
             <NavigationMenuTrigger className="px-2">
@@ -54,12 +56,12 @@ export function MainNav() {
             </NavigationMenuContent>
           </NavigationMenuItem>
           {/* <NavigationMenuItem>
-            <NavigationMenuLink
-              href="/client-example"
-              className={navigationMenuTriggerStyle()}
-            >
-              Client Side
-            </NavigationMenuLink>
+        <NavigationMenuLink
+          href="/client-example"
+          className={navigationMenuTriggerStyle()}
+        >
+          Client Side
+        </NavigationMenuLink>
           </NavigationMenuItem> */}
         </NavigationMenuList>
       </NavigationMenu>

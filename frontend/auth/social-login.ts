@@ -26,6 +26,7 @@ export async function doSocialLogin2(provider: ProviderDict) {
     // not existing, or the user not having the correct role.
     // In some cases, you may want to redirect to a custom error
     if (error instanceof AuthError) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return redirect(`${SIGNIN_ERROR_URL}?error=${error.type}`);
     }
 

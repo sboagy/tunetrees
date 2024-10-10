@@ -101,3 +101,52 @@ export const submitPracticeFeedbacks = async ({
     return "Error: An unknown error occurred";
   }
 };
+
+export interface ITuneScheduleUpdate {
+  review_date: string;
+}
+
+interface IPracticeSchedulesProps {
+  playlist_id: string;
+  updates: { [key: string]: ITuneScheduleUpdate };
+}
+
+export const submitPracticeSchedules = async ({
+  playlist_id,
+  updates,
+}: IPracticeSchedulesProps): Promise<string> => {
+  if (!baseURL) {
+    console.error("Base URL is not defined");
+    return "Error: Base URL is not defined";
+  }
+  const url = `${baseURL}/practice/submit_schedules`;
+  console.log(
+    `Submitting feedbacks for user_id: ${playlist_id}, updates: ${JSON.stringify(updates)} url: ${url}`,
+  );
+
+  try {
+    const response = await axios({
+      method: "post",
+      url: `${baseURL}/practice/submit_schedules/${playlist_id}`,
+      data: updates,
+      headers: {
+        key: "Access-Control-Allow-Origin",
+        Accept: "application/json",
+        // "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
+      },
+    });
+    console.log("Schedules submitted successfully:", response.data);
+    return response.data as string;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error("Axios error:", error.response?.data || error.message);
+    } else {
+      console.error("Unexpected error:", error);
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return "Error: An unknown error occurred";
+  }
+};

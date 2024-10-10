@@ -18,6 +18,7 @@ import type {
   Table as TanstackTable,
 } from "@tanstack/react-table";
 import type { Tune } from "../types";
+import { submitPracticeSchedules } from "../commands";
 
 export default function RepertoireGrid(
   tunes: IScheduledTunesType,
@@ -43,7 +44,51 @@ export default function RepertoireGrid(
   };
 
   const addToReviewQueue = () => {
-    console.log("submitPracticeFeedbacksHandler!");
+    console.log("addToReviewQueue!");
+
+    // TODO: Implement addToReviewQueue logic
+    // 1. Get the checkmarked tunes
+    // 2. Create a TuneUpdate object for each tune
+    // 3. Send the TuneUpdate objects to the server for scheduling
+    // 4. Update the UI to reflect the changes
+
+    // const updates: { [key: string]: ITuneUpdate } = {};
+
+    const selectedTunes = table
+      .getSelectedRowModel()
+      .rows.map((row) => row.original);
+    const updates: { [key: string]: { review_date: string } } = {};
+
+    for (const tune of selectedTunes) {
+      const idString = `${tune.id}`;
+      const existingReviewDateString = tune.review_date;
+      if (existingReviewDateString !== null) {
+        console.log("existingReviewDateString", existingReviewDateString);
+        const existingReviewDate = new Date(existingReviewDateString);
+        console.log("existingReviewDate", existingReviewDate);
+      }
+
+      // const newReviewDate = new Date().toISOString().split("T")[0];
+      const newReviewDate = new Date().toISOString();
+
+      updates[idString] = { review_date: newReviewDate };
+    }
+    console.log("updates", updates);
+
+    const playlistId = tunes.playlist_id;
+
+    const promiseResult = submitPracticeSchedules({
+      playlist_id: playlistId,
+      updates,
+    });
+    promiseResult
+      .then((result) => {
+        console.log("submit_practice_feedbacks_result result:", result);
+      })
+      .catch((error) => {
+        console.error("Error submit_practice_feedbacks_result:", error);
+        throw error;
+      });
 
     // const updates: { [key: string]: TuneUpdate } = {};
   };
@@ -82,7 +127,7 @@ export default function RepertoireGrid(
               <SelectValue placeholder="Presets" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="oldest">Show All</SelectItem>
+              <SelectItem value="clear">Clear</SelectItem>
               <SelectItem value="oldest">Show Oldest Not Played</SelectItem>
               <SelectItem value="lapsed">Show Recently Lapsed</SelectItem>
               <SelectItem value="selected">Show Only Selected</SelectItem>
