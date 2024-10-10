@@ -9,4 +9,18 @@ module.exports = {
     // Enables the styled-components SWC transform
     styledComponents: true,
   },
+  // files: {
+  //   maxSize: "2MB",
+  // },
+  webpack: (config, { isServer }) => {
+    // Increase the maximum file size limit for development
+    if (!isServer) {
+      config.performance = {
+        maxAssetSize: 2000000, // 2 MiB
+        maxEntrypointSize: 2000000, // 2 MiB
+      };
+    }
+
+    return config;
+  },
 };
