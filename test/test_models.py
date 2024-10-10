@@ -1,8 +1,10 @@
-from typing import List
+from typing import Any, List
 from datetime import datetime
 
+import pytest
+from sqlalchemy.engine.row import Row
 from tunetrees.app.database import SessionLocal
-from tunetrees.app.queries import get_tune_table, get_practice_list_scheduled
+from tunetrees.app.queries import get_tune_table, query_practice_list_scheduled
 from tunetrees.models.tunetrees import Tune
 
 
@@ -25,11 +27,14 @@ def test_basic_connect_and_read():
             db.close()
 
 
+@pytest.mark.skip(
+    reason="This test needs to figure out a testing strategy re DB state."
+)
 def test_practice_list_joined():
     db = None
     try:
         db = SessionLocal()
-        tunes: List[Tune] = get_practice_list_scheduled(
+        tunes: List[Row[Any]] = query_practice_list_scheduled(
             db,
             limit=1000,
             print_table=True,
