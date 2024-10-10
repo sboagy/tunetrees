@@ -45,3 +45,21 @@ export async function getRecentlyPracticed(
     return ERROR_TUNE;
   }
 }
+
+export async function getTuneStaged(
+  user_id: string,
+  playlist_id: string,
+  tune_id: string,
+): Promise<Tune[]> {
+  try {
+    const response = await client.get<Tune[]>(
+      `/get_tune_staged/${user_id}/${playlist_id}/${tune_id}`,
+    );
+    const data = response.data;
+    return data;
+  } catch (error) {
+    console.error("Error in getTuneStaged: ", error);
+    // Return a dummy Tune object to avoid breaking the UI
+    return ERROR_TUNE;
+  }
+}
