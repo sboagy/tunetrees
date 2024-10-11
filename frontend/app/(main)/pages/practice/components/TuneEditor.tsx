@@ -1,3 +1,4 @@
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,14 +12,61 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PlusCircle, X } from "lucide-react";
+import { useEffect } from "react";
+import { getTuneStaged } from "../queries";
 
 interface IExternalRef {
   url: string;
-  note: string;
-  type: string;
+  note?: string;
+  type?: string;
 }
 
-export default function TuneEditor() {
+export default function TuneEditor({
+  userId,
+  playlistId,
+  tuneId,
+}: {
+  userId: string;
+  playlistId: string;
+  tuneId: string;
+}): JSX.Element {
+  console.log({ userId, playlistId, tuneId });
+
+  useEffect(() => {
+    async function fetchInitialState() {
+      try {
+        const tuneData = await getTuneStaged(userId, playlistId, tuneId);
+        if (tuneData.length > 0) {
+          const tune = tuneData[0];
+          setFormData({
+            id: String(tune.id),
+            title: String(tune.title),
+            type: String(tune.type),
+            structure: String(tune.structure),
+            mode: String(tune.mode),
+            incipit: String(tune.incipit),
+            learned: String(tune.learned),
+            practiced: String(tune.practiced),
+            quality: String(tune.quality),
+            easiness: String(tune.easiness),
+            interval: String(tune.interval),
+            repetitions: String(tune.repetitions),
+            reviewDate: String(tune.review_date),
+            notePrivate: String(tune.notes_private),
+            notePublic: String(tune.notes_public),
+            tags: String(tune.tags),
+          });
+          setExternalRefs(
+            tune.external_ref ? [{ url: tune.external_ref }] : [],
+          );
+        }
+      } catch (error) {
+        console.error("Failed to fetch initial state:", error);
+      }
+    }
+
+    void fetchInitialState();
+  }, [userId, playlistId, tuneId]);
   const [formData, setFormData] = useState({
     id: "1", // Set a default value for the read-only ID field
     title: "",
@@ -80,6 +128,12 @@ export default function TuneEditor() {
     // Here you would typically send the data to your backend
   };
 
+  const router = useRouter();
+
+  const handleCancel = () => {
+    router.back();
+  };
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -94,7 +148,7 @@ export default function TuneEditor() {
             name="id"
             value={formData.id}
             readOnly
-            className="bg-gray-100"
+            className="bg-gray-100 text-black"
           />
         </div>
         <div>
@@ -348,9 +402,14 @@ export default function TuneEditor() {
         ))}
       </div>
 
-      <Button type="submit" className="w-full">
-        Submit
-      </Button>
+      <div className="flex space-x-4">
+        <Button type="button" onClick={handleCancel} className="w-full">
+          Cancel
+        </Button>
+        <Button type="submit" className="w-full">
+          Submit
+        </Button>
+      </div>
     </form>
   );
 }

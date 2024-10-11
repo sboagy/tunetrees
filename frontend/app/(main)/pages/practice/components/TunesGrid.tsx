@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import {
   type ColumnFiltersState,
   type SortingState,
@@ -338,6 +340,8 @@ type Props = {
 };
 
 const TunesGrid = (props: Props) => {
+  const router = useRouter();
+
   const table = props.table;
   const columns = get_columns(props.userId, props.playlistId, props.purpose);
 
@@ -369,6 +373,17 @@ const TunesGrid = (props: Props) => {
                 table.getRowModel().rows.map((row) => (
                   <TableRow
                     key={row.id}
+                    onDoubleClick={(event) => {
+                      event.preventDefault(); // Prevent default double-click action
+                      event.stopPropagation(); // Stop event bubbling
+                      const userId = props.userId;
+                      const playlistId = props.playlistId;
+                      const tuneId = row.original.id;
+                      console.log("double-click occurred: tuneId=", tuneId);
+                      router.push(
+                        `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tuneId}`,
+                      );
+                    }}
                     data-state={row.getIsSelected() && "selected"}
                     className={`${getColorForEvaluation(row.original.recall_eval || null)}`}
                     // className="hover:bg-gray-100"
