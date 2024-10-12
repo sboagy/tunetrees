@@ -67,3 +67,28 @@
     @apply bg-background text-foreground;
   }
 }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+header, footer {
+  flex-shrink: 0;
+}
+
+main {
+  flex: 1 0 auto;
+  overflow-y: auto;
+}

@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: React.PropsWithChildren) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.className} h-full`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
           disableTransitionOnChange
         >
           <Theme>
-            <div className="flex flex-col justify-between w-full h-full min-h-screen">
+            <div id="root" className="flex flex-col h-full">
               <Header />
               <main
                 id="main-content"
