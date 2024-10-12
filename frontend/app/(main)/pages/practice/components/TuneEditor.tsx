@@ -172,7 +172,7 @@ export default function TuneEditor({
             className="flex-grow w-full rounded-md border p-4"
             style={{ height: "auto" }}
           >
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-1">
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
               <FormField
                 control={form.control}
                 name="title"
@@ -411,7 +411,7 @@ export default function TuneEditor({
                 control={form.control}
                 name="external_ref"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormItem className="flex flex-row items-center space-y-1 space-x-2">
                     <FormLabel className="w-1/5 text-right">
                       External Reference:{" "}
                     </FormLabel>
@@ -428,7 +428,7 @@ export default function TuneEditor({
               control={form.control}
               name="notes_private"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                <FormItem className="flex flex-row items-center space-y-1 space-x-2">
                   <FormLabel className="w-1/5 text-right">
                     Private Notes:{" "}
                   </FormLabel>
@@ -444,7 +444,7 @@ export default function TuneEditor({
               control={form.control}
               name="notes_public"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                <FormItem className="flex flex-row items-center space-y-1 space-x-2">
                   <FormLabel className="w-1/5 text-right">
                     Public Notes:{" "}
                   </FormLabel>
@@ -460,7 +460,7 @@ export default function TuneEditor({
               control={form.control}
               name="tags"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                <FormItem className="flex flex-row items-center space-y-1 space-x-2">
                   <FormLabel className="w-1/5 text-right">Tags: </FormLabel>
 
                   <FormControl className="w-1/5">
@@ -476,7 +476,7 @@ export default function TuneEditor({
               control={form.control}
               name="recall_eval"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                <FormItem className="flex flex-row items-center space-y-1 space-x-2">
                   <FormLabel className="w-1/5 text-right">
                     Recall Evaluation:{" "}
                   </FormLabel>
