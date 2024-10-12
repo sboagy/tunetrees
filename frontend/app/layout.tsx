@@ -28,7 +28,10 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
           <Theme>
             <div className="flex flex-col justify-between w-full h-full min-h-screen">
               <Header />
-              <main className="flex-auto w-full max-w-8xl px-4 py-2 mx-auto sm:px-6 md:pt-0">
+              <main
+                id="main-content"
+                className="flex-auto w-full max-w-8xl px-4 py-2 mx-auto sm:px-6 md:pt-0"
+              >
                 {children}
               </main>
               <Footer />

@@ -1,8 +1,18 @@
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -11,120 +21,114 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle, X } from "lucide-react";
-import { useEffect } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { getTuneStaged } from "../queries";
 
-interface IExternalRef {
-  url: string;
-  note?: string;
-  type?: string;
+type Tune = {
+  id: number;
+  title: string;
+  type: string | null;
+  structure: string | null;
+  mode: string | null;
+  incipit: string | null;
+  learned: string | null;
+  practiced: string | null;
+  quality: string | null;
+  easiness: number | null;
+  interval: number | null;
+  repetitions: number | null;
+  review_date: string | null;
+  backup_practiced: string | null;
+  external_ref?: string | null;
+  notes_private?: string | null;
+  notes_public?: string | null;
+  tags?: string | null;
+  recall_eval?: string | null;
+};
+
+const formSchema = z.object({
+  title: z.string().min(1, { message: "Title is required" }),
+  type: z.string().nullable(),
+  structure: z.string().nullable(),
+  mode: z.string().nullable(),
+  incipit: z.string().nullable(),
+  learned: z.string().nullable(),
+  practiced: z.string().nullable(),
+  quality: z.string().nullable(),
+  easiness: z.number().nullable(),
+  interval: z.number().nullable(),
+  repetitions: z.number().nullable(),
+  review_date: z.string().nullable(),
+  backup_practiced: z.string().nullable(),
+  external_ref: z.string().nullable(),
+  notes_private: z.string().nullable(),
+  notes_public: z.string().nullable(),
+  tags: z.string().nullable(),
+  recall_eval: z.string().nullable(),
+});
+
+interface ITuneEditorProps {
+  userId: string;
+  playlistId: string;
+  tuneId: string;
 }
 
 export default function TuneEditor({
   userId,
   playlistId,
   tuneId,
-}: {
-  userId: string;
-  playlistId: string;
-  tuneId: string;
-}): JSX.Element {
-  console.log({ userId, playlistId, tuneId });
+}: ITuneEditorProps) {
+  const [height, setHeight] = useState(window.innerHeight * 0.85);
 
   useEffect(() => {
-    async function fetchInitialState() {
-      try {
-        const tuneData = await getTuneStaged(userId, playlistId, tuneId);
-        if (tuneData.length > 0) {
-          const tune = tuneData[0];
-          setFormData({
-            id: String(tune.id),
-            title: String(tune.title),
-            type: String(tune.type),
-            structure: String(tune.structure),
-            mode: String(tune.mode),
-            incipit: String(tune.incipit),
-            learned: String(tune.learned),
-            practiced: String(tune.practiced),
-            quality: String(tune.quality),
-            easiness: String(tune.easiness),
-            interval: String(tune.interval),
-            repetitions: String(tune.repetitions),
-            reviewDate: String(tune.review_date),
-            notePrivate: String(tune.notes_private),
-            notePublic: String(tune.notes_public),
-            tags: String(tune.tags),
-          });
-          setExternalRefs(
-            tune.external_ref ? [{ url: tune.external_ref }] : [],
-          );
-        }
-      } catch (error) {
-        console.error("Failed to fetch initial state:", error);
+    const mainElement = document.querySelector("#main-content");
+
+    const handleResize = () => {
+      if (mainElement) {
+        setHeight(window.innerHeight * 0.8);
+        // setHeight(mainElement.clientHeight);
+        // const rect = mainElement.getBoundingClientRect();
+        // setHeight(rect.height);
       }
+    };
+
+    if (mainElement) {
+      setHeight(window.innerHeight * 0.8);
+      // setHeight(mainElement.clientHeight);
+      // const rect = mainElement.getBoundingClientRect();
+      // setHeight(rect.height);
     }
 
-    void fetchInitialState();
-  }, [userId, playlistId, tuneId]);
-  const [formData, setFormData] = useState({
-    id: "1", // Set a default value for the read-only ID field
-    title: "",
-    type: "",
-    structure: "",
-    mode: "",
-    incipit: "",
-    learned: "",
-    practiced: "",
-    quality: "",
-    easiness: "",
-    interval: "",
-    repetitions: "",
-    reviewDate: "",
-    notePrivate: "",
-    notePublic: "",
-    tags: "",
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  const [tune, setTune] = useState<Tune | null>(null);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {},
   });
 
-  const [externalRefs, setExternalRefs] = useState<IExternalRef[]>([]);
+  useEffect(() => {
+    const fetchTune = async () => {
+      const tuneData = await getTuneStaged(userId, playlistId, tuneId);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+      if (tuneData.length > 0) {
+        setTune(tuneData[0]);
 
-  const handleSelectChange = (name: string) => (value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+        form.reset(tuneData[0]);
+      }
+    };
 
-  const handleExternalRefChange = (
-    index: number,
-    field: keyof IExternalRef,
-    value: string,
-  ) => {
-    setExternalRefs((prev) => {
-      const newRefs = [...prev];
-      newRefs[index] = { ...newRefs[index], [field]: value };
-      return newRefs;
-    });
-  };
+    void fetchTune();
+  }, [userId, playlistId, tuneId, form]);
 
-  const addExternalRef = () => {
-    setExternalRefs((prev) => [
-      ...prev,
-      { url: "", note: "", type: "website" },
-    ]);
-  };
+  const onSubmit = (data: z.infer<typeof formSchema>) => {
+    console.log(data);
 
-  const removeExternalRef = (index: number) => {
-    setExternalRefs((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log({ ...formData, externalRefs });
     // Here you would typically send the data to your backend
   };
 
@@ -134,282 +138,342 @@ export default function TuneEditor({
     router.back();
   };
 
+  if (!tune) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-6 max-w-2xl mx-auto p-6 bg-white rounded-lg shadow"
-    >
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="id">ID</Label>
-          <Input
-            type="text"
-            id="id"
-            name="id"
-            value={formData.id}
-            readOnly
-            className="bg-gray-100 text-black"
-          />
-        </div>
-        <div>
-          <Label htmlFor="title">Title</Label>
-          <Input
-            type="text"
-            id="title"
-            name="title"
-            value={formData.title}
-            onChange={handleChange}
-          />
-        </div>
-      </div>
+    <Form {...form}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void form.handleSubmit(onSubmit)(e);
+        }}
+        className="flex-auto w-full space-y-4"
+        style={{ height: `${height}px`, overflowY: "unset" }}
+      >
+        <h1 className="text-2xl font-bold mb-4">Tune #{tune.id}</h1>
+        <ScrollArea
+          className="w-full rounded-md border p-4"
+          style={{ height: "90%", overflowY: "unset" }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-1">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">Title: </FormLabel>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="type">Type</Label>
-          <Select
-            onValueChange={handleSelectChange("type")}
-            value={formData.type}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="type1">Type 1</SelectItem>
-              <SelectItem value="type2">Type 2</SelectItem>
-              <SelectItem value="type3">Type 3</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="structure">Structure</Label>
-          <Input
-            type="text"
-            id="structure"
-            name="structure"
-            value={formData.structure}
-            onChange={handleChange}
-          />
-        </div>
-      </div>
+                  <FormControl className="w-1/5">
+                    <Input {...field} value={field.value || ""} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="mode">Mode</Label>
-          <Select
-            onValueChange={handleSelectChange("mode")}
-            value={formData.mode}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select mode" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mode1">Mode 1</SelectItem>
-              <SelectItem value="mode2">Mode 2</SelectItem>
-              <SelectItem value="mode3">Mode 3</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="incipit">Incipit</Label>
-          <Input
-            type="text"
-            id="incipit"
-            name="incipit"
-            value={formData.incipit}
-            onChange={handleChange}
-          />
-        </div>
-      </div>
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">Type: </FormLabel>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="learned">Learned</Label>
-          <Input
-            type="date"
-            id="learned"
-            name="learned"
-            value={formData.learned}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="practiced">Practiced</Label>
-          <Input
-            type="date"
-            id="practiced"
-            name="practiced"
-            value={formData.practiced}
-            onChange={handleChange}
-          />
-        </div>
-      </div>
+                  <FormControl className="w-1/5">
+                    <Input {...field} value={field.value || ""} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <Label htmlFor="quality">Quality</Label>
-          <Select
-            onValueChange={handleSelectChange("quality")}
-            value={formData.quality}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select quality" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="easiness">Easiness</Label>
-          <Input
-            type="number"
-            step="0.1"
-            id="easiness"
-            name="easiness"
-            value={formData.easiness}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="interval">Interval</Label>
-          <Input
-            type="number"
-            id="interval"
-            name="interval"
-            value={formData.interval}
-            onChange={handleChange}
-          />
-        </div>
-      </div>
+            <FormField
+              control={form.control}
+              name="structure"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">
+                    Structure:{" "}
+                  </FormLabel>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="repetitions">Repetitions</Label>
-          <Input
-            type="number"
-            id="repetitions"
-            name="repetitions"
-            value={formData.repetitions}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="reviewDate">Review Date</Label>
-          <Input
-            type="date"
-            id="reviewDate"
-            name="reviewDate"
-            value={formData.reviewDate}
-            onChange={handleChange}
-          />
-        </div>
-      </div>
+                  <FormControl className="w-1/5">
+                    <Input {...field} value={field.value || ""} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
-      <div>
-        <Label htmlFor="notePrivate">Private Note</Label>
-        <Textarea
-          id="notePrivate"
-          name="notePrivate"
-          value={formData.notePrivate}
-          onChange={handleChange}
-        />
-      </div>
+            <FormField
+              control={form.control}
+              name="mode"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">Mode: </FormLabel>
 
-      <div>
-        <Label htmlFor="notePublic">Public Note</Label>
-        <Textarea
-          id="notePublic"
-          name="notePublic"
-          value={formData.notePublic}
-          onChange={handleChange}
-        />
-      </div>
+                  <FormControl className="w-1/5">
+                    <Input {...field} value={field.value || ""} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
-      <div>
-        <Label htmlFor="tags">Tags</Label>
-        <Input
-          type="text"
-          id="tags"
-          name="tags"
-          value={formData.tags}
-          onChange={handleChange}
-        />
-      </div>
+            <FormField
+              control={form.control}
+              name="incipit"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">Incipit: </FormLabel>
 
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Label>External References</Label>
-          <Button
-            type="button"
-            onClick={addExternalRef}
-            variant="outline"
-            size="sm"
-          >
-            <PlusCircle className="w-4 h-4 mr-2" />
-            Add Reference
-          </Button>
-        </div>
-        {externalRefs.map((ref, index) => (
-          // See https://robinpokorny.com/blog/index-as-a-key-is-an-anti-pattern/
-          // Not sure if this is something to worry about in this case, but,
-          // in any case, I want to wait until I have a better understanding of
-          // of this component before further refactoring it.
-          // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-          <div key={index} className="space-y-2 p-4 border rounded-md relative">
-            <Button
-              type="button"
-              onClick={() => removeExternalRef(index)}
-              variant="ghost"
-              size="sm"
-              className="absolute top-2 right-2"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-            <div>
-              <Label htmlFor={`ref-url-${index}`}>URL</Label>
-              <Input
-                type="url"
-                id={`ref-url-${index}`}
-                value={ref.url}
-                onChange={(e) =>
-                  handleExternalRefChange(index, "url", e.target.value)
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor={`ref-note-${index}`}>Note</Label>
-              <Textarea
-                id={`ref-note-${index}`}
-                value={ref.note}
-                onChange={(e) =>
-                  handleExternalRefChange(index, "note", e.target.value)
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor={`ref-type-${index}`}>Type</Label>
-              <Input
-                type="text"
-                id={`ref-type-${index}`}
-                value={ref.type}
-                readOnly
-                className="bg-gray-100"
-              />
-            </div>
+                  <FormControl className="w-1/5">
+                    <Input {...field} value={field.value || ""} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="learned"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">
+                    Learned Date:{" "}
+                  </FormLabel>
+
+                  <FormControl className="w-1/5">
+                    <Input type="date" {...field} value={field.value || ""} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="practiced"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">
+                    Practiced Date:{" "}
+                  </FormLabel>
+
+                  <FormControl className="w-1/5">
+                    <Input type="date" {...field} value={field.value || ""} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="quality"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">Quality: </FormLabel>
+
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || undefined}
+                  >
+                    <FormControl className="w-1/5">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select quality" />
+                      </SelectTrigger>
+                    </FormControl>
+
+                    <SelectContent>
+                      <SelectItem value="Poor">Poor</SelectItem>
+
+                      <SelectItem value="Fair">Fair</SelectItem>
+
+                      <SelectItem value="Good">Good</SelectItem>
+
+                      <SelectItem value="Excellent">Excellent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="easiness"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">Easiness: </FormLabel>
+
+                  <FormControl className="w-1/5">
+                    <Input
+                      type="number"
+                      {...field}
+                      value={field.value?.toString() || ""}
+                      onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="interval"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">Interval: </FormLabel>
+
+                  <FormControl className="w-1/5">
+                    <Input
+                      type="number"
+                      {...field}
+                      value={field.value?.toString() || ""}
+                      onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="repetitions"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">
+                    Repetitions:{" "}
+                  </FormLabel>
+
+                  <FormControl className="w-1/5">
+                    <Input
+                      type="number"
+                      {...field}
+                      value={field.value?.toString() || ""}
+                      onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="review_date"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">
+                    Review Date:{" "}
+                  </FormLabel>
+
+                  <FormControl className="w-1/5">
+                    <Input type="date" {...field} value={field.value || ""} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="backup_practiced"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">
+                    Backup Practiced Date:{" "}
+                  </FormLabel>
+
+                  <FormControl className="w-1/5">
+                    <Input type="date" {...field} value={field.value || ""} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="external_ref"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                  <FormLabel className="w-1/5 text-right">
+                    External Reference:{" "}
+                  </FormLabel>
+
+                  <FormControl className="w-1/5">
+                    <Input {...field} value={field.value || ""} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
           </div>
-        ))}
-      </div>
 
-      <div className="flex space-x-4">
-        <Button type="button" onClick={handleCancel} className="w-full">
-          Cancel
-        </Button>
-        <Button type="submit" className="w-full">
-          Submit
-        </Button>
-      </div>
-    </form>
+          <FormField
+            control={form.control}
+            name="notes_private"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                <FormLabel className="w-1/5 text-right">
+                  Private Notes:{" "}
+                </FormLabel>
+
+                <FormControl className="w-1/5">
+                  <Textarea {...field} value={field.value || ""} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="notes_public"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                <FormLabel className="w-1/5 text-right">
+                  Public Notes:{" "}
+                </FormLabel>
+
+                <FormControl className="w-1/5">
+                  <Textarea {...field} value={field.value || ""} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="tags"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                <FormLabel className="w-1/5 text-right">Tags: </FormLabel>
+
+                <FormControl className="w-1/5">
+                  <Input {...field} value={field.value || ""} />
+                </FormControl>
+
+                <FormDescription>Separate tags with commas</FormDescription>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="recall_eval"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center space-y-0 space-x-2">
+                <FormLabel className="w-1/5 text-right">
+                  Recall Evaluation:{" "}
+                </FormLabel>
+
+                <FormControl className="w-1/5">
+                  <Input {...field} value={field.value || ""} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </ScrollArea>
+
+        <div className="flex w-3/5 justify-center space-x-4 p-4">
+          <Button type="button" onClick={handleCancel} variant="outline">
+            Cancel
+          </Button>
+
+          <Button type="submit">Save</Button>
+        </div>
+      </form>
+    </Form>
   );
 }

@@ -12,11 +12,6 @@ const TuneEditPage = (): JSX.Element => {
   if (!userId || !playlistId || !tuneId) {
     return <div>Missing required parameters for tune edit</div>;
   }
-  // return (
-  //   <div>
-  //     userId: {userId}, playlistId: {playlistId}, tuneId: {tuneId}
-  //   </div>
-  // );
 
   return <TuneEditor userId={userId} playlistId={playlistId} tuneId={tuneId} />;
 };
