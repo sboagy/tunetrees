@@ -1,0 +1,20 @@
+/* TuneEditor.css */
+.tune-form-base-item-style {
+  @apply flex flex-row items-center space-x-3;
+}
+
+.tune-form-item-style {
+  @apply tune-form-base-item-style space-y-0;
+}
+
+.tune-form-item-style2 {
+  @apply tune-form-base-item-style space-y-1;
+}
+
+.tune-form-label-style {
+  @apply w-1/5 text-right;
+}
+
+.tune-form-control-style {
+  @apply w-2/5;
+}

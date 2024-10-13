@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getTuneStaged } from "../queries";
+import "./TuneEditor.css"; // Import the CSS file
 
 type Tune = {
   id: number;
@@ -177,10 +178,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="title"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">Title: </FormLabel>
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
+                      Title:{" "}
+                    </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input {...field} value={field.value || ""} />
                     </FormControl>
                   </FormItem>
@@ -191,10 +194,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="type"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">Type: </FormLabel>
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
+                      Type:{" "}
+                    </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input {...field} value={field.value || ""} />
                     </FormControl>
                   </FormItem>
@@ -205,12 +210,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="structure"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
                       Structure:{" "}
                     </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input {...field} value={field.value || ""} />
                     </FormControl>
                   </FormItem>
@@ -221,10 +226,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="mode"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">Mode: </FormLabel>
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
+                      Mode:{" "}
+                    </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input {...field} value={field.value || ""} />
                     </FormControl>
                   </FormItem>
@@ -235,12 +242,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="incipit"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
                       Incipit:{" "}
                     </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input {...field} value={field.value || ""} />
                     </FormControl>
                   </FormItem>
@@ -251,12 +258,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="learned"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
                       Learned Date:{" "}
                     </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input type="date" {...field} value={field.value || ""} />
                     </FormControl>
                   </FormItem>
@@ -267,12 +274,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="practiced"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
                       Practiced Date:{" "}
                     </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input type="date" {...field} value={field.value || ""} />
                     </FormControl>
                   </FormItem>
@@ -283,8 +290,8 @@ export default function TuneEditor({
                 control={form.control}
                 name="quality"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
                       Quality:{" "}
                     </FormLabel>
 
@@ -292,7 +299,7 @@ export default function TuneEditor({
                       onValueChange={field.onChange}
                       value={field.value || undefined}
                     >
-                      <FormControl className="w-1/5">
+                      <FormControl className="tune-form-control-style">
                         <SelectTrigger>
                           <SelectValue placeholder="Select quality" />
                         </SelectTrigger>
@@ -316,12 +323,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="easiness"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
                       Easiness:{" "}
                     </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input
                         type="number"
                         {...field}
@@ -337,12 +344,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="interval"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
                       Interval:{" "}
                     </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input
                         type="number"
                         {...field}
@@ -358,12 +365,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="repetitions"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
                       Repetitions:{" "}
                     </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input
                         type="number"
                         {...field}
@@ -379,12 +386,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="review_date"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
                       Review Date:{" "}
                     </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input type="date" {...field} value={field.value || ""} />
                     </FormControl>
                   </FormItem>
@@ -395,12 +402,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="backup_practiced"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-0 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
                       Backup Practiced Date:{" "}
                     </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input type="date" {...field} value={field.value || ""} />
                     </FormControl>
                   </FormItem>
@@ -411,12 +418,12 @@ export default function TuneEditor({
                 control={form.control}
                 name="external_ref"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center space-y-1 space-x-2">
-                    <FormLabel className="w-1/5 text-right">
+                  <FormItem className="tune-form-item-style2">
+                    <FormLabel className="tune-form-label-style">
                       External Reference:{" "}
                     </FormLabel>
 
-                    <FormControl className="w-1/5">
+                    <FormControl className="tune-form-control-style">
                       <Input {...field} value={field.value || ""} />
                     </FormControl>
                   </FormItem>
@@ -428,12 +435,12 @@ export default function TuneEditor({
               control={form.control}
               name="notes_private"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-y-1 space-x-2">
-                  <FormLabel className="w-1/5 text-right">
+                <FormItem className="tune-form-item-style2">
+                  <FormLabel className="tune-form-label-style">
                     Private Notes:{" "}
                   </FormLabel>
 
-                  <FormControl className="w-1/5">
+                  <FormControl className="tune-form-control-style">
                     <Textarea {...field} value={field.value || ""} />
                   </FormControl>
                 </FormItem>
@@ -444,12 +451,12 @@ export default function TuneEditor({
               control={form.control}
               name="notes_public"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-y-1 space-x-2">
-                  <FormLabel className="w-1/5 text-right">
+                <FormItem className="tune-form-item-style2">
+                  <FormLabel className="tune-form-label-style">
                     Public Notes:{" "}
                   </FormLabel>
 
-                  <FormControl className="w-1/5">
+                  <FormControl className="tune-form-control-style">
                     <Textarea {...field} value={field.value || ""} />
                   </FormControl>
                 </FormItem>
@@ -460,10 +467,12 @@ export default function TuneEditor({
               control={form.control}
               name="tags"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-y-1 space-x-2">
-                  <FormLabel className="w-1/5 text-right">Tags: </FormLabel>
+                <FormItem className="tune-form-item-style2">
+                  <FormLabel className="tune-form-label-style">
+                    Tags:{" "}
+                  </FormLabel>
 
-                  <FormControl className="w-1/5">
+                  <FormControl className="tune-form-control-style">
                     <Input {...field} value={field.value || ""} />
                   </FormControl>
 
@@ -476,12 +485,12 @@ export default function TuneEditor({
               control={form.control}
               name="recall_eval"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-y-1 space-x-2">
-                  <FormLabel className="w-1/5 text-right">
+                <FormItem className="tune-form-item-style2">
+                  <FormLabel className="tune-form-label-style">
                     Recall Evaluation:{" "}
                   </FormLabel>
 
-                  <FormControl className="w-1/5">
+                  <FormControl className="tune-form-control-style">
                     <Input {...field} value={field.value || ""} />
                   </FormControl>
                 </FormItem>
