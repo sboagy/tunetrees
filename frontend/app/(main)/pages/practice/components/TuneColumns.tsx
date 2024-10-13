@@ -247,14 +247,14 @@ export function get_columns(
           accessorKey: "recall_eval",
           header: ({ column }) => sortableHeader(column, "Title"),
           enableHiding: false,
-          cell: (info: CellContext<Tune, string | undefined>) =>
+          cell: (info: CellContext<Tune, unknown>) =>
             RecallEvalComboBox(info, userId, playlistId, purpose),
         }
       : {
           accessorKey: "select",
           header: ({ column, table }) => selectionHeader(column, table),
           enableHiding: false,
-          cell: (info: CellContext<Tune, string | undefined>) =>
+          cell: (info: CellContext<Tune, unknown>) =>
             RowSelectedCheckBox(info, userId, playlistId, purpose),
         },
     {
