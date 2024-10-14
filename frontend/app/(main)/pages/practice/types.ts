@@ -20,6 +20,28 @@ export type Tune = {
   recall_eval?: string | null;
 };
 
+export type PlaylistTune = {
+  ID?: number;
+  Title?: string;
+  Type?: string;
+  Structure?: string;
+  Mode?: string;
+  Incipit?: string;
+  Learned?: string;
+  Practiced?: string;
+  Quality?: string;
+  Easiness?: number;
+  Interval?: number;
+  Repetitions?: number;
+  ReviewDate?: string;
+  BackupPracticed?: string;
+  NotePrivate?: string;
+  NotePublic?: string;
+  Tags?: string;
+  USER_REF?: number;
+  PLAYLIST_REF?: number;
+};
+
 export type ScreenSize = "small" | "full";
 
 export type TablePurpose = "practice" | "repertoire" | "suggestions";
