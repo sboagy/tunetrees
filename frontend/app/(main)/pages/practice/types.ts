@@ -7,7 +7,7 @@ export type Tune = {
   incipit: string | null;
   learned: string | null;
   practiced: string | null;
-  quality: string | null;
+  quality: number | null;
   easiness: number | null;
   interval: number | null;
   repetitions: number | null;
@@ -29,7 +29,7 @@ export type PlaylistTune = {
   Incipit?: string;
   Learned?: string;
   Practiced?: string;
-  Quality?: string;
+  Quality?: number;
   Easiness?: number;
   Interval?: number;
   Repetitions?: number;

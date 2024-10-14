@@ -197,7 +197,7 @@ class PlaylistTune(BaseModel):
     Incipit: Optional[str]
     Learned: Optional[str]
     Practiced: Optional[str]
-    Quality: Optional[str]
+    Quality: Optional[int]
     Easiness: Optional[float]
     Interval: Optional[int]
     Repetitions: Optional[int]

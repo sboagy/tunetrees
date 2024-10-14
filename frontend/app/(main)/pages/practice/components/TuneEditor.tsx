@@ -28,7 +28,7 @@ const formSchema = z.object({
   Incipit: z.string().optional(),
   Learned: z.string().optional(),
   Practiced: z.string().optional(),
-  Quality: z.string().optional(),
+  Quality: z.number().optional(),
   Easiness: z.number().optional(),
   Interval: z.number().optional(),
   Repetitions: z.number().optional(),

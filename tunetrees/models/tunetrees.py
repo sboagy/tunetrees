@@ -28,11 +28,11 @@ t_practice_list_joined = Table(
     Column("Incipit", Text),
     Column("Learned", Text),
     Column("Practiced", Text),
-    Column("Quality", Text),
+    Column("Quality", Integer),
     Column("Easiness", Float),
     Column("Interval", Integer),
     Column("Repetitions", Integer),
-    Column("ReviewDate", Text),
+    Column("ReviewDate", Integer),
     Column("BackupPracticed", Text),
     Column("NotePrivate", Text),
     Column("NotePublic", Text),
@@ -56,11 +56,11 @@ t_practice_list_staged = Table(
     Column("PLAYLIST_REF", Integer),
     Column("Instrument", Text),
     Column("Practiced", Text),
-    Column("Quality", Text),
+    Column("Quality", Integer),
     Column("Easiness", Float),
     Column("Interval", Integer),
     Column("Repetitions", Integer),
-    Column("ReviewDate", Text),
+    Column("ReviewDate", Integer),
     Column("BackupPracticed", Text),
     Column("NotePrivate", Text),
     Column("NotePublic", Text),
@@ -78,12 +78,12 @@ class PracticeRecord(Base):
     PLAYLIST_REF = mapped_column(Integer)
     TUNE_REF = mapped_column(Text)
     Practiced = mapped_column(Text)
-    Quality = mapped_column(Text)
+    Quality = mapped_column(Integer)
     ID = mapped_column(Integer, primary_key=True)
     Easiness = mapped_column(Float)
     Interval = mapped_column(Integer)
     Repetitions = mapped_column(Integer)
-    ReviewDate = mapped_column(Text)
+    ReviewDate = mapped_column(Integer)
     BackupPracticed = mapped_column(Text)
 
 
