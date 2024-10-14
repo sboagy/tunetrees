@@ -32,7 +32,7 @@ t_practice_list_joined = Table(
     Column("Easiness", Float),
     Column("Interval", Integer),
     Column("Repetitions", Integer),
-    Column("ReviewDate", Integer),
+    Column("ReviewDate", Text),
     Column("BackupPracticed", Text),
     Column("NotePrivate", Text),
     Column("NotePublic", Text),
@@ -60,7 +60,7 @@ t_practice_list_staged = Table(
     Column("Easiness", Float),
     Column("Interval", Integer),
     Column("Repetitions", Integer),
-    Column("ReviewDate", Integer),
+    Column("ReviewDate", Text),
     Column("BackupPracticed", Text),
     Column("NotePrivate", Text),
     Column("NotePublic", Text),
@@ -70,6 +70,21 @@ t_practice_list_staged = Table(
     Column("StagedNotesPublic", Text),
     Column("StagedRecallEval", Text),
 )
+
+
+class PracticeRecord(Base):
+    __tablename__ = "practice_record"
+
+    PLAYLIST_REF = mapped_column(Integer)
+    TUNE_REF = mapped_column(Text)
+    Practiced = mapped_column(Text)
+    Quality = mapped_column(Text)
+    ID = mapped_column(Integer, primary_key=True)
+    Easiness = mapped_column(Float)
+    Interval = mapped_column(Integer)
+    Repetitions = mapped_column(Integer)
+    ReviewDate = mapped_column(Text)
+    BackupPracticed = mapped_column(Text)
 
 
 class Tune(Base):
@@ -90,9 +105,6 @@ class Tune(Base):
     )
     playlist_tune: Mapped[List["PlaylistTune"]] = relationship(
         "PlaylistTune", uselist=True, back_populates="tune"
-    )
-    practice_record: Mapped[List["PracticeRecord"]] = relationship(
-        "PracticeRecord", uselist=True, back_populates="tune"
     )
     table_transient_data: Mapped[List["TableTransientData"]] = relationship(
         "TableTransientData", uselist=True, back_populates="tune"
@@ -181,9 +193,6 @@ class Playlist(Base):
     playlist_tune: Mapped[List["PlaylistTune"]] = relationship(
         "PlaylistTune", uselist=True, back_populates="playlist"
     )
-    practice_record: Mapped[List["PracticeRecord"]] = relationship(
-        "PracticeRecord", uselist=True, back_populates="playlist"
-    )
     table_transient_data: Mapped[List["TableTransientData"]] = relationship(
         "TableTransientData", uselist=True, back_populates="playlist"
     )
@@ -245,28 +254,6 @@ class PlaylistTune(Base):
     )
     tune: Mapped[Optional["Tune"]] = relationship(
         "Tune", back_populates="playlist_tune"
-    )
-
-
-class PracticeRecord(Base):
-    __tablename__ = "practice_record"
-
-    PLAYLIST_REF = mapped_column(ForeignKey("playlist.PLAYLIST_ID"))
-    TUNE_REF = mapped_column(ForeignKey("tune.ID"))
-    Practiced = mapped_column(Text)
-    Quality = mapped_column(Text)
-    ID = mapped_column(Integer, primary_key=True)
-    Easiness = mapped_column(Float)
-    Interval = mapped_column(Integer)
-    Repetitions = mapped_column(Integer)
-    ReviewDate = mapped_column(Integer)
-    BackupPracticed = mapped_column(Text)
-
-    playlist: Mapped[Optional["Playlist"]] = relationship(
-        "Playlist", back_populates="practice_record"
-    )
-    tune: Mapped[Optional["Tune"]] = relationship(
-        "Tune", back_populates="practice_record"
     )
 
 
