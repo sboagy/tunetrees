@@ -267,7 +267,7 @@ def update_practice_feedbacks(
                     "Easiness": review.get("easiness"),
                     "Repetitions": review.get("repetitions"),
                     "ReviewDate": review_date_str,
-                    "Quality": quality,
+                    "Quality": quality_int,
                     "Practiced": practiced_str,
                 }
             )
