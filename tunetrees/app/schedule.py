@@ -439,6 +439,12 @@ def update_practice_schedules(
 
 
 def query_and_print_tune_by_id(tune_id: int, print_table=True):
+    """Diagnostic function to query and print a tune by its ID.
+
+    Args:
+        tune_id (int): unique ID of the tune to query.
+        print_table (bool, optional): only prints the table if True. Defaults to True.
+    """
     db = None
     try:
         db = SessionLocal()
