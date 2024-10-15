@@ -28,11 +28,11 @@ t_practice_list_joined = Table(
     Column("Incipit", Text),
     Column("Learned", Text),
     Column("Practiced", Text),
-    Column("Quality", Integer),
+    Column("Quality", Text),
     Column("Easiness", Float),
     Column("Interval", Integer),
     Column("Repetitions", Integer),
-    Column("ReviewDate", Integer),
+    Column("ReviewDate", Text),
     Column("BackupPracticed", Text),
     Column("NotePrivate", Text),
     Column("NotePublic", Text),
@@ -56,11 +56,11 @@ t_practice_list_staged = Table(
     Column("PLAYLIST_REF", Integer),
     Column("Instrument", Text),
     Column("Practiced", Text),
-    Column("Quality", Integer),
+    Column("Quality", Text),
     Column("Easiness", Float),
     Column("Interval", Integer),
     Column("Repetitions", Integer),
-    Column("ReviewDate", Integer),
+    Column("ReviewDate", Text),
     Column("BackupPracticed", Text),
     Column("NotePrivate", Text),
     Column("NotePublic", Text),
@@ -78,12 +78,12 @@ class PracticeRecord(Base):
     PLAYLIST_REF = mapped_column(Integer)
     TUNE_REF = mapped_column(Text)
     Practiced = mapped_column(Text)
-    Quality = mapped_column(Integer)
+    Quality = mapped_column(Text)
     ID = mapped_column(Integer, primary_key=True)
     Easiness = mapped_column(Float)
     Interval = mapped_column(Integer)
     Repetitions = mapped_column(Integer)
-    ReviewDate = mapped_column(Integer)
+    ReviewDate = mapped_column(Text)
     BackupPracticed = mapped_column(Text)
 
 
@@ -129,6 +129,9 @@ class User(Base):
     )
     session: Mapped[List["Session"]] = relationship(
         "Session", uselist=True, back_populates="user"
+    )
+    tab_group_main_state: Mapped[List["TabGroupMainState"]] = relationship(
+        "TabGroupMainState", uselist=True, back_populates="user"
     )
     table_state: Mapped[List["TableState"]] = relationship(
         "TableState", uselist=True, back_populates="user"
@@ -206,6 +209,18 @@ class Session(Base):
     user_id = mapped_column(ForeignKey("user.id"))
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="session")
+
+
+class TabGroupMainState(Base):
+    __tablename__ = "tab_group_main_state"
+
+    user_id = mapped_column(ForeignKey("user.id"), nullable=False)
+    id = mapped_column(Integer, primary_key=True)
+    which_tab = mapped_column(
+        Enum("practice", "repertoire", "suggestions"), server_default=text("'practice'")
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="tab_group_main_state")
 
 
 class TableState(Base):

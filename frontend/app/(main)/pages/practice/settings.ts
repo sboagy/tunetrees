@@ -197,3 +197,69 @@ export async function deleteTableTransientData(
 //     return 500;
 //   }
 // }
+
+export interface ITabGroupMainStateModel {
+  user_id: number;
+  which_tab: string;
+}
+
+export async function getTabGroupMainState(
+  userId: number,
+): Promise<ITabGroupMainStateModel | null> {
+  try {
+    const response = await client.get(`/tab_group_main_state/${userId}`);
+    console.log("getTabGroupMainState response status: ", response.status);
+    return response.data as ITabGroupMainStateModel;
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 404) {
+      return null; // Return null for 404 status
+    }
+    console.error("getTabGroupMainState error: ", error);
+    throw error;
+  }
+}
+
+export async function updateTabGroupMainState(
+  userId: number,
+  tabGroupMainState: ITabGroupMainStateModel,
+): Promise<number> {
+  try {
+    const response = await client.put(
+      `/tab_group_main_state/${userId}`,
+      tabGroupMainState,
+    );
+    console.log("updateTabGroupMainState response status: ", response.status);
+    return response.status;
+  } catch (error) {
+    console.error("updateTabGroupMainState error: ", error);
+    return 500;
+  }
+}
+
+export async function createTabGroupMainState(
+  userId: number,
+  tabGroupMainState: ITabGroupMainStateModel,
+): Promise<number> {
+  try {
+    const response = await client.post(
+      `/tab_group_main_state/${userId}`,
+      tabGroupMainState,
+    );
+    console.log("createTabGroupMainState response status: ", response.status);
+    return response.status;
+  } catch (error) {
+    console.error("createTabGroupMainState error: ", error);
+    return 500;
+  }
+}
+
+export async function deleteTabGroupMainState(userId: number): Promise<number> {
+  try {
+    const response = await client.delete(`/tab_group_main_state/${userId}`);
+    console.log("deleteTabGroupMainState response status: ", response.status);
+    return response.status;
+  } catch (error) {
+    console.error("deleteTabGroupMainState error: ", error);
+    return 500;
+  }
+}

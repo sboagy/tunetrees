@@ -5,8 +5,9 @@ from fastapi import APIRouter, Body, HTTPException, Path
 from starlette import status as status
 
 from tunetrees.app.database import SessionLocal
-from tunetrees.models.tunetrees import TableState, TableTransientData
+from tunetrees.models.tunetrees import TabGroupMainState, TableState, TableTransientData
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 settings_router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -401,3 +402,133 @@ def delete_table_transient_data(
     finally:
         if db is not None:
             db.close()
+
+
+class TabGroupMainStateModel(BaseModel):
+    user_id: int
+    which_tab: str
+
+    class Config:
+        orm_mode = True
+
+
+@settings_router.get(
+    "/tab_group_main_state/{user_id}",
+    response_model=TabGroupMainStateModel,
+    summary="Retrieve the tab group main state for a user",
+    description="Retrieve the tab group main state for a user, which indicates the currently active tab.",
+    status_code=status.HTTP_200_OK,
+)
+def get_tab_group_main_state(
+    user_id: Annotated[
+        int,
+        Path(
+            description="Should be a valid user id that corresponds to a user in the user table"
+        ),
+    ],
+):
+    with SessionLocal() as db:
+        try:
+            tab_group_main_state = (
+                db.query(TabGroupMainState).filter_by(user_id=user_id).first()
+            )
+            if not tab_group_main_state:
+                raise HTTPException(
+                    status_code=404, detail="Tab group main state not found"
+                )
+            return tab_group_main_state
+        except Exception as e:
+            logging.getLogger().error("Unknown error: %s" % e)
+            raise HTTPException(status_code=500, detail="Unknown error occurred")
+
+
+@settings_router.post(
+    "/tab_group_main_state",
+    response_model=TabGroupMainStateModel,
+    summary="Create a new tab group main state for a user",
+    description="Create a new tab group main state for a user, which indicates the currently active tab.",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_tab_group_main_state(
+    tab_group_main_state: TabGroupMainStateModel,
+):
+    with SessionLocal() as db:
+        try:
+            new_tab_group_main_state = TabGroupMainState(
+                user_id=tab_group_main_state.user_id,
+                which_tab=tab_group_main_state.which_tab,
+            )
+            db.add(new_tab_group_main_state)
+            db.commit()
+            db.refresh(new_tab_group_main_state)
+            return new_tab_group_main_state
+        except Exception as e:
+            logging.getLogger().error("Unknown error: %s" % e)
+            raise HTTPException(status_code=500, detail="Unknown error occurred")
+
+
+@settings_router.put(
+    "/tab_group_main_state/{user_id}",
+    response_model=TabGroupMainStateModel,
+    summary="Update the tab group main state for a user",
+    description="Update the tab group main state for a user, which indicates the currently active tab.",
+    status_code=status.HTTP_200_OK,
+)
+def update_tab_group_main_state(
+    user_id: Annotated[
+        int,
+        Path(
+            description="Should be a valid user id that corresponds to a user in the user table"
+        ),
+    ],
+    tab_group_main_state: TabGroupMainStateModel,
+):
+    with SessionLocal() as db:
+        try:
+            existing_tab_group_main_state = (
+                db.query(TabGroupMainState).filter_by(user_id=user_id).first()
+            )
+            if not existing_tab_group_main_state:
+                raise HTTPException(
+                    status_code=404, detail="Tab group main state not found"
+                )
+
+            existing_tab_group_main_state.which_tab = tab_group_main_state.which_tab
+            db.commit()
+            db.refresh(existing_tab_group_main_state)
+            return existing_tab_group_main_state
+        except Exception as e:
+            logging.getLogger().error("Unknown error: %s" % e)
+            raise HTTPException(status_code=500, detail="Unknown error occurred")
+
+
+@settings_router.delete(
+    "/tab_group_main_state/{user_id}",
+    summary="Delete the tab group main state for a user",
+    description="Delete the tab group main state for a user, which indicates the currently active tab.",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_tab_group_main_state(
+    user_id: Annotated[
+        int,
+        Path(
+            description="Should be a valid user id that corresponds to a user in the user table"
+        ),
+    ],
+):
+    with SessionLocal() as db:
+        try:
+            tab_group_main_state = (
+                db.query(TabGroupMainState).filter_by(user_id=user_id).first()
+            )
+            if not tab_group_main_state:
+                raise HTTPException(
+                    status_code=404, detail="Tab group main state not found"
+                )
+
+            db.delete(tab_group_main_state)
+            db.commit()
+            return {"status": "success", "code": 204}
+        except Exception as e:
+            logging.getLogger().error("Unknown error: %s" % e)
+            raise HTTPException(status_code=500, detail="Unknown error occurred")
