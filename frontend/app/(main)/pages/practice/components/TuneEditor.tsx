@@ -15,30 +15,31 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getPlaylistTune } from "../queries";
+import { getPlaylistTune, updatePlaylistTune } from "../queries";
 import "./TuneEditor.css"; // Import the CSS file
 import type { PlaylistTune } from "../types";
+import { ERROR_PLAYLIST_TUNE } from "../mocks";
 
 const formSchema = z.object({
   ID: z.number().optional(),
   Title: z.string().optional(),
-  Type: z.string().optional(),
-  Structure: z.string().optional(),
-  Mode: z.string().optional(),
-  Incipit: z.string().optional(),
-  Learned: z.string().optional(),
-  Practiced: z.string().optional(),
-  Quality: z.number().optional(),
-  Easiness: z.number().optional(),
-  Interval: z.number().optional(),
-  Repetitions: z.number().optional(),
-  ReviewDate: z.string().optional(),
-  BackupPracticed: z.string().optional(),
-  NotePrivate: z.string().optional(),
-  NotePublic: z.string().optional(),
-  Tags: z.string().optional(),
-  USER_REF: z.number().optional(),
-  PLAYLIST_REF: z.number().optional(),
+  Type: z.string().nullable().optional(),
+  Structure: z.string().nullable().optional(),
+  Mode: z.string().nullable().optional(),
+  Incipit: z.string().nullable().optional(),
+  Learned: z.string().nullable().optional(),
+  Practiced: z.string().nullable().optional(),
+  Quality: z.number().nullable().optional(),
+  Easiness: z.number().nullable().optional(),
+  Interval: z.number().nullable().optional(),
+  Repetitions: z.number().nullable().optional(),
+  ReviewDate: z.string().nullable().optional(),
+  BackupPracticed: z.string().nullable().optional(),
+  NotePrivate: z.string().nullable().optional(),
+  NotePublic: z.string().nullable().optional(),
+  Tags: z.string().nullable().optional(),
+  USER_REF: z.number().nullable().optional(),
+  PLAYLIST_REF: z.number().nullable().optional(),
 });
 
 interface ITuneEditorProps {
@@ -98,20 +99,33 @@ export default function TuneEditor({
     const fetchTune = async () => {
       const tuneData = await getPlaylistTune(userId, playlistId, tuneId);
 
-      if (tuneData) {
-        setTune(tuneData);
-
-        form.reset(tuneData);
+      if (tuneData && (tuneData as PlaylistTune).ID !== undefined) {
+        setTune(tuneData as PlaylistTune);
+        form.reset(tuneData as PlaylistTune);
+      } else {
+        console.error("Failed to fetch tune");
+        setTune(ERROR_PLAYLIST_TUNE);
       }
     };
 
     void fetchTune();
   }, [userId, playlistId, tuneId, form]);
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
     console.log(data);
 
-    // Here you would typically send the data to your backend
+    const result: { success?: string; detail?: string } =
+      await updatePlaylistTune(
+        userId,
+        playlistId,
+        tuneId,
+        data as PlaylistTune,
+      );
+    if (result.success) {
+      console.log("Tune updated successfully");
+    } else {
+      console.error("Failed to update tune:", result.detail);
+    }
   };
 
   const router = useRouter();

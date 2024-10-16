@@ -34,7 +34,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import type { TablePurpose, Tune } from "./types";
+import type { PlaylistTune, TablePurpose, Tune } from "./types";
 import { get_columns } from "./components/TuneColumns";
 
 export function getMockTune(): Tune {
@@ -47,7 +47,7 @@ export function getMockTune(): Tune {
     incipit: "incipit",
     learned: "2023-01-01",
     practiced: "2023-01-02",
-    quality: "Good",
+    quality: 3,
     easiness: 5,
     interval: 3,
     repetitions: 10,
@@ -113,7 +113,7 @@ export const ERROR_TUNE: Tune[] = [
     incipit: "Error",
     learned: "Error",
     practiced: "Error",
-    quality: "Error",
+    quality: 0,
     easiness: 0,
     interval: 0,
     repetitions: 0,
@@ -125,3 +125,25 @@ export const ERROR_TUNE: Tune[] = [
     recall_eval: "Error", // Optional property, should't need to be set
   },
 ];
+
+export const ERROR_PLAYLIST_TUNE: PlaylistTune = {
+  ID: 0,
+  Title: "Error",
+  Type: "Error",
+  Structure: "Error",
+  Mode: "Error",
+  Incipit: "Error",
+  Learned: "Error",
+  Practiced: "Error",
+  Quality: 0,
+  Easiness: 0,
+  Interval: 0,
+  Repetitions: 0,
+  ReviewDate: "Error",
+  BackupPracticed: "Error",
+  NotePrivate: "Error", // Optional property, should't need to be set
+  NotePublic: "Error", // Optional property, should't need to be set
+  Tags: "Error", // Optional property, should't need to be set
+  USER_REF: 0,
+  PLAYLIST_REF: 0,
+};

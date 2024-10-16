@@ -10,6 +10,11 @@ import type { Tune } from "../types";
 import RepertoireGrid from "./RepertoireGrid";
 import ScheduledTunesGrid from "./ScheduledTunesGrid";
 import type { NextPage } from "next";
+import {
+  getTabGroupMainState,
+  type ITabGroupMainStateModel,
+  updateTabGroupMainState,
+} from "../settings";
 
 function CircularProgress() {
   return (
@@ -24,6 +29,24 @@ interface IPracticeProps {
   playlist_id: string;
 }
 
+const tabSpec = [
+  {
+    id: "scheduled",
+    name: "Practice",
+    content: "Review and practice your scheduled tunes.",
+  },
+  {
+    id: "repertoire",
+    name: "Repertoire",
+    content: "Manage your repertoire.",
+  },
+  {
+    id: "analysis",
+    name: "Analysis",
+    content: "Practice Analytics.",
+  },
+];
+
 const tabGroupMain: NextPage<IPracticeProps> = ({
   user_id,
   playlist_id,
@@ -33,6 +56,51 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
   const [scheduled, setScheduled] = useState<Tune[]>();
   const [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
   const [origRecentlyPracticed, setOrigRecentlyPracticed] = useState<Tune[]>();
+
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const doInitialization = async (user_id: string) => {
+      try {
+        console.log("Initializing...");
+        const userIdInt = Number.parseInt(user_id, 10);
+        const tabGroupMainState: ITabGroupMainStateModel | null =
+          await getTabGroupMainState(userIdInt);
+        if (tabGroupMainState !== null) {
+          setActiveTab(tabGroupMainState.which_tab);
+        } else {
+          setActiveTab(tabSpec[0].id);
+        }
+
+        // TODO: The tab components should fetch their own data
+        const scheduledData = await getPracticeListScheduled(
+          user_id,
+          playlist_id,
+        );
+        setScheduled(scheduledData);
+
+        const repertoireData = await getRecentlyPracticed(user_id, playlist_id);
+        setRecentlyPracticed(repertoireData);
+        setOrigRecentlyPracticed(repertoireData);
+      } catch (error) {
+        console.error("Error fetching active tab:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void doInitialization(user_id);
+  }, [user_id, playlist_id]);
+
+  const changeActiveTab = (whichTag: string) => {
+    setActiveTab(whichTag);
+    const userIdInt = Number.parseInt(user_id, 10);
+    const tabGroupMainState: ITabGroupMainStateModel = {
+      user_id: userIdInt,
+      which_tab: whichTag,
+    };
+    void updateTabGroupMainState(userIdInt, tabGroupMainState);
+  };
 
   const handleFilterChange = (filter: React.ChangeEvent<HTMLInputElement>) => {
     if (origRecentlyPracticed === undefined) return;
@@ -48,47 +116,31 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
     setRecentlyPracticed(filteredData);
   };
 
-  useEffect(() => {
-    const getScheduled = async (user_id: string, playlist_id: string) => {
-      const data = await getPracticeListScheduled(user_id, playlist_id);
-      setScheduled(data);
-    };
-    void getScheduled(user_id, playlist_id);
-  }, [user_id, playlist_id]);
+  // useEffect(() => {
+  //   const getScheduled = async (user_id: string, playlist_id: string) => {
+  //     const data = await getPracticeListScheduled(user_id, playlist_id);
+  //     setScheduled(data);
+  //   };
+  //   void getScheduled(user_id, playlist_id);
+  // }, [user_id, playlist_id]);
 
-  useEffect(() => {
-    const getRecent = async (user_id: string, playlist_id: string) => {
-      const data = await getRecentlyPracticed(user_id, playlist_id);
-      setRecentlyPracticed(data);
-      setOrigRecentlyPracticed(data);
-    };
-    void getRecent(user_id, playlist_id);
-  }, [user_id, playlist_id]);
+  // useEffect(() => {
+  //   const getRecent = async (user_id: string, playlist_id: string) => {
+  //     const data = await getRecentlyPracticed(user_id, playlist_id);
+  //     setRecentlyPracticed(data);
+  //     setOrigRecentlyPracticed(data);
+  //   };
+  //   void getRecent(user_id, playlist_id);
+  // }, [user_id, playlist_id]);
 
-  const tabSpec = [
-    {
-      id: "scheduled",
-      name: "Practice",
-      content: "Review and practice your scheduled tunes.",
-    },
-    {
-      id: "repertoire",
-      name: "Repertoire",
-      content: "Manage your repertoire.",
-    },
-    {
-      id: "analysis",
-      name: "Analysis",
-      content: "Practice Analytics.",
-    },
-  ];
-
-  const [activeTab, setActiveTab] = useState(tabSpec[0].id);
+  if (loading) {
+    return <div>Loading...</div>; // Render a loading state while fetching data
+  }
 
   return (
     <Tabs
-      defaultValue="scheduled"
-      onValueChange={setActiveTab}
+      defaultValue={activeTab || "scheduled"}
+      onValueChange={changeActiveTab}
       className="flex h-full w-full flex-col"
     >
       <TabsList className="grid w-full grid-cols-3 rounded-none bg-transparent p-0 gap-2">
@@ -97,7 +149,8 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
             key={tab.id}
             value={tab.id}
             className={`rounded-t-lg border-t border-l border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors duration-200
-                ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
+              ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
+            // onClick={() => changeActiveTab(tab.id)}
           >
             {tab.name}
           </TabsTrigger>

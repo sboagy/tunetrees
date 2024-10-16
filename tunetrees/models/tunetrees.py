@@ -217,7 +217,7 @@ class TabGroupMainState(Base):
     user_id = mapped_column(ForeignKey("user.id"), nullable=False)
     id = mapped_column(Integer, primary_key=True)
     which_tab = mapped_column(
-        Enum("practice", "repertoire", "suggestions"), server_default=text("'practice'")
+        Enum("scheduled", "repertoire", "analysis"), server_default=text("'practice'")
     )
 
     user: Mapped["User"] = relationship("User", back_populates="tab_group_main_state")
@@ -229,7 +229,7 @@ class TableState(Base):
     user_id = mapped_column(ForeignKey("user.id"), primary_key=True, nullable=False)
     screen_size = mapped_column(Enum("small", "full"), primary_key=True, nullable=False)
     purpose = mapped_column(
-        Enum("practice", "repertoire", "suggestions"), primary_key=True, nullable=False
+        Enum("practice", "repertoire", "analysis"), primary_key=True, nullable=False
     )
     settings = mapped_column(Text)
 

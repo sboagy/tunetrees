@@ -7,7 +7,6 @@ from starlette import status as status
 from tunetrees.app.database import SessionLocal
 from tunetrees.models.tunetrees import TabGroupMainState, TableState, TableTransientData
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 settings_router = APIRouter(prefix="/settings", tags=["settings"])
 
