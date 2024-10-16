@@ -126,6 +126,7 @@ export const ERROR_TUNE: Tune[] = [
   },
 ];
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export const ERROR_PLAYLIST_TUNE: PlaylistTune = {
   ID: 0,
   Title: "Error",
