@@ -28,17 +28,20 @@ export async function createOrUpdateTableState(
   tableStates: TableState,
 ): Promise<number> {
   try {
+    console.log(
+      `=> createOrUpdateTableState rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
+    );
     const tableStatesStr = JSON.stringify(tableStates);
     const response = await client.post(
       `/table_state/${userId}/${screenSize}/${purpose}`,
       tableStatesStr,
     );
-    console.log("createOrUpdateTableState: ", response?.status);
+    console.log("<= createOrUpdateTableState: ", response?.status);
     return response.status;
     // Handle successful response
   } catch (error) {
     // Handle error
-    console.error("createOrUpdateTableState: ", error);
+    console.error("<= createOrUpdateTableState: ", error);
     return 500;
   }
 }

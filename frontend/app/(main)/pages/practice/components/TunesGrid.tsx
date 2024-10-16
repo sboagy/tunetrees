@@ -239,7 +239,24 @@ export function TunesTable(
 
     originalSetRowSelectionRef.current(resolvedRowSelectionState);
 
-    void saveTableState(table, user_id, table_purpose);
+    console.log(
+      "=> interceptedRowSelectionChange - resolvedRowSelectionState: ",
+      resolvedRowSelectionState,
+    );
+    const result = saveTableState(table, user_id, table_purpose);
+    result
+      .then((result) => {
+        console.log(
+          "<= interceptedRowSelectionChange - saveTableState result: ",
+          result,
+        );
+      })
+      .catch((error) => {
+        console.error(
+          "<= interceptedRowSelectionChange - Error saveTableState: ",
+          error,
+        );
+      });
     if (selectionChangedCallback) {
       selectionChangedCallback(table, resolvedRowSelectionState);
     }
@@ -256,7 +273,9 @@ export function TunesTable(
         : newColumnFiltersState;
 
     originalColumnFiltersRef.current(resolvedColumnFiltersState);
-
+    console.log(
+      `=> interceptedOnColumnFiltersChange - resolvedColumnFiltersState: ${JSON.stringify(resolvedColumnFiltersState)}`,
+    );
     void saveTableState(table, user_id, table_purpose);
   };
 
@@ -267,7 +286,9 @@ export function TunesTable(
       newSorting instanceof Function ? newSorting(sorting) : newSorting;
 
     originalSetSortingRef.current(resolvedSorting);
-
+    console.log(
+      `=> interceptedSetSorting - resolvedSorting: ${JSON.stringify(newSorting)}`,
+    );
     void saveTableState(table, user_id, table_purpose);
   };
 
@@ -282,7 +303,9 @@ export function TunesTable(
         : newVisibilityState;
 
     originalSetColumnVisibilityRef.current(resolvedVisibilityState);
-
+    console.log(
+      `=> interceptedSetColumnVisibility - resolvedVisibilityState: ${JSON.stringify(resolvedVisibilityState)}`,
+    );
     void saveTableState(table, user_id, table_purpose);
   };
 
@@ -298,6 +321,9 @@ export function TunesTable(
 
     originalSetPaginationState.current(resolvedPaginationState);
 
+    console.log(
+      `=> interceptedSetPagination - resolvedPaginationState: ${JSON.stringify(resolvedPaginationState)}`,
+    );
     void saveTableState(table, user_id, table_purpose);
   };
 

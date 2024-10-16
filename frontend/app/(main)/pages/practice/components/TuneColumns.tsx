@@ -27,7 +27,6 @@ import {
   EyeOff,
   Filter,
 } from "lucide-react";
-import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { createOrUpdateTableState } from "../settings";
 import type { CheckedState } from "@radix-ui/react-checkbox";
@@ -132,7 +131,15 @@ export function get_columns(
   playlistId: number,
   purpose: TablePurpose,
 ): ColumnDef<Tune>[] {
-  const [isAllChecked, setIsAllChecked] = useState<CheckedState>(false);
+  const determineHeaderCheckedState = (
+    table: TanstackTable<Tune>,
+  ): CheckedState => {
+    const rowSelection = table.getState().rowSelection;
+    const allSelected =
+      Object.keys(rowSelection).length === table.getRowCount();
+    const noneSelected = Object.keys(rowSelection).length === 0;
+    return allSelected ? true : noneSelected ? false : "indeterminate";
+  };
 
   const saveTableState = async (
     table: TanstackTable<Tune>,
@@ -166,12 +173,36 @@ export function get_columns(
     const checkedResolved =
       typeof checked === "string" ? checked === "true" : checked;
 
-    setIsAllChecked(checkedResolved);
+    // setIsAllChecked(checkedResolved);
     table.toggleAllRowsSelected(checkedResolved);
 
+    if (!checkedResolved) {
+      table.getState().rowSelection = {};
+    } else {
+      const rowSelection = table.getState().rowSelection;
+      for (let i = 0; i < table.getRowCount(); i++) {
+        const row = table.getRow(i.toString());
+        rowSelection[row.id] = true;
+      }
+      table.getState().rowSelection = rowSelection;
+    }
     const rowSelection = table.getState().rowSelection;
     console.log("rowSelection: ", rowSelection);
-    void saveTableState(table, userId.toString(), purpose);
+    const result = saveTableState(table, userId.toString(), purpose);
+    result
+      .then((result) => {
+        console.log(
+          "-> handleHeaderCheckboxChange - saveTableState result: ",
+          result,
+        );
+      })
+      .catch((error) => {
+        console.error(
+          "handleHeaderCheckboxChange - Error saveTableState: ",
+          error,
+        );
+        throw error;
+      });
   };
 
   // const isIndeterminate = () => {
@@ -187,7 +218,7 @@ export function get_columns(
     console.log("column: ", column);
     return (
       <Checkbox
-        checked={isAllChecked}
+        checked={determineHeaderCheckedState(table)}
         onCheckedChange={(checked) =>
           handleHeaderCheckboxChange(checked, table)
         }
@@ -201,6 +232,12 @@ export function get_columns(
     );
   }
 
+  function refreshHeader(info: CellContext<Tune, string>) {
+    // Ugly trick to force a refresh of the header
+    info.table.getColumn(info.column.id)?.toggleVisibility();
+    info.table.getColumn(info.column.id)?.toggleVisibility();
+  }
+
   function RowSelectedCheckBox(
     info: CellContext<Tune, string>,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -210,12 +247,29 @@ export function get_columns(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     purpose: TablePurpose,
   ) {
-    // const [checkedItems, setCheckedItems] = useState<number[]>([]);
-
     const handleItemCheckboxChange = () => {
-      setIsAllChecked("indeterminate");
+      console.log(
+        `-> handleItemCheckboxChange - row.id: ${info.row.id}, ${JSON.stringify(info.table.getState().rowSelection)}`,
+      );
+      refreshHeader(info);
+
       info.row.toggleSelected();
-      info.table.getState().rowSelection[info.row.id] = true;
+      const rowSelection = { ...info.table.getState().rowSelection };
+      rowSelection[info.row.id] =
+        rowSelection[info.row.id] === undefined
+          ? true
+          : !rowSelection[info.row.id];
+
+      for (const key in rowSelection) {
+        if (!rowSelection[key]) {
+          delete rowSelection[key];
+        }
+      }
+      info.table.getState().rowSelection = rowSelection;
+
+      console.log(
+        `<- handleItemCheckboxChange - row.id: ${info.row.id}, ${JSON.stringify(info.table.getState().rowSelection)}`,
+      );
       const promise = saveTableState(info.table, userId.toString(), purpose);
       promise
         .then((result) => {
@@ -229,7 +283,6 @@ export function get_columns(
             "handleItemCheckboxChange - Error saveTableState: ",
             error,
           );
-          throw error;
         });
     };
 
