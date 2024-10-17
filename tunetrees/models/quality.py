@@ -5,8 +5,15 @@
 #         2: incorrect response; where the correct one seemed easy to recall.
 #         1: incorrect response; the correct one remembered.
 #         0: complete blackout.
+
+RESCHEDULED = "rescheduled"
+NEW = "new"
+NOT_SET = "not_set"
+
 quality_lookup = {
-    "not_set": -1,
+    RESCHEDULED: 0,
+    NEW: 0,
+    NOT_SET: -1,
     "blackout": 0,  # 0: complete blackout.
     "failed": 1,  # 1: incorrect response; the correct one remembered.
     "barely": 2,  # 2: incorrect response; where the correct one seemed easy to recall.

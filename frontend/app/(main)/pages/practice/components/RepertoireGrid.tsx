@@ -18,7 +18,7 @@ import type {
   Table as TanstackTable,
 } from "@tanstack/react-table";
 import type { Tune } from "../types";
-import { submitPracticeSchedules } from "../commands";
+import { submitPracticeFeedbacks } from "../commands";
 
 export default function RepertoireGrid(
   tunes: IScheduledTunesType,
@@ -57,27 +57,17 @@ export default function RepertoireGrid(
     const selectedTunes = table
       .getSelectedRowModel()
       .rows.map((row) => row.original);
-    const updates: { [key: string]: { review_date: string } } = {};
+    const updates: { [key: string]: { feedback: string } } = {};
 
     for (const tune of selectedTunes) {
       const idString = `${tune.id}`;
-      const existingReviewDateString = tune.review_date;
-      if (existingReviewDateString !== null) {
-        console.log("existingReviewDateString", existingReviewDateString);
-        const existingReviewDate = new Date(existingReviewDateString);
-        console.log("existingReviewDate", existingReviewDate);
-      }
-
-      // const newReviewDate = new Date().toISOString().split("T")[0];
-      const newReviewDate = new Date().toISOString();
-
-      updates[idString] = { review_date: newReviewDate };
+      updates[idString] = { feedback: "rescheduled" };
     }
     console.log("updates", updates);
 
     const playlistId = tunes.playlist_id;
 
-    const promiseResult = submitPracticeSchedules({
+    const promiseResult = submitPracticeFeedbacks({
       playlist_id: playlistId,
       updates,
     });

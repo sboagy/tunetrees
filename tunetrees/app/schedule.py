@@ -11,7 +11,7 @@ from tunetrees.app.queries import (
     get_practice_record_table,
     query_result_to_diagnostic_dict,
 )
-from tunetrees.models.quality import quality_lookup
+from tunetrees.models.quality import NEW, NOT_SET, RESCHEDULED, quality_lookup
 from tunetrees.models.tunetrees import PracticeRecord
 
 log = logging.getLogger()
@@ -129,26 +129,54 @@ def update_practice_record(
             if quality_int == -1:
                 raise ValueError(f"Unexpected quality value: {quality}")
 
-            practiced_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
-            practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
+            # quality = 1  # could calculate from how recent, or??  Otherwise, ¯\_(ツ)_/¯
+            # practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)  # type: ignore
+            # review = sm_two.first_review(quality, practiced)
 
-            review = sm_two.review(
-                quality_int,
-                practice_record.Easiness,
-                practice_record.Interval,
-                practice_record.Repetitions,
-                practiced,
-            )
-
-            review_date = review.get("review_datetime")
-            if isinstance(review_date, datetime):
-                review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
-            elif isinstance(review_date, str):
-                review_date_str = review_date
-            else:
-                raise ValueError(
-                    f"Unexpected review_date type: {type(review_date)}: {review_date}"
+            if quality == NEW or quality == RESCHEDULED:
+                stmt = select(PracticeRecord.Practiced).where(
+                    and_(
+                        PracticeRecord.TUNE_REF == tune_id,
+                        PracticeRecord.PLAYLIST_REF == playlist_ref,
+                    )
                 )
+                practiced_result = db.execute(stmt).one_or_none()
+                if practiced_result:
+                    practiced_str = practiced_result[0]
+                else:
+                    practiced_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
+
+                practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
+
+                review = sm_two.first_review(quality_int, practiced)
+
+                # Ignore the review date for new or rescheduled tunes, since the
+                # sm_two algorithm seems to put it one day after the last practiced date,
+                # which will probably be an aged out tune for tunetrees.  So, we'll just
+                # set the review date to the current date, but respect the other values.
+                review_date_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
+
+            else:
+                practiced_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
+                practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
+
+                review = sm_two.review(
+                    quality_int,
+                    practice_record.Easiness,
+                    practice_record.Interval,
+                    practice_record.Repetitions,
+                    practiced,
+                )
+
+                review_date = review.get("review_datetime")
+                if isinstance(review_date, datetime):
+                    review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
+                elif isinstance(review_date, str):
+                    review_date_str = review_date
+                else:
+                    raise ValueError(
+                        f"Unexpected review_date type: {type(review_date)}: {review_date}"
+                    )
 
             # Update the PracticeRecord with the new review data
             practice_record.ReviewDate = review_date_str
@@ -234,30 +262,54 @@ def update_practice_feedbacks(
             quality = tune_update.get("feedback")
             assert quality is not None
             assert isinstance(user_tune_updates, Dict)
-            quality_int = quality_lookup.get(quality, -1)
-            if quality_int == -1:
+            quality_int = quality_lookup.get(quality, -2)
+            if quality_int == -2:
                 raise ValueError(f"Unexpected quality value: {quality_int}")
+            if quality == NOT_SET:
+                continue
 
-            practiced_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
-            practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
-
-            review = sm_two.review(
-                quality_int,
-                easiness,
-                interval,
-                repetitions,
-                practiced,
-            )
-
-            review_date = review.get("review_datetime")
-            if isinstance(review_date, datetime):
-                review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
-            elif isinstance(review_date, str):
-                review_date_str = review_date
-            else:
-                raise ValueError(
-                    f"Unexpected review_date type: {type(review_date)}: {review_date}"
+            if quality == NEW or quality == RESCHEDULED:
+                stmt = select(PracticeRecord.Practiced).where(
+                    and_(
+                        PracticeRecord.TUNE_REF == tune_id,
+                        PracticeRecord.PLAYLIST_REF == playlist_ref,
+                    )
                 )
+                practiced_result = db.execute(stmt).one_or_none()
+                if practiced_result:
+                    practiced_str = practiced_result[0]
+                else:
+                    practiced_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
+
+                practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
+
+                review = sm_two.first_review(quality_int, practiced)
+                # Ignore the review date for new or rescheduled tunes, since the
+                # sm_two algorithm seems to put it one day after the last practiced date,
+                # which will probably be an aged out tune for tunetrees.  So, we'll just
+                # set the review date to the current date, but respect the other values.
+                review_date_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
+            else:
+                practiced_str = datetime.strftime(datetime.now(), TT_DATE_FORMAT)
+                practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
+
+                review = sm_two.review(
+                    quality_int,
+                    easiness,
+                    interval,
+                    repetitions,
+                    practiced,
+                )
+
+                review_date = review.get("review_datetime")
+                if isinstance(review_date, datetime):
+                    review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
+                elif isinstance(review_date, str):
+                    review_date_str = review_date
+                else:
+                    raise ValueError(
+                        f"Unexpected review_date type: {type(review_date)}: {review_date}"
+                    )
 
             data_to_update.append(
                 {
