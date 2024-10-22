@@ -18,7 +18,9 @@ export default function Footer() {
       >
         <div className="flex items-center  space-x-4">
           <Collapsible.Trigger asChild>
-            {isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+            <span className="ml-6">
+              {isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+            </span>
           </Collapsible.Trigger>
           <Collapsible.Content className="collapsible-content">
             {/* <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:whitespace-nowrap sm:overflow-x-clip"> */}
