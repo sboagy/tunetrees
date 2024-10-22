@@ -427,6 +427,14 @@ your own secrets, or, if working as part of the project, you can obtain these se
 
 Obviously ensure that no secrets are ever checked into the github repository.
 
+Before the next step, you should declare `TUNETREES_DB` and `TUNETREES_DEPLOY_BASE_DIR` in 
+your terminal environment (not sure if there's a reasonable way to make this more automatic):
+
+```shell
+export TUNETREES_DB="/home/sboag/tunetrees/tunetrees.sqlite3"
+export TUNETREES_DEPLOY_BASE_DIR="/home/sboag/tunetrees"
+```
+
 4. Build the Docker images by running the following command:
 
     ```bash
