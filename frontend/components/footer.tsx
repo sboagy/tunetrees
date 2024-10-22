@@ -1,3 +1,4 @@
+"use client";
 import CustomLink from "./CustomLink";
 import { Toaster } from "./ui/toaster";
 
