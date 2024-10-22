@@ -14,7 +14,7 @@ export async function getPracticeListScheduled(
   playlist_id: string,
 ): Promise<Tune[]> {
   try {
-    console.log("Environment Variables:", process.env);
+    // console.log("Environment Variables:", process.env);
     console.log("In getPracticeListScheduled: baseURL: %s", client.getUri());
     console.log("user_id: %s, playlist_id: %s", user_id, playlist_id);
     const response = await client.get<Tune[]>(
