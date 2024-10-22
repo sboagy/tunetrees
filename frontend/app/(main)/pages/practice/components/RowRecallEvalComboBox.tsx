@@ -119,7 +119,7 @@ export function RecallEvalComboBox(
           variant="outline"
           role="combobox"
           aria-expanded={isOpen}
-          className={`w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(info.row.original.recall_eval ?? null)}`}
+          className={`w-[9em] sm:w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(info.row.original.recall_eval ?? null)}`}
           style={{
             textAlign: "left",
           }}
@@ -128,7 +128,7 @@ export function RecallEvalComboBox(
           /* the button.  Per suggestion from Stack Overflow. */}
           <span
             style={{
-              width: "18em",
+              // width: "18em",
               overflow: "hidden",
               whiteSpace: "nowrap",
               display: "block",
@@ -136,6 +136,7 @@ export function RecallEvalComboBox(
               textWrap: "nowrap",
               textOverflow: "ellipsis",
             }}
+            className="sm:w-[9em]"
           >
             {info.row.original.recall_eval
               ? qualityList.find(
