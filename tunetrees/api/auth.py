@@ -53,6 +53,7 @@ router = APIRouter(
 )
 
 
+# pyright: reportUnusedFunction=false
 def register_exception(app: FastAPI):
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
@@ -271,27 +272,25 @@ async def get_user_by_email(email: str) -> Optional[User]:
     response_model_exclude_none=True,
 )
 async def get_user_by_account(provider: str, providerAccountId: str) -> Optional[User]:
-    db = None
     try:
-        db = SessionLocal()
+        with SessionLocal() as db:
+            stmt = select(orm.Account).where(
+                orm.Account.provider == provider,
+                orm.Account.provider_account_id == providerAccountId,
+            )
 
-        stmt = select(orm.Account).where(
-            orm.Account.provider == provider,
-            orm.Account.provider_account_id == providerAccountId,
-        )
+            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            which_row: Optional[Row[orm.Account]] = result.fetchone()
+            if which_row and len(which_row) > 0:
+                account: orm.Account = which_row[0]
 
-        result: Result = db.execute(stmt)
-        which_row: Optional[Row[orm.Account]] = result.fetchone()
-        if which_row and len(which_row) > 0:
-            account: orm.Account = which_row[0]
+                # There's probably a way to do with with a single query
+                user_query = select(orm.User).where(orm.User.id == account.user_id)
+                auth_user = query_user_to_auth_user(user_query, db)
 
-            # There's probably a way to do with with a single query
-            user_query = select(orm.User).where(orm.User.id == account.user_id)
-            auth_user = query_user_to_auth_user(user_query, db)
-
-            return auth_user
-        else:
-            raise HTTPException(status_code=404, detail="User Not Found")
+                return auth_user
+            else:
+                raise HTTPException(status_code=404, detail="User Not Found")
     except HTTPException as e:
         if e.status_code == 404:
             logger.warning(
@@ -305,9 +304,6 @@ async def get_user_by_account(provider: str, providerAccountId: str) -> Optional
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.patch(
@@ -320,7 +316,7 @@ async def update_user(user: User) -> User:
     try:
         db = SessionLocal()
 
-        user_dict = user.dict(exclude_unset=True)
+        user_dict = user.model_dump(exclude_unset=True)
 
         update_dict: dict[Any, Any] = {}
 
@@ -331,7 +327,7 @@ async def update_user(user: User) -> User:
                 update_dict[k] = user_dict[k]
 
         existing = db.query(orm.User).filter_by(id=user.id)
-        if existing is not None and existing.count() > 0:
+        if existing.count() > 0:
             existing.update(update_dict)
 
         db.commit()
@@ -389,7 +385,7 @@ async def link_account(account: Account) -> Account:
         db = SessionLocal()
 
         existing = db.query(orm.Account).filter_by(user_id=account.userId)
-        if existing is not None and existing.count() > 0:
+        if existing.count() > 0:
             # Why on earth do I need to do and update with a dictionary?
             # and why is this so hard?  Isn't the orm supposed to make this easier?
             existing.update(
@@ -433,7 +429,7 @@ async def link_account(account: Account) -> Account:
             orm.Account.provider_account_id == account.providerAccountId,
         )
 
-        result: Result = db.execute(stmt)
+        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
         which_row: Optional[Row[orm.Account]] = result.fetchone()
         if which_row and len(which_row) > 0:
             found_orm_account: orm.Account = which_row[0]
@@ -486,7 +482,7 @@ async def unlink_account(provider: str, providerAccountId: str) -> None:
             orm.Account.provider_account_id == providerAccountId,
         )
 
-        result: Result = db.execute(stmt)
+        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
         which_row: Optional[Row[orm.Account]] = result.fetchone()
         if which_row and len(which_row) > 0:
             orm_account: orm.Account = which_row[0]
@@ -532,7 +528,7 @@ async def create_session(session: Session) -> Session:
         stmt = select(orm.Session).where(
             orm.Session.session_token == orm_session.session_token
         )
-        result: Result = db.execute(stmt)
+        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
         which_row: Optional[Row[orm.Session]] = result.fetchone()
         if which_row and len(which_row) > 0:
             orm_session_new: orm.Session = which_row[0]
@@ -570,7 +566,7 @@ async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUser]:
     try:
         db = SessionLocal()
         stmt = select(orm.Session).where(orm.Session.session_token == sessionToken)
-        result: Result = db.execute(stmt)
+        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
         which_row: Optional[Row[orm.User]] = result.fetchone()
         if which_row and len(which_row) > 0:
             orm_session: orm.Session = which_row[0]
@@ -583,7 +579,7 @@ async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUser]:
                 userId=orm_session.user_id,
             )
 
-            if auth_session is not None and auth_user is not None:
+            if auth_user is not None:
                 session_and_user = SessionAndUser(session=auth_session, user=auth_user)
                 return session_and_user
             else:
@@ -628,7 +624,7 @@ async def update_session(session: Session) -> Session:
         session_query = select(orm.User).where(
             orm.Session.session_token == session.sessionToken
         )
-        result: Result = db.execute(session_query)
+        result: Result = db.execute(session_query)  # pyright: ignore[reportMissingTypeArgument]
         which_row: Optional[Row[orm.Session]] = result.fetchone()
         if which_row and len(which_row) > 0:
             orm_session: orm.Session = which_row[0]
@@ -699,7 +695,7 @@ async def create_verification_token(
         stmt = select(orm.VerificationToken).where(
             orm.VerificationToken.identifier == verification_token.identifier
         )
-        result: Result = db.execute(stmt)
+        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
         which_row: Optional[Row[orm.Session]] = result.fetchone()
         if which_row and len(which_row) > 0:
             orm_verification_token_new: orm.VerificationToken = which_row[0]
@@ -739,7 +735,7 @@ async def use_verification_token(params: VerificationTokenParams) -> Verificatio
         else:
             raise HTTPException(status_code=422, detail="params must have identifier")
 
-        result: Result = db.execute(stmt)
+        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
         which_row: Optional[Row[orm.VerificationToken]] = result.fetchone()
         if which_row and len(which_row) > 0:
             orm_verification_token: orm.VerificationToken = which_row[0]
@@ -786,7 +782,7 @@ def query_user_to_auth_user(
         if local_session:
             db = SessionLocal()
 
-        result: Result = db.execute(stmt)
+        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
         which_row: Optional[Row[orm.User]] = result.fetchone()
         if which_row and len(which_row) > 0:
             user: orm.User = which_row[0]

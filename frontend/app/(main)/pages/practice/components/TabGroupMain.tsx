@@ -55,7 +55,7 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
   const [userRef] = useState<string>(user_id);
   const [scheduled, setScheduled] = useState<Tune[]>();
   const [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
-  const [origRecentlyPracticed, setOrigRecentlyPracticed] = useState<Tune[]>();
+  // const [origRecentlyPracticed, setOrigRecentlyPracticed] = useState<Tune[]>();
 
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,7 +82,7 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
 
         const repertoireData = await getRecentlyPracticed(user_id, playlist_id);
         setRecentlyPracticed(repertoireData);
-        setOrigRecentlyPracticed(repertoireData);
+        // setOrigRecentlyPracticed(repertoireData);
       } catch (error) {
         console.error("Error fetching active tab:", error);
       } finally {
@@ -92,6 +92,27 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
     void doInitialization(user_id);
   }, [user_id, playlist_id]);
 
+  const refreshData = async (): Promise<{
+    scheduledData: Tune[];
+    repertoireData: Tune[];
+  }> => {
+    try {
+      const scheduledData = await getPracticeListScheduled(
+        user_id,
+        playlist_id,
+      );
+      setScheduled(scheduledData);
+
+      const repertoireData = await getRecentlyPracticed(user_id, playlist_id);
+      setRecentlyPracticed(repertoireData);
+
+      return { scheduledData, repertoireData };
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      throw error;
+    }
+  };
+
   const changeActiveTab = (whichTag: string) => {
     setActiveTab(whichTag);
     const userIdInt = Number.parseInt(user_id, 10);
@@ -100,20 +121,6 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
       which_tab: whichTag,
     };
     void updateTabGroupMainState(userIdInt, tabGroupMainState);
-  };
-
-  const handleFilterChange = (filter: React.ChangeEvent<HTMLInputElement>) => {
-    if (origRecentlyPracticed === undefined) return;
-    const filterValue = filter.target.value;
-
-    const filteredData = origRecentlyPracticed.filter((item) =>
-      Object.values(item).some((value) =>
-        value
-          ? value.toString().toLowerCase().includes(filterValue.toLowerCase())
-          : false,
-      ),
-    );
-    setRecentlyPracticed(filteredData);
   };
 
   // useEffect(() => {
@@ -170,6 +177,7 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
                 user_id={userRef}
                 playlist_id={playlistRef}
                 table_purpose="practice"
+                refreshData={refreshData}
               />
             ) : (
               <CircularProgress />
@@ -186,7 +194,8 @@ const tabGroupMain: NextPage<IPracticeProps> = ({
                 user_id={userRef}
                 playlist_id={playlistRef}
                 table_purpose="repertoire"
-                handleFilterChange={handleFilterChange}
+                refreshData={refreshData}
+                // handleFilterChange={handleFilterChange}
               />
             ) : (
               <CircularProgress />

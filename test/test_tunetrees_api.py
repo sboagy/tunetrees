@@ -8,6 +8,8 @@ from tunetrees.app.database import SessionLocal
 #     query_tune_staged,
 # )
 
+# pyright: reportUnknownParameterType=false
+
 client = TestClient(router)
 
 
@@ -54,9 +56,9 @@ def test_get_tune_staged(db_session):
         "mode",
         "incipit",
         "learned",
-        "USER_REF",
-        "PLAYLIST_REF",
-        "Instrument",
+        "user_ref",
+        "playlist_ref",
+        "instrument",
         "practiced",
         "quality",
         "easiness",
@@ -64,10 +66,10 @@ def test_get_tune_staged(db_session):
         "repetitions",
         "review_date",
         "backup_practiced",
-        "notes_private",
-        "notes_public",
+        "note_private",
+        "note_public",
         "tags",
-        "Purpose",
+        "purpose",
     }
     assert set(item.keys()) == expected_keys
     assert item["id"] == 1060
@@ -77,9 +79,9 @@ def test_get_tune_staged(db_session):
     assert item["mode"] == "D Major"
     assert item["incipit"] == "|d2Bd A2FA|BAFA D2ED|"
     assert item["learned"] == "2004-11-23"
-    assert item["USER_REF"] == 1
-    assert item["PLAYLIST_REF"] == 1
-    assert item["Instrument"] == "flute"
+    assert item["user_ref"] == 1
+    assert item["playlist_ref"] == 1
+    assert item["instrument"] == "flute"
     assert item["practiced"] is not None
     # assert item["quality"] == "5"
     # assert item["easiness"] == 2.0200000000000005
@@ -87,10 +89,10 @@ def test_get_tune_staged(db_session):
     # assert item["repetitions"] == 8
     # assert item["review_date"] == "2025-01-27 12:27:08"
     # assert item["backup_practiced"] == "2021-08-25 23:43:55"
-    # assert item["notes_private"] is None
-    # assert item["notes_public"] is None
+    # assert item["note_private"] is None
+    # assert item["note_public"] is None
     # assert item["tags"] is None
-    # assert item["Purpose"] is None
+    # assert item["purpose"] is None
 
     # [
     #   {
@@ -101,9 +103,9 @@ def test_get_tune_staged(db_session):
     #     "mode": "D Major",
     #     "incipit": "|d2Bd A2FA|BAFA D2ED|",
     #     "learned": "2004-11-23",
-    #     "USER_REF": 1,
-    #     "PLAYLIST_REF": 1,
-    #     "Instrument": "flute",
+    #     "user_ref": 1,
+    #     "playlist_ref": 1,
+    #     "instrument": "flute",
     #     "practiced": "2024-07-07 12:27:08",
     #     "quality": "5",
     #     "easiness": 2.0200000000000005,
@@ -111,10 +113,10 @@ def test_get_tune_staged(db_session):
     #     "repetitions": 8,
     #     "review_date": "2025-01-27 12:27:08",
     #     "backup_practiced": "2021-08-25 23:43:55",
-    #     "notes_private": null,
-    #     "notes_public": null,
+    #     "note_private": null,
+    #     "note_public": null,
     #     "tags": null,
-    #     "Purpose": null
+    #     "purpose": null
     #   }
     # ]
 

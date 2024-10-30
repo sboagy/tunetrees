@@ -8,7 +8,6 @@ import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import TunesGrid, { type IScheduledTunesType, TunesTable } from "./TunesGrid";
 import { deleteTableTransientData } from "../settings";
-import { getPracticeListScheduled } from "../queries";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import FlashcardPanel from "./FlashcardPanel";
@@ -19,19 +18,28 @@ export default function ScheduledTunesGrid({
   tunes,
   user_id,
   playlist_id,
+  refreshData,
 }: IScheduledTunesType): JSX.Element {
   const [scheduled, setScheduled] = useState<Tune[]>(tunes);
+  const refreshDataCallback = refreshData;
 
   const table: TanstackTable<Tune> = TunesTable({
     tunes: scheduled,
     user_id,
     playlist_id,
     table_purpose: "practice",
+    globalFilter: "",
+    refreshData,
   });
 
   // const valuesArray = {};
 
-  const submitPracticeFeedbacksHandler = () => {
+  const submitPracticeFeedbacksHandler = (
+    refreshData: () => Promise<{
+      scheduledData: Tune[];
+      repertoireData: Tune[];
+    }>,
+  ) => {
     console.log("submitPracticeFeedbacksHandler!");
 
     const updates: { [key: string]: ITuneUpdate } = {};
@@ -40,7 +48,9 @@ export default function ScheduledTunesGrid({
       const idString = `${tune.id}`;
       const row = table.getRow(i.toString());
 
-      const feedback: string = row.renderValue("recall_eval");
+      // For some reason, the renderValue here stopped working, not sure why.
+      // const feedback: string = row.renderValue("recall_eval");
+      const feedback: string | null | undefined = row.original.recall_eval;
 
       if (feedback) {
         updates[idString] = { feedback: feedback };
@@ -77,12 +87,15 @@ export default function ScheduledTunesGrid({
         throw error;
       });
 
-    const getScheduled = async (user_id: string, playlist_id: string) => {
-      const data: Tune[] = await getPracticeListScheduled(user_id, playlist_id);
-      setScheduled(data);
-    };
-    // For this one, we don't need to wait for the response
-    void getScheduled(user_id, playlist_id);
+    refreshData()
+      .then((result) => {
+        console.log("refreshData successful:", result);
+        setScheduled(result.scheduledData);
+      })
+      .catch((error) => {
+        console.error("Error invoking refreshData()", error);
+        throw error;
+      });
   };
 
   const [mode, setMode] = useState<ReviewMode>("grid");
@@ -107,7 +120,7 @@ export default function ScheduledTunesGrid({
           <Button
             type="submit"
             variant="outline"
-            onClick={submitPracticeFeedbacksHandler}
+            onClick={() => submitPracticeFeedbacksHandler(refreshDataCallback)}
           >
             Submit Practiced Tunes
           </Button>

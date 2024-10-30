@@ -104,8 +104,8 @@ export async function createOrUpdateTableTransientData(
 ): Promise<number> {
   try {
     const transientData: TableTransientDataFields = {
-      notes_private: notesPrivate,
-      notes_public: notesPublic,
+      note_private: notesPrivate,
+      note_public: notesPublic,
       recall_eval: recallEval,
     };
     // const transientDataStr = JSON.stringify(transientData);

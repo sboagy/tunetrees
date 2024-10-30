@@ -3,8 +3,20 @@
         "fastapi",
         "starlette"
     ],
-    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.typeCheckingMode": "strict",
     "python.analysis.autoImportCompletions": true,
     "python.languageServer": "Default",
     "editor.formatOnSave": true,
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportUnknownMemberType": "none",
+        "reportMissingTypeStubs": "none",
+        "reportUnknownVariableType": "none",
+        "reportUnknownArgumentType": "none",
+        "reportMissingParameterType": "none"
+    },
+    "python.analysis.exclude": [
+        ".venv",
+        ".venv/**",
+        ".venv/**/*.py"
+    ]
 }

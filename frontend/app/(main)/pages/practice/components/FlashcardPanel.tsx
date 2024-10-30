@@ -79,6 +79,16 @@ export default function FlashcardPanel(props: Props) {
     setVisibleFields((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
+  if (table.getRowCount() === 0) {
+    return (
+      <Card className="w-full max-w-3xl mx-auto">
+        <CardHeader>
+          <CardTitle>No tunes to review</CardTitle>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full max-w-3xl mx-auto">
       <CardHeader>

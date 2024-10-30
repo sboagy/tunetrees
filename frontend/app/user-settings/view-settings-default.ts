@@ -76,12 +76,12 @@ export const viewSettingsDefault = {
         visible: false,
         enabled: true, // is this column enabled at all for this table?
       },
-      notes_private: {
+      note_private: {
         sort_direction: null, // null, "asc", "desc"
         visible: false,
         enabled: true, // is this column enabled at all for this table?
       },
-      notes_public: {
+      note_public: {
         sort_direction: null, // null, "asc", "desc"
         visible: false,
         enabled: true, // is this column enabled at all for this table?

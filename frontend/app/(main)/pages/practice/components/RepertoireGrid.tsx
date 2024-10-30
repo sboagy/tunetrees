@@ -11,14 +11,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type {
   RowSelectionState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
-import type { Tune } from "../types";
 import { submitPracticeFeedbacks } from "../commands";
+import type { Tune } from "../types";
+
+async function fetchFilterFromDB(
+  userId: number,
+  purpose: string,
+): Promise<string> {
+  const response = await fetch(
+    `/api/getFilter?userId=${userId}&purpose=${purpose}`,
+  );
+  const data = await response.json();
+  return String(data.filter);
+}
 
 export default function RepertoireGrid(
   tunes: IScheduledTunesType,
@@ -33,9 +44,32 @@ export default function RepertoireGrid(
     const selectedRowsCount = Object.keys(rowSelectionState).length;
     setIsAddToReviewQueueEnabled(selectedRowsCount > 0);
   };
+  const refreshDataCallback = tunes.refreshData;
 
-  const table = TunesTable(tunes, selectionChangedCallback);
-  const [filter, setFilter] = useState("");
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [isFilterLoaded, setIsFilterLoaded] = useState(false);
+
+  useEffect(() => {
+    const getFilter = () => {
+      fetchFilterFromDB(
+        Number.parseInt(tunes.user_id),
+        String(tunes.table_purpose),
+      )
+        .then((filter) => {
+          setGlobalFilter(filter);
+          setIsFilterLoaded(true);
+        })
+        .catch((error) => {
+          console.error("Error fetching filter:", error);
+          setIsFilterLoaded(true);
+        });
+    };
+
+    getFilter();
+  }, [tunes]);
+
+  const tunesWithFilter = { ...tunes, globalFilter };
+  const table = TunesTable(tunesWithFilter, selectionChangedCallback);
   const [preset, setPreset] = useState("");
 
   const handlePresetChange = (value: string) => {
@@ -43,7 +77,12 @@ export default function RepertoireGrid(
     // Implement preset logic here
   };
 
-  const addToReviewQueue = () => {
+  const addToReviewQueue = (
+    refreshData: () => Promise<{
+      scheduledData: Tune[];
+      repertoireData: Tune[];
+    }>,
+  ) => {
     console.log("addToReviewQueue!");
 
     // TODO: Implement addToReviewQueue logic
@@ -74,6 +113,8 @@ export default function RepertoireGrid(
     promiseResult
       .then((result) => {
         console.log("submit_practice_feedbacks_result result:", result);
+        table.resetRowSelection();
+        void refreshData();
       })
       .catch((error) => {
         console.error("Error submit_practice_feedbacks_result:", error);
@@ -103,68 +144,73 @@ export default function RepertoireGrid(
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between py-4">
-        <div className="flex items-center space-x-4 mb-4">
-          <Button
-            disabled={!isAddToReviewQueueEnabled}
-            variant="outline"
-            onClick={addToReviewQueue}
-          >
-            Add To Review Queue
-          </Button>
-          <Select value={preset} onValueChange={handlePresetChange}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Presets" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="clear">Clear</SelectItem>
-              <SelectItem value="oldest">Show Oldest Not Played</SelectItem>
-              <SelectItem value="lapsed">Show Recently Lapsed</SelectItem>
-              <SelectItem value="selected">Show Only Selected</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div
-          className="flex items-center space-x-4 mb-4"
-          style={{ width: "60ch" }}
-        >
-          <Input
-            placeholder="Filter"
-            value={filter}
-            onChange={(e) => {
-              setFilter(e.target.value);
-              if (tunes.handleFilterChange) {
-                tunes.handleFilterChange(e);
-              }
-            }}
+      {/* Optionally, show a loading indicator */}
+      {!isFilterLoaded ? (
+        <p>Loading...</p>
+      ) : (
+        <>
+          <div className="flex items-center justify-between py-4">
+            <div className="flex items-center space-x-4 mb-4">
+              <Button
+                disabled={!isAddToReviewQueueEnabled}
+                variant="outline"
+                onClick={() => addToReviewQueue(refreshDataCallback)}
+              >
+                Add To Review Queue
+              </Button>
+              <Select value={preset} onValueChange={handlePresetChange}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Presets" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="clear">Clear</SelectItem>
+                  <SelectItem value="oldest">Show Oldest Not Played</SelectItem>
+                  <SelectItem value="lapsed">Show Recently Lapsed</SelectItem>
+                  <SelectItem value="selected">Show Only Selected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div
+              className="flex items-center space-x-4 mb-4"
+              style={{ width: "60ch" }}
+            >
+              <Input
+                placeholder="Filter"
+                value={globalFilter}
+                onChange={(e) => {
+                  setGlobalFilter(e.target.value);
+                }}
+              />
+            </div>
+            <div className="flex items-center space-x-4 mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+              >
+                Next
+              </Button>
+              <ColumnsMenu user_id={tunes.user_id} table={table} />
+            </div>
+          </div>
+          <TunesGrid
+            table={table}
+            userId={Number.parseInt(tunes.user_id)}
+            playlistId={Number.parseInt(tunes.playlist_id)}
+            purpose={tunes.table_purpose}
+            globalFilter={globalFilter}
           />
-        </div>
-        <div className="flex items-center space-x-4 mb-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-          </Button>
-          <ColumnsMenu user_id={tunes.user_id} table={table} />
-        </div>
-      </div>
-      <TunesGrid
-        table={table}
-        userId={Number.parseInt(tunes.user_id)}
-        playlistId={Number.parseInt(tunes.playlist_id)}
-        purpose={tunes.table_purpose}
-      />
+        </>
+      )}
     </div>
   );
 }

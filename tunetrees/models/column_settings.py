@@ -23,8 +23,8 @@ class ColumnSettingsModel(BaseModel):
     review_date: ColumnConfig
     backup_practiced: ColumnConfig
     external_ref: ColumnConfig
-    notes_private: ColumnConfig
-    notes_public: ColumnConfig
+    note_private: ColumnConfig
+    note_public: ColumnConfig
     tags: ColumnConfig
     recallEval: ColumnConfig
 
@@ -105,12 +105,12 @@ column_settings_example_data = {
         "visible": False,
         "enabled": True,
     },
-    "notes_private": {
+    "note_private": {
         "sort_direction": None,
         "visible": False,
         "enabled": True,
     },
-    "notes_public": {
+    "note_public": {
         "sort_direction": None,
         "visible": False,
         "enabled": True,

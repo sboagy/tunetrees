@@ -7,6 +7,11 @@ from starlette import status as status
 from tunetrees.app.database import SessionLocal
 from tunetrees.models.tunetrees import TabGroupMainState, TableState, TableTransientData
 from pydantic import BaseModel
+from tunetrees.models.tunetrees_pydantic import (
+    TableTransientDataModel as TableTransientDataModelPydantic,
+)
+
+# TODO: Rename this route to "states" instead of "settings"
 
 settings_router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -42,36 +47,33 @@ def create_table_state(
         ),
     ],
     settings: str = Body(...),
-):
-    db = SessionLocal()
-    try:
-        table_state = TableState(
-            user_id=user_id,
-            screen_size=screen_size,
-            purpose=purpose,
-            settings=settings,
-        )
-        db.add(table_state)
-        db.commit()
-        db.refresh(table_state)
-        return {"status": "success", "code": 201}
-    except HTTPException as e:
-        if e.status_code == 404:
-            logging.getLogger().warning(
-                "table state Not Found (create_table_state(%s, %s, %s))",
-                user_id,
-                screen_size,
-                purpose,
+) -> dict[str, str | int]:
+    with SessionLocal() as db:
+        try:
+            table_state = TableState(
+                user_id=user_id,
+                screen_size=screen_size,
+                purpose=purpose,
+                settings=settings,
             )
-        else:
-            logging.getLogger().error("HTTPException (secondary catch): %s" % e)
-        raise
-    except Exception as e:
-        logging.getLogger().error("Unknown error: %s" % e)
-        raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
+            db.add(table_state)
+            db.commit()
+            db.refresh(table_state)
+            return {"status": "success", "code": 201}
+        except HTTPException as e:
+            if e.status_code == 404:
+                logging.getLogger().warning(
+                    "table state Not Found (create_table_state(%s, %s, %s))",
+                    user_id,
+                    screen_size,
+                    purpose,
+                )
+            else:
+                logging.getLogger().error("HTTPException (secondary catch): %s" % e)
+            raise
+        except Exception as e:
+            logging.getLogger().error("Unknown error: %s" % e)
+            raise HTTPException(status_code=500, detail="Unknown error occured")
 
 
 @settings_router.put(
@@ -105,45 +107,42 @@ def update_table_state(
         ),
     ],
     settings: str,
-):
-    db = SessionLocal()
-    try:
-        table_state = TableState(
-            user_id=user_id,
-            screen_size=screen_size,
-            purpose=purpose,
-            settings=settings,
-        )
-        existing_table_state = (
-            db.query(TableState)
-            .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
-            .first()
-        )
-
-        if not existing_table_state:
-            raise HTTPException(status_code=404, detail="Column setting not found")
-
-        existing_table_state.settings = table_state.settings
-        db.commit()
-        db.refresh(existing_table_state)
-        return {"status": "success", "code": 204}
-    except HTTPException as e:
-        if e.status_code == 404:
-            logging.getLogger().warning(
-                "table state Not Found (update_table_state(%s, %s, %s))",
-                user_id,
-                screen_size,
-                purpose,
+) -> None:
+    with SessionLocal() as db:
+        try:
+            table_state = TableState(
+                user_id=user_id,
+                screen_size=screen_size,
+                purpose=purpose,
+                settings=settings,
             )
-        else:
-            logging.getLogger().error("HTTPException (secondary catch): %s" % e)
-        raise
-    except Exception as e:
-        logging.getLogger().error("Unknown error: %s" % e)
-        raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
+            existing_table_state = (
+                db.query(TableState)
+                .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
+                .first()
+            )
+
+            if not existing_table_state:
+                raise HTTPException(status_code=404, detail="Column setting not found")
+
+            existing_table_state.settings = table_state.settings
+            db.commit()
+            db.refresh(existing_table_state)
+            # return {"status": "success", "code": 204}
+        except HTTPException as e:
+            if e.status_code == 404:
+                logging.getLogger().warning(
+                    "table state Not Found (update_table_state(%s, %s, %s))",
+                    user_id,
+                    screen_size,
+                    purpose,
+                )
+            else:
+                logging.getLogger().error("HTTPException (secondary catch): %s" % e)
+            raise
+        except Exception as e:
+            logging.getLogger().error("Unknown error: %s" % e)
+            raise HTTPException(status_code=500, detail="Unknown error occured")
 
 
 @settings_router.get(
@@ -175,40 +174,37 @@ def get_table_states(
         ),
     ],
 ) -> str:
-    db = SessionLocal()
-    try:
-        table_state: TableState | None = (
-            db.query(TableState)
-            .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
-            .first()
-        )
-
-        if not table_state:
-            raise HTTPException(status_code=404, detail="Column setting not found")
-
-        return table_state.settings
-    except HTTPException as e:
-        if e.status_code == 404:
-            logging.getLogger().warning(
-                "table state Not Found (get_table_state(%s, %s, %s))",
-                user_id,
-                screen_size,
-                purpose,
+    with SessionLocal() as db:
+        try:
+            table_state: TableState | None = (
+                db.query(TableState)
+                .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
+                .first()
             )
-        else:
-            logging.getLogger().error("HTTPException (secondary catch): %s" % e)
-        raise
-    except Exception as e:
-        logging.getLogger().error("Unknown error: %s" % e)
-        raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
+
+            if not table_state:
+                raise HTTPException(status_code=404, detail="Column setting not found")
+
+            return table_state.settings
+        except HTTPException as e:
+            if e.status_code == 404:
+                logging.getLogger().warning(
+                    "table state Not Found (get_table_state(%s, %s, %s))",
+                    user_id,
+                    screen_size,
+                    purpose,
+                )
+            else:
+                logging.getLogger().error("HTTPException (secondary catch): %s" % e)
+            raise
+        except Exception as e:
+            logging.getLogger().error("Unknown error: %s" % e)
+            raise HTTPException(status_code=500, detail="Unknown error occured")
 
 
 class TableTransientDataFields(BaseModel):
-    notes_private: Optional[str]
-    notes_public: Optional[str]
+    note_private: Optional[str]
+    note_public: Optional[str]
     recall_eval: Optional[str]
 
 
@@ -245,28 +241,25 @@ def stage_table_transient_data(
         ),
     ],
     field_data: TableTransientDataFields = Body(...),
-):
-    db = SessionLocal()
-    try:
-        table_transient_data = TableTransientData(
-            user_id=user_id,
-            tune_id=tune_id,
-            playlist_id=playlist_id,
-            purpose=purpose,
-            notes_private=field_data.notes_private,
-            notes_public=field_data.notes_public,
-            recall_eval=field_data.recall_eval,
-        )
-        db.add(table_transient_data)
-        db.commit()
-        db.refresh(table_transient_data)
-        return {"status": "success", "code": 201}
-    except Exception as e:
-        logging.getLogger().error("Unknown error: %s" % e)
-        raise HTTPException(status_code=500, detail="Unknown error occurred")
-    finally:
-        if db is not None:
-            db.close()
+) -> dict[str, str | int]:
+    with SessionLocal() as db:
+        try:
+            table_transient_data = TableTransientData(
+                user_id=user_id,
+                tune_id=tune_id,
+                playlist_id=playlist_id,
+                purpose=purpose,
+                note_private=field_data.note_private,
+                note_public=field_data.note_public,
+                recall_eval=field_data.recall_eval,
+            )
+            db.add(table_transient_data)
+            db.commit()
+            db.refresh(table_transient_data)
+            return {"status": "success", "code": 201}
+        except Exception as e:
+            logging.getLogger().error("Unknown error: %s" % e)
+            raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
 @settings_router.get(
@@ -274,6 +267,7 @@ def stage_table_transient_data(
     summary="Retrieve a table transient data entry",
     description="Retrieve an entry from the table_transient_data table",
     status_code=status.HTTP_200_OK,
+    response_model=TableTransientDataModelPydantic,
 )
 def get_table_transient_data(
     user_id: Annotated[
@@ -301,32 +295,31 @@ def get_table_transient_data(
             description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
         ),
     ],
-):
-    db = SessionLocal()
-    try:
-        table_transient_data: TableTransientData | None = (
-            db.query(TableTransientData)
-            .filter_by(
-                user_id=user_id,
-                tune_id=tune_id,
-                playlist_id=playlist_id,
-                purpose=purpose,
-            )
-            .first()
-        )
-
-        if not table_transient_data:
-            raise HTTPException(
-                status_code=404, detail="Table transient data not found"
+) -> TableTransientDataModelPydantic:
+    with SessionLocal() as db:
+        try:
+            table_transient_data: TableTransientData | None = (
+                db.query(TableTransientData)
+                .filter_by(
+                    user_id=user_id,
+                    tune_id=tune_id,
+                    playlist_id=playlist_id,
+                    purpose=purpose,
+                )
+                .first()
             )
 
-        return table_transient_data
-    except Exception as e:
-        logging.getLogger().error("Unknown error: %s" % e)
-        raise HTTPException(status_code=500, detail="Unknown error occurred")
-    finally:
-        if db is not None:
-            db.close()
+            if not table_transient_data:
+                raise HTTPException(
+                    status_code=404, detail="Table transient data not found"
+                )
+            table_transient_data_pydantic: TableTransientDataModelPydantic = (
+                TableTransientDataModelPydantic.model_validate(table_transient_data)
+            )
+            return table_transient_data_pydantic
+        except Exception as e:
+            logging.getLogger().error("Unknown error: %s" % e)
+            raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
 @settings_router.delete(
@@ -361,46 +354,39 @@ def delete_table_transient_data(
             description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
         ),
     ],
-):
-    db = SessionLocal()
-    try:
-        if tune_id == -1:
-            table_transient_data = (
-                db.query(TableTransientData)
-                .filter_by(
+) -> None:
+    with SessionLocal() as db:
+        try:
+            if tune_id == -1:
+                db.query(TableTransientData).filter_by(
                     user_id=user_id,
                     playlist_id=playlist_id,
                     purpose=purpose,
-                )
-                .delete()
-            )
-        else:
-            table_transient_data = (
-                db.query(TableTransientData)
-                .filter_by(
-                    user_id=user_id,
-                    tune_id=tune_id,
-                    playlist_id=playlist_id,
-                    purpose=purpose,
-                )
-                .first()
-            )
-
-            if not table_transient_data:
-                raise HTTPException(
-                    status_code=404, detail="Table transient data not found"
+                ).delete()
+            else:
+                table_transient_data = (
+                    db.query(TableTransientData)
+                    .filter_by(
+                        user_id=user_id,
+                        tune_id=tune_id,
+                        playlist_id=playlist_id,
+                        purpose=purpose,
+                    )
+                    .first()
                 )
 
-            db.delete(table_transient_data)
+                if not table_transient_data:
+                    raise HTTPException(
+                        status_code=404, detail="Table transient data not found"
+                    )
 
-        db.commit()
-        return {"status": "success", "code": 204}
-    except Exception as e:
-        logging.getLogger().error("Unknown error: %s" % e)
-        raise HTTPException(status_code=500, detail="Unknown error occurred")
-    finally:
-        if db is not None:
-            db.close()
+                db.delete(table_transient_data)
+
+            db.commit()
+            # return {"status": "success", "code": 204}
+        except Exception as e:
+            logging.getLogger().error("Unknown error: %s" % e)
+            raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
 class TabGroupMainStateModel(BaseModel):
@@ -514,7 +500,7 @@ def delete_tab_group_main_state(
             description="Should be a valid user id that corresponds to a user in the user table"
         ),
     ],
-):
+) -> None:
     with SessionLocal() as db:
         try:
             tab_group_main_state = (
@@ -527,7 +513,7 @@ def delete_tab_group_main_state(
 
             db.delete(tab_group_main_state)
             db.commit()
-            return {"status": "success", "code": 204}
+            # return {"status": "success", "code": 204}
         except Exception as e:
             logging.getLogger().error("Unknown error: %s" % e)
             raise HTTPException(status_code=500, detail="Unknown error occurred")

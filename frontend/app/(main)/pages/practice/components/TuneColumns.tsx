@@ -215,7 +215,7 @@ export function get_columns(
     column: Column<TData, TValue>,
     table: TanstackTable<Tune>,
   ) {
-    console.log("column: ", column);
+    // console.log("column: ", column);
     return (
       <Checkbox
         checked={determineHeaderCheckedState(table)}
@@ -224,7 +224,7 @@ export function get_columns(
         }
         ref={(input: HTMLButtonElement | null) => {
           if (input) {
-            console.log("input: ", input);
+            // console.log("input: ", input);
             // input.state = isIndeterminate;
           }
         }}
@@ -298,7 +298,7 @@ export function get_columns(
     "practice" === purpose
       ? {
           accessorKey: "recall_eval",
-          header: ({ column }) => sortableHeader(column, "Title"),
+          header: ({ column }) => sortableHeader(column, "Evaluation"),
           enableHiding: false,
           cell: (info: CellContext<Tune, unknown>) =>
             RecallEvalComboBox(info, userId, playlistId, purpose),
@@ -489,7 +489,7 @@ export function get_columns(
       enableHiding: true,
     },
     {
-      accessorKey: "notes_private",
+      accessorKey: "note_private",
       header: "Private Note",
       cell: (info) => {
         return info.getValue();
@@ -498,7 +498,7 @@ export function get_columns(
       enableHiding: true,
     },
     {
-      accessorKey: "notes_public",
+      accessorKey: "note_public",
       header: "Public Note",
       cell: (info) => {
         return info.getValue();

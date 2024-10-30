@@ -24,7 +24,7 @@ def clean_tune_data():  # sourcery skip: extract-method
             if tune.Incipit:
                 tune.Incipit = tune.Incipit.strip()
             print(
-                f"\n{tune.ID=}, {tune.Title=}, {tune.Type=}, {tune.Mode=}, {tune.Structure=}, {tune.Incipit=}"
+                f"\n{tune.id=}, {tune.Title=}, {tune.Type=}, {tune.Mode=}, {tune.Structure=}, {tune.Incipit=}"
             )
 
         db.commit()
@@ -45,19 +45,19 @@ def clean_practice_record_data():  # sourcery skip: extract-method
         # Obviously you would normally just query for record 36
 
         for practice_record in practice_records:
-            if practice_record.Practiced:
-                practice_record.Practiced = practice_record.Practiced.strip()
+            if practice_record.practiced:
+                practice_record.practiced = practice_record.practiced.strip()
             if practice_record.Feedback:
                 practice_record.Feedback = practice_record.Feedback.strip()
             # if practice_record.PLAYLIST_REF:
             #     practice_record.PLAYLIST_REF = practice_record.PLAYLIST_REF.strip()
-            if practice_record.TUNE_REF:
-                practice_record.TUNE_REF = practice_record.TUNE_REF.strip()
+            if practice_record.tune_ref:
+                practice_record.tune_ref = practice_record.tune_ref.strip()
 
             print(
                 f"{practice_record.tune.Title=}, {practice_record.playlist.instrument=}, "
-                f"{practice_record.PLAYLIST_REF=}, {practice_record.TUNE_REF=}, "
-                f"{practice_record.Practiced=}, {practice_record.Feedback=}"
+                f"{practice_record.playlist_ref=}, {practice_record.tune_ref=}, "
+                f"{practice_record.practiced=}, {practice_record.Feedback=}"
             )
 
         db.commit()

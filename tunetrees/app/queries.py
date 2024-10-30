@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+import logging
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import and_, desc, func
@@ -15,7 +16,9 @@ from tunetrees.models.tunetrees import (
 )
 
 
-def query_result_to_diagnostic_dict(rows, table_name) -> List[Dict[str, Any]]:
+def query_result_to_diagnostic_dict(
+    rows: list[Any], table_name: str
+) -> List[Dict[str, Any]]:
     rows_list = []
     for row in rows:
         column_names = row.metadata.tables[table_name].columns.keys()
@@ -49,9 +52,9 @@ def get_practice_record_table(
     return rows
 
 
-def get_playlist_ids_for_user(session: Session, USER_REF) -> List[int]:
+def get_playlist_ids_for_user(session: Session, user_ref: str) -> List[int]:
     playlist_ids = (
-        session.query(Playlist.PLAYLIST_ID).filter(Playlist.USER_REF == USER_REF).all()
+        session.query(Playlist.playlist_id).filter(Playlist.user_ref == user_ref).all()
     )
     return [playlist_id[0] for playlist_id in playlist_ids]
 
@@ -59,13 +62,13 @@ def get_playlist_ids_for_user(session: Session, USER_REF) -> List[int]:
 def get_most_recent_review_date(session: Session, playlist_ref: int) -> None | datetime:
     most_recent_review_date = (
         session.query(PracticeRecord)
-        .filter(PracticeRecord.PLAYLIST_REF == playlist_ref)
-        .order_by(desc(PracticeRecord.ReviewDate))
+        .filter(PracticeRecord.playlist_ref == playlist_ref)
+        .order_by(desc(PracticeRecord.review_date))
         .first()
     )
     if most_recent_review_date is None:
         return None
-    most_recent_review_date_str = most_recent_review_date.ReviewDate
+    most_recent_review_date_str = most_recent_review_date.review_date
     most_recent_review_date = datetime.fromisoformat(most_recent_review_date_str)
     return most_recent_review_date
 
@@ -73,18 +76,18 @@ def get_most_recent_review_date(session: Session, playlist_ref: int) -> None | d
 def get_most_recent_practiced(session: Session, playlist_ref: int):
     most_recent_practice = (
         session.query(PracticeRecord)
-        .filter(PracticeRecord.PLAYLIST_REF == playlist_ref)
-        .order_by(desc(PracticeRecord.Practiced))
+        .filter(PracticeRecord.playlist_ref == playlist_ref)
+        .order_by(desc(PracticeRecord.practiced))
         .first()
     )
     if most_recent_practice is None:
         return None
-    most_recent_practice_date_str = most_recent_practice.Practiced
+    most_recent_practice_date_str = most_recent_practice.practiced
     most_recent_practice_date = datetime.fromisoformat(most_recent_practice_date_str)
     return most_recent_practice_date
 
 
-def find_dict_index(data: list, key, value):
+def find_dict_index(data: list[Any], key: str, value: Any) -> int:
     for i, item in enumerate(data):
         if item[key] == value:
             return i
@@ -121,7 +124,7 @@ def query_practice_list_scheduled(
         List[Tune]: tunes scheduled between the acceptable_delinquency_window and review_sitdown_date, but limit number to the `limit` var.
     """
     if review_sitdown_date is None:
-        review_sitdown_date = datetime.today()
+        review_sitdown_date = datetime.now(timezone.utc)
         print("review_sitdown_date is None, using today: ", review_sitdown_date)
     assert isinstance(review_sitdown_date, datetime)
 
@@ -137,25 +140,31 @@ def query_practice_list_scheduled(
     )
 
     # Create the query
-    practice_list_query = db.query(t_practice_list_staged).filter(
-        and_(
-            t_practice_list_staged.c.USER_REF == user_ref,
-            t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
-            t_practice_list_staged.c.ReviewDate > lower_bound_date,
-            t_practice_list_staged.c.ReviewDate <= review_sitdown_date,
+    try:
+        practice_list_query = db.query(t_practice_list_staged).filter(
+            and_(
+                t_practice_list_staged.c.user_ref == user_ref,
+                t_practice_list_staged.c.playlist_id == playlist_ref,
+                t_practice_list_staged.c.review_date > lower_bound_date,
+                t_practice_list_staged.c.review_date <= review_sitdown_date,
+            )
         )
-    )
+    except Exception as e:
+        logging.getLogger().error(
+            f"An error occurred while querying the practice list: {e}"
+        )
+        raise
 
     scheduled_rows_query_sorted = practice_list_query.order_by(
-        func.DATE(t_practice_list_staged.c.ReviewDate).desc()
+        func.DATE(t_practice_list_staged.c.review_date).desc()
     )
     # scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
     scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip)
 
-    scheduled_rows: List[Row] = scheduled_rows_query_clipped.all()
+    scheduled_rows: List[Row[Any]] = scheduled_rows_query_clipped.all()
 
     tune_type_column_index = find_dict_index(
-        scheduled_rows_query_clipped.column_descriptions, "name", "Type"
+        scheduled_rows_query_clipped.column_descriptions, "name", "type"
     )
     scheduled_rows = sorted(scheduled_rows, key=lambda row: row[tune_type_column_index])
 
@@ -166,8 +175,8 @@ def query_practice_list_scheduled(
 
     # practice_list_query2 = db.query(t_practice_list_staged).filter(
     #     and_(
-    #         t_practice_list_staged.c.USER_REF == user_ref,
-    #         t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
+    #         t_practice_list_staged.c.user_ref == user_ref,
+    #         t_practice_list_staged.c.playlist_ref == playlist_ref,
     #     )
     # )
 
@@ -231,17 +240,17 @@ def query_practice_list_scheduled(
 
 #     practice_list_query = get_practice_list_query(db, playlist_ref, user_ref)
 
-#     practice_list_query_scheduled = practice_list_query.where(
-#         and_(
-#             PracticeRecord.ReviewDate
-#             > (review_sitdown_date - timedelta(acceptable_delinquency_window)),
-#             PracticeRecord.ReviewDate <= review_sitdown_date,
-#         )
+# practice_list_query_scheduled = practice_list_query.where(
+#     and_(
+#         PracticeRecord.review_date
+#         > (review_sitdown_date - timedelta(acceptable_delinquency_window)),
+#         PracticeRecord.review_date <= review_sitdown_date,
 #     )
-#     scheduled_rows_query_sorted = practice_list_query_scheduled.order_by(
-#         func.DATE(PracticeRecord.ReviewDate).desc()
-#     )
-#     scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
+# )
+# scheduled_rows_query_sorted = practice_list_query_scheduled.order_by(
+#     func.DATE(PracticeRecord.review_date).desc()
+# )
+# scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
 
 #     scheduled_rows: List[Row] = scheduled_rows_query_clipped.all()
 
@@ -279,11 +288,13 @@ def query_practice_list_recently_played(
 ) -> List[Tune]:
     query = db.query(t_practice_list_staged).filter(
         and_(
-            t_practice_list_staged.c.USER_REF == user_ref,
-            t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
+            t_practice_list_staged.c.user_ref == user_ref,
+            t_practice_list_staged.c.playlist_id == playlist_ref,
         )
     )
-    query_sorted = query.order_by(func.DATE(t_practice_list_staged.c.ReviewDate).desc())
+    query_sorted = query.order_by(
+        func.DATE(t_practice_list_staged.c.review_date).desc()
+    )
 
     rows: List[Tune] = query_sorted.offset(skip).limit(limit).all()
 
@@ -318,9 +329,9 @@ def query_tune_staged(
     """
     query = db.query(t_practice_list_staged).filter(
         and_(
-            t_practice_list_staged.c.ID == tune_id,
-            t_practice_list_staged.c.USER_REF == user_ref,
-            t_practice_list_staged.c.PLAYLIST_REF == playlist_ref,
+            t_practice_list_staged.c.id == tune_id,
+            t_practice_list_staged.c.user_ref == user_ref,
+            t_practice_list_staged.c.playlist_id == playlist_ref,
         )
     )
 

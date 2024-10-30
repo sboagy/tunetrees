@@ -21,25 +21,25 @@ import type { PlaylistTune } from "../types";
 import { ERROR_PLAYLIST_TUNE } from "../mocks";
 
 const formSchema = z.object({
-  ID: z.number().optional(),
-  Title: z.string().optional(),
-  Type: z.string().nullable().optional(),
-  Structure: z.string().nullable().optional(),
-  Mode: z.string().nullable().optional(),
-  Incipit: z.string().nullable().optional(),
-  Learned: z.string().nullable().optional(),
-  Practiced: z.string().nullable().optional(),
-  Quality: z.number().nullable().optional(),
-  Easiness: z.number().nullable().optional(),
-  Interval: z.number().nullable().optional(),
-  Repetitions: z.number().nullable().optional(),
-  ReviewDate: z.string().nullable().optional(),
-  BackupPracticed: z.string().nullable().optional(),
-  NotePrivate: z.string().nullable().optional(),
-  NotePublic: z.string().nullable().optional(),
-  Tags: z.string().nullable().optional(),
-  USER_REF: z.number().nullable().optional(),
-  PLAYLIST_REF: z.number().nullable().optional(),
+  id: z.number().optional(),
+  title: z.string().optional(),
+  type: z.string().nullable().optional(),
+  structure: z.string().nullable().optional(),
+  mode: z.string().nullable().optional(),
+  incipit: z.string().nullable().optional(),
+  learned: z.string().nullable().optional(),
+  practiced: z.string().nullable().optional(),
+  quality: z.number().nullable().optional(),
+  easiness: z.number().nullable().optional(),
+  interval: z.number().nullable().optional(),
+  repetitions: z.number().nullable().optional(),
+  review_date: z.string().nullable().optional(),
+  backup_practiced: z.string().nullable().optional(),
+  note_private: z.string().nullable().optional(),
+  note_public: z.string().nullable().optional(),
+  tags: z.string().nullable().optional(),
+  user_ref: z.number().nullable().optional(),
+  playlist_ref: z.number().nullable().optional(),
 });
 
 interface ITuneEditorProps {
@@ -99,7 +99,7 @@ export default function TuneEditor({
     const fetchTune = async () => {
       const tuneData = await getPlaylistTune(userId, playlistId, tuneId);
 
-      if (tuneData && (tuneData as PlaylistTune).ID !== undefined) {
+      if (tuneData && (tuneData as PlaylistTune).id !== undefined) {
         setTune(tuneData as PlaylistTune);
         form.reset(tuneData as PlaylistTune);
       } else {
@@ -110,6 +110,8 @@ export default function TuneEditor({
 
     void fetchTune();
   }, [userId, playlistId, tuneId, form]);
+
+  const router = useRouter();
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     console.log(data);
@@ -126,9 +128,8 @@ export default function TuneEditor({
     } else {
       console.error("Failed to update tune:", result.detail);
     }
+    router.back();
   };
-
-  const router = useRouter();
 
   const handleCancel = () => {
     router.back();
@@ -148,7 +149,7 @@ export default function TuneEditor({
         className="flex flex-col w-full space-y-4"
         style={{ height: `${height}px`, overflowY: "unset" }}
       >
-        <h1 className="text-2xl font-bold mb-4">Tune #{tune.ID}</h1>
+        <h1 className="text-2xl font-bold mb-4">Tune #{tune.id}</h1>
         <div
           className="flex flex-col flex-grow"
           style={{
@@ -163,7 +164,7 @@ export default function TuneEditor({
             <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
               <FormField
                 control={form.control}
-                name="Title"
+                name="title"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -179,7 +180,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="Type"
+                name="type"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -195,7 +196,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="Structure"
+                name="structure"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -211,7 +212,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="Mode"
+                name="mode"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -227,7 +228,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="Incipit"
+                name="incipit"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -243,7 +244,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="Learned"
+                name="learned"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -259,7 +260,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="Practiced"
+                name="practiced"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -279,7 +280,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="Quality"
+                name="quality"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -338,7 +339,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="Easiness"
+                name="easiness"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -359,7 +360,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="Interval"
+                name="interval"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -380,7 +381,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="Repetitions"
+                name="repetitions"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -401,7 +402,7 @@ export default function TuneEditor({
 
               <FormField
                 control={form.control}
-                name="ReviewDate"
+                name="review_date"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -458,7 +459,7 @@ export default function TuneEditor({
 
             <FormField
               control={form.control}
-              name="NotePrivate"
+              name="note_private"
               render={({ field }) => (
                 <FormItem className="tune-form-item-style2">
                   <FormLabel className="tune-form-label-style">
@@ -474,7 +475,7 @@ export default function TuneEditor({
 
             <FormField
               control={form.control}
-              name="NotePublic"
+              name="note_public"
               render={({ field }) => (
                 <FormItem className="tune-form-item-style2">
                   <FormLabel className="tune-form-label-style">
@@ -490,7 +491,7 @@ export default function TuneEditor({
 
             <FormField
               control={form.control}
-              name="Tags"
+              name="tags"
               render={({ field }) => (
                 <FormItem className="tune-form-item-style2">
                   <FormLabel className="tune-form-label-style">

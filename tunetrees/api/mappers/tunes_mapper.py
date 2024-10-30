@@ -23,53 +23,53 @@ def tunes_mapper(tune: Row[Any], table: Table) -> dict[str, Any]:
     # of migration from various evolutions of the tables and interfaces.
 
     for i, column in enumerate(table.c):
-        if column.name == "ID":
+        if column.name == "id":
             tune_dict["id"] = tune[i]
-        elif column.name == "Title":
+        elif column.name == "title":
             tune_dict["title"] = tune[i]
-        elif column.name == "Type":
+        elif column.name == "type":
             tune_dict["type"] = tune[i]
-        elif column.name == "Structure":
+        elif column.name == "structure":
             tune_dict["structure"] = tune[i]
-        elif column.name == "Mode":
+        elif column.name == "mode":
             tune_dict["mode"] = tune[i]
-        elif column.name == "Incipit":
+        elif column.name == "incipit":
             tune_dict["incipit"] = tune[i]
-        elif column.name == "Learned":
+        elif column.name == "learned":
             tune_dict["learned"] = tune[i]
-        elif column.name == "Practiced":
+        elif column.name == "practiced":
             tune_dict["practiced"] = tune[i]
-        elif column.name == "Quality":
+        elif column.name == "quality":
             tune_dict["quality"] = tune[i]
-        elif column.name == "Easiness":
+        elif column.name == "easiness":
             tune_dict["easiness"] = tune[i]
-        elif column.name == "Interval":
+        elif column.name == "interval":
             tune_dict["interval"] = tune[i]
-        elif column.name == "Repetitions":
+        elif column.name == "repetitions":
             tune_dict["repetitions"] = tune[i]
-        elif column.name == "ReviewDate":
+        elif column.name == "review_date":
             tune_dict["review_date"] = tune[i]
-        elif column.name == "BackupPracticed":
+        elif column.name == "backup_practiced":
             tune_dict["backup_practiced"] = tune[i]
-        elif column.name == "NotePrivate":
-            tune_dict["notes_private"] = tune[i]
-        elif column.name == "NotePublic":
-            tune_dict["notes_public"] = tune[i]
-        elif column.name == "Tags":
+        elif column.name == "note_private":
+            tune_dict["note_private"] = tune[i]
+        elif column.name == "note_public":
+            tune_dict["note_public"] = tune[i]
+        elif column.name == "tags":
             tune_dict["tags"] = tune[i]
-        elif column.name == "StagedNotesPrivate":
+        elif column.name == "staged_notes_private":
             if tune[i] is not None:
                 # Special case to overwrite the committed value with a staged value.
-                tune_dict["notes_private"] = tune[i]
-        elif column.name == "StagedNotesPublic":
+                tune_dict["note_private"] = tune[i]
+        elif column.name == "staged_notes_public":
             if tune[i] is not None:
                 # Special case to overwrite the committed value with a staged value.
-                tune_dict["notes_public"] = tune[i]
-        elif column.name == "StagedRecallEval":
+                tune_dict["note_public"] = tune[i]
+        elif column.name == "staged_recall_eval":
             if tune[i] is not None:
                 # Special case to overwrite the committed value with a staged value.
                 tune_dict["recall_eval"] = tune[i]
         else:
             # Fallback to the original column name as the key
-            tune_dict[column.name] = tune[i]
+            tune_dict[column.name.lower()] = tune[i]
     return tune_dict

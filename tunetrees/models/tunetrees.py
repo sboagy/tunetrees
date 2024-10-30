@@ -5,97 +5,91 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
-    Index,
     Integer,
     Table,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
+# from sqlalchemy.orm.base import Mapped
 
 Base = declarative_base()
 metadata = Base.metadata
 
 
+class PlaylistTune(Base):
+    __tablename__ = "playlist_tune"
+
+    playlist_ref = mapped_column(Integer, primary_key=True)
+    tune_ref = mapped_column(Integer, primary_key=True)
+    current = mapped_column(Text)
+    learned = mapped_column(Text)
+
+
 t_practice_list_joined = Table(
     "practice_list_joined",
     metadata,
-    Column("ID", Integer),
-    Column("Title", Text),
-    Column("Type", Text),
-    Column("Structure", Text),
-    Column("Mode", Text),
-    Column("Incipit", Text),
-    Column("Learned", Text),
-    Column("Practiced", Text),
-    Column("Quality", Text),
-    Column("Easiness", Float),
-    Column("Interval", Integer),
-    Column("Repetitions", Integer),
-    Column("ReviewDate", Text),
-    Column("BackupPracticed", Text),
-    Column("NotePrivate", Text),
-    Column("NotePublic", Text),
-    Column("Tags", Text),
-    Column("USER_REF", Integer),
-    Column("PLAYLIST_REF", Integer),
+    Column("id", Integer),
+    Column("title", Text),
+    Column("type", Text),
+    Column("structure", Text),
+    Column("mode", Text),
+    Column("incipit", Text),
+    Column("learned", Text),
+    Column("practiced", Text),
+    Column("quality", Text),
+    Column("easiness", Float),
+    Column("interval", Integer),
+    Column("repetitions", Integer),
+    Column("review_date", Text),
+    Column("note_private", Text),
+    Column("note_public", Text),
+    Column("tags", Text),
+    Column("user_ref", Integer),
+    Column("playlist_ref", Integer),
 )
 
 
 t_practice_list_staged = Table(
     "practice_list_staged",
     metadata,
-    Column("ID", Integer),
-    Column("Title", Text),
-    Column("Type", Text),
-    Column("Structure", Text),
-    Column("Mode", Text),
-    Column("Incipit", Text),
-    Column("Learned", Text),
-    Column("USER_REF", Integer),
-    Column("PLAYLIST_REF", Integer),
-    Column("Instrument", Text),
-    Column("Practiced", Text),
-    Column("Quality", Text),
-    Column("Easiness", Float),
-    Column("Interval", Integer),
-    Column("Repetitions", Integer),
-    Column("ReviewDate", Text),
-    Column("BackupPracticed", Text),
-    Column("NotePrivate", Text),
-    Column("NotePublic", Text),
-    Column("Tags", Text),
-    Column("Purpose", Text),
-    Column("StagedNotesPrivate", Text),
-    Column("StagedNotesPublic", Text),
-    Column("StagedRecallEval", Text),
+    Column("id", Integer),
+    Column("title", Text),
+    Column("type", Text),
+    Column("structure", Text),
+    Column("mode", Text),
+    Column("incipit", Text),
+    Column("learned", Text),
+    Column("user_ref", Integer),
+    Column("playlist_id", Integer),
+    Column("instrument", Text),
+    Column("practiced", Text),
+    Column("quality", Text),
+    Column("easiness", Float),
+    Column("interval", Integer),
+    Column("repetitions", Integer),
+    Column("review_date", Text),
+    Column("backup_practiced", Text),
+    Column("note_private", Text),
+    Column("note_public", Text),
+    Column("tags", Text),
+    Column("purpose", Text),
+    Column("staged_notes_private", Text),
+    Column("staged_notes_public", Text),
+    Column("staged_recall_eval", Text),
 )
-
-
-class PracticeRecord(Base):
-    __tablename__ = "practice_record"
-
-    PLAYLIST_REF = mapped_column(Integer)
-    TUNE_REF = mapped_column(Text)
-    Practiced = mapped_column(Text)
-    Quality = mapped_column(Text)
-    ID = mapped_column(Integer, primary_key=True)
-    Easiness = mapped_column(Float)
-    Interval = mapped_column(Integer)
-    Repetitions = mapped_column(Integer)
-    ReviewDate = mapped_column(Text)
-    BackupPracticed = mapped_column(Text)
 
 
 class Tune(Base):
     __tablename__ = "tune"
 
-    ID = mapped_column(Integer, primary_key=True)
-    Type = mapped_column(Text)
-    Structure = mapped_column(Text)
-    Title = mapped_column(Text)
-    Mode = mapped_column(Text)
-    Incipit = mapped_column(Text)
+    id = mapped_column(Integer, primary_key=True)
+    type = mapped_column(Text)
+    structure = mapped_column(Text)
+    title = mapped_column(Text)
+    mode = mapped_column(Text)
+    incipit = mapped_column(Text)
 
     external_ref: Mapped[List["ExternalRef"]] = relationship(
         "ExternalRef", uselist=True, back_populates="tune"
@@ -103,8 +97,8 @@ class Tune(Base):
     user_annotation_set: Mapped[List["UserAnnotationSet"]] = relationship(
         "UserAnnotationSet", uselist=True, back_populates="tune"
     )
-    playlist_tune: Mapped[List["PlaylistTune"]] = relationship(
-        "PlaylistTune", uselist=True, back_populates="tune"
+    practice_record: Mapped[List["PracticeRecord"]] = relationship(
+        "PracticeRecord", uselist=True, back_populates="tune"
     )
     table_transient_data: Mapped[List["TableTransientData"]] = relationship(
         "TableTransientData", uselist=True, back_populates="tune"
@@ -126,6 +120,9 @@ class User(Base):
     )
     playlist: Mapped[List["Playlist"]] = relationship(
         "Playlist", uselist=True, back_populates="user"
+    )
+    prefs_spaced_repetition: Mapped[List["PrefsSpacedRepetition"]] = relationship(
+        "PrefsSpacedRepetition", uselist=True, back_populates="user"
     )
     session: Mapped[List["Session"]] = relationship(
         "Session", uselist=True, back_populates="user"
@@ -175,7 +172,7 @@ class ExternalRef(Base):
 
     id = mapped_column(Integer, primary_key=True)
     url = mapped_column(Text, nullable=False)
-    tune_ref = mapped_column(ForeignKey("tune.ID"), nullable=False)
+    tune_ref = mapped_column(ForeignKey("tune.id"), nullable=False)
     ref_type = mapped_column(Text)
 
     tune: Mapped["Tune"] = relationship("Tune", back_populates="external_ref")
@@ -183,21 +180,31 @@ class ExternalRef(Base):
 
 class Playlist(Base):
     __tablename__ = "playlist"
-    __table_args__ = (
-        Index("playlists_USER_REF_index", "USER_REF"),
-        Index("playlists_instrument_index", "instrument"),
-    )
 
-    PLAYLIST_ID = mapped_column(Integer, primary_key=True)
-    USER_REF = mapped_column(ForeignKey("user.id"))
+    playlist_id = mapped_column(Integer, primary_key=True)
+    user_ref = mapped_column(ForeignKey("user.id"))
     instrument = mapped_column(Text)
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="playlist")
-    playlist_tune: Mapped[List["PlaylistTune"]] = relationship(
-        "PlaylistTune", uselist=True, back_populates="playlist"
+    practice_record: Mapped[List["PracticeRecord"]] = relationship(
+        "PracticeRecord", uselist=True, back_populates="playlist"
     )
     table_transient_data: Mapped[List["TableTransientData"]] = relationship(
         "TableTransientData", uselist=True, back_populates="playlist"
+    )
+
+
+class PrefsSpacedRepetition(Base):
+    __tablename__ = "prefs_spaced_repetition"
+
+    alg_type = mapped_column(Enum("SM2", "FSRS"), primary_key=True, nullable=False)
+    user_id = mapped_column(ForeignKey("user.id"), primary_key=True)
+    fsrs_weights = mapped_column(Text)
+    request_retention = mapped_column(Float)
+    maximum_interval = mapped_column(Integer)
+
+    user: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="prefs_spaced_repetition"
     )
 
 
@@ -239,56 +246,64 @@ class TableState(Base):
 class UserAnnotationSet(Base):
     __tablename__ = "user_annotation_set"
 
-    USER_REF = mapped_column(
-        ForeignKey("user.id"),
-        primary_key=True,
-        nullable=False,
-        server_default=text("1"),
-    )
-    TUNE_REF = mapped_column(ForeignKey("tune.ID"), primary_key=True)
-    NotePrivate = mapped_column(Text)
-    NotePublic = mapped_column(Text)
-    Tags = mapped_column(Text)
+    tune_ref = mapped_column(ForeignKey("tune.id"), primary_key=True)
+    note_private = mapped_column(Text)
+    note_public = mapped_column(Text)
+    tags = mapped_column(Text)
+    user_ref = mapped_column(ForeignKey("user.id"), primary_key=True)
 
     tune: Mapped[Optional["Tune"]] = relationship(
         "Tune", back_populates="user_annotation_set"
     )
-    user: Mapped["User"] = relationship("User", back_populates="user_annotation_set")
+    user: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="user_annotation_set"
+    )
 
 
-class PlaylistTune(Base):
-    __tablename__ = "playlist_tune"
+class PracticeRecord(Base):
+    __tablename__ = "practice_record"
+    __table_args__ = (UniqueConstraint("tune_ref", "playlist_ref"),)
 
-    PLAYLIST_REF = mapped_column(ForeignKey("playlist.PLAYLIST_ID"), primary_key=True)
-    TUNE_REF = mapped_column(ForeignKey("tune.ID"), primary_key=True)
-    Current = mapped_column(Text)
-    Learned = mapped_column(Text)
+    playlist_ref = mapped_column(ForeignKey("playlist.playlist_id"))
+    tune_ref = mapped_column(ForeignKey("tune.id"))
+    practiced = mapped_column(Text)
+    quality = mapped_column(Text)
+    id = mapped_column(Integer, primary_key=True)
+    easiness = mapped_column(Float)
+    interval = mapped_column(Integer)
+    repetitions = mapped_column(Integer)
+    review_date = mapped_column(Text)
+    backup_practiced = mapped_column(Text)
+    stability = mapped_column(Float)
+    elapsed_days = mapped_column(Integer)
+    lapses = mapped_column(Integer)
+    state = mapped_column(Integer)
 
     playlist: Mapped[Optional["Playlist"]] = relationship(
-        "Playlist", back_populates="playlist_tune"
+        "Playlist", back_populates="practice_record"
     )
     tune: Mapped[Optional["Tune"]] = relationship(
-        "Tune", back_populates="playlist_tune"
+        "Tune", back_populates="practice_record"
     )
 
 
 class TableTransientData(Base):
     __tablename__ = "table_transient_data"
 
-    user_id = mapped_column(ForeignKey("user.id"), primary_key=True, nullable=False)
-    tune_id = mapped_column(ForeignKey("tune.ID"), primary_key=True, nullable=False)
-    playlist_id = mapped_column(
-        ForeignKey("playlist.PLAYLIST_ID"), primary_key=True, nullable=False
-    )
-    purpose = mapped_column(
-        Enum("practice", "repertoire", "suggestions"), primary_key=True
-    )
-    notes_private = mapped_column(Text)
-    notes_public = mapped_column(Text)
+    user_id = mapped_column(ForeignKey("user.id"), primary_key=True)
+    tune_id = mapped_column(ForeignKey("tune.id"), primary_key=True)
+    playlist_id = mapped_column(ForeignKey("playlist.playlist_id"), primary_key=True)
+    purpose = mapped_column(Text)
+    note_private = mapped_column(Text)
+    note_public = mapped_column(Text)
     recall_eval = mapped_column(Text)
 
-    playlist: Mapped["Playlist"] = relationship(
+    playlist: Mapped[Optional["Playlist"]] = relationship(
         "Playlist", back_populates="table_transient_data"
     )
-    tune: Mapped["Tune"] = relationship("Tune", back_populates="table_transient_data")
-    user: Mapped["User"] = relationship("User", back_populates="table_transient_data")
+    tune: Mapped[Optional["Tune"]] = relationship(
+        "Tune", back_populates="table_transient_data"
+    )
+    user: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="table_transient_data"
+    )

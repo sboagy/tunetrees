@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import tunetrees.api.auth as auth
 import tunetrees.api.tunetrees as tunetrees_api
-from tunetrees.api import settings
+from tunetrees.api import preferences, settings
 
 tags_metadata = [
     {
@@ -21,6 +21,10 @@ tags_metadata = [
         "to persist state between sessions and devices.  There may be a fuzzy decision between these records and "
         "what should be directly stored in the user records.",
     },
+    {
+        "name": "preferences",
+        "description": "User preferences, such as spaced repetition settings.",
+    },
 ]
 
 app = FastAPI(debug=True, openapi_tags=tags_metadata)
@@ -28,6 +32,7 @@ app = FastAPI(debug=True, openapi_tags=tags_metadata)
 app.include_router(auth.router)
 app.include_router(tunetrees_api.router)
 app.include_router(settings.settings_router)
+app.include_router(preferences.preferences_router)
 
 
 @app.get("/")

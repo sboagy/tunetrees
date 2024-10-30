@@ -54,8 +54,8 @@ export function getMockTune(): Tune {
     review_date: "2023-01-03",
     backup_practiced: "2023-01-04",
     external_ref: "http://example.com",
-    notes_private: "Private notes",
-    notes_public: "Public notes",
+    note_private: "Private notes",
+    note_public: "Public notes",
     tags: "tag1, tag2",
     recall_eval: "High",
   };
@@ -119,8 +119,8 @@ export const ERROR_TUNE: Tune[] = [
     repetitions: 0,
     review_date: "Error",
     backup_practiced: "Error",
-    notes_private: "Error", // Optional property, should't need to be set
-    notes_public: "Error", // Optional property, should't need to be set
+    note_private: "Error", // Optional property, should't need to be set
+    note_public: "Error", // Optional property, should't need to be set
     tags: "Error", // Optional property, should't need to be set
     recall_eval: "Error", // Optional property, should't need to be set
   },
@@ -128,23 +128,23 @@ export const ERROR_TUNE: Tune[] = [
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export const ERROR_PLAYLIST_TUNE: PlaylistTune = {
-  ID: 0,
-  Title: "Error",
-  Type: "Error",
-  Structure: "Error",
-  Mode: "Error",
-  Incipit: "Error",
-  Learned: "Error",
-  Practiced: "Error",
-  Quality: 0,
-  Easiness: 0,
-  Interval: 0,
-  Repetitions: 0,
-  ReviewDate: "Error",
-  BackupPracticed: "Error",
-  NotePrivate: "Error", // Optional property, should't need to be set
-  NotePublic: "Error", // Optional property, should't need to be set
-  Tags: "Error", // Optional property, should't need to be set
-  USER_REF: 0,
-  PLAYLIST_REF: 0,
+  id: 0,
+  title: "Error",
+  type: "Error",
+  structure: "Error",
+  mode: "Error",
+  incipit: "Error",
+  learned: "Error",
+  practiced: "Error",
+  quality: 0,
+  easiness: 0,
+  interval: 0,
+  repetitions: 0,
+  review_date: "Error",
+  backup_practiced: "Error",
+  note_private: "Error", // Optional property, should't need to be set
+  note_public: "Error", // Optional property, should't need to be set
+  tags: "Error", // Optional property, should't need to be set
+  user_ref: 0,
+  playlist_ref: 0,
 };

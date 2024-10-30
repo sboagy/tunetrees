@@ -4,6 +4,7 @@ from os import environ
 from typing import Annotated, Any, Dict, List, Optional
 
 from fastapi import APIRouter, Form, HTTPException
+from sqlalchemy import ColumnElement, Table
 from starlette import status as status
 from starlette.responses import HTMLResponse, RedirectResponse
 
@@ -59,68 +60,57 @@ async def practice_page():
 async def get_scheduled(
     user_id: str, playlist_ref: str
 ) -> List[dict[str, Any]] | dict[str, str]:
-    db = None
     try:
-        db = SessionLocal()
-        tunes_scheduled = query_practice_list_scheduled(
-            db, limit=10, user_ref=int(user_id), playlist_ref=int(playlist_ref)
-        )
-        tune_list = [
-            tunes_mapper(tune, t_practice_list_staged) for tune in tunes_scheduled
-        ]
-        return tune_list
+        with SessionLocal() as db:
+            tunes_scheduled = query_practice_list_scheduled(
+                db, limit=10, user_ref=int(user_id), playlist_ref=int(playlist_ref)
+            )
+            tune_list = [
+                tunes_mapper(tune, t_practice_list_staged) for tune in tunes_scheduled
+            ]
+            return tune_list
     except Exception as e:
         logger = logging.getLogger("tunetrees.api")
         logger.error(f"Unable to fetch scheduled practice list: {e}")
         return {"error": f"Unable to fetch scheduled practice list: {e}"}
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.get("/get_tunes_recently_played/{user_id}/{playlist_ref}")
 async def get_recently_played(
     user_id: str, playlist_ref: str
 ) -> List[dict[str, Any]] | dict[str, str]:
-    db = None
     try:
-        db = SessionLocal()
-        tunes_recently_played: List[Tune] = query_practice_list_recently_played(
-            db, user_ref=int(user_id), playlist_ref=int(playlist_ref)
-        )
-        tune_list = []
-        for tune in tunes_recently_played:
-            tune_list.append(tunes_mapper(tune, t_practice_list_staged))
-        return tune_list
+        with SessionLocal() as db:
+            tunes_recently_played: List[Tune] = query_practice_list_recently_played(
+                db, user_ref=int(user_id), playlist_ref=int(playlist_ref)
+            )
+            tune_list = []
+            for tune in tunes_recently_played:
+                tune_list.append(tunes_mapper(tune, t_practice_list_staged))
+            return tune_list
     except Exception as e:
         return {"error": f"Unable to fetch recently played tunes: {e}"}
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.get("/get_tune_staged/{user_id}/{playlist_ref}/{tune_id}")
 async def get_tune_staged(
     user_id: str, playlist_ref: str, tune_id: str
 ) -> List[dict[str, Any]] | dict[str, str]:
-    db = None
     try:
-        db = SessionLocal()
-        tunes_recently_played: List[Tune] = query_tune_staged(
-            db,
-            user_ref=int(user_id),
-            playlist_ref=int(playlist_ref),
-            tune_id=int(tune_id),
-        )
-        tune_list = []
-        for tune in tunes_recently_played:
-            tune_list.append(tunes_mapper(tune, t_practice_list_staged))
-        return tune_list
+        with SessionLocal() as db:
+            tunes_recently_played: List[Tune] = query_tune_staged(
+                db,
+                user_ref=int(user_id),
+                playlist_ref=int(playlist_ref),
+                tune_id=int(tune_id),
+            )
+            tune_list = [
+                tunes_mapper(tune, t_practice_list_staged)
+                for tune in tunes_recently_played
+            ]
+            return tune_list
     except Exception as e:
         return {"error": f"Unable to fetch recently played tunes: {e}"}
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.post("/practice/submit_feedback")
@@ -194,31 +184,36 @@ async def feedback(
 
 
 class PlaylistTuneJoinedModel(BaseModel):
-    ID: Optional[int]
-    Title: Optional[str]
-    Type: Optional[str]
-    Structure: Optional[str]
-    Mode: Optional[str]
-    Incipit: Optional[str]
-    Learned: Optional[str]
-    Practiced: Optional[str]
-    Quality: Optional[int]
-    Easiness: Optional[float]
-    Interval: Optional[int]
-    Repetitions: Optional[int]
-    ReviewDate: Optional[str]
-    BackupPracticed: Optional[str]
-    NotePrivate: Optional[str]
-    NotePublic: Optional[str]
-    Tags: Optional[str]
-    USER_REF: Optional[int]
-    PLAYLIST_REF: Optional[int]
+    id: Optional[int]
+    title: Optional[str]
+    type: Optional[str]
+    structure: Optional[str]
+    mode: Optional[str]
+    incipit: Optional[str]
+    learned: Optional[str]
+    practiced: Optional[str]
+    quality: Optional[int]
+    easiness: Optional[float]
+    interval: Optional[int]
+    repetitions: Optional[int]
+    review_date: Optional[str]
+    note_private: Optional[str]
+    note_public: Optional[str]
+    tags: Optional[str]
+    user_ref: Optional[int]
+    playlist_ref: Optional[int]
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True  # Enable attribute parsing from ORM objects
+    }
 
 
-def update_table(db: Session, table, conditions, values):
+def update_table(
+    db: Session,
+    table: Table,
+    conditions: List[ColumnElement[bool]],
+    values: dict[str, Any],
+):
     stmt = table.update().where(*conditions).values(**values)
     db.execute(stmt)
 
@@ -250,22 +245,22 @@ async def update_playlist_tune(
     logger = logging.getLogger("tunetrees.api")
     with SessionLocal() as db:
         try:
-            updates = tune_update.dict(exclude_unset=True)
+            updates = tune_update.model_dump(exclude_unset=True)
 
             # Define the mapping of fields to tables and columns
             table_field_mapping = {
-                Tune: ["Title", "Type", "Structure", "Mode", "Incipit"],
-                PlaylistTune: ["Learned"],
+                Tune: ["title", "type", "structure", "mode", "incipit"],
+                PlaylistTune: ["learned"],
                 PracticeRecord: [
-                    "Practiced",
-                    "Quality",
-                    "Easiness",
-                    "Interval",
-                    "Repetitions",
-                    "ReviewDate",
-                    "BackupPracticed",
+                    "practiced",
+                    "quality",
+                    "easiness",
+                    "interval",
+                    "repetitions",
+                    "review_date",
+                    "backup_practiced",
                 ],
-                UserAnnotationSet: ["NotePrivate", "NotePublic", "Tags"],
+                UserAnnotationSet: ["note_private", "note_public", "tags"],
             }
 
             # Update each table based on the fields provided
@@ -273,21 +268,21 @@ async def update_playlist_tune(
                 if any(field in updates for field in fields):
                     conditions = []
                     if table is Tune:
-                        conditions = [Tune.ID == tune_id]
+                        conditions = [Tune.id == tune_id]
                     elif table is PlaylistTune:
                         conditions = [
-                            PlaylistTune.TUNE_REF == tune_id,
-                            PlaylistTune.PLAYLIST_REF == playlist_ref,
+                            PlaylistTune.tune_ref == tune_id,
+                            PlaylistTune.playlist_ref == playlist_ref,
                         ]
                     elif table is PracticeRecord:
                         conditions = [
-                            PracticeRecord.TUNE_REF == tune_id,
-                            PracticeRecord.PLAYLIST_REF == playlist_ref,
+                            PracticeRecord.tune_ref == tune_id,
+                            PracticeRecord.playlist_ref == playlist_ref,
                         ]
                     elif table is UserAnnotationSet:
                         conditions = [
-                            UserAnnotationSet.TUNE_REF == tune_id,
-                            UserAnnotationSet.USER_REF == user_id,
+                            UserAnnotationSet.tune_ref == tune_id,
+                            UserAnnotationSet.user_ref == user_id,
                         ]
 
                     update_table(
@@ -326,9 +321,9 @@ async def delete_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
     try:
         with SessionLocal() as db:
             stmt = t_practice_list_joined.delete().where(
-                t_practice_list_joined.c.USER_REF == user_id,
-                t_practice_list_joined.c.PLAYLIST_REF == playlist_ref,
-                t_practice_list_joined.c.ID == tune_id,
+                t_practice_list_joined.c.user_ref == user_id,
+                t_practice_list_joined.c.playlist_ref == playlist_ref,
+                t_practice_list_joined.c.id == tune_id,
             )
             result = db.execute(stmt)
             db.commit()
@@ -363,18 +358,21 @@ async def get_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
     logger = logging.getLogger("tunetrees.api")
     try:
         with SessionLocal() as db:
-            stmt = t_practice_list_joined.select().where(
-                t_practice_list_joined.c.USER_REF == user_id,
-                t_practice_list_joined.c.PLAYLIST_REF == playlist_ref,
-                t_practice_list_joined.c.ID == tune_id,
+            result = (
+                db.query(t_practice_list_joined)
+                .filter(
+                    t_practice_list_joined.c.user_ref == user_id,
+                    t_practice_list_joined.c.playlist_ref == playlist_ref,
+                    t_practice_list_joined.c.id == tune_id,
+                )
+                .first()
             )
-            result = db.execute(stmt).fetchone()
+
             if result is None:
                 raise HTTPException(
                     status_code=404, detail=f"Tune not found: ({tune_id})"
                 )
-            result_dict = result._mapping
-            return PlaylistTuneJoinedModel(**result_dict)
+            return PlaylistTuneJoinedModel.model_validate(result)
     except Exception as e:
         logger.error(f"Unable to fetch tune ({tune_id}): {e}")
         raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")

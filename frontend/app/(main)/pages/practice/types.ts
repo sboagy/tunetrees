@@ -14,32 +14,32 @@ export type Tune = {
   review_date: string | null;
   backup_practiced: string | null;
   external_ref?: string | null;
-  notes_private?: string | null;
-  notes_public?: string | null;
+  note_private?: string | null;
+  note_public?: string | null;
   tags?: string | null;
   recall_eval?: string | null;
 };
 
 export type PlaylistTune = {
-  ID?: number;
-  Title?: string;
-  Type?: string;
-  Structure?: string;
-  Mode?: string;
-  Incipit?: string;
-  Learned?: string;
-  Practiced?: string;
-  Quality?: number;
-  Easiness?: number;
-  Interval?: number;
-  Repetitions?: number;
-  ReviewDate?: string;
-  BackupPracticed?: string;
-  NotePrivate?: string;
-  NotePublic?: string;
-  Tags?: string;
-  USER_REF?: number;
-  PLAYLIST_REF?: number;
+  id?: number;
+  title?: string;
+  type?: string;
+  structure?: string;
+  mode?: string;
+  incipit?: string;
+  learned?: string;
+  practiced?: string;
+  quality?: number;
+  easiness?: number;
+  interval?: number;
+  repetitions?: number;
+  review_date?: string;
+  backup_practiced?: string;
+  note_private?: string;
+  note_public?: string;
+  tags?: string;
+  user_ref?: number;
+  playlist_ref?: number;
 };
 
 export type ScreenSize = "small" | "full";
@@ -51,14 +51,14 @@ export type TableTransientData = {
   tune_id: number;
   playlist_id: number;
   purpose: string;
-  notes_private: string | null;
-  notes_public: string | null;
+  note_private: string | null;
+  note_public: string | null;
   recall_eval: string | null;
 };
 
 export type TableTransientDataFields = {
-  notes_private: string | null;
-  notes_public: string | null;
+  note_private: string | null;
+  note_public: string | null;
   recall_eval: string | null;
 };
 

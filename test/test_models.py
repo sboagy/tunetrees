@@ -14,7 +14,7 @@ def test_basic_connect_and_read():
         db = SessionLocal()
         tunes: List[Tune] = get_tune_table(db, limit=1000, print_table=True)
         # Obviously you would normally just query for record 36
-        filtered = list(filter(lambda tune: tune.ID == 36, tunes))
+        filtered = list(filter(lambda tune: tune.id == 36, tunes))
         # filtered = [tune for tune in tunes if tune.ID == 36]
         assert filtered
         r36 = filtered[0]

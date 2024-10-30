@@ -40,8 +40,13 @@ export interface IScheduledTunesType {
   user_id: string;
   playlist_id: string;
   table_purpose: TablePurpose;
+  globalFilter?: string;
+  refreshData: () => Promise<{
+    scheduledData: Tune[];
+    repertoireData: Tune[];
+  }>;
   // setRecentlyPracticedCallback?: (tunes: Tune[]) => void;
-  handleFilterChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  // handleFilterChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export const tableContext = React.createContext<TanstackTable<Tune> | null>(
@@ -56,14 +61,46 @@ export const useTableContext = () => {
   return context;
 };
 
+const saveTableState = async (
+  table: TanstackTable<Tune>,
+  user_id: string,
+  table_purpose: TablePurpose,
+) => {
+  const tableState: TableState = table.getState();
+
+  try {
+    const response = await createOrUpdateTableState(
+      Number.parseInt(user_id),
+      "full",
+      table_purpose,
+      tableState,
+    );
+    // Handle the response as needed
+    console.log("Server response:", response);
+    return response;
+  } catch (error) {
+    console.error("Error calling server function:", error);
+    throw error;
+  } finally {
+    // setIsLoading(false);
+  }
+};
+
 export function TunesTable(
-  { tunes, user_id, playlist_id, table_purpose }: IScheduledTunesType,
+  {
+    tunes,
+    user_id,
+    playlist_id,
+    table_purpose,
+    globalFilter = "",
+  }: IScheduledTunesType,
   selectionChangedCallback:
     | ((
         table: TanstackTable<Tune>,
         rowSelectionState: RowSelectionState,
       ) => void)
     | null = null,
+  filterStringCallback?: (filter: string) => void,
 ) {
   const [tableStateFromDb, setTableStateFromDb] =
     React.useState<TableState | null>(null);
@@ -156,6 +193,17 @@ export function TunesTable(
   const table: TanstackTable<Tune> = useReactTable({
     data: tunes,
     columns: columns,
+    // globalFilterFn: (
+    //   value: string,
+    //   row: string,
+    //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    //   meta: TableMeta<Tune>,
+    // ): boolean => {
+    //   const searchText = value.toLowerCase();
+    //   const cellText = String(row).toLowerCase(); // Convert row to string
+    //   return cellText.includes(searchText);
+    // },
+    globalFilterFn: "auto", // Use the built-in default filter
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
@@ -170,6 +218,7 @@ export function TunesTable(
       rowSelection,
       columnVisibility,
       pagination,
+      globalFilter,
     },
   });
 
@@ -189,6 +238,9 @@ export function TunesTable(
           table.setColumnVisibility(tableStateFromDb.columnVisibility);
           table.setColumnFilters(tableStateFromDb.columnFilters);
           table.setSorting(tableStateFromDb.sorting);
+          if (filterStringCallback) {
+            filterStringCallback(tableStateFromDb.globalFilter);
+          }
         }
       } catch (error) {
         console.error(error);
@@ -197,30 +249,7 @@ export function TunesTable(
     };
 
     void fetchTableState();
-  }, [user_id, table_purpose, table]);
-
-  const saveTableState = async (
-    table: TanstackTable<Tune>,
-    user_id: string,
-    table_purpose: TablePurpose,
-  ) => {
-    const tableState: TableState = table.getState();
-
-    try {
-      const response = await createOrUpdateTableState(
-        Number.parseInt(user_id),
-        "full",
-        table_purpose,
-        tableState,
-      );
-      // Handle the response as needed
-      console.log("Server response:", response);
-    } catch (error) {
-      console.error("Error calling server function:", error);
-    } finally {
-      // setIsLoading(false);
-    }
-  };
+  }, [user_id, table_purpose, table, filterStringCallback]);
 
   // Intercept the state changes.  I should be able to do this in a more generic way
   // with just onStateChange, but I couldn't get that to work.  Maybe I'll try again later.
@@ -247,8 +276,8 @@ export function TunesTable(
     result
       .then((result) => {
         console.log(
-          "<= interceptedRowSelectionChange - saveTableState result: ",
-          result,
+          "<= interceptedRowSelectionChange - saveTableState: ",
+          result ? "success" : "empty result",
         );
       })
       .catch((error) => {
@@ -286,9 +315,9 @@ export function TunesTable(
       newSorting instanceof Function ? newSorting(sorting) : newSorting;
 
     originalSetSortingRef.current(resolvedSorting);
-    console.log(
-      `=> interceptedSetSorting - resolvedSorting: ${JSON.stringify(newSorting)}`,
-    );
+    // console.log(
+    //   `=> interceptedSetSorting - resolvedSorting: ${JSON.stringify(newSorting)}`,
+    // );
     void saveTableState(table, user_id, table_purpose);
   };
 
@@ -363,6 +392,7 @@ type Props = {
   userId: number;
   playlistId: number;
   purpose: TablePurpose;
+  globalFilter?: string;
 };
 
 const TunesGrid = (props: Props) => {
@@ -405,6 +435,11 @@ const TunesGrid = (props: Props) => {
                       const userId = props.userId;
                       const playlistId = props.playlistId;
                       const tuneId = row.original.id;
+                      void saveTableState(
+                        table,
+                        userId.toString(),
+                        props.purpose,
+                      );
                       console.log("double-click occurred: tuneId=", tuneId);
                       router.push(
                         `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tuneId}`,

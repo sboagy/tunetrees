@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from http.client import HTTPResponse
 from pathlib import Path
 from time import sleep
-from typing import Dict, List, TypedDict
+from typing import List, TypedDict
 from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -106,33 +106,33 @@ def get_headers():
 
 @dataclass
 class IrishTuneInfoPlaylistRow:
-    ID: str
-    Type: str
-    Structure: str
-    Title: str
-    Mode: str
-    Incipit: str
-    Current: str
-    Learned: str
-    Practiced: str
-    NotePrivate: str
-    NotePublic: str
-    Tags: str
+    id: str
+    type: str
+    structure: str
+    title: str
+    mode: str
+    incipit: str
+    current: str
+    learned: str
+    practiced: str
+    note_private: str
+    note_public: str
+    tags: str
 
 
 class IrishTuneInfoPlaylistRowDict(TypedDict):
-    ID: str
-    Type: str
-    Structure: str
-    Title: str
-    Mode: str
-    Incipit: str
-    Current: str
-    Learned: str
-    Practiced: str
-    NotePrivate: str
-    NotePublic: str
-    Tags: str
+    id: str
+    type: str
+    structure: str
+    title: str
+    mode: str
+    incipit: str
+    current: str
+    learned: str
+    practiced: str
+    note_private: str
+    note_public: str
+    tags: str
 
 
 class IrishTuneInfoPlaylistDict(TypedDict):
@@ -156,32 +156,32 @@ def main():
     dump_obj: IrishTuneInfoPlaylistDict = json.loads(page)
     tunes_dict = dump_obj["data"]
     tunes_columns = [
-        "ID",
-        "Type",
-        "Structure",
-        "Title",
-        "Mode",
-        "Incipit",
+        "id",
+        "type",
+        "structure",
+        "title",
+        "mode",
+        "incipit",
     ]
     tunes_user_notes_columns = [
-        "ID",  # TUNE_REF
+        "id",  # TUNE_REF
         # Add also user id column
-        "NotePrivate",
-        "NotePublic",
-        "Tags",
+        "note_private",
+        "note_public",
+        "tags",
     ]
     tunes_practice_record_columns = [
-        "PLAYLIST_REF",  #
-        "ID",  # TUNE_REF (redundant, but will keep for now)
+        "playlist_ref",  #
+        "id",  # TUNE_REF (redundant, but will keep for now)
         # Add also user id column
-        "Practiced",
-        "Feedback",
+        "practiced",
+        "feedback",
     ]
     playlist_tunes_columns = [
-        "PLAYLIST_REF",  # Joins
-        "ID",  # TUNE_REF
-        "Current",
-        "Learned",
+        "playlist_ref",  # Joins
+        "id",  # TUNE_REF
+        "current",
+        "learned",
     ]
     tunes_dump_cvs = data_dir.joinpath("dump_tunes.cvs")
     tune_user_notes_dump_cvs = data_dir.joinpath("dump_tune_user_notes.cvs")
@@ -204,7 +204,7 @@ def main():
         # tune_row = IrishTuneInfoPlaylistRow(*tune_dict)
         for table_dump_cvs_path, columns in tables.items():
             with open(table_dump_cvs_path, "a") as f:
-                utd: Dict[str, str] = tune_dict  # untyped tune dict
+                utd = tune_dict  # untyped tune dict
                 row_data = [(utd.get(k) or "").translate(trans) for k in columns]
                 f.write(", ".join(row_data))
                 f.write("\n")
