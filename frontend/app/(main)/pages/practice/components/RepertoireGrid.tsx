@@ -19,6 +19,7 @@ import type {
 } from "@tanstack/react-table";
 import { submitPracticeFeedbacks } from "../commands";
 import type { Tune } from "../types";
+import NewTuneButton from "./NewTuneButton";
 
 async function fetchFilterFromDB(
   userId: number,
@@ -31,9 +32,17 @@ async function fetchFilterFromDB(
   return String(data.filter);
 }
 
-export default function RepertoireGrid(
-  tunes: IScheduledTunesType,
-): JSX.Element {
+interface IRepertoireGridProps extends IScheduledTunesType {
+  setCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
+}
+
+export default function RepertoireGrid({
+  tunes,
+  user_id,
+  playlist_id,
+  refreshData,
+  setCurrentTune, // Destructure setCurrentTune
+}: IRepertoireGridProps): JSX.Element {
   const [isAddToReviewQueueEnabled, setIsAddToReviewQueueEnabled] =
     useState(false);
   const selectionChangedCallback = (
@@ -44,17 +53,14 @@ export default function RepertoireGrid(
     const selectedRowsCount = Object.keys(rowSelectionState).length;
     setIsAddToReviewQueueEnabled(selectedRowsCount > 0);
   };
-  const refreshDataCallback = tunes.refreshData;
+  const refreshDataCallback = refreshData;
 
   const [globalFilter, setGlobalFilter] = useState("");
   const [isFilterLoaded, setIsFilterLoaded] = useState(false);
 
   useEffect(() => {
     const getFilter = () => {
-      fetchFilterFromDB(
-        Number.parseInt(tunes.user_id),
-        String(tunes.table_purpose),
-      )
+      fetchFilterFromDB(Number.parseInt(user_id), "repertoire")
         .then((filter) => {
           setGlobalFilter(filter);
           setIsFilterLoaded(true);
@@ -66,9 +72,16 @@ export default function RepertoireGrid(
     };
 
     getFilter();
-  }, [tunes]);
+  }, [user_id]);
 
-  const tunesWithFilter = { ...tunes, globalFilter };
+  const tunesWithFilter: IScheduledTunesType = {
+    tunes: tunes,
+    user_id: user_id,
+    playlist_id: playlist_id,
+    table_purpose: "repertoire",
+    refreshData: refreshData,
+    globalFilter,
+  };
   const table = TunesTable(tunesWithFilter, selectionChangedCallback);
   const [preset, setPreset] = useState("");
 
@@ -104,7 +117,7 @@ export default function RepertoireGrid(
     }
     console.log("updates", updates);
 
-    const playlistId = tunes.playlist_id;
+    const playlistId = playlist_id;
 
     const promiseResult = submitPracticeFeedbacks({
       playlist_id: playlistId,
@@ -199,15 +212,21 @@ export default function RepertoireGrid(
               >
                 Next
               </Button>
-              <ColumnsMenu user_id={tunes.user_id} table={table} />
+              <ColumnsMenu user_id={user_id} table={table} />
+              <NewTuneButton
+                user_id={user_id}
+                playlist_id={playlist_id}
+                refreshData={refreshData}
+              />
             </div>
           </div>
           <TunesGrid
             table={table}
-            userId={Number.parseInt(tunes.user_id)}
-            playlistId={Number.parseInt(tunes.playlist_id)}
-            purpose={tunes.table_purpose}
+            userId={Number.parseInt(user_id)}
+            playlistId={Number.parseInt(playlist_id)}
+            purpose={"repertoire"}
             globalFilter={globalFilter}
+            setCurrentTune={setCurrentTune} // Pass setCurrentTune to TunesGrid
           />
         </>
       )}

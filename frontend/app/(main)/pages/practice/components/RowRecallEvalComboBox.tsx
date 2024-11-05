@@ -20,7 +20,7 @@ import {
 
 import type { CellContext } from "@tanstack/react-table";
 
-import type { TablePurpose, Tune } from "../types";
+import type { TablePurpose, Tune, TunesGridColumnGeneralType } from "../types";
 import { getColorForEvaluation } from "./TunesGrid";
 import { createOrUpdateTableTransientData } from "../settings";
 
@@ -80,7 +80,7 @@ const qualityList = [
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function RecallEvalComboBox(
-  info: CellContext<Tune, string | null>,
+  info: CellContext<Tune, TunesGridColumnGeneralType>,
   userId: number,
   playlistId: number,
   purpose: TablePurpose,
@@ -92,9 +92,12 @@ export function RecallEvalComboBox(
       if (changed_value === "") {
         return;
       }
+      // In the following, id may be ommited in the case of a new tune,
+      // but I don't think it's ever undefined in this case?
+      // But, keep an eye on it.
       await createOrUpdateTableTransientData(
         userId,
-        info.row.original.id,
+        info.row.original.id ?? 0,
         playlistId,
         purpose,
         info.row.original.note_private ?? null,
@@ -112,6 +115,11 @@ export function RecallEvalComboBox(
     setIsOpen(false);
   };
 
+  const handleButtonClick = (event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the parent elements
+    setIsOpen(!isOpen);
+  };
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
@@ -123,6 +131,7 @@ export function RecallEvalComboBox(
           style={{
             textAlign: "left",
           }}
+          onClick={handleButtonClick}
         >
           {/* This span is the only way I could get the overflow with ellipsis to work in  */
           /* the button.  Per suggestion from Stack Overflow. */}

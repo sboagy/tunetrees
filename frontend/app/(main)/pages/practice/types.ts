@@ -1,5 +1,8 @@
+// In the following, id may be ommited in the case of a new tune.
+// I might be better to use a base class for a new tune, and then
+// add the id in a derived class?
 export type Tune = {
-  id: number;
+  id?: number;
   title: string;
   type: string | null;
   structure: string | null;
@@ -75,3 +78,35 @@ export type FilteredDataReturnType = Tune[];
 export type FilteredDataType = (
   params: FilteredDataParams,
 ) => FilteredDataReturnType;
+
+export type TunesGridColumnGeneralType =
+  | string
+  | number
+  | null
+  | JSX.Element
+  | undefined;
+
+export interface IReferenceData {
+  tune_ref?: number;
+  user_ref?: number;
+  public: number | null;
+  id: number;
+  url: string;
+  ref_type: string;
+  favorite: number | null;
+  comment: string | null;
+  title?: string;
+  isNew?: boolean;
+}
+
+export interface INote {
+  id?: number;
+  user_ref: number;
+  tune_ref: number;
+  playlist_ref?: number | null;
+  created_date?: string | null;
+  note_text: string | null;
+  public: boolean | null;
+  favorite: number | null;
+  isNew?: boolean;
+}

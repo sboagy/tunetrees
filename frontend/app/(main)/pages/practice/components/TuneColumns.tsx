@@ -1,7 +1,7 @@
 "use client";
 
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
-import type { TablePurpose, Tune } from "../types";
+import type { TablePurpose, Tune, TunesGridColumnGeneralType } from "../types";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -130,7 +130,7 @@ export function get_columns(
   userId: number,
   playlistId: number,
   purpose: TablePurpose,
-): ColumnDef<Tune>[] {
+): ColumnDef<Tune, TunesGridColumnGeneralType>[] {
   const determineHeaderCheckedState = (
     table: TanstackTable<Tune>,
   ): CheckedState => {
@@ -232,14 +232,14 @@ export function get_columns(
     );
   }
 
-  function refreshHeader(info: CellContext<Tune, string | null>) {
+  function refreshHeader(info: CellContext<Tune, TunesGridColumnGeneralType>) {
     // Ugly trick to force a refresh of the header
     info.table.getColumn(info.column.id)?.toggleVisibility();
     info.table.getColumn(info.column.id)?.toggleVisibility();
   }
 
   function RowSelectedCheckBox(
-    info: CellContext<Tune, string | null>,
+    info: CellContext<Tune, TunesGridColumnGeneralType>,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     userId: number,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -295,57 +295,62 @@ export function get_columns(
   }
 
   return [
-    ("practice" === purpose
+    {
+      id: "id",
+      // header: ({ column }) => sortableHeader(column, "Id"),
+      header: ({ column }) => sortableHeader(column, "Id"),
+      cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) => {
+        return info.getValue();
+        // if (!info.row.original?.external_ref) {
+        //   return (
+        //     <a
+        //       href={`https://www.irishtune.info/tune/${info.row.original.id}/`}
+        //       target="_blank"
+        //       rel="noopener noreferrer"
+        //       className="text-blue-500 underline"
+        //     >
+        //       {info.row.original.id}
+        //     </a>
+        //   );
+        // }
+        // return <span>{info.row.original.id}</span>;
+      },
+      accessorFn: (row) => row.id,
+      enableSorting: true,
+      enableHiding: true,
+      size: 20,
+    },
+    "practice" === purpose
       ? {
           accessorKey: "recall_eval",
           header: ({ column }) => sortableHeader(column, "Evaluation"),
           enableHiding: false,
-          cell: (info: CellContext<Tune, string | null>) =>
+          cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) =>
             RecallEvalComboBox(info, userId, playlistId, purpose),
+          accessorFn: (row) => row.recall_eval,
         }
       : {
           accessorKey: "select",
           header: ({ column, table }) => selectionHeader(column, table),
           enableHiding: false,
-          cell: (info: CellContext<Tune, string | null>) =>
+          cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) =>
             RowSelectedCheckBox(info, userId, playlistId, purpose),
-        }) as ColumnDef<Tune>,
-    {
-      id: "id",
-      // header: ({ column }) => sortableHeader(column, "Id"),
-      header: "Id",
-      cell: (info: CellContext<Tune, string>) => {
-        // return info.getValue();
-        if (!info.row.original?.external_ref) {
-          return (
-            <a
-              href={`https://www.irishtune.info/tune/${info.row.original.id}/`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 underline"
-            >
-              {info.row.original.id}
-            </a>
-          );
-        }
-        return info.row.original.id;
-      },
-
-      enableSorting: true,
-      enableHiding: true,
-      size: 20,
-    } as ColumnDef<Tune>,
+          accessorFn: () => null, // Return null since we don't need a value
+          meta: {
+            type: "boolean", // Set the type to boolean for consistency
+          },
+        },
     {
       accessorKey: "title",
       header: ({ column }) => sortableHeader(column, "Title"),
-      cell: (info: CellContext<Tune, string | undefined>) => {
+      cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) => {
         return info.getValue();
       },
       enableSorting: true,
       enableHiding: true,
       enableResizing: true,
       size: 400,
-    } as ColumnDef<Tune>,
+    },
     {
       accessorKey: "type",
       header: ({ column }) => sortableHeader(column, "Type"),
@@ -448,19 +453,19 @@ export function get_columns(
       enableHiding: true,
       sortingFn: datetimeTextSortingFn,
     },
-    {
-      accessorKey: "backup_practiced",
-      header: "Backup Practiced",
-      cell: (info) => {
-        return info.getValue();
-      },
-      enableSorting: true,
-      enableHiding: true,
-    },
+    // {
+    //   accessorKey: "backup_practiced",
+    //   header: "Backup Practiced",
+    //   cell: (info) => {
+    //     return info.getValue();
+    //   },
+    //   enableSorting: true,
+    //   enableHiding: true,
+    // },
     {
       accessorKey: "external_ref",
       header: "External Ref",
-      cell: (info: CellContext<Tune, string | undefined>) => {
+      cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) => {
         // return info.getValue();
         if (!info.row.original.external_ref) {
           return (
@@ -487,25 +492,25 @@ export function get_columns(
       },
       enableSorting: true,
       enableHiding: true,
-    } as ColumnDef<Tune>,
-    {
-      accessorKey: "note_private",
-      header: "Private Note",
-      cell: (info) => {
-        return info.getValue();
-      },
-      enableSorting: true,
-      enableHiding: true,
     },
-    {
-      accessorKey: "note_public",
-      header: "Public Note",
-      cell: (info) => {
-        return info.getValue();
-      },
-      enableSorting: true,
-      enableHiding: true,
-    },
+    // {
+    //   accessorKey: "note_private",
+    //   header: "Private Note",
+    //   cell: (info) => {
+    //     return info.getValue();
+    //   },
+    //   enableSorting: true,
+    //   enableHiding: true,
+    // },
+    // {
+    //   accessorKey: "note_public",
+    //   header: "Public Note",
+    //   cell: (info) => {
+    //     return info.getValue();
+    //   },
+    //   enableSorting: true,
+    //   enableHiding: true,
+    // },
     {
       accessorKey: "tags",
       header: ({ column }) => sortableHeader(column, "Tags"),

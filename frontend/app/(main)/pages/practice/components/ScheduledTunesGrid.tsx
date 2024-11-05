@@ -11,15 +11,21 @@ import { deleteTableTransientData } from "../settings";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import FlashcardPanel from "./FlashcardPanel";
+import NewTuneButton from "./NewTuneButton";
 
 type ReviewMode = "grid" | "flashcard";
+
+interface IScheduledTunesGridProps extends IScheduledTunesType {
+  setCurrentTune: (tuneId: number | null) => void;
+}
 
 export default function ScheduledTunesGrid({
   tunes,
   user_id,
   playlist_id,
   refreshData,
-}: IScheduledTunesType): JSX.Element {
+  setCurrentTune,
+}: IScheduledTunesGridProps): JSX.Element {
   const [scheduled, setScheduled] = useState<Tune[]>(tunes);
   const refreshDataCallback = refreshData;
 
@@ -31,8 +37,6 @@ export default function ScheduledTunesGrid({
     globalFilter: "",
     refreshData,
   });
-
-  // const valuesArray = {};
 
   const submitPracticeFeedbacksHandler = (
     refreshData: () => Promise<{
@@ -48,16 +52,12 @@ export default function ScheduledTunesGrid({
       const idString = `${tune.id}`;
       const row = table.getRow(i.toString());
 
-      // For some reason, the renderValue here stopped working, not sure why.
-      // const feedback: string = row.renderValue("recall_eval");
       const feedback: string | null | undefined = row.original.recall_eval;
 
       if (feedback) {
         updates[idString] = { feedback: feedback };
       }
     }
-
-    // TODO: Put up a spinner while waiting for the response
 
     const promiseResult = submitPracticeFeedbacks({
       playlist_id,
@@ -107,16 +107,7 @@ export default function ScheduledTunesGrid({
   return (
     <div className="w-full">
       <div className="flex items-center justify-between py-4">
-        {/* <Input
-          placeholder="Filter by type..."
-          value={(table.getColumn("type")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("type")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
-        /> */}
         <div className="flex-row items-center">
-          {/* <h1>Scheduled for practice:</h1> */}
           <Button
             type="submit"
             variant="outline"
@@ -156,6 +147,11 @@ export default function ScheduledTunesGrid({
           >
             <ColumnsMenu user_id={user_id} table={table} />
           </div>
+          <NewTuneButton
+            user_id={user_id}
+            playlist_id={playlist_id}
+            refreshData={refreshData}
+          />
         </div>
       </div>
       {mode === "grid" ? (
@@ -164,6 +160,7 @@ export default function ScheduledTunesGrid({
           userId={Number.parseInt(user_id)}
           playlistId={Number.parseInt(playlist_id)}
           purpose={"practice"}
+          setCurrentTune={setCurrentTune}
         />
       ) : (
         <FlashcardPanel

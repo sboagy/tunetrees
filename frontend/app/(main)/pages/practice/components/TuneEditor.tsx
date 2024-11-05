@@ -96,16 +96,25 @@ export default function TuneEditor({
   });
 
   useEffect(() => {
-    const fetchTune = async () => {
-      const tuneData = await getPlaylistTune(userId, playlistId, tuneId);
-
-      if (tuneData && (tuneData as PlaylistTune).id !== undefined) {
-        setTune(tuneData as PlaylistTune);
-        form.reset(tuneData as PlaylistTune);
-      } else {
-        console.error("Failed to fetch tune");
-        setTune(ERROR_PLAYLIST_TUNE);
-      }
+    const fetchTune = () => {
+      getPlaylistTune(userId, playlistId, tuneId)
+        .then((tuneData) => {
+          if (tuneData && (tuneData as PlaylistTune).id !== undefined) {
+            setTune(tuneData as PlaylistTune);
+            form.reset(tuneData as PlaylistTune);
+          } else {
+            console.error(
+              `Failed to fetch tune: ${userId} ${playlistId} ${tuneId}`,
+            );
+            setTune(ERROR_PLAYLIST_TUNE);
+          }
+        })
+        .catch((error) => {
+          console.error(
+            `Error fetching tune (${userId} ${playlistId} ${tuneId}): ${error}`,
+          );
+          setTune(ERROR_PLAYLIST_TUNE);
+        });
     };
 
     void fetchTune();
@@ -406,7 +415,7 @@ export default function TuneEditor({
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
-                      Review Date:{" "}
+                      Scheduled:{" "}
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">

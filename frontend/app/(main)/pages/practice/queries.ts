@@ -1,7 +1,7 @@
 "use server";
 
 import axios from "axios";
-import type { PlaylistTune, Tune } from "./types";
+import type { IReferenceData, INote, PlaylistTune, Tune } from "./types";
 import { ERROR_TUNE } from "./mocks";
 
 const client = axios.create({
@@ -168,5 +168,302 @@ export async function createPlaylistTune(
   } catch (error) {
     console.error("Error in createPlaylistTune: ", error);
     return { detail: `Unable to create tune: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Fetch references for a specific tune.
+ *
+ * @param tuneRef - The reference ID of the tune.
+ * @param userRef - The user reference ID.
+ * @returns A promise that resolves to a list of references.
+ */
+export async function getReferences(
+  tuneRef: number,
+  userRef: number | null,
+): Promise<IReferenceData[]> {
+  try {
+    console.log(
+      "In getReferences (server): tuneRef: %s, userRef: %s",
+      tuneRef,
+      userRef,
+    );
+    console.log(
+      `Request URL: /references?user_ref=${userRef}&tune_ref=${tuneRef}&public=0`,
+    );
+    const response = await client.get<IReferenceData[]>(
+      `/references?tune_ref=${tuneRef}&user_ref=${userRef}&public=0`,
+    );
+    console.log("getReferences response: ", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error in getReferences: ", error);
+    return [];
+  }
+}
+
+/**
+ * Update a specific reference.
+ *
+ * @param referenceId - The ID of the reference.
+ * @param referenceUpdate - The fields to update (all optional).
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function updateReference(
+  referenceId: number,
+  referenceUpdate: Partial<IReferenceData>,
+): Promise<{ success?: string; detail?: string }> {
+  try {
+    const response = await client.put<{ success?: string; detail?: string }>(
+      `/references/${referenceId}`,
+      referenceUpdate,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in updateReference: ", error);
+    return {
+      detail: `Unable to update reference: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Create a new reference.
+ *
+ * @param reference - The reference data to create.
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function createReference(
+  reference: IReferenceData,
+): Promise<{ success?: string; detail?: string }> {
+  try {
+    const response = await client.post<{ success?: string; detail?: string }>(
+      "/references",
+      reference,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in createReference: ", error);
+    return {
+      detail: `Unable to create reference: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Delete a specific reference.
+ *
+ * @param referenceId - The ID of the reference.
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function deleteReference(
+  referenceId: number,
+): Promise<{ success?: string; detail?: string }> {
+  try {
+    const response = await client.delete<{ success?: string; detail?: string }>(
+      `/references/${referenceId}`,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in deleteReference: ", error);
+    return {
+      detail: `Unable to delete reference: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Retrieve notes for a specific tune.
+ *
+ * @param tune_id - The ID of the tune.
+ * @returns A promise that resolves to a list of notes.
+ */
+export async function getNotes(
+  tuneRef: number,
+  playlistRef?: number,
+  userRef?: number,
+  displayPublic?: boolean,
+): Promise<INote[]> {
+  try {
+    const response = await client.get<INote[]>("/notes", {
+      params: {
+        tune_ref: tuneRef,
+        playlist_ref: playlistRef,
+        user_ref: userRef,
+        public: displayPublic ? 1 : 0,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error in getNotes: ", error);
+    return [];
+  }
+}
+
+/**
+ * Update a specific note.
+ *
+ * @param note_id - The ID of the note.
+ * @param note_update - The fields to update (all optional).
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function updateNote(
+  note_id: string,
+  note_update: Partial<INote>,
+): Promise<{ success?: string; detail?: string }> {
+  try {
+    const response = await client.put<{ success?: string; detail?: string }>(
+      `/notes/${note_id}`,
+      note_update,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in updateNote: ", error);
+    return { detail: `Unable to update note: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Create a new note for a specific tune.
+ *
+ * @param tune_id - The ID of the tune.
+ * @param note - The note data to create.
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function createNote(
+  tune_id: string,
+  note: INote,
+): Promise<{ success?: string; detail?: string }> {
+  try {
+    const response = await client.post<{ success?: string; detail?: string }>(
+      `/notes/${tune_id}`,
+      note,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in createNote: ", error);
+    return { detail: `Unable to create note: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Delete a specific note.
+ *
+ * @param note_id - The ID of the note.
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function deleteNote(
+  note_id: string,
+): Promise<{ success?: string; detail?: string }> {
+  try {
+    const response = await client.delete<{ success?: string; detail?: string }>(
+      `/notes/${note_id}`,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in deleteNote: ", error);
+    return { detail: `Unable to delete note: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Retrieve a specific tune.
+ *
+ * @param tuneRef - The reference ID of the tune.
+ * @returns A promise that resolves to the requested Tune object, or an error message.
+ */
+export async function getTune(
+  tuneRef: number,
+): Promise<Tune | { detail: string }> {
+  try {
+    const response = await client.get<Tune | { detail: string }>("/tune", {
+      params: { tune_ref: tuneRef },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error in getTune: ", error);
+    return { detail: `Unable to fetch tune: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Update a specific tune.
+ *
+ * @param tuneRef - The reference ID of the tune.
+ * @param tuneUpdate - The fields to update (all optional).
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function updateTune(
+  tuneRef: number,
+  tuneUpdate: Partial<Tune>,
+): Promise<{ success?: string; detail?: string }> {
+  try {
+    const response = await client.put<{ success?: string; detail?: string }>(
+      "/tune",
+      tuneUpdate,
+      { params: { tune_ref: tuneRef } },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in updateTune: ", error);
+    return { detail: `Unable to update tune: ${(error as Error).message}` };
+  }
+}
+
+export interface ITuneCreate {
+  title: string;
+  type: string;
+  structure: string;
+  mode: string;
+  incipit: string;
+}
+
+/**
+ * Create a new tune.
+ *
+ * @param tune - The tune data to create.
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function createTune(
+  tune: Tune,
+  playlistRef: number,
+): Promise<Tune | { success?: string; detail?: string }> {
+  try {
+    const tuneCreateInput: ITuneCreate = {
+      title: tune.title,
+      type: tune.type ?? "",
+      structure: tune.structure ?? "",
+      mode: tune.mode ?? "",
+      incipit: tune.incipit ?? "",
+    };
+    const response = await client.post<
+      Tune | { success?: string; detail?: string }
+    >(`/tune?playlist_ref=${playlistRef}`, tuneCreateInput);
+    console.log("createTune response: ", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error in createTune: ", error);
+    return { detail: `Unable to create tune: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Delete a specific tune.
+ *
+ * @param tuneRef - The reference ID of the tune.
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function deleteTune(
+  tuneRef: number,
+): Promise<{ success?: string; detail?: string }> {
+  try {
+    const response = await client.delete<{ success?: string; detail?: string }>(
+      "/tune",
+      { params: { tune_ref: tuneRef } },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in deleteTune: ", error);
+    return { detail: `Unable to delete tune: ${(error as Error).message}` };
   }
 }

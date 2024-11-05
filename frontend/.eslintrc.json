@@ -193,7 +193,10 @@
           {
             "cases": {
               "pascalCase": true
-            }
+            },
+            "ignore": [
+              "Sidebar.tsx"
+            ]
           }
         ]
       }

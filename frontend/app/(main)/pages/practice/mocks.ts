@@ -23,7 +23,6 @@
  * @throws Will throw an error if the cell with the specified column ID is not found.
  */
 import type {
-  ColumnDef,
   CellContext,
   Table as TanstackTable,
 } from "@tanstack/react-table";
@@ -77,7 +76,7 @@ export function createMockTuneCellContext<
 
   const mockTunes = [tuneData];
 
-  const columns: ColumnDef<Tune>[] = get_columns(userId, playlistId, purpose);
+  const columns = get_columns(userId, playlistId, purpose);
 
   const table: TanstackTable<Tune> = useReactTable({
     data: mockTunes,

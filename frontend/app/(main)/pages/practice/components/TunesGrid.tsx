@@ -17,6 +17,7 @@ import * as React from "react";
 
 import type {
   PaginationState,
+  Row,
   RowSelectionState,
   TableState,
   Table as TanstackTable,
@@ -393,25 +394,34 @@ type Props = {
   playlistId: number;
   purpose: TablePurpose;
   globalFilter?: string;
+  setCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
 };
 
 const TunesGrid = (props: Props) => {
   const router = useRouter();
+  const [selectedRowId, setSelectedRowId] = React.useState<number | null>(null);
 
   const table = props.table;
   const columns = get_columns(props.userId, props.playlistId, props.purpose);
+
+  const handleRowClick = (row: Row<Tune>) => {
+    const tuneId = row.original.id;
+    props.setCurrentTune(tuneId ?? null);
+    setSelectedRowId(tuneId || null);
+    // table.setRowSelection({ [row.id]: true }); // Update table selection state
+  };
 
   return (
     <>
       <div className="rounded-md border">
         <tableContext.Provider value={table}>
-          <Table>
+          <Table className="table-auto w-full">
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
+                <TableRow key={headerGroup.id} className="h-auto">
                   {headerGroup.headers.map((header) => {
                     return (
-                      <TableHead key={header.id}>
+                      <TableHead key={header.id} className="p-2 align-top">
                         {header.isPlaceholder
                           ? null
                           : flexRender(
@@ -429,6 +439,12 @@ const TunesGrid = (props: Props) => {
                 table.getRowModel().rows.map((row) => (
                   <TableRow
                     key={row.id}
+                    className={`h-auto cursor-pointer ${
+                      selectedRowId === row.original.id
+                        ? "outline outline-2 outline-blue-500"
+                        : ""
+                    } ${getColorForEvaluation(row.original.recall_eval || null)}`}
+                    onClick={() => handleRowClick(row)}
                     onDoubleClick={(event) => {
                       event.preventDefault(); // Prevent default double-click action
                       event.stopPropagation(); // Stop event bubbling
@@ -446,11 +462,10 @@ const TunesGrid = (props: Props) => {
                       );
                     }}
                     data-state={row.getIsSelected() && "selected"}
-                    className={`${getColorForEvaluation(row.original.recall_eval || null)}`}
                     // className="hover:bg-gray-100"
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="max-h-1 py-0">
+                      <TableCell key={cell.id}>
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext(),
@@ -460,7 +475,7 @@ const TunesGrid = (props: Props) => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow>
+                <TableRow className="h-auto">
                   <TableCell
                     colSpan={columns.length}
                     className="h-12 text-center"
