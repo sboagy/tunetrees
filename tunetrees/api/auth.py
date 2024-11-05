@@ -45,7 +45,7 @@ class StatusCode(object):
 
 # import models as orm
 
-logger = logging.getLogger()
+logger = logging.getLogger("auth")
 
 router = APIRouter(
     prefix="/auth",

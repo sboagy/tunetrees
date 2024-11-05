@@ -1,0 +1,4051 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "FastAPI",
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/auth/signup/": {
+            "post": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Create User",
+                "operationId": "create_user_auth_signup__post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/User"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "$ref": "#/components/schemas/User"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ],
+                                    "title": "Response Create User Auth Signup  Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/get-user/{id}": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get User",
+                "operationId": "get_user_auth_get_user__id__get",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "$ref": "#/components/schemas/User"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ],
+                                    "title": "Response Get User Auth Get User  Id  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/get-user-by-email/{email}": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get User By Email",
+                "operationId": "get_user_by_email_auth_get_user_by_email__email__get",
+                "parameters": [
+                    {
+                        "name": "email",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Email"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "$ref": "#/components/schemas/User"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ],
+                                    "title": "Response Get User By Email Auth Get User By Email  Email  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/get-user-by-account/{provider}/{providerAccountId}": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get User By Account",
+                "operationId": "get_user_by_account_auth_get_user_by_account__provider___providerAccountId__get",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Provider"
+                        }
+                    },
+                    {
+                        "name": "providerAccountId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Provideraccountid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "$ref": "#/components/schemas/User"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ],
+                                    "title": "Response Get User By Account Auth Get User By Account  Provider   Provideraccountid  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/update-user/": {
+            "patch": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Update User",
+                "operationId": "update_user_auth_update_user__patch",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/User"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/User"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/delete-user/{id}": {
+            "delete": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Delete User",
+                "operationId": "delete_user_auth_delete_user__id__delete",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/link-account/": {
+            "post": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Link Account",
+                "operationId": "link_account_auth_link_account__post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Account"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Account"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/unlink-account/{provider}/{providerAccountId}": {
+            "delete": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Unlink Account",
+                "operationId": "unlink_account_auth_unlink_account__provider___providerAccountId__delete",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Provider"
+                        }
+                    },
+                    {
+                        "name": "providerAccountId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Provideraccountid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/create-session/": {
+            "post": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Create Session",
+                "operationId": "create_session_auth_create_session__post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Session"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Session"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/get-session/{sessionToken}": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get Session And User",
+                "operationId": "get_session_and_user_auth_get_session__sessionToken__get",
+                "parameters": [
+                    {
+                        "name": "sessionToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Sessiontoken"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "$ref": "#/components/schemas/SessionAndUser"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ],
+                                    "title": "Response Get Session And User Auth Get Session  Sessiontoken  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/update-session/": {
+            "patch": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Update Session",
+                "operationId": "update_session_auth_update_session__patch",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Session"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Session"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/delete-session/{sessionToken}": {
+            "delete": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Delete Session",
+                "operationId": "delete_session_auth_delete_session__sessionToken__delete",
+                "parameters": [
+                    {
+                        "name": "session_token",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Session Token"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/create-verification-token/": {
+            "post": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Create Verification Token",
+                "operationId": "create_verification_token_auth_create_verification_token__post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VerificationToken"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VerificationToken"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/use-verification-token/": {
+            "post": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Use Verification Token",
+                "operationId": "use_verification_token_auth_use_verification_token__post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VerificationTokenParams"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VerificationToken"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/practice": {
+            "get": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Practice Page",
+                "operationId": "practice_page_tunetrees_practice_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "text/html": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/get_practice_list_scheduled/{user_id}/{playlist_ref}": {
+            "get": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Get Scheduled",
+                "operationId": "get_scheduled_tunetrees_get_practice_list_scheduled__user_id___playlist_ref__get",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "User Id"
+                        }
+                    },
+                    {
+                        "name": "playlist_ref",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Playlist Ref"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    ],
+                                    "title": "Response Get Scheduled Tunetrees Get Practice List Scheduled  User Id   Playlist Ref  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/get_tunes_recently_played/{user_id}/{playlist_ref}": {
+            "get": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Get Recently Played",
+                "operationId": "get_recently_played_tunetrees_get_tunes_recently_played__user_id___playlist_ref__get",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "User Id"
+                        }
+                    },
+                    {
+                        "name": "playlist_ref",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Playlist Ref"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    ],
+                                    "title": "Response Get Recently Played Tunetrees Get Tunes Recently Played  User Id   Playlist Ref  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/get_tune_staged/{user_id}/{playlist_ref}/{tune_id}": {
+            "get": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Get Tune Staged",
+                "operationId": "get_tune_staged_tunetrees_get_tune_staged__user_id___playlist_ref___tune_id__get",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "User Id"
+                        }
+                    },
+                    {
+                        "name": "playlist_ref",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Playlist Ref"
+                        }
+                    },
+                    {
+                        "name": "tune_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Tune Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    ],
+                                    "title": "Response Get Tune Staged Tunetrees Get Tune Staged  User Id   Playlist Ref   Tune Id  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/practice/submit_feedback": {
+            "post": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Submit Feedback",
+                "operationId": "submit_feedback_tunetrees_practice_submit_feedback_post",
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Body_submit_feedback_tunetrees_practice_submit_feedback_post"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/practice/submit_schedules/{playlist_id}": {
+            "post": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Submit Schedules",
+                "operationId": "submit_schedules_tunetrees_practice_submit_schedules__playlist_id__post",
+                "parameters": [
+                    {
+                        "name": "playlist_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Playlist Id"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "$ref": "#/components/schemas/TuneScheduleUpdate"
+                                },
+                                "title": "Tune Updates"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/practice/submit_feedbacks/{playlist_id}": {
+            "post": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Submit Feedbacks",
+                "operationId": "submit_feedbacks_tunetrees_practice_submit_feedbacks__playlist_id__post",
+                "parameters": [
+                    {
+                        "name": "playlist_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Playlist Id"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "$ref": "#/components/schemas/TuneFeedbackUpdate"
+                                },
+                                "title": "Tune Updates"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/practice/feedback": {
+            "post": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Feedback",
+                "description": "Submit feedback for a tune for the direct use of the backend server.\nIf successful, redirect to the practice page.",
+                "operationId": "feedback_tunetrees_practice_feedback_post",
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Body_feedback_tunetrees_practice_feedback_post"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/playlist-tune/{user_id}/{playlist_ref}/{tune_id}": {
+            "put": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Update Playlist Tune",
+                "description": "Directly update a constituent tablels joined by the `practice_list_joined` view fields.\n\nArgs:\n    user_id (int): Unique user ID.\n    playlist_ref (int): Unique playlist ID.\n    tune_id (int): Unique tune ID.\n    tune_update (PlaylistTuneJoinedModel): The fields to update (all optional).\n\nNote:\n    At some point, access control for the tune table field updates may be needed,\n    since the core tune data may be shared across users.\n\nReturns:\n    dict: A dictionary containing either a success message or an error message.\n        Example:\n            {\"success\": \"Tune updated successfully\"}\n            {\"detail\": \"No tune found to update\"}\n            {\"detail\": \"Unable to update tune: \u003Cerror_message\u003E\"}",
+                "operationId": "update_playlist_tune_tunetrees_playlist_tune__user_id___playlist_ref___tune_id__put",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "User Id"
+                        }
+                    },
+                    {
+                        "name": "playlist_ref",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Playlist Ref"
+                        }
+                    },
+                    {
+                        "name": "tune_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tune Id"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PlaylistTuneJoinedModel"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "title": "Response Update Playlist Tune Tunetrees Playlist Tune  User Id   Playlist Ref   Tune Id  Put"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Delete Playlist Tune",
+                "description": "Delete a tune from the database.\n\nArgs:\n    user_id (int): Unique user ID.\n    playlist_ref (int): Unique playlist ID.\n    tune_id (int): Unique tune ID.\n\nReturns:\n    dict: A dictionary containing either a success message or an error message.\n        Example:\n            {\"success\": \"Tune deleted successfully\"}\n            {\"detail\": \"No tune found to delete\"}\n            {\"detail\": \"Unable to delete tune: \u003Cerror_message\u003E\"}",
+                "operationId": "delete_playlist_tune_tunetrees_playlist_tune__user_id___playlist_ref___tune_id__delete",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "User Id"
+                        }
+                    },
+                    {
+                        "name": "playlist_ref",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Playlist Ref"
+                        }
+                    },
+                    {
+                        "name": "tune_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tune Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "title": "Response Delete Playlist Tune Tunetrees Playlist Tune  User Id   Playlist Ref   Tune Id  Delete"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Get Playlist Tune",
+                "description": "Retrieve a tune from the database.\n\nArgs:\n    user_id (int): Unique user ID.\n    playlist_ref (int): Unique playlist ID.\n    tune_id (int): Unique tune ID.\n\nReturns:\n    PlaylistTune | dict[str, str]: The retrieved tune data or an error message.\n        Example:\n            PlaylistTune object\n            {\"detail\": \"Tune not found\"}\n            {\"detail\": \"Unable to fetch tune: \u003Cerror_message\u003E\"}",
+                "operationId": "get_playlist_tune_tunetrees_playlist_tune__user_id___playlist_ref___tune_id__get",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "User Id"
+                        }
+                    },
+                    {
+                        "name": "playlist_ref",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Playlist Ref"
+                        }
+                    },
+                    {
+                        "name": "tune_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tune Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlaylistTuneJoinedModel"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/references": {
+            "get": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Get References",
+                "description": "Get all references for a user and tune or public references.",
+                "operationId": "get_references_tunetrees_references_get",
+                "parameters": [
+                    {
+                        "name": "user_ref",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "User Ref"
+                        }
+                    },
+                    {
+                        "name": "tune_ref",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tune Ref"
+                        }
+                    },
+                    {
+                        "name": "public",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1,
+                            "minimum": 0,
+                            "default": 0,
+                            "title": "Public"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ReferenceResponse"
+                                    },
+                                    "title": "Response Get References Tunetrees References Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Create Reference",
+                "description": "Create a new reference.",
+                "operationId": "create_reference_tunetrees_references_post",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReferenceCreate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReferenceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Update Reference",
+                "description": "Update an existing reference.",
+                "operationId": "update_reference_tunetrees_references_put",
+                "parameters": [
+                    {
+                        "name": "user_ref",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "User Ref"
+                        }
+                    },
+                    {
+                        "name": "tune_ref",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tune Ref"
+                        }
+                    },
+                    {
+                        "name": "public",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Public"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReferenceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Delete Reference",
+                "description": "Delete an existing reference.",
+                "operationId": "delete_reference_tunetrees_references_delete",
+                "parameters": [
+                    {
+                        "name": "user_ref",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "User Ref"
+                        }
+                    },
+                    {
+                        "name": "tune_ref",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tune Ref"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/notes": {
+            "get": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Get Notes",
+                "description": "Retrieve notes based on tune_ref and optional playlist_ref, user_ref, or public.",
+                "operationId": "get_notes_tunetrees_notes_get",
+                "parameters": [
+                    {
+                        "name": "tune_ref",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tune Ref"
+                        }
+                    },
+                    {
+                        "name": "playlist_ref",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Playlist Ref"
+                        }
+                    },
+                    {
+                        "name": "user_ref",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "User Ref"
+                        }
+                    },
+                    {
+                        "name": "public",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer",
+                                    "maximum": 1,
+                                    "minimum": 0
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Public"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/NoteResponse"
+                                    },
+                                    "title": "Response Get Notes Tunetrees Notes Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Create Note",
+                "description": "Create a new note.",
+                "operationId": "create_note_tunetrees_notes_post",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NoteCreate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NoteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/notes/{note_id}": {
+            "put": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Update Note",
+                "description": "Update an existing note.",
+                "operationId": "update_note_tunetrees_notes__note_id__put",
+                "parameters": [
+                    {
+                        "name": "note_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Note Id"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NoteUpdate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NoteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Delete Note",
+                "description": "Delete an existing note.",
+                "operationId": "delete_note_tunetrees_notes__note_id__delete",
+                "parameters": [
+                    {
+                        "name": "note_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Note Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/tunetrees/tune": {
+            "get": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Get Tune",
+                "description": "Retrieve a tune by its reference ID.",
+                "operationId": "get_tune_tunetrees_tune_get",
+                "parameters": [
+                    {
+                        "name": "tune_ref",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tune Ref"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TuneResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Create Tune",
+                "description": "Create a new tune.",
+                "operationId": "create_tune_tunetrees_tune_post",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TuneCreate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TuneResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Update Tune",
+                "description": "Update an existing tune by its reference ID.",
+                "operationId": "update_tune_tunetrees_tune_put",
+                "parameters": [
+                    {
+                        "name": "tune_ref",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tune Ref"
+                        }
+                    },
+                    {
+                        "name": "title",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Title"
+                        }
+                    },
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Type"
+                        }
+                    },
+                    {
+                        "name": "structure",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Structure"
+                        }
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Mode"
+                        }
+                    },
+                    {
+                        "name": "incipit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Incipit"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TuneResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "tunetrees"
+                ],
+                "summary": "Delete Tune",
+                "description": "Delete an existing tune by its reference ID.",
+                "operationId": "delete_tune_tunetrees_tune_delete",
+                "parameters": [
+                    {
+                        "name": "tune_ref",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tune Ref"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/table_state/{user_id}/{screen_size}/{purpose}": {
+            "post": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Create a new datagrid table state for a user, for a specific screen size and purpose",
+                "description": "Create a new column setting with specific configurations.  The column setting entries correspond to the columns in the practice_list_joined view.  Each time the user changes a column setting, it should be reflected in this table, so the settings can be persisted between sessions and devices.",
+                "operationId": "create_table_state_settings_table_state__user_id___screen_size___purpose__post",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "Should be a valid user id that corresponds to a user in the user table",
+                            "title": "User Id"
+                        },
+                        "description": "Should be a valid user id that corresponds to a user in the user table"
+                    },
+                    {
+                        "name": "screen_size",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Associated screen size, one of 'small' or 'full'",
+                            "enum_values": [
+                                "small",
+                                "full"
+                            ],
+                            "title": "Screen Size"
+                        },
+                        "description": "Associated screen size, one of 'small' or 'full'"
+                    },
+                    {
+                        "name": "purpose",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+                            "enum_values": [
+                                "practice",
+                                "repertoire",
+                                "suggestions"
+                            ],
+                            "title": "Purpose"
+                        },
+                        "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "string",
+                                "title": "Settings"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "integer"
+                                            }
+                                        ]
+                                    },
+                                    "title": "Response Create Table State Settings Table State  User Id   Screen Size   Purpose  Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Update a datagrid table state for a user, for a specific screen size and purpose",
+                "description": "Update a column setting.  The column setting entries correspond to the columns in the practice_list_joined view.  Each time the user changes a column setting, it should be reflected in this table, so the settings can be persisted between sessions and devices.",
+                "operationId": "update_table_state_settings_table_state__user_id___screen_size___purpose__put",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "Should be a valid user id that corresponds to a user in the user table",
+                            "title": "User Id"
+                        },
+                        "description": "Should be a valid user id that corresponds to a user in the user table"
+                    },
+                    {
+                        "name": "screen_size",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Associated screen size, one of 'small' or 'full'",
+                            "enum_values": [
+                                "small",
+                                "full"
+                            ],
+                            "title": "Screen Size"
+                        },
+                        "description": "Associated screen size, one of 'small' or 'full'"
+                    },
+                    {
+                        "name": "purpose",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+                            "enum_values": [
+                                "practice",
+                                "repertoire",
+                                "suggestions"
+                            ],
+                            "title": "Purpose"
+                        },
+                        "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'"
+                    },
+                    {
+                        "name": "settings",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Settings"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Retrieve the stored datagrid table state for a user, for a specific screen size and purpose",
+                "description": "Retrieve the column setting with specific configurations.  The column setting entries correspond to the columns in the practice_list_joined view.",
+                "operationId": "get_table_states_settings_table_state__user_id___screen_size___purpose__get",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "Should be a valid user id that corresponds to a user in the user table",
+                            "title": "User Id"
+                        },
+                        "description": "Should be a valid user id that corresponds to a user in the user table"
+                    },
+                    {
+                        "name": "screen_size",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Associated screen size, one of 'small' or 'full'",
+                            "enum_values": [
+                                "small",
+                                "full"
+                            ],
+                            "title": "Screen Size"
+                        },
+                        "description": "Associated screen size, one of 'small' or 'full'"
+                    },
+                    {
+                        "name": "purpose",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+                            "enum_values": [
+                                "practice",
+                                "repertoire",
+                                "suggestions"
+                            ],
+                            "title": "Purpose"
+                        },
+                        "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "title": "Response Get Table States Settings Table State  User Id   Screen Size   Purpose  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/table_transient_data/{user_id}/{tune_id}/{playlist_id}/{purpose}": {
+            "post": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Create or update new table transient data entry",
+                "description": "Create a new entry or update existing in the table_transient_data table",
+                "operationId": "stage_table_transient_data_settings_table_transient_data__user_id___tune_id___playlist_id___purpose__post",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "Should be a valid user id that corresponds to a user in the user table",
+                            "title": "User Id"
+                        },
+                        "description": "Should be a valid user id that corresponds to a user in the user table"
+                    },
+                    {
+                        "name": "tune_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "The tune id that corresponds to a tune data being staged",
+                            "title": "Tune Id"
+                        },
+                        "description": "The tune id that corresponds to a tune data being staged"
+                    },
+                    {
+                        "name": "playlist_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "The playlist id that corresponds to a tune data being staged",
+                            "title": "Playlist Id"
+                        },
+                        "description": "The playlist id that corresponds to a tune data being staged"
+                    },
+                    {
+                        "name": "purpose",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+                            "enum_values": [
+                                "practice",
+                                "repertoire",
+                                "suggestions"
+                            ],
+                            "title": "Purpose"
+                        },
+                        "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TableTransientDataFields"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "integer"
+                                            }
+                                        ]
+                                    },
+                                    "title": "Response Stage Table Transient Data Settings Table Transient Data  User Id   Tune Id   Playlist Id   Purpose  Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Retrieve a table transient data entry",
+                "description": "Retrieve an entry from the table_transient_data table",
+                "operationId": "get_table_transient_data_settings_table_transient_data__user_id___tune_id___playlist_id___purpose__get",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "Should be a valid user id that corresponds to a user in the user table",
+                            "title": "User Id"
+                        },
+                        "description": "Should be a valid user id that corresponds to a user in the user table"
+                    },
+                    {
+                        "name": "tune_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "The tune id that corresponds to a tune data being staged",
+                            "title": "Tune Id"
+                        },
+                        "description": "The tune id that corresponds to a tune data being staged"
+                    },
+                    {
+                        "name": "playlist_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "The playlist id that corresponds to a tune data being staged",
+                            "title": "Playlist Id"
+                        },
+                        "description": "The playlist id that corresponds to a tune data being staged"
+                    },
+                    {
+                        "name": "purpose",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+                            "enum_values": [
+                                "practice",
+                                "repertoire",
+                                "suggestions"
+                            ],
+                            "title": "Purpose"
+                        },
+                        "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TableTransientDataModel"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Delete a table transient data entry",
+                "description": "Delete an entry from the table_transient_data table",
+                "operationId": "delete_table_transient_data_settings_table_transient_data__user_id___tune_id___playlist_id___purpose__delete",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "Should be a valid user id that corresponds to a user in the user table",
+                            "title": "User Id"
+                        },
+                        "description": "Should be a valid user id that corresponds to a user in the user table"
+                    },
+                    {
+                        "name": "tune_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "The tune id that corresponds to a tune data being staged, use -1 for all tunes",
+                            "title": "Tune Id"
+                        },
+                        "description": "The tune id that corresponds to a tune data being staged, use -1 for all tunes"
+                    },
+                    {
+                        "name": "playlist_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "The playlist id that corresponds to a tune data being staged",
+                            "title": "Playlist Id"
+                        },
+                        "description": "The playlist id that corresponds to a tune data being staged"
+                    },
+                    {
+                        "name": "purpose",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+                            "enum_values": [
+                                "practice",
+                                "repertoire",
+                                "suggestions"
+                            ],
+                            "title": "Purpose"
+                        },
+                        "description": "Associated purpose, one of 'practice', 'repertoire', or 'suggestions'"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/tab_group_main_state/{user_id}": {
+            "get": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Retrieve the tab group main state for a user",
+                "description": "Retrieve the tab group main state for a user, which indicates the currently active tab.",
+                "operationId": "get_tab_group_main_state_settings_tab_group_main_state__user_id__get",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "Should be a valid user id that corresponds to a user in the user table",
+                            "title": "User Id"
+                        },
+                        "description": "Should be a valid user id that corresponds to a user in the user table"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TabGroupMainStateModel"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Update the tab group main state for a user",
+                "description": "Update the tab group main state for a user, which indicates the currently active tab.",
+                "operationId": "update_tab_group_main_state_settings_tab_group_main_state__user_id__put",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "Should be a valid user id that corresponds to a user in the user table",
+                            "title": "User Id"
+                        },
+                        "description": "Should be a valid user id that corresponds to a user in the user table"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TabGroupMainStateModel"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TabGroupMainStateModel"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Delete the tab group main state for a user",
+                "description": "Delete the tab group main state for a user, which indicates the currently active tab.",
+                "operationId": "delete_tab_group_main_state_settings_tab_group_main_state__user_id__delete",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "description": "Should be a valid user id that corresponds to a user in the user table",
+                            "title": "User Id"
+                        },
+                        "description": "Should be a valid user id that corresponds to a user in the user table"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/tab_group_main_state": {
+            "post": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Create a new tab group main state for a user",
+                "description": "Create a new tab group main state for a user, which indicates the currently active tab.",
+                "operationId": "create_tab_group_main_state_settings_tab_group_main_state_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TabGroupMainStateModel"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TabGroupMainStateModel"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/preferences/prefs_spaced_repetition": {
+            "get": {
+                "tags": [
+                    "preferences"
+                ],
+                "summary": "Get all spaced repetition preferences",
+                "description": "Retrieve all spaced repetition preferences from the database.",
+                "operationId": "get_prefs_spaced_repetition_preferences_prefs_spaced_repetition_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/PrefsSpacedRepetitionResponse"
+                                    },
+                                    "type": "array",
+                                    "title": "Response Get Prefs Spaced Repetition Preferences Prefs Spaced Repetition Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "preferences"
+                ],
+                "summary": "Create a new spaced repetition preference",
+                "description": "Create a new spaced repetition preference in the database.",
+                "operationId": "create_prefs_spaced_repetition_preferences_prefs_spaced_repetition_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PrefsSpacedRepetitionCreate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PrefsSpacedRepetitionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/preferences/prefs_spaced_repetition/{prefs_id}": {
+            "put": {
+                "tags": [
+                    "preferences"
+                ],
+                "summary": "Update a spaced repetition preference",
+                "description": "Update an existing spaced repetition preference in the database.",
+                "operationId": "update_prefs_spaced_repetition_preferences_prefs_spaced_repetition__prefs_id__put",
+                "parameters": [
+                    {
+                        "name": "prefs_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Prefs Id"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PrefsSpacedRepetitionUpdate"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PrefsSpacedRepetitionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "preferences"
+                ],
+                "summary": "Delete a spaced repetition preference",
+                "description": "Delete an existing spaced repetition preference from the database.",
+                "operationId": "delete_prefs_spaced_repetition_preferences_prefs_spaced_repetition__prefs_id__delete",
+                "parameters": [
+                    {
+                        "name": "prefs_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Prefs Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/": {
+            "get": {
+                "summary": "Root",
+                "operationId": "root__get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hello/{name}": {
+            "get": {
+                "summary": "Say Hello",
+                "operationId": "say_hello_hello__name__get",
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Name"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Account": {
+                "properties": {
+                    "userId": {
+                        "type": "string",
+                        "title": "Userid"
+                    },
+                    "providerAccountId": {
+                        "type": "string",
+                        "title": "Provideraccountid"
+                    },
+                    "provider": {
+                        "type": "string",
+                        "title": "Provider"
+                    },
+                    "type": {
+                        "$ref": "#/components/schemas/AccountType"
+                    },
+                    "access_token": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Access Token"
+                    },
+                    "token_type": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Token Type"
+                    },
+                    "id_token": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Id Token"
+                    },
+                    "scope": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Scope"
+                    },
+                    "expires_at": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Expires At"
+                    },
+                    "session_state": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Session State"
+                    },
+                    "refresh_token": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Refresh Token"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "userId",
+                    "providerAccountId",
+                    "provider",
+                    "type",
+                    "session_state",
+                    "refresh_token"
+                ],
+                "title": "Account"
+            },
+            "AccountType": {
+                "type": "string",
+                "enum": [
+                    "oauth",
+                    "oidc",
+                    "email",
+                    "credentials"
+                ],
+                "title": "AccountType"
+            },
+            "AlgorithmType": {
+                "type": "string",
+                "enum": [
+                    "SM2",
+                    "FSRS"
+                ],
+                "title": "AlgorithmType"
+            },
+            "Body_feedback_tunetrees_practice_feedback_post": {
+                "properties": {
+                    "selected_tune": {
+                        "type": "integer",
+                        "title": "Selected Tune"
+                    },
+                    "vote_type": {
+                        "type": "string",
+                        "title": "Vote Type"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "title": "User Id"
+                    },
+                    "playlist_id": {
+                        "type": "string",
+                        "title": "Playlist Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "selected_tune",
+                    "vote_type",
+                    "user_id",
+                    "playlist_id"
+                ],
+                "title": "Body_feedback_tunetrees_practice_feedback_post"
+            },
+            "Body_submit_feedback_tunetrees_practice_submit_feedback_post": {
+                "properties": {
+                    "selected_tune": {
+                        "type": "integer",
+                        "title": "Selected Tune"
+                    },
+                    "vote_type": {
+                        "type": "string",
+                        "title": "Vote Type"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "title": "User Id"
+                    },
+                    "playlist_id": {
+                        "type": "string",
+                        "title": "Playlist Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "selected_tune",
+                    "vote_type",
+                    "user_id",
+                    "playlist_id"
+                ],
+                "title": "Body_submit_feedback_tunetrees_practice_submit_feedback_post"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "NoteCreate": {
+                "properties": {
+                    "user_ref": {
+                        "type": "integer",
+                        "title": "User Ref"
+                    },
+                    "tune_ref": {
+                        "type": "integer",
+                        "title": "Tune Ref"
+                    },
+                    "playlist_ref": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Playlist Ref"
+                    },
+                    "created_date": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Created Date"
+                    },
+                    "note_text": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Note Text"
+                    },
+                    "public": {
+                        "anyOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Public",
+                        "default": false
+                    },
+                    "favorite": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Favorite"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "user_ref",
+                    "tune_ref"
+                ],
+                "title": "NoteCreate"
+            },
+            "NoteResponse": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "user_ref": {
+                        "type": "integer",
+                        "title": "User Ref"
+                    },
+                    "tune_ref": {
+                        "type": "integer",
+                        "title": "Tune Ref"
+                    },
+                    "playlist_ref": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Playlist Ref"
+                    },
+                    "created_date": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Created Date"
+                    },
+                    "note_text": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Note Text"
+                    },
+                    "public": {
+                        "anyOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Public"
+                    },
+                    "favorite": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Favorite"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "user_ref",
+                    "tune_ref",
+                    "playlist_ref",
+                    "created_date",
+                    "note_text",
+                    "public",
+                    "favorite"
+                ],
+                "title": "NoteResponse"
+            },
+            "NoteUpdate": {
+                "properties": {
+                    "playlist_ref": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Playlist Ref"
+                    },
+                    "created_date": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Created Date"
+                    },
+                    "note_text": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Note Text"
+                    },
+                    "public": {
+                        "anyOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Public"
+                    },
+                    "favorite": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Favorite"
+                    }
+                },
+                "type": "object",
+                "title": "NoteUpdate"
+            },
+            "PlaylistTuneJoinedModel": {
+                "properties": {
+                    "id": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Id"
+                    },
+                    "title": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Title"
+                    },
+                    "type": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Type"
+                    },
+                    "structure": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Structure"
+                    },
+                    "mode": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Mode"
+                    },
+                    "incipit": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Incipit"
+                    },
+                    "learned": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Learned"
+                    },
+                    "practiced": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Practiced"
+                    },
+                    "quality": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Quality"
+                    },
+                    "easiness": {
+                        "anyOf": [
+                            {
+                                "type": "number"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Easiness"
+                    },
+                    "interval": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Interval"
+                    },
+                    "repetitions": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Repetitions"
+                    },
+                    "review_date": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Review Date"
+                    },
+                    "note_private": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Note Private"
+                    },
+                    "note_public": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Note Public"
+                    },
+                    "tags": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Tags"
+                    },
+                    "user_ref": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "User Ref"
+                    },
+                    "playlist_ref": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Playlist Ref"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "title",
+                    "type",
+                    "structure",
+                    "mode",
+                    "incipit",
+                    "learned",
+                    "practiced",
+                    "quality",
+                    "easiness",
+                    "interval",
+                    "repetitions",
+                    "review_date",
+                    "note_private",
+                    "note_public",
+                    "tags",
+                    "user_ref",
+                    "playlist_ref"
+                ],
+                "title": "PlaylistTuneJoinedModel"
+            },
+            "PrefsSpacedRepetitionCreate": {
+                "properties": {
+                    "user_id": {
+                        "type": "integer",
+                        "title": "User Id"
+                    },
+                    "algorithm": {
+                        "$ref": "#/components/schemas/AlgorithmType"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "user_id",
+                    "algorithm"
+                ],
+                "title": "PrefsSpacedRepetitionCreate"
+            },
+            "PrefsSpacedRepetitionResponse": {
+                "properties": {
+                    "user_id": {
+                        "type": "integer",
+                        "title": "User Id"
+                    },
+                    "algorithm": {
+                        "$ref": "#/components/schemas/AlgorithmType"
+                    },
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "user_id",
+                    "algorithm",
+                    "id"
+                ],
+                "title": "PrefsSpacedRepetitionResponse"
+            },
+            "PrefsSpacedRepetitionUpdate": {
+                "properties": {
+                    "algorithm": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/AlgorithmType"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "title": "PrefsSpacedRepetitionUpdate"
+            },
+            "PurposeEnum": {
+                "type": "string",
+                "enum": [
+                    "practice",
+                    "repertoire",
+                    "analysis",
+                    "suggestions"
+                ],
+                "title": "PurposeEnum"
+            },
+            "ReferenceCreate": {
+                "properties": {
+                    "tune_ref": {
+                        "type": "integer",
+                        "title": "Tune Ref"
+                    },
+                    "user_ref": {
+                        "type": "integer",
+                        "title": "User Ref"
+                    },
+                    "public": {
+                        "type": "integer",
+                        "title": "Public"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "tune_ref",
+                    "user_ref",
+                    "public"
+                ],
+                "title": "ReferenceCreate"
+            },
+            "ReferenceResponse": {
+                "properties": {
+                    "tune_ref": {
+                        "type": "integer",
+                        "title": "Tune Ref"
+                    },
+                    "user_ref": {
+                        "type": "integer",
+                        "title": "User Ref"
+                    },
+                    "public": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Public"
+                    },
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "url": {
+                        "type": "string",
+                        "title": "Url"
+                    },
+                    "ref_type": {
+                        "type": "string",
+                        "title": "Ref Type"
+                    },
+                    "favorite": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Favorite"
+                    },
+                    "comment": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Comment"
+                    },
+                    "title": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Title"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "tune_ref",
+                    "user_ref",
+                    "public",
+                    "id",
+                    "url",
+                    "ref_type",
+                    "favorite",
+                    "comment",
+                    "title"
+                ],
+                "title": "ReferenceResponse"
+            },
+            "Session": {
+                "properties": {
+                    "expires": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Expires"
+                    },
+                    "sessionToken": {
+                        "type": "string",
+                        "title": "Sessiontoken"
+                    },
+                    "userId": {
+                        "type": "string",
+                        "title": "Userid"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "expires",
+                    "sessionToken",
+                    "userId"
+                ],
+                "title": "Session"
+            },
+            "SessionAndUser": {
+                "properties": {
+                    "session": {
+                        "$ref": "#/components/schemas/Session"
+                    },
+                    "user": {
+                        "$ref": "#/components/schemas/User"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "session",
+                    "user"
+                ],
+                "title": "SessionAndUser"
+            },
+            "TabGroupMainStateModel": {
+                "properties": {
+                    "user_id": {
+                        "type": "integer",
+                        "title": "User Id"
+                    },
+                    "which_tab": {
+                        "type": "string",
+                        "title": "Which Tab"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "user_id",
+                    "which_tab"
+                ],
+                "title": "TabGroupMainStateModel"
+            },
+            "TableTransientDataFields": {
+                "properties": {
+                    "note_private": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Note Private"
+                    },
+                    "note_public": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Note Public"
+                    },
+                    "recall_eval": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Recall Eval"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "note_private",
+                    "note_public",
+                    "recall_eval"
+                ],
+                "title": "TableTransientDataFields"
+            },
+            "TableTransientDataModel": {
+                "properties": {
+                    "user_id": {
+                        "type": "integer",
+                        "title": "User Id"
+                    },
+                    "tune_id": {
+                        "type": "integer",
+                        "title": "Tune Id"
+                    },
+                    "playlist_id": {
+                        "type": "integer",
+                        "title": "Playlist Id"
+                    },
+                    "purpose": {
+                        "$ref": "#/components/schemas/PurposeEnum"
+                    },
+                    "note_private": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Note Private"
+                    },
+                    "note_public": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Note Public"
+                    },
+                    "recall_eval": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Recall Eval"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "user_id",
+                    "tune_id",
+                    "playlist_id",
+                    "purpose",
+                    "note_private",
+                    "note_public",
+                    "recall_eval"
+                ],
+                "title": "TableTransientDataModel"
+            },
+            "TuneCreate": {
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "title": "Title"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Type"
+                    },
+                    "structure": {
+                        "type": "string",
+                        "title": "Structure"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "title": "Mode"
+                    },
+                    "incipit": {
+                        "type": "string",
+                        "title": "Incipit"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "title",
+                    "type",
+                    "structure",
+                    "mode",
+                    "incipit"
+                ],
+                "title": "TuneCreate"
+            },
+            "TuneFeedbackUpdate": {
+                "properties": {
+                    "feedback": {
+                        "type": "string",
+                        "title": "Feedback"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "feedback"
+                ],
+                "title": "TuneFeedbackUpdate"
+            },
+            "TuneResponse": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "title": "Id"
+                    },
+                    "title": {
+                        "type": "string",
+                        "title": "Title"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Type"
+                    },
+                    "structure": {
+                        "type": "string",
+                        "title": "Structure"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "title": "Mode"
+                    },
+                    "incipit": {
+                        "type": "string",
+                        "title": "Incipit"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "id",
+                    "title",
+                    "type",
+                    "structure",
+                    "mode",
+                    "incipit"
+                ],
+                "title": "TuneResponse"
+            },
+            "TuneScheduleUpdate": {
+                "properties": {
+                    "review_date": {
+                        "type": "string",
+                        "title": "Review Date"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "review_date"
+                ],
+                "title": "TuneScheduleUpdate"
+            },
+            "User": {
+                "properties": {
+                    "id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Id",
+                        "description": "This will be assigned and will be ignored for create or update"
+                    },
+                    "name": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Name",
+                        "description": "For now assume this is the user name.  It's exact meaning is a little ambigious at the moment"
+                    },
+                    "email": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Email"
+                    },
+                    "emailVerified": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Emailverified"
+                    },
+                    "image": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Image"
+                    },
+                    "hash": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Hash"
+                    }
+                },
+                "type": "object",
+                "title": "User"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            },
+            "VerificationToken": {
+                "properties": {
+                    "identifier": {
+                        "type": "string",
+                        "title": "Identifier"
+                    },
+                    "token": {
+                        "type": "string",
+                        "title": "Token"
+                    },
+                    "expires": {
+                        "type": "string",
+                        "title": "Expires"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "identifier",
+                    "token",
+                    "expires"
+                ],
+                "title": "VerificationToken"
+            },
+            "VerificationTokenParams": {
+                "properties": {
+                    "identifier": {
+                        "type": "string",
+                        "title": "Identifier"
+                    },
+                    "token": {
+                        "type": "string",
+                        "title": "Token"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "identifier",
+                    "token"
+                ],
+                "title": "VerificationTokenParams"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "auth",
+            "description": "Operations for authentication and user management, designed to be used by the frontend auth.js/nextauth adapter."
+        },
+        {
+            "name": "tunetrees",
+            "description": "Core TuneTrees operations relating to practice, scheduling, and repertoire management."
+        },
+        {
+            "name": "settings",
+            "description": "UI state and settings, such as column state.  These are meant to be used by the frontend, to persist state between sessions and devices.  There may be a fuzzy decision between these records and what should be directly stored in the user records."
+        },
+        {
+            "name": "preferences",
+            "description": "User preferences, such as spaced repetition settings."
+        }
+    ]
+}

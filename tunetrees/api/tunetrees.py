@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from os import environ
 from typing import Annotated, Any, Dict, List, Optional
 
@@ -25,8 +25,10 @@ from tunetrees.app.schedule import (
     update_practice_schedules,
 )
 from tunetrees.models.tunetrees import (
+    Note,
     PlaylistTune,
     PracticeRecord,
+    Reference,
     Tune,
     UserAnnotationSet,
     t_practice_list_staged,
@@ -35,6 +37,10 @@ from tunetrees.models.tunetrees import (
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.future import select
+from fastapi import Depends, Query
+
+logger = logging.getLogger("tunetrees.api")
 
 router = APIRouter(
     prefix="/tunetrees",
@@ -70,7 +76,6 @@ async def get_scheduled(
             ]
             return tune_list
     except Exception as e:
-        logger = logging.getLogger("tunetrees.api")
         logger.error(f"Unable to fetch scheduled practice list: {e}")
         return {"error": f"Unable to fetch scheduled practice list: {e}"}
 
@@ -121,7 +126,6 @@ async def submit_feedback(
     playlist_id: Annotated[str, Form()],
 ):
     assert user_id
-    logger = logging.getLogger("tunetrees.api")
     logger.debug(f"{selected_tune=}, {vote_type=}")
     # query_and_print_tune_by_id(634)
 
@@ -135,7 +139,6 @@ async def submit_schedules(
     playlist_id: str,
     tune_updates: Dict[str, TuneScheduleUpdate],
 ):
-    logger = logging.getLogger("tunetrees.api")
     logger.debug(f"{tune_updates=}")
 
     update_practice_schedules(tune_updates, playlist_id)
@@ -148,7 +151,6 @@ async def submit_feedbacks(
     playlist_id: str,
     tune_updates: Dict[str, TuneFeedbackUpdate],
 ):
-    logger = logging.getLogger("tunetrees.api")
     logger.debug(f"{tune_updates=}")
 
     update_practice_feedbacks(tune_updates, playlist_id)
@@ -167,7 +169,6 @@ async def feedback(
     If successful, redirect to the practice page.
     """
     assert user_id
-    logger = logging.getLogger("tunetrees.api")
     logger.debug(f"{selected_tune=}, {vote_type=}")
     query_and_print_tune_by_id(634)
 
@@ -242,7 +243,6 @@ async def update_playlist_tune(
                 {"detail": "No tune found to update"}
                 {"detail": "Unable to update tune: <error_message>"}
     """
-    logger = logging.getLogger("tunetrees.api")
     with SessionLocal() as db:
         try:
             updates = tune_update.model_dump(exclude_unset=True)
@@ -317,7 +317,6 @@ async def delete_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
                 {"detail": "No tune found to delete"}
                 {"detail": "Unable to delete tune: <error_message>"}
     """
-    logger = logging.getLogger("tunetrees.api")
     try:
         with SessionLocal() as db:
             stmt = t_practice_list_joined.delete().where(
@@ -355,7 +354,6 @@ async def get_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
                 {"detail": "Tune not found"}
                 {"detail": "Unable to fetch tune: <error_message>"}
     """
-    logger = logging.getLogger("tunetrees.api")
     try:
         with SessionLocal() as db:
             result = (
@@ -376,3 +374,435 @@ async def get_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
     except Exception as e:
         logger.error(f"Unable to fetch tune ({tune_id}): {e}")
         raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
+
+
+class ReferenceCreate(BaseModel):
+    tune_ref: int
+    user_ref: int
+    public: int
+    # Add other fields as necessary
+
+
+class ReferenceUpdate(BaseModel):
+    public: Optional[int] = None
+    # Add other fields as necessary
+
+
+class ReferenceResponse(BaseModel):
+    tune_ref: int
+    user_ref: int
+    public: int | None
+    id: int
+    url: str
+    ref_type: str
+    favorite: int | None
+    comment: str | None
+    title: str | None
+
+    class Config:
+        # orm_mode = True
+        from_attributes = True
+
+
+@router.get(
+    "/references",
+    response_model=List[ReferenceResponse],
+    summary="Get References",
+    description="Get all references for a user and tune or public references.",
+    status_code=200,
+)
+def get_references(
+    user_ref: int = Query(...),
+    tune_ref: int = Query(...),
+    public: int = Query(0, ge=0, le=1),
+):
+    try:
+        with SessionLocal() as db:
+            stmt = (
+                select(Reference).where(
+                    (Reference.tune_ref == tune_ref)
+                    & ((Reference.user_ref == user_ref) | (Reference.public == public))
+                )
+                if public
+                else select(Reference).where(
+                    (Reference.user_ref == user_ref) & (Reference.tune_ref == tune_ref)
+                )
+            )
+            print(f"Generated SQL: {stmt}")
+            print(
+                f"Parameters: user_ref={user_ref}, tune_ref={tune_ref}, public={public}"
+            )
+
+            result = db.execute(stmt)
+            references = result.scalars().all()
+            # Debugging: Print the fetched references
+            print(f"Fetched references: {references}")
+            for reference in references:
+                print(f"Reference type: {type(reference)}, Reference: {reference}")
+
+            result = [
+                ReferenceResponse.model_validate(reference) for reference in references
+            ]
+            return result
+    except Exception as e:
+        logger.error(
+            f"Unable to fetch references for user_ref ({user_ref}) and tune_ref ({tune_ref}): {e}"
+        )
+        raise HTTPException(status_code=500, detail=f"Unable to fetch references: {e}")
+
+
+@router.post(
+    "/references",
+    response_model=ReferenceResponse,
+    summary="Create Reference",
+    description="Create a new reference.",
+    status_code=201,
+)
+def create_reference(reference: ReferenceCreate):
+    try:
+        with SessionLocal() as db:
+            new_reference = Reference(**reference.model_dump())
+            db.add(new_reference)
+            db.commit()
+            db.refresh(new_reference)
+            return ReferenceResponse.model_validate(new_reference)
+    except Exception as e:
+        logger.error(f"Unable to create reference: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to create reference: {e}")
+
+
+@router.put(
+    "/references",
+    response_model=ReferenceResponse,
+    summary="Update Reference",
+    description="Update an existing reference.",
+    status_code=200,
+)
+def update_reference(
+    user_ref: int = Query(...),
+    tune_ref: int = Query(...),
+    reference: ReferenceUpdate = Depends(),
+):
+    try:
+        with SessionLocal() as db:
+            stmt = select(Reference).where(
+                (Reference.user_ref == user_ref) & (Reference.tune_ref == tune_ref)
+            )
+            result = db.execute(stmt)
+            existing_reference = result.scalars().first()
+
+            if not existing_reference:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Reference not found: ({user_ref}, {tune_ref})",
+                )
+
+            for key, value in reference.model_dump(exclude_unset=True).items():
+                setattr(existing_reference, key, value)
+
+            db.commit()
+            db.refresh(existing_reference)
+            return ReferenceResponse.model_validate(existing_reference)
+    except Exception as e:
+        logger.error(f"Unable to update reference ({user_ref}, {tune_ref}): {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to update reference: {e}")
+
+
+@router.delete(
+    "/references",
+    summary="Delete Reference",
+    description="Delete an existing reference.",
+    status_code=204,
+)
+def delete_reference(user_ref: int = Query(...), tune_ref: int = Query(...)):  # noqa: C901
+    try:
+        with SessionLocal() as db:
+            stmt = select(Reference).where(
+                (Reference.user_ref == user_ref) & (Reference.tune_ref == tune_ref)
+            )
+            result = db.execute(stmt)
+            existing_reference = result.scalars().first()
+
+            if not existing_reference:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Reference not found: ({user_ref}, {tune_ref})",
+                )
+
+            db.delete(existing_reference)
+            db.commit()
+            return
+    except Exception as e:
+        logger.error(f"Unable to delete reference ({user_ref}, {tune_ref}): {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to delete reference: {e}")
+
+
+class NoteCreate(BaseModel):
+    user_ref: int
+    tune_ref: int
+    playlist_ref: Optional[int] = None
+    created_date: Optional[str] = None
+    note_text: Optional[str] = None
+    public: Optional[bool] = False
+    favorite: Optional[int] = None
+
+
+class NoteUpdate(BaseModel):
+    playlist_ref: Optional[int] = None
+    created_date: Optional[str] = None
+    note_text: Optional[str] = None
+    public: Optional[bool] = None
+    favorite: Optional[int] = None
+
+
+class NoteResponse(BaseModel):
+    id: int
+    user_ref: int
+    tune_ref: int
+    playlist_ref: Optional[int]
+    created_date: Optional[str]
+    note_text: Optional[str]
+    public: Optional[bool]
+    favorite: Optional[int]
+
+    class Config:
+        from_attributes = True
+
+
+@router.get(
+    "/notes",
+    response_model=List[NoteResponse],
+    summary="Get Notes",
+    description="Retrieve notes based on tune_ref and optional playlist_ref, user_ref, or public.",
+    status_code=200,
+)
+def get_notes(
+    tune_ref: int = Query(...),
+    playlist_ref: Optional[int] = Query(None),
+    user_ref: Optional[int] = Query(None),
+    public: Optional[int] = Query(None, ge=0, le=1),
+):
+    try:
+        with SessionLocal() as db:
+            stmt = select(Note).where(
+                Note.tune_ref == tune_ref,
+                (Note.playlist_ref == playlist_ref)
+                | (Note.user_ref == user_ref)
+                | (Note.public == public),
+            )
+            result = db.execute(stmt)
+            notes = result.scalars().all()
+            return [NoteResponse.model_validate(note) for note in notes]
+    except Exception as e:
+        logger.error(f"Unable to fetch notes: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to fetch notes: {e}")
+
+
+@router.post(
+    "/notes",
+    response_model=NoteResponse,
+    summary="Create Note",
+    description="Create a new note.",
+    status_code=201,
+)
+def create_note(note: NoteCreate):
+    try:
+        with SessionLocal() as db:
+            new_note = Note(**note.model_dump())
+            db.add(new_note)
+            db.commit()
+            db.refresh(new_note)
+            return NoteResponse.model_validate(new_note)
+    except Exception as e:
+        logger.error(f"Unable to create note: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to create note: {e}")
+
+
+@router.put(
+    "/notes/{note_id}",
+    response_model=NoteResponse,
+    summary="Update Note",
+    description="Update an existing note.",
+    status_code=200,
+)
+def update_note(
+    note_id: int,
+    note: NoteUpdate,
+):
+    try:
+        with SessionLocal() as db:
+            stmt = select(Note).where(Note.id == note_id)
+            result = db.execute(stmt)
+            existing_note = result.scalars().first()
+
+            if not existing_note:
+                raise HTTPException(
+                    status_code=404, detail=f"Note not found: {note_id}"
+                )
+
+            for key, value in note.model_dump(exclude_unset=True).items():
+                setattr(existing_note, key, value)
+
+            db.commit()
+            db.refresh(existing_note)
+            return NoteResponse.model_validate(existing_note)
+    except Exception as e:
+        logger.error(f"Unable to update note ({note_id}): {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to update note: {e}")
+
+
+@router.delete(
+    "/notes/{note_id}",
+    summary="Delete Note",
+    description="Delete an existing note.",
+    status_code=204,
+)
+def delete_note(
+    note_id: int,
+):
+    try:
+        with SessionLocal() as db:
+            stmt = select(Note).where(Note.id == note_id)
+            result = db.execute(stmt)
+            existing_note = result.scalars().first()
+
+            if not existing_note:
+                raise HTTPException(
+                    status_code=404, detail=f"Note not found: {note_id}"
+                )
+
+            db.delete(existing_note)
+            db.commit()
+            return
+    except Exception as e:
+        logger.error(f"Unable to delete note ({note_id}): {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to delete note: {e}")
+
+
+class TuneCreate(BaseModel):
+    title: str
+    type: str
+    structure: str
+    mode: str
+    incipit: str
+
+
+class TuneUpdate(BaseModel):
+    title: Optional[str] = None
+    type: Optional[str] = None
+    structure: Optional[str] = None
+    mode: Optional[str] = None
+    incipit: Optional[str] = None
+
+
+class TuneResponse(BaseModel):
+    id: int
+    title: str
+    type: str
+    structure: str
+    mode: str
+    incipit: str
+
+    class Config:
+        from_attributes = True
+
+
+@router.get(
+    "/tune",
+    response_model=TuneResponse,
+    summary="Get Tune",
+    description="Retrieve a tune by its reference ID.",
+    status_code=200,
+)
+def get_tune(tune_ref: int = Query(...)):
+    try:
+        with SessionLocal() as db:
+            tune = db.query(Tune).filter(Tune.id == tune_ref).first()
+            if not tune:
+                raise HTTPException(status_code=404, detail="Tune not found")
+            return TuneResponse.model_validate(tune)
+    except Exception as e:
+        logger.error(f"Unable to fetch tune: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
+
+
+@router.post(
+    "/tune",
+    response_model=TuneResponse,
+    summary="Create Tune",
+    description="Create a new tune.",
+    status_code=201,
+)
+def create_tune(tune: TuneCreate, playlist_ref: Optional[int] = None):
+    try:
+        with SessionLocal() as db:
+            new_tune = Tune(**tune.model_dump())
+            db.add(new_tune)
+            db.flush()  # Explicitly flush the session
+
+            # Optionally create a playlist_tune row if playlist_ref is provided
+            if playlist_ref is not None:
+                playlist_tune = PlaylistTune(
+                    tune_ref=new_tune.id,
+                    playlist_ref=playlist_ref,
+                    learned=datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%d"
+                    ),  # Set current UTC date as a default
+                    current="T",
+                )
+                db.add(playlist_tune)
+                db.flush()  # Explicitly flush the session
+
+            db.commit()
+            db.refresh(new_tune)
+            print(f"Created tune: {new_tune.id}")
+            return TuneResponse.model_validate(new_tune)
+    except Exception as e:
+        logger.error(f"Unable to create tune: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to create tune: {e}")
+
+
+@router.put(
+    "/tune",
+    response_model=TuneResponse,
+    summary="Update Tune",
+    description="Update an existing tune by its reference ID.",
+    status_code=200,
+)
+def update_tune(tune_ref: int = Query(...), tune: TuneUpdate = Depends()):
+    try:
+        with SessionLocal() as db:
+            existing_tune = db.query(Tune).filter(Tune.id == tune_ref).first()
+            if not existing_tune:
+                raise HTTPException(status_code=404, detail="Tune not found")
+
+            for key, value in tune.model_dump(exclude_unset=True).items():
+                setattr(existing_tune, key, value)
+
+            db.commit()
+            db.refresh(existing_tune)
+            return TuneResponse.model_validate(existing_tune)
+    except Exception as e:
+        logger.error(f"Unable to update tune: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to update tune: {e}")
+
+
+@router.delete(
+    "/tune",
+    summary="Delete Tune",
+    description="Delete an existing tune by its reference ID.",
+    status_code=204,
+)
+def delete_tune(tune_ref: int = Query(...)):
+    try:
+        with SessionLocal() as db:
+            existing_tune = db.query(Tune).filter(Tune.id == tune_ref).first()
+            if not existing_tune:
+                raise HTTPException(status_code=404, detail="Tune not found")
+
+            db.delete(existing_tune)
+            db.commit()
+            return
+    except Exception as e:
+        logger.error(f"Unable to delete tune: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to delete tune: {e}")

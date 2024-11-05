@@ -345,7 +345,7 @@ class ReviewResult(TypedDict):
     review_datetime: str
 
 
-def update_practice_feedbacks(
+def update_practice_feedbacks(  # noqa: C901
     user_tune_updates: dict[str, TuneFeedbackUpdate], playlist_ref: str | int
 ):
     playlist_ref = int(playlist_ref)
