@@ -25,6 +25,7 @@ interface IPracticeProps {
   user_id: string;
   playlist_id: string;
   setCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
+  currentTune: number | null;
   loading: boolean;
   scheduled: Tune[] | undefined;
   recentlyPracticed: Tune[] | undefined;
@@ -56,6 +57,7 @@ export default function TabGroupMain({
   user_id,
   playlist_id,
   setCurrentTune, // Destructure setCurrentTune
+  currentTune,
   loading,
   scheduled,
   recentlyPracticed,
@@ -145,7 +147,8 @@ export default function TabGroupMain({
                 playlist_id={playlistRef}
                 table_purpose="practice"
                 refreshData={refreshData}
-                setCurrentTune={setCurrentTune} // Pass setCurrentTune to ScheduledTunesGrid
+                setMainPanelCurrentTune={setCurrentTune}
+                mainPanelCurrentTune={currentTune}
               />
             ) : (
               <CircularProgress />
@@ -163,7 +166,8 @@ export default function TabGroupMain({
                 playlist_id={playlistRef}
                 table_purpose="repertoire"
                 refreshData={refreshData}
-                setCurrentTune={setCurrentTune} // Pass setCurrentTune to RepertoireGrid
+                setMainPanelCurrentTune={setCurrentTune}
+                mainPanelCurrentTune={currentTune}
               />
             ) : (
               <CircularProgress />

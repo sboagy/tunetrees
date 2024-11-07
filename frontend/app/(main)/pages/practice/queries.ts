@@ -381,7 +381,7 @@ export async function getTune(
     });
     return response.data;
   } catch (error) {
-    console.error("Error in getTune: ", error);
+    console.error(`Error in getTune(${tuneRef})`, error);
     return { detail: `Unable to fetch tune: ${(error as Error).message}` };
   }
 }

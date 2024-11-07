@@ -28,7 +28,7 @@ import {
   Filter,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { createOrUpdateTableState } from "../settings";
+import { createOrUpdateTableState, getTableCurrentTune } from "../settings";
 import type { CheckedState } from "@radix-ui/react-checkbox";
 
 function columnControlMenu() {
@@ -141,19 +141,55 @@ export function get_columns(
     return allSelected ? true : noneSelected ? false : "indeterminate";
   };
 
-  const saveTableState = async (
+  // const saveTableState = async (
+  //   table: TanstackTable<Tune>,
+  //   user_id: string,
+  //   table_purpose: TablePurpose,
+  //   currentTune: number | null,
+  // ) => {
+  //   const tableState: TableState = table.getState();
+
+  //   try {
+  //     const response = await createOrUpdateTableState(
+  //       Number.parseInt(user_id),
+  //       "full",
+  //       table_purpose,
+  //       tableState,
+  //       currentTune,
+  //     );
+  //     // Handle the response as needed
+  //     console.log("Server response:", response);
+  //     return response;
+  //   } catch (error) {
+  //     console.error("Error calling server function:", error);
+  //     return null;
+  //   } finally {
+  //     // setIsLoading(false);
+  //   }
+  // };
+
+  const updateTableState = async (
     table: TanstackTable<Tune>,
     user_id: string,
     table_purpose: TablePurpose,
   ) => {
     const tableState: TableState = table.getState();
-
+    let currentTune = -1;
+    getTableCurrentTune(Number(user_id), "full", table_purpose)
+      .then((result) => {
+        currentTune = result;
+      })
+      .catch((error) => {
+        console.error("Error getTableCurrentTune:", error);
+        throw error;
+      });
     try {
       const response = await createOrUpdateTableState(
         Number.parseInt(user_id),
         "full",
         table_purpose,
         tableState,
+        currentTune,
       );
       // Handle the response as needed
       console.log("Server response:", response);
@@ -188,7 +224,7 @@ export function get_columns(
     }
     const rowSelection = table.getState().rowSelection;
     console.log("rowSelection: ", rowSelection);
-    const result = saveTableState(table, userId.toString(), purpose);
+    const result = updateTableState(table, userId.toString(), purpose);
     result
       .then((result) => {
         console.log(
@@ -270,7 +306,7 @@ export function get_columns(
       console.log(
         `<- handleItemCheckboxChange - row.id: ${info.row.id}, ${JSON.stringify(info.table.getState().rowSelection)}`,
       );
-      const promise = saveTableState(info.table, userId.toString(), purpose);
+      const promise = updateTableState(info.table, userId.toString(), purpose);
       promise
         .then((result) => {
           console.log(
@@ -516,6 +552,19 @@ export function get_columns(
       header: ({ column }) => sortableHeader(column, "Tags"),
       cell: (info) => {
         return info.getValue();
+      },
+      enableSorting: true,
+      enableHiding: true,
+    },
+    {
+      accessorKey: "notes",
+      header: "Notes",
+      cell: (info) => {
+        return (
+          <div className="truncate" style={{ maxWidth: "30ch" }}>
+            {info.getValue()}
+          </div>
+        );
       },
       enableSorting: true,
       enableHiding: true,

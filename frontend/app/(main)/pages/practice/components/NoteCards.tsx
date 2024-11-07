@@ -7,11 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Edit, Check, Star, Save, XCircle, Plus } from "lucide-react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import type { INote } from "../types";
 import { getNotes } from "../queries";
 
@@ -21,120 +17,136 @@ interface INoteCardProps {
 }
 
 function NoteCard({ note, onUpdate }: INoteCardProps) {
-  const [isOpen, setIsOpen] = useState(note.isNew || false);
-  const [editDate, setEditDate] = useState(note.created_date || "");
-  const [editText, setEditText] = useState(note.note_text || "");
+  const [isOpen, setIsOpen] = useState(note.isNew);
+  const [stagedNote, setStagedNote] = useState<INote>({ ...note });
 
-  const handleToggle = (field: "public" | "favorite") => {
-    const updatedNote = {
-      ...note,
-      [field]: field === "public" ? !note.public : note.favorite === 1 ? 0 : 1,
-    };
-    onUpdate(updatedNote);
-  };
+  function isModified(): boolean {
+    return (
+      (note.created_date ?? "") !== (stagedNote.created_date ?? "") ||
+      note.note_text !== stagedNote.note_text ||
+      Boolean(note.favorite) !== Boolean(stagedNote.favorite) ||
+      Boolean(note.public) !== Boolean(stagedNote.public)
+    );
+  }
 
   const handleSave = () => {
-    const updatedNote = {
-      ...note,
-      created_date: editDate,
-      note_text: editText,
-    };
-    onUpdate(updatedNote);
+    if (!isModified()) {
+      return;
+    }
+    onUpdate(stagedNote);
     setIsOpen(false);
+  };
+
+  const handleEditClick = (event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the CollapsibleTrigger
+    setIsOpen(!isOpen);
+  };
+
+  const handleChange = (
+    field: keyof INote,
+    value: string | boolean | number | undefined,
+  ) => {
+    setStagedNote((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
     <Card className="w-full max-w-md mb-4">
       <CardContent className="pt-6">
-        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-          <CollapsibleTrigger asChild>
-            <div className="flex items-right justify-between mb-2 cursor-pointer">
-              <div className="flex items-center space-x-2">
-                {/* <Badge>Note</Badge> */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggle("favorite");
-                  }}
-                  aria-label={
-                    note.favorite === 1
-                      ? "Remove from favorites"
-                      : "Add to favorites"
+        <Collapsible open={isOpen}>
+          <div className="flex items-right justify-between mb-2">
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isOpen) {
+                    handleChange("favorite", !stagedNote.favorite);
                   }
-                  className="p-0 h-auto"
-                  title="Favorite"
-                >
-                  <Star
-                    className={`w-4 h-4 ${note.favorite === 1 ? "text-yellow-500 fill-current" : "text-gray-400"}`}
-                  />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggle("public");
-                  }}
-                  aria-label={note.public ? "Set to private" : "Set to public"}
-                  title="Public"
-                >
-                  <Check
-                    className={`w-4 h-4 ${note.public ? "text-green-500" : "text-gray-300"}`}
-                  />
-                </Button>
-              </div>
-              <div className="flex items-center space-x-2">
-                {isOpen ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsOpen(false)}
-                      aria-label="Cancel edits"
-                      className="p-0 h-auto"
-                      title="Cancel edits"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleSave}
-                      aria-label="Save edits"
-                      className="p-0 h-auto"
-                      title="Save edits"
-                    >
-                      <Save className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
+                }}
+                aria-label={
+                  stagedNote.favorite
+                    ? "Unflag as favorite"
+                    : "Flag as favorite"
+                }
+                className={`p-0 h-auto ${!isOpen ? "pointer-events-none cursor-pointer" : ""}`}
+                title="Favorite"
+              >
+                <Star
+                  className={`w-4 h-4 ${stagedNote.favorite ? "text-yellow-500 fill-current" : "text-gray-400"}`}
+                />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isOpen) {
+                    handleChange("public", !stagedNote.public);
+                  }
+                }}
+                aria-label={
+                  stagedNote.public ? "Set to private" : "Set to public"
+                }
+                className={`p-0 h-auto ${!isOpen ? "pointer-events-none cursor-pointer" : ""}`}
+                title="Public"
+              >
+                <Check
+                  className={`w-4 h-4 ${stagedNote.public ? "text-green-500" : "text-gray-300"}`}
+                />
+              </Button>
+            </div>
+            <div className="flex items-center space-x-2">
+              {isOpen ? (
+                <>
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Edit"
-                    className="p-0 h-auto"
-                    title="Edit"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpen(false);
+                    }}
+                    aria-label="Cancel edits"
+                    className="p-0 h-auto cursor-pointer"
+                    title="Cancel edits"
                   >
-                    <Edit className="h-4 w-4" />
+                    <XCircle className="h-4 w-4" />
                   </Button>
-                )}
-              </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSave();
+                    }}
+                    aria-label="Save edits"
+                    className="p-0 h-auto cursor-pointer"
+                    title="Save edits"
+                    disabled={!isModified()} // Disable the button if no modifications are made
+                  >
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Edit"
+                  className="p-0 h-auto cursor-pointer"
+                  onClick={handleEditClick} // Handle the click event to toggle the collapsible
+                  title="Edit"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-          </CollapsibleTrigger>
+          </div>
           {isOpen ? (
             <span />
           ) : (
             <div className="space-y-2">
-              <p className="text-sm">
-                {/* <span className="font-medium">Date:</span> {note.created_date} */}
-                {note.created_date}
-              </p>
-              <p className="text-sm">
-                {/* <span className="font-medium">Note:</span> {note.note_text} */}
-                {note.note_text}
-              </p>
+              <p className="text-sm">{note.created_date}</p>
+              <p className="text-sm">{note.note_text}</p>
             </div>
           )}
           <CollapsibleContent className="space-y-2 pt-4">
@@ -148,8 +160,8 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
               <Input
                 id={`edit-date-${note.id}`}
                 type="date"
-                value={editDate}
-                onChange={(e) => setEditDate(e.target.value)}
+                value={stagedNote.created_date ?? ""}
+                onChange={(e) => handleChange("created_date", e.target.value)}
               />
             </div>
             <div className="space-y-1">
@@ -161,12 +173,11 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
               </label>
               <Textarea
                 id={`edit-note-${note.id}`}
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
+                value={stagedNote.note_text ?? ""}
+                onChange={(e) => handleChange("note_text", e.target.value)}
                 rows={4}
               />
             </div>
-            {/* <Button onClick={handleSave}>Save Changes</Button> */}
           </CollapsibleContent>
         </Collapsible>
       </CardContent>
@@ -232,7 +243,7 @@ export default function NoteCards({
               created_date: new Date().toISOString().split("T")[0],
               note_text: "",
               public: false,
-              favorite: 0,
+              favorite: false,
               isNew: true,
             };
             // Here you would typically make an API call to create the note on the server

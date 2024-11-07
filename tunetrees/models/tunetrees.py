@@ -15,7 +15,9 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
+
 # from sqlalchemy.orm.base import Mapped
+from sqlalchemy.sql.sqltypes import NullType
 
 Base = declarative_base()
 metadata = Base.metadata
@@ -46,11 +48,10 @@ t_practice_list_joined = Table(
     Column("interval", Integer),
     Column("repetitions", Integer),
     Column("review_date", Text),
-    Column("note_private", Text),
-    Column("note_public", Text),
     Column("tags", Text),
     Column("playlist_ref", Integer),
     Column("user_ref", Integer),
+    Column("notes", NullType),
 )
 
 
@@ -74,13 +75,12 @@ t_practice_list_staged = Table(
     Column("repetitions", Integer),
     Column("review_date", Text),
     Column("backup_practiced", Text),
-    Column("note_private", Text),
-    Column("note_public", Text),
     Column("tags", Text),
     Column("purpose", Text),
     Column("staged_notes_private", Text),
     Column("staged_notes_public", Text),
     Column("staged_recall_eval", Text),
+    Column("notes", NullType),
 )
 
 
@@ -264,6 +264,7 @@ class TableState(Base):
         Enum("practice", "repertoire", "analysis"), primary_key=True, nullable=False
     )
     settings = mapped_column(Text)
+    current_tune = mapped_column(Integer, server_default=text("null"))
 
     user: Mapped["User"] = relationship("User", back_populates="table_state")
 

@@ -19,6 +19,16 @@ interface IMainPanelProps {
 
 const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
   const sidebarRef = useRef<ImperativePanelHandle>(null);
+
+  // Important Note (1): There are two levels of "currentTune" states.
+  // The first level is in the MainPanel component, which is user to track the current tune for
+  // sharing between the Sidebar and TabGroupMain components.
+  // The second level is that both the RepertoireGrid and ScheduledTunesGrid components have their
+  // own "currentTune" states, which are used to track the current tune for each grid.  These grid
+  // states are also stored in the `table_state` table in the database.
+  // Trying to keep these states in sync is a bit tricky and messy, including making sure the
+  // table callback functions can access the current tune states.  Hopefully I can polish this up
+  // over time.
   const [currentTune, setCurrentTune] = useState<number | null>(null); // Add currentTune state
   const [scheduled, setScheduled] = useState<Tune[]>();
   const [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
@@ -103,6 +113,7 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
             user_id={userId}
             playlist_id={playlistId}
             setCurrentTune={setCurrentTune} // Pass setCurrentTune to TabGroupMain
+            currentTune={currentTune}
             loading={loading}
             scheduled={scheduled}
             recentlyPracticed={recentlyPracticed}

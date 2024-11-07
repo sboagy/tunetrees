@@ -17,13 +17,15 @@ SELECT
        practice_record.repetitions,
        practice_record.review_date,
        practice_record.backup_practiced,
-       user_annotation_set.note_private,
-       user_annotation_set.note_public,
        user_annotation_set.tags,
        td.purpose AS purpose,
        td.note_private AS staged_notes_private,
        td.note_public AS staged_notes_public,
-       td.recall_eval AS staged_recall_eval
+       td.recall_eval AS staged_recall_eval,
+       (SELECT group_concat(note.note_text, ' ')
+        FROM note
+        WHERE note.tune_ref = tune.id
+          AND note.user_ref = playlist.user_ref) AS notes
 FROM
     tune
 LEFT JOIN

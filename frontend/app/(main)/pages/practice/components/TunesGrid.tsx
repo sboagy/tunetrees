@@ -34,7 +34,7 @@ import {
 
 import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns";
 import type { TablePurpose, Tune } from "../types";
-import { createOrUpdateTableState, getTableState } from "../settings";
+import { createOrUpdateTableState, getTableStateTable } from "../settings";
 
 export interface IScheduledTunesType {
   tunes: Tune[];
@@ -46,6 +46,11 @@ export interface IScheduledTunesType {
     scheduledData: Tune[];
     repertoireData: Tune[];
   }>;
+  // Per these current tune states,
+  // see "Important Note (1)" in app/(main)/pages/practice/components/MainPanel.tsx
+  mainPanelCurrentTune: number | null;
+  setMainPanelCurrentTune: (tuneId: number | null) => void;
+  getCurrentTune?: () => number | null;
   // setRecentlyPracticedCallback?: (tunes: Tune[]) => void;
   // handleFilterChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
@@ -62,29 +67,32 @@ export const useTableContext = () => {
   return context;
 };
 
-const saveTableState = async (
+const saveTableState = (
   table: TanstackTable<Tune>,
   user_id: string,
   table_purpose: TablePurpose,
+  currentTuneId: number | null,
 ) => {
   const tableState: TableState = table.getState();
 
-  try {
-    const response = await createOrUpdateTableState(
-      Number.parseInt(user_id),
-      "full",
-      table_purpose,
-      tableState,
-    );
-    // Handle the response as needed
-    console.log("Server response:", response);
-    return response;
-  } catch (error) {
-    console.error("Error calling server function:", error);
-    throw error;
-  } finally {
-    // setIsLoading(false);
-  }
+  createOrUpdateTableState(
+    Number.parseInt(user_id),
+    "full",
+    table_purpose,
+    tableState,
+    currentTuneId,
+  )
+    .then((result) => {
+      console.log(
+        "saveTableState: result=",
+        result ? "success" : "empty result",
+      );
+      return result;
+    })
+    .catch((error) => {
+      console.error("Error calling server function:", error);
+      throw error;
+    });
 };
 
 export function TunesTable(
@@ -94,6 +102,8 @@ export function TunesTable(
     playlist_id,
     table_purpose,
     globalFilter = "",
+    getCurrentTune,
+    // setCurrentTune,
   }: IScheduledTunesType,
   selectionChangedCallback:
     | ((
@@ -227,11 +237,12 @@ export function TunesTable(
     const fetchTableState = async () => {
       try {
         const userIdInt = Number.parseInt(user_id);
-        const tableStateFromDb = await getTableState(
+        const tableStateTable = await getTableStateTable(
           userIdInt,
           "full",
           table_purpose,
         );
+        const tableStateFromDb = tableStateTable?.settings as TableState;
         if (tableStateFromDb) {
           setTableStateFromDb(tableStateFromDb);
           table.setPagination(tableStateFromDb.pagination);
@@ -273,20 +284,13 @@ export function TunesTable(
       "=> interceptedRowSelectionChange - resolvedRowSelectionState: ",
       resolvedRowSelectionState,
     );
-    const result = saveTableState(table, user_id, table_purpose);
-    result
-      .then((result) => {
-        console.log(
-          "<= interceptedRowSelectionChange - saveTableState: ",
-          result ? "success" : "empty result",
-        );
-      })
-      .catch((error) => {
-        console.error(
-          "<= interceptedRowSelectionChange - Error saveTableState: ",
-          error,
-        );
-      });
+    saveTableState(
+      table,
+      user_id,
+      table_purpose,
+      getCurrentTune ? getCurrentTune() : -1,
+    );
+
     if (selectionChangedCallback) {
       selectionChangedCallback(table, resolvedRowSelectionState);
     }
@@ -306,7 +310,12 @@ export function TunesTable(
     console.log(
       `=> interceptedOnColumnFiltersChange - resolvedColumnFiltersState: ${JSON.stringify(resolvedColumnFiltersState)}`,
     );
-    void saveTableState(table, user_id, table_purpose);
+    saveTableState(
+      table,
+      user_id,
+      table_purpose,
+      getCurrentTune ? getCurrentTune() : -1,
+    );
   };
 
   const interceptedSetSorting = (
@@ -319,7 +328,12 @@ export function TunesTable(
     // console.log(
     //   `=> interceptedSetSorting - resolvedSorting: ${JSON.stringify(newSorting)}`,
     // );
-    void saveTableState(table, user_id, table_purpose);
+    saveTableState(
+      table,
+      user_id,
+      table_purpose,
+      getCurrentTune ? getCurrentTune() : -1,
+    );
   };
 
   const interceptedSetColumnVisibility = (
@@ -336,7 +350,12 @@ export function TunesTable(
     console.log(
       `=> interceptedSetColumnVisibility - resolvedVisibilityState: ${JSON.stringify(resolvedVisibilityState)}`,
     );
-    void saveTableState(table, user_id, table_purpose);
+    saveTableState(
+      table,
+      user_id,
+      table_purpose,
+      getCurrentTune ? getCurrentTune() : -1,
+    );
   };
 
   const interceptedSetPagination = (
@@ -354,7 +373,12 @@ export function TunesTable(
     console.log(
       `=> interceptedSetPagination - resolvedPaginationState: ${JSON.stringify(resolvedPaginationState)}`,
     );
-    void saveTableState(table, user_id, table_purpose);
+    saveTableState(
+      table,
+      user_id,
+      table_purpose,
+      getCurrentTune ? getCurrentTune() : -1,
+    );
   };
 
   table.setOptions((prev) => ({
@@ -394,22 +418,69 @@ type Props = {
   playlistId: number;
   purpose: TablePurpose;
   globalFilter?: string;
-  setCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
+  setMainPanelCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
+  getCurrentTune: () => number | null;
+  setCurrentTune: (tuneId: number) => void;
 };
 
 const TunesGrid = (props: Props) => {
   const router = useRouter();
-  const [selectedRowId, setSelectedRowId] = React.useState<number | null>(null);
 
   const table = props.table;
   const columns = get_columns(props.userId, props.playlistId, props.purpose);
 
   const handleRowClick = (row: Row<Tune>) => {
     const tuneId = row.original.id;
-    props.setCurrentTune(tuneId ?? null);
-    setSelectedRowId(tuneId || null);
+    props.setMainPanelCurrentTune(tuneId ?? null);
+    props.setCurrentTune(tuneId || 0);
+    console.log("handleRowClick: tuneId=", tuneId);
+    saveTableState(table, props.userId.toString(), props.purpose, tuneId ?? -1);
     // table.setRowSelection({ [row.id]: true }); // Update table selection state
   };
+
+  React.useEffect(() => {
+    console.log(
+      `**** TunesGrid useEffect userId: ${props.userId} purpose: ${props.purpose}`,
+    );
+    getTableStateTable(props.userId, "full", props.purpose)
+      .then((tableStateTable) => {
+        const currentTuneId = tableStateTable?.current_tune as number;
+        if (currentTuneId === 0 || currentTuneId === null) {
+          console.log("****-> TunesGrid useEffect setCurrentTune: 0 or null");
+          props.setMainPanelCurrentTune(null);
+        } else {
+          console.log(
+            `****-> TunesGrid useEffect setCurrentTune: ${currentTuneId}`,
+          );
+          props.setCurrentTune(currentTuneId);
+          props.setMainPanelCurrentTune(currentTuneId);
+        }
+      })
+      .catch((error) => {
+        console.error("Error calling server function:", error);
+      });
+
+    //   if (currentTune !== null) {
+    //     const rowToScrollTo = table
+    //       .getRowModel()
+    //       .rows.find((row) => row.original.id === currentTune);
+    //     if (rowToScrollTo) {
+    //       const rowElement = document.querySelector(
+    //         `[data-row-id="${rowToScrollTo.id}"]`,
+    //       );
+    //       if (rowElement) {
+    //         rowElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    //         rowElement.classList.add("bg-blue-100");
+    //         // rowElement.classList.remove("bg-blue-100");
+    //       }
+    //     }
+    //   }
+  }, [
+    props.userId,
+    props.purpose,
+    props.setCurrentTune,
+    props.setMainPanelCurrentTune,
+  ]);
 
   return (
     <>
@@ -440,7 +511,7 @@ const TunesGrid = (props: Props) => {
                   <TableRow
                     key={row.id}
                     className={`h-auto cursor-pointer ${
-                      selectedRowId === row.original.id
+                      props.getCurrentTune() === row.original.id
                         ? "outline outline-2 outline-blue-500"
                         : ""
                     } ${getColorForEvaluation(row.original.recall_eval || null)}`}
@@ -451,10 +522,11 @@ const TunesGrid = (props: Props) => {
                       const userId = props.userId;
                       const playlistId = props.playlistId;
                       const tuneId = row.original.id;
-                      void saveTableState(
+                      saveTableState(
                         table,
                         userId.toString(),
                         props.purpose,
+                        props.getCurrentTune(),
                       );
                       console.log("double-click occurred: tuneId=", tuneId);
                       router.push(

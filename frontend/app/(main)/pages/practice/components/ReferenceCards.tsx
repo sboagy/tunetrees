@@ -4,123 +4,235 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, Star, Edit, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { Check, Star, Edit, Plus, Save, XCircle } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { getReferences } from "@/app/(main)/pages/practice/queries";
 import type { IReferenceData } from "../types";
 
 interface IReferenceCardProps {
   reference: IReferenceData;
   onToggle: (id: number, field: "public" | "favorite") => void;
-  onCommentChange: (id: number, comment: string) => void;
+  // onCommentChange: (id: number, comment: string) => void;
   displayPublic: boolean;
+  onUpdate: (updatedNote: IReferenceData) => void;
 }
 
 function ReferenceCard({
   reference,
-  onToggle,
-  onCommentChange,
   displayPublic,
+  onUpdate,
 }: IReferenceCardProps) {
   const [isOpen, setIsOpen] = useState(reference.isNew || false);
+  const [stagedReference, setStagedReference] = useState<IReferenceData>({
+    ...reference,
+  });
+
+  function isModified(): boolean {
+    return (
+      (reference.comment ?? "") !== (stagedReference.comment ?? "") ||
+      reference.url !== stagedReference.url ||
+      reference.title !== stagedReference.title ||
+      reference.ref_type !== stagedReference.ref_type ||
+      Boolean(reference.favorite) !== Boolean(stagedReference.favorite) ||
+      Boolean(reference.public) !== Boolean(stagedReference.public)
+    );
+  }
+
+  const handleSave = () => {
+    onUpdate(stagedReference);
+    setIsOpen(false);
+  };
+
+  const handleEditClick = (event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the CollapsibleTrigger
+    setIsOpen(!isOpen);
+  };
+
+  const handleChange = (
+    field: keyof IReferenceData,
+    value: string | boolean | number | undefined,
+  ) => {
+    setStagedReference((prev) => ({ ...prev, [field]: value }));
+  };
 
   return (
     <Card className="w-full max-w-md mb-4">
       <CardContent className="pt-6">
-        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-          <div className="flex items-center justify-between mb-2">
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center space-x-2 cursor-pointer">
-                {/* <span className="font-medium">Ref:</span> */}
+        <Collapsible open={isOpen}>
+          <div className="flex items-right justify-between mb-2">
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isOpen) {
+                    handleChange("favorite", !stagedReference.favorite);
+                  }
+                }}
+                aria-label={
+                  stagedReference.favorite
+                    ? "Unflag as favorite"
+                    : "Flag as favorite"
+                }
+                className={`p-0 h-auto ${!isOpen ? "pointer-events-none cursor-pointer" : ""}`}
+                title="Favorite"
+              >
+                <Star
+                  className={`w-4 h-4 ${stagedReference.favorite ? "text-yellow-500 fill-current" : "text-gray-400"}`}
+                />
+              </Button>
+              {displayPublic && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isOpen) {
+                      handleChange("public", !stagedReference.public);
+                    }
+                  }}
+                  aria-label={
+                    stagedReference.public ? "Set to private" : "Set to public"
+                  }
+                  className={`p-0 h-auto ${!isOpen ? "pointer-events-none cursor-pointer" : ""}`}
+                  title="Public"
+                >
+                  <Check
+                    className={`w-4 h-4 ${stagedReference.public ? "text-green-500" : "text-gray-300"}`}
+                  />
+                </Button>
+              )}
+            </div>
+            {!isOpen ? (
+              <div className="flex items-center">
                 <a
-                  href={reference.url}
+                  href={stagedReference.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-500 hover:underline break-all"
+                  className="text-blue-500 hover:underline"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {reference.title && reference.title.trim() !== ""
-                    ? reference.title
-                    : reference.url}
+                  {stagedReference.title && stagedReference.title.trim() !== ""
+                    ? stagedReference.title
+                    : stagedReference.url}
                 </a>
-                {isOpen ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
               </div>
-            </CollapsibleTrigger>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onToggle(reference.id, "favorite")}
-              aria-label={
-                reference.favorite === 1
-                  ? "Remove from favorites"
-                  : "Add to favorites"
-              }
-              className="p-0 h-auto"
-            >
-              <Star
-                className={`w-4 h-4 ${reference.favorite === 1 ? "text-yellow-500 fill-current" : "text-gray-400"}`}
-              />
-            </Button>
+            ) : (
+              <span className="font-medium"> </span>
+            )}
+            <div className="flex items-center space-x-2">
+              {isOpen ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpen(false);
+                    }}
+                    aria-label="Cancel edits"
+                    className="p-0 h-auto cursor-pointer"
+                    title="Cancel edits"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSave();
+                    }}
+                    aria-label="Save edits"
+                    className="p-0 h-auto"
+                    title="Save edits"
+                    disabled={!isModified()} // Disable the button if no modifications are made
+                  >
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Edit"
+                  onClick={handleEditClick} // Handle the click event to toggle the collapsible
+                  className="p-0 h-auto cursor-pointer"
+                  title="Edit"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
+          {isOpen ? (
+            <span />
+          ) : (
+            <div className="space-y-2">
+              {!isOpen ? <div>{stagedReference.comment}</div> : <span />}
+            </div>
+          )}
           <CollapsibleContent className="space-y-2 pt-2">
             <div className="flex items-center justify-between">
               <Badge
                 variant={
-                  reference.ref_type === "website"
+                  stagedReference.ref_type === "website"
                     ? "default"
-                    : reference.ref_type === "audio"
+                    : stagedReference.ref_type === "audio"
                       ? "secondary"
                       : "destructive"
                 }
+                onClick={(e) => e.stopPropagation()}
+                className="cursor-pointer"
               >
-                {reference.ref_type}
+                {stagedReference.ref_type}
               </Badge>
-              {displayPublic && (
-                <div className="flex items-center space-x-2">
-                  <span className="font-medium text-sm">Public:</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onToggle(reference.id, "public")}
-                    aria-label={
-                      reference.public === 1
-                        ? "Set to private"
-                        : "Set to public"
-                    }
-                  >
-                    <Check
-                      className={`w-4 h-4 ${reference.public === 1 ? "text-green-500" : "text-gray-300"}`}
-                    />
-                  </Button>
-                </div>
-              )}
-
-              <Button variant="ghost" size="icon" aria-label="Edit reference">
-                <Edit className="h-4 w-4" />
-              </Button>
             </div>
             <div className="space-y-1">
               <label
-                htmlFor={`comment-${reference.id}`}
+                htmlFor={`title-${stagedReference.id}`}
+                className="text-sm font-medium"
+              >
+                Title:
+              </label>
+              <Textarea
+                id={`title-${stagedReference.title}`}
+                value={stagedReference.title ?? ""}
+                onChange={(e) => handleChange("title", e.target.value)}
+                placeholder="Add a title..."
+                className="w-full h-10 min-h-10 max-h-20 !important"
+              />
+            </div>
+            <div className="space-y-1">
+              <label
+                htmlFor={`url-${stagedReference.id}`}
+                className="text-sm font-medium"
+              >
+                URL:
+              </label>
+              <Textarea
+                id={`url-${stagedReference.id}`}
+                value={stagedReference.url ?? ""}
+                onChange={(e) => handleChange("url", e.target.value)}
+                placeholder="Add a url..."
+                className="w-full h-10 min-h-10 max-h-30 !important"
+              />
+            </div>
+            <div className="space-y-1">
+              <label
+                htmlFor={`comment-${stagedReference.id}`}
                 className="text-sm font-medium"
               >
                 Comment:
               </label>
               <Textarea
-                id={`comment-${reference.id}`}
-                value={reference.comment ?? ""}
-                onChange={(e) => onCommentChange(reference.id, e.target.value)}
+                id={`comment-${stagedReference.id}`}
+                value={stagedReference.comment ?? ""}
+                onChange={(e) => handleChange("comment", e.target.value)}
                 placeholder="Add a comment..."
-                className="w-full"
+                className="w-full h-20 min-h-10 max-h-50 !important"
               />
             </div>
           </CollapsibleContent>
@@ -163,10 +275,18 @@ export default function ReferenceCards({
     );
   };
 
-  const handleCommentChange = (id: number, comment: string) => {
+  // const handleCommentChange = (id: number, comment: string) => {
+  //   setReferences((prevReferences) =>
+  //     prevReferences.map((ref) => (ref.id === id ? { ...ref, comment } : ref)),
+  //   );
+  // };
+  const handleUpdateReference = (updatedReference: IReferenceData) => {
     setReferences((prevReferences) =>
-      prevReferences.map((ref) => (ref.id === id ? { ...ref, comment } : ref)),
+      prevReferences.map((note) =>
+        note.id === updatedReference.id ? updatedReference : note,
+      ),
     );
+    // Here you would typically also make an API call to update the note on the server
   };
 
   return (
@@ -204,8 +324,9 @@ export default function ReferenceCards({
           key={reference.id}
           reference={reference}
           onToggle={handleToggle}
-          onCommentChange={handleCommentChange}
+          // onCommentChange={handleCommentChange}
           displayPublic={displayPublic}
+          onUpdate={handleUpdateReference}
         />
       ))}
     </div>

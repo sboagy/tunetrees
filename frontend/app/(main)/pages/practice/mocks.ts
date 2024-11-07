@@ -53,10 +53,9 @@ export function getMockTune(): Tune {
     review_date: "2023-01-03",
     backup_practiced: "2023-01-04",
     external_ref: "http://example.com",
-    note_private: "Private notes",
-    note_public: "Public notes",
     tags: "tag1, tag2",
     recall_eval: "High",
+    notes: "",
   };
   return tuneData;
 }
@@ -118,10 +117,9 @@ export const ERROR_TUNE: Tune[] = [
     repetitions: 0,
     review_date: "Error",
     backup_practiced: "Error",
-    note_private: "Error", // Optional property, should't need to be set
-    note_public: "Error", // Optional property, should't need to be set
     tags: "Error", // Optional property, should't need to be set
     recall_eval: "Error", // Optional property, should't need to be set
+    notes: "",
   },
 ];
 
@@ -141,9 +139,8 @@ export const ERROR_PLAYLIST_TUNE: PlaylistTune = {
   repetitions: 0,
   review_date: "Error",
   backup_practiced: "Error",
-  note_private: "Error", // Optional property, should't need to be set
-  note_public: "Error", // Optional property, should't need to be set
   tags: "Error", // Optional property, should't need to be set
   user_ref: 0,
   playlist_ref: 0,
+  notes: "",
 };

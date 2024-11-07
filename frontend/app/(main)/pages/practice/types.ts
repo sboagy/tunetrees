@@ -1,5 +1,8 @@
 // In the following, id may be ommited in the case of a new tune.
 // I might be better to use a base class for a new tune, and then
+
+import type { TableState } from "@tanstack/react-table";
+
 // add the id in a derived class?
 export type Tune = {
   id?: number;
@@ -17,10 +20,11 @@ export type Tune = {
   review_date: string | null;
   backup_practiced: string | null;
   external_ref?: string | null;
-  note_private?: string | null;
-  note_public?: string | null;
+  // note_private?: string | null;
+  // note_public?: string | null;
   tags?: string | null;
   recall_eval?: string | null;
+  notes?: string | null;
 };
 
 export type PlaylistTune = {
@@ -38,11 +42,12 @@ export type PlaylistTune = {
   repetitions?: number;
   review_date?: string;
   backup_practiced?: string;
-  note_private?: string;
-  note_public?: string;
+  // note_private?: string;
+  // note_public?: string;
   tags?: string;
   user_ref?: number;
   playlist_ref?: number;
+  notes?: string | null;
 };
 
 export type ScreenSize = "small" | "full";
@@ -106,7 +111,15 @@ export interface INote {
   playlist_ref?: number | null;
   created_date?: string | null;
   note_text: string | null;
-  public: boolean | null;
-  favorite: number | null;
+  public: boolean | false;
+  favorite: boolean | false;
   isNew?: boolean;
+}
+
+export interface ITableStateTable {
+  user_id: number;
+  screen_size: ScreenSize;
+  purpose: TablePurpose;
+  settings: string | TableState;
+  current_tune?: number | null;
 }

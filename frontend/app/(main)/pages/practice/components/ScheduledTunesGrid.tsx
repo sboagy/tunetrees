@@ -2,12 +2,12 @@
 
 import { Button } from "@/components/ui/button";
 import type { Table as TanstackTable } from "@tanstack/react-table";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { submitPracticeFeedbacks, type ITuneUpdate } from "../commands";
 import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import TunesGrid, { type IScheduledTunesType, TunesTable } from "./TunesGrid";
-import { deleteTableTransientData } from "../settings";
+import { deleteTableTransientData, getTableCurrentTune } from "../settings";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import FlashcardPanel from "./FlashcardPanel";
@@ -16,7 +16,8 @@ import NewTuneButton from "./NewTuneButton";
 type ReviewMode = "grid" | "flashcard";
 
 interface IScheduledTunesGridProps extends IScheduledTunesType {
-  setCurrentTune: (tuneId: number | null) => void;
+  setMainPanelCurrentTune: (tuneId: number | null) => void;
+  mainPanelCurrentTune: number | null;
 }
 
 export default function ScheduledTunesGrid({
@@ -24,10 +25,29 @@ export default function ScheduledTunesGrid({
   user_id,
   playlist_id,
   refreshData,
-  setCurrentTune,
+  setMainPanelCurrentTune,
+  mainPanelCurrentTune,
 }: IScheduledTunesGridProps): JSX.Element {
   const [scheduled, setScheduled] = useState<Tune[]>(tunes);
   const refreshDataCallback = refreshData;
+
+  // Per these current tune states,
+  // see "Important Note (1)" in app/(main)/pages/practice/components/MainPanel.tsx
+  const [currentTune, setCurrentTune] = useState<number>(-3);
+  const getCurrentTune = useCallback(() => currentTune, [currentTune]);
+
+  useEffect(() => {
+    const getSetCurrentTune = () => {
+      getTableCurrentTune(Number(user_id), "full", "practice")
+        .then((tuneId) => {
+          setCurrentTune(tuneId);
+        })
+        .catch((error) => {
+          console.error("Error fetching current tune:", error);
+        });
+    };
+    getSetCurrentTune();
+  }, [user_id]);
 
   const table: TanstackTable<Tune> = TunesTable({
     tunes: scheduled,
@@ -36,6 +56,9 @@ export default function ScheduledTunesGrid({
     table_purpose: "practice",
     globalFilter: "",
     refreshData,
+    mainPanelCurrentTune,
+    setMainPanelCurrentTune,
+    getCurrentTune,
   });
 
   const submitPracticeFeedbacksHandler = (
@@ -160,6 +183,8 @@ export default function ScheduledTunesGrid({
           userId={Number.parseInt(user_id)}
           playlistId={Number.parseInt(playlist_id)}
           purpose={"practice"}
+          setMainPanelCurrentTune={setMainPanelCurrentTune}
+          getCurrentTune={getCurrentTune}
           setCurrentTune={setCurrentTune}
         />
       ) : (

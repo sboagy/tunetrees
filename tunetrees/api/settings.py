@@ -1,7 +1,8 @@
+from enum import Enum
 import logging
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 from starlette import status as status
 
 from tunetrees.app.database import SessionLocal
@@ -13,198 +14,257 @@ from tunetrees.models.tunetrees_pydantic import (
 
 # TODO: Rename this route to "states" instead of "settings"
 
+logger = logging.getLogger(__name__)
+
 settings_router = APIRouter(prefix="/settings", tags=["settings"])
 
 
-@settings_router.post(
-    "/table_state/{user_id}/{screen_size}/{purpose}",
-    summary="Create a new datagrid table state for a user, for a specific screen size and purpose",
-    description="Create a new column setting with specific configurations.  The "
-    "column setting entries correspond to the columns in the practice_list_joined view.  Each time the "
-    "user changes a column setting, it should be reflected in this table, so the settings can "
-    "be persisted between sessions and devices.",
-    status_code=status.HTTP_201_CREATED,
-)
-def create_table_state(
-    user_id: Annotated[
-        int,
-        Path(
-            description="Should be a valid user id that corresponds to a user in the user table",
-        ),
-    ],
-    screen_size: Annotated[
-        str,
-        Path(
-            enum_values=["small", "full"],
-            description="Associated screen size, one of 'small' or 'full'",
-        ),
-    ],
-    purpose: Annotated[
-        str,
-        Path(
-            enum_values=["practice", "repertoire", "suggestions"],
-            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
-        ),
-    ],
-    settings: str = Body(...),
-) -> dict[str, str | int]:
-    with SessionLocal() as db:
-        try:
-            table_state = TableState(
-                user_id=user_id,
-                screen_size=screen_size,
-                purpose=purpose,
-                settings=settings,
-            )
-            db.add(table_state)
-            db.commit()
-            db.refresh(table_state)
-            return {"status": "success", "code": 201}
-        except HTTPException as e:
-            if e.status_code == 404:
-                logging.getLogger().warning(
-                    "table state Not Found (create_table_state(%s, %s, %s))",
-                    user_id,
-                    screen_size,
-                    purpose,
-                )
-            else:
-                logging.getLogger().error("HTTPException (secondary catch): %s" % e)
-            raise
-        except Exception as e:
-            logging.getLogger().error("Unknown error: %s" % e)
-            raise HTTPException(status_code=500, detail="Unknown error occured")
+class TableStateBase(BaseModel):
+    user_id: int
+    screen_size: Literal["small", "full"]
+    purpose: Literal["practice", "repertoire", "analysis"]
+    settings: str
+    current_tune: Optional[int] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
-@settings_router.put(
-    "/table_state/{user_id}/{screen_size}/{purpose}",
-    summary="Update a datagrid table state for a user, for a specific screen size and purpose",
-    description="Update a column setting.  The "
-    "column setting entries correspond to the columns in the practice_list_joined view.  Each time the "
-    "user changes a column setting, it should be reflected in this table, so the settings can "
-    "be persisted between sessions and devices.",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-def update_table_state(
-    user_id: Annotated[
-        int,
-        Path(
-            description="Should be a valid user id that corresponds to a user in the user table",
-        ),
-    ],
-    screen_size: Annotated[
-        str,
-        Path(
-            enum_values=["small", "full"],
-            description="Associated screen size, one of 'small' or 'full'",
-        ),
-    ],
-    purpose: Annotated[
-        str,
-        Path(
-            enum_values=["practice", "repertoire", "suggestions"],
-            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
-        ),
-    ],
-    settings: str,
-) -> None:
-    with SessionLocal() as db:
-        try:
-            table_state = TableState(
-                user_id=user_id,
-                screen_size=screen_size,
-                purpose=purpose,
-                settings=settings,
-            )
-            existing_table_state = (
-                db.query(TableState)
-                .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
-                .first()
-            )
+class TableStateCreate(TableStateBase):
+    pass
 
-            if not existing_table_state:
-                raise HTTPException(status_code=404, detail="Column setting not found")
 
-            existing_table_state.settings = table_state.settings
-            db.commit()
-            db.refresh(existing_table_state)
-            # return {"status": "success", "code": 204}
-        except HTTPException as e:
-            if e.status_code == 404:
-                logging.getLogger().warning(
-                    "table state Not Found (update_table_state(%s, %s, %s))",
-                    user_id,
-                    screen_size,
-                    purpose,
-                )
-            else:
-                logging.getLogger().error("HTTPException (secondary catch): %s" % e)
-            raise
-        except Exception as e:
-            logging.getLogger().error("Unknown error: %s" % e)
-            raise HTTPException(status_code=500, detail="Unknown error occured")
+class TableStateUpdate(BaseModel):
+    settings: Optional[str] = None
+    current_tune: Optional[int] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class TableStateResponse(TableStateBase):
+    pass
+
+
+class ScreenSizeEnum(str, Enum):
+    small = "small"
+    full = "full"
+
+
+class PurposeEnum(str, Enum):
+    practice = "practice"
+    repertoire = "repertoire"
+    analysis = "analysis"
 
 
 @settings_router.get(
-    "/table_state/{user_id}/{screen_size}/{purpose}",
-    summary="Retrieve the stored datagrid table state for a user, for a specific screen size and purpose",
-    description="Retrieve the column setting with specific configurations.  The "
-    "column setting entries correspond to the columns in the practice_list_joined view.",
+    "/table_state",
+    response_model=TableStateResponse,
+    summary="Get Table State",
+    description="Retrieve the stored datagrid table state for a user, for a specific screen size and purpose.",
     status_code=status.HTTP_200_OK,
 )
-def get_table_states(
-    user_id: Annotated[
-        int,
-        Path(
-            description="Should be a valid user id that corresponds to a user in the user table",
-        ),
-    ],
-    screen_size: Annotated[
-        str,
-        Path(
-            enum_values=["small", "full"],
-            description="Associated screen size, one of 'small' or 'full'",
-        ),
-    ],
-    purpose: Annotated[
-        str,
-        Path(
-            enum_values=["practice", "repertoire", "suggestions"],
-            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
-        ),
-    ],
-) -> str:
-    with SessionLocal() as db:
-        try:
-            table_state: TableState | None = (
+def get_table_state(
+    user_id: int = Query(
+        ...,
+        description="Should be a valid user id that corresponds to a user in the user table",
+    ),
+    screen_size: ScreenSizeEnum = Query(
+        ..., description="Associated screen size, one of 'small' or 'full'"
+    ),
+    purpose: PurposeEnum = Query(
+        ...,
+        description="Associated purpose, one of 'practice', 'repertoire', or 'analysis'",
+    ),
+) -> TableStateResponse:
+    try:
+        with SessionLocal() as db:
+            table_state = (
                 db.query(TableState)
                 .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
                 .first()
             )
-
             if not table_state:
-                raise HTTPException(status_code=404, detail="Column setting not found")
+                raise HTTPException(status_code=404, detail="Table state not found")
+            return TableStateResponse.model_validate(table_state)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Unable to fetch table state: {e}")
+        raise HTTPException(status_code=500, detail="Unable to fetch table state")
 
-            return table_state.settings
-        except HTTPException as e:
-            if e.status_code == 404:
-                logging.getLogger().warning(
-                    "table state Not Found (get_table_state(%s, %s, %s))",
-                    user_id,
-                    screen_size,
-                    purpose,
-                )
-            else:
-                logging.getLogger().error("HTTPException (secondary catch): %s" % e)
-            raise
-        except Exception as e:
-            logging.getLogger().error("Unknown error: %s" % e)
-            raise HTTPException(status_code=500, detail="Unknown error occured")
+
+@settings_router.post(
+    "/table_state",
+    response_model=TableStateResponse,
+    summary="Create Table State",
+    description="Create a new datagrid table state for a user, for a specific screen size and purpose.",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_table_state(table_state: TableStateCreate) -> TableStateResponse:
+    try:
+        with SessionLocal() as db:
+            new_table_state = TableState(**table_state.model_dump())
+            db.add(new_table_state)
+            db.commit()
+            db.refresh(new_table_state)
+            return TableStateResponse.model_validate(new_table_state)
+    except Exception as e:
+        logger.error(f"Unable to create table state: {e}")
+        raise HTTPException(status_code=500, detail="Unable to create table state")
+
+
+@settings_router.put(
+    "/table_state",
+    response_model=TableStateResponse,
+    summary="Update Table State",
+    description="Update an existing datagrid table state for a user, for a specific screen size and purpose.",
+    status_code=status.HTTP_200_OK,
+)
+def update_table_state(
+    user_id: int = Query(
+        ...,
+        description="Should be a valid user id that corresponds to a user in the user table",
+    ),
+    screen_size: str = Query(
+        ...,
+        enum=["small", "full"],
+        description="Associated screen size, one of 'small' or 'full'",
+    ),
+    purpose: str = Query(
+        ...,
+        enum=["practice", "repertoire", "analysis"],
+        description="Associated purpose, one of 'practice', 'repertoire', or 'analysis'",
+    ),
+    table_state_update: TableStateUpdate = Depends(),
+) -> TableStateResponse:
+    try:
+        with SessionLocal() as db:
+            table_state = (
+                db.query(TableState)
+                .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
+                .first()
+            )
+            if not table_state:
+                raise HTTPException(status_code=404, detail="Table state not found")
+
+        update_data = table_state_update.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(table_state, key, value)
+
+        db.commit()
+        db.refresh(table_state)
+        return TableStateResponse.model_validate(table_state)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Unable to update table state: {e}")
+        raise HTTPException(status_code=500, detail="Unable to update table state")
+
+
+@settings_router.delete(
+    "/table_state",
+    summary="Delete Table State",
+    description="Delete an existing datagrid table state for a user, for a specific screen size and purpose.",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_table_state(
+    user_id: int = Query(
+        ...,
+        description="Should be a valid user id that corresponds to a user in the user table",
+    ),
+    screen_size: str = Query(
+        ...,
+        enum=["small", "full"],
+        description="Associated screen size, one of 'small' or 'full'",
+    ),
+    purpose: str = Query(
+        ...,
+        enum=["practice", "repertoire", "analysis"],
+        description="Associated purpose, one of 'practice', 'repertoire', or 'analysis'",
+    ),
+) -> None:
+    try:
+        with SessionLocal() as db:
+            table_state = (
+                db.query(TableState)
+                .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
+                .first()
+            )
+            if not table_state:
+                raise HTTPException(status_code=404, detail="Table state not found")
+
+        db.delete(table_state)
+        db.commit()
+        return
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Unable to delete table state: {e}")
+        raise HTTPException(status_code=500, detail="Unable to delete table state")
+
+
+# @settings_router.get(
+#     "/table_state/{user_id}/{screen_size}/{purpose}",
+#     response_model=TableStateResponse,
+#     summary="Retrieve the stored datagrid table state for a user, for a specific screen size and purpose",
+#     description="Retrieve the column setting with specific configurations. The "
+#     "column setting entries correspond to the columns in the practice_list_joined view.",
+#     status_code=status.HTTP_200_OK,
+# )
+# def get_table_states(
+#     user_id: Annotated[
+#         int,
+#         Path(
+#             description="Should be a valid user id that corresponds to a user in the user table",
+#         ),
+#     ],
+#     screen_size: Annotated[
+#         str,
+#         Path(
+#             enum_values=["small", "full"],
+#             description="Associated screen size, one of 'small' or 'full'",
+#         ),
+#     ],
+#     purpose: Annotated[
+#         str,
+#         Path(
+#             enum_values=["practice", "repertoire", "suggestions"],
+#             description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+#         ),
+#     ],
+# ) -> TableStateResponse:
+#     with SessionLocal() as db:
+#         try:
+#             table_state: TableState | None = (
+#                 db.query(TableState)
+#                 .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
+#                 .first()
+#             )
+
+#             if not table_state:
+#                 raise HTTPException(status_code=404, detail="Column setting not found")
+
+#             return TableStateResponse.model_validate(table_state)
+#         except HTTPException as e:
+#             if e.status_code == 404:
+#                 logging.getLogger().warning(
+#                     "table state Not Found (get_table_state(%s, %s, %s))",
+#                     user_id,
+#                     screen_size,
+#                     purpose,
+#                 )
+#             else:
+#                 logging.getLogger().error("HTTPException (secondary catch): %s" % e)
+#             raise
+#         except Exception as e:
+#             logging.getLogger().error("Unknown error: %s" % e)
+#             raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
 class TableTransientDataFields(BaseModel):
-    note_private: Optional[str]
-    note_public: Optional[str]
     recall_eval: Optional[str]
 
 
@@ -249,8 +309,6 @@ def stage_table_transient_data(
                 tune_id=tune_id,
                 playlist_id=playlist_id,
                 purpose=purpose,
-                note_private=field_data.note_private,
-                note_public=field_data.note_public,
                 recall_eval=field_data.recall_eval,
             )
             db.add(table_transient_data)

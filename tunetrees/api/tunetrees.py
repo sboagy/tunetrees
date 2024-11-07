@@ -198,11 +198,10 @@ class PlaylistTuneJoinedModel(BaseModel):
     interval: Optional[int]
     repetitions: Optional[int]
     review_date: Optional[str]
-    note_private: Optional[str]
-    note_public: Optional[str]
     tags: Optional[str]
     user_ref: Optional[int]
     playlist_ref: Optional[int]
+    notes: Optional[str]
 
     model_config = {
         "from_attributes": True  # Enable attribute parsing from ORM objects
@@ -258,9 +257,9 @@ async def update_playlist_tune(
                     "interval",
                     "repetitions",
                     "review_date",
-                    "backup_practiced",
+                    # "backup_practiced",
                 ],
-                UserAnnotationSet: ["note_private", "note_public", "tags"],
+                UserAnnotationSet: ["tags"],
             }
 
             # Update each table based on the fields provided

@@ -2,6 +2,7 @@
 
 import axios, { isAxiosError } from "axios";
 import type {
+  ITableStateTable,
   ScreenSize,
   TablePurpose,
   TableTransientData,
@@ -20,51 +21,96 @@ const client = axios.create({
 //   columnSettings: ColumnSettingsModel;
 // }
 
-// =====
 export async function createOrUpdateTableState(
   userId: number,
   screenSize: ScreenSize,
   purpose: TablePurpose,
   tableStates: TableState,
+  currentTune: number | null,
 ): Promise<number> {
   try {
     console.log(
       `=> createOrUpdateTableState rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
     );
     const tableStatesStr = JSON.stringify(tableStates);
-    const response = await client.post(
-      `/table_state/${userId}/${screenSize}/${purpose}`,
-      tableStatesStr,
+    const tableStateTable: ITableStateTable = {
+      user_id: userId,
+      screen_size: screenSize,
+      purpose: purpose,
+      settings: tableStatesStr,
+      current_tune: currentTune === null ? -1 : currentTune,
+    };
+    const response = await client.post<ITableStateTable>(
+      "/table_state",
+      tableStateTable,
+      {
+        params: {
+          user_id: userId,
+          screen_size: screenSize,
+          purpose: purpose,
+        },
+      },
     );
     console.log("<= createOrUpdateTableState: ", response?.status);
     return response.status;
-    // Handle successful response
   } catch (error) {
-    // Handle error
     console.error("<= createOrUpdateTableState: ", error);
     return 500;
   }
 }
 
-export async function updateTableState(
+// export async function updateTableStateOnly(
+//   userId: number,
+//   screenSize: ScreenSize,
+//   purpose: TablePurpose,
+//   tableStates: TableState,
+// ): Promise<number> {
+//   try {
+//     const tableStatesStr = JSON.stringify(tableStates);
+//     const response = await client.put<ITableStateTable>(
+//       "/table_state",
+//       { settings: tableStatesStr },
+//       {
+//         params: {
+//           user_id: userId,
+//           screen_size: screenSize,
+//           purpose: purpose,
+//         },
+//       },
+//     );
+//     console.log("updateTableState: ", response?.status);
+//     return response.status;
+//   } catch (error) {
+//     console.error("updateTableState: ", error);
+//     return 500;
+//   }
+// }
+
+export async function getTableStateTable(
   userId: number,
   screenSize: ScreenSize,
   purpose: TablePurpose,
-  tableStates: TableState,
-): Promise<number> {
+): Promise<ITableStateTable | null> {
   try {
-    const tableStatesStr = JSON.stringify(tableStates);
-    const response = await client.put(
-      `/table_state/${userId}/${screenSize}/${purpose}`,
-      tableStatesStr,
-    );
-    // Handle successful response
-    console.log("createOrUpdateTableState: ", response?.status);
-    return response.status;
+    const response = await client.get<ITableStateTable>("/table_state", {
+      params: {
+        user_id: userId,
+        screen_size: screenSize,
+        purpose: purpose,
+      },
+    });
+    response.data.settings = JSON.parse(
+      response.data.settings as string,
+    ) as TableState;
+    const tableStateTable: ITableStateTable = response.data;
+    console.log("getTableStateTable response status: ", response.status);
+    return tableStateTable;
   } catch (error) {
-    // Handle error
-    console.error("updateTableState: ", error);
-    return 500;
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return null; // Return null for 404 status
+    }
+    console.error("getTableState error: ", error);
+    throw error;
   }
 }
 
@@ -73,25 +119,113 @@ export async function getTableState(
   screenSize: ScreenSize,
   purpose: TablePurpose,
 ): Promise<TableState | null> {
+  const tableStateTable = await getTableStateTable(userId, screenSize, purpose);
+  return tableStateTable?.settings as TableState;
+}
+
+export async function getTableCurrentTune(
+  userId: number,
+  screenSize: ScreenSize,
+  purpose: TablePurpose,
+): Promise<number> {
+  const tableStateTable = await getTableStateTable(userId, screenSize, purpose);
+  return tableStateTable?.current_tune ?? -1;
+}
+
+export async function deleteTableState(
+  userId: number,
+  screenSize: ScreenSize,
+  purpose: TablePurpose,
+): Promise<number> {
   try {
-    const response = await client.get(
-      `/table_state/${userId}/${screenSize}/${purpose}`,
-    );
-    // Handle successful response
-    const tableStatesStr: string = response.data as string;
-    // Not very confident about this reconstitution of TableState
-    const tableStates: TableState = JSON.parse(tableStatesStr) as TableState;
-    console.error("getTableState response status: ", response.status);
-    return tableStates;
+    const response = await client.delete("/table_state", {
+      params: {
+        user_id: userId,
+        screen_size: screenSize,
+        purpose: purpose,
+      },
+    });
+    console.log("deleteTableState: ", response?.status);
+    return response.status;
   } catch (error) {
-    if (isAxiosError(error) && error.response?.status === 404) {
-      return null; // Return null for 404 status
-    }
-    // Handle error
-    console.error("getTableState error: ", error);
-    throw error;
+    console.error("deleteTableState: ", error);
+    return 500;
   }
 }
+
+// =====
+// export async function createOrUpdateTableState(
+//   userId: number,
+//   screenSize: ScreenSize,
+//   purpose: TablePurpose,
+//   tableStates: TableState,
+//   currentTune: number | null,
+// ): Promise<number> {
+//   try {
+//     console.log(
+//       `=> createOrUpdateTableState rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
+//     );
+//     const tableStatesStr = JSON.stringify(tableStates);
+//     const response = await client.post(
+//       `/table_state/${userId}/${screenSize}/${purpose}`,
+//       tableStatesStr,
+//     );
+//     console.log("<= createOrUpdateTableState: ", response?.status);
+//     return response.status;
+//     // Handle successful response
+//   } catch (error) {
+//     // Handle error
+//     console.error("<= createOrUpdateTableState: ", error);
+//     return 500;
+//   }
+// }
+
+// export async function updateTableState(
+//   userId: number,
+//   screenSize: ScreenSize,
+//   purpose: TablePurpose,
+//   tableStates: TableState,
+// ): Promise<number> {
+//   try {
+//     const tableStatesStr = JSON.stringify(tableStates);
+//     const response = await client.put(
+//       `/table_state/${userId}/${screenSize}/${purpose}`,
+//       tableStatesStr,
+//     );
+//     // Handle successful response
+//     console.log("createOrUpdateTableState: ", response?.status);
+//     return response.status;
+//   } catch (error) {
+//     // Handle error
+//     console.error("updateTableState: ", error);
+//     return 500;
+//   }
+// }
+
+// export async function getTableState(
+//   userId: number,
+//   screenSize: ScreenSize,
+//   purpose: TablePurpose,
+// ): Promise<TableState | null> {
+//   try {
+//     const response = await client.get(
+//       `/table_state/${userId}/${screenSize}/${purpose}`,
+//     );
+//     // Handle successful response
+//     const tableStatesStr: string = response.data as string;
+//     // Not very confident about this reconstitution of TableState
+//     const tableStates: TableState = JSON.parse(tableStatesStr) as TableState;
+//     console.error("getTableState response status: ", response.status);
+//     return tableStates;
+//   } catch (error) {
+//     if (isAxiosError(error) && error.response?.status === 404) {
+//       return null; // Return null for 404 status
+//     }
+//     // Handle error
+//     console.error("getTableState error: ", error);
+//     throw error;
+//   }
+// }
 
 export async function createOrUpdateTableTransientData(
   userId: number,

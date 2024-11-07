@@ -13,7 +13,6 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getPlaylistTune, updatePlaylistTune } from "../queries";
 import "./TuneEditor.css"; // Import the CSS file
@@ -466,7 +465,7 @@ export default function TuneEditor({
               /> */}
             </div>
 
-            <FormField
+            {/* <FormField
               control={form.control}
               name="note_private"
               render={({ field }) => (
@@ -480,9 +479,9 @@ export default function TuneEditor({
                   </FormControl>
                 </FormItem>
               )}
-            />
+            /> */}
 
-            <FormField
+            {/* <FormField
               control={form.control}
               name="note_public"
               render={({ field }) => (
@@ -496,7 +495,7 @@ export default function TuneEditor({
                   </FormControl>
                 </FormItem>
               )}
-            />
+            /> */}
 
             <FormField
               control={form.control}

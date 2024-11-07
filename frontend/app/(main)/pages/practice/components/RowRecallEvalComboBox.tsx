@@ -100,8 +100,8 @@ export function RecallEvalComboBox(
         info.row.original.id ?? 0,
         playlistId,
         purpose,
-        info.row.original.note_private ?? null,
-        info.row.original.note_public ?? null,
+        null,
+        null,
         changed_value,
       );
       console.log("State saved:", changed_value);

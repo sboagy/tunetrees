@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type {
   RowSelectionState,
@@ -20,6 +20,7 @@ import type {
 import { submitPracticeFeedbacks } from "../commands";
 import type { Tune } from "../types";
 import NewTuneButton from "./NewTuneButton";
+import { getTableCurrentTune } from "../settings";
 
 async function fetchFilterFromDB(
   userId: number,
@@ -33,7 +34,8 @@ async function fetchFilterFromDB(
 }
 
 interface IRepertoireGridProps extends IScheduledTunesType {
-  setCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
+  setMainPanelCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
+  mainPanelCurrentTune: number | null;
 }
 
 export default function RepertoireGrid({
@@ -41,7 +43,8 @@ export default function RepertoireGrid({
   user_id,
   playlist_id,
   refreshData,
-  setCurrentTune, // Destructure setCurrentTune
+  setMainPanelCurrentTune, // Destructure setCurrentTune
+  mainPanelCurrentTune,
 }: IRepertoireGridProps): JSX.Element {
   const [isAddToReviewQueueEnabled, setIsAddToReviewQueueEnabled] =
     useState(false);
@@ -57,6 +60,24 @@ export default function RepertoireGrid({
 
   const [globalFilter, setGlobalFilter] = useState("");
   const [isFilterLoaded, setIsFilterLoaded] = useState(false);
+
+  // Per these current tune states,
+  // see "Important Note (1)" in app/(main)/pages/practice/components/MainPanel.tsx
+  const [currentTune, setCurrentTune] = useState<number>(-2);
+  const getCurrentTune = useCallback(() => currentTune, [currentTune]);
+
+  useEffect(() => {
+    const getSetCurrentTune = () => {
+      getTableCurrentTune(Number(user_id), "full", "repertoire")
+        .then((tuneId) => {
+          setCurrentTune(tuneId);
+        })
+        .catch((error) => {
+          console.error("Error fetching current tune:", error);
+        });
+    };
+    getSetCurrentTune();
+  }, [user_id]);
 
   useEffect(() => {
     const getFilter = () => {
@@ -81,6 +102,9 @@ export default function RepertoireGrid({
     table_purpose: "repertoire",
     refreshData: refreshData,
     globalFilter,
+    mainPanelCurrentTune,
+    setMainPanelCurrentTune,
+    getCurrentTune,
   };
   const table = TunesTable(tunesWithFilter, selectionChangedCallback);
   const [preset, setPreset] = useState("");
@@ -226,7 +250,9 @@ export default function RepertoireGrid({
             playlistId={Number.parseInt(playlist_id)}
             purpose={"repertoire"}
             globalFilter={globalFilter}
-            setCurrentTune={setCurrentTune} // Pass setCurrentTune to TunesGrid
+            setMainPanelCurrentTune={setMainPanelCurrentTune} // Pass setCurrentTune to TunesGrid
+            getCurrentTune={getCurrentTune}
+            setCurrentTune={setCurrentTune}
           />
         </>
       )}

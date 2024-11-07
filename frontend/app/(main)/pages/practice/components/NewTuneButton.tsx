@@ -36,10 +36,9 @@ export default function NewTuneButton({
       review_date: null,
       backup_practiced: null,
       external_ref: null,
-      note_private: null,
-      note_public: null,
       tags: null,
       recall_eval: null,
+      notes: null,
     };
     createTune(newTune, Number(playlist_id))
       .then((result) => {

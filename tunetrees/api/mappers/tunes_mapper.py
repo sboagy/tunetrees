@@ -4,7 +4,7 @@ from sqlalchemy import Table
 from sqlalchemy.engine.row import Row
 
 
-def tunes_mapper(tune: Row[Any], table: Table) -> dict[str, Any]:
+def tunes_mapper(tune: Row[Any], table: Table) -> dict[str, Any]:  # noqa: C901
     """
     Maps a tune listing in the form of an array of values, to a dictionary.
     Arguably this function is greatly evil, and shouldn't be necessary in
@@ -51,10 +51,6 @@ def tunes_mapper(tune: Row[Any], table: Table) -> dict[str, Any]:
             tune_dict["review_date"] = tune[i]
         elif column.name == "backup_practiced":
             tune_dict["backup_practiced"] = tune[i]
-        elif column.name == "note_private":
-            tune_dict["note_private"] = tune[i]
-        elif column.name == "note_public":
-            tune_dict["note_public"] = tune[i]
         elif column.name == "tags":
             tune_dict["tags"] = tune[i]
         elif column.name == "staged_notes_private":

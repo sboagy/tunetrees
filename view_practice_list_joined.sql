@@ -13,11 +13,13 @@ SELECT
     practice_record.interval,
     practice_record.repetitions,
     practice_record.review_date,
-    user_annotation_set.note_private,
-    user_annotation_set.note_public,
     user_annotation_set.tags,
     playlist_tune.playlist_ref,
-    playlist.user_ref
+    playlist.user_ref,
+    (SELECT group_concat(note.note_text, ' ')
+        FROM note
+        WHERE note.tune_ref = tune.id
+          AND note.user_ref = playlist.user_ref) AS notes
 FROM
     tune
 LEFT JOIN
