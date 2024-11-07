@@ -35,6 +35,7 @@ import {
 import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns";
 import type { TablePurpose, Tune } from "../types";
 import { createOrUpdateTableState, getTableStateTable } from "../settings";
+import "./TunesGrid.css";
 
 export interface IScheduledTunesType {
   tunes: Tune[];
@@ -185,7 +186,7 @@ export function TunesTable(
       ? tableStateFromDb.pagination
       : {
           pageIndex: 0,
-          pageSize: 15, //optionally customize the initial pagination state.
+          pageSize: 1, //optionally customize the initial pagination state.
         },
   );
   const originalSetPaginationState = React.useRef(setPaginationState);
@@ -246,6 +247,11 @@ export function TunesTable(
         if (tableStateFromDb) {
           setTableStateFromDb(tableStateFromDb);
           table.setPagination(tableStateFromDb.pagination);
+          // const hardCodedPagination = {
+          //   pageIndex: 0,
+          //   pageSize: 12, //optionally customize the initial pagination state.
+          // };
+          // table.setPagination(hardCodedPagination);
           table.setRowSelection(tableStateFromDb.rowSelection);
           table.setColumnVisibility(tableStateFromDb.columnVisibility);
           table.setColumnFilters(tableStateFromDb.columnFilters);
@@ -484,7 +490,7 @@ const TunesGrid = (props: Props) => {
 
   return (
     <>
-      <div className="rounded-md border">
+      <div className="rounded-md border table-container">
         <tableContext.Provider value={table}>
           <Table className="table-auto w-full">
             <TableHeader>
