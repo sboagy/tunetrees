@@ -56,7 +56,7 @@ const Sidebar = ({
 
   return currentTune ? (
     <>
-      <div className="flex items-right justify-between mb-2 cursor-pointer">
+      <div className="flex items-right justify-between mb-2 cursor-auto">
         <h4>{tuneTitle}</h4>
         <Button
           variant="ghost"

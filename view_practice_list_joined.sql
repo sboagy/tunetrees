@@ -19,7 +19,13 @@ SELECT
     (SELECT group_concat(note.note_text, ' ')
         FROM note
         WHERE note.tune_ref = tune.id
-          AND note.user_ref = playlist.user_ref) AS notes
+          AND note.user_ref = playlist.user_ref) AS notes,
+    (SELECT ref.url
+     FROM reference ref
+     WHERE ref.tune_ref = tune.id
+      AND ref.user_ref = playlist.user_ref
+      AND ref.favorite = 1
+    LIMIT 1) AS favorite_url
 FROM
     tune
 LEFT JOIN

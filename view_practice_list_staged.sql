@@ -25,7 +25,13 @@ SELECT
        (SELECT group_concat(note.note_text, ' ')
         FROM note
         WHERE note.tune_ref = tune.id
-          AND note.user_ref = playlist.user_ref) AS notes
+          AND note.user_ref = playlist.user_ref) AS notes,
+       (SELECT ref.url
+        FROM reference ref
+        WHERE ref.tune_ref = tune.id
+          AND ref.user_ref = playlist.user_ref
+          AND ref.favorite = 1
+        LIMIT 1) AS favorite_url
 FROM
     tune
 LEFT JOIN
@@ -36,4 +42,5 @@ LEFT JOIN
     practice_record ON practice_record.tune_ref = tune.id AND practice_record.playlist_ref = playlist_tune.playlist_ref
 LEFT JOIN
     user_annotation_set ON user_annotation_set.tune_ref = tune.id
-LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.playlist_id = playlist_tune.playlist_ref;
+LEFT JOIN
+    table_transient_data td ON td.tune_id = tune.id AND td.playlist_id = playlist_tune.playlist_ref;

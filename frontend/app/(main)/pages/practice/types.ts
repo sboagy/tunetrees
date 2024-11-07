@@ -25,6 +25,7 @@ export type Tune = {
   tags?: string | null;
   recall_eval?: string | null;
   notes?: string | null;
+  favorite_url?: string | null;
 };
 
 export type PlaylistTune = {
@@ -48,6 +49,7 @@ export type PlaylistTune = {
   user_ref?: number;
   playlist_ref?: number;
   notes?: string | null;
+  favorite_url?: string | null;
 };
 
 export type ScreenSize = "small" | "full";
@@ -91,11 +93,17 @@ export type TunesGridColumnGeneralType =
   | JSX.Element
   | undefined;
 
+export enum UpdateActionType {
+  CREATE = "create",
+  DELETE = "delete",
+  UPDATE = "update",
+}
+
 export interface IReferenceData {
   tune_ref?: number;
   user_ref?: number;
   public: number | null;
-  id: number;
+  id?: number;
   url: string;
   ref_type: string;
   favorite: number | null;

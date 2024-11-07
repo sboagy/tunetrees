@@ -5,15 +5,15 @@ import { Card, CardContent } from "@/components/ui/card";
 // import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Edit, Check, Star, Save, XCircle, Plus } from "lucide-react";
+import { Edit, Check, Star, Save, XCircle, Plus, Delete } from "lucide-react";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import type { INote } from "../types";
-import { getNotes } from "../queries";
+import { type INote, UpdateActionType } from "../types";
+import { createNote, deleteNote, getNotes, updateNote } from "../queries";
+import AutoResizingTextarea from "@/components/AutoResizingTextarea";
 
 interface INoteCardProps {
   note: INote;
-  onUpdate: (updatedNote: INote) => void;
+  onUpdate: (updatedNote: INote, action: UpdateActionType) => void;
 }
 
 function NoteCard({ note, onUpdate }: INoteCardProps) {
@@ -29,16 +29,39 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
     );
   }
 
-  const handleSave = () => {
-    if (!isModified()) {
-      return;
+  const handleEditClick = (event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the CollapsibleTrigger
+    setIsOpen(!isOpen);
+  };
+
+  const handleDelete = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this note?")) {
+      onUpdate(stagedNote, UpdateActionType.DELETE);
     }
-    onUpdate(stagedNote);
     setIsOpen(false);
   };
 
-  const handleEditClick = (event: React.MouseEvent) => {
+  const handleSave = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (isModified()) {
+      const { isNew, ...noteToUpdate } = stagedNote;
+      onUpdate(
+        noteToUpdate,
+        isNew ? UpdateActionType.CREATE : UpdateActionType.UPDATE,
+      );
+    }
+    setIsOpen(false);
+  };
+
+  const handleCancelClick = (event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent the event from bubbling up to the CollapsibleTrigger
+    if (isModified()) {
+      if (!window.confirm("Are you sure you want to lose your changes?")) {
+        return;
+      }
+      setStagedNote({ ...note });
+    }
     setIsOpen(!isOpen);
   };
 
@@ -97,34 +120,39 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
               </Button>
             </div>
             <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDelete}
+                aria-label="Delete reference"
+                className="p-0 h-auto"
+                title="Delete reference"
+                // disabled={!isModified()} // Disable the button if no modifications are made
+              >
+                <Delete className="h-4 w-4" />
+              </Button>
               {isOpen ? (
                 <>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsOpen(false);
-                    }}
-                    aria-label="Cancel edits"
-                    className="p-0 h-auto cursor-pointer"
-                    title="Cancel edits"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSave();
-                    }}
+                    onClick={handleSave}
                     aria-label="Save edits"
                     className="p-0 h-auto cursor-pointer"
                     title="Save edits"
                     disabled={!isModified()} // Disable the button if no modifications are made
                   >
                     <Save className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCancelClick}
+                    aria-label="Cancel edits"
+                    className="p-0 h-auto cursor-pointer"
+                    title="Cancel edits"
+                  >
+                    <XCircle className="h-4 w-4" />
                   </Button>
                 </>
               ) : (
@@ -144,9 +172,41 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
           {isOpen ? (
             <span />
           ) : (
-            <div className="space-y-2">
-              <p className="text-sm">{note.created_date}</p>
-              <p className="text-sm">{note.note_text}</p>
+            <div className="space-y-0">
+              {stagedNote.created_date ? (
+                <div className="space-y-0">
+                  {/* <label
+                  htmlFor={`edit-date-${note.id}`}
+                  className="text-sm font-medium"
+                >
+                  Edit Date:
+                </label> */}
+                  <Input
+                    id={`edit-date-${note.id}`}
+                    type="date"
+                    value={stagedNote.created_date ?? ""}
+                    readOnly
+                    className="border-none"
+                  />
+                </div>
+              ) : (
+                <span />
+              )}
+              <div className="space-y-0">
+                {/* <label
+                  htmlFor={`edit-note-${note.id}`}
+                  className="text-sm font-medium"
+                >
+                  Edit Note:
+                </label> */}
+                <AutoResizingTextarea
+                  id={`edit-note-${note.id}`}
+                  value={stagedNote.note_text ?? ""}
+                  readOnly
+                  onChange={(e) => handleChange("note_text", e.target.value)}
+                  className="border-none"
+                />
+              </div>
             </div>
           )}
           <CollapsibleContent className="space-y-2 pt-4">
@@ -162,6 +222,17 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
                 type="date"
                 value={stagedNote.created_date ?? ""}
                 onChange={(e) => handleChange("created_date", e.target.value)}
+                onPaste={(e) => {
+                  const pastedText = e.clipboardData.getData("text");
+                  const date = new Date(pastedText);
+                  if (!Number.isNaN(date.getTime())) {
+                    handleChange(
+                      "created_date",
+                      date.toISOString().split("T")[0],
+                    );
+                    e.preventDefault();
+                  }
+                }}
               />
             </div>
             <div className="space-y-1">
@@ -171,11 +242,10 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
               >
                 Edit Note:
               </label>
-              <Textarea
+              <AutoResizingTextarea
                 id={`edit-note-${note.id}`}
                 value={stagedNote.note_text ?? ""}
                 onChange={(e) => handleChange("note_text", e.target.value)}
-                rows={4}
               />
             </div>
           </CollapsibleContent>
@@ -216,13 +286,53 @@ export default function NoteCards({
       .catch((error) => console.error("Error fetching notes:", error));
   }, [tuneRef, userRef, displayPublic]);
 
-  const handleUpdateNote = (updatedNote: INote) => {
-    setNotes((prevNotes) =>
-      prevNotes.map((note) =>
-        note.id === updatedNote.id ? updatedNote : note,
-      ),
-    );
-    // Here you would typically also make an API call to update the note on the server
+  const handleUpdateNote = (updatedNote: INote, action: UpdateActionType) => {
+    if (action === UpdateActionType.DELETE) {
+      // Logic to delete the reference entry
+      console.log("Deleting reference entry...");
+      setNotes((prevNotes) =>
+        prevNotes.filter((note) => note.id !== updatedNote.id),
+      );
+      deleteNote(updatedNote.id ?? 0)
+        .then(() => {
+          console.log("Note deleted successfully");
+        })
+        .catch((error) => {
+          console.error("Error deleting note:", error);
+          alert("An error occurred while deleting the note. Please try again.");
+        });
+    } else if (action === UpdateActionType.CREATE) {
+      // Logic to create a new reference entry
+      console.log("Creating new reference entry...");
+      createNote(updatedNote)
+        .then((result: INote) => {
+          console.log("Reference updated successfully");
+          // Need to update the note with the new ID
+          setNotes((prevNotes) => [...prevNotes, result]);
+        })
+        .catch((error) => {
+          console.error("Error updating reference:", error);
+          alert(
+            "An error occurred while creating the reference. Please try again.",
+          );
+        });
+    } else {
+      setNotes((prevNotes) =>
+        prevNotes.map((note) =>
+          note.id === updatedNote.id ? updatedNote : note,
+        ),
+      );
+      updateNote(updatedNote.id ?? 0, updatedNote)
+        .then(() => {
+          console.log("Reference updated successfully");
+        })
+        .catch((error) => {
+          console.error("Error updating reference:", error);
+          alert(
+            "An error occurred while updating the reference. Please try again.",
+          );
+        });
+    }
   };
 
   return (

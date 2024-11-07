@@ -52,6 +52,7 @@ t_practice_list_joined = Table(
     Column("playlist_ref", Integer),
     Column("user_ref", Integer),
     Column("notes", NullType),
+    Column("favorite_url", Text),
 )
 
 
@@ -81,6 +82,7 @@ t_practice_list_staged = Table(
     Column("staged_notes_public", Text),
     Column("staged_recall_eval", Text),
     Column("notes", NullType),
+    Column("favorite_url", Text),
 )
 
 

@@ -202,6 +202,34 @@ export async function getReferences(
   }
 }
 
+export async function getReferenceFavorite(
+  tuneRef: number,
+  userRef: number | null,
+): Promise<IReferenceData | null> {
+  try {
+    console.log(
+      "In getReferences (server): tuneRef: %s, userRef: %s",
+      tuneRef,
+      userRef,
+    );
+    console.log(
+      `Request URL: /references?user_ref=${userRef}&tune_ref=${tuneRef}&public=0`,
+    );
+    const response = await client.get<IReferenceData[]>(
+      `/references?tune_ref=${tuneRef}&user_ref=${userRef}&public=0`,
+    );
+    const references = response.data;
+    const favoriteReference = references.find((ref) => ref.favorite === 1);
+    if (favoriteReference) {
+      return favoriteReference;
+    }
+    return references.length > 0 ? references[0] : null;
+  } catch (error) {
+    console.error("Error in getReferences: ", error);
+    return null;
+  }
+}
+
 /**
  * Update a specific reference.
  *
@@ -212,12 +240,11 @@ export async function getReferences(
 export async function updateReference(
   referenceId: number,
   referenceUpdate: Partial<IReferenceData>,
-): Promise<{ success?: string; detail?: string }> {
+): Promise<IReferenceData | { success?: string; detail?: string }> {
   try {
-    const response = await client.put<{ success?: string; detail?: string }>(
-      `/references/${referenceId}`,
-      referenceUpdate,
-    );
+    const response = await client.put<
+      IReferenceData | { success?: string; detail?: string }
+    >("/references", referenceUpdate, { params: { id: referenceId } });
     return response.data;
   } catch (error) {
     console.error("Error in updateReference: ", error);
@@ -231,22 +258,22 @@ export async function updateReference(
  * Create a new reference.
  *
  * @param reference - The reference data to create.
- * @returns A promise that resolves to a success or error message.
+ * @returns A promise that resolves to an IReferenceData object.
  */
 export async function createReference(
   reference: IReferenceData,
-): Promise<{ success?: string; detail?: string }> {
+): Promise<IReferenceData> {
   try {
-    const response = await client.post<{ success?: string; detail?: string }>(
+    const { isNew, ...referenceWithoutIsNew } = reference;
+    console.log("createReference: isNew=", isNew);
+    const response = await client.post<IReferenceData>(
       "/references",
-      reference,
+      referenceWithoutIsNew,
     );
     return response.data;
   } catch (error) {
     console.error("Error in createReference: ", error);
-    return {
-      detail: `Unable to create reference: ${(error as Error).message}`,
-    };
+    throw error;
   }
 }
 
@@ -308,13 +335,14 @@ export async function getNotes(
  * @returns A promise that resolves to a success or error message.
  */
 export async function updateNote(
-  note_id: string,
+  note_id: number,
   note_update: Partial<INote>,
 ): Promise<{ success?: string; detail?: string }> {
   try {
     const response = await client.put<{ success?: string; detail?: string }>(
-      `/notes/${note_id}`,
+      "/notes",
       note_update,
+      { params: { id: note_id } },
     );
     return response.data;
   } catch (error) {
@@ -328,21 +356,15 @@ export async function updateNote(
  *
  * @param tune_id - The ID of the tune.
  * @param note - The note data to create.
- * @returns A promise that resolves to a success or error message.
+ * @returns A promise that resolves to a IReferenceData object.
  */
-export async function createNote(
-  tune_id: string,
-  note: INote,
-): Promise<{ success?: string; detail?: string }> {
+export async function createNote(note: INote): Promise<INote> {
   try {
-    const response = await client.post<{ success?: string; detail?: string }>(
-      `/notes/${tune_id}`,
-      note,
-    );
+    const response = await client.post<INote>("/notes", note);
     return response.data;
   } catch (error) {
     console.error("Error in createNote: ", error);
-    return { detail: `Unable to create note: ${(error as Error).message}` };
+    throw error;
   }
 }
 
@@ -353,7 +375,7 @@ export async function createNote(
  * @returns A promise that resolves to a success or error message.
  */
 export async function deleteNote(
-  note_id: string,
+  note_id: number,
 ): Promise<{ success?: string; detail?: string }> {
   try {
     const response = await client.delete<{ success?: string; detail?: string }>(

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from os import environ
 from typing import Annotated, Any, Dict, List, Optional
 
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Body, Form, HTTPException
 from sqlalchemy import ColumnElement, Table
 from starlette import status as status
 from starlette.responses import HTMLResponse, RedirectResponse
@@ -378,13 +378,28 @@ async def get_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
 class ReferenceCreate(BaseModel):
     tune_ref: int
     user_ref: int
-    public: int
-    # Add other fields as necessary
+    public: int | None
+    url: str
+    ref_type: str
+    favorite: int | None
+    comment: str | None
+    title: str | None
 
 
 class ReferenceUpdate(BaseModel):
-    public: Optional[int] = None
-    # Add other fields as necessary
+    tune_ref: Optional[int]
+    user_ref: Optional[int]
+    public: Optional[int]
+    id: Optional[int]
+    url: Optional[str]
+    ref_type: Optional[str]
+    favorite: Optional[int]
+    comment: Optional[str]
+    title: Optional[str]
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class ReferenceResponse(BaseModel):
@@ -478,22 +493,19 @@ def create_reference(reference: ReferenceCreate):
     status_code=200,
 )
 def update_reference(
-    user_ref: int = Query(...),
-    tune_ref: int = Query(...),
-    reference: ReferenceUpdate = Depends(),
+    id: int,
+    reference: ReferenceUpdate = Body(...),
 ):
     try:
         with SessionLocal() as db:
-            stmt = select(Reference).where(
-                (Reference.user_ref == user_ref) & (Reference.tune_ref == tune_ref)
-            )
+            stmt = select(Reference).where((Reference.id == id))
             result = db.execute(stmt)
             existing_reference = result.scalars().first()
 
             if not existing_reference:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Reference not found: ({user_ref}, {tune_ref})",
+                    detail=f"Reference not found: ({id})",
                 )
 
             for key, value in reference.model_dump(exclude_unset=True).items():
@@ -503,36 +515,34 @@ def update_reference(
             db.refresh(existing_reference)
             return ReferenceResponse.model_validate(existing_reference)
     except Exception as e:
-        logger.error(f"Unable to update reference ({user_ref}, {tune_ref}): {e}")
+        logger.error(f"Unable to update reference ({id}: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to update reference: {e}")
 
 
 @router.delete(
-    "/references",
+    "/references/{id}",
     summary="Delete Reference",
     description="Delete an existing reference.",
     status_code=204,
 )
-def delete_reference(user_ref: int = Query(...), tune_ref: int = Query(...)):  # noqa: C901
+def delete_reference(id: int):  # noqa: C901
     try:
         with SessionLocal() as db:
-            stmt = select(Reference).where(
-                (Reference.user_ref == user_ref) & (Reference.tune_ref == tune_ref)
-            )
+            stmt = select(Reference).where(Reference.id == id)
             result = db.execute(stmt)
             existing_reference = result.scalars().first()
 
             if not existing_reference:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Reference not found: ({user_ref}, {tune_ref})",
+                    detail=f"Reference not found: {id}",
                 )
 
             db.delete(existing_reference)
             db.commit()
-            return
+            return {"detail": "Reference deleted successfully"}
     except Exception as e:
-        logger.error(f"Unable to delete reference ({user_ref}, {tune_ref}): {e}")
+        logger.error(f"Unable to delete reference {id}: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to delete reference: {e}")
 
 
@@ -547,11 +557,18 @@ class NoteCreate(BaseModel):
 
 
 class NoteUpdate(BaseModel):
-    playlist_ref: Optional[int] = None
-    created_date: Optional[str] = None
-    note_text: Optional[str] = None
-    public: Optional[bool] = None
-    favorite: Optional[int] = None
+    id: Optional[int]
+    user_ref: Optional[int]
+    tune_ref: Optional[int]
+    playlist_ref: Optional[int]
+    created_date: Optional[str]
+    note_text: Optional[str]
+    public: Optional[bool]
+    favorite: Optional[int]
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class NoteResponse(BaseModel):
@@ -618,26 +635,24 @@ def create_note(note: NoteCreate):
 
 
 @router.put(
-    "/notes/{note_id}",
+    "/notes",
     response_model=NoteResponse,
     summary="Update Note",
     description="Update an existing note.",
     status_code=200,
 )
 def update_note(
-    note_id: int,
-    note: NoteUpdate,
+    id: int,
+    note: NoteUpdate = Body(...),
 ):
     try:
         with SessionLocal() as db:
-            stmt = select(Note).where(Note.id == note_id)
+            stmt = select(Note).where(Note.id == id)
             result = db.execute(stmt)
             existing_note = result.scalars().first()
 
             if not existing_note:
-                raise HTTPException(
-                    status_code=404, detail=f"Note not found: {note_id}"
-                )
+                raise HTTPException(status_code=404, detail=f"Note not found: {id}")
 
             for key, value in note.model_dump(exclude_unset=True).items():
                 setattr(existing_note, key, value)
@@ -646,7 +661,7 @@ def update_note(
             db.refresh(existing_note)
             return NoteResponse.model_validate(existing_note)
     except Exception as e:
-        logger.error(f"Unable to update note ({note_id}): {e}")
+        logger.error(f"Unable to update note ({id}): {e}")
         raise HTTPException(status_code=500, detail=f"Unable to update note: {e}")
 
 
@@ -672,7 +687,7 @@ def delete_note(
 
             db.delete(existing_note)
             db.commit()
-            return
+            return {"detail": "Note deleted successfully"}
     except Exception as e:
         logger.error(f"Unable to delete note ({note_id}): {e}")
         raise HTTPException(status_code=500, detail=f"Unable to delete note: {e}")

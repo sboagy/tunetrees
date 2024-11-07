@@ -380,7 +380,19 @@ export function get_columns(
       accessorKey: "title",
       header: ({ column }) => sortableHeader(column, "Title"),
       cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) => {
-        return info.getValue();
+        const favoriteUrl = info.row.original.favorite_url;
+        return favoriteUrl ? (
+          <a
+            href={favoriteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 underline hover:text-blue-700"
+          >
+            {info.getValue()}
+          </a>
+        ) : (
+          info.getValue()
+        );
       },
       enableSorting: true,
       enableHiding: true,

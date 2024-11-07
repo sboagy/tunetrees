@@ -4,18 +4,29 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, Star, Edit, Plus, Save, XCircle } from "lucide-react";
+import { Check, Star, Edit, Plus, Save, XCircle, Delete } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { getReferences } from "@/app/(main)/pages/practice/queries";
-import type { IReferenceData } from "../types";
+import {
+  createReference,
+  deleteReference,
+  getReferences,
+  updateReference,
+} from "@/app/(main)/pages/practice/queries";
+import { type IReferenceData, UpdateActionType } from "../types";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import "./ReferenceCards.css"; // Import the CSS file
 
 interface IReferenceCardProps {
   reference: IReferenceData;
   onToggle: (id: number, field: "public" | "favorite") => void;
   // onCommentChange: (id: number, comment: string) => void;
   displayPublic: boolean;
-  onUpdate: (updatedNote: IReferenceData) => void;
+  onUpdate: (updatedNote: IReferenceData, action: UpdateActionType) => void;
 }
 
 function ReferenceCard({
@@ -27,6 +38,7 @@ function ReferenceCard({
   const [stagedReference, setStagedReference] = useState<IReferenceData>({
     ...reference,
   });
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   function isModified(): boolean {
     return (
@@ -39,13 +51,39 @@ function ReferenceCard({
     );
   }
 
-  const handleSave = () => {
-    onUpdate(stagedReference);
+  const handleEditClick = (event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the CollapsibleTrigger
+    setIsOpen(!isOpen);
+  };
+
+  const handleSave = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (isModified()) {
+      const { isNew, ...referenceToUpdate } = stagedReference;
+      onUpdate(
+        referenceToUpdate,
+        isNew ? UpdateActionType.CREATE : UpdateActionType.UPDATE,
+      );
+    }
     setIsOpen(false);
   };
 
-  const handleEditClick = (event: React.MouseEvent) => {
+  const handleDelete = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this reference?")) {
+      onUpdate(stagedReference, UpdateActionType.DELETE);
+    }
+    setIsOpen(false);
+  };
+
+  const handleCancelClick = (event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent the event from bubbling up to the CollapsibleTrigger
+    if (isModified()) {
+      if (!window.confirm("Are you sure you want to lose your changes?")) {
+        return;
+      }
+      setStagedReference({ ...reference });
+    }
     setIsOpen(!isOpen);
   };
 
@@ -54,6 +92,11 @@ function ReferenceCard({
     value: string | boolean | number | undefined,
   ) => {
     setStagedReference((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleTypeChange = (newType: string) => {
+    setStagedReference((prev) => ({ ...prev, ref_type: newType }));
+    setIsPopoverOpen(false);
   };
 
   return (
@@ -123,34 +166,39 @@ function ReferenceCard({
               <span className="font-medium"> </span>
             )}
             <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDelete}
+                aria-label="Delete reference"
+                className="p-0 h-auto"
+                title="Delete reference"
+                // disabled={!isModified()} // Disable the button if no modifications are made
+              >
+                <Delete className="h-4 w-4" />
+              </Button>
               {isOpen ? (
                 <>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsOpen(false);
-                    }}
-                    aria-label="Cancel edits"
-                    className="p-0 h-auto cursor-pointer"
-                    title="Cancel edits"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSave();
-                    }}
+                    onClick={handleSave}
                     aria-label="Save edits"
                     className="p-0 h-auto"
                     title="Save edits"
                     disabled={!isModified()} // Disable the button if no modifications are made
                   >
                     <Save className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCancelClick}
+                    aria-label="Cancel edits"
+                    className="p-0 h-auto cursor-pointer"
+                    title="Cancel edits"
+                  >
+                    <XCircle className="h-4 w-4" />
                   </Button>
                 </>
               ) : (
@@ -174,22 +222,56 @@ function ReferenceCard({
               {!isOpen ? <div>{stagedReference.comment}</div> : <span />}
             </div>
           )}
+          <div className="mt-2 flex items-center justify-between">
+            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+              <PopoverTrigger asChild>
+                {isOpen ? (
+                  <Button variant="outline">{stagedReference.ref_type}</Button>
+                ) : (
+                  <Badge
+                    variant={
+                      stagedReference.ref_type === "website"
+                        ? "default"
+                        : stagedReference.ref_type === "audio"
+                          ? "secondary"
+                          : "destructive"
+                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // console.log("Badge clicked");
+                      // setIsPopoverOpen(true);
+                    }}
+                    className={"cursor-default no-hover"}
+                  >
+                    {stagedReference.ref_type}
+                  </Badge>
+                )}
+              </PopoverTrigger>
+              <PopoverContent>
+                <div className="flex flex-col space-y-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleTypeChange("website")}
+                  >
+                    Website
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleTypeChange("audio")}
+                  >
+                    Audio
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleTypeChange("video")}
+                  >
+                    Video
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>{" "}
           <CollapsibleContent className="space-y-2 pt-2">
-            <div className="flex items-center justify-between">
-              <Badge
-                variant={
-                  stagedReference.ref_type === "website"
-                    ? "default"
-                    : stagedReference.ref_type === "audio"
-                      ? "secondary"
-                      : "destructive"
-                }
-                onClick={(e) => e.stopPropagation()}
-                className="cursor-pointer"
-              >
-                {stagedReference.ref_type}
-              </Badge>
-            </div>
             <div className="space-y-1">
               <label
                 htmlFor={`title-${stagedReference.id}`}
@@ -244,7 +326,7 @@ function ReferenceCard({
 
 interface IReferenceCardsProps {
   tuneRef: number;
-  userRef: number | null;
+  userRef: number;
   displayPublic: boolean;
 }
 
@@ -280,13 +362,70 @@ export default function ReferenceCards({
   //     prevReferences.map((ref) => (ref.id === id ? { ...ref, comment } : ref)),
   //   );
   // };
-  const handleUpdateReference = (updatedReference: IReferenceData) => {
-    setReferences((prevReferences) =>
-      prevReferences.map((note) =>
-        note.id === updatedReference.id ? updatedReference : note,
-      ),
-    );
-    // Here you would typically also make an API call to update the note on the server
+  const handleUpdateReference = (
+    updatedReference: IReferenceData,
+    action: UpdateActionType,
+  ) => {
+    if (action === UpdateActionType.DELETE) {
+      // Logic to delete the reference entry
+      console.log("Deleting reference entry...");
+      // Need to update the note with the new ID
+      setReferences((prevReferences) =>
+        prevReferences.filter(
+          (reference) => reference.id !== updatedReference.id,
+        ),
+      );
+      deleteReference(updatedReference.id ?? 0)
+        .then(() => {
+          console.log("Reference deleted successfully");
+        })
+        .catch((error) => {
+          console.error("Error deleting reference:", error);
+          alert(
+            "An error occurred while deleting the reference. Please try again.",
+          );
+        });
+
+      return;
+    }
+    const { isNew, ...referenceToUpdate } = updatedReference;
+    if (action === UpdateActionType.CREATE || isNew) {
+      // Logic to create a new reference entry
+      console.log("Creating new reference entry...");
+      const { id, ...referenceToUpdate2 } = referenceToUpdate;
+      setReferences((prevReferences) =>
+        prevReferences.filter((reference) => reference.id !== id),
+      );
+
+      createReference(referenceToUpdate2)
+        .then((result: IReferenceData) => {
+          console.log("Reference updated successfully");
+          // Need to update the note with the new ID
+          setReferences((prevReferences) => [...prevReferences, result]);
+        })
+        .catch((error) => {
+          console.error("Error creating reference:", error);
+          alert(
+            "An error occurred while creating the reference. Please try again.",
+          );
+        });
+    } else {
+      setReferences((prevReferences) =>
+        prevReferences.map((reference) =>
+          reference.id === updatedReference.id ? updatedReference : reference,
+        ),
+      );
+      updateReference(updatedReference.id ?? 0, updatedReference)
+        .then(() => {
+          console.log("Reference updated successfully");
+        })
+        .catch((error) => {
+          console.error("Error updating reference:", error);
+          alert(
+            "An error occurred while updating the reference. Please try again.",
+          );
+        });
+    }
   };
 
   return (
@@ -301,6 +440,8 @@ export default function ReferenceCards({
             // Logic to create a new reference entry
             const newReference: IReferenceData = {
               id: Date.now(), // Temporary ID, replace with actual ID from the database
+              tune_ref: tuneRef,
+              user_ref: userRef,
               url: "",
               title: "",
               ref_type: "website",
