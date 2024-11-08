@@ -9,7 +9,7 @@ import { Edit, Check, Star, Save, XCircle, Plus, Delete } from "lucide-react";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { type INote, UpdateActionType } from "../types";
 import { createNote, deleteNote, getNotes, updateNote } from "../queries";
-import AutoResizingTextarea from "@/components/AutoResizingTextarea";
+import AutoResizingRichTextarea from "@/components/AutoResizingRichTextarea";
 
 interface INoteCardProps {
   note: INote;
@@ -199,11 +199,11 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
                 >
                   Edit Note:
                 </label> */}
-                <AutoResizingTextarea
+                <AutoResizingRichTextarea
                   id={`edit-note-${note.id}`}
                   value={stagedNote.note_text ?? ""}
                   readOnly
-                  onChange={(e) => handleChange("note_text", e.target.value)}
+                  onChange={(value: string) => handleChange("note_text", value)}
                   className="border-none"
                 />
               </div>
@@ -242,10 +242,10 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
               >
                 Edit Note:
               </label>
-              <AutoResizingTextarea
+              <AutoResizingRichTextarea
                 id={`edit-note-${note.id}`}
                 value={stagedNote.note_text ?? ""}
-                onChange={(e) => handleChange("note_text", e.target.value)}
+                onChange={(value: string) => handleChange("note_text", value)}
               />
             </div>
           </CollapsibleContent>

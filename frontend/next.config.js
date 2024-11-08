@@ -9,6 +9,11 @@ module.exports = {
     // Enables the styled-components SWC transform
     styledComponents: true,
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "2mb",
+    },
+  },
   // files: {
   //   maxSize: "2MB",
   // },

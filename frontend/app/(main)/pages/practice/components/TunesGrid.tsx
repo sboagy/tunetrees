@@ -246,12 +246,12 @@ export function TunesTable(
         const tableStateFromDb = tableStateTable?.settings as TableState;
         if (tableStateFromDb) {
           setTableStateFromDb(tableStateFromDb);
-          table.setPagination(tableStateFromDb.pagination);
-          // const hardCodedPagination = {
-          //   pageIndex: 0,
-          //   pageSize: 12, //optionally customize the initial pagination state.
-          // };
-          // table.setPagination(hardCodedPagination);
+          // table.setPagination(tableStateFromDb.pagination);
+          const hardCodedPagination = {
+            pageIndex: 0,
+            pageSize: 12, //optionally customize the initial pagination state.
+          };
+          table.setPagination(hardCodedPagination);
           table.setRowSelection(tableStateFromDb.rowSelection);
           table.setColumnVisibility(tableStateFromDb.columnVisibility);
           table.setColumnFilters(tableStateFromDb.columnFilters);

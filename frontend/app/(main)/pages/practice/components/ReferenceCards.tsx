@@ -5,7 +5,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Check, Star, Edit, Plus, Save, XCircle, Delete } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   createReference,
@@ -20,6 +19,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import "./ReferenceCards.css"; // Import the CSS file
+import AutoResizingRichTextarea from "@/components/AutoResizingRichTextarea";
+import AutoResizingTextarea from "@/components/AutoResizingTextarea";
 
 interface IReferenceCardProps {
   reference: IReferenceData;
@@ -279,12 +280,12 @@ function ReferenceCard({
               >
                 Title:
               </label>
-              <Textarea
+              <AutoResizingTextarea
                 id={`title-${stagedReference.title}`}
                 value={stagedReference.title ?? ""}
                 onChange={(e) => handleChange("title", e.target.value)}
                 placeholder="Add a title..."
-                className="w-full h-10 min-h-10 max-h-20 !important"
+                // className="w-full h-10 min-h-10 max-h-20 !important"
               />
             </div>
             <div className="space-y-1">
@@ -294,12 +295,12 @@ function ReferenceCard({
               >
                 URL:
               </label>
-              <Textarea
+              <AutoResizingTextarea
                 id={`url-${stagedReference.id}`}
                 value={stagedReference.url ?? ""}
                 onChange={(e) => handleChange("url", e.target.value)}
                 placeholder="Add a url..."
-                className="w-full h-10 min-h-10 max-h-30 !important"
+                // className="w-full h-10 min-h-10 max-h-30 !important"
               />
             </div>
             <div className="space-y-1">
@@ -309,12 +310,12 @@ function ReferenceCard({
               >
                 Comment:
               </label>
-              <Textarea
+              <AutoResizingRichTextarea
                 id={`comment-${stagedReference.id}`}
                 value={stagedReference.comment ?? ""}
-                onChange={(e) => handleChange("comment", e.target.value)}
+                onChange={(value: string) => handleChange("comment", value)}
                 placeholder="Add a comment..."
-                className="w-full h-20 min-h-10 max-h-50 !important"
+                // className="w-full h-20 min-h-10 max-h-50 !important"
               />
             </div>
           </CollapsibleContent>
