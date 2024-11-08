@@ -1,9 +1,9 @@
 {
   "extends": "./node_modules/gts/tsconfig-google.json",
   "compilerOptions": {
-    //    "target": "es5",
+    "target": "es2022",
     "lib": [
-      "es2015",
+      "es2022",
       "dom",
       "dom.iterable",
       "esnext"
@@ -53,6 +53,7 @@
     ".next/types/**/*.ts",
     ".next/**/*.tsx",
     "auth/auth-types.ts",
+    "react-quill.d.ts",
   ],
   "exclude": [
     "node_modules",

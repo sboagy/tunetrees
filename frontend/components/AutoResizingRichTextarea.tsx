@@ -23,6 +23,7 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
   readOnly,
 }) => {
   const [editorValue, setEditorValue] = useState(value);
+  console.log("AutoResizingRichTextarea ignoring id value: ", id);
 
   useEffect(() => {
     // Convert plain text to HTML if necessary
@@ -63,7 +64,7 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
         <div className={className}>{parse(editorValue)}</div>
       ) : (
         <ReactQuill
-          id={id}
+          // id={id}
           value={editorValue}
           onChange={handleChange}
           placeholder={placeholder}

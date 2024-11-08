@@ -1,54 +1,85 @@
 # syntax=docker/dockerfile:1
 
-# Comments are provided throughout this file to help you get started.
-# If you need more help, visit the Dockerfile reference guide at
-# https://docs.docker.com/go/dockerfile-reference/
-
-# Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
-
 ARG NODE_VERSION=22.7.0
 
-################################################################################
 # Use node image for base image for all stages.
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS deps
 
 # Set working directory for all build stages.
 WORKDIR /usr/src/app
 
-COPY tsconfig.json .eslintrc.json .eslintignore .prettierrc .prettierrc.js ./
+# Copy necessary configuration files
+COPY .eslintrc.json .eslintignore .prettierrc .prettierrc.js *.d.ts ./
 
+# Copy necessary configuration files
+COPY tsconfig.json  ./tsconfig.json
+
+# Install necessary dependencies
 RUN npm install --save-dev @next/eslint-plugin-next
-
 RUN npm install gts
-RUN npx gts init --yes
+RUN npx gts init --no
+
+# Remove the src directory created by gts
+RUN rm -rf src
+
+# # Verify the presence of tsconfig-google.json
+# RUN (echo "Checking for tsconfig-google.json (1)" && \
+#     ls -l /usr/src/app/node_modules/gts/tsconfig-google.json && \
+#     echo "Done checking for tsconfig-google.json (1)")
+
+# re-copy the configuration files to since gts is evil and overwrites them
+# Copy necessary configuration files
+# COPY .eslintrc.json .eslintignore .prettierrc .prettierrc.js *.d.ts ./
+
+# Copy necessary configuration files
+COPY tsconfig.json  ./tsconfig.json
 
 # Install TypeScript globally
-RUN npm install -g typescript@5.5.4
+RUN npm install -g typescript@5.6.3
 
+# # Verify the presence of tsconfig-google.json
+# RUN (echo "Checking for tsconfig-google.json (2)" && \
+#     ls -l /usr/src/app/node_modules/gts/tsconfig-google.json && \
+#     echo "Done checking for tsconfig-google.json (2)")
+
+# Install type definitions
 RUN npm install --save-dev @types/node
 
+# Copy package.json and package-lock.json
 COPY package.json package-lock.json ./
 
-# Copy the main application direectories.  I'm not totally sure why 
-# it needs the source in this layer if it's just installing the dependencies, 
-# maybe something to do with install-time linting?
-# COPY app app
-# COPY auth auth
-# COPY components components
-# COPY public public
-# COPY lib lib
+# # Verify the presence of tsconfig-google.json
+# RUN (echo "Checking for tsconfig-google.json (3)" && \
+#     ls -l /usr/src/app/node_modules/gts/tsconfig-google.json && \
+#     echo "Done checking for tsconfig-google.json (3)")
 
-# COPY middleware.ts ./
+# RUN (echo "Dumping tsconfig-google.json (3)" && \
+#     cat /usr/src/app/node_modules/gts/tsconfig-google.json && \
+#     echo "Done Dumping tsconfig-google.json (3)")
 
-# COPY components.json next.config.js next.config.mjs postcss.config.js ./
+# RUN (echo "Running pwd" && \
+#     pwd && \
+#     echo "Done running pwd")
 
-# COPY tailwind.config.js tailwind.config.js ./
+# # Print the environment variables
+# RUN echo "Printing environment variables" && \
+#     printenv && \
+#     echo "Done printing environment variables"
 
-# COPY tsconfig.json ./
+# # Print the contents of tsconfig.json
+# RUN echo "Printing tsconfig.json contents" && \
+#     cat tsconfig.json && \
+#     echo "Done printing tsconfig.json contents"
 
-# RUN npm install gts
+# # Print the contents of node_modules/gts
+# RUN echo "Printing contents of node_modules/gts" && \
+#     ls -l /usr/src/app/node_modules/gts && \
+#     echo "Done printing contents of node_modules/gts"
 
-# RUN npx gts init --yes
+# # Print the contents of the current directory
+# RUN echo "Printing contents of the current directory" && \
+#     ls -l /usr/src/app && \
+#     echo "Done printing contents of the current directory"
 
 # Download dependencies as a separate step to take advantage of Docker's caching.
 # Leverage a cache mount to /root/.npm to speed up subsequent builds.
@@ -58,8 +89,6 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=package-lock.json,target=package-lock.json \
     --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev
-# RUN npm ci --omit=dev
-# CMD ["sleep", "infinity"]
 
 ################################################################################
 # Create a stage for building the application.
@@ -68,8 +97,6 @@ FROM deps AS build
 # Set the working directory
 WORKDIR /usr/src/app
 
-# ENV NEXT_PUBLIC_TT_BASE_URL="http://server:8000/tunetrees"
-
 # Download additional development dependencies before building, as some projects require
 # "devDependencies" to be installed to build. If you don't need this, remove this step.
 RUN --mount=type=bind,source=package.json,target=package.json \
@@ -77,9 +104,7 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=cache,target=/root/.npm \
     npm ci
 
-# Copy the main application direectories.  I'm not totally sure why 
-# it needs the source in this layer if it's just installing the dependencies, 
-# maybe something to do with install-time linting?
+# Copy the main application directories.
 COPY app app
 COPY auth auth
 COPY components components
@@ -87,21 +112,13 @@ COPY public public
 COPY lib lib
 
 COPY middleware.ts ./
-
 COPY components.json next.config.js next.config.mjs postcss.config.js ./
-
 COPY tailwind.config.js tailwind.config.js ./
-
 COPY tsconfig.json ./
-
 COPY .eslintignore .eslintrc.json .prettierrc .prettierrc.js ./
-
-# I don't know where that src directory is coming from, but it's not in the repo.
-RUN rm -rf src
 
 # Run the build script.
 RUN npm run build
-# CMD ["sleep", "infinity"]
 
 ################################################################################
 # Create a new stage to run the application with minimal runtime dependencies
@@ -114,8 +131,8 @@ WORKDIR /usr/src/app
 # Use production node environment by default.
 ENV NODE_ENV=production
 
-# # Do this before we change the user.  Curl is added for developer fooling around 
-# # in terminal.  Maybe do this only in a dev container later.
+# Do this before we change the user. Curl is added for developer fooling around 
+# in terminal. Maybe do this only in a dev container later.
 RUN apk --no-cache add curl
 
 # Run the application as a non-root user.
@@ -129,11 +146,8 @@ COPY package.json .
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/.next ./.next
 
-# ENV NEXT_PUBLIC_TT_BASE_URL="http://server:8000/tunetrees"
-
 # Expose the port that the application listens on.
 EXPOSE 3000
 
 # Run the application.
 CMD ["npm", "start"]
-# CMD npm run dev
