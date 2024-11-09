@@ -1,7 +1,7 @@
 .sidebar {
-  width: 30em;
-  padding: 10px;
-  border-left: 1px solid #ccc;
+  /* width: 30em; */
+  /* padding: 10px; */
+  /* border-left: 1px solid #ccc; */
   transition: width 0.3s ease-in-out;
 }
 

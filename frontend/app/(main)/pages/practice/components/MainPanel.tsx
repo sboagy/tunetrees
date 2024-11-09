@@ -11,6 +11,7 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 import { useRef } from "react";
 import type { Tune } from "../types";
 import { getPracticeListScheduled, getRecentlyPracticed } from "../queries";
+import "./MainPanel.css";
 
 interface IMainPanelProps {
   userId: string;
@@ -96,12 +97,12 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
       <ResizablePanelGroup direction="horizontal">
         <ResizablePanel
           ref={sidebarRef}
-          className={"sidebar"}
+          className={"sidebar flex flex-col overflow-y-auto"} // Add overflow-y-auto for vertical scrolling
           collapsedSize={0} // Set collapsed size to 0
           collapsible={true} // Enable collapsing
           defaultSize={25} // Use current width
           minSize={12} // Adjust minimum size based on collapsed state
-          maxSize={35} // Adjust maximum size based on collapsed state
+          // maxSize={35} // Adjust maximum size based on collapsed state
         >
           <Sidebar
             currentTune={currentTune}
@@ -115,7 +116,12 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
           withHandle
           onDoubleClick={toggleSidebar} // Add double-click event listener
         />
-        <ResizablePanel className="content-panel flex-grow" minSize={65}>
+        <ResizablePanel
+          className="content-panel flex-grow"
+          collapsedSize={0} // Set collapsed size to 0
+          collapsible={true} // Enable collapsing
+          minSize={65}
+        >
           <div className="flex flex-col h-full">
             <TabGroupMain
               user_id={userId}

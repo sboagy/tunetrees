@@ -16,8 +16,8 @@ import {
 import * as React from "react";
 
 import type {
+  PaginationState,
   Row,
-  RowModel,
   RowSelectionState,
   TableState,
   Table as TanstackTable,
@@ -181,20 +181,23 @@ export function TunesTable(
     originalSetRowSelectionRef.current = setRowSelection;
   }, []);
 
-  // const [pagination, setPaginationState] = React.useState<PaginationState>(
-  //   tableStateFromDb
-  //     ? tableStateFromDb.pagination
-  //     : {
-  //         pageIndex: 0,
-  //         pageSize: 12, //optionally customize the initial pagination state.
-  //       },
-  // );
-  // const originalSetPaginationState = React.useRef(setPaginationState);
+  const [pagination, setPaginationState] = React.useState<PaginationState>(
+    tableStateFromDb
+      ? {
+          pageIndex: tableStateFromDb.pagination.pageIndex,
+          pageSize: tunes.length,
+        }
+      : {
+          pageIndex: 0,
+          pageSize: 100000, //optionally customize the initial pagination state.
+        },
+  );
+  const originalSetPaginationState = React.useRef(setPaginationState);
 
-  // React.useEffect(() => {
-  //   // Interception logic here
-  //   originalSetPaginationState.current = setPaginationState;
-  // }, []);
+  React.useEffect(() => {
+    // Interception logic here
+    originalSetPaginationState.current = setPaginationState;
+  }, []);
 
   const columns = get_columns(
     Number.parseInt(user_id),
@@ -229,7 +232,7 @@ export function TunesTable(
       columnFilters,
       rowSelection,
       columnVisibility,
-      // pagination,
+      pagination,
       globalFilter,
     },
   });
@@ -439,122 +442,122 @@ const TunesGrid = (props: Props) => {
   const columns = get_columns(props.userId, props.playlistId, props.purpose);
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
-    const calculatePageSize = () => {
-      getTableStateTable(props.userId, "full", props.purpose)
-        .then((tableStateTable) => {
-          const tableStateFromDb = tableStateTable?.settings as TableState;
-          if (tableContainerRef.current) {
-            const windowHeight = window.innerHeight;
-            const mainContentHeight =
-              document.querySelector("#main-content")?.clientHeight || 0;
-            const headerHeight =
-              document.querySelector("header")?.clientHeight || 0;
-            const footerHeight =
-              document.querySelector("footer")?.clientHeight || 0;
-            const ttTabsHeight =
-              document.querySelector("#tt-tabs")?.clientHeight || 0;
-            const ttTunesGridHeader =
-              document.querySelector("#tt-tunes-grid-header")?.clientHeight ||
-              0;
-            const ttTunesGridFooter =
-              document.querySelector("#tt-tunes-grid-footer")?.clientHeight ||
-              0;
+  // React.useEffect(() => {
+  //   const calculatePageSize = () => {
+  //     getTableStateTable(props.userId, "full", props.purpose)
+  //       .then((tableStateTable) => {
+  //         const tableStateFromDb = tableStateTable?.settings as TableState;
+  //         if (tableContainerRef.current) {
+  //           const windowHeight = window.innerHeight;
+  //           const mainContentHeight =
+  //             document.querySelector("#main-content")?.clientHeight || 0;
+  //           const headerHeight =
+  //             document.querySelector("header")?.clientHeight || 0;
+  //           const footerHeight =
+  //             document.querySelector("footer")?.clientHeight || 0;
+  //           const ttTabsHeight =
+  //             document.querySelector("#tt-tabs")?.clientHeight || 0;
+  //           const ttTunesGridHeader =
+  //             document.querySelector("#tt-tunes-grid-header")?.clientHeight ||
+  //             0;
+  //           const ttTunesGridFooter =
+  //             document.querySelector("#tt-tunes-grid-footer")?.clientHeight ||
+  //             0;
 
-            const ttToolbarSelector =
-              props.purpose === "practice"
-                ? "#tt-scheduled-tunes-header"
-                : "#tt-repertoire-tunes-header";
+  //           const ttToolbarSelector =
+  //             props.purpose === "practice"
+  //               ? "#tt-scheduled-tunes-header"
+  //               : "#tt-repertoire-tunes-header";
 
-            const ttGridToolbarHeight =
-              document.querySelector(ttToolbarSelector)?.clientHeight || 0;
+  //           const ttGridToolbarHeight =
+  //             document.querySelector(ttToolbarSelector)?.clientHeight || 0;
 
-            console.log("windowHeight:", windowHeight);
+  //           console.log("windowHeight:", windowHeight);
 
-            console.log("mainContentHeight:", mainContentHeight);
-            console.log("headerHeight:", headerHeight);
-            console.log("ttGridToolbarHeight:", ttGridToolbarHeight);
-            console.log("footerHeight:", footerHeight);
-            console.log("ttTabsHeight:", ttTabsHeight);
-            console.log("ttTunesGridHeader:", ttTunesGridHeader);
-            console.log("ttTunesGridFooter:", ttTunesGridFooter);
+  //           console.log("mainContentHeight:", mainContentHeight);
+  //           console.log("headerHeight:", headerHeight);
+  //           console.log("ttGridToolbarHeight:", ttGridToolbarHeight);
+  //           console.log("footerHeight:", footerHeight);
+  //           console.log("ttTabsHeight:", ttTabsHeight);
+  //           console.log("ttTunesGridHeader:", ttTunesGridHeader);
+  //           console.log("ttTunesGridFooter:", ttTunesGridFooter);
 
-            const containerHeight =
-              mainContentHeight -
-              ttTabsHeight -
-              ttTunesGridHeader -
-              ttGridToolbarHeight -
-              ttTunesGridFooter;
-            // const containerHeight = tableContainerRef.current.clientHeight;
+  //           const containerHeight =
+  //             mainContentHeight -
+  //             ttTabsHeight -
+  //             ttTunesGridHeader -
+  //             ttGridToolbarHeight -
+  //             ttTunesGridFooter;
+  //           // const containerHeight = tableContainerRef.current.clientHeight;
 
-            console.log("containerHeight:", containerHeight);
+  //           console.log("containerHeight:", containerHeight);
 
-            const rows = tableContainerRef.current.querySelectorAll("tr"); // Adjust the selector as needed
-            console.log("rows.length:", rows.length);
+  //           const rows = tableContainerRef.current.querySelectorAll("tr"); // Adjust the selector as needed
+  //           console.log("rows.length:", rows.length);
 
-            let totalRowHeight = 0;
-            for (const row of rows) {
-              totalRowHeight += row.clientHeight;
-            }
-            const averageRowHeight = totalRowHeight / rows.length;
-            console.log("averageRowHeight:", averageRowHeight);
+  //           let totalRowHeight = 0;
+  //           for (const row of rows) {
+  //             totalRowHeight += row.clientHeight;
+  //           }
+  //           const averageRowHeight = totalRowHeight / rows.length;
+  //           console.log("averageRowHeight:", averageRowHeight);
 
-            let calculatedPageSize = Math.floor(
-              containerHeight / averageRowHeight,
-            );
-            console.log("original calculatedPageSize:", calculatedPageSize);
-            if (calculatedPageSize * averageRowHeight > containerHeight) {
-              calculatedPageSize -= 1;
-            }
-            console.log("adjusted calculatedPageSize:", calculatedPageSize);
-            table.setPagination({
-              ...tableStateFromDb.pagination,
-              pageSize: calculatedPageSize,
-            });
+  //           let calculatedPageSize = Math.floor(
+  //             containerHeight / averageRowHeight,
+  //           );
+  //           console.log("original calculatedPageSize:", calculatedPageSize);
+  //           if (calculatedPageSize * averageRowHeight > containerHeight) {
+  //             calculatedPageSize -= 1;
+  //           }
+  //           calculatedPageSize = table.getRowCount();
+  //           console.log("adjusted calculatedPageSize:", calculatedPageSize);
+  //           table.setPagination({
+  //             ...tableStateFromDb.pagination,
+  //             pageSize: calculatedPageSize,
+  //           });
 
-            saveTableState(
-              table,
-              props.userId.toString(),
-              props.purpose,
-              props.getCurrentTune(),
-            );
+  //           saveTableState(
+  //             table,
+  //             props.userId.toString(),
+  //             props.purpose,
+  //             props.getCurrentTune(),
+  //           );
 
-            // Force the table to recalculate its rows
-            console.log("Forcing the table to recalculate its rows");
-            const rowModel: RowModel<Tune> = table.getRowModel();
-            console.log("rowModel.rows.length:", rowModel.rows.length);
-          }
-        })
-        .catch((error) => {
-          console.error("Error calling server function:", error);
-        });
-    };
+  //           // Force the table to recalculate its rows
+  //           console.log("Forcing the table to recalculate its rows");
+  //           const rowModel: RowModel<Tune> = table.getRowModel();
+  //           console.log("rowModel.rows.length:", rowModel.rows.length);
+  //         }
+  //       })
+  //       .catch((error) => {
+  //         console.error("Error calling server function:", error);
+  //       });
+  //   };
 
-    // Calculate page size on initial render
-    calculatePageSize();
+  //   // Calculate page size on initial render
+  //   calculatePageSize();
 
-    // Debounce resize event
-    const debounce = <T extends (...args: unknown[]) => void>(
-      func: T,
-      wait: number,
-    ) => {
-      let timeout: ReturnType<typeof setTimeout>;
-      return (...args: Parameters<T>): void => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), wait);
-      };
-    };
+  //   // Debounce resize event
+  //   const debounce = <T extends (...args: unknown[]) => void>(
+  //     func: T,
+  //     wait: number,
+  //   ) => {
+  //     let timeout: ReturnType<typeof setTimeout>;
+  //     return (...args: Parameters<T>): void => {
+  //       clearTimeout(timeout);
+  //       timeout = setTimeout(() => func(...args), wait);
+  //     };
+  //   };
 
-    const handleResize = debounce(calculatePageSize, 200);
+  //   const handleResize = debounce(calculatePageSize, 200);
 
-    // Recalculate page size on window resize
-    if (typeof window !== "undefined") {
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
-    } else {
-      return () => console.log("window is undefined");
-    }
-  }, [table, props.userId, props.purpose, props.getCurrentTune]);
+  //   // Recalculate page size on window resize
+  //   if (typeof window !== "undefined") {
+  //     window.addEventListener("resize", handleResize);
+  //     return () => window.removeEventListener("resize", handleResize);
+  //   }
+  //   return () => console.log("window is undefined");
+  // }, [table, props.userId, props.purpose, props.getCurrentTune]);
 
   const handleRowClick = (row: Row<Tune>) => {
     const tuneId = row.original.id;

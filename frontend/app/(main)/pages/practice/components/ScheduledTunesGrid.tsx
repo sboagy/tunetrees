@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import FlashcardPanel from "./FlashcardPanel";
 import NewTuneButton from "./NewTuneButton";
+import { Upload } from "lucide-react";
 
 type ReviewMode = "grid" | "flashcard";
 
@@ -128,7 +129,7 @@ export default function ScheduledTunesGrid({
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full h-full">
       <div
         id="tt-scheduled-tunes-header"
         className="flex items-center justify-between py-4"
@@ -139,7 +140,8 @@ export default function ScheduledTunesGrid({
             variant="outline"
             onClick={() => submitPracticeFeedbacksHandler(refreshDataCallback)}
           >
-            Submit Practiced Tunes
+            <Upload />
+            {window.innerWidth < 768 ? "" : " Submit Practiced Tunes"}
           </Button>
         </div>
         <div className="flex items-center space-x-4">
@@ -150,14 +152,14 @@ export default function ScheduledTunesGrid({
           />
         </div>
         <div className="flex items-center space-x-4 mb-4">
-          <Button
+          {/* <Button
             variant="outline"
             size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
             style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
           >
-            Previous
+            {"<"}
           </Button>
           <Button
             variant="outline"
@@ -166,8 +168,8 @@ export default function ScheduledTunesGrid({
             disabled={!table.getCanNextPage()}
             style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
           >
-            Next
-          </Button>
+            {">"}
+          </Button> */}
           <div
             style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
           >

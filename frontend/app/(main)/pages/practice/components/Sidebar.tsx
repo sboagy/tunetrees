@@ -9,6 +9,7 @@ import { Edit } from "lucide-react";
 import { getTune } from "../queries";
 import { useEffect, useState } from "react";
 import type { Tune } from "../types";
+import "./Sidebar.css";
 
 interface ISidebarProps {
   currentTune: number | null; // Add currentTune prop
@@ -55,37 +56,39 @@ const Sidebar = ({
   }, [currentTune]);
 
   return currentTune ? (
-    <>
-      <div className="flex items-right justify-between mb-2 cursor-auto">
-        <h4>{tuneTitle}</h4>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Edit"
-          className="p-0 h-auto"
-          title="Edit"
-          onClick={() => {
-            console.log("Edit button clicked");
-            router.push(
-              `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${currentTune}`,
-            );
-            void refreshData();
-          }}
-        >
-          <Edit className="h-4 w-4" />
-        </Button>
+    <div className="flex flex-col h-full">
+      <div className="sidebar flex-grow overflow-y-auto">
+        <div className="flex items-right justify-between mb-2 cursor-auto">
+          <h4>{tuneTitle}</h4>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Edit"
+            className="p-0 h-auto"
+            title="Edit"
+            onClick={() => {
+              console.log("Edit button clicked");
+              router.push(
+                `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${currentTune}`,
+              );
+              void refreshData();
+            }}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="urls">
+          <ReferenceCards
+            tuneRef={currentTune}
+            userRef={1}
+            displayPublic={true}
+          />
+        </div>
+        <div className="notes">
+          <NoteCards tuneRef={currentTune} userRef={1} displayPublic={true} />
+        </div>
       </div>
-      <div className="urls">
-        <ReferenceCards
-          tuneRef={currentTune}
-          userRef={1}
-          displayPublic={true}
-        />
-      </div>
-      <div className="notes">
-        <NoteCards tuneRef={currentTune} userRef={1} displayPublic={true} />
-      </div>
-    </>
+    </div>
   ) : (
     <p>No Tune selected</p>
   );

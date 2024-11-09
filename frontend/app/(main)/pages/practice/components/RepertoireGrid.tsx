@@ -15,6 +15,7 @@ import { submitPracticeFeedbacks } from "../commands";
 import type { Tune } from "../types";
 import NewTuneButton from "./NewTuneButton";
 import { getTableCurrentTune } from "../settings";
+import { FastForward } from "lucide-react";
 
 async function fetchFilterFromDB(
   userId: number,
@@ -174,7 +175,7 @@ export default function RepertoireGrid({
   //   );
 
   return (
-    <div className="w-full">
+    <div className="w-full h-full">
       {/* Optionally, show a loading indicator */}
       {!isFilterLoaded ? (
         <p>Loading...</p>
@@ -189,8 +190,10 @@ export default function RepertoireGrid({
                 disabled={!isAddToReviewQueueEnabled}
                 variant="outline"
                 onClick={() => addToReviewQueue(refreshDataCallback)}
+                title="Add selected tunes to review queue"
               >
-                Add To Review
+                <FastForward />
+                {window.innerWidth < 768 ? "" : " Add To Review"}
               </Button>
               {/* <Select value={preset} onValueChange={handlePresetChange}>
                 <SelectTrigger className="w-[200px]">
@@ -217,13 +220,13 @@ export default function RepertoireGrid({
               />
             </div>
             <div className="flex items-center space-x-4 mb-4">
-              <Button
+              {/* <Button
                 variant="outline"
                 size="sm"
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
               >
-                Previous
+                {"<"}
               </Button>
               <Button
                 variant="outline"
@@ -231,8 +234,8 @@ export default function RepertoireGrid({
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
               >
-                Next
-              </Button>
+                {">"}
+              </Button> */}
               <ColumnsMenu user_id={user_id} table={table} />
               <NewTuneButton
                 user_id={user_id}
