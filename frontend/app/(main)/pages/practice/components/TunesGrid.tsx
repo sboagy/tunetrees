@@ -16,8 +16,8 @@ import {
 import * as React from "react";
 
 import type {
-  PaginationState,
   Row,
+  RowModel,
   RowSelectionState,
   TableState,
   Table as TanstackTable,
@@ -181,20 +181,20 @@ export function TunesTable(
     originalSetRowSelectionRef.current = setRowSelection;
   }, []);
 
-  const [pagination, setPaginationState] = React.useState<PaginationState>(
-    tableStateFromDb
-      ? tableStateFromDb.pagination
-      : {
-          pageIndex: 0,
-          pageSize: 1, //optionally customize the initial pagination state.
-        },
-  );
-  const originalSetPaginationState = React.useRef(setPaginationState);
+  // const [pagination, setPaginationState] = React.useState<PaginationState>(
+  //   tableStateFromDb
+  //     ? tableStateFromDb.pagination
+  //     : {
+  //         pageIndex: 0,
+  //         pageSize: 12, //optionally customize the initial pagination state.
+  //       },
+  // );
+  // const originalSetPaginationState = React.useRef(setPaginationState);
 
-  React.useEffect(() => {
-    // Interception logic here
-    originalSetPaginationState.current = setPaginationState;
-  }, []);
+  // React.useEffect(() => {
+  //   // Interception logic here
+  //   originalSetPaginationState.current = setPaginationState;
+  // }, []);
 
   const columns = get_columns(
     Number.parseInt(user_id),
@@ -229,7 +229,7 @@ export function TunesTable(
       columnFilters,
       rowSelection,
       columnVisibility,
-      pagination,
+      // pagination,
       globalFilter,
     },
   });
@@ -247,11 +247,11 @@ export function TunesTable(
         if (tableStateFromDb) {
           setTableStateFromDb(tableStateFromDb);
           // table.setPagination(tableStateFromDb.pagination);
-          const hardCodedPagination = {
-            pageIndex: 0,
-            pageSize: 12, //optionally customize the initial pagination state.
-          };
-          table.setPagination(hardCodedPagination);
+          // const hardCodedPagination = {
+          //   pageIndex: 0,
+          //   pageSize: 12, //optionally customize the initial pagination state.
+          // };
+          // table.setPagination(hardCodedPagination);
           table.setRowSelection(tableStateFromDb.rowSelection);
           table.setColumnVisibility(tableStateFromDb.columnVisibility);
           table.setColumnFilters(tableStateFromDb.columnFilters);
@@ -364,28 +364,28 @@ export function TunesTable(
     );
   };
 
-  const interceptedSetPagination = (
-    newPaginationState:
-      | PaginationState
-      | ((state: PaginationState) => PaginationState),
-  ): void => {
-    const resolvedPaginationState: PaginationState =
-      newPaginationState instanceof Function
-        ? newPaginationState(pagination)
-        : newPaginationState;
+  // const interceptedSetPagination = (
+  //   newPaginationState:
+  //     | PaginationState
+  //     | ((state: PaginationState) => PaginationState),
+  // ): void => {
+  //   const resolvedPaginationState: PaginationState =
+  //     newPaginationState instanceof Function
+  //       ? newPaginationState(pagination)
+  //       : newPaginationState;
 
-    originalSetPaginationState.current(resolvedPaginationState);
+  //   originalSetPaginationState.current(resolvedPaginationState);
 
-    console.log(
-      `=> interceptedSetPagination - resolvedPaginationState: ${JSON.stringify(resolvedPaginationState)}`,
-    );
-    saveTableState(
-      table,
-      user_id,
-      table_purpose,
-      getCurrentTune ? getCurrentTune() : -1,
-    );
-  };
+  //   console.log(
+  //     `=> interceptedSetPagination - resolvedPaginationState: ${JSON.stringify(resolvedPaginationState)}`,
+  //   );
+  //   saveTableState(
+  //     table,
+  //     user_id,
+  //     table_purpose,
+  //     getCurrentTune ? getCurrentTune() : -1,
+  //   );
+  // };
 
   table.setOptions((prev) => ({
     ...prev, //preserve any other options that we have set up above
@@ -393,7 +393,7 @@ export function TunesTable(
     onColumnFiltersChange: interceptedOnColumnFiltersChange,
     onRowSelectionChange: interceptedRowSelectionChange,
     onColumnVisibilityChange: interceptedSetColumnVisibility,
-    onPaginationChange: interceptedSetPagination,
+    // onPaginationChange: interceptedSetPagination,
   }));
 
   return table;
@@ -424,16 +424,137 @@ type Props = {
   playlistId: number;
   purpose: TablePurpose;
   globalFilter?: string;
-  setMainPanelCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
+  setMainPanelCurrentTune: (tuneId: number | null) => void;
   getCurrentTune: () => number | null;
   setCurrentTune: (tuneId: number) => void;
+  refreshData: () => Promise<{
+    scheduledData: Tune[];
+    repertoireData: Tune[];
+  }>;
 };
 
 const TunesGrid = (props: Props) => {
   const router = useRouter();
-
   const table = props.table;
   const columns = get_columns(props.userId, props.playlistId, props.purpose);
+  const tableContainerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const calculatePageSize = () => {
+      getTableStateTable(props.userId, "full", props.purpose)
+        .then((tableStateTable) => {
+          const tableStateFromDb = tableStateTable?.settings as TableState;
+          if (tableContainerRef.current) {
+            const windowHeight = window.innerHeight;
+            const mainContentHeight =
+              document.querySelector("#main-content")?.clientHeight || 0;
+            const headerHeight =
+              document.querySelector("header")?.clientHeight || 0;
+            const footerHeight =
+              document.querySelector("footer")?.clientHeight || 0;
+            const ttTabsHeight =
+              document.querySelector("#tt-tabs")?.clientHeight || 0;
+            const ttTunesGridHeader =
+              document.querySelector("#tt-tunes-grid-header")?.clientHeight ||
+              0;
+            const ttTunesGridFooter =
+              document.querySelector("#tt-tunes-grid-footer")?.clientHeight ||
+              0;
+
+            const ttToolbarSelector =
+              props.purpose === "practice"
+                ? "#tt-scheduled-tunes-header"
+                : "#tt-repertoire-tunes-header";
+
+            const ttGridToolbarHeight =
+              document.querySelector(ttToolbarSelector)?.clientHeight || 0;
+
+            console.log("windowHeight:", windowHeight);
+
+            console.log("mainContentHeight:", mainContentHeight);
+            console.log("headerHeight:", headerHeight);
+            console.log("ttGridToolbarHeight:", ttGridToolbarHeight);
+            console.log("footerHeight:", footerHeight);
+            console.log("ttTabsHeight:", ttTabsHeight);
+            console.log("ttTunesGridHeader:", ttTunesGridHeader);
+            console.log("ttTunesGridFooter:", ttTunesGridFooter);
+
+            const containerHeight =
+              mainContentHeight -
+              ttTabsHeight -
+              ttTunesGridHeader -
+              ttGridToolbarHeight -
+              ttTunesGridFooter;
+            // const containerHeight = tableContainerRef.current.clientHeight;
+
+            console.log("containerHeight:", containerHeight);
+
+            const rows = tableContainerRef.current.querySelectorAll("tr"); // Adjust the selector as needed
+            console.log("rows.length:", rows.length);
+
+            let totalRowHeight = 0;
+            for (const row of rows) {
+              totalRowHeight += row.clientHeight;
+            }
+            const averageRowHeight = totalRowHeight / rows.length;
+            console.log("averageRowHeight:", averageRowHeight);
+
+            let calculatedPageSize = Math.floor(
+              containerHeight / averageRowHeight,
+            );
+            console.log("original calculatedPageSize:", calculatedPageSize);
+            if (calculatedPageSize * averageRowHeight > containerHeight) {
+              calculatedPageSize -= 1;
+            }
+            console.log("adjusted calculatedPageSize:", calculatedPageSize);
+            table.setPagination({
+              ...tableStateFromDb.pagination,
+              pageSize: calculatedPageSize,
+            });
+
+            saveTableState(
+              table,
+              props.userId.toString(),
+              props.purpose,
+              props.getCurrentTune(),
+            );
+
+            // Force the table to recalculate its rows
+            console.log("Forcing the table to recalculate its rows");
+            const rowModel: RowModel<Tune> = table.getRowModel();
+            console.log("rowModel.rows.length:", rowModel.rows.length);
+          }
+        })
+        .catch((error) => {
+          console.error("Error calling server function:", error);
+        });
+    };
+
+    // Calculate page size on initial render
+    calculatePageSize();
+
+    // Debounce resize event
+    const debounce = <T extends (...args: unknown[]) => void>(
+      func: T,
+      wait: number,
+    ) => {
+      let timeout: ReturnType<typeof setTimeout>;
+      return (...args: Parameters<T>): void => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+      };
+    };
+
+    const handleResize = debounce(calculatePageSize, 200);
+
+    // Recalculate page size on window resize
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    } else {
+      return () => console.log("window is undefined");
+    }
+  }, [table, props.userId, props.purpose, props.getCurrentTune]);
 
   const handleRowClick = (row: Row<Tune>) => {
     const tuneId = row.original.id;
@@ -441,7 +562,6 @@ const TunesGrid = (props: Props) => {
     props.setCurrentTune(tuneId || 0);
     console.log("handleRowClick: tuneId=", tuneId);
     saveTableState(table, props.userId.toString(), props.purpose, tuneId ?? -1);
-    // table.setRowSelection({ [row.id]: true }); // Update table selection state
   };
 
   React.useEffect(() => {
@@ -465,22 +585,6 @@ const TunesGrid = (props: Props) => {
       .catch((error) => {
         console.error("Error calling server function:", error);
       });
-
-    //   if (currentTune !== null) {
-    //     const rowToScrollTo = table
-    //       .getRowModel()
-    //       .rows.find((row) => row.original.id === currentTune);
-    //     if (rowToScrollTo) {
-    //       const rowElement = document.querySelector(
-    //         `[data-row-id="${rowToScrollTo.id}"]`,
-    //       );
-    //       if (rowElement) {
-    //         rowElement.scrollIntoView({ behavior: "smooth", block: "center" });
-    //         rowElement.classList.add("bg-blue-100");
-    //         // rowElement.classList.remove("bg-blue-100");
-    //       }
-    //     }
-    //   }
   }, [
     props.userId,
     props.purpose,
@@ -490,10 +594,14 @@ const TunesGrid = (props: Props) => {
 
   return (
     <>
-      <div className="rounded-md border table-container">
+      <div
+        className="rounded-md border table-container flex-grow"
+        ref={tableContainerRef}
+        style={{ height: "100%", overflowY: "auto" }}
+      >
         <tableContext.Provider value={table}>
           <Table className="table-auto w-full">
-            <TableHeader>
+            <TableHeader id="tt-tunes-grid-header">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="h-auto">
                   {headerGroup.headers.map((header) => {
@@ -540,7 +648,6 @@ const TunesGrid = (props: Props) => {
                       );
                     }}
                     data-state={row.getIsSelected() && "selected"}
-                    // className="hover:bg-gray-100"
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
@@ -566,7 +673,10 @@ const TunesGrid = (props: Props) => {
           </Table>
         </tableContext.Provider>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
+      <div
+        className="flex items-center justify-end space-x-2 py-4"
+        id="tt-tunes-grid-footer"
+      >
         <div className="flex-1 text-sm text-muted-foreground">
           {table.getFilteredSelectedRowModel().rows.length} of{" "}
           {table.getFilteredRowModel().rows.length} row(s) selected.

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Check, Star, Edit, Plus, Save, XCircle, Delete } from "lucide-react";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
@@ -149,23 +148,6 @@ function ReferenceCard({
                 </Button>
               )}
             </div>
-            {!isOpen ? (
-              <div className="flex items-center">
-                <a
-                  href={stagedReference.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {stagedReference.title && stagedReference.title.trim() !== ""
-                    ? stagedReference.title
-                    : stagedReference.url}
-                </a>
-              </div>
-            ) : (
-              <span className="font-medium"> </span>
-            )}
             <div className="flex items-center space-x-2">
               <Button
                 variant="ghost"
@@ -220,57 +202,90 @@ function ReferenceCard({
             <span />
           ) : (
             <div className="space-y-2">
-              {!isOpen ? <div>{stagedReference.comment}</div> : <span />}
+              {!isOpen && stagedReference.comment?.trim ? (
+                <AutoResizingRichTextarea
+                  id={`edit-note-${reference.id}`}
+                  value={stagedReference.comment ?? ""}
+                  readOnly
+                  onChange={(value: string) => handleChange("comment", value)}
+                  className="border-none"
+                />
+              ) : (
+                <span />
+              )}
             </div>
           )}
           <div className="mt-2 flex items-center justify-between">
-            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-              <PopoverTrigger asChild>
-                {isOpen ? (
-                  <Button variant="outline">{stagedReference.ref_type}</Button>
-                ) : (
-                  <Badge
-                    variant={
+            {!isOpen ? (
+              <>
+                <div
+                  className={`mt-1 rounded-2xl px-2 py-1 ${
+                    stagedReference.ref_type === "website"
+                      ? "bg-blue-800 text-white"
+                      : stagedReference.ref_type === "audio"
+                        ? "bg-green-800 text-white"
+                        : "bg-red-800 text-white"
+                  }`}
+                >
+                  {stagedReference.ref_type}
+                </div>
+                <div className="flex items-center">
+                  <a
+                    href={stagedReference.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {stagedReference.title &&
+                    stagedReference.title.trim() !== ""
+                      ? stagedReference.title
+                      : stagedReference.url}
+                  </a>
+                </div>
+              </>
+            ) : (
+              <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <div
+                    className={`mt-1 rounded-2xl px-2 py-1 ${
                       stagedReference.ref_type === "website"
-                        ? "default"
+                        ? "bg-blue-800 text-white"
                         : stagedReference.ref_type === "audio"
-                          ? "secondary"
-                          : "destructive"
-                    }
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // console.log("Badge clicked");
-                      // setIsPopoverOpen(true);
-                    }}
-                    className={"cursor-default no-hover"}
+                          ? "bg-green-800 text-white"
+                          : "bg-purple-800 text-white"
+                    }`}
                   >
                     {stagedReference.ref_type}
-                  </Badge>
-                )}
-              </PopoverTrigger>
-              <PopoverContent>
-                <div className="flex flex-col space-y-2">
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleTypeChange("website")}
-                  >
-                    Website
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleTypeChange("audio")}
-                  >
-                    Audio
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleTypeChange("video")}
-                  >
-                    Video
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <div className="flex flex-col space-y-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleTypeChange("website")}
+                      className="bg-blue-800 text-white"
+                    >
+                      Website
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleTypeChange("audio")}
+                      className="bg-green-800 text-white"
+                    >
+                      Audio
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleTypeChange("video")}
+                      className="bg-purple-800 text-white"
+                    >
+                      Video
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>{" "}
           <CollapsibleContent className="space-y-2 pt-2">
             <div className="space-y-1">

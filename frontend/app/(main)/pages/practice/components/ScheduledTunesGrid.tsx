@@ -129,7 +129,10 @@ export default function ScheduledTunesGrid({
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between py-4">
+      <div
+        id="tt-scheduled-tunes-header"
+        className="flex items-center justify-between py-4"
+      >
         <div className="flex-row items-center">
           <Button
             type="submit"
@@ -186,6 +189,7 @@ export default function ScheduledTunesGrid({
           setMainPanelCurrentTune={setMainPanelCurrentTune}
           getCurrentTune={getCurrentTune}
           setCurrentTune={setCurrentTune}
+          refreshData={refreshData}
         />
       ) : (
         <FlashcardPanel

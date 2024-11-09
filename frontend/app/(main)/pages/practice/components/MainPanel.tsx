@@ -84,6 +84,13 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
     }
   };
 
+  useEffect(() => {
+    // Collapse the sidebar if on a small device
+    if (window !== undefined && sidebarRef.current && window.innerWidth < 768) {
+      sidebarRef.current.collapse();
+    }
+  }, []);
+
   return (
     <div className="main-panel">
       <ResizablePanelGroup direction="horizontal">
@@ -108,17 +115,19 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
           withHandle
           onDoubleClick={toggleSidebar} // Add double-click event listener
         />
-        <ResizablePanel className="content-panel" minSize={65}>
-          <TabGroupMain
-            user_id={userId}
-            playlist_id={playlistId}
-            setCurrentTune={setCurrentTune} // Pass setCurrentTune to TabGroupMain
-            currentTune={currentTune}
-            loading={loading}
-            scheduled={scheduled}
-            recentlyPracticed={recentlyPracticed}
-            refreshData={refreshData} // Pass refreshData
-          />
+        <ResizablePanel className="content-panel flex-grow" minSize={65}>
+          <div className="flex flex-col h-full">
+            <TabGroupMain
+              user_id={userId}
+              playlist_id={playlistId}
+              setCurrentTune={setCurrentTune} // Pass setCurrentTune to TabGroupMain
+              currentTune={currentTune}
+              loading={loading}
+              scheduled={scheduled}
+              recentlyPracticed={recentlyPracticed}
+              refreshData={refreshData} // Pass refreshData
+            />
+          </div>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

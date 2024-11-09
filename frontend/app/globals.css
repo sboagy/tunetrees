@@ -66,6 +66,15 @@
   body {
     @apply bg-background text-foreground;
   }
+  a {
+    color: revert;
+    text-decoration: underline;
+    transition: revert;
+
+    &:hover {
+      color: revert;
+    }
+  }
 }
 
 html, body {

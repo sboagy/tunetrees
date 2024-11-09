@@ -29,9 +29,9 @@ export async function createOrUpdateTableState(
   currentTune: number | null,
 ): Promise<number> {
   try {
-    console.log(
-      `=> createOrUpdateTableState rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
-    );
+    // console.log(
+    //   `=> createOrUpdateTableState rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
+    // );
     const tableStatesStr = JSON.stringify(tableStates);
     const tableStateTable: ITableStateTable = {
       user_id: userId,
@@ -51,7 +51,7 @@ export async function createOrUpdateTableState(
         },
       },
     );
-    console.log("<= createOrUpdateTableState: ", response?.status);
+    // console.log("<= createOrUpdateTableState: ", response?.status);
     return response.status;
   } catch (error) {
     console.error("<= createOrUpdateTableState: ", error);

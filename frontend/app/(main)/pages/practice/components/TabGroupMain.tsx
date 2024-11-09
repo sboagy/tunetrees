@@ -125,7 +125,10 @@ export default function TabGroupMain({
       onValueChange={changeActiveTab}
       className="flex h-full w-full flex-col"
     >
-      <TabsList className="grid w-full grid-cols-3 rounded-none bg-transparent p-0 gap-2">
+      <TabsList
+        id="tt-tabs"
+        className="grid w-full grid-cols-3 rounded-none bg-transparent p-0 gap-2"
+      >
         {tabSpec.map((tab) => (
           <TabsTrigger
             key={tab.id}

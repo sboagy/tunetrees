@@ -3,13 +3,7 @@
 import { Button } from "@/components/ui/button";
 import ColumnsMenu from "./ColumnsMenu";
 import TunesGrid, { type IScheduledTunesType, TunesTable } from "./TunesGrid";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import { Input } from "@/components/ui/input";
 import { useCallback, useEffect, useState } from "react";
 
@@ -107,12 +101,12 @@ export default function RepertoireGrid({
     getCurrentTune,
   };
   const table = TunesTable(tunesWithFilter, selectionChangedCallback);
-  const [preset, setPreset] = useState("");
+  // const [preset, setPreset] = useState("");
 
-  const handlePresetChange = (value: string) => {
-    setPreset(value);
-    // Implement preset logic here
-  };
+  // const handlePresetChange = (value: string) => {
+  //   setPreset(value);
+  //   // Implement preset logic here
+  // };
 
   const addToReviewQueue = (
     refreshData: () => Promise<{
@@ -186,16 +180,19 @@ export default function RepertoireGrid({
         <p>Loading...</p>
       ) : (
         <>
-          <div className="flex items-center justify-between py-4">
+          <div
+            id="tt-repertoire-tunes-header"
+            className="flex items-center justify-between py-4"
+          >
             <div className="flex items-center space-x-4 mb-4">
               <Button
                 disabled={!isAddToReviewQueueEnabled}
                 variant="outline"
                 onClick={() => addToReviewQueue(refreshDataCallback)}
               >
-                Add To Review Queue
+                Add To Review
               </Button>
-              <Select value={preset} onValueChange={handlePresetChange}>
+              {/* <Select value={preset} onValueChange={handlePresetChange}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Presets" />
                 </SelectTrigger>
@@ -205,7 +202,7 @@ export default function RepertoireGrid({
                   <SelectItem value="lapsed">Show Recently Lapsed</SelectItem>
                   <SelectItem value="selected">Show Only Selected</SelectItem>
                 </SelectContent>
-              </Select>
+              </Select> */}
             </div>
             <div
               className="flex items-center space-x-4 mb-4"
@@ -253,6 +250,7 @@ export default function RepertoireGrid({
             setMainPanelCurrentTune={setMainPanelCurrentTune} // Pass setCurrentTune to TunesGrid
             getCurrentTune={getCurrentTune}
             setCurrentTune={setCurrentTune}
+            refreshData={refreshData}
           />
         </>
       )}
