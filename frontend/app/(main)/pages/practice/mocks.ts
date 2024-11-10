@@ -138,7 +138,6 @@ export const ERROR_PLAYLIST_TUNE: PlaylistTune = {
   interval: 0,
   repetitions: 0,
   review_date: "Error",
-  backup_practiced: "Error",
   tags: "Error", // Optional property, should't need to be set
   user_ref: 0,
   playlist_ref: 0,
