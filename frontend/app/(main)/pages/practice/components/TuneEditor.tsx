@@ -124,17 +124,16 @@ export default function TuneEditor({
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     console.log(data);
 
-    const result: { success?: string; detail?: string } =
-      await updatePlaylistTune(
-        userId,
-        playlistId,
-        tuneId,
-        data as PlaylistTune,
-      );
-    if (result.success) {
-      console.log("Tune updated successfully");
-    } else {
+    const result = await updatePlaylistTune(
+      userId,
+      playlistId,
+      tuneId,
+      data as PlaylistTune,
+    );
+    if ("detail" in result) {
       console.error("Failed to update tune:", result.detail);
+    } else {
+      console.log("Tune updated successfully");
     }
     router.back();
   };

@@ -27,18 +27,15 @@ from tunetrees.app.schedule import (
 from tunetrees.models.tunetrees import (
     Note,
     PlaylistTune,
-    PracticeRecord,
     Reference,
     Tune,
-    UserAnnotationSet,
     t_practice_list_staged,
     t_practice_list_joined,
 )
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.future import select
-from fastapi import Depends, Query
+from fastapi import Query
 
 logger = logging.getLogger("tunetrees.api")
 
@@ -185,27 +182,28 @@ async def feedback(
 
 
 class PlaylistTuneJoinedModel(BaseModel):
-    id: Optional[int]
-    title: Optional[str]
-    type: Optional[str]
-    structure: Optional[str]
-    mode: Optional[str]
-    incipit: Optional[str]
-    learned: Optional[str]
-    practiced: Optional[str]
-    quality: Optional[int]
-    easiness: Optional[float]
-    interval: Optional[int]
-    repetitions: Optional[int]
-    review_date: Optional[str]
-    tags: Optional[str]
-    user_ref: Optional[int]
-    playlist_ref: Optional[int]
-    notes: Optional[str]
+    id: Optional[int] = None
+    title: Optional[str] = None
+    type: Optional[str] = None
+    structure: Optional[str] = None
+    mode: Optional[str] = None
+    incipit: Optional[str] = None
+    learned: Optional[str] = None
+    practiced: Optional[str] = None
+    quality: Optional[int] = None
+    easiness: Optional[float] = None
+    interval: Optional[int] = None
+    repetitions: Optional[int] = None
+    review_date: Optional[str] = None
+    tags: Optional[str] = None
+    user_ref: Optional[int] = None
+    playlist_ref: Optional[int] = None
+    notes: Optional[str] = None
+    favorite_url: Optional[str] = None
 
-    model_config = {
-        "from_attributes": True  # Enable attribute parsing from ORM objects
-    }
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 def update_table(
@@ -216,87 +214,6 @@ def update_table(
 ):
     stmt = table.update().where(*conditions).values(**values)
     db.execute(stmt)
-
-
-@router.put("/playlist-tune/{user_id}/{playlist_ref}/{tune_id}", response_model=dict)
-async def update_playlist_tune(
-    user_id: int, playlist_ref: int, tune_id: int, tune_update: PlaylistTuneJoinedModel
-):
-    """
-    Directly update a constituent tablels joined by the `practice_list_joined` view fields.
-
-    Args:
-        user_id (int): Unique user ID.
-        playlist_ref (int): Unique playlist ID.
-        tune_id (int): Unique tune ID.
-        tune_update (PlaylistTuneJoinedModel): The fields to update (all optional).
-
-    Note:
-        At some point, access control for the tune table field updates may be needed,
-        since the core tune data may be shared across users.
-
-    Returns:
-        dict: A dictionary containing either a success message or an error message.
-            Example:
-                {"success": "Tune updated successfully"}
-                {"detail": "No tune found to update"}
-                {"detail": "Unable to update tune: <error_message>"}
-    """
-    with SessionLocal() as db:
-        try:
-            updates = tune_update.model_dump(exclude_unset=True)
-
-            # Define the mapping of fields to tables and columns
-            table_field_mapping = {
-                Tune: ["title", "type", "structure", "mode", "incipit"],
-                PlaylistTune: ["learned"],
-                PracticeRecord: [
-                    "practiced",
-                    "quality",
-                    "easiness",
-                    "interval",
-                    "repetitions",
-                    "review_date",
-                    # "backup_practiced",
-                ],
-                UserAnnotationSet: ["tags"],
-            }
-
-            # Update each table based on the fields provided
-            for table, fields in table_field_mapping.items():
-                if any(field in updates for field in fields):
-                    conditions = []
-                    if table is Tune:
-                        conditions = [Tune.id == tune_id]
-                    elif table is PlaylistTune:
-                        conditions = [
-                            PlaylistTune.tune_ref == tune_id,
-                            PlaylistTune.playlist_ref == playlist_ref,
-                        ]
-                    elif table is PracticeRecord:
-                        conditions = [
-                            PracticeRecord.tune_ref == tune_id,
-                            PracticeRecord.playlist_ref == playlist_ref,
-                        ]
-                    elif table is UserAnnotationSet:
-                        conditions = [
-                            UserAnnotationSet.tune_ref == tune_id,
-                            UserAnnotationSet.user_ref == user_id,
-                        ]
-
-                    update_table(
-                        db,
-                        table.__table__,
-                        conditions,
-                        {k: v for k, v in updates.items() if k in fields},
-                    )
-
-            db.commit()
-            return {"success": "Tune updated successfully"}
-        except SQLAlchemyError as e:
-            db.rollback()
-            logger.error(f"Unable to update tune ({tune_id}): {e}")
-            raise HTTPException(status_code=500, detail=f"Unable to update tune: {e}")
 
 
 @router.delete("/playlist-tune/{user_id}/{playlist_ref}/{tune_id}", response_model=dict)
@@ -783,7 +700,7 @@ def create_tune(tune: TuneCreate, playlist_ref: Optional[int] = None):
     description="Update an existing tune by its reference ID.",
     status_code=200,
 )
-def update_tune(tune_ref: int = Query(...), tune: TuneUpdate = Depends()):
+def update_tune(tune_ref: int = Query(...), tune: TuneUpdate = Body(...)):
     try:
         with SessionLocal() as db:
             existing_tune = db.query(Tune).filter(Tune.id == tune_ref).first()

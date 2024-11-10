@@ -42,14 +42,11 @@ export type PlaylistTune = {
   interval?: number;
   repetitions?: number;
   review_date?: string;
-  backup_practiced?: string;
-  // note_private?: string;
-  // note_public?: string;
   tags?: string;
   user_ref?: number;
   playlist_ref?: number;
-  notes?: string | null;
-  favorite_url?: string | null;
+  notes?: string;
+  favorite_url?: string;
 };
 
 export type ScreenSize = "small" | "full";
@@ -130,4 +127,12 @@ export interface ITableStateTable {
   purpose: TablePurpose;
   settings: string | TableState;
   current_tune?: number | null;
+}
+
+export interface ITune {
+  title?: string | null;
+  type?: string | null;
+  structure?: string | null;
+  mode?: string | null;
+  incipit?: string | null;
 }

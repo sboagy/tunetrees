@@ -33,5 +33,15 @@ INSERT OR REPLACE INTO main.user_annotation_set (tune_ref, note_private, note_pu
 SELECT tune_ref, note_private, note_public, tags, user_ref
 FROM source_db.user_annotation_set;
 
+-- Note Table Migration
+INSERT OR REPLACE INTO main.note (id, user_ref, tune_ref, playlist_ref, created_date, note_text, public, favorite)
+SELECT id, user_ref, tune_ref, playlist_ref, created_date, note_text, public, favorite
+FROM source_db.note;
+
+-- Reference Table Migration
+INSERT OR REPLACE INTO main.reference (id, url, ref_type, tune_ref, public, favorite, user_ref, comment, title)
+SELECT id, url, ref_type, tune_ref, public, favorite, user_ref, comment, title
+FROM source_db.reference;
+
 -- Detach the source database after migration is done
 DETACH DATABASE source_db;

@@ -1,7 +1,7 @@
 "use server";
 
 import axios from "axios";
-import type { IReferenceData, INote, PlaylistTune, Tune } from "./types";
+import type { IReferenceData, INote, PlaylistTune, Tune, ITune } from "./types";
 import { ERROR_TUNE } from "./mocks";
 
 const client = axios.create({
@@ -85,12 +85,32 @@ export async function updatePlaylistTune(
   playlist_ref: string,
   tune_id: string,
   tune_update: Partial<PlaylistTune>,
-): Promise<{ success?: string; detail?: string }> {
+): Promise<Partial<PlaylistTune> | { detail?: string }> {
   try {
-    const response = await client.put<{ success?: string; detail?: string }>(
-      `/playlist-tune/${user_id}/${playlist_ref}/${tune_id}`,
-      tune_update,
-    );
+    const dbTune = await getPlaylistTune(user_id, playlist_ref, tune_id);
+    if ("detail" in dbTune) {
+      console.error("Error in updatePlaylistTune: ", dbTune.detail);
+      return { detail: "Unable to update tune: Tune not found" };
+    }
+    const tuneUpdateData: Partial<ITune> = {};
+
+    if (dbTune) {
+      if (tune_update.title !== dbTune.title)
+        tuneUpdateData.title = tune_update.title;
+      if (tune_update.type !== dbTune.type)
+        tuneUpdateData.type = tune_update.type;
+      if (tune_update.structure !== dbTune.structure)
+        tuneUpdateData.structure = tune_update.structure;
+      if (tune_update.mode !== dbTune.mode)
+        tuneUpdateData.mode = tune_update.mode;
+      if (tune_update.incipit !== dbTune.incipit)
+        tuneUpdateData.incipit = tune_update.incipit;
+    }
+    const response = await client.put<{
+      success?: string;
+      detail?: string;
+    }>("/tune", tuneUpdateData, { params: { tune_ref: tune_id } });
+
     return response.data;
   } catch (error) {
     console.error("Error in updatePlaylistTune: ", error);
