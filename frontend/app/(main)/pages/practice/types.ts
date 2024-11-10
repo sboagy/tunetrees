@@ -20,8 +20,6 @@ export type Tune = {
   review_date: string | null;
   backup_practiced: string | null;
   external_ref?: string | null;
-  // note_private?: string | null;
-  // note_public?: string | null;
   tags?: string | null;
   recall_eval?: string | null;
   notes?: string | null;

@@ -152,7 +152,7 @@ export default function ScheduledTunesGrid({
           />
         </div>
         <div className="flex items-center space-x-4 mb-4">
-          {/* <Button
+          <Button
             variant="outline"
             size="sm"
             onClick={() => table.previousPage()}
@@ -169,7 +169,7 @@ export default function ScheduledTunesGrid({
             style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
           >
             {">"}
-          </Button> */}
+          </Button>
           <div
             style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
           >

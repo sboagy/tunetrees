@@ -220,7 +220,7 @@ export default function RepertoireGrid({
               />
             </div>
             <div className="flex items-center space-x-4 mb-4">
-              {/* <Button
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={() => table.previousPage()}
@@ -235,7 +235,7 @@ export default function RepertoireGrid({
                 disabled={!table.getCanNextPage()}
               >
                 {">"}
-              </Button> */}
+              </Button>
               <ColumnsMenu user_id={user_id} table={table} />
               <NewTuneButton
                 user_id={user_id}
