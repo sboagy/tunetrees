@@ -5,7 +5,7 @@ import ColumnsMenu from "./ColumnsMenu";
 import TunesGrid, { type IScheduledTunesType, TunesTable } from "./TunesGrid";
 
 import { Input } from "@/components/ui/input";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type JSX } from "react";
 
 import type {
   RowSelectionState,

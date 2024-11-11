@@ -2,6 +2,7 @@
 // I might be better to use a base class for a new tune, and then
 
 import type { TableState } from "@tanstack/react-table";
+import type { JSX } from "react";
 
 // add the id in a derived class?
 export type Tune = {

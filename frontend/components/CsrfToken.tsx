@@ -14,19 +14,27 @@ export function CSRFInput() {
   // const sleep = (ms: number) =>
   //   new Promise((resolve) => setTimeout(resolve, ms));
 
-  const csrfToken = cookies()
-    .get("__Host-authjs.csrf-token")
-    ?.value.split("|")[0];
-  // let csrfToken = "abcdef";
-  console.log("CSRFInput(): csrfToken: %s", csrfToken);
+  cookies()
+    .then((cookie) => {
+      const csrfToken = cookie
+        .get("__Host-authjs.csrf-token")
+        ?.value.split("|")[0];
 
-  return (
-    <Input
-      type="hidden"
-      // required={false}
-      name="csrfToken"
-      defaultValue={csrfToken}
-      // value={csrfToken}
-    />
-  );
+      // let csrfToken = "abcdef";
+      console.log("CSRFInput(): csrfToken: %s", csrfToken);
+
+      return (
+        <Input
+          type="hidden"
+          // required={false}
+          name="csrfToken"
+          defaultValue={csrfToken}
+          // value={csrfToken}
+        />
+      );
+    })
+    .catch((error) => {
+      console.error("CSRFInput(): error: %s", error);
+      throw error;
+    });
 }

@@ -63,10 +63,10 @@ const accountFormSchema = z.object({
   }),
 });
 
-type AccountFormValues = z.infer<typeof accountFormSchema>;
+type AccountFormValues = z.infer;
 
 // This can come from your database or API.
-const defaultValues: Partial<AccountFormValues> = {
+const defaultValues: Partial = {
   // name: "Your name",
   // dob: new Date("2023-01-23"),
 };
@@ -161,21 +161,25 @@ export function AccountForm() {
               <Popover>
                 <PopoverTrigger asChild>
                   <FormControl>
-                    <Button
-                      variant="outline"
-                      role="combobox"
+                    <select
                       className={cn(
-                        "w-[200px] justify-between",
+                        "w-[200px] justify-between border border-gray-300 rounded-md p-2",
                         !field.value && "text-muted-foreground",
                       )}
+                      value={field.value}
+                      onChange={(e) =>
+                        form.setValue("language", e.target.value)
+                      }
                     >
-                      {field.value
-                        ? languages.find(
-                            (language) => language.value === field.value,
-                          )?.label
-                        : "Select language"}
-                      <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
+                      <option value="" disabled>
+                        Select language
+                      </option>
+                      {languages.map((language) => (
+                        <option key={language.value} value={language.value}>
+                          {language.label}
+                        </option>
+                      ))}
+                    </select>
                   </FormControl>
                 </PopoverTrigger>
                 <PopoverContent className="w-[200px] p-0">

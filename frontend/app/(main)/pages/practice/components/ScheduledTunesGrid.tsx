@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import type { Table as TanstackTable } from "@tanstack/react-table";
 import { useCallback, useEffect, useState } from "react";
+import type { JSX } from "react";
 import { submitPracticeFeedbacks, type ITuneUpdate } from "../commands";
 import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";

@@ -12,6 +12,7 @@ import {
   type ITabGroupMainStateModel,
   updateTabGroupMainState,
 } from "../settings";
+import type { JSX } from "react";
 
 function CircularProgress() {
   return (

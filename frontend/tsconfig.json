@@ -54,9 +54,11 @@
     ".next/**/*.tsx",
     "auth/auth-types.ts",
     "react-quill.d.ts",
+    "eslint.config.mjs"
   ],
   "exclude": [
     "node_modules",
-    "archive/**/*.ts"
+    "archive/**/*.ts",
+    ".prettierrc.js"
   ]
 }

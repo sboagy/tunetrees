@@ -1,5 +1,6 @@
 "use client";
 
+import type { JSX } from "react";
 import { useSearchParams } from "next/navigation";
 import TuneEditor from "../practice/components/TuneEditor";
 

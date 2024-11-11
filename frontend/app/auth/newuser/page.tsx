@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import type { JSX } from "react";
+
 import Image from "next/image";
 import profilePic from "/public/logo4.png";
 
