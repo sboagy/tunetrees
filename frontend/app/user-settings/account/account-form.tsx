@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarIcon, CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
+import { CalendarIcon, CheckIcon } from "@radix-ui/react-icons";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -63,10 +63,10 @@ const accountFormSchema = z.object({
   }),
 });
 
-type AccountFormValues = z.infer;
+type AccountFormValues = z.infer<typeof accountFormSchema>;
 
 // This can come from your database or API.
-const defaultValues: Partial = {
+const defaultValues: Partial<AccountFormValues> = {
   // name: "Your name",
   // dob: new Date("2023-01-23"),
 };

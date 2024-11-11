@@ -1,8 +1,7 @@
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check } from "lucide-react";
 // RecallEvalRadioGroup.tsx
 import React from "react";
 
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import {
@@ -80,7 +79,7 @@ const qualityList = [
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function RecallEvalComboBox(
-  info: CellContext,
+  info: CellContext<Tune, TunesGridColumnGeneralType>,
   userId: number,
   playlistId: number,
   purpose: TablePurpose,
@@ -115,10 +114,10 @@ export function RecallEvalComboBox(
     setIsOpen(false);
   };
 
-  const handleButtonClick = (event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent the event from bubbling up to the parent elements
-    setIsOpen(!isOpen);
-  };
+  // const handleButtonClick = (event: React.MouseEvent) => {
+  //   event.stopPropagation(); // Prevent the event from bubbling up to the parent elements
+  //   setIsOpen(!isOpen);
+  // };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
