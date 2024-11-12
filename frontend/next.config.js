@@ -1,3 +1,5 @@
+const path = require("node:path");
+
 /** @type {import('next').NextConfig} */
 // const nextConfig = {}
 
@@ -25,6 +27,11 @@ module.exports = {
         maxEntrypointSize: 2000000, // 2 MiB
       };
     }
+
+    // Add alias paths
+    config.resolve.alias["@"] = path.resolve(__dirname, "./");
+    config.resolve.alias.auth = path.resolve(__dirname, "./auth");
+    config.resolve.alias.components = path.resolve(__dirname, "./components");
 
     return config;
   },

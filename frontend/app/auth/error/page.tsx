@@ -1,21 +1,24 @@
-// import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-// enum Error {
-//   Configuration = "Configuration",
-// }
-
-// export default async function ErrorPage(searchParams: any) {
-//   return (
-//     <div className="space-y-2">Something bad happened: {searchParams}</div>
-//   );
-// }
-
-export default function ErrorPage({
+function ErrorPageContent({
   searchParams,
 }: {
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const error = searchParams.error ?? "1"; // default value is "1"
+  return <div>Password does not match. Error code: {error}</div>;
+}
 
-  return <>Current error is: {error}</>;
+export default async function ErrorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const resolvedSearchParams = await searchParams;
+
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ErrorPageContent searchParams={resolvedSearchParams} />
+    </Suspense>
+  );
 }

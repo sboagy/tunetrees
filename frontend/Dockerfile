@@ -9,7 +9,7 @@ FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /usr/src/app
 
 # Copy necessary configuration files
-COPY eslint.config.mjs .prettierrc .prettierrc.js *.d.ts ./
+COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.js next.config.mjs *.d.ts ./
 
 # Copy necessary configuration files
 COPY tsconfig.json  ./tsconfig.json
@@ -28,8 +28,7 @@ RUN rm -rf src
 #     echo "Done checking for tsconfig-google.json (1)")
 
 # re-copy the configuration files to since gts is evil and overwrites them
-# Copy necessary configuration files
-# COPY .eslintrc.json .eslintignore .prettierrc .prettierrc.js *.d.ts ./
+COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.js next.config.mjs *.d.ts ./
 
 # Copy necessary configuration files
 COPY tsconfig.json  ./tsconfig.json
@@ -107,7 +106,7 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 # Copy the main application directories.
 COPY app app
 COPY auth auth
-COPY components componentsnp
+COPY components components
 COPY public public
 COPY lib lib
 

@@ -56,6 +56,8 @@ import type { NextRequest } from "next/server";
 import { getUserExtendedByEmail, ttHttpAdapter } from "./auth-tt-adapter";
 import { matchPasswordWithHash } from "./password-match";
 import { sendGrid } from "./helpers";
+import { NextApiRequest } from "next";
+import type { NextApiResponse } from "next";
 
 export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
   if (value === undefined || value === null) {
