@@ -1,10 +1,10 @@
+// TabGroupMain.tsx
 "use client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { JSX } from "react";
 import { useEffect, useState } from "react";
-
 import type { Tune } from "../types";
-
 import RepertoireGrid from "./RepertoireGrid";
 import ScheduledTunesGrid from "./ScheduledTunesGrid";
 import {
@@ -12,7 +12,6 @@ import {
   type ITabGroupMainStateModel,
   updateTabGroupMainState,
 } from "../settings";
-import type { JSX } from "react";
 
 function CircularProgress() {
   return (
@@ -25,8 +24,6 @@ function CircularProgress() {
 interface IPracticeProps {
   user_id: string;
   playlist_id: string;
-  setCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
-  currentTune: number | null;
   loading: boolean;
   scheduled: Tune[] | undefined;
   recentlyPracticed: Tune[] | undefined;
@@ -42,23 +39,13 @@ const tabSpec = [
     name: "Practice",
     content: "Review and practice your scheduled tunes.",
   },
-  {
-    id: "repertoire",
-    name: "Repertoire",
-    content: "Manage your repertoire.",
-  },
-  {
-    id: "analysis",
-    name: "Analysis",
-    content: "Practice Analytics.",
-  },
+  { id: "repertoire", name: "Repertoire", content: "Manage your repertoire." },
+  { id: "analysis", name: "Analysis", content: "Practice Analytics." },
 ];
 
 export default function TabGroupMain({
   user_id,
   playlist_id,
-  setCurrentTune, // Destructure setCurrentTune
-  currentTune,
   loading,
   scheduled,
   recentlyPracticed,
@@ -66,8 +53,6 @@ export default function TabGroupMain({
 }: IPracticeProps): JSX.Element {
   const [playlistRef] = useState<string>(playlist_id);
   const [userRef] = useState<string>(user_id);
-  // const [origRecentlyPracticed, setOrigRecentlyPracticed] = useState<Tune[]>();
-
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
   const changeActiveTab = (whichTag: string) => {
@@ -99,23 +84,6 @@ export default function TabGroupMain({
     void doInitialization(user_id);
   }, [user_id]);
 
-  // useEffect(() => {
-  //   const getScheduled = async (user_id: string, playlist_id: string) => {
-  //     const data = await getPracticeListScheduled(user_id, playlist_id);
-  //     setScheduled(data);
-  //   };
-  //   void getScheduled(user_id, playlist_id);
-  // }, [user_id, playlist_id]);
-
-  // useEffect(() => {
-  //   const getRecent = async (user_id: string, playlist_id: string) => {
-  //     const data = await getRecentlyPracticed(user_id, playlist_id);
-  //     setRecentlyPracticed(data);
-  //     setOrigRecentlyPracticed(data);
-  //   };
-  //   void getRecent(user_id, playlist_id);
-  // }, [user_id, playlist_id]);
-
   if (loading) {
     return <div>Loading...</div>; // Render a loading state while fetching data
   }
@@ -134,8 +102,7 @@ export default function TabGroupMain({
           <TabsTrigger
             key={tab.id}
             value={tab.id}
-            className={`rounded-t-lg border-t border-l border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors duration-200
-          ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
+            className={`rounded-t-lg border-t border-l border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors duration-200 ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
           >
             {tab.name}
           </TabsTrigger>
@@ -151,8 +118,6 @@ export default function TabGroupMain({
                 playlist_id={playlistRef}
                 table_purpose="practice"
                 refreshData={refreshData}
-                setMainPanelCurrentTune={setCurrentTune}
-                mainPanelCurrentTune={currentTune}
               />
             ) : (
               <CircularProgress />
@@ -170,8 +135,6 @@ export default function TabGroupMain({
                 playlist_id={playlistRef}
                 table_purpose="repertoire"
                 refreshData={refreshData}
-                setMainPanelCurrentTune={setCurrentTune}
-                mainPanelCurrentTune={currentTune}
               />
             ) : (
               <CircularProgress />

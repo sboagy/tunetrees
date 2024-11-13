@@ -12,6 +12,7 @@ import { useRef } from "react";
 import type { Tune } from "../types";
 import { getPracticeListScheduled, getRecentlyPracticed } from "../queries";
 import "./MainPanel.css";
+import { TuneProvider } from "./TuneContext";
 
 interface IMainPanelProps {
   userId: string;
@@ -30,7 +31,6 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
   // Trying to keep these states in sync is a bit tricky and messy, including making sure the
   // table callback functions can access the current tune states.  Hopefully I can polish this up
   // over time.
-  const [currentTune, setCurrentTune] = useState<number | null>(null); // Add currentTune state
   const [scheduled, setScheduled] = useState<Tune[]>();
   const [recentlyPracticed, setRecentlyPracticed] = useState<Tune[]>();
   const [loading, setLoading] = useState(true);
@@ -93,50 +93,49 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
   }, []);
 
   return (
-    <div className="main-panel">
-      <ResizablePanelGroup direction="horizontal">
-        <ResizablePanel
-          ref={sidebarRef}
-          className={"sidebar flex flex-col overflow-y-auto"} // Add overflow-y-auto for vertical scrolling
-          collapsedSize={0} // Set collapsed size to 0
-          collapsible={true} // Enable collapsing
-          defaultSize={25} // Use current width
-          minSize={12} // Adjust minimum size based on collapsed state
-          // maxSize={35} // Adjust maximum size based on collapsed state
-        >
-          <Sidebar
-            currentTune={currentTune}
-            userId={Number(userId)}
-            playlistId={Number(playlistId)}
-            refreshData={refreshData} // Pass refreshData callback
-          />{" "}
-          {/* Pass currentTune to Sidebar */}
-        </ResizablePanel>
-        <ResizableHandle
-          withHandle
-          onDoubleClick={toggleSidebar} // Add double-click event listener
-        />
-        <ResizablePanel
-          className="content-panel flex-grow"
-          collapsedSize={0} // Set collapsed size to 0
-          collapsible={true} // Enable collapsing
-          minSize={65}
-        >
-          <div className="flex flex-col h-full">
-            <TabGroupMain
-              user_id={userId}
-              playlist_id={playlistId}
-              setCurrentTune={setCurrentTune} // Pass setCurrentTune to TabGroupMain
-              currentTune={currentTune}
-              loading={loading}
-              scheduled={scheduled}
-              recentlyPracticed={recentlyPracticed}
-              refreshData={refreshData} // Pass refreshData
-            />
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </div>
+    <TuneProvider>
+      <div className="main-panel">
+        <ResizablePanelGroup direction="horizontal">
+          <ResizablePanel
+            ref={sidebarRef}
+            className={"sidebar flex flex-col overflow-y-auto"} // Add overflow-y-auto for vertical scrolling
+            collapsedSize={0} // Set collapsed size to 0
+            collapsible={true} // Enable collapsing
+            defaultSize={25} // Use current width
+            minSize={12} // Adjust minimum size based on collapsed state
+            // maxSize={35} // Adjust maximum size based on collapsed state
+          >
+            <Sidebar
+              userId={Number(userId)}
+              playlistId={Number(playlistId)}
+              refreshData={refreshData} // Pass refreshData callback
+            />{" "}
+            {/* Pass currentTune to Sidebar */}
+          </ResizablePanel>
+          <ResizableHandle
+            withHandle
+            onDoubleClick={toggleSidebar} // Add double-click event listener
+          />
+          <ResizablePanel
+            className="content-panel flex-grow"
+            collapsedSize={0} // Set collapsed size to 0
+            collapsible={true} // Enable collapsing
+            minSize={65}
+          >
+            <div className="flex flex-col h-full">
+              <TabGroupMain
+                user_id={userId}
+                playlist_id={playlistId}
+                loading={loading}
+                scheduled={scheduled}
+                recentlyPracticed={recentlyPracticed}
+                refreshData={refreshData} // Pass refreshData
+              />
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+    </TuneProvider>
   );
 };
 

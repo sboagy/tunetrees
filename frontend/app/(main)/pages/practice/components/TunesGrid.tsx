@@ -36,6 +36,7 @@ import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns"
 import type { TablePurpose, Tune } from "../types";
 import { createOrUpdateTableState, getTableStateTable } from "../settings";
 import "./TunesGrid.css";
+import { useTune } from "./TuneContext";
 
 export interface IScheduledTunesType {
   tunes: Tune[];
@@ -47,13 +48,6 @@ export interface IScheduledTunesType {
     scheduledData: Tune[];
     repertoireData: Tune[];
   }>;
-  // Per these current tune states,
-  // see "Important Note (1)" in app/(main)/pages/practice/components/MainPanel.tsx
-  mainPanelCurrentTune: number | null;
-  setMainPanelCurrentTune: (tuneId: number | null) => void;
-  getCurrentTune?: () => number | null;
-  // setRecentlyPracticedCallback?: (tunes: Tune[]) => void;
-  // handleFilterChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export const tableContext = React.createContext<TanstackTable<Tune> | null>(
@@ -103,8 +97,6 @@ export function TunesTable(
     playlist_id,
     table_purpose,
     globalFilter = "",
-    getCurrentTune,
-    // setCurrentTune,
   }: IScheduledTunesType,
   selectionChangedCallback:
     | ((
@@ -114,6 +106,8 @@ export function TunesTable(
     | null = null,
   filterStringCallback?: (filter: string) => void,
 ) {
+  const { currentTune, setCurrentTune } = useTune();
+
   const [tableStateFromDb, setTableStateFromDb] =
     React.useState<TableState | null>(null);
 
@@ -246,6 +240,7 @@ export function TunesTable(
         const tableStateFromDb = tableStateTable?.settings as TableState;
         if (tableStateFromDb) {
           setTableStateFromDb(tableStateFromDb);
+          setCurrentTune(tableStateTable?.current_tune ?? null);
           // table.setPagination(tableStateFromDb.pagination);
           // const hardCodedPagination = {
           //   pageIndex: 0,
@@ -267,7 +262,7 @@ export function TunesTable(
     };
 
     void fetchTableState();
-  }, [user_id, table_purpose, table, filterStringCallback]);
+  }, [user_id, table_purpose, table, filterStringCallback, setCurrentTune]);
 
   // Intercept the state changes.  I should be able to do this in a more generic way
   // with just onStateChange, but I couldn't get that to work.  Maybe I'll try again later.
@@ -290,12 +285,7 @@ export function TunesTable(
       "=> interceptedRowSelectionChange - resolvedRowSelectionState: ",
       resolvedRowSelectionState,
     );
-    saveTableState(
-      table,
-      user_id,
-      table_purpose,
-      getCurrentTune ? getCurrentTune() : -1,
-    );
+    saveTableState(table, user_id, table_purpose, currentTune);
 
     if (selectionChangedCallback) {
       selectionChangedCallback(table, resolvedRowSelectionState);
@@ -316,12 +306,7 @@ export function TunesTable(
     console.log(
       `=> interceptedOnColumnFiltersChange - resolvedColumnFiltersState: ${JSON.stringify(resolvedColumnFiltersState)}`,
     );
-    saveTableState(
-      table,
-      user_id,
-      table_purpose,
-      getCurrentTune ? getCurrentTune() : -1,
-    );
+    saveTableState(table, user_id, table_purpose, currentTune);
   };
 
   const interceptedSetSorting = (
@@ -334,12 +319,7 @@ export function TunesTable(
     // console.log(
     //   `=> interceptedSetSorting - resolvedSorting: ${JSON.stringify(newSorting)}`,
     // );
-    saveTableState(
-      table,
-      user_id,
-      table_purpose,
-      getCurrentTune ? getCurrentTune() : -1,
-    );
+    saveTableState(table, user_id, table_purpose, currentTune);
   };
 
   const interceptedSetColumnVisibility = (
@@ -356,12 +336,7 @@ export function TunesTable(
     console.log(
       `=> interceptedSetColumnVisibility - resolvedVisibilityState: ${JSON.stringify(resolvedVisibilityState)}`,
     );
-    saveTableState(
-      table,
-      user_id,
-      table_purpose,
-      getCurrentTune ? getCurrentTune() : -1,
-    );
+    saveTableState(table, user_id, table_purpose, currentTune);
   };
 
   // const interceptedSetPagination = (
@@ -424,9 +399,6 @@ type Props = {
   playlistId: number;
   purpose: TablePurpose;
   globalFilter?: string;
-  setMainPanelCurrentTune: (tuneId: number | null) => void;
-  getCurrentTune: () => number | null;
-  setCurrentTune: (tuneId: number) => void;
   refreshData: () => Promise<{
     scheduledData: Tune[];
     repertoireData: Tune[];
@@ -438,6 +410,7 @@ const TunesGrid = (props: Props) => {
   const table = props.table;
   const columns = get_columns(props.userId, props.playlistId, props.purpose);
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
+  const { currentTune, setCurrentTune } = useTune();
 
   React.useEffect(() => {
     const calculatePageSize = () => {
@@ -516,7 +489,7 @@ const TunesGrid = (props: Props) => {
               table,
               props.userId.toString(),
               props.purpose,
-              props.getCurrentTune(),
+              currentTune,
             );
 
             // Force the table to recalculate its rows
@@ -553,12 +526,11 @@ const TunesGrid = (props: Props) => {
       return () => window.removeEventListener("resize", handleResize);
     }
     return () => console.log("window is undefined");
-  }, [table, props.userId, props.purpose, props.getCurrentTune]);
+  }, [table, props.userId, props.purpose, currentTune]);
 
   const handleRowClick = (row: Row<Tune>) => {
     const tuneId = row.original.id;
-    props.setMainPanelCurrentTune(tuneId ?? null);
-    props.setCurrentTune(tuneId || 0);
+    setCurrentTune(tuneId ?? null);
     console.log("handleRowClick: tuneId=", tuneId);
     saveTableState(table, props.userId.toString(), props.purpose, tuneId ?? -1);
   };
@@ -572,24 +544,18 @@ const TunesGrid = (props: Props) => {
         const currentTuneId = tableStateTable?.current_tune as number;
         if (currentTuneId === 0 || currentTuneId === null) {
           console.log("****-> TunesGrid useEffect setCurrentTune: 0 or null");
-          props.setMainPanelCurrentTune(null);
+          setCurrentTune(null);
         } else {
           console.log(
             `****-> TunesGrid useEffect setCurrentTune: ${currentTuneId}`,
           );
-          props.setCurrentTune(currentTuneId);
-          props.setMainPanelCurrentTune(currentTuneId);
+          setCurrentTune(currentTuneId);
         }
       })
       .catch((error) => {
         console.error("Error calling server function:", error);
       });
-  }, [
-    props.userId,
-    props.purpose,
-    props.setCurrentTune,
-    props.setMainPanelCurrentTune,
-  ]);
+  }, [props.userId, props.purpose, setCurrentTune]);
 
   return (
     <>
@@ -624,7 +590,7 @@ const TunesGrid = (props: Props) => {
                   <TableRow
                     key={row.id}
                     className={`h-auto cursor-pointer ${
-                      props.getCurrentTune() === row.original.id
+                      currentTune === row.original.id
                         ? "outline outline-2 outline-blue-500"
                         : ""
                     } ${getColorForEvaluation(row.original.recall_eval || null)}`}
@@ -639,7 +605,7 @@ const TunesGrid = (props: Props) => {
                         table,
                         userId.toString(),
                         props.purpose,
-                        props.getCurrentTune(),
+                        currentTune,
                       );
                       console.log("double-click occurred: tuneId=", tuneId);
                       router.push(

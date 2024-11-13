@@ -1,12 +1,11 @@
 "use client";
 
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type React from "react";
 import dynamic from "next/dynamic";
 import parse from "html-react-parser";
 import { useTheme } from "next-themes";
 import "./AutoResizingRichTextarea.css";
-import { fallbackModeToStaticPathsResult } from "next/dist/lib/fallback";
 // import JoditEditor from "jodit-react";
 
 // Dynamically import JoditEditor to ensure it only loads on the client side
@@ -31,7 +30,6 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
   id,
   value,
   onChange,
-  placeholder,
   className,
   style,
   readOnly,
