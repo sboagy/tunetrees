@@ -18,3 +18,36 @@
   color: #999;
   text-transform: uppercase;
 }
+
+.read-only-rich {
+  padding: 10px;
+}
+
+:root {
+  --jd-color-background-default: black;
+  --jd-color-border: darkgray;
+  --jd-color-panel: #9bffe1;
+  --jd-color-icon: #044406;
+  --jd-color-backgrounn-toolbar: black;
+}
+
+/* .jodit-toolbar {
+  background-color: black !important;
+  color: white !important;
+}
+
+.jodit-dark .jodit-wysiwyg {
+  background-color: black !important; 
+} */
+
+/* .jodit-custom {
+    --jd-color-background-default: #ffffff;
+    --jd-color-border: #044406;
+    --jd-color-panel: #9bffe1;
+    --jd-color-icon: #044406;
+} */
+
+/* 
+.jodit-dark .jodit-wysiwyg {
+  background-color: black !important; 
+} */

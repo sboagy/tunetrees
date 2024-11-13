@@ -1,15 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import type React from "react";
 import dynamic from "next/dynamic";
-import "react-quill/dist/quill.snow.css";
-import "./AutoResizingRichTextarea.css";
 import parse from "html-react-parser";
+import { useTheme } from "next-themes";
+import "./AutoResizingRichTextarea.css";
+import { fallbackModeToStaticPathsResult } from "next/dist/lib/fallback";
+// import JoditEditor from "jodit-react";
 
-// Dynamically import ReactQuill to ensure it only loads on the client side
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+// Dynamically import JoditEditor to ensure it only loads on the client side
+const JoditEditor = dynamic(
+  () => import("jodit-react").then((mod) => mod.default),
+  {
+    ssr: false,
+  },
+);
 
 interface IAutoResizingRichTextareaProps {
   id: string;
@@ -32,8 +38,6 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
 }) => {
   const [editorValue, setEditorValue] = useState(value);
 
-  console.log("AutoResizingRichTextarea: id: ", id);
-
   useEffect(() => {
     // Convert plain text to HTML if necessary
     if (!/<[a-z][\S\s]*>/i.test(value)) {
@@ -42,92 +46,110 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
       setEditorValue(value);
     }
   }, [value]);
+  console.log("AutoResizingRichTextarea: ", className);
 
   const handleChange = (content: string) => {
     setEditorValue(content);
     onChange(content);
   };
 
-  // const modules = {
-  //   toolbar: [
-  //     [{ header: "1" }, { header: "2" }, { font: [] }],
-  //     [{ size: [] }],
-  //     ["bold", "italic", "underline", "strike", "blockquote"],
-  //     [
-  //       { list: "ordered" },
-  //       { list: "bullet" },
-  //       { indent: "-1" },
-  //       { indent: "+1" },
-  //     ],
-  //     ["link", "image"],
-  //     ["clean"],
-  //   ],
-  // };
+  const { theme, resolvedTheme } = useTheme();
 
-  // const modules = {
-  //   toolbar: [
-  //     [{ header: [1, 2, false] }], // Combine header options
-  //     ["bold", "italic", "underline", "strike"], // Common formatting options
-  //     [{ list: "ordered" }, { list: "bullet" }], // List options
-  //     [{ color: [] }, { background: [] }], // Color and background
-  //     ["link", "image"], // Links and images
-  //     ["clean"], // Clean formatting
-  //   ],
-  // };
+  // Determine if the theme is dark
+  const isDarkMode = theme === "dark" || resolvedTheme === "dark";
 
-  const modules = {
-    toolbar: [
-      [{ header: [1, 2, false] }],
-      [
+  const config = useMemo(
+    () => ({
+      ic: id,
+      readonly: false,
+      theme: isDarkMode ? "dark" : "default",
+      style: {
+        background: "var(--jd-color-background-default)",
+        border: "1px solid var(--jd-color-border)",
+        panel: "var(--jd-color-panel)",
+        icon: "var(--jd-color-icon)",
+      },
+      toolbar: false, // Initially hide the toolbar
+      // placeholder: placeholder,
+      toolbarSticky: false,
+      toolbarAdaptive: false,
+      spellcheck: true,
+      showCharsCounter: false,
+      showWordsCounter: false,
+      showXPathInStatusbar: false,
+      buttons: [
         "bold",
         "italic",
         "underline",
-        "strike",
-        { list: "ordered" },
-        { list: "bullet" },
-      ], // Combined formatting and lists
-      [{ color: [] }, { background: [] }, "link", "image"], // Combined colors, links, and images
-      ["clean"],
-    ],
-  };
-
-  // const modules = {
-  //   toolbar: [
-  //     [{ header: [1, 2, false] }],
-  //     [
-  //       {
-  //         list: [
-  //           {
-  //             label: "Style",
-  //             value: ["bold", "italic", "underline", "strike"],
-  //           }, // Add style options here
-  //           { list: "ordered" },
-  //           { list: "bullet" },
-  //         ],
-  //       },
-  //     ],
-  //     [{ color: [] }, { background: [] }, "link", "image"],
-  //     ["clean"],
-  //   ],
-  // };
+        "strikethrough",
+        "|",
+        "ul",
+        "ol",
+        "|",
+        "font",
+        "fontsize",
+        "brush",
+        "|",
+        "link",
+        "image",
+        "|",
+        "align",
+        "undo",
+        "redo",
+        "|",
+        "hr",
+        "eraser",
+        "fullsize",
+      ],
+      buttonsXS: [
+        "bold",
+        "italic",
+        "underline",
+        "strikethrough",
+        "|",
+        "ul",
+        "ol",
+        "|",
+        "font",
+        "fontsize",
+        "brush",
+        "|",
+        "link",
+        "image",
+        "|",
+        "align",
+        "undo",
+        "redo",
+        "|",
+        "hr",
+        "eraser",
+        "fullsize",
+      ],
+      i18n: {
+        en: {
+          "Type something": "Type something",
+          // Add other necessary localization strings here
+        },
+      },
+    }),
+    [id, isDarkMode],
+  );
 
   return (
     <div
-      className="quill-container"
+      className="read-only-rich"
       style={{ ...style, overflow: "hidden", resize: "vertical" }}
     >
       {readOnly ? (
         <div className={className}>{parse(editorValue)}</div>
       ) : (
-        <ReactQuill
-          // id={id}
+        <JoditEditor
           value={editorValue}
-          onChange={handleChange}
-          placeholder={placeholder}
-          className={className}
-          readOnly={readOnly}
-          theme="snow"
-          modules={modules}
+          config={config}
+          onBlur={handleChange}
+          onChange={(newContent) => {
+            handleChange(newContent);
+          }}
         />
       )}
     </div>

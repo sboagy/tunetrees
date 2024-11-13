@@ -22,6 +22,7 @@
     "node": ">=v22.7.0"
   },
   "dependencies": {
+    "-": "^0.0.1",
     "@auth/unstorage-adapter": "^2.7.3",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-avatar": "^1.1.1",
@@ -57,6 +58,7 @@
     "formik": "^2.4.6",
     "gts": "^6.0.2",
     "html-react-parser": "^5.1.18",
+    "jodit-react": "^4.1.2",
     "lucide-react": "^0.456.0",
     "next": "15.0.3",
     "next-auth": "^5.0.0-beta.24",
@@ -70,8 +72,8 @@
     "react-day-picker": "^9.3.0",
     "react-dom": "19.0.0-rc-5c56b873-20241107",
     "react-hook-form": "^7.53.2",
-    "react-quill": "^2.0.0",
     "react-resizable-panels": "^2.1.6",
+    "save": "^2.9.0",
     "sharp": "^0.33.5",
     "supports-color": "^9.4.0",
     "tailwind-merge": "^2.5.4",
