@@ -58,12 +58,12 @@ export interface ITuneUpdate {
 }
 
 interface IPracticeFeedbacksProps {
-  playlist_id: string;
+  playlistId: number;
   updates: { [key: string]: ITuneUpdate };
 }
 
 export const submitPracticeFeedbacks = async ({
-  playlist_id,
+  playlistId,
   updates,
 }: IPracticeFeedbacksProps): Promise<string> => {
   if (!baseURL) {
@@ -72,13 +72,13 @@ export const submitPracticeFeedbacks = async ({
   }
   const url = `${baseURL}/practice/submit_feedbacks`;
   console.log(
-    `Submitting feedbacks for user_id: ${playlist_id}, updates: ${JSON.stringify(updates)} url: ${url}`,
+    `Submitting feedbacks for user_id: ${playlistId}, updates: ${JSON.stringify(updates)} url: ${url}`,
   );
 
   try {
     const response = await axios({
       method: "post",
-      url: `${baseURL}/practice/submit_feedbacks/${playlist_id}`,
+      url: `${baseURL}/practice/submit_feedbacks/${playlistId}`,
       data: updates,
       headers: {
         key: "Access-Control-Allow-Origin",

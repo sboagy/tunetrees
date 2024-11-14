@@ -14,13 +14,9 @@ import { useTune } from "./TuneContext";
 interface ISidebarProps {
   userId: number;
   playlistId: number;
-  refreshData: () => Promise<{
-    scheduledData: Tune[];
-    repertoireData: Tune[];
-  }>;
 }
 
-const Sidebar = ({ userId, playlistId, refreshData }: ISidebarProps) => {
+const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
   // const [selectedTune, setSelectedTune] = useState(1);
 
   // const urls = [
@@ -65,7 +61,7 @@ const Sidebar = ({ userId, playlistId, refreshData }: ISidebarProps) => {
               router.push(
                 `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${currentTune}`,
               );
-              void refreshData();
+              // void refreshData();
             }}
           >
             <Edit className="h-4 w-4" />

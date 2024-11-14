@@ -10,15 +10,15 @@ const client = axios.create({
 });
 
 export async function getPracticeListScheduled(
-  user_id: string,
-  playlist_id: string,
+  userId: number,
+  playlistId: number,
 ): Promise<Tune[]> {
   try {
     // console.log("Environment Variables:", process.env);
     console.log("In getPracticeListScheduled: baseURL: %s", client.getUri());
-    console.log("user_id: %s, playlist_id: %s", user_id, playlist_id);
+    console.log("user_id: %s, playlist_id: %s", userId, playlistId);
     const response = await client.get<Tune[]>(
-      `/get_practice_list_scheduled/${user_id}/${playlist_id}`,
+      `/get_practice_list_scheduled/${userId}/${playlistId}`,
     );
     const data = response.data;
     return data;
@@ -30,12 +30,12 @@ export async function getPracticeListScheduled(
 }
 
 export async function getRecentlyPracticed(
-  user_id: string,
-  playlist_id: string,
+  userId: number,
+  playlistId: number,
 ): Promise<Tune[]> {
   try {
     const response = await client.get<Tune[]>(
-      `/get_tunes_recently_played/${user_id}/${playlist_id}`,
+      `/get_tunes_recently_played/${userId}/${playlistId}`,
     );
     const data = response.data;
     return data;

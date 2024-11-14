@@ -4,7 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
-import type { Tune } from "../types";
 import RepertoireGrid from "./RepertoireGrid";
 import ScheduledTunesGrid from "./ScheduledTunesGrid";
 import {
@@ -13,24 +12,9 @@ import {
   updateTabGroupMainState,
 } from "../settings";
 
-function CircularProgress() {
-  return (
-    <div className="flex justify-center items-center h-32">
-      <div className="w-12 h-12 border-t-2 border-b-2 border-gray-900 rounded-full animate-spin" />
-    </div>
-  );
-}
-
 interface IPracticeProps {
-  user_id: string;
-  playlist_id: string;
-  loading: boolean;
-  scheduled: Tune[] | undefined;
-  recentlyPracticed: Tune[] | undefined;
-  refreshData: () => Promise<{
-    scheduledData: Tune[];
-    repertoireData: Tune[];
-  }>;
+  userId: number;
+  playlistId: number;
 }
 
 const tabSpec = [
@@ -44,34 +28,26 @@ const tabSpec = [
 ];
 
 export default function TabGroupMain({
-  user_id,
-  playlist_id,
-  loading,
-  scheduled,
-  recentlyPracticed,
-  refreshData,
+  userId,
+  playlistId,
 }: IPracticeProps): JSX.Element {
-  const [playlistRef] = useState<string>(playlist_id);
-  const [userRef] = useState<string>(user_id);
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
   const changeActiveTab = (whichTag: string) => {
     setActiveTab(whichTag);
-    const userIdInt = Number.parseInt(user_id, 10);
     const tabGroupMainState: ITabGroupMainStateModel = {
-      user_id: userIdInt,
+      user_id: userId,
       which_tab: whichTag,
     };
-    void updateTabGroupMainState(userIdInt, tabGroupMainState);
+    void updateTabGroupMainState(userId, tabGroupMainState);
   };
 
   useEffect(() => {
-    const doInitialization = async (user_id: string) => {
+    const doInitialization = async () => {
       try {
         console.log("Initializing...");
-        const userIdInt = Number.parseInt(user_id, 10);
         const tabGroupMainState: ITabGroupMainStateModel | null =
-          await getTabGroupMainState(userIdInt);
+          await getTabGroupMainState(userId);
         if (tabGroupMainState !== null) {
           setActiveTab(tabGroupMainState.which_tab);
         } else {
@@ -81,12 +57,8 @@ export default function TabGroupMain({
         console.error("Error fetching active tab:", error);
       }
     };
-    void doInitialization(user_id);
-  }, [user_id]);
-
-  if (loading) {
-    return <div>Loading...</div>; // Render a loading state while fetching data
-  }
+    void doInitialization();
+  }, [userId]);
 
   return (
     <Tabs
@@ -111,34 +83,14 @@ export default function TabGroupMain({
       <TabsContent value="scheduled">
         <Card>
           <CardContent className="space-y-2">
-            {scheduled ? (
-              <ScheduledTunesGrid
-                tunes={scheduled}
-                user_id={userRef}
-                playlist_id={playlistRef}
-                table_purpose="practice"
-                refreshData={refreshData}
-              />
-            ) : (
-              <CircularProgress />
-            )}
+            <ScheduledTunesGrid userId={userId} playlistId={playlistId} />
           </CardContent>
         </Card>
       </TabsContent>
       <TabsContent value="repertoire">
         <Card>
           <CardContent className="space-y-2">
-            {recentlyPracticed ? (
-              <RepertoireGrid
-                tunes={recentlyPracticed}
-                user_id={userRef}
-                playlist_id={playlistRef}
-                table_purpose="repertoire"
-                refreshData={refreshData}
-              />
-            ) : (
-              <CircularProgress />
-            )}
+            <RepertoireGrid userId={userId} playlistId={playlistId} />
           </CardContent>
         </Card>
       </TabsContent>

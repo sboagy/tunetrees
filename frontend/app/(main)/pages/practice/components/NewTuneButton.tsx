@@ -6,18 +6,13 @@ import { createTune } from "../queries";
 import type { Tune } from "../types";
 
 interface INewTuneButtonProps {
-  user_id: string;
-  playlist_id: string;
-  refreshData: () => Promise<{
-    scheduledData: Tune[];
-    repertoireData: Tune[];
-  }>;
+  userId: number;
+  playlistId: number;
 }
 
 export default function NewTuneButton({
-  user_id,
-  playlist_id,
-  refreshData,
+  userId,
+  playlistId,
 }: INewTuneButtonProps): JSX.Element {
   const router = useRouter();
 
@@ -41,16 +36,16 @@ export default function NewTuneButton({
       recall_eval: null,
       notes: null,
     };
-    createTune(newTune, Number(playlist_id))
+    createTune(newTune, Number(playlistId))
       .then((result) => {
         const tune = result as Tune;
         console.log(
-          `Tune created successfully /pages/tune-edit?userId=${user_id}&playlistId=${playlist_id}&tuneId=${tune.id}`,
+          `Tune created successfully /pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tune.id}`,
         );
         router.push(
-          `/pages/tune-edit?userId=${user_id}&playlistId=${playlist_id}&tuneId=${tune.id}`,
+          `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tune.id}`,
         );
-        void refreshData();
+        // void refreshData();
       })
       .catch((error) => {
         console.error("Error creating tune:", error);
