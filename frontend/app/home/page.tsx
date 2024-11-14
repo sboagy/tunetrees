@@ -19,8 +19,8 @@ const HomePage = async () => {
 
   console.log("Session found! (HomePage)");
 
-  const userId = (session?.user?.id as string) ?? "1";
-  const playlistId = "1";
+  const userId = session?.user?.id ? Number.parseInt(session?.user?.id) : 1;
+  const playlistId = 1;
 
   return <MainPanel userId={userId} playlistId={playlistId} />;
 };

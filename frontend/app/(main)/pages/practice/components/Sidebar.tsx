@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/filename-case */
 "use client";
 import { useRouter } from "next/navigation";
 
@@ -10,24 +9,14 @@ import { getTune } from "../queries";
 import { useEffect, useState } from "react";
 import type { Tune } from "../types";
 import "./Sidebar.css";
+import { useTune } from "./TuneContext";
 
 interface ISidebarProps {
-  currentTune: number | null; // Add currentTune prop
   userId: number;
   playlistId: number;
-  refreshData: () => Promise<{
-    scheduledData: Tune[];
-    repertoireData: Tune[];
-  }>;
 }
 
-const Sidebar = ({
-  currentTune,
-  userId,
-  playlistId,
-  refreshData,
-}: ISidebarProps) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
   // const [selectedTune, setSelectedTune] = useState(1);
 
   // const urls = [
@@ -37,6 +26,7 @@ const Sidebar = ({
 
   const router = useRouter();
   const [tuneTitle, setTuneTitle] = useState<string | null>(null);
+  const { currentTune } = useTune();
 
   useEffect(() => {
     if (currentTune !== null) {
@@ -71,7 +61,7 @@ const Sidebar = ({
               router.push(
                 `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${currentTune}`,
               );
-              void refreshData();
+              // void refreshData();
             }}
           >
             <Edit className="h-4 w-4" />

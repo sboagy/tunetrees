@@ -1,78 +1,69 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import type { Table as TanstackTable } from "@tanstack/react-table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type JSX } from "react";
 import { submitPracticeFeedbacks, type ITuneUpdate } from "../commands";
 import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import TunesGrid, { type IScheduledTunesType, TunesTable } from "./TunesGrid";
-import { deleteTableTransientData, getTableCurrentTune } from "../settings";
+import { deleteTableTransientData } from "../settings";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import FlashcardPanel from "./FlashcardPanel";
 import NewTuneButton from "./NewTuneButton";
 import { Upload } from "lucide-react";
+import { getPracticeListScheduled } from "../queries";
+import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 
 type ReviewMode = "grid" | "flashcard";
 
-interface IScheduledTunesGridProps extends IScheduledTunesType {
-  setMainPanelCurrentTune: (tuneId: number | null) => void;
-  mainPanelCurrentTune: number | null;
-}
+type ScheduledTunesGridProps = {
+  userId: number;
+  playlistId: number;
+};
 
 export default function ScheduledTunesGrid({
-  tunes,
-  user_id,
-  playlist_id,
-  refreshData,
-  setMainPanelCurrentTune,
-  mainPanelCurrentTune,
-}: IScheduledTunesGridProps): JSX.Element {
-  const [scheduled, setScheduled] = useState<Tune[]>(tunes);
-  const refreshDataCallback = refreshData;
+  userId,
+  playlistId,
+}: ScheduledTunesGridProps): JSX.Element {
+  // const [scheduled, setScheduled] = useState<Tune[]>([]);
+  const [tunes, setTunes] = useState<Tune[]>([]);
+  const { refreshId, triggerRefresh } = useTuneDataRefresh();
 
-  // Per these current tune states,
-  // see "Important Note (1)" in app/(main)/pages/practice/components/MainPanel.tsx
-  const [currentTune, setCurrentTune] = useState<number>(-3);
-  const getCurrentTune = useCallback(() => currentTune, [currentTune]);
+  const refreshTunes = useCallback((userId: number, playlistId: number) => {
+    getPracticeListScheduled(userId, playlistId)
+      .then((result: Tune[]) => {
+        setTunes(result);
+      })
+      .catch((error) => {
+        console.error("Error refreshing tunes:", error);
+      });
+  }, []);
 
   useEffect(() => {
-    const getSetCurrentTune = () => {
-      getTableCurrentTune(Number(user_id), "full", "practice")
-        .then((tuneId) => {
-          setCurrentTune(tuneId);
-        })
-        .catch((error) => {
-          console.error("Error fetching current tune:", error);
-        });
-    };
-    getSetCurrentTune();
-  }, [user_id]);
+    refreshTunes(userId, playlistId);
+  }, [userId, playlistId, refreshTunes]);
 
-  const table: TanstackTable<Tune> = TunesTable({
-    tunes: scheduled,
-    user_id,
-    playlist_id,
-    table_purpose: "practice",
+  useEffect(() => {
+    console.log("ScheduledTunesGrid refreshId:", refreshId);
+    refreshTunes(userId, playlistId);
+  }, [refreshId, userId, playlistId, refreshTunes]);
+
+  const tunesWithFilter: IScheduledTunesType = {
+    tunes,
+    userId,
+    playlistId,
+    tablePurpose: "practice",
     globalFilter: "",
-    refreshData,
-    mainPanelCurrentTune,
-    setMainPanelCurrentTune,
-    getCurrentTune,
-  });
+  };
+  const table = TunesTable(tunesWithFilter);
 
-  const submitPracticeFeedbacksHandler = (
-    refreshData: () => Promise<{
-      scheduledData: Tune[];
-      repertoireData: Tune[];
-    }>,
-  ) => {
+  const submitPracticeFeedbacksHandler = () => {
     console.log("submitPracticeFeedbacksHandler!");
 
     const updates: { [key: string]: ITuneUpdate } = {};
 
-    for (const [i, tune] of scheduled.entries()) {
+    for (const [i, tune] of tunes.entries()) {
       const idString = `${tune.id}`;
       const row = table.getRow(i.toString());
 
@@ -84,7 +75,7 @@ export default function ScheduledTunesGrid({
     }
 
     const promiseResult = submitPracticeFeedbacks({
-      playlist_id,
+      playlistId,
       updates,
     });
     promiseResult
@@ -97,9 +88,9 @@ export default function ScheduledTunesGrid({
       });
 
     const promiseResult2 = deleteTableTransientData(
-      Number.parseInt(user_id),
+      userId,
       -1,
-      Number.parseInt(playlist_id),
+      playlistId,
       "practice",
     );
     promiseResult2
@@ -111,15 +102,17 @@ export default function ScheduledTunesGrid({
         throw error;
       });
 
-    refreshData()
-      .then((result) => {
-        console.log("refreshData successful:", result);
-        setScheduled(result.scheduledData);
-      })
-      .catch((error) => {
-        console.error("Error invoking refreshData()", error);
-        throw error;
-      });
+    triggerRefresh();
+
+    // refreshData()
+    //   .then((result) => {
+    //     console.log("refreshData successful:", result);
+    //     setScheduled(result.scheduledData);
+    //   })
+    //   .catch((error) => {
+    //     console.error("Error invoking refreshData()", error);
+    //     throw error;
+    //   });
   };
 
   const [mode, setMode] = useState<ReviewMode>("grid");
@@ -138,7 +131,7 @@ export default function ScheduledTunesGrid({
           <Button
             type="submit"
             variant="outline"
-            onClick={() => submitPracticeFeedbacksHandler(refreshDataCallback)}
+            onClick={() => submitPracticeFeedbacksHandler()}
           >
             <Upload />
             {window.innerWidth < 768 ? "" : " Submit Practiced Tunes"}
@@ -173,31 +166,23 @@ export default function ScheduledTunesGrid({
           <div
             style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
           >
-            <ColumnsMenu user_id={user_id} table={table} />
+            <ColumnsMenu user_id={userId} table={table} />
           </div>
-          <NewTuneButton
-            user_id={user_id}
-            playlist_id={playlist_id}
-            refreshData={refreshData}
-          />
+          <NewTuneButton userId={userId} playlistId={playlistId} />
         </div>
       </div>
       {mode === "grid" ? (
         <TunesGrid
           table={table}
-          userId={Number.parseInt(user_id)}
-          playlistId={Number.parseInt(playlist_id)}
-          purpose={"practice"}
-          setMainPanelCurrentTune={setMainPanelCurrentTune}
-          getCurrentTune={getCurrentTune}
-          setCurrentTune={setCurrentTune}
-          refreshData={refreshData}
+          userId={userId}
+          playlistId={userId}
+          tablePurpose={"practice"}
         />
       ) : (
         <FlashcardPanel
           table={table}
-          userId={Number.parseInt(user_id)}
-          playlistId={Number.parseInt(playlist_id)}
+          userId={userId}
+          playlistId={playlistId}
           purpose={"practice"}
         />
       )}

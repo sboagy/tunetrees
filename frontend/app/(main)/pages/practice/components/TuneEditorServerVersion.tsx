@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getTuneStaged } from "../queries";
 import { NextRequest } from "next/server";
+import type { JSX } from "react";
 
 const formSchema = z.object({
   title: z.string().min(1, { message: "Title is required" }),

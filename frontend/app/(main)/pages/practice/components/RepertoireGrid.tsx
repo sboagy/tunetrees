@@ -5,7 +5,7 @@ import ColumnsMenu from "./ColumnsMenu";
 import TunesGrid, { type IScheduledTunesType, TunesTable } from "./TunesGrid";
 
 import { Input } from "@/components/ui/input";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type JSX } from "react";
 
 import type {
   RowSelectionState,
@@ -14,8 +14,9 @@ import type {
 import { submitPracticeFeedbacks } from "../commands";
 import type { Tune } from "../types";
 import NewTuneButton from "./NewTuneButton";
-import { getTableCurrentTune } from "../settings";
 import { FastForward } from "lucide-react";
+import { getRecentlyPracticed } from "../queries";
+import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 
 async function fetchFilterFromDB(
   userId: number,
@@ -28,55 +29,61 @@ async function fetchFilterFromDB(
   return String(data.filter);
 }
 
-interface IRepertoireGridProps extends IScheduledTunesType {
-  setMainPanelCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
-  mainPanelCurrentTune: number | null;
-}
+type RepertoireGridProps = {
+  userId: number;
+  playlistId: number;
+};
 
 export default function RepertoireGrid({
-  tunes,
-  user_id,
-  playlist_id,
-  refreshData,
-  setMainPanelCurrentTune, // Destructure setCurrentTune
-  mainPanelCurrentTune,
-}: IRepertoireGridProps): JSX.Element {
+  userId,
+  playlistId,
+}: RepertoireGridProps): JSX.Element {
   const [isAddToReviewQueueEnabled, setIsAddToReviewQueueEnabled] =
     useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const selectionChangedCallback = (
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     table: TanstackTable<Tune>,
     rowSelectionState: RowSelectionState,
   ): void => {
     const selectedRowsCount = Object.keys(rowSelectionState).length;
     setIsAddToReviewQueueEnabled(selectedRowsCount > 0);
   };
-  const refreshDataCallback = refreshData;
-
   const [globalFilter, setGlobalFilter] = useState("");
   const [isFilterLoaded, setIsFilterLoaded] = useState(false);
+  const [tunes, setTunes] = useState<Tune[]>([]);
+  const { refreshId, triggerRefresh } = useTuneDataRefresh();
 
-  // Per these current tune states,
-  // see "Important Note (1)" in app/(main)/pages/practice/components/MainPanel.tsx
-  const [currentTune, setCurrentTune] = useState<number>(-2);
-  const getCurrentTune = useCallback(() => currentTune, [currentTune]);
+  const refreshTunes = useCallback((userId: number, playlistId: number) => {
+    getRecentlyPracticed(userId, playlistId)
+      .then((result: Tune[]) => {
+        setTunes(result);
+      })
+      .catch((error) => {
+        console.error("Error refreshing tunes:", error);
+      });
+  }, []);
 
   useEffect(() => {
-    const getSetCurrentTune = () => {
-      getTableCurrentTune(Number(user_id), "full", "repertoire")
-        .then((tuneId) => {
-          setCurrentTune(tuneId);
-        })
-        .catch((error) => {
-          console.error("Error fetching current tune:", error);
-        });
-    };
-    getSetCurrentTune();
-  }, [user_id]);
+    refreshTunes(userId, playlistId);
+  }, [userId, playlistId, refreshTunes]);
+
+  useEffect(() => {
+    console.log("ScheduledTunesGrid refreshId:", refreshId);
+    refreshTunes(userId, playlistId);
+  }, [refreshId, userId, playlistId, refreshTunes]);
+
+  const tunesWithFilter: IScheduledTunesType = {
+    tunes,
+    userId,
+    playlistId,
+    tablePurpose: "repertoire",
+    globalFilter: globalFilter,
+  };
+  const table = TunesTable(tunesWithFilter);
 
   useEffect(() => {
     const getFilter = () => {
-      fetchFilterFromDB(Number.parseInt(user_id), "repertoire")
+      fetchFilterFromDB(userId, "repertoire")
         .then((filter) => {
           setGlobalFilter(filter);
           setIsFilterLoaded(true);
@@ -88,20 +95,8 @@ export default function RepertoireGrid({
     };
 
     getFilter();
-  }, [user_id]);
+  }, [userId]);
 
-  const tunesWithFilter: IScheduledTunesType = {
-    tunes: tunes,
-    user_id: user_id,
-    playlist_id: playlist_id,
-    table_purpose: "repertoire",
-    refreshData: refreshData,
-    globalFilter,
-    mainPanelCurrentTune,
-    setMainPanelCurrentTune,
-    getCurrentTune,
-  };
-  const table = TunesTable(tunesWithFilter, selectionChangedCallback);
   // const [preset, setPreset] = useState("");
 
   // const handlePresetChange = (value: string) => {
@@ -109,12 +104,7 @@ export default function RepertoireGrid({
   //   // Implement preset logic here
   // };
 
-  const addToReviewQueue = (
-    refreshData: () => Promise<{
-      scheduledData: Tune[];
-      repertoireData: Tune[];
-    }>,
-  ) => {
+  const addToReviewQueue = () => {
     console.log("addToReviewQueue!");
 
     // TODO: Implement addToReviewQueue logic
@@ -136,17 +126,15 @@ export default function RepertoireGrid({
     }
     console.log("updates", updates);
 
-    const playlistId = playlist_id;
-
     const promiseResult = submitPracticeFeedbacks({
-      playlist_id: playlistId,
+      playlistId,
       updates,
     });
     promiseResult
       .then((result) => {
         console.log("submit_practice_feedbacks_result result:", result);
         table.resetRowSelection();
-        void refreshData();
+        triggerRefresh();
       })
       .catch((error) => {
         console.error("Error submit_practice_feedbacks_result:", error);
@@ -189,7 +177,7 @@ export default function RepertoireGrid({
               <Button
                 disabled={!isAddToReviewQueueEnabled}
                 variant="outline"
-                onClick={() => addToReviewQueue(refreshDataCallback)}
+                onClick={() => addToReviewQueue()}
                 title="Add selected tunes to review queue"
               >
                 <FastForward />
@@ -236,24 +224,15 @@ export default function RepertoireGrid({
               >
                 {">"}
               </Button>
-              <ColumnsMenu user_id={user_id} table={table} />
-              <NewTuneButton
-                user_id={user_id}
-                playlist_id={playlist_id}
-                refreshData={refreshData}
-              />
+              <ColumnsMenu user_id={userId} table={table} />
+              <NewTuneButton userId={userId} playlistId={playlistId} />
             </div>
           </div>
           <TunesGrid
             table={table}
-            userId={Number.parseInt(user_id)}
-            playlistId={Number.parseInt(playlist_id)}
-            purpose={"repertoire"}
-            globalFilter={globalFilter}
-            setMainPanelCurrentTune={setMainPanelCurrentTune} // Pass setCurrentTune to TunesGrid
-            getCurrentTune={getCurrentTune}
-            setCurrentTune={setCurrentTune}
-            refreshData={refreshData}
+            userId={userId}
+            playlistId={playlistId}
+            tablePurpose={"repertoire"}
           />
         </>
       )}

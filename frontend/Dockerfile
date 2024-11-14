@@ -9,7 +9,7 @@ FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /usr/src/app
 
 # Copy necessary configuration files
-COPY .eslintrc.json .eslintignore .prettierrc .prettierrc.js *.d.ts ./
+COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.js next.config.mjs *.d.ts ./
 
 # Copy necessary configuration files
 COPY tsconfig.json  ./tsconfig.json
@@ -28,8 +28,7 @@ RUN rm -rf src
 #     echo "Done checking for tsconfig-google.json (1)")
 
 # re-copy the configuration files to since gts is evil and overwrites them
-# Copy necessary configuration files
-# COPY .eslintrc.json .eslintignore .prettierrc .prettierrc.js *.d.ts ./
+COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.js next.config.mjs *.d.ts ./
 
 # Copy necessary configuration files
 COPY tsconfig.json  ./tsconfig.json
@@ -88,7 +87,7 @@ COPY package.json package-lock.json ./
 RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=package-lock.json,target=package-lock.json \
     --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev
+    npm ci  --legacy-peer-deps --omit=dev
 
 ################################################################################
 # Create a stage for building the application.
@@ -102,7 +101,7 @@ WORKDIR /usr/src/app
 RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=package-lock.json,target=package-lock.json \
     --mount=type=cache,target=/root/.npm \
-    npm ci
+    npm ci --legacy-peer-deps
 
 # Copy the main application directories.
 COPY app app
@@ -115,7 +114,7 @@ COPY middleware.ts ./
 COPY components.json next.config.js next.config.mjs postcss.config.js ./
 COPY tailwind.config.js tailwind.config.js ./
 COPY tsconfig.json ./
-COPY .eslintignore .eslintrc.json .prettierrc .prettierrc.js ./
+COPY eslint.config.mjs .prettierrc .prettierrc.js ./
 
 # Run the build script.
 RUN npm run build

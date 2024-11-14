@@ -18,7 +18,7 @@ const ColumnsMenu = ({
   user_id,
   table,
 }: {
-  user_id: string;
+  user_id: number;
   table: Table<Tune>;
 }) => {
   return (

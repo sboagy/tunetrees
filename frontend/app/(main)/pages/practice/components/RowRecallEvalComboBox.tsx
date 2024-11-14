@@ -1,8 +1,7 @@
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check } from "lucide-react";
 // RecallEvalRadioGroup.tsx
 import React from "react";
 
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import {
@@ -115,47 +114,35 @@ export function RecallEvalComboBox(
     setIsOpen(false);
   };
 
-  const handleButtonClick = (event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent the event from bubbling up to the parent elements
-    setIsOpen(!isOpen);
-  };
+  // const handleButtonClick = (event: React.MouseEvent) => {
+  //   event.stopPropagation(); // Prevent the event from bubbling up to the parent elements
+  //   setIsOpen(!isOpen);
+  // };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={isOpen}
+        <select
           className={`w-[9em] sm:w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(info.row.original.recall_eval ?? null)}`}
           style={{
             textAlign: "left",
           }}
-          onClick={handleButtonClick}
+          onChange={(e) => {
+            const newValue = e.target.value;
+            info.row.original.recall_eval = newValue;
+            void saveData(newValue);
+          }}
+          value={info.row.original.recall_eval ?? ""}
         >
-          {/* This span is the only way I could get the overflow with ellipsis to work in  */
-          /* the button.  Per suggestion from Stack Overflow. */}
-          <span
-            style={{
-              // width: "18em",
-              overflow: "hidden",
-              whiteSpace: "nowrap",
-              display: "block",
-              textAlign: "left",
-              textWrap: "nowrap",
-              textOverflow: "ellipsis",
-            }}
-            className="sm:w-[9em]"
-          >
-            {info.row.original.recall_eval
-              ? qualityList.find(
-                  (qualityList) =>
-                    qualityList.value === info.row.original.recall_eval,
-                )?.label2
-              : "Recall Quality..."}
-          </span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
-        </Button>
+          <option value="" disabled>
+            Recall Quality...
+          </option>
+          {qualityList.slice(1).map((qualityList) => (
+            <option key={qualityList.value} value={qualityList.value}>
+              {qualityList.label2}
+            </option>
+          ))}
+        </select>
       </PopoverTrigger>
       <PopoverContent align="end">
         <Command>

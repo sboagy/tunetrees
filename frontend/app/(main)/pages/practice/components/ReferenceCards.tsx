@@ -330,6 +330,7 @@ function ReferenceCard({
                 value={stagedReference.comment ?? ""}
                 onChange={(value: string) => handleChange("comment", value)}
                 placeholder="Add a comment..."
+                className="border-none"
                 // className="w-full h-20 min-h-10 max-h-50 !important"
               />
             </div>

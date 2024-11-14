@@ -1,10 +1,9 @@
+// TabGroupMain.tsx
 "use client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { JSX } from "react";
 import { useEffect, useState } from "react";
-
-import type { Tune } from "../types";
-
 import RepertoireGrid from "./RepertoireGrid";
 import ScheduledTunesGrid from "./ScheduledTunesGrid";
 import {
@@ -13,26 +12,9 @@ import {
   updateTabGroupMainState,
 } from "../settings";
 
-function CircularProgress() {
-  return (
-    <div className="flex justify-center items-center h-32">
-      <div className="w-12 h-12 border-t-2 border-b-2 border-gray-900 rounded-full animate-spin" />
-    </div>
-  );
-}
-
 interface IPracticeProps {
-  user_id: string;
-  playlist_id: string;
-  setCurrentTune: (tuneId: number | null) => void; // Add setCurrentTune prop
-  currentTune: number | null;
-  loading: boolean;
-  scheduled: Tune[] | undefined;
-  recentlyPracticed: Tune[] | undefined;
-  refreshData: () => Promise<{
-    scheduledData: Tune[];
-    repertoireData: Tune[];
-  }>;
+  userId: number;
+  playlistId: number;
 }
 
 const tabSpec = [
@@ -41,51 +23,31 @@ const tabSpec = [
     name: "Practice",
     content: "Review and practice your scheduled tunes.",
   },
-  {
-    id: "repertoire",
-    name: "Repertoire",
-    content: "Manage your repertoire.",
-  },
-  {
-    id: "analysis",
-    name: "Analysis",
-    content: "Practice Analytics.",
-  },
+  { id: "repertoire", name: "Repertoire", content: "Manage your repertoire." },
+  { id: "analysis", name: "Analysis", content: "Practice Analytics." },
 ];
 
 export default function TabGroupMain({
-  user_id,
-  playlist_id,
-  setCurrentTune, // Destructure setCurrentTune
-  currentTune,
-  loading,
-  scheduled,
-  recentlyPracticed,
-  refreshData,
+  userId,
+  playlistId,
 }: IPracticeProps): JSX.Element {
-  const [playlistRef] = useState<string>(playlist_id);
-  const [userRef] = useState<string>(user_id);
-  // const [origRecentlyPracticed, setOrigRecentlyPracticed] = useState<Tune[]>();
-
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
   const changeActiveTab = (whichTag: string) => {
     setActiveTab(whichTag);
-    const userIdInt = Number.parseInt(user_id, 10);
     const tabGroupMainState: ITabGroupMainStateModel = {
-      user_id: userIdInt,
+      user_id: userId,
       which_tab: whichTag,
     };
-    void updateTabGroupMainState(userIdInt, tabGroupMainState);
+    void updateTabGroupMainState(userId, tabGroupMainState);
   };
 
   useEffect(() => {
-    const doInitialization = async (user_id: string) => {
+    const doInitialization = async () => {
       try {
         console.log("Initializing...");
-        const userIdInt = Number.parseInt(user_id, 10);
         const tabGroupMainState: ITabGroupMainStateModel | null =
-          await getTabGroupMainState(userIdInt);
+          await getTabGroupMainState(userId);
         if (tabGroupMainState !== null) {
           setActiveTab(tabGroupMainState.which_tab);
         } else {
@@ -95,29 +57,8 @@ export default function TabGroupMain({
         console.error("Error fetching active tab:", error);
       }
     };
-    void doInitialization(user_id);
-  }, [user_id]);
-
-  // useEffect(() => {
-  //   const getScheduled = async (user_id: string, playlist_id: string) => {
-  //     const data = await getPracticeListScheduled(user_id, playlist_id);
-  //     setScheduled(data);
-  //   };
-  //   void getScheduled(user_id, playlist_id);
-  // }, [user_id, playlist_id]);
-
-  // useEffect(() => {
-  //   const getRecent = async (user_id: string, playlist_id: string) => {
-  //     const data = await getRecentlyPracticed(user_id, playlist_id);
-  //     setRecentlyPracticed(data);
-  //     setOrigRecentlyPracticed(data);
-  //   };
-  //   void getRecent(user_id, playlist_id);
-  // }, [user_id, playlist_id]);
-
-  if (loading) {
-    return <div>Loading...</div>; // Render a loading state while fetching data
-  }
+    void doInitialization();
+  }, [userId]);
 
   return (
     <Tabs
@@ -133,8 +74,7 @@ export default function TabGroupMain({
           <TabsTrigger
             key={tab.id}
             value={tab.id}
-            className={`rounded-t-lg border-t border-l border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors duration-200
-          ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
+            className={`rounded-t-lg border-t border-l border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors duration-200 ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
           >
             {tab.name}
           </TabsTrigger>
@@ -143,38 +83,14 @@ export default function TabGroupMain({
       <TabsContent value="scheduled">
         <Card>
           <CardContent className="space-y-2">
-            {scheduled ? (
-              <ScheduledTunesGrid
-                tunes={scheduled}
-                user_id={userRef}
-                playlist_id={playlistRef}
-                table_purpose="practice"
-                refreshData={refreshData}
-                setMainPanelCurrentTune={setCurrentTune}
-                mainPanelCurrentTune={currentTune}
-              />
-            ) : (
-              <CircularProgress />
-            )}
+            <ScheduledTunesGrid userId={userId} playlistId={playlistId} />
           </CardContent>
         </Card>
       </TabsContent>
       <TabsContent value="repertoire">
         <Card>
           <CardContent className="space-y-2">
-            {recentlyPracticed ? (
-              <RepertoireGrid
-                tunes={recentlyPracticed}
-                user_id={userRef}
-                playlist_id={playlistRef}
-                table_purpose="repertoire"
-                refreshData={refreshData}
-                setMainPanelCurrentTune={setCurrentTune}
-                mainPanelCurrentTune={currentTune}
-              />
-            ) : (
-              <CircularProgress />
-            )}
+            <RepertoireGrid userId={userId} playlistId={playlistId} />
           </CardContent>
         </Card>
       </TabsContent>
