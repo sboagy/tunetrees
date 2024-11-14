@@ -9,6 +9,7 @@ import "./AutoResizingRichTextarea.css";
 // import JoditEditor from "jodit-react";
 
 // Dynamically import JoditEditor to ensure it only loads on the client side
+// eslint-disable-next-line @typescript-eslint/naming-convention
 const JoditEditor = dynamic(
   () => import("jodit-react").then((mod) => mod.default),
   {

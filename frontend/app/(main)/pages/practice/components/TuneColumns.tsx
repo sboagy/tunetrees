@@ -276,11 +276,8 @@ export function get_columns(
 
   function RowSelectedCheckBox(
     info: CellContext<Tune, TunesGridColumnGeneralType>,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     userId: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     playlistId: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     purpose: TablePurpose,
   ) {
     const handleItemCheckboxChange = () => {
