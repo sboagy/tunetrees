@@ -40,7 +40,6 @@ export default function RepertoireGrid({
 }: RepertoireGridProps): JSX.Element {
   const [isAddToReviewQueueEnabled, setIsAddToReviewQueueEnabled] =
     useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const selectionChangedCallback = (
     table: TanstackTable<Tune>,
     rowSelectionState: RowSelectionState,
@@ -64,11 +63,7 @@ export default function RepertoireGrid({
   }, []);
 
   useEffect(() => {
-    refreshTunes(userId, playlistId);
-  }, [userId, playlistId, refreshTunes]);
-
-  useEffect(() => {
-    console.log("ScheduledTunesGrid refreshId:", refreshId);
+    console.log("RepertoireGrid refreshId:", refreshId);
     refreshTunes(userId, playlistId);
   }, [refreshId, userId, playlistId, refreshTunes]);
 
@@ -79,7 +74,11 @@ export default function RepertoireGrid({
     tablePurpose: "repertoire",
     globalFilter: globalFilter,
   };
-  const table = TunesTable(tunesWithFilter);
+  const table = TunesTable(
+    tunesWithFilter,
+    selectionChangedCallback,
+    // setGlobalFilter,
+  );
 
   useEffect(() => {
     const getFilter = () => {
@@ -106,14 +105,6 @@ export default function RepertoireGrid({
 
   const addToReviewQueue = () => {
     console.log("addToReviewQueue!");
-
-    // TODO: Implement addToReviewQueue logic
-    // 1. Get the checkmarked tunes
-    // 2. Create a TuneUpdate object for each tune
-    // 3. Send the TuneUpdate objects to the server for scheduling
-    // 4. Update the UI to reflect the changes
-
-    // const updates: { [key: string]: ITuneUpdate } = {};
 
     const selectedTunes = table
       .getSelectedRowModel()
@@ -143,24 +134,6 @@ export default function RepertoireGrid({
 
     // const updates: { [key: string]: TuneUpdate } = {};
   };
-
-  // const filteredData: Tune[] = tunes.tunes.filter((item: Tune) =>
-  //   Object.values(item).some((value) =>
-  //     value
-  //       ? value.toString().toLowerCase().includes(filter.toLowerCase())
-  //       : true,
-  //   ),
-  // );
-
-  // table.getRowModel().rows = table
-  //   .getRowModel()
-  //   .rows.filter((row) =>
-  //     Object.values(row.original).some((value) =>
-  //       value
-  //         ? value.toString().toLowerCase().includes(filter.toLowerCase())
-  //         : true,
-  //     ),
-  //   );
 
   return (
     <div className="w-full h-full">
@@ -204,6 +177,7 @@ export default function RepertoireGrid({
                 value={globalFilter}
                 onChange={(e) => {
                   setGlobalFilter(e.target.value);
+                  // void handleSave();
                 }}
               />
             </div>
