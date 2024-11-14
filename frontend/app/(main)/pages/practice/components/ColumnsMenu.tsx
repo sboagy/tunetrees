@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Table } from "@tanstack/react-table";
 import type { Tune } from "../types";
+import { useEffect, useState } from "react";
 
 const ColumnsMenu = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -21,11 +22,17 @@ const ColumnsMenu = ({
   user_id: number;
   table: Table<Tune>;
 }) => {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="ml-auto">
-          {window.innerWidth < 768 ? "" : "Columns"}
+          {isClient && (window.innerWidth < 768 ? "" : "Columns")}
           <ChevronDown className="ml-2 h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>

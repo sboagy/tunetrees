@@ -29,6 +29,11 @@ export default function ScheduledTunesGrid({
   // const [scheduled, setScheduled] = useState<Tune[]>([]);
   const [tunes, setTunes] = useState<Tune[]>([]);
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const refreshTunes = useCallback((userId: number, playlistId: number) => {
     getPracticeListScheduled(userId, playlistId)
@@ -41,13 +46,11 @@ export default function ScheduledTunesGrid({
   }, []);
 
   useEffect(() => {
-    refreshTunes(userId, playlistId);
-  }, [userId, playlistId, refreshTunes]);
-
-  useEffect(() => {
-    console.log("ScheduledTunesGrid refreshId:", refreshId);
-    refreshTunes(userId, playlistId);
-  }, [refreshId, userId, playlistId, refreshTunes]);
+    if (isClient) {
+      console.log("ScheduledTunesGrid refreshId:", refreshId);
+      refreshTunes(userId, playlistId);
+    }
+  }, [refreshId, userId, playlistId, refreshTunes, isClient]);
 
   const tunesWithFilter: IScheduledTunesType = {
     tunes,
@@ -134,7 +137,8 @@ export default function ScheduledTunesGrid({
             onClick={() => submitPracticeFeedbacksHandler()}
           >
             <Upload />
-            {window.innerWidth < 768 ? "" : " Submit Practiced Tunes"}
+            {isClient &&
+              (window.innerWidth < 768 ? "" : " Submit Practiced Tunes")}
           </Button>
         </div>
         <div className="flex items-center space-x-4">
