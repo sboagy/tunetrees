@@ -58,7 +58,7 @@ export const useTableContext = () => {
   return context;
 };
 
-const saveTableState = (
+export const saveTableState = (
   table: TanstackTable<Tune>,
   userId: number,
   tablePurpose: TablePurpose,
@@ -396,6 +396,96 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const columns = get_columns(userId, playlistId, tablePurpose);
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
   const { currentTune, setCurrentTune } = useTune();
+
+  React.useEffect(() => {
+    // Save the table state when the user navigates away from the page.
+    // * Global Event Handlers: The beforeunload and visibilitychange event handlers are
+    //   set up to handle global events such as closing the browser tab or switching
+    //   to another application.
+    // * Component Cleanup: The component's cleanup function in the useEffect hook ensures
+    //   that the state is saved when the component is unmounted, which happens when
+    //   switching tabs within your app.
+    console.log(
+      "TunesGrid: setting up handleBeforeUnload for tablePurpose: ",
+      tablePurpose,
+    );
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      const tableState: TableState = table.getState();
+
+      console.log(
+        "TunesGrid: calling createOrUpdateTableState in BeforeUnloadEvent for tablePurpose: ",
+        tablePurpose,
+      );
+      // This will run in backgroun, should be ok.
+      void createOrUpdateTableState(
+        userId,
+        "full",
+        tablePurpose,
+        tableState,
+        currentTune,
+      );
+
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        const tableState: TableState = table.getState();
+
+        console.log(
+          "TunesGrid: calling createOrUpdateTableState in visibilitychange for tablePurpose: ",
+          tablePurpose,
+        );
+        // This will run in background, should be ok.
+        void createOrUpdateTableState(
+          userId,
+          "full",
+          tablePurpose,
+          tableState,
+          currentTune,
+        );
+      }
+    };
+
+    if (window !== undefined) {
+      console.log(
+        "TunesGrid: adding beforeunload and visibilitychange event listeners for tablePurpose: ",
+        tablePurpose,
+      );
+      window.addEventListener("beforeunload", handleBeforeUnload);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+
+    return () => {
+      if (window !== undefined) {
+        console.log(
+          "TunesGrid: removing handleBeforeUnload for tablePurpose: ",
+          tablePurpose,
+        );
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+        document.removeEventListener(
+          "visibilitychange",
+          handleVisibilityChange,
+        );
+      }
+
+      console.log(
+        "TunesGrid: calling createOrUpdateTableState in beforeunload cleanup for tablePurpose: ",
+        tablePurpose,
+      );
+      const tableState: TableState = table.getState();
+
+      // This will run in backgroun, should be ok.
+      void createOrUpdateTableState(
+        userId,
+        "full",
+        tablePurpose,
+        tableState,
+        currentTune,
+      );
+    };
+  }, [table, userId, tablePurpose, currentTune]);
 
   React.useEffect(() => {
     const calculatePageSize = () => {
