@@ -17,7 +17,6 @@ import * as React from "react";
 
 import type {
   Row,
-  RowModel,
   RowSelectionState,
   TableState,
   Table as TanstackTable,
@@ -37,6 +36,8 @@ import type { TablePurpose, Tune } from "../types";
 import { createOrUpdateTableState, getTableStateTable } from "../settings";
 import "./TunesGrid.css";
 import { useTune } from "./TuneContext";
+import { useSaveTableState } from "./use-save-table-state";
+import { useCalculatePageSize } from "./use-calculate-page-size";
 
 export interface IScheduledTunesType {
   tunes: Tune[];
@@ -394,209 +395,10 @@ type Props = {
 const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const router = useRouter();
   const columns = get_columns(userId, playlistId, tablePurpose);
-  const tableContainerRef = React.useRef<HTMLDivElement>(null);
   const { currentTune, setCurrentTune } = useTune();
 
-  React.useEffect(() => {
-    // Save the table state when the user navigates away from the page.
-    // * Global Event Handlers: The beforeunload and visibilitychange event handlers are
-    //   set up to handle global events such as closing the browser tab or switching
-    //   to another application.
-    // * Component Cleanup: The component's cleanup function in the useEffect hook ensures
-    //   that the state is saved when the component is unmounted, which happens when
-    //   switching tabs within your app.
-    console.log(
-      "TunesGrid: setting up handleBeforeUnload for tablePurpose: ",
-      tablePurpose,
-    );
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      const tableState: TableState = table.getState();
-
-      console.log(
-        "TunesGrid: calling createOrUpdateTableState in BeforeUnloadEvent for tablePurpose: ",
-        tablePurpose,
-      );
-      // This will run in backgroun, should be ok.
-      void createOrUpdateTableState(
-        userId,
-        "full",
-        tablePurpose,
-        tableState,
-        currentTune,
-      );
-
-      event.preventDefault();
-      event.returnValue = "";
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        const tableState: TableState = table.getState();
-
-        console.log(
-          "TunesGrid: calling createOrUpdateTableState in visibilitychange for tablePurpose: ",
-          tablePurpose,
-        );
-        // This will run in background, should be ok.
-        void createOrUpdateTableState(
-          userId,
-          "full",
-          tablePurpose,
-          tableState,
-          currentTune,
-        );
-      }
-    };
-
-    if (window !== undefined) {
-      console.log(
-        "TunesGrid: adding beforeunload and visibilitychange event listeners for tablePurpose: ",
-        tablePurpose,
-      );
-      window.addEventListener("beforeunload", handleBeforeUnload);
-      document.addEventListener("visibilitychange", handleVisibilityChange);
-    }
-
-    return () => {
-      if (window !== undefined) {
-        console.log(
-          "TunesGrid: removing handleBeforeUnload for tablePurpose: ",
-          tablePurpose,
-        );
-        window.removeEventListener("beforeunload", handleBeforeUnload);
-        document.removeEventListener(
-          "visibilitychange",
-          handleVisibilityChange,
-        );
-      }
-
-      console.log(
-        "TunesGrid: calling createOrUpdateTableState in beforeunload cleanup for tablePurpose: ",
-        tablePurpose,
-      );
-      const tableState: TableState = table.getState();
-
-      // This will run in backgroun, should be ok.
-      void createOrUpdateTableState(
-        userId,
-        "full",
-        tablePurpose,
-        tableState,
-        currentTune,
-      );
-    };
-  }, [table, userId, tablePurpose, currentTune]);
-
-  React.useEffect(() => {
-    const calculatePageSize = () => {
-      getTableStateTable(userId, "full", tablePurpose)
-        .then((tableStateTable) => {
-          const tableStateFromDb = tableStateTable?.settings as TableState;
-          if (tableContainerRef.current) {
-            const windowHeight = window.innerHeight;
-            const mainContentHeight =
-              document.querySelector("#main-content")?.clientHeight || 0;
-            const headerHeight =
-              document.querySelector("header")?.clientHeight || 0;
-            const footerHeight =
-              document.querySelector("footer")?.clientHeight || 0;
-            const ttTabsHeight =
-              document.querySelector("#tt-tabs")?.clientHeight || 0;
-            const ttTunesGridHeader =
-              document.querySelector("#tt-tunes-grid-header")?.clientHeight ||
-              0;
-            const ttTunesGridFooter =
-              document.querySelector("#tt-tunes-grid-footer")?.clientHeight ||
-              0;
-
-            const ttToolbarSelector =
-              tablePurpose === "practice"
-                ? "#tt-scheduled-tunes-header"
-                : "#tt-repertoire-tunes-header";
-
-            const ttGridToolbarHeight =
-              document.querySelector(ttToolbarSelector)?.clientHeight || 0;
-
-            console.log("windowHeight:", windowHeight);
-
-            console.log("mainContentHeight:", mainContentHeight);
-            console.log("headerHeight:", headerHeight);
-            console.log("ttGridToolbarHeight:", ttGridToolbarHeight);
-            console.log("footerHeight:", footerHeight);
-            console.log("ttTabsHeight:", ttTabsHeight);
-            console.log("ttTunesGridHeader:", ttTunesGridHeader);
-            console.log("ttTunesGridFooter:", ttTunesGridFooter);
-
-            const containerHeight =
-              mainContentHeight -
-              ttTabsHeight -
-              ttTunesGridHeader -
-              ttGridToolbarHeight -
-              ttTunesGridFooter;
-            // const containerHeight = tableContainerRef.current.clientHeight;
-
-            console.log("containerHeight:", containerHeight);
-
-            const rows = tableContainerRef.current.querySelectorAll("tr"); // Adjust the selector as needed
-            console.log("rows.length:", rows.length);
-
-            let totalRowHeight = 0;
-            for (const row of rows) {
-              totalRowHeight += row.clientHeight;
-            }
-            const averageRowHeight = totalRowHeight / rows.length;
-            console.log("averageRowHeight:", averageRowHeight);
-
-            let calculatedPageSize = Math.floor(
-              containerHeight / averageRowHeight,
-            );
-            console.log("original calculatedPageSize:", calculatedPageSize);
-            if (calculatedPageSize * averageRowHeight > containerHeight) {
-              calculatedPageSize -= 1;
-            }
-            console.log("adjusted calculatedPageSize:", calculatedPageSize);
-            table.setPagination({
-              ...tableStateFromDb.pagination,
-              pageSize: calculatedPageSize,
-            });
-
-            saveTableState(table, userId, tablePurpose, currentTune);
-
-            // Force the table to recalculate its rows
-            console.log("Forcing the table to recalculate its rows");
-            const rowModel: RowModel<Tune> = table.getRowModel();
-            console.log("rowModel.rows.length:", rowModel.rows.length);
-          }
-        })
-        .catch((error) => {
-          console.error("Error calling server function:", error);
-        });
-    };
-
-    // Calculate page size on initial render
-    calculatePageSize();
-
-    // Debounce resize event
-    const debounce = <T extends (...args: unknown[]) => void>(
-      func: T,
-      wait: number,
-    ) => {
-      let timeout: ReturnType<typeof setTimeout>;
-      return (...args: Parameters<T>): void => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), wait);
-      };
-    };
-
-    const handleResize = debounce(calculatePageSize, 200);
-
-    // Recalculate page size on window resize
-    if (typeof window !== "undefined") {
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
-    }
-    return () => console.log("window is undefined");
-  }, [table, userId, tablePurpose, currentTune]);
+  useSaveTableState(table, userId, tablePurpose, currentTune);
+  const tableContainerRef = useCalculatePageSize(table, userId, tablePurpose);
 
   const handleRowClick = (row: Row<Tune>) => {
     const tuneId = row.original.id;
