@@ -9,7 +9,6 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
@@ -26,6 +25,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -37,7 +37,6 @@ import { createOrUpdateTableState, getTableStateTable } from "../settings";
 import "./TunesGrid.css";
 import { useTune } from "./TuneContext";
 import { useSaveTableState } from "./use-save-table-state";
-import { useCalculatePageSize } from "./use-calculate-page-size";
 
 export interface IScheduledTunesType {
   tunes: Tune[];
@@ -206,7 +205,7 @@ export function TunesTable(
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    // getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
@@ -246,6 +245,7 @@ export function TunesTable(
           if (filterStringCallback) {
             filterStringCallback(tableStateFromDb.globalFilter);
           }
+          table.resetPagination();
         }
       } catch (error) {
         console.error(error);
@@ -398,7 +398,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const { currentTune, setCurrentTune } = useTune();
 
   useSaveTableState(table, userId, tablePurpose, currentTune);
-  const tableContainerRef = useCalculatePageSize(table, userId, tablePurpose);
+  // const tableContainerRef = useCalculatePageSize(table, tablePurpose);
 
   const handleRowClick = (row: Row<Tune>) => {
     const tuneId = row.original.id;
@@ -409,87 +409,91 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
 
   return (
     <>
-      <div
-        className="rounded-md border table-container flex-grow"
-        ref={tableContainerRef}
-        style={{ height: "100%", overflowY: "auto" }}
-      >
-        <tableContext.Provider value={table}>
-          <Table className="table-auto w-full">
-            <TableHeader id="tt-tunes-grid-header">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="h-auto">
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead key={header.id} className="p-2 align-top">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                      </TableHead>
+      <tableContext.Provider value={table}>
+        <Table
+          className="table-auto w-full flex-grow flex flex-col"
+          style={{
+            minHeight: "calc(100vh - 270px)",
+            maxHeight: "calc(100vh - 270px)",
+          }} // Inline style for min-height and max-height
+        >
+          <TableHeader
+            id="tt-tunes-grid-header"
+            className="sticky top-0 bg-white dark:bg-gray-800 z-10"
+          >
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="h-auto">
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id} className="p-2 align-top">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody className="flex-grow overflow-y-scroll ">
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className={`h-auto cursor-pointer ${
+                    currentTune === row.original.id
+                      ? "outline outline-2 outline-blue-500"
+                      : ""
+                  } ${getColorForEvaluation(row.original.recall_eval || null)}`}
+                  onClick={() => handleRowClick(row)}
+                  onDoubleClick={(event) => {
+                    event.preventDefault(); // Prevent default double-click action
+                    event.stopPropagation(); // Stop event bubbling
+                    const tuneId = row.original.id;
+                    saveTableState(table, userId, tablePurpose, currentTune);
+                    console.log("double-click occurred: tuneId=", tuneId);
+                    router.push(
+                      `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tuneId}`,
                     );
-                  })}
+                  }}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </TableCell>
+                  ))}
                 </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className={`h-auto cursor-pointer ${
-                      currentTune === row.original.id
-                        ? "outline outline-2 outline-blue-500"
-                        : ""
-                    } ${getColorForEvaluation(row.original.recall_eval || null)}`}
-                    onClick={() => handleRowClick(row)}
-                    onDoubleClick={(event) => {
-                      event.preventDefault(); // Prevent default double-click action
-                      event.stopPropagation(); // Stop event bubbling
-                      const tuneId = row.original.id;
-                      saveTableState(table, userId, tablePurpose, currentTune);
-                      console.log("double-click occurred: tuneId=", tuneId);
-                      router.push(
-                        `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tuneId}`,
-                      );
-                    }}
-                    data-state={row.getIsSelected() && "selected"}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow className="h-auto">
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-12 text-center"
-                  >
-                    No results.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </tableContext.Provider>
-      </div>
-      <div
-        className="flex items-center justify-end space-x-2 py-4"
-        id="tt-tunes-grid-footer"
-      >
-        <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
-        </div>
-      </div>
+              ))
+            ) : (
+              <TableRow className="h-auto">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-12 text-center"
+                >
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+          <TableFooter className="sticky bottom-0 bg-white dark:bg-gray-800 z-10">
+            <TableRow id="tt-tunes-grid-footer">
+              <TableCell colSpan={columns.length} className="h-12">
+                <div className="flex-1 text-sm text-muted-foreground">
+                  {table.getFilteredSelectedRowModel().rows.length} of{" "}
+                  {table.getFilteredRowModel().rows.length} row(s) selected.
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </tableContext.Provider>
     </>
   );
 };

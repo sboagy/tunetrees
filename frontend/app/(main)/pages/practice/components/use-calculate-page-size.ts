@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
-import type { TableState, Table as TanstackTable } from "@tanstack/react-table";
+import type { Table as TanstackTable } from "@tanstack/react-table";
 import type { TablePurpose, Tune } from "../types";
-import { getTableStateTable } from "../settings";
 
 /**
  * Custom hook to calculate and set the page size for a table based on the available container height.
@@ -14,96 +13,92 @@ import { getTableStateTable } from "../settings";
  */
 export const useCalculatePageSize = (
   table: TanstackTable<Tune>,
-  userId: number,
   tablePurpose: TablePurpose,
 ) => {
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const calculatePageSize = () => {
-      getTableStateTable(userId, "full", tablePurpose)
-        .then((tableStateTable) => {
-          const tableStateFromDb = tableStateTable?.settings as TableState;
-          if (tableContainerRef.current) {
-            // const windowHeight = window.innerHeight;
-            const mainContentHeight =
-              document.querySelector("#main-content")?.clientHeight || 0;
-            // const headerHeight =
-            //   document.querySelector("header")?.clientHeight || 0;
-            // const footerHeight =
-            //   document.querySelector("footer")?.clientHeight || 0;
-            const ttTabsHeight =
-              document.querySelector("#tt-tabs")?.clientHeight || 0;
-            const ttTunesGridHeader =
-              document.querySelector("#tt-tunes-grid-header")?.clientHeight ||
-              0;
-            const ttTunesGridFooter =
-              document.querySelector("#tt-tunes-grid-footer")?.clientHeight ||
-              0;
+    const calculatePageSize = (newHeight?: number) => {
+      if (tableContainerRef.current) {
+        const windowHeight = newHeight ?? window.innerHeight;
+        // const mainContentHeight =
+        //   document.querySelector("#main-content")?.clientHeight || 0;
+        const headerHeight =
+          document.querySelector("header")?.clientHeight || 0;
+        const footerHeight =
+          document.querySelector("footer")?.clientHeight || 0;
 
-            const ttToolbarSelector =
-              tablePurpose === "practice"
-                ? "#tt-scheduled-tunes-header"
-                : "#tt-repertoire-tunes-header";
+        // const mainContentHeight =
+        //   newHeight ??
+        //   (document.querySelector("#main-content")?.clientHeight || 0);
+        const ttTabsHeight =
+          document.querySelector("#tt-tabs")?.clientHeight || 0;
+        const ttTunesGridHeader =
+          document.querySelector("#tt-tunes-grid-header")?.clientHeight || 0;
+        const ttTunesGridFooter =
+          document.querySelector("#tt-tunes-grid-footer")?.clientHeight || 0;
 
-            const ttGridToolbarHeight =
-              document.querySelector(ttToolbarSelector)?.clientHeight || 0;
+        const ttToolbarSelector =
+          tablePurpose === "practice"
+            ? "#tt-scheduled-tunes-header"
+            : "#tt-repertoire-tunes-header";
 
-            const containerHeight =
-              mainContentHeight -
-              ttTabsHeight -
-              ttTunesGridHeader -
-              ttGridToolbarHeight -
-              ttTunesGridFooter;
+        const ttGridToolbarHeight =
+          document.querySelector(ttToolbarSelector)?.clientHeight || 0;
 
-            const rows = tableContainerRef.current.querySelectorAll("tr");
-            let totalRowHeight = 0;
-            for (const row of rows) {
-              totalRowHeight += row.clientHeight;
-            }
-            const averageRowHeight = totalRowHeight / rows.length;
+        const containerHeight =
+          windowHeight -
+          headerHeight -
+          footerHeight -
+          ttTabsHeight -
+          ttTunesGridHeader -
+          ttGridToolbarHeight -
+          ttTunesGridFooter -
+          20;
 
-            let calculatedPageSize = Math.floor(
-              containerHeight / averageRowHeight,
-            );
-            if (calculatedPageSize * averageRowHeight > containerHeight) {
-              calculatedPageSize -= 1;
-            }
-            table.setPagination({
-              ...tableStateFromDb.pagination,
-              pageSize: calculatedPageSize,
-            });
+        const rows = tableContainerRef.current.querySelectorAll("tr");
+        let totalRowHeight = 0;
+        for (const row of rows) {
+          totalRowHeight += row.clientHeight;
+        }
+        const averageRowHeight = totalRowHeight / rows.length;
 
-            // Force the table to recalculate its rows
-            table.getRowModel();
-          }
-        })
-        .catch((error) => {
-          console.error("Error calling server function:", error);
+        let calculatedPageSize = Math.floor(containerHeight / averageRowHeight);
+        if (calculatedPageSize * averageRowHeight > containerHeight) {
+          calculatedPageSize -= 1;
+        }
+        const existingPagination = table.getState().pagination;
+        table.setPagination({
+          ...existingPagination,
+          pageSize: calculatedPageSize,
         });
+
+        // Force the table to recalculate its rows
+        table.getRowModel();
+      }
     };
 
     calculatePageSize();
 
-    const debounce = <T extends (...args: unknown[]) => void>(
-      func: T,
-      wait: number,
-    ) => {
+    const debounce = (func: (event: UIEvent) => void, wait: number) => {
       let timeout: ReturnType<typeof setTimeout>;
-      return (...args: Parameters<T>): void => {
+      return (event: UIEvent): void => {
         clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), wait);
+        timeout = setTimeout(() => func(event), wait);
       };
     };
 
-    const handleResize = debounce(calculatePageSize, 200);
+    const handleResize = debounce((event: UIEvent) => {
+      const newHeight = (event.target as Window).innerHeight;
+      calculatePageSize(newHeight);
+    }, 200);
 
     if (typeof window !== "undefined") {
       window.addEventListener("resize", handleResize);
       return () => window.removeEventListener("resize", handleResize);
     }
     return () => console.log("window is undefined");
-  }, [table, userId, tablePurpose]);
+  }, [table, tablePurpose]);
 
   return tableContainerRef;
 };
