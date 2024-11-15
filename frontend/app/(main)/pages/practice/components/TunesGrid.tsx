@@ -407,28 +407,6 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
     saveTableState(table, userId, tablePurpose, tuneId ?? -1);
   };
 
-  React.useEffect(() => {
-    console.log(
-      `**** TunesGrid useEffect userId: ${userId} purpose: ${tablePurpose}`,
-    );
-    getTableStateTable(userId, "full", tablePurpose)
-      .then((tableStateTable) => {
-        const currentTuneId = tableStateTable?.current_tune as number;
-        if (currentTuneId === 0 || currentTuneId === null) {
-          console.log("****-> TunesGrid useEffect setCurrentTune: 0 or null");
-          setCurrentTune(null);
-        } else {
-          console.log(
-            `****-> TunesGrid useEffect setCurrentTune: ${currentTuneId}`,
-          );
-          setCurrentTune(currentTuneId);
-        }
-      })
-      .catch((error) => {
-        console.error("Error calling server function:", error);
-      });
-  }, [userId, tablePurpose, setCurrentTune]);
-
   return (
     <>
       <div
