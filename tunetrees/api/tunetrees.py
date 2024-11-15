@@ -654,7 +654,10 @@ def get_tune(tune_ref: int = Query(...)):
             return TuneResponse.model_validate(tune)
     except Exception as e:
         logger.error(f"Unable to fetch tune: {e}")
-        raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
+        if isinstance(e, HTTPException):
+            raise e
+        else:
+            raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
 
 
 @router.post(
