@@ -19,7 +19,7 @@ export const useSaveTableState = (
 ) => {
   useEffect(() => {
     const saveTableStateAsync = (eventString: string) => {
-      console.log(
+      console.debug(
         `TunesGrid: calling createOrUpdateTableState in ${eventString} for tablePurpose: ${tablePurpose}`,
       );
       const tableState: TableState = table.getState();
@@ -46,7 +46,7 @@ export const useSaveTableState = (
       // Global Event Handlers: The beforeunload and visibilitychange event handlers are
       // set up to handle global events such as closing the browser tab or switching
       // to another application.
-      console.log(
+      console.debug(
         "TunesGrid: adding beforeunload and visibilitychange event listeners for tablePurpose: ",
         tablePurpose,
       );
@@ -56,7 +56,7 @@ export const useSaveTableState = (
 
     return () => {
       if (typeof window !== "undefined") {
-        console.log(
+        console.debug(
           "TunesGrid: removing handleBeforeUnload for tablePurpose: ",
           tablePurpose,
         );
