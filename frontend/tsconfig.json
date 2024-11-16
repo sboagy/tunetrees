@@ -1,49 +1,49 @@
 {
-	"extends": "./node_modules/gts/tsconfig-google.json",
-	"compilerOptions": {
-		"target": "es2022",
-		"lib": ["es2022", "dom", "dom.iterable", "esnext"],
-		// "sourceMap": true,
-		"outDir": ".next",
-		"allowJs": true,
-		"skipLibCheck": true,
-		"strict": true,
-		"noEmit": true,
-		"esModuleInterop": true,
-		"module": "esnext",
-		"moduleResolution": "bundler",
-		"resolveJsonModule": true,
-		"isolatedModules": true,
-		"jsx": "preserve",
-		"incremental": true,
-		// "inlineSourceMap": true,
-		"plugins": [
-			{
-				"name": "next"
-			}
-		],
-		"paths": {
-			"@/*": ["./*"],
-			"auth": ["./auth/"],
-			"components": ["./components/"]
-			// "next-auth-http-adapter": [
-			//   "./../../../gitmisc/next-auth-http-adapter/src"
-			// ]
-		}
-	},
-	"include": [
-		"next-env.d.ts",
-		"app/**/*.ts",
-		"app/**/*.tsx",
-		"components/**/*.ts",
-		"components/**/*.tsx",
-		"auth/**/*.ts",
-		"lib/**/*.ts",
-		".next/types/**/*.ts",
-		".next/**/*.tsx",
-		"auth/auth-types.ts",
-		"react-quill.d.ts",
-		"eslint.config.mjs"
-	],
-	"exclude": ["node_modules", "archive/**/*.ts", ".prettierrc.js"]
+  "extends": "./node_modules/gts/tsconfig-google.json",
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022", "dom", "dom.iterable", "esnext"],
+    // "sourceMap": true,
+    "outDir": ".next",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    // "inlineSourceMap": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"],
+      "auth": ["./auth/"],
+      "components": ["./components/"]
+      // "next-auth-http-adapter": [
+      //   "./../../../gitmisc/next-auth-http-adapter/src"
+      // ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "auth/**/*.ts",
+    "lib/**/*.ts",
+    ".next/types/**/*.ts",
+    ".next/**/*.tsx",
+    "auth/auth-types.ts",
+    "react-quill.d.ts",
+    "eslint.config.mjs"
+  ],
+  "exclude": ["node_modules", "archive/**/*.ts", ".prettierrc.js"]
 }

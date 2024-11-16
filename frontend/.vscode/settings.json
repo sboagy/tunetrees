@@ -7,12 +7,21 @@
     "**/archive": true,
     "archive": true
   },
-  "typescript.preferences.autoImportFileExcludePatterns": ["**/archive"],
+  "typescript.preferences.autoImportFileExcludePatterns": [
+    "**/archive"
+  ],
   "javascript.preferences.autoImportFileExcludePatterns": [
     "**/archive"
   ],
   "javascript.inlayHints.parameterNames.suppressWhenArgumentMatchesName": true,
   "typescript.inlayHints.parameterNames.suppressWhenArgumentMatchesName": true,
   "javascript.inlayHints.functionLikeReturnTypes.enabled": true,
-  "eslint.useFlatConfig": true
+  "eslint.useFlatConfig": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit",
+    "source.fixAll.eslint": "explicit",
+    "source.removeUnusedImports": "explicit",
+    "source.organizeImports": "explicit",
+    "source.format": "explicit"
+  }
 }
