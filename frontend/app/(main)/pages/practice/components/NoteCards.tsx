@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import AutoResizingRichTextarea from "@/components/AutoResizingRichTextarea";
 // import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Edit, Check, Star, Save, XCircle, Plus, Delete } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { type INote, UpdateActionType } from "../types";
+import { Input } from "@/components/ui/input";
+import { Check, Delete, Edit, Plus, Save, Star, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { createNote, deleteNote, getNotes, updateNote } from "../queries";
-import AutoResizingRichTextarea from "@/components/AutoResizingRichTextarea";
+import { type INote, UpdateActionType } from "../types";
 
 interface INoteCardProps {
   note: INote;

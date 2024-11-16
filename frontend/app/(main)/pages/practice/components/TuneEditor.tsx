@@ -1,8 +1,3 @@
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -14,10 +9,15 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 import { getPlaylistTune, updatePlaylistTune } from "../queries";
 import "./TuneEditor.css"; // Import the CSS file
-import type { PlaylistTune } from "../types";
 import { ERROR_PLAYLIST_TUNE } from "../mocks";
+import type { PlaylistTune } from "../types";
 
 const formSchema = z.object({
   id: z.number().optional(),

@@ -4,11 +4,11 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { useEffect } from "react";
+import { useRef } from "react";
+import type { ImperativePanelHandle } from "react-resizable-panels";
 import Sidebar from "./Sidebar";
 import TabGroupMain from "./TabGroupMain";
-import { useEffect } from "react";
-import type { ImperativePanelHandle } from "react-resizable-panels";
-import { useRef } from "react";
 import "./MainPanel.css";
 import { TuneProvider } from "./TuneContext";
 import { TuneDataRefreshProvider } from "./TuneDataRefreshContext";

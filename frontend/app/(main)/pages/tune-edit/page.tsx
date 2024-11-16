@@ -1,8 +1,8 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
 import TuneEditor from "../practice/components/TuneEditor";
 
 function TuneEditPageContent(): JSX.Element {

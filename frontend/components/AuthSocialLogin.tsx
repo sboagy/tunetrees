@@ -1,7 +1,7 @@
 import type { ProviderMap } from "@/auth";
-import { Button } from "./ui/button";
-import { Label } from "@/components/ui/label";
 import { doSocialLogin2 } from "@/auth/social-login";
+import { Label } from "@/components/ui/label";
+import { Button } from "./ui/button";
 // import { getSocialLoginURLs } from "@/auth/social_login";
 // import { doSocialLogin2 } from "@/auth/social_login";
 

@@ -4,13 +4,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
-import RepertoireGrid from "./RepertoireGrid";
-import ScheduledTunesGrid from "./ScheduledTunesGrid";
 import {
-  getTabGroupMainState,
   type ITabGroupMainStateModel,
+  getTabGroupMainState,
   updateTabGroupMainState,
 } from "../settings";
+import RepertoireGrid from "./RepertoireGrid";
+import ScheduledTunesGrid from "./ScheduledTunesGrid";
 
 interface IPracticeProps {
   userId: number;

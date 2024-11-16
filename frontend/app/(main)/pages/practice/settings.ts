@@ -1,5 +1,6 @@
 "use server";
 
+import type { TableState } from "@tanstack/react-table";
 import axios, { isAxiosError } from "axios";
 import type {
   ITableStateTable,
@@ -8,7 +9,6 @@ import type {
   TableTransientData,
   TableTransientDataFields,
 } from "./types";
-import type { TableState } from "@tanstack/react-table";
 
 const client = axios.create({
   baseURL: `${process.env.NEXT_BASE_URL}/settings`,

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import type { Table as TanstackTable } from "@tanstack/react-table";
+import { useEffect, useRef } from "react";
 import type { TablePurpose, Tune } from "../types";
 
 /**

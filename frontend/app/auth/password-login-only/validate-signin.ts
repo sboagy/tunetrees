@@ -1,8 +1,8 @@
 "use server";
 
 import {
-  getUserExtendedByEmail,
   type IExtendedAdapterUser,
+  getUserExtendedByEmail,
 } from "@/auth/auth-tt-adapter";
 import { matchPasswordWithHash } from "@/auth/password-match";
 import axios from "axios";

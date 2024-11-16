@@ -5,17 +5,17 @@ import ColumnsMenu from "./ColumnsMenu";
 import { type IScheduledTunesType, TunesTable } from "./tunes-table";
 
 import { Input } from "@/components/ui/input";
-import { useCallback, useEffect, useState, type JSX } from "react";
+import { type JSX, useCallback, useEffect, useState } from "react";
 
 import type {
   RowSelectionState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
+import { FastForward } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
+import { getRecentlyPracticed } from "../queries";
 import type { Tune } from "../types";
 import NewTuneButton from "./NewTuneButton";
-import { FastForward } from "lucide-react";
-import { getRecentlyPracticed } from "../queries";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import TunesGrid from "./TunesGrid";
 

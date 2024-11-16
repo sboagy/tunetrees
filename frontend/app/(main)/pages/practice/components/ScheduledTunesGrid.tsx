@@ -1,18 +1,18 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useCallback, useEffect, useState, type JSX } from "react";
-import { submitPracticeFeedbacks, type ITuneUpdate } from "../commands";
-import type { Tune } from "../types";
-import ColumnsMenu from "./ColumnsMenu";
-import { type IScheduledTunesType, TunesTable } from "././tunes-table";
-import { deleteTableTransientData } from "../settings";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Upload } from "lucide-react";
+import { type JSX, useCallback, useEffect, useState } from "react";
+import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
+import { getPracticeListScheduled } from "../queries";
+import { deleteTableTransientData } from "../settings";
+import type { Tune } from "../types";
+import { type IScheduledTunesType, TunesTable } from "././tunes-table";
+import ColumnsMenu from "./ColumnsMenu";
 import FlashcardPanel from "./FlashcardPanel";
 import NewTuneButton from "./NewTuneButton";
-import { Upload } from "lucide-react";
-import { getPracticeListScheduled } from "../queries";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import TunesGrid from "./TunesGrid";
 

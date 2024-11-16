@@ -2,12 +2,12 @@
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Edit } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getTune } from "../queries";
+import type { Tune } from "../types";
 import NoteCards from "./NoteCards";
 import ReferenceCards from "./ReferenceCards";
-import { Edit } from "lucide-react";
-import { getTune } from "../queries";
-import { useEffect, useState } from "react";
-import type { Tune } from "../types";
 import "./Sidebar.css";
 import { useTune } from "./TuneContext";
 

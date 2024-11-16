@@ -27,6 +27,8 @@ import {
   accountFormSchema,
   defaultValues,
 } from "@/app/auth/newuser/account-form";
+import { providerMap } from "@/auth";
+import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 import { PasswordInput } from "@/components/PasswordInput";
 import {
   Card,
@@ -36,11 +38,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
-import { newUser } from "./newuser-actions";
-import { getUser } from "../password-login-only/validate-signin";
-import { SocialLoginButtons } from "@/components/AuthSocialLogin";
-import { providerMap } from "@/auth";
 import { emailSchema } from "../auth-types";
+import { getUser } from "../password-login-only/validate-signin";
+import { newUser } from "./newuser-actions";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const languages = [

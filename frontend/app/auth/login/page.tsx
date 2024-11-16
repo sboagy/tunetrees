@@ -1,7 +1,6 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from "react";
-import type { JSX } from "react";
+import { providerMap } from "@/auth";
+import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,12 +11,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Image from "next/image";
 import axios from "axios";
-import { authorizeWithPassword } from "../password-login-only/validate-signin";
-import { providerMap } from "@/auth";
-import { SocialLoginButtons } from "@/components/AuthSocialLogin";
+import Image from "next/image";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useCallback, useEffect, useState } from "react";
+import type { JSX } from "react";
 import { emailSchema } from "../auth-types";
+import { authorizeWithPassword } from "../password-login-only/validate-signin";
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
 function LoginDialog(props: any): JSX.Element {

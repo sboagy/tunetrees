@@ -1,8 +1,8 @@
 "use client";
+import { doSignOut } from "@/app/actions";
 import { signIn } from "auth";
 import { useRouter } from "next/navigation"; // Use the next/navigation module for client-side navigation
 import { Button } from "./ui/button";
-import { doSignOut } from "@/app/actions";
 
 export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
   const router = useRouter();

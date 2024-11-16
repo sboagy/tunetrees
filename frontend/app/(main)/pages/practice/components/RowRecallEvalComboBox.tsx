@@ -19,9 +19,9 @@ import {
 
 import type { CellContext } from "@tanstack/react-table";
 
+import { createOrUpdateTableTransientData } from "../settings";
 import type { TablePurpose, Tune, TunesGridColumnGeneralType } from "../types";
 import { getColorForEvaluation } from "./TunesGrid";
-import { createOrUpdateTableTransientData } from "../settings";
 
 // #     Quality: The quality of recalling the answer from a scale of 0 to 5.
 // #         5: perfect response.

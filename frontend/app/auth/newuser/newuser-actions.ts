@@ -6,8 +6,8 @@ import {
   verification_mail_text,
 } from "@/auth/auth-send-request";
 import {
-  getUserExtendedByEmail,
   type IExtendedAdapterUser,
+  getUserExtendedByEmail,
   ttHttpAdapter,
 } from "@/auth/auth-tt-adapter";
 

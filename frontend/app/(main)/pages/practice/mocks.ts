@@ -33,8 +33,8 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import type { PlaylistTune, TablePurpose, Tune } from "./types";
 import { get_columns } from "./components/TuneColumns";
+import type { PlaylistTune, TablePurpose, Tune } from "./types";
 
 export function getMockTune(): Tune {
   const tuneData: Tune = {

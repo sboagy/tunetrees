@@ -1,5 +1,6 @@
 "use client";
 
+import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns";
 import {
   type ColumnFiltersState,
   type SortingState,
@@ -9,15 +10,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import * as React from "react";
 import type {
   RowSelectionState,
   TableState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
-import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns";
-import type { TablePurpose, Tune } from "../types";
+import * as React from "react";
 import { createOrUpdateTableState, getTableStateTable } from "../settings";
+import type { TablePurpose, Tune } from "../types";
 import { useTune } from "./TuneContext";
 
 export interface IScheduledTunesType {

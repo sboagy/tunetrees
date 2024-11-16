@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   console.log("protected.ts: GET(): request: %s", JSON.stringify(request));

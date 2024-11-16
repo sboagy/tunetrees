@@ -1,9 +1,9 @@
 "use server";
 // import { signIn } from "@/auth";
 import { type ProviderDict, type ProviderMap, signIn } from "auth";
-import { redirect } from "next/navigation";
 // import { signIn } from "next-auth/react";
 import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
 
 const SIGNIN_ERROR_URL = "/error";
 

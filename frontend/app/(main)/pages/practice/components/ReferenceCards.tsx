@@ -1,22 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Check, Star, Edit, Plus, Save, XCircle, Delete } from "lucide-react";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   createReference,
   deleteReference,
   getReferences,
   updateReference,
 } from "@/app/(main)/pages/practice/queries";
-import { type IReferenceData, UpdateActionType } from "../types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Check, Delete, Edit, Plus, Save, Star, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { type IReferenceData, UpdateActionType } from "../types";
 import "./ReferenceCards.css"; // Import the CSS file
 import AutoResizingRichTextarea from "@/components/AutoResizingRichTextarea";
 import AutoResizingTextarea from "@/components/AutoResizingTextarea";

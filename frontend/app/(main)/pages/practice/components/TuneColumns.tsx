@@ -1,8 +1,8 @@
 "use client";
 
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
-import type { TablePurpose, Tune, TunesGridColumnGeneralType } from "../types";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { CheckedState } from "@radix-ui/react-checkbox";
 import type {
   CellContext,
   Column,
@@ -27,9 +28,8 @@ import {
   EyeOff,
   Filter,
 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { createOrUpdateTableState, getTableCurrentTune } from "../settings";
-import type { CheckedState } from "@radix-ui/react-checkbox";
+import type { TablePurpose, Tune, TunesGridColumnGeneralType } from "../types";
 
 function columnControlMenu() {
   return (

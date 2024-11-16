@@ -9,6 +9,7 @@ import profilePic from "/public/logo4.png";
 
 import CustomLink from "./CustomLink";
 import { Button } from "./ui/button";
+import { Label } from "./ui/label";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -17,7 +18,6 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
 } from "./ui/navigation-menu";
-import { Label } from "./ui/label";
 
 export function MainNav() {
   return (

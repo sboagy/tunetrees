@@ -11,8 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Table } from "@tanstack/react-table";
-import type { Tune } from "../types";
 import { useEffect, useState } from "react";
+import type { Tune } from "../types";
 
 const ColumnsMenu = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

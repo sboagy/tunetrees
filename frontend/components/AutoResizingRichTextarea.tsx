@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import type React from "react";
-import dynamic from "next/dynamic";
 import parse from "html-react-parser";
 import { useTheme } from "next-themes";
+import dynamic from "next/dynamic";
+import { useEffect, useMemo, useState } from "react";
+import type React from "react";
 import "./AutoResizingRichTextarea.css";
 // import JoditEditor from "jodit-react";
 

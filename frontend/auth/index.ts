@@ -38,24 +38,24 @@ import type {
 import NextAuth, { AuthError } from "next-auth";
 import "next-auth/jwt";
 
+import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import SendgridProvider from "next-auth/providers/sendgrid";
-import CredentialsProvider from "next-auth/providers/credentials";
 
 import { viewSettingsDefault } from "@/app/user-settings/view-settings-default";
+import type { Adapter, AdapterUser } from "next-auth/adapters";
+import type { JWT, JWTOptions } from "next-auth/jwt";
+import type { CredentialInput, Provider } from "next-auth/providers";
+import type { NextRequest } from "next/server";
 import {
   sendVerificationRequest,
   verification_mail_html,
   verification_mail_text,
 } from "./auth-send-request";
-import type { Adapter, AdapterUser } from "next-auth/adapters";
-import type { JWT, JWTOptions } from "next-auth/jwt";
-import type { CredentialInput, Provider } from "next-auth/providers";
-import type { NextRequest } from "next/server";
 import { getUserExtendedByEmail, ttHttpAdapter } from "./auth-tt-adapter";
-import { matchPasswordWithHash } from "./password-match";
 import { sendGrid } from "./helpers";
+import { matchPasswordWithHash } from "./password-match";
 
 export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
   if (value === undefined || value === null) {
