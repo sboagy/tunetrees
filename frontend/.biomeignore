@@ -1,6 +1,7 @@
 .vscode/
 .vscode/**/*.json
 node_modules/
+build/
 .next/
 .vercel/
 .git/ 

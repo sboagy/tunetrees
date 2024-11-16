@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import ColumnsMenu from "./ColumnsMenu";
-import TunesGrid, { type IScheduledTunesType, TunesTable } from "./TunesGrid";
+import { type IScheduledTunesType, TunesTable } from "./tunes-table";
 
 import { Input } from "@/components/ui/input";
 import { useCallback, useEffect, useState, type JSX } from "react";
@@ -17,6 +17,7 @@ import NewTuneButton from "./NewTuneButton";
 import { FastForward } from "lucide-react";
 import { getRecentlyPracticed } from "../queries";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
+import TunesGrid from "./TunesGrid";
 
 async function fetchFilterFromDB(
   userId: number,

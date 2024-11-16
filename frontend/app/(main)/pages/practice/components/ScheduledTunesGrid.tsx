@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type JSX } from "react";
 import { submitPracticeFeedbacks, type ITuneUpdate } from "../commands";
 import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
-import TunesGrid, { type IScheduledTunesType, TunesTable } from "./TunesGrid";
+import { type IScheduledTunesType, TunesTable } from "././tunes-table";
 import { deleteTableTransientData } from "../settings";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import NewTuneButton from "./NewTuneButton";
 import { Upload } from "lucide-react";
 import { getPracticeListScheduled } from "../queries";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
+import TunesGrid from "./TunesGrid";
 
 type ReviewMode = "grid" | "flashcard";
 

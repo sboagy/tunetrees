@@ -254,6 +254,7 @@ export function get_columns(
     // console.log("column: ", column);
     return (
       <Checkbox
+        className="mt-3"
         checked={determineHeaderCheckedState(table)}
         onCheckedChange={(checked) =>
           handleHeaderCheckboxChange(checked, table)
@@ -351,7 +352,7 @@ export function get_columns(
       accessorFn: (row) => row.id,
       enableSorting: true,
       enableHiding: true,
-      size: 20,
+      size: 80,
     },
     "practice" === purpose
       ? {
@@ -361,6 +362,7 @@ export function get_columns(
           cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) =>
             RecallEvalComboBox(info, userId, playlistId, purpose),
           accessorFn: (row) => row.recall_eval,
+          size: 284,
         }
       : {
           accessorKey: "select",
@@ -372,6 +374,7 @@ export function get_columns(
           meta: {
             type: "boolean", // Set the type to boolean for consistency
           },
+          size: 50,
         },
     {
       accessorKey: "title",
@@ -394,7 +397,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       enableResizing: true,
-      size: 400,
+      size: 160,
     },
     {
       accessorKey: "type",
@@ -404,6 +407,7 @@ export function get_columns(
       },
       enableSorting: true,
       enableHiding: true,
+      size: 100,
     },
     {
       accessorKey: "structure",
@@ -413,6 +417,7 @@ export function get_columns(
       },
       enableSorting: true,
       enableHiding: true,
+      size: 130,
     },
     {
       accessorKey: "mode",
@@ -422,6 +427,7 @@ export function get_columns(
       },
       enableSorting: true,
       enableHiding: true,
+      size: 100,
     },
     {
       accessorKey: "incipit",
@@ -431,6 +437,7 @@ export function get_columns(
       },
       enableSorting: true,
       enableHiding: true,
+      size: 200,
     },
     {
       accessorKey: "learned",
@@ -441,6 +448,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       sortingFn: datetimeTextSortingFn,
+      size: 120,
     },
     {
       accessorKey: "practiced",
@@ -451,6 +459,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       sortingFn: datetimeTextSortingFn,
+      size: 120,
     },
     {
       accessorKey: "quality",
@@ -567,7 +576,7 @@ export function get_columns(
     },
     {
       accessorKey: "notes",
-      header: "Notes",
+      header: ({ column }) => sortableHeader(column, "Notes"),
       cell: (info) => {
         return (
           <div className="truncate" style={{ maxWidth: "30ch" }}>

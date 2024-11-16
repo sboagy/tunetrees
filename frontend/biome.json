@@ -11,7 +11,7 @@
   },
   "overrides": [
     {
-      "ignore": ["node_modules", ".next", ".vercel", ".vscode/", ".vscode", ".git", ".github", "dist", "out"]
+      "ignore": ["node_modules", "build", ".next", ".vercel", ".vscode/", ".vscode", ".git", ".github", "dist", "out"]
     }
   ]
 }

@@ -48,6 +48,7 @@
     "@radix-ui/themes": "^3.1.5",
     "@sendgrid/mail": "^8.1.4",
     "@tanstack/react-table": "^8.20.5",
+    "@tanstack/react-virtual": "^3.10.9",
     "@types/quill": "^2.0.14",
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",
