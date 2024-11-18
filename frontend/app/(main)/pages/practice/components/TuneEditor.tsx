@@ -256,6 +256,8 @@ export default function TuneEditor({
                 )}
               />
 
+              <hr className="my-4" />
+
               <FormField
                 control={form.control}
                 name="learned"
@@ -266,7 +268,12 @@ export default function TuneEditor({
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">
-                      <Input type="date" {...field} value={field.value || ""} />
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value || ""}
+                        readOnly
+                      />
                     </FormControl>
                   </FormItem>
                 )}
@@ -286,6 +293,7 @@ export default function TuneEditor({
                         type="datetime-local"
                         {...field}
                         value={field.value ? field.value.replace(" ", "T") : ""}
+                        readOnly
                       />
                     </FormControl>
                   </FormItem>
@@ -302,7 +310,7 @@ export default function TuneEditor({
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">
-                      <Input {...field} value={field.value || ""} />
+                      <Input {...field} value={field.value || ""} readOnly />
                     </FormControl>
                   </FormItem>
                 )}
@@ -366,6 +374,7 @@ export default function TuneEditor({
                         {...field}
                         value={field.value?.toString() || ""}
                         onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        readOnly
                       />
                     </FormControl>
                   </FormItem>
@@ -386,6 +395,7 @@ export default function TuneEditor({
                         type="number"
                         {...field}
                         value={field.value?.toString() || ""}
+                        readOnly
                         onChange={(e) => field.onChange(e.target.valueAsNumber)}
                       />
                     </FormControl>
@@ -407,6 +417,7 @@ export default function TuneEditor({
                         type="number"
                         {...field}
                         value={field.value?.toString() || ""}
+                        readOnly
                         onChange={(e) => field.onChange(e.target.valueAsNumber)}
                       />
                     </FormControl>
@@ -428,6 +439,7 @@ export default function TuneEditor({
                         type="datetime-local"
                         {...field}
                         value={field.value ? field.value.replace(" ", "T") : ""}
+                        readOnly
                       />
                     </FormControl>
                   </FormItem>
@@ -513,7 +525,7 @@ export default function TuneEditor({
                   </FormLabel>
 
                   <FormControl className="tune-form-control-style">
-                    <Input {...field} value={field.value || ""} />
+                    <Input {...field} value={field.value || ""} readOnly />
                   </FormControl>
 
                   <FormDescription>Separate tags with commas</FormDescription>
@@ -537,6 +549,8 @@ export default function TuneEditor({
               )}
             /> */}
           </div>
+
+          <hr className="my-4" />
 
           <div className="flex w-3/5 justify-center space-x-4 p-4">
             <Button type="button" onClick={handleCancel} variant="outline">
