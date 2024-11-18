@@ -2,30 +2,36 @@ import type React from "react";
 import { type ReactNode, createContext, useContext, useState } from "react";
 import type { Tune } from "../types";
 
-interface ITunesContextType {
+interface IRepertoireTunesContextType {
   tunes: Tune[];
   setTunes: React.Dispatch<React.SetStateAction<Tune[]>>;
   tunesRefreshId: number | null;
   setTunesRefreshId: (newRefreshId: number) => void;
 }
 
-const TunesContext = createContext<ITunesContextType | undefined>(undefined);
+const RepertoireTunesContext = createContext<
+  IRepertoireTunesContextType | undefined
+>(undefined);
 
-export const TunesProvider = ({ children }: { children: ReactNode }) => {
+export const RepertoireTunesProvider = ({
+  children,
+}: {
+  children: ReactNode;
+}) => {
   const [tunes, setTunes] = useState<Tune[]>([]);
   const [tunesRefreshId, setTunesRefreshId] = useState<number | null>(null);
 
   return (
-    <TunesContext.Provider
+    <RepertoireTunesContext.Provider
       value={{ tunes, setTunes, tunesRefreshId, setTunesRefreshId }}
     >
       {children}
-    </TunesContext.Provider>
+    </RepertoireTunesContext.Provider>
   );
 };
 
-export const useTunes = () => {
-  const context = useContext(TunesContext);
+export const useRepertoireTunes = () => {
+  const context = useContext(RepertoireTunesContext);
   if (!context) {
     throw new Error("useTunes must be used within a TunesProvider");
   }

@@ -10,7 +10,6 @@ import {
 } from "../settings";
 import RepertoireGrid from "./RepertoireGrid";
 import ScheduledTunesGrid from "./ScheduledTunesGrid";
-import { TunesProvider } from "./TunesContext";
 
 interface IPracticeProps {
   userId: number;
@@ -97,9 +96,7 @@ export default function TabGroupMain({
       <TabsContent value="repertoire">
         <Card>
           <CardContent className="space-y-2">
-            <TunesProvider>
-              <RepertoireGrid userId={userId} playlistId={playlistId} />
-            </TunesProvider>
+            <RepertoireGrid userId={userId} playlistId={playlistId} />
           </CardContent>
         </Card>
       </TabsContent>

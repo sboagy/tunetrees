@@ -16,8 +16,8 @@ import { submitPracticeFeedbacks } from "../commands";
 import { getRecentlyPracticed } from "../queries";
 import type { Tune } from "../types";
 import NewTuneButton from "./NewTuneButton";
+import { useRepertoireTunes } from "./RepertoireTunesContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
-import { useTunes } from "./TunesContext";
 import TunesGrid from "./TunesGrid";
 
 async function fetchFilterFromDB(
@@ -67,7 +67,8 @@ export default function RepertoireGrid({
   // which is specific to the repertoire grid, is used to track the last refresh
   // of the tunes. The refreshId, which is global to the app, is
   // used to compare to tunesRefreshId to trigger a refresh of the tunes when it changes.
-  const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } = useTunes();
+  const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =
+    useRepertoireTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
 
   // Due to the asynchronous nature of setTunesRefreshId, the state update may not
