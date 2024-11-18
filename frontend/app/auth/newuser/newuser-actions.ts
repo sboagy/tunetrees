@@ -44,7 +44,7 @@ export const newUser = async (data: AccountFormValues, host: string) => {
   }
 
   // Since we are creating a new user, we need to hash the password.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bcrypt = require("bcryptjs");
 
   // We'll go ahead and create the user in the database, with the hashed password,
@@ -55,7 +55,7 @@ export const newUser = async (data: AccountFormValues, host: string) => {
     name: data.name,
     email: email,
     emailVerified: null,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
     hash: bcrypt.hashSync(data.password, bcrypt.genSaltSync()),
   };
 

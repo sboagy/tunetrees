@@ -25,7 +25,7 @@ export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
 
 export function NewUser(
   props: React.ComponentPropsWithRef<typeof Button>,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   // crsf_token: string,
 ) {
   const router = useRouter();

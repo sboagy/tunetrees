@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { EmailConfig } from "next-auth/providers";
 
 // token: string; theme: Theme; request: Request; }) => Awaitable<void>

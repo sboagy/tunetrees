@@ -139,7 +139,6 @@ export default function LoginDialog(props: any): JSX.Element {
                   name="password"
                   type="password"
                   value={password}
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
                   onChange={(e) => setPassword(e.target.value)}
                   autoFocus
                   required

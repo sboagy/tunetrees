@@ -18,10 +18,9 @@ export const matchPasswordWithHash = async (
   if (!is_server()) {
     throw new Error("Why is this not running on the server!!!");
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bcrypt = require("bcryptjs");
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   const match: boolean = await bcrypt.compare(rawPassword, hashedPassword);
   return match;
 };
