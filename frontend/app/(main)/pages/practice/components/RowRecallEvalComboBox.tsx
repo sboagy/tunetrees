@@ -138,6 +138,10 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
           style={{
             textAlign: "left",
           }}
+          onClick={(event) => {
+            event.stopPropagation(); // Prevents the click from reaching the TableRow
+            setIsOpen((prev) => !prev);
+          }}
         >
           {selectedQuality
             ? qualityList.find((q) => q.value === selectedQuality)?.label2
