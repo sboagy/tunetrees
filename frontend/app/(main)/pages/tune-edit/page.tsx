@@ -15,7 +15,17 @@ function TuneEditPageContent(): JSX.Element {
     return <div>Missing required parameters for tune edit</div>;
   }
 
-  return <TuneEditor userId={userId} playlistId={playlistId} tuneId={tuneId} />;
+  const userIdInt = Number.parseInt(userId);
+  const playlistIdInt = Number.parseInt(playlistId);
+  const tuneIdInt = Number(tuneId);
+
+  return (
+    <TuneEditor
+      userId={userIdInt}
+      playlistId={playlistIdInt}
+      tuneId={tuneIdInt}
+    />
+  );
 }
 
 const TuneEditPage = (): JSX.Element => {

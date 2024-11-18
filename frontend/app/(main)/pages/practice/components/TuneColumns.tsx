@@ -130,6 +130,7 @@ export function get_columns(
   userId: number,
   playlistId: number,
   purpose: TablePurpose,
+  onRecallEvalChange?: (tuneId: number, newValue: string) => void,
 ): ColumnDef<Tune, TunesGridColumnGeneralType>[] {
   const determineHeaderCheckedState = (
     table: TanstackTable<Tune>,
@@ -360,7 +361,13 @@ export function get_columns(
           header: ({ column }) => sortableHeader(column, "Evaluation"),
           enableHiding: false,
           cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) =>
-            RecallEvalComboBox(info, userId, playlistId, purpose),
+            RecallEvalComboBox(
+              info,
+              userId,
+              playlistId,
+              purpose,
+              onRecallEvalChange,
+            ),
           accessorFn: (row) => row.recall_eval,
           size: 284,
         }

@@ -5,7 +5,7 @@ import ColumnsMenu from "./ColumnsMenu";
 import { type IScheduledTunesType, TunesTable } from "./tunes-table";
 
 import { Input } from "@/components/ui/input";
-import { type JSX, useCallback, useEffect, useState } from "react";
+import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   RowSelectionState,
@@ -17,6 +17,7 @@ import { getRecentlyPracticed } from "../queries";
 import type { Tune } from "../types";
 import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
+import { useTunes } from "./TunesContext";
 import TunesGrid from "./TunesGrid";
 
 async function fetchFilterFromDB(
@@ -33,11 +34,23 @@ async function fetchFilterFromDB(
 type RepertoireGridProps = {
   userId: number;
   playlistId: number;
+  onEditTune: (tuneId: number) => void;
 };
 
+/**
+ * RepertoireGrid component displays a grid of tunes for a given user and playlist,
+ * along with a toolbar for filtering, refreshing, and selecting tunes.
+ *
+ * @remarks
+ * - The component uses the `useTunes` and `useTuneDataRefresh` hooks to manage the tunes data and refresh state.
+ * - The `refreshTunes` function fetches the recently practiced tunes and updates the state.
+ * - The component includes a filter input, a button to add selected tunes to the review queue, and a grid to display the tunes.
+ * - The `addToReviewQueue` function handles adding selected tunes to the review queue and submitting feedback.
+ */
 export default function RepertoireGrid({
   userId,
   playlistId,
+  onEditTune,
 }: RepertoireGridProps): JSX.Element {
   const [isAddToReviewQueueEnabled, setIsAddToReviewQueueEnabled] =
     useState(false);
@@ -50,23 +63,62 @@ export default function RepertoireGrid({
   };
   const [globalFilter, setGlobalFilter] = useState("");
   const [isFilterLoaded, setIsFilterLoaded] = useState(false);
-  const [tunes, setTunes] = useState<Tune[]>([]);
+
+  // The tunes are persisted in a context to avoid fetching them multiple times
+  // during the life of the app if they haven't changed. The tunesRefreshId,
+  // which is specific to the repertoire grid, is used to track the last refresh
+  // of the tunes. The refreshId, which is global to the app, is
+  // used to compare to tunesRefreshId to trigger a refresh of the tunes when it changes.
+  const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } = useTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
 
-  const refreshTunes = useCallback((userId: number, playlistId: number) => {
-    getRecentlyPracticed(userId, playlistId)
-      .then((result: Tune[]) => {
+  // Due to the asynchronous nature of setTunesRefreshId, the state update may not
+  // complete before the useEffect hook exits. This can lead to multiple refreshes
+  // being triggered before tunesRefreshId is updated. To prevent this, we use a ref
+  // (isRefreshing) to track the refresh state. The useRef hook allows the value to
+  // persist across renders without causing re-renders.
+  const isRefreshing = useRef(false);
+
+  const refreshTunes = useCallback(
+    async (userId: number, playlistId: number, refreshId: number) => {
+      try {
+        const result: Tune[] = await getRecentlyPracticed(userId, playlistId);
+        setTunesRefreshId(refreshId);
         setTunes(result);
-      })
-      .catch((error) => {
-        console.error("Error refreshing tunes:", error);
-      });
-  }, []);
+        isRefreshing.current = false;
+        console.log(`LF1 RepertoireGrid setTunesRefreshId(${refreshId})`);
+        return result;
+      } catch (error) {
+        console.error("LF1 Error refreshing tunes:", error);
+        throw error;
+      }
+    },
+    [setTunes, setTunesRefreshId],
+  );
 
   useEffect(() => {
-    console.log("RepertoireGrid refreshId:", refreshId);
-    refreshTunes(userId, playlistId);
-  }, [refreshId, userId, playlistId, refreshTunes]);
+    if (tunesRefreshId !== refreshId && !isRefreshing.current) {
+      console.log(
+        `LF1 RepertoireGrid call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+      );
+      isRefreshing.current = true;
+      refreshTunes(userId, playlistId, refreshId)
+        .then((result: Tune[]) => {
+          console.log(`LF1 RepertoireGrid number tunes: ${result.length}`);
+          console.log(
+            `LF1 RepertoireGrid back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+          );
+        })
+        .catch((error) => {
+          isRefreshing.current = false;
+          console.error("LF1 Error invoking refreshTunes:", error);
+        });
+    } else {
+      console.log(
+        `LF1 RepertoireGrid skipping refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+      );
+    }
+  }, [refreshId, tunesRefreshId, userId, playlistId, refreshTunes]);
 
   const tunesWithFilter: IScheduledTunesType = {
     tunes,
@@ -134,6 +186,10 @@ export default function RepertoireGrid({
       });
 
     // const updates: { [key: string]: TuneUpdate } = {};
+  };
+
+  const handleRowDoubleClick = (tuneId: number) => {
+    onEditTune(tuneId);
   };
 
   return (
@@ -208,6 +264,7 @@ export default function RepertoireGrid({
             userId={userId}
             playlistId={playlistId}
             tablePurpose={"repertoire"}
+            onRowDoubleClick={handleRowDoubleClick}
           />
         </>
       )}

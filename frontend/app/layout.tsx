@@ -1,11 +1,10 @@
-import "@radix-ui/themes/styles.css";
-import "./globals.css";
+import ClientLayout from "@/components/ClientLayout";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
-import { ThemeProvider } from "@/components/ThemeProvider";
-import { Theme } from "@radix-ui/themes";
+import "@radix-ui/themes/styles.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,25 +18,9 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} h-full`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <Theme>
-            <div id="root" className="flex flex-col h-full">
-              <Header />
-              <main
-                id="main-content"
-                className="flex-auto w-full max-w-8xl px-4 py-2 mx-auto sm:px-6 md:pt-0"
-              >
-                {children}
-              </main>
-              <Footer />
-            </div>
-          </Theme>
-        </ThemeProvider>
+        <Header />
+        <ClientLayout>{children}</ClientLayout>
+        <Footer />
       </body>
     </html>
   );

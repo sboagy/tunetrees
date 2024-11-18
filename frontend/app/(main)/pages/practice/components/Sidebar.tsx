@@ -1,5 +1,4 @@
 "use client";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
@@ -14,9 +13,10 @@ import { useTune } from "./TuneContext";
 interface ISidebarProps {
   userId: number;
   playlistId: number;
+  onEditTune: (tuneId: number) => void;
 }
 
-const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
+const Sidebar = ({ onEditTune }: ISidebarProps) => {
   // const [selectedTune, setSelectedTune] = useState(1);
 
   // const urls = [
@@ -24,7 +24,6 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
   //   { title: "Another URL", url: "http://example2.com", favorite: false },
   // ];
 
-  const router = useRouter();
   const [tuneTitle, setTuneTitle] = useState<string | null>(null);
   const { currentTune } = useTune();
 
@@ -45,6 +44,10 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
     }
   }, [currentTune]);
 
+  const handleTuneEditClick = (tuneId: number) => {
+    onEditTune(tuneId);
+  };
+
   return currentTune ? (
     <div className="flex flex-col h-full">
       <div className="sidebar flex-grow overflow-y-auto">
@@ -58,10 +61,7 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
             title="Edit"
             onClick={() => {
               console.log("Edit button clicked");
-              router.push(
-                `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${currentTune}`,
-              );
-              // void refreshData();
+              handleTuneEditClick(currentTune);
             }}
           >
             <Edit className="h-4 w-4" />

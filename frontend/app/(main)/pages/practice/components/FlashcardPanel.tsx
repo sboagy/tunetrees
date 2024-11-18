@@ -40,8 +40,7 @@ function getCellContext(
     throw Error("Cell not found");
   }
 
-  const theCellContext = cell.getContext() as CellContext<Tune, string>;
-  return theCellContext;
+  return cell.getContext() as CellContext<Tune, string>;
 }
 
 type Props = {
@@ -49,6 +48,7 @@ type Props = {
   userId: number;
   playlistId: number;
   purpose: TablePurpose;
+  onRecallEvalChange?: (tuneId: number, newValue: string) => void;
 };
 
 export default function FlashcardPanel(props: Props) {
@@ -62,7 +62,6 @@ export default function FlashcardPanel(props: Props) {
     recall_eval: true,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [tableIndex, setTableIndex] = useState<number>(0);
 
   const onPrevious = () => {
@@ -108,6 +107,7 @@ export default function FlashcardPanel(props: Props) {
             props.userId,
             props.playlistId,
             props.purpose,
+            props.onRecallEvalChange,
           )}
           <Button
             onClick={onNext}

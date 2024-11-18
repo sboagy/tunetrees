@@ -1,4 +1,3 @@
-// TabGroupMain.tsx
 "use client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,10 +10,12 @@ import {
 } from "../settings";
 import RepertoireGrid from "./RepertoireGrid";
 import ScheduledTunesGrid from "./ScheduledTunesGrid";
+import { TunesProvider } from "./TunesContext";
 
 interface IPracticeProps {
   userId: number;
   playlistId: number;
+  onEditTune: (tuneId: number) => void;
 }
 
 const tabSpec = [
@@ -30,15 +31,21 @@ const tabSpec = [
 export default function TabGroupMain({
   userId,
   playlistId,
+  onEditTune,
 }: IPracticeProps): JSX.Element {
-  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("scheduled");
 
   const changeActiveTab = (whichTag: string) => {
+    console.log("tabGroupMainState changeActiveTab:", whichTag);
     setActiveTab(whichTag);
     const tabGroupMainState: ITabGroupMainStateModel = {
       user_id: userId,
       which_tab: whichTag,
     };
+    console.log(
+      "tabGroupMainState updateTabGroupMainState:",
+      tabGroupMainState.which_tab,
+    );
     void updateTabGroupMainState(userId, tabGroupMainState);
   };
 
@@ -49,8 +56,10 @@ export default function TabGroupMain({
         const tabGroupMainState: ITabGroupMainStateModel | null =
           await getTabGroupMainState(userId);
         if (tabGroupMainState !== null) {
+          console.log("tabGroupMainState (init):", tabGroupMainState.which_tab);
           setActiveTab(tabGroupMainState.which_tab);
         } else {
+          console.log("tabGroupMainState tabSpec[0].id:", tabSpec[0].id);
           setActiveTab(tabSpec[0].id);
         }
       } catch (error) {
@@ -62,7 +71,7 @@ export default function TabGroupMain({
 
   return (
     <Tabs
-      defaultValue={activeTab || "scheduled"}
+      value={activeTab}
       onValueChange={changeActiveTab}
       className="flex h-full w-full flex-col"
     >
@@ -83,14 +92,24 @@ export default function TabGroupMain({
       <TabsContent value="scheduled">
         <Card>
           <CardContent className="space-y-2">
-            <ScheduledTunesGrid userId={userId} playlistId={playlistId} />
+            <ScheduledTunesGrid
+              userId={userId}
+              playlistId={playlistId}
+              onEditTune={onEditTune}
+            />
           </CardContent>
         </Card>
       </TabsContent>
       <TabsContent value="repertoire">
         <Card>
           <CardContent className="space-y-2">
-            <RepertoireGrid userId={userId} playlistId={playlistId} />
+            <TunesProvider>
+              <RepertoireGrid
+                userId={userId}
+                playlistId={playlistId}
+                onEditTune={onEditTune}
+              />
+            </TunesProvider>
           </CardContent>
         </Card>
       </TabsContent>

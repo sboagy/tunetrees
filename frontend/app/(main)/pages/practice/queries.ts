@@ -20,8 +20,7 @@ export async function getPracticeListScheduled(
     const response = await client.get<Tune[]>(
       `/get_practice_list_scheduled/${userId}/${playlistId}`,
     );
-    const data = response.data;
-    return data;
+    return response.data;
   } catch (error) {
     console.error("Error in getPracticeListScheduled: ", error);
     // Return a dummy Tune object to avoid breaking the UI
@@ -37,8 +36,7 @@ export async function getRecentlyPracticed(
     const response = await client.get<Tune[]>(
       `/get_tunes_recently_played/${userId}/${playlistId}`,
     );
-    const data = response.data;
-    return data;
+    return response.data;
   } catch (error) {
     console.error("Error in getRecentlyPracticed: ", error);
     // Return a dummy Tune object to avoid breaking the UI
@@ -62,8 +60,7 @@ export async function getTuneStaged(
     const response = await client.get<Tune[]>(
       `/get_tune_staged/${user_id}/${playlist_id}/${tune_id}`,
     );
-    const data = response.data;
-    return data;
+    return response.data;
   } catch (error) {
     console.error("Error in getTuneStaged: ", error);
     // Return a dummy Tune object to avoid breaking the UI
@@ -81,9 +78,9 @@ export async function getTuneStaged(
  * @returns A promise that resolves to a success or error message.
  */
 export async function updatePlaylistTune(
-  user_id: string,
-  playlist_ref: string,
-  tune_id: string,
+  user_id: number,
+  playlist_ref: number,
+  tune_id: number,
   tune_update: Partial<PlaylistTune>,
 ): Promise<Partial<PlaylistTune> | { detail?: string }> {
   try {
@@ -151,9 +148,9 @@ export async function deletePlaylistTune(
  * @returns A promise that resolves to the requested PlaylistTune object, or an error message.
  */
 export async function getPlaylistTune(
-  user_id: string,
-  playlist_ref: string,
-  tune_id: string,
+  user_id: number,
+  playlist_ref: number,
+  tune_id: number,
 ): Promise<PlaylistTune | { detail: string }> {
   try {
     const response = await client.get<PlaylistTune | { detail: string }>(
@@ -322,7 +319,6 @@ export async function deleteReference(
 /**
  * Retrieve notes for a specific tune.
  *
- * @param tune_id - The ID of the tune.
  * @returns A promise that resolves to a list of notes.
  */
 export async function getNotes(
@@ -374,8 +370,6 @@ export async function updateNote(
 /**
  * Create a new note for a specific tune.
  *
- * @param tune_id - The ID of the tune.
- * @param note - The note data to create.
  * @returns A promise that resolves to a IReferenceData object.
  */
 export async function createNote(note: INote): Promise<INote> {
@@ -461,10 +455,11 @@ export interface ITuneCreate {
 }
 
 /**
- * Create a new tune.
+ * Creates a new tune and associates it with the specified playlist.
  *
- * @param tune - The tune data to create.
- * @returns A promise that resolves to a success or error message.
+ * @param {Tune} tune - The tune object to be created.
+ * @param {number} playlistRef - The reference ID of the playlist to associate the tune with.
+ * @return {Promise<Tune | { success?: string; detail?: string }>} A promise that resolves to the created tune or an object with success or detail messages.
  */
 export async function createTune(
   tune: Tune,

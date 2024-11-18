@@ -1,9 +1,3 @@
-import { Check } from "lucide-react";
-// RecallEvalRadioGroup.tsx
-import React from "react";
-
-import { cn } from "@/lib/utils";
-
 import {
   Command,
   CommandEmpty,
@@ -16,10 +10,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-
+import { cn } from "@/lib/utils";
 import type { CellContext } from "@tanstack/react-table";
-
-import { createOrUpdateTableTransientData } from "../settings";
+import { Check } from "lucide-react";
+import { useState } from "react";
+import {
+  createOrUpdateTableTransientData,
+  deleteTableTransientData,
+} from "../settings";
 import type { TablePurpose, Tune, TunesGridColumnGeneralType } from "../types";
 import { getColorForEvaluation } from "./TunesGrid";
 
@@ -82,131 +80,99 @@ export function RecallEvalComboBox(
   userId: number,
   playlistId: number,
   purpose: TablePurpose,
+  onRecallEvalChange?: (tuneId: number, newValue: string) => void,
 ) {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedQuality, setSelectedQuality] = useState<string | null>(
+    info.row.original.recall_eval ?? null,
+  );
 
   const saveData = async (changed_value: string) => {
     try {
-      if (changed_value === "") {
-        return;
-      }
-      // In the following, id may be ommited in the case of a new tune,
+      // In the following, id may be omitted in the case of a new tune,
       // but I don't think it's ever undefined in this case?
       // But, keep an eye on it.
-      await createOrUpdateTableTransientData(
-        userId,
-        info.row.original.id ?? 0,
-        playlistId,
-        purpose,
-        null,
-        null,
-        changed_value,
-      );
-      console.log("State saved:", changed_value);
+      if (changed_value) {
+        await createOrUpdateTableTransientData(
+          userId,
+          info.row.original.id ?? 0,
+          playlistId,
+          purpose,
+          null,
+          null,
+          changed_value,
+        );
+        console.log(
+          `LF17 State saved: ${changed_value} for ${info.row.original.id}`,
+        );
+      } else {
+        await deleteTableTransientData(
+          userId,
+          info.row.original.id ?? 0,
+          playlistId,
+          purpose,
+        );
+        console.log(`LF17 State deleted for ${info.row.original.id}`);
+      }
     } catch (error) {
-      console.error("Failed to save state:", error);
+      console.error("LF17 Failed to save state:", error);
     }
-    console.log("State saved:", changed_value);
   };
 
   const forceClose = () => {
     setIsOpen(false);
   };
 
-  // const handleButtonClick = (event: React.MouseEvent) => {
-  //   event.stopPropagation(); // Prevent the event from bubbling up to the parent elements
-  //   setIsOpen(!isOpen);
-  // };
-
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <select
-          className={`w-[9em] sm:w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(info.row.original.recall_eval ?? null)}`}
+        <button
+          type="button"
+          className={`w-[9em] sm:w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(
+            selectedQuality ?? null,
+          )}`}
           style={{
             textAlign: "left",
           }}
-          onChange={(e) => {
-            const newValue = e.target.value;
-            info.row.original.recall_eval = newValue;
-            void saveData(newValue);
-          }}
-          value={info.row.original.recall_eval ?? ""}
         >
-          <option value="" disabled>
-            Recall Quality...
-          </option>
-          {qualityList.slice(1).map((qualityList) => (
-            <option key={qualityList.value} value={qualityList.value}>
-              {qualityList.label2}
-            </option>
-          ))}
-        </select>
+          {selectedQuality
+            ? qualityList.find((q) => q.value === selectedQuality)?.label2
+            : "Recall Quality..."}
+        </button>
       </PopoverTrigger>
       <PopoverContent align="end">
         <Command>
-          {/* <CommandInput placeholder="Recall Eval..." /> */}
           <CommandList>
             <CommandEmpty>Recall Eval...</CommandEmpty>
             <CommandGroup>
-              {qualityList.slice(1).map((qualityList) => (
+              {qualityList.map((qualityList) => (
                 <CommandItem
                   key={qualityList.value}
                   value={qualityList.value}
                   onSelect={(currentValue) => {
-                    console.log(
-                      "value, currentValue: ",
-                      info.row.original.recall_eval,
-                      currentValue,
-                    );
                     const newValue =
                       currentValue === info.row.original.recall_eval
                         ? ""
                         : currentValue;
-                    // setRecallEvalValue(newValue);
-
-                    // setIsUpdated(!isUpdated);
-
+                    setSelectedQuality(newValue);
                     info.row.original.recall_eval = newValue;
+                    if (onRecallEvalChange) {
+                      onRecallEvalChange(info.row.original.id ?? -1, newValue); // Call the callback
+                    }
 
-                    // This toggleSelected forces the row to re-render, maybe there's a better way?
-                    // info.row.renderValue("recall_eval");
                     forceClose();
 
                     const selectedRowModels =
                       info.table.getSelectedRowModel().rowsById;
-                    console.log("selectedRowModels: ", selectedRowModels);
-
                     for (const rowId in selectedRowModels) {
                       const rowModel = selectedRowModels[rowId];
                       rowModel.toggleSelected(false);
                     }
 
-                    // for (let i = 0; i < nrows; i++) {
-                    //   const cell = info.table.getSelectedRowModel(i));
-                    //   cell.row.toggleSelected(false);
-                    // }
-
-                    // This will just update the button, but not the row.
-                    // Leaving it here for reference, and also, maybe we shouldn't
-                    // change the color of the entire row based on the recall_eval?
-                    // updateState({});
-
-                    // const original_selection_state = info.row.getIsSelected();
-                    // info.row.toggleSelected(!original_selection_state);
-
                     const tableState = info.table.getState();
                     info.table.setState(tableState);
 
                     void saveData(newValue);
-
-                    // info.row.toggleSelected(original_selection_state);
-
-                    // This toggleSelected hack forces the whole row to re-render.
-                    // Maybe there's a better way?
-                    // const original_selection_state = info.row.getIsSelected();
-                    // info.row.toggleSelected();
-                    // info.row.toggleSelected(original_selection_state);
                   }}
                 >
                   <Check

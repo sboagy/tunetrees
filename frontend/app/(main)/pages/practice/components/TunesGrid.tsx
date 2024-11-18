@@ -7,11 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { flexRender } from "@tanstack/react-table";
 import type { Row, Table as TanstackTable } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { flexRender } from "@tanstack/react-table";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
-import { useRouter } from "next/navigation";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useRef } from "react";
 import type { TablePurpose, Tune } from "../types";
 import { get_columns } from "./TuneColumns";
@@ -43,10 +42,17 @@ type Props = {
   userId: number;
   playlistId: number;
   tablePurpose: TablePurpose;
+  onRowDoubleClick: (tuneId: number) => void;
+  onRecallEvalChange?: (tuneId: number, newValue: string) => void;
 };
 
-const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
-  const router = useRouter();
+const TunesGrid = ({
+  table,
+  userId,
+  playlistId,
+  tablePurpose,
+  onRowDoubleClick,
+}: Props) => {
   const { currentTune, setCurrentTune } = useTune();
 
   useSaveTableState(table, userId, tablePurpose, currentTune);
@@ -62,9 +68,9 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
     [setCurrentTune, table, userId, tablePurpose],
   );
 
-  console.log(
-    `TunesGrid ${tablePurpose}: count=${table.getRowModel().rows.length}`,
-  );
+  // console.log(
+  //   `TunesGrid ${tablePurpose}: count=${table.getRowModel().rows.length}`,
+  // );
 
   const rowVirtualizer: Virtualizer<HTMLDivElement, HTMLTableRowElement> =
     useVirtualizer({
@@ -141,7 +147,10 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
               >
                 {virtualRows.map((virtualRow: VirtualItem) => {
                   const row = table.getRowModel().rows[virtualRow.index];
-                  console.log("Rendering virtualRow.index:", virtualRow.index);
+                  // console.debug(
+                  //   "Rendering virtualRow.index:",
+                  //   virtualRow.index,
+                  // );
                   return (
                     <TableRow
                       key={row.id}
@@ -160,16 +169,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                         event.preventDefault();
                         event.stopPropagation();
                         const tuneId = row.original.id;
-                        saveTableState(
-                          table,
-                          userId,
-                          tablePurpose,
-                          currentTune,
-                        );
-                        console.log("double-click occurred: tuneId=", tuneId);
-                        router.push(
-                          `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tuneId}`,
-                        );
+                        onRowDoubleClick(tuneId ?? -1);
                       }}
                       data-state={row.getIsSelected() && "selected"}
                     >

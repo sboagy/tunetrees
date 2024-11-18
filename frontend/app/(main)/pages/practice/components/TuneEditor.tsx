@@ -8,16 +8,15 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { getPlaylistTune, updatePlaylistTune } from "../queries";
-import "./TuneEditor.css"; // Import the CSS file
 import { ERROR_PLAYLIST_TUNE } from "../mocks";
+import { getPlaylistTune, updatePlaylistTune } from "../queries";
 import type { PlaylistTune } from "../types";
+import { useTuneDataRefresh } from "./TuneDataRefreshContext";
+import "./TuneEditor.css"; // Import the CSS file
 
 const formSchema = z.object({
   id: z.number().optional(),
@@ -42,25 +41,31 @@ const formSchema = z.object({
 });
 
 interface ITuneEditorProps {
-  userId: string;
-  playlistId: string;
-  tuneId: string;
+  userId: number;
+  playlistId: number;
+  tuneId?: number;
+  onCancel?: () => void;
 }
 
 export default function TuneEditor({
   userId,
   playlistId,
   tuneId,
+  onCancel,
 }: ITuneEditorProps) {
   // const squishFactorY = 0.75;
   const mainElement = document.querySelector("#main-content");
   if (!mainElement) {
     return <div>Missing main element</div>;
   }
+  if (!tuneId) {
+    return <div>Missing tune ID</div>;
+  }
   const origBoundingClientRect = mainElement.getBoundingClientRect();
   const headerFooterHeight = window.innerHeight - origBoundingClientRect.height;
   // const buttonsHeightSortOf = headerFooterHeight / 2;
   const [height, setHeight] = useState(origBoundingClientRect.height);
+  const { triggerRefresh } = useTuneDataRefresh();
 
   useEffect(() => {
     // const mainElement = document.querySelector("#main-content");
@@ -119,8 +124,6 @@ export default function TuneEditor({
     void fetchTune();
   }, [userId, playlistId, tuneId, form]);
 
-  const router = useRouter();
-
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     console.log(data);
 
@@ -135,11 +138,16 @@ export default function TuneEditor({
     } else {
       console.log("Tune updated successfully");
     }
-    router.back();
+    triggerRefresh();
+    if (onCancel) {
+      onCancel();
+    }
   };
 
   const handleCancel = () => {
-    router.back();
+    if (onCancel) {
+      onCancel();
+    }
   };
 
   if (!tune) {
@@ -164,9 +172,12 @@ export default function TuneEditor({
             overflowY: "unset",
           }}
         >
-          <ScrollArea
-            className="flex-grow w-full rounded-md border p-4"
-            style={{ height: "auto" }}
+          <div
+            className="flex-grow w-full rounded-md border p-4 overflow-y-scroll"
+            style={{
+              minHeight: "calc(100vh - 400px)",
+              maxHeight: "calc(100vh - 400px)",
+            }}
           >
             <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
               <FormField
@@ -529,7 +540,7 @@ export default function TuneEditor({
                 </FormItem>
               )}
             /> */}
-          </ScrollArea>
+          </div>
 
           <div className="flex w-3/5 justify-center space-x-4 p-4">
             <Button type="button" onClick={handleCancel} variant="outline">

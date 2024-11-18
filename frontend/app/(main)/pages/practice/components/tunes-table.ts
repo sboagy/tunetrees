@@ -1,6 +1,11 @@
 "use client";
 
 import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns";
+import type {
+  RowSelectionState,
+  TableState,
+  Table as TanstackTable,
+} from "@tanstack/react-table";
 import {
   type ColumnFiltersState,
   type SortingState,
@@ -9,11 +14,6 @@ import {
   getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
-} from "@tanstack/react-table";
-import type {
-  RowSelectionState,
-  TableState,
-  Table as TanstackTable,
 } from "@tanstack/react-table";
 import * as React from "react";
 import { createOrUpdateTableState, getTableStateTable } from "../settings";
@@ -26,6 +26,7 @@ export interface IScheduledTunesType {
   playlistId: number;
   tablePurpose: TablePurpose;
   globalFilter?: string;
+  onRecallEvalChange?: (tuneId: number, newValue: string) => void;
 }
 
 export const tableContext = React.createContext<TanstackTable<Tune> | null>(
@@ -72,6 +73,7 @@ export function TunesTable(
     playlistId,
     tablePurpose,
     globalFilter = "",
+    onRecallEvalChange,
   }: IScheduledTunesType,
   selectionChangedCallback:
     | ((
@@ -145,7 +147,12 @@ export function TunesTable(
     originalSetRowSelectionRef.current = setRowSelection;
   }, []);
 
-  const columns = get_columns(userId, playlistId, tablePurpose);
+  const columns = get_columns(
+    userId,
+    playlistId,
+    tablePurpose,
+    onRecallEvalChange,
+  );
 
   const table: TanstackTable<Tune> = useReactTable({
     data: tunes,

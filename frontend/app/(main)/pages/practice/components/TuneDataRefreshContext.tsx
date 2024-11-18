@@ -1,5 +1,5 @@
-// TuneDataRefreshContext.tsx
-import React, { createContext, useState } from "react";
+import type React from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 
 interface ITuneDataRefreshContextType {
   refreshId: number; // Unique identifier for each refresh
@@ -18,25 +18,21 @@ export const TuneDataRefreshProvider = ({
   const [refreshId, setRefreshId] = useState(Date.now());
 
   // Function to trigger a refresh (sets a new unique identifier)
-  const triggerRefresh = () => {
-    setRefreshId(Date.now());
-  };
+  const triggerRefresh = useCallback(() => {
+    const newRefreshId = Date.now();
+    setRefreshId(newRefreshId);
+  }, []);
 
   return (
-    <TuneDataRefreshContext.Provider
-      value={{
-        refreshId,
-        triggerRefresh,
-      }}
-    >
+    <TuneDataRefreshContext.Provider value={{ refreshId, triggerRefresh }}>
       {children}
     </TuneDataRefreshContext.Provider>
   );
 };
 
 export const useTuneDataRefresh = () => {
-  const context = React.useContext(TuneDataRefreshContext);
-  if (context === undefined) {
+  const context = useContext(TuneDataRefreshContext);
+  if (!context) {
     throw new Error(
       "useTuneDataRefresh must be used within a TuneDataRefreshProvider",
     );

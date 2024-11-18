@@ -12,6 +12,7 @@ import type {
 
 const client = axios.create({
   baseURL: `${process.env.NEXT_BASE_URL}/settings`,
+  timeout: 2000, // Increase timeout to 2 seconds
 });
 
 // interface ColumnRecordModel {

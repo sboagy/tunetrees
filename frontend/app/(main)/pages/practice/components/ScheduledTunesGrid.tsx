@@ -9,32 +9,40 @@ import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
 import { getPracticeListScheduled } from "../queries";
 import { deleteTableTransientData } from "../settings";
 import type { Tune } from "../types";
-import { type IScheduledTunesType, TunesTable } from "././tunes-table";
 import ColumnsMenu from "./ColumnsMenu";
 import FlashcardPanel from "./FlashcardPanel";
 import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import TunesGrid from "./TunesGrid";
+import { type IScheduledTunesType, TunesTable } from "./tunes-table";
 
 type ReviewMode = "grid" | "flashcard";
 
 type ScheduledTunesGridProps = {
   userId: number;
   playlistId: number;
+  onEditTune: (tuneId: number) => void;
 };
 
 export default function ScheduledTunesGrid({
   userId,
   playlistId,
+  onEditTune,
 }: ScheduledTunesGridProps): JSX.Element {
   // const [scheduled, setScheduled] = useState<Tune[]>([]);
   const [tunes, setTunes] = useState<Tune[]>([]);
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
   const [isClient, setIsClient] = useState(false);
+  const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    const hasNonEmptyRecallEval = tunes.some((tune) => tune.recall_eval);
+    setIsSubmitEnabled(hasNonEmptyRecallEval);
+  }, [tunes]);
 
   const refreshTunes = useCallback((userId: number, playlistId: number) => {
     getPracticeListScheduled(userId, playlistId)
@@ -53,12 +61,21 @@ export default function ScheduledTunesGrid({
     }
   }, [refreshId, userId, playlistId, refreshTunes, isClient]);
 
+  const handleRecallEvalChange = (tuneId: number, newValue: string): void => {
+    setTunes((prevTunes) =>
+      prevTunes.map((tune) =>
+        tune.id === tuneId ? { ...tune, recall_eval: newValue } : tune,
+      ),
+    );
+  };
+
   const tunesWithFilter: IScheduledTunesType = {
     tunes,
     userId,
     playlistId,
     tablePurpose: "practice",
     globalFilter: "",
+    onRecallEvalChange: handleRecallEvalChange,
   };
   const table = TunesTable(tunesWithFilter);
 
@@ -125,6 +142,10 @@ export default function ScheduledTunesGrid({
     setMode(mode === "grid" ? "flashcard" : "grid");
   };
 
+  const handleRowDoubleClick = (tuneId: number) => {
+    onEditTune(tuneId);
+  };
+
   return (
     <div className="w-full h-full">
       <div
@@ -136,6 +157,7 @@ export default function ScheduledTunesGrid({
             type="submit"
             variant="outline"
             onClick={() => submitPracticeFeedbacksHandler()}
+            disabled={!isSubmitEnabled}
           >
             <Upload />
             {isClient &&
@@ -182,6 +204,8 @@ export default function ScheduledTunesGrid({
           userId={userId}
           playlistId={userId}
           tablePurpose={"practice"}
+          onRowDoubleClick={handleRowDoubleClick}
+          onRecallEvalChange={handleRecallEvalChange}
         />
       ) : (
         <FlashcardPanel
