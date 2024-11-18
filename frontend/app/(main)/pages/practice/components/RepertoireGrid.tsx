@@ -34,7 +34,6 @@ async function fetchFilterFromDB(
 type RepertoireGridProps = {
   userId: number;
   playlistId: number;
-  onEditTune: (tuneId: number) => void;
 };
 
 /**
@@ -50,7 +49,6 @@ type RepertoireGridProps = {
 export default function RepertoireGrid({
   userId,
   playlistId,
-  onEditTune,
 }: RepertoireGridProps): JSX.Element {
   const [isAddToReviewQueueEnabled, setIsAddToReviewQueueEnabled] =
     useState(false);
@@ -188,10 +186,6 @@ export default function RepertoireGrid({
     // const updates: { [key: string]: TuneUpdate } = {};
   };
 
-  const handleRowDoubleClick = (tuneId: number) => {
-    onEditTune(tuneId);
-  };
-
   return (
     <div className="w-full h-full">
       {/* Optionally, show a loading indicator */}
@@ -264,7 +258,6 @@ export default function RepertoireGrid({
             userId={userId}
             playlistId={playlistId}
             tablePurpose={"repertoire"}
-            onRowDoubleClick={handleRowDoubleClick}
           />
         </>
       )}

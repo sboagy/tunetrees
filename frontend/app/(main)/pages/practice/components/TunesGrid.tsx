@@ -13,6 +13,7 @@ import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useRef } from "react";
 import type { TablePurpose, Tune } from "../types";
+import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
 import { useTune } from "./TuneContext";
 import { saveTableState, tableContext } from "./tunes-table";
@@ -42,18 +43,11 @@ type Props = {
   userId: number;
   playlistId: number;
   tablePurpose: TablePurpose;
-  onRowDoubleClick: (tuneId: number) => void;
-  onRecallEvalChange?: (tuneId: number, newValue: string) => void;
 };
 
-const TunesGrid = ({
-  table,
-  userId,
-  playlistId,
-  tablePurpose,
-  onRowDoubleClick,
-}: Props) => {
+const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const { currentTune, setCurrentTune } = useTune();
+  const { setCurrentView } = useMainPaneView();
 
   useSaveTableState(table, userId, tablePurpose, currentTune);
   const tableBodyRef = useRef<HTMLDivElement>(null);
@@ -68,9 +62,13 @@ const TunesGrid = ({
     [setCurrentTune, table, userId, tablePurpose],
   );
 
-  // console.log(
-  //   `TunesGrid ${tablePurpose}: count=${table.getRowModel().rows.length}`,
-  // );
+  const handleRowDoubleClick = (row: Row<Tune>) => {
+    console.log(
+      "handleRowDoubleClick (current tune should already be set): tuneId=",
+      row.original.id,
+    );
+    setCurrentView("edit");
+  };
 
   const rowVirtualizer: Virtualizer<HTMLDivElement, HTMLTableRowElement> =
     useVirtualizer({
@@ -147,10 +145,6 @@ const TunesGrid = ({
               >
                 {virtualRows.map((virtualRow: VirtualItem) => {
                   const row = table.getRowModel().rows[virtualRow.index];
-                  // console.debug(
-                  //   "Rendering virtualRow.index:",
-                  //   virtualRow.index,
-                  // );
                   return (
                     <TableRow
                       key={row.id}
@@ -165,12 +159,7 @@ const TunesGrid = ({
                           : ""
                       } ${getColorForEvaluation(row.original.recall_eval || null)}`}
                       onClick={() => handleRowClick(row)}
-                      onDoubleClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        const tuneId = row.original.id;
-                        onRowDoubleClick(tuneId ?? -1);
-                      }}
+                      onDoubleClick={() => handleRowDoubleClick(row)}
                       data-state={row.getIsSelected() && "selected"}
                     >
                       {row.getVisibleCells().map((cell) => (

@@ -21,15 +21,12 @@ type ReviewMode = "grid" | "flashcard";
 type ScheduledTunesGridProps = {
   userId: number;
   playlistId: number;
-  onEditTune: (tuneId: number) => void;
 };
 
 export default function ScheduledTunesGrid({
   userId,
   playlistId,
-  onEditTune,
 }: ScheduledTunesGridProps): JSX.Element {
-  // const [scheduled, setScheduled] = useState<Tune[]>([]);
   const [tunes, setTunes] = useState<Tune[]>([]);
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
   const [isClient, setIsClient] = useState(false);
@@ -142,10 +139,6 @@ export default function ScheduledTunesGrid({
     setMode(mode === "grid" ? "flashcard" : "grid");
   };
 
-  const handleRowDoubleClick = (tuneId: number) => {
-    onEditTune(tuneId);
-  };
-
   return (
     <div className="w-full h-full">
       <div
@@ -204,8 +197,6 @@ export default function ScheduledTunesGrid({
           userId={userId}
           playlistId={userId}
           tablePurpose={"practice"}
-          onRowDoubleClick={handleRowDoubleClick}
-          onRecallEvalChange={handleRecallEvalChange}
         />
       ) : (
         <FlashcardPanel

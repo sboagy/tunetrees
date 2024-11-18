@@ -5,6 +5,7 @@ import { Edit } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getTune } from "../queries";
 import type { Tune } from "../types";
+import { useMainPaneView } from "./MainPaneViewContext";
 import NoteCards from "./NoteCards";
 import ReferenceCards from "./ReferenceCards";
 import "./Sidebar.css";
@@ -13,16 +14,11 @@ import { useTune } from "./TuneContext";
 interface ISidebarProps {
   userId: number;
   playlistId: number;
-  onEditTune: (tuneId: number) => void;
 }
 
-const Sidebar = ({ onEditTune }: ISidebarProps) => {
-  // const [selectedTune, setSelectedTune] = useState(1);
-
-  // const urls = [
-  //   { title: "Favorite URL", url: "http://example.com", favorite: true },
-  //   { title: "Another URL", url: "http://example2.com", favorite: false },
-  // ];
+const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
+  const { setCurrentView } = useMainPaneView();
+  console.log(`Sidebar: userId=${userId}, playlistId=${playlistId}`);
 
   const [tuneTitle, setTuneTitle] = useState<string | null>(null);
   const { currentTune } = useTune();
@@ -45,7 +41,11 @@ const Sidebar = ({ onEditTune }: ISidebarProps) => {
   }, [currentTune]);
 
   const handleTuneEditClick = (tuneId: number) => {
-    onEditTune(tuneId);
+    console.log(
+      "handleTuneEditClick (current tune should already be set): tuneId=",
+      tuneId,
+    );
+    setCurrentView("edit");
   };
 
   return currentTune ? (

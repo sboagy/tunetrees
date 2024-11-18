@@ -15,6 +15,7 @@ import * as z from "zod";
 import { ERROR_PLAYLIST_TUNE } from "../mocks";
 import { getPlaylistTune, updatePlaylistTune } from "../queries";
 import type { PlaylistTune } from "../types";
+import { useMainPaneView } from "./MainPaneViewContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import "./TuneEditor.css"; // Import the CSS file
 
@@ -43,15 +44,13 @@ const formSchema = z.object({
 interface ITuneEditorProps {
   userId: number;
   playlistId: number;
-  tuneId?: number;
-  onCancel?: () => void;
+  tuneId: number;
 }
 
 export default function TuneEditor({
   userId,
   playlistId,
   tuneId,
-  onCancel,
 }: ITuneEditorProps) {
   // const squishFactorY = 0.75;
   const mainElement = document.querySelector("#main-content");
@@ -66,6 +65,7 @@ export default function TuneEditor({
   // const buttonsHeightSortOf = headerFooterHeight / 2;
   const [height, setHeight] = useState(origBoundingClientRect.height);
   const { triggerRefresh } = useTuneDataRefresh();
+  const { setCurrentView } = useMainPaneView();
 
   useEffect(() => {
     // const mainElement = document.querySelector("#main-content");
@@ -139,15 +139,11 @@ export default function TuneEditor({
       console.log("Tune updated successfully");
     }
     triggerRefresh();
-    if (onCancel) {
-      onCancel();
-    }
+    setCurrentView("tabs");
   };
 
   const handleCancel = () => {
-    if (onCancel) {
-      onCancel();
-    }
+    setCurrentView("tabs");
   };
 
   if (!tune) {

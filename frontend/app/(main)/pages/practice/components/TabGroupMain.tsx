@@ -15,7 +15,6 @@ import { TunesProvider } from "./TunesContext";
 interface IPracticeProps {
   userId: number;
   playlistId: number;
-  onEditTune: (tuneId: number) => void;
 }
 
 const tabSpec = [
@@ -31,7 +30,6 @@ const tabSpec = [
 export default function TabGroupMain({
   userId,
   playlistId,
-  onEditTune,
 }: IPracticeProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<string>("scheduled");
 
@@ -92,11 +90,7 @@ export default function TabGroupMain({
       <TabsContent value="scheduled">
         <Card>
           <CardContent className="space-y-2">
-            <ScheduledTunesGrid
-              userId={userId}
-              playlistId={playlistId}
-              onEditTune={onEditTune}
-            />
+            <ScheduledTunesGrid userId={userId} playlistId={playlistId} />
           </CardContent>
         </Card>
       </TabsContent>
@@ -104,11 +98,7 @@ export default function TabGroupMain({
         <Card>
           <CardContent className="space-y-2">
             <TunesProvider>
-              <RepertoireGrid
-                userId={userId}
-                playlistId={playlistId}
-                onEditTune={onEditTune}
-              />
+              <RepertoireGrid userId={userId} playlistId={playlistId} />
             </TunesProvider>
           </CardContent>
         </Card>

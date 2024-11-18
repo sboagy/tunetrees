@@ -1,4 +1,4 @@
-import ClientLayout from "@/components/ClientLayout";
+import ClientContextsWrapper from "@/components/ClientContextsWrapper";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import "@radix-ui/themes/styles.css";
@@ -19,7 +19,7 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} h-full`}>
         <Header />
-        <ClientLayout>{children}</ClientLayout>
+        <ClientContextsWrapper>{children}</ClientContextsWrapper>
         <Footer />
       </body>
     </html>
