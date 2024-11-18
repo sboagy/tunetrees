@@ -264,7 +264,7 @@ export default function TuneEditor({
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
-                      Learned Date:{" "}
+                      <em>Learned Date:</em>{" "}
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">
@@ -285,7 +285,7 @@ export default function TuneEditor({
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
-                      Practiced Date:{" "}
+                      <em>Practiced Date:</em>{" "}
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">
@@ -306,7 +306,7 @@ export default function TuneEditor({
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
-                      Quality:{" "}
+                      <em>Quality:</em>{" "}
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">
@@ -320,44 +320,44 @@ export default function TuneEditor({
                 name="Quality"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
-                    <FormLabel className="tune-form-label-style">
-                      Quality:{" "}
-                    </FormLabel>
+                  <FormLabel className="tune-form-label-style">
+                    <em>Quality:</em>{" "}
+                  </FormLabel>
 
-                    <Select
-                      onValueChange={(value) =>
-                        field.onChange(Number.parseInt(value))
-                      }
-                      value={
-                        qualityList
-                          .find(
-                            (item) =>
-                              item.int_value.toString() === field.value ||
-                              item.value === field.value,
-                          )
-                          ?.int_value.toString() || ""
-                      }
-                    >
-                      <FormControl className="tune-form-control-style">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select quality" />
-                        </SelectTrigger>
-                      </FormControl>
+                  <Select
+                    onValueChange={(value) =>
+                    field.onChange(Number.parseInt(value))
+                    }
+                    value={
+                    qualityList
+                      .find(
+                      (item) =>
+                        item.int_value.toString() === field.value ||
+                        item.value === field.value,
+                      )
+                      ?.int_value.toString() || ""
+                    }
+                  >
+                    <FormControl className="tune-form-control-style">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select quality" />
+                    </SelectTrigger>
+                    </FormControl>
 
-                      <SelectContent>
-                        {qualityList.map((item) => (
-                          <SelectItem
-                            key={item.int_value}
-                            value={item.int_value.toString()}
-                          >
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SelectContent>
+                    {qualityList.map((item) => (
+                      <SelectItem
+                      key={item.int_value}
+                      value={item.int_value.toString()}
+                      >
+                      {item.label}
+                      </SelectItem>
+                    ))}
+                    </SelectContent>
+                  </Select>
                   </FormItem>
                 )}
-              /> */}
+                /> */}
 
               <FormField
                 control={form.control}
@@ -365,7 +365,7 @@ export default function TuneEditor({
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
-                      Easiness:{" "}
+                      <em>Easiness:</em>{" "}
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">
@@ -387,7 +387,7 @@ export default function TuneEditor({
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
-                      Interval:{" "}
+                      <em>Interval:</em>{" "}
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">
@@ -409,7 +409,7 @@ export default function TuneEditor({
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
-                      Repetitions:{" "}
+                      <em>Repetitions:</em>{" "}
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">
@@ -431,7 +431,7 @@ export default function TuneEditor({
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
-                      Scheduled:{" "}
+                      <em>Scheduled:</em>{" "}
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">
@@ -451,69 +451,69 @@ export default function TuneEditor({
                 name="BackupPracticed"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
-                    <FormLabel className="tune-form-label-style">
-                      Backup Practiced Date:{" "}
-                    </FormLabel>
+                  <FormLabel className="tune-form-label-style">
+                    <em>Backup Practiced Date:</em>{" "}
+                  </FormLabel>
 
-                    <FormControl className="tune-form-control-style">
-                      <Input
-                        type="datetime-local"
-                        {...field}
-                        value={field.value ? field.value.replace(" ", "T") : ""}
-                      />
-                    </FormControl>
+                  <FormControl className="tune-form-control-style">
+                    <Input
+                    type="datetime-local"
+                    {...field}
+                    value={field.value ? field.value.replace(" ", "T") : ""}
+                    />
+                  </FormControl>
                   </FormItem>
                 )}
-              /> */}
+                /> */}
 
               {/* <FormField
                 control={form.control}
                 name="external_ref"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style2">
-                    <FormLabel className="tune-form-label-style">
-                      External Reference:{" "}
-                    </FormLabel>
+                  <FormLabel className="tune-form-label-style">
+                    <em>External Reference:</em>{" "}
+                  </FormLabel>
 
-                    <FormControl className="tune-form-control-style">
-                      <Input {...field} value={field.value || ""} />
-                    </FormControl>
+                  <FormControl className="tune-form-control-style">
+                    <Input {...field} value={field.value || ""} />
+                  </FormControl>
                   </FormItem>
                 )}
-              /> */}
+                /> */}
             </div>
 
             {/* <FormField
-              control={form.control}
-              name="note_private"
-              render={({ field }) => (
+                control={form.control}
+                name="note_private"
+                render={({ field }) => (
                 <FormItem className="tune-form-item-style2">
                   <FormLabel className="tune-form-label-style">
-                    Private Notes:{" "}
+                  <em>Private Notes:</em>{" "}
                   </FormLabel>
 
                   <FormControl className="tune-form-control-style">
-                    <Textarea {...field} value={field.value || ""} />
+                  <Textarea {...field} value={field.value || ""} />
                   </FormControl>
                 </FormItem>
-              )}
-            /> */}
+                )}
+              /> */}
 
             {/* <FormField
-              control={form.control}
-              name="note_public"
-              render={({ field }) => (
+                control={form.control}
+                name="note_public"
+                render={({ field }) => (
                 <FormItem className="tune-form-item-style2">
                   <FormLabel className="tune-form-label-style">
-                    Public Notes:{" "}
+                  <em>Public Notes:</em>{" "}
                   </FormLabel>
 
                   <FormControl className="tune-form-control-style">
-                    <Textarea {...field} value={field.value || ""} />
+                  <Textarea {...field} value={field.value || ""} />
                   </FormControl>
                 </FormItem>
-              )}
-            /> */}
+                )}
+              /> */}
 
             <FormField
               control={form.control}
@@ -521,7 +521,7 @@ export default function TuneEditor({
               render={({ field }) => (
                 <FormItem className="tune-form-item-style2">
                   <FormLabel className="tune-form-label-style">
-                    Tags:{" "}
+                    <em>Tags:</em>{" "}
                   </FormLabel>
 
                   <FormControl className="tune-form-control-style">
@@ -534,20 +534,20 @@ export default function TuneEditor({
             />
 
             {/* <FormField
-              control={form.control}
-              name="RecallEval"
-              render={({ field }) => (
+                control={form.control}
+                name="RecallEval"
+                render={({ field }) => (
                 <FormItem className="tune-form-item-style2">
                   <FormLabel className="tune-form-label-style">
-                    Recall Evaluation:{" "}
+                  <em>Recall Evaluation:</em>{" "}
                   </FormLabel>
 
                   <FormControl className="tune-form-control-style">
-                    <Input {...field} value={field.value || ""} />
+                  <Input {...field} value={field.value || ""} />
                   </FormControl>
                 </FormItem>
-              )}
-            /> */}
+                )}
+              /> */}
           </div>
 
           <hr className="my-4" />
