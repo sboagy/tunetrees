@@ -204,6 +204,7 @@ export default function ScheduledTunesGrid({
           userId={userId}
           playlistId={playlistId}
           purpose={"practice"}
+          onRecallEvalChange={handleRecallEvalChange}
         />
       )}
     </div>

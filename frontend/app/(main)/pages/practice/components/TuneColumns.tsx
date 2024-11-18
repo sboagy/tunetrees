@@ -360,14 +360,15 @@ export function get_columns(
           accessorKey: "recall_eval",
           header: ({ column }) => sortableHeader(column, "Evaluation"),
           enableHiding: false,
-          cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) =>
-            RecallEvalComboBox(
-              info,
-              userId,
-              playlistId,
-              purpose,
-              onRecallEvalChange,
-            ),
+          cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) => (
+            <RecallEvalComboBox
+              info={info}
+              userId={userId}
+              playlistId={playlistId}
+              purpose={purpose}
+              onRecallEvalChange={onRecallEvalChange}
+            />
+          ),
           accessorFn: (row) => row.recall_eval,
           size: 284,
         }

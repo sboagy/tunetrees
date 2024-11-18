@@ -96,19 +96,20 @@ export default function FlashcardPanel(props: Props) {
           <Button onClick={onPrevious} disabled={Number(tableIndex) <= 0}>
             Previous
           </Button>
-          {RecallEvalComboBox(
-            getCellContext(
+          <RecallEvalComboBox
+            key={tableIndex}
+            info={getCellContext(
               props.table,
               props.userId,
               props.playlistId,
               props.purpose,
               tableIndex,
-            ),
-            props.userId,
-            props.playlistId,
-            props.purpose,
-            props.onRecallEvalChange,
-          )}
+            )}
+            userId={props.userId}
+            playlistId={props.playlistId}
+            purpose={props.purpose}
+            onRecallEvalChange={props.onRecallEvalChange}
+          />
           <Button
             onClick={onNext}
             disabled={Number(tableIndex) >= table.getRowCount() - 1}

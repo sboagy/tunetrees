@@ -75,13 +75,17 @@ const qualityList = [
   },
 ];
 
-export function RecallEvalComboBox(
-  info: CellContext<Tune, TunesGridColumnGeneralType>,
-  userId: number,
-  playlistId: number,
-  purpose: TablePurpose,
-  onRecallEvalChange?: (tuneId: number, newValue: string) => void,
-) {
+type RecallEvalComboBoxProps = {
+  info: CellContext<Tune, TunesGridColumnGeneralType>;
+  userId: number;
+  playlistId: number;
+  purpose: TablePurpose;
+  onRecallEvalChange?: (tuneId: number, newValue: string) => void;
+};
+
+export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
+  const { info, userId, playlistId, purpose, onRecallEvalChange } = props;
+
   const [isOpen, setIsOpen] = useState(false);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(
     info.row.original.recall_eval ?? null,
@@ -128,7 +132,7 @@ export function RecallEvalComboBox(
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`w-[9em] sm:w-[18em] h-[2em] justify-between text-ellipsis truncate:overflow-ellipsis ${getColorForEvaluation(
+          className={`w-[9em] sm:w-[18em] h-[2em] justify-between whitespace-nowrap overflow-hidden text-ellipsis ${getColorForEvaluation(
             selectedQuality ?? null,
           )}`}
           style={{
@@ -142,7 +146,7 @@ export function RecallEvalComboBox(
       </PopoverTrigger>
       <PopoverContent align="end">
         <Command>
-          <CommandList>
+          <CommandList className="max-h-none">
             <CommandEmpty>Recall Eval...</CommandEmpty>
             <CommandGroup>
               {qualityList.map((qualityList) => (
