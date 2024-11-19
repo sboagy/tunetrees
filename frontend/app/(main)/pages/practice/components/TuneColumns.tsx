@@ -394,7 +394,9 @@ export function get_columns(
             href={favoriteUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-500 underline hover:text-blue-700"
+            className="text-foreground underline hover:text-blue-700"
+            // className="underline hover:text-blue-700"
+            // className="text-blue-500 underline hover:text-blue-700"
           >
             {info.getValue()}
           </a>
@@ -536,7 +538,7 @@ export function get_columns(
     // },
     {
       accessorKey: "external_ref",
-      header: "External Ref",
+      header: ({ column }) => sortableHeader(column, "External Ref"),
       cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) => {
         // return info.getValue();
         if (!info.row.original.external_ref) {
