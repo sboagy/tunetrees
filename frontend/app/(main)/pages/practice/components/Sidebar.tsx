@@ -9,7 +9,7 @@ import { useMainPaneView } from "./MainPaneViewContext";
 import NoteCards from "./NoteCards";
 import ReferenceCards from "./ReferenceCards";
 import "./Sidebar.css";
-import { useTune } from "./TuneContext";
+import { useTune } from "./CurrentTuneContext";
 
 interface ISidebarProps {
   userId: number;

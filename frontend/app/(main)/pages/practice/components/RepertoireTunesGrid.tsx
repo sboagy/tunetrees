@@ -37,7 +37,7 @@ type RepertoireGridProps = {
 };
 
 /**
- * RepertoireGrid component displays a grid of tunes for a given user and playlist,
+ * RepertoireTunesGrid component displays a grid of tunes for a given user and playlist,
  * along with a toolbar for filtering, refreshing, and selecting tunes.
  *
  * @remarks
@@ -46,7 +46,7 @@ type RepertoireGridProps = {
  * - The component includes a filter input, a button to add selected tunes to the review queue, and a grid to display the tunes.
  * - The `addToReviewQueue` function handles adding selected tunes to the review queue and submitting feedback.
  */
-export default function RepertoireGrid({
+export default function RepertoireTunesGrid({
   userId,
   playlistId,
 }: RepertoireGridProps): JSX.Element {

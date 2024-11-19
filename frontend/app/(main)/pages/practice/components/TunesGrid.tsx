@@ -15,7 +15,7 @@ import { useCallback, useRef } from "react";
 import type { TablePurpose, Tune } from "../types";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
-import { useTune } from "./TuneContext";
+import { useTune } from "./CurrentTuneContext";
 import { saveTableState, tableContext } from "./tunes-table";
 import { useSaveTableState } from "./use-save-table-state";
 

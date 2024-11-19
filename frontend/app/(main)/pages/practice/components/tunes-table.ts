@@ -18,7 +18,7 @@ import {
 import * as React from "react";
 import { createOrUpdateTableState, getTableStateTable } from "../settings";
 import type { TablePurpose, Tune } from "../types";
-import { useTune } from "./TuneContext";
+import { useTune } from "./CurrentTuneContext";
 
 export interface IScheduledTunesType {
   tunes: Tune[];
@@ -83,6 +83,10 @@ export function TunesTable(
     | null = null,
   filterStringCallback?: (filter: string) => void,
 ): TanstackTable<Tune> {
+  console.log(
+    `LF4: ScheduledTunesGrid, creating scheduled TunesTable for ${tablePurpose}`,
+  );
+
   const { currentTune, setCurrentTune } = useTune();
 
   const [tableStateFromDb, setTableStateFromDb] =

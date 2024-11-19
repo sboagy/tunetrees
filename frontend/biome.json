@@ -8,21 +8,5 @@
     "rules": {
       "recommended": true
     }
-  },
-  "overrides": [
-    {
-      "ignore": [
-        "node_modules",
-        "build",
-        ".next",
-        ".vercel",
-        ".vscode/",
-        ".vscode",
-        ".git",
-        ".github",
-        "dist",
-        "out"
-      ]
-    }
-  ]
+  }
 }

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Upload } from "lucide-react";
-import { type JSX, useCallback, useEffect, useState } from "react";
+import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
 import { getPracticeListScheduled } from "../queries";
 import { deleteTableTransientData } from "../settings";
@@ -12,6 +12,7 @@ import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import FlashcardPanel from "./FlashcardPanel";
 import NewTuneButton from "./NewTuneButton";
+import { useScheduledTunes } from "./ScheduledTunesContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import TunesGrid from "./TunesGrid";
 import { type IScheduledTunesType, TunesTable } from "./tunes-table";
@@ -27,7 +28,8 @@ export default function ScheduledTunesGrid({
   userId,
   playlistId,
 }: ScheduledTunesGridProps): JSX.Element {
-  const [tunes, setTunes] = useState<Tune[]>([]);
+  const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =
+    useScheduledTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
   const [isClient, setIsClient] = useState(false);
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
@@ -41,22 +43,55 @@ export default function ScheduledTunesGrid({
     setIsSubmitEnabled(hasNonEmptyRecallEval);
   }, [tunes]);
 
-  const refreshTunes = useCallback((userId: number, playlistId: number) => {
-    getPracticeListScheduled(userId, playlistId)
-      .then((result: Tune[]) => {
+  // See comment for isRefreshing in RepertoireTunesGrid.tsx.
+  const isRefreshing = useRef(false);
+
+  const refreshTunes = useCallback(
+    async (userId: number, playlistId: number, refreshId: number) => {
+      try {
+        const result: Tune[] = await getPracticeListScheduled(
+          userId,
+          playlistId,
+        );
+        setTunesRefreshId(refreshId);
         setTunes(result);
-      })
-      .catch((error) => {
-        console.error("Error refreshing tunes:", error);
-      });
-  }, []);
+        isRefreshing.current = false;
+        console.log(`LF1 ScheduledTunesGrid setTunesRefreshId(${refreshId})`);
+        return result;
+      } catch (error) {
+        console.error("LF1 ScheduledTunesGrid Error refreshing tunes:", error);
+        throw error;
+      }
+    },
+    [setTunes, setTunesRefreshId],
+  );
 
   useEffect(() => {
-    if (isClient) {
-      console.log("ScheduledTunesGrid refreshId:", refreshId);
-      refreshTunes(userId, playlistId);
+    if (tunesRefreshId !== refreshId && !isRefreshing.current) {
+      console.log(
+        `LF1 ScheduledTunesGrid call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+      );
+      isRefreshing.current = true;
+      refreshTunes(userId, playlistId, refreshId)
+        .then((result: Tune[]) => {
+          console.log(`LF1 ScheduledTunesGrid number tunes: ${result.length}`);
+          console.log(
+            `LF1 ScheduledTunesGrid back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+          );
+        })
+        .catch((error) => {
+          isRefreshing.current = false;
+          console.error(
+            "LF1 ScheduledTunesGrid Error invoking refreshTunes:",
+            error,
+          );
+        });
+    } else {
+      console.log(
+        `LF1 ScheduledTunesGrid skipping refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+      );
     }
-  }, [refreshId, userId, playlistId, refreshTunes, isClient]);
+  }, [refreshId, tunesRefreshId, userId, playlistId, refreshTunes]);
 
   const handleRecallEvalChange = (tuneId: number, newValue: string): void => {
     setTunes((prevTunes) =>

@@ -10,7 +10,7 @@ import "./MainPanel.css";
 import { useMainPaneView } from "./MainPaneViewContext";
 import Sidebar from "./Sidebar";
 import TabGroupMain from "./TabGroupMain";
-import { useTune } from "./TuneContext";
+import { useTune } from "./CurrentTuneContext";
 import TuneEditor from "./TuneEditor";
 
 interface IMainPanelProps {

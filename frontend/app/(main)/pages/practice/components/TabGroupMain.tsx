@@ -8,7 +8,7 @@ import {
   getTabGroupMainState,
   updateTabGroupMainState,
 } from "../settings";
-import RepertoireGrid from "./RepertoireGrid";
+import RepertoireTunesGrid from "./RepertoireTunesGrid";
 import ScheduledTunesGrid from "./ScheduledTunesGrid";
 
 interface IPracticeProps {
@@ -96,7 +96,7 @@ export default function TabGroupMain({
       <TabsContent value="repertoire">
         <Card>
           <CardContent className="space-y-2">
-            <RepertoireGrid userId={userId} playlistId={playlistId} />
+            <RepertoireTunesGrid userId={userId} playlistId={playlistId} />
           </CardContent>
         </Card>
       </TabsContent>
