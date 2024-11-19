@@ -35,6 +35,8 @@ def tunes_mapper(tune: Row[Any], table: Table) -> dict[str, Any]:  # noqa: C901
             tune_dict["mode"] = tune[i]
         elif column.name == "incipit":
             tune_dict["incipit"] = tune[i]
+        elif column.name == "genre":
+            tune_dict["genre"] = tune[i]
         elif column.name == "learned":
             tune_dict["learned"] = tune[i]
         elif column.name == "practiced":

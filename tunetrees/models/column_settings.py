@@ -14,6 +14,7 @@ class ColumnSettingsModel(BaseModel):
     structure: ColumnConfig
     mode: ColumnConfig
     incipit: ColumnConfig
+    genre: ColumnConfig
     learned: ColumnConfig
     practiced: ColumnConfig
     quality: ColumnConfig
@@ -56,6 +57,11 @@ column_settings_example_data = {
         "enabled": True,
     },
     "incipit": {
+        "sort_direction": None,
+        "visible": False,
+        "enabled": True,
+    },
+    "genre": {
         "sort_direction": None,
         "visible": False,
         "enabled": True,

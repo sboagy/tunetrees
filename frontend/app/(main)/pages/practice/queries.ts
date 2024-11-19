@@ -102,6 +102,8 @@ export async function updatePlaylistTune(
         tuneUpdateData.mode = tune_update.mode;
       if (tune_update.incipit !== dbTune.incipit)
         tuneUpdateData.incipit = tune_update.incipit;
+      if (tune_update.genre !== dbTune.genre)
+        tuneUpdateData.genre = tune_update.genre;
     }
     const response = await client.put<{
       success?: string;
@@ -452,6 +454,7 @@ export interface ITuneCreate {
   structure: string;
   mode: string;
   incipit: string;
+  genre: string;
 }
 
 /**
@@ -472,6 +475,7 @@ export async function createTune(
       structure: tune.structure ?? "",
       mode: tune.mode ?? "",
       incipit: tune.incipit ?? "",
+      genre: tune.genre ?? "",
     };
     const response = await client.post<
       Tune | { success?: string; detail?: string }

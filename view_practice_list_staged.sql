@@ -6,6 +6,7 @@ SELECT
        tune.structure,
        tune.mode,
        tune.incipit,
+       tune.genre,
        playlist_tune.learned,
        playlist.user_ref AS user_ref,
        playlist.playlist_id AS playlist_id,

@@ -26,6 +26,7 @@ const formSchema = z.object({
   structure: z.string().nullable().optional(),
   mode: z.string().nullable().optional(),
   incipit: z.string().nullable().optional(),
+  genre: z.string().nullable().optional(),
   learned: z.string().nullable().optional(),
   practiced: z.string().nullable().optional(),
   quality: z.number().nullable().optional(),
@@ -247,6 +248,22 @@ export default function TuneEditor({
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
                       Incipit:{" "}
+                    </FormLabel>
+
+                    <FormControl className="tune-form-control-style">
+                      <Input {...field} value={field.value || ""} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="genre"
+                render={({ field }) => (
+                  <FormItem className="tune-form-item-style">
+                    <FormLabel className="tune-form-label-style">
+                      Genre:{" "}
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">

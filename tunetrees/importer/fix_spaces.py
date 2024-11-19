@@ -23,8 +23,10 @@ def clean_tune_data():  # sourcery skip: extract-method
                 tune.Structure = tune.Structure.strip()
             if tune.Incipit:
                 tune.Incipit = tune.Incipit.strip()
+            if tune.Genre:
+                tune.Genre = tune.Genre.strip()
             print(
-                f"\n{tune.id=}, {tune.Title=}, {tune.Type=}, {tune.Mode=}, {tune.Structure=}, {tune.Incipit=}"
+                f"\n{tune.id=}, {tune.Title=}, {tune.Type=}, {tune.Mode=}, {tune.Structure=}, {tune.Incipit=}, {tune.Genre=}"
             )
 
         db.commit()

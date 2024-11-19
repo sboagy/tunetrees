@@ -188,6 +188,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     structure: Optional[str] = None
     mode: Optional[str] = None
     incipit: Optional[str] = None
+    genre: Optional[str] = None
     learned: Optional[str] = None
     practiced: Optional[str] = None
     quality: Optional[int] = None
@@ -616,6 +617,7 @@ class TuneCreate(BaseModel):
     structure: str
     mode: str
     incipit: str
+    genre: str
 
 
 class TuneUpdate(BaseModel):
@@ -624,6 +626,7 @@ class TuneUpdate(BaseModel):
     structure: Optional[str] = None
     mode: Optional[str] = None
     incipit: Optional[str] = None
+    genre: Optional[str] = None
 
 
 class TuneResponse(BaseModel):
@@ -633,6 +636,7 @@ class TuneResponse(BaseModel):
     structure: str
     mode: str
     incipit: str
+    genre: str
 
     class Config:
         from_attributes = True

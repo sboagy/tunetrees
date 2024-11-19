@@ -448,6 +448,16 @@ export function get_columns(
       size: 200,
     },
     {
+      accessorKey: "genre",
+      header: ({ column }) => sortableHeader(column, "Genre"),
+      cell: (info) => {
+        return info.getValue();
+      },
+      enableSorting: true,
+      enableHiding: true,
+      size: 200,
+    },
+    {
       accessorKey: "learned",
       header: ({ column }) => sortableHeader(column, "Learned"),
       cell: (info) => {

@@ -15,6 +15,7 @@ const formSchema = z.object({
   structure: z.string().nullable(),
   mode: z.string().nullable(),
   incipit: z.string().nullable(),
+  genre: z.string().nullable(),
   learned: z.string().nullable(),
   practiced: z.string().nullable(),
   quality: z.string().nullable(),

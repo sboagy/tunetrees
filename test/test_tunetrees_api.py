@@ -55,6 +55,7 @@ def test_get_tune_staged(db_session):
         "structure",
         "mode",
         "incipit",
+        "genre",
         "learned",
         "user_ref",
         "playlist_ref",
@@ -78,6 +79,7 @@ def test_get_tune_staged(db_session):
     assert item["structure"] == "AABB"
     assert item["mode"] == "D Major"
     assert item["incipit"] == "|d2Bd A2FA|BAFA D2ED|"
+    assert item["genre"] == "ITRAD"
     assert item["learned"] == "2004-11-23"
     assert item["user_ref"] == 1
     assert item["playlist_ref"] == 1

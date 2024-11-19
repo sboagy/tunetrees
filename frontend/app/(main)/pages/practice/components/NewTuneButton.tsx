@@ -23,6 +23,7 @@ export default function NewTuneButton({
       structure: null,
       mode: null,
       incipit: null,
+      genre: null,
       learned: null,
       practiced: null,
       quality: null,

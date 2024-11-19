@@ -31,6 +31,11 @@ export const viewSettingsDefault = {
         visible: false,
         enabled: true, // is this column enabled at all for this table?
       },
+      genre: {
+        sort_direction: null, // null, "asc", "desc"
+        visible: false,
+        enabled: true, // is this column enabled at all for this table?
+      },
       learned: {
         sort_direction: null, // null, "asc", "desc"
         visible: false,

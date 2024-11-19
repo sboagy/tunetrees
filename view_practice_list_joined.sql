@@ -6,6 +6,7 @@ SELECT
     tune.structure,
     tune.mode,
     tune.incipit,
+    tune.genre,
     playlist_tune.learned,
     practice_record.practiced,
     practice_record.quality,

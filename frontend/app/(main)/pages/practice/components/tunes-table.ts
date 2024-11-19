@@ -117,6 +117,7 @@ export function TunesTable(
             structure: true,
             mode: false,
             incipit: false,
+            genre: false,
             learned: false,
             practiced: true,
             quality: false,

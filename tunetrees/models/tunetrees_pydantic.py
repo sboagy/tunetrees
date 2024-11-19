@@ -43,6 +43,7 @@ class TuneModel(BaseModel):
     title: Optional[str]
     mode: Optional[str]
     incipit: Optional[str]
+    genre: Optional[str]
     external_ref: List["ExternalRefModel"]
     user_annotation_set: List["UserAnnotationSetModel"]
     practice_record: List["PracticeRecordModel"]

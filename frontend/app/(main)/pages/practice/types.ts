@@ -12,6 +12,7 @@ export type Tune = {
   structure: string | null;
   mode: string | null;
   incipit: string | null;
+  genre: string | null;
   learned: string | null;
   practiced: string | null;
   quality: number | null;
@@ -34,6 +35,7 @@ export type PlaylistTune = {
   structure?: string;
   mode?: string;
   incipit?: string;
+  genre?: string;
   learned?: string;
   practiced?: string;
   quality?: number;
@@ -134,4 +136,5 @@ export interface ITune {
   structure?: string | null;
   mode?: string | null;
   incipit?: string | null;
+  genre?: string | null;
 }
