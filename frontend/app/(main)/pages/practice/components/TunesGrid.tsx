@@ -149,11 +149,9 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                     <TableRow
                       key={row.id}
                       style={{
-                        position: "absolute",
-                        top: `${virtualRow.start}px`, // Position the row based on virtual start
-                        width: "100%",
+                        top: `${virtualRow.start + 3}px`, // Position the row based on virtual start
                       }}
-                      className={`h-auto cursor-pointer w-full ${
+                      className={`absolute h-16 cursor-pointer w-full ${
                         currentTune === row.original.id
                           ? "outline outline-2 outline-blue-500"
                           : ""
@@ -165,7 +163,12 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                       {row.getVisibleCells().map((cell) => (
                         <TableCell
                           key={cell.id}
-                          style={{ width: cell.column.getSize() }}
+                          style={{
+                            position: "absolute",
+                            top: "0px",
+                            left: `${cell.column.getStart()}px`,
+                            width: cell.column.getSize(),
+                          }}
                         >
                           {flexRender(
                             cell.column.columnDef.cell,
@@ -185,7 +188,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
             <TableRow id="tt-tunes-grid-footer">
               <TableCell
                 colSpan={get_columns(userId, playlistId, tablePurpose).length}
-                className="h-12"
+                className="h-16"
               >
                 <div className="flex-1 text-sm text-muted-foreground">
                   {table.getFilteredSelectedRowModel().rows.length} of{" "}
