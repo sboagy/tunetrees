@@ -1,6 +1,7 @@
 import ClientContextsWrapper from "@/components/ClientContextsWrapper";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "@radix-ui/themes/styles.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -18,9 +19,16 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} h-full`}>
-        <Header />
-        <ClientContextsWrapper>{children}</ClientContextsWrapper>
-        <Footer />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Header />
+          <ClientContextsWrapper>{children}</ClientContextsWrapper>
+          <Footer />
+        </ThemeProvider>
       </body>
     </html>
   );
