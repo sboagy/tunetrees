@@ -31,12 +31,7 @@ export default function ScheduledTunesGrid({
   const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =
     useScheduledTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
-  const [isClient, setIsClient] = useState(false);
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   useEffect(() => {
     const hasNonEmptyRecallEval = tunes.some((tune) => tune.recall_eval);
@@ -188,7 +183,7 @@ export default function ScheduledTunesGrid({
             disabled={!isSubmitEnabled}
           >
             <Upload />
-            {isClient &&
+            {window &&
               (window.innerWidth < 768 ? "" : " Submit Practiced Tunes")}
           </Button>
         </div>
