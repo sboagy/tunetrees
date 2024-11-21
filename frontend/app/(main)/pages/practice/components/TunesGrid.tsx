@@ -13,10 +13,10 @@ import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useRef } from "react";
 import type { TablePurpose, Tune } from "../types";
+import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
-import { useTune } from "./CurrentTuneContext";
-import { saveTableState, tableContext } from "./tunes-table";
+import { tableContext } from "./tunes-table";
 import { useSaveTableState } from "./use-save-table-state";
 
 export const getColorForEvaluation = (review_status: string | null): string => {
@@ -48,18 +48,48 @@ type Props = {
 const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const { currentTune, setCurrentTune } = useTune();
   const { setCurrentView } = useMainPaneView();
+  const rowRefs = useRef<{ [key: number]: HTMLTableRowElement | null }>({});
 
+  // Invoke useEffect hook for the table state
   useSaveTableState(table, userId, tablePurpose, currentTune);
+
   const tableBodyRef = useRef<HTMLDivElement>(null);
 
+  // const handleRowClick = useCallback(
+  //   (row: Row<Tune>) => {
+  //     const tuneId = row.original.id;
+  //     setCurrentTune(tuneId ?? null);
+  //     console.log("handleRowClick: tuneId=", tuneId);
+  //     saveTableState(table, userId, tablePurpose, tuneId ?? -1);
+  //   },
+  //   [setCurrentTune, table, userId, tablePurpose],
+  // );
   const handleRowClick = useCallback(
     (row: Row<Tune>) => {
-      const tuneId = row.original.id;
-      setCurrentTune(tuneId ?? null);
-      console.log("handleRowClick: tuneId=", tuneId);
-      saveTableState(table, userId, tablePurpose, tuneId ?? -1);
+      const previousTune = currentTune;
+      const newTune = row.original.id;
+
+      if (newTune) setCurrentTune(newTune);
+
+      // Update styles of the previously selected row
+      if (previousTune && rowRefs.current[previousTune]) {
+        rowRefs.current[previousTune].classList.remove(
+          "outline",
+          "outline-2",
+          "outline-blue-500",
+        );
+      }
+
+      if (newTune && rowRefs.current[newTune]) {
+        // Update styles of the newly selected row
+        rowRefs.current[newTune].classList.add(
+          "outline",
+          "outline-2",
+          "outline-blue-500",
+        );
+      }
     },
-    [setCurrentTune, table, userId, tablePurpose],
+    [currentTune, setCurrentTune],
   );
 
   const handleRowDoubleClick = (row: Row<Tune>) => {
@@ -148,15 +178,26 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                   return (
                     <TableRow
                       key={row.id}
+                      ref={(el) => {
+                        if (row.original.id !== undefined) {
+                          rowRefs.current[row.original.id] = el;
+                        }
+                      }}
                       style={{
                         top: `${virtualRow.start + 3}px`, // Position the row based on virtual start
                       }}
+                      // className={`absolute h-16 cursor-pointer w-full ${
+                      //   currentTune === row.original.id
+                      //     ? "outline outline-2 outline-blue-500"
+                      //     : ""
+                      // } ${getColorForEvaluation(row.original.recall_eval || null)}`}
+                      // className={`absolute h-16 cursor-pointer w-full ${getColorForEvaluation(row.original.recall_eval || null)}`}
                       className={`absolute h-16 cursor-pointer w-full ${
                         currentTune === row.original.id
                           ? "outline outline-2 outline-blue-500"
                           : ""
                       } ${getColorForEvaluation(row.original.recall_eval || null)}`}
-                      onClick={() => handleRowClick(row)}
+                      onClick={handleRowClick.bind(null, row)}
                       onDoubleClick={() => handleRowDoubleClick(row)}
                       data-state={row.getIsSelected() && "selected"}
                     >

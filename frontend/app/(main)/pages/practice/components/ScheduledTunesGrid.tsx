@@ -15,7 +15,7 @@ import NewTuneButton from "./NewTuneButton";
 import { useScheduledTunes } from "./ScheduledTunesContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import TunesGrid from "./TunesGrid";
-import { type IScheduledTunesType, TunesTable } from "./tunes-table";
+import { useTunesTable } from "./TunesTable";
 
 type ReviewMode = "grid" | "flashcard";
 
@@ -32,11 +32,23 @@ export default function ScheduledTunesGrid({
     useScheduledTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const hasNonEmptyRecallEval = tunes.some((tune) => tune.recall_eval);
     setIsSubmitEnabled(hasNonEmptyRecallEval);
   }, [tunes]);
+
+  const handleRecallEvalChange = useCallback(
+    (tuneId: number, newValue: string): void => {
+      setTunes((prevTunes) =>
+        prevTunes.map((tune) =>
+          tune.id === tuneId ? { ...tune, recall_eval: newValue } : tune,
+        ),
+      );
+    },
+    [setTunes],
+  );
 
   // See comment for isRefreshing in RepertoireTunesGrid.tsx.
   const isRefreshing = useRef(false);
@@ -50,8 +62,7 @@ export default function ScheduledTunesGrid({
         );
         setTunesRefreshId(refreshId);
         setTunes(result);
-        isRefreshing.current = false;
-        console.log(`LF1 ScheduledTunesGrid setTunesRefreshId(${refreshId})`);
+
         return result;
       } catch (error) {
         console.error("LF1 ScheduledTunesGrid Error refreshing tunes:", error);
@@ -67,6 +78,7 @@ export default function ScheduledTunesGrid({
         `LF1 ScheduledTunesGrid call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
       );
       isRefreshing.current = true;
+      setIsLoading(true);
       refreshTunes(userId, playlistId, refreshId)
         .then((result: Tune[]) => {
           console.log(`LF1 ScheduledTunesGrid number tunes: ${result.length}`);
@@ -80,6 +92,10 @@ export default function ScheduledTunesGrid({
             "LF1 ScheduledTunesGrid Error invoking refreshTunes:",
             error,
           );
+        })
+        .finally(() => {
+          isRefreshing.current = false;
+          setIsLoading(false);
         });
     } else {
       console.log(
@@ -88,25 +104,20 @@ export default function ScheduledTunesGrid({
     }
   }, [refreshId, tunesRefreshId, userId, playlistId, refreshTunes]);
 
-  const handleRecallEvalChange = (tuneId: number, newValue: string): void => {
-    setTunes((prevTunes) =>
-      prevTunes.map((tune) =>
-        tune.id === tuneId ? { ...tune, recall_eval: newValue } : tune,
-      ),
-    );
-  };
-
-  const tunesWithFilter: IScheduledTunesType = {
+  // Move table creation after tunes are loaded
+  const [tableComponent, table] = useTunesTable({
     tunes,
     userId,
     playlistId,
     tablePurpose: "practice",
     globalFilter: "",
     onRecallEvalChange: handleRecallEvalChange,
-  };
-  const table = TunesTable(tunesWithFilter);
+  });
 
   const submitPracticeFeedbacksHandler = () => {
+    if (table === null) {
+      return;
+    }
     console.log("submitPracticeFeedbacksHandler!");
 
     const updates: { [key: string]: ITuneUpdate } = {};
@@ -169,73 +180,67 @@ export default function ScheduledTunesGrid({
     setMode(mode === "grid" ? "flashcard" : "grid");
   };
 
+  // Update loading condition to only show loading when we're actually loading
   return (
     <div className="w-full h-full">
-      <div
-        id="tt-scheduled-tunes-header"
-        className="flex items-center justify-between py-4"
-      >
-        <div className="flex-row items-center">
-          <Button
-            type="submit"
-            variant="outline"
-            onClick={() => submitPracticeFeedbacksHandler()}
-            disabled={!isSubmitEnabled}
-          >
-            <Upload />
-            {window &&
-              (window.innerWidth < 768 ? "" : " Submit Practiced Tunes")}
-          </Button>
+      {tableComponent}
+      {isLoading || !table ? (
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="text-lg">Loading tunes...</div>
         </div>
-        <div className="flex items-center space-x-4">
-          <Label htmlFor="flashcard-mode">Flashcard Mode</Label>
-          <Switch
-            checked={mode === "flashcard"}
-            onCheckedChange={handleModeChange}
-          />
-        </div>
-        <div className="flex items-center space-x-4 mb-4">
-          {/* <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-            style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
-          >
-            {"<"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-            style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
-          >
-            {">"}
-          </Button> */}
-          <div
-            style={{ visibility: mode === "flashcard" ? "hidden" : "visible" }}
-          >
-            <ColumnsMenu user_id={userId} table={table} />
-          </div>
-          <NewTuneButton userId={userId} playlistId={playlistId} />
-        </div>
-      </div>
-      {mode === "grid" ? (
-        <TunesGrid
-          table={table}
-          userId={userId}
-          playlistId={userId}
-          tablePurpose={"practice"}
-        />
       ) : (
-        <FlashcardPanel
-          table={table}
-          userId={userId}
-          playlistId={playlistId}
-          purpose={"practice"}
-          onRecallEvalChange={handleRecallEvalChange}
-        />
+        <>
+          <div
+            id="tt-scheduled-tunes-header"
+            className="flex items-center justify-between py-4"
+          >
+            <div className="flex-row items-center">
+              <Button
+                type="submit"
+                variant="outline"
+                onClick={() => submitPracticeFeedbacksHandler()}
+                disabled={!isSubmitEnabled}
+                title="Submit your practiced tunes"
+              >
+                <Upload />
+                {window.innerWidth < 768 ? "" : " Submit Practiced Tunes"}
+              </Button>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Label htmlFor="flashcard-mode">Flashcard Mode</Label>
+              <Switch
+                checked={mode === "flashcard"}
+                onCheckedChange={handleModeChange}
+              />
+            </div>
+            <div className="flex items-center space-x-4 mb-4">
+              <div
+                style={{
+                  visibility: mode === "flashcard" ? "hidden" : "visible",
+                }}
+              >
+                <ColumnsMenu user_id={userId} table={table} />
+              </div>
+              <NewTuneButton userId={userId} playlistId={playlistId} />
+            </div>
+          </div>
+          {mode === "grid" ? (
+            <TunesGrid
+              table={table}
+              userId={userId}
+              playlistId={userId}
+              tablePurpose={"practice"}
+            />
+          ) : (
+            <FlashcardPanel
+              table={table}
+              userId={userId}
+              playlistId={playlistId}
+              purpose={"practice"}
+              onRecallEvalChange={handleRecallEvalChange}
+            />
+          )}
+        </>
       )}
     </div>
   );

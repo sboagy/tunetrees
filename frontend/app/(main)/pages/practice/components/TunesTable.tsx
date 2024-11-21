@@ -1,6 +1,5 @@
 "use client";
 
-import { get_columns } from "@/app/(main)/pages/practice/components/TuneColumns";
 import type {
   RowSelectionState,
   TableState,
@@ -19,6 +18,7 @@ import * as React from "react";
 import { createOrUpdateTableState, getTableStateTable } from "../settings";
 import type { TablePurpose, Tune } from "../types";
 import { useTune } from "./CurrentTuneContext";
+import { get_columns } from "./TuneColumns";
 
 export interface IScheduledTunesType {
   tunes: Tune[];
@@ -72,25 +72,26 @@ export const saveTableState = async (
   // });
 };
 
-export function TunesTable(
-  {
-    tunes,
-    userId,
-    playlistId,
-    tablePurpose,
-    globalFilter = "",
-    onRecallEvalChange,
-  }: IScheduledTunesType,
-  selectionChangedCallback:
+export function TunesTableComponent({
+  tunes,
+  userId,
+  playlistId,
+  tablePurpose,
+  globalFilter = "",
+  onRecallEvalChange,
+  onTableCreated,
+  selectionChangedCallback = null,
+  filterStringCallback,
+}: IScheduledTunesType & {
+  onTableCreated: (table: TanstackTable<Tune>) => void;
+  selectionChangedCallback?:
     | ((
         table: TanstackTable<Tune>,
         rowSelectionState: RowSelectionState,
       ) => void)
-    | null = null,
-  filterStringCallback?: (filter: string) => void,
-): TanstackTable<Tune> {
-  console.log(`LF1: TunesTable, creating TunesTable for ${tablePurpose}`);
-
+    | null;
+  filterStringCallback?: (filter: string) => void;
+}): null {
   const { currentTune, setCurrentTune } = useTune();
 
   const [tableStateFromDb, setTableStateFromDb] =
@@ -288,5 +289,28 @@ export function TunesTable(
     onColumnVisibilityChange: interceptedSetColumnVisibility,
   }));
 
-  return table;
+  React.useEffect(() => {
+    onTableCreated(table);
+  }, [table, onTableCreated]);
+
+  return null;
+}
+
+// Create a hook to use the table
+export function useTunesTable(
+  props: IScheduledTunesType,
+): [React.JSX.Element, TanstackTable<Tune> | null] {
+  const [table, setTable] = React.useState<TanstackTable<Tune> | null>(null);
+
+  const tableComponent = (
+    <TunesTableComponent
+      {...props}
+      onTableCreated={(newTable) => {
+        console.log("Table created/updated with", props.tunes.length, "tunes");
+        setTable(newTable);
+      }}
+    />
+  );
+
+  return [tableComponent, table];
 }

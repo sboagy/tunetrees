@@ -30,7 +30,12 @@ export default function TabGroupMain({
   userId,
   playlistId,
 }: IPracticeProps): JSX.Element {
-  const [activeTab, setActiveTab] = useState<string>("scheduled");
+  console.log("LF1: TabGroupMain Rendering...");
+
+  // As a sort of work-around, setting the default to a non-tunes tab
+  // avoids initial render attempt on the server, and avoids problems
+  // with client-side rendering on the conplex tunes grid..
+  const [activeTab, setActiveTab] = useState<string>("");
 
   const changeActiveTab = (whichTag: string) => {
     console.log("tabGroupMainState changeActiveTab:", whichTag);
@@ -49,7 +54,7 @@ export default function TabGroupMain({
   useEffect(() => {
     const doInitialization = async () => {
       try {
-        console.log("Initializing...");
+        console.log("LF1: TabGroupMain Initializing...");
         const tabGroupMainState: ITabGroupMainStateModel | null =
           await getTabGroupMainState(userId);
         if (tabGroupMainState !== null) {
@@ -87,18 +92,10 @@ export default function TabGroupMain({
         ))}
       </TabsList>
       <TabsContent value="scheduled">
-        <Card>
-          <CardContent className="space-y-2">
-            <ScheduledTunesGrid userId={userId} playlistId={playlistId} />
-          </CardContent>
-        </Card>
+        <ScheduledTunesGrid userId={userId} playlistId={playlistId} />
       </TabsContent>
       <TabsContent value="repertoire">
-        <Card>
-          <CardContent className="space-y-2">
-            <RepertoireTunesGrid userId={userId} playlistId={playlistId} />
-          </CardContent>
-        </Card>
+        <RepertoireTunesGrid userId={userId} playlistId={playlistId} />
       </TabsContent>
       <TabsContent value="analysis">
         <Card>
