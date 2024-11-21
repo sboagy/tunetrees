@@ -7,10 +7,10 @@ import {
 import { useEffect, useRef } from "react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import "./MainPanel.css";
+import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import Sidebar from "./Sidebar";
 import TabGroupMain from "./TabGroupMain";
-import { useTune } from "./CurrentTuneContext";
 import TuneEditor from "./TuneEditor";
 
 interface IMainPanelProps {

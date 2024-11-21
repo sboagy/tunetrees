@@ -7,7 +7,9 @@ interface ITuneContextType {
   setCurrentTune: (tuneId: number | null) => void;
 }
 
-const CurrentTuneContext = createContext<ITuneContextType | undefined>(undefined);
+const CurrentTuneContext = createContext<ITuneContextType | undefined>(
+  undefined,
+);
 
 export const CurrentTuneProvider = ({ children }: { children: ReactNode }) => {
   const [currentTune, setCurrentTune] = useState<number | null>(null);
