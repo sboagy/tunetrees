@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import ColumnsMenu from "./ColumnsMenu";
-import { type IScheduledTunesType, TunesTable } from "./tunes-table";
+import { useTunesTable } from "./TunesTable"; // Add this import
 
 import { Input } from "@/components/ui/input";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
@@ -119,18 +119,15 @@ export default function RepertoireTunesGrid({
     }
   }, [refreshId, tunesRefreshId, userId, playlistId, refreshTunes]);
 
-  const tunesWithFilter: IScheduledTunesType = {
+  const [tableComponent, table] = useTunesTable({
     tunes,
     userId,
     playlistId,
     tablePurpose: "repertoire",
     globalFilter: globalFilter,
-  };
-  const table = TunesTable(
-    tunesWithFilter,
+    onRecallEvalChange: undefined, // not needed for repertoire
     selectionChangedCallback,
-    // setGlobalFilter,
-  );
+  });
 
   useEffect(() => {
     const getFilter = () => {
@@ -157,7 +154,10 @@ export default function RepertoireTunesGrid({
 
   const addToReviewQueue = () => {
     console.log("addToReviewQueue!");
-
+    if (table === null) {
+      console.log("addToReviewQueue: table is null");
+      return;
+    }
     const selectedTunes = table
       .getSelectedRowModel()
       .rows.map((row) => row.original);
@@ -176,7 +176,9 @@ export default function RepertoireTunesGrid({
     promiseResult
       .then((result) => {
         console.log("submit_practice_feedbacks_result result:", result);
-        table.resetRowSelection();
+        if (table !== null) {
+          table.resetRowSelection();
+        }
         triggerRefresh();
       })
       .catch((error) => {
@@ -189,8 +191,8 @@ export default function RepertoireTunesGrid({
 
   return (
     <div className="w-full h-full">
-      {/* Optionally, show a loading indicator */}
-      {!isFilterLoaded ? (
+      {tableComponent}
+      {!isFilterLoaded || !table ? (
         <p>Loading...</p>
       ) : (
         <>

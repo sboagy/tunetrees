@@ -27,6 +27,14 @@ export interface IScheduledTunesType {
   tablePurpose: TablePurpose;
   globalFilter?: string;
   onRecallEvalChange?: (tuneId: number, newValue: string) => void;
+  onTableCreated?: (table: TanstackTable<Tune>) => void;
+  selectionChangedCallback?:
+    | ((
+        table: TanstackTable<Tune>,
+        rowSelectionState: RowSelectionState,
+      ) => void)
+    | null;
+  filterStringCallback?: (filter: string) => void;
 }
 
 export const tableContext = React.createContext<TanstackTable<Tune> | null>(
@@ -82,16 +90,7 @@ export function TunesTableComponent({
   onTableCreated,
   selectionChangedCallback = null,
   filterStringCallback,
-}: IScheduledTunesType & {
-  onTableCreated: (table: TanstackTable<Tune>) => void;
-  selectionChangedCallback?:
-    | ((
-        table: TanstackTable<Tune>,
-        rowSelectionState: RowSelectionState,
-      ) => void)
-    | null;
-  filterStringCallback?: (filter: string) => void;
-}): null {
+}: IScheduledTunesType): null {
   const { currentTune, setCurrentTune } = useTune();
 
   const [tableStateFromDb, setTableStateFromDb] =
@@ -290,7 +289,9 @@ export function TunesTableComponent({
   }));
 
   React.useEffect(() => {
-    onTableCreated(table);
+    if (onTableCreated) {
+      onTableCreated(table);
+    }
   }, [table, onTableCreated]);
 
   return null;

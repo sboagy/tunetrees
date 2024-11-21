@@ -16,7 +16,7 @@ import type { TablePurpose, Tune } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
-import { tableContext } from "./tunes-table";
+import { tableContext } from "./TunesTable";
 import { useSaveTableState } from "./use-save-table-state";
 
 export const getColorForEvaluation = (review_status: string | null): string => {
@@ -126,7 +126,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
         <Table>
           <TableHeader
             id="tt-tunes-grid-header"
-            className="block top-0 bg-white dark:bg-gray-800 z-10"
+            className="block top-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar"
           >
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
@@ -225,11 +225,11 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           </div>
         </div>
         <Table>
-          <TableFooter className="sticky bottom-0 bg-white dark:bg-gray-800 z-10">
+          <TableFooter className="sticky bottom-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar">
             <TableRow id="tt-tunes-grid-footer">
               <TableCell
                 colSpan={get_columns(userId, playlistId, tablePurpose).length}
-                className="h-16"
+                className="h-12"
               >
                 <div className="flex-1 text-sm text-muted-foreground">
                   {table.getFilteredSelectedRowModel().rows.length} of{" "}
