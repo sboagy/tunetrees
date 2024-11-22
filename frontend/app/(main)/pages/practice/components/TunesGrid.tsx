@@ -131,10 +131,12 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
       return;
     }
 
+    const numberOfAttempts = 6;
+
     const scrollToTune = (attempt = 0) => {
-      if (attempt >= 4) {
-        console.error(
-          `Failed to find row for currentTune=${currentTune} after 4 attempts`,
+      if (attempt >= numberOfAttempts) {
+        console.log(
+          `Failed to find row for currentTune=${currentTune} after ${numberOfAttempts} attempts`,
         );
         return;
       }
@@ -153,7 +155,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           });
         }
       } else {
-        setTimeout(() => scrollToTune(attempt + 1), 200);
+        setTimeout(() => scrollToTune(attempt + 1), 20 + attempt * 100);
       }
     };
 
@@ -173,7 +175,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           maxHeight: "calc(100vh - 270px)",
         }}
       >
-        <Table className="hide-scrollbar">
+        <Table className="hide-scrollbar overflow-hidden">
           <TableHeader
             id="tt-tunes-grid-header"
             className="block top-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar"
@@ -235,7 +237,8 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                         }
                       }}
                       style={{
-                        top: `${virtualRow.start + 3}px`, // Position the row based on virtual start
+                        top: `${virtualRow.start}px`, // Position the row based on virtual start
+                        height: `${virtualRow.size}px`, // Set the height of the row
                       }}
                       // className={`absolute h-16 cursor-pointer w-full ${
                       //   currentTune === row.original.id
@@ -243,7 +246,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                       //     : ""
                       // } ${getColorForEvaluation(row.original.recall_eval || null)}`}
                       // className={`absolute h-16 cursor-pointer w-full ${getColorForEvaluation(row.original.recall_eval || null)}`}
-                      className={`absolute h-16 cursor-pointer w-full ${
+                      className={`absolute cursor-pointer w-full ${
                         currentTune === row.original.id
                           ? "outline outline-2 outline-blue-500"
                           : ""
@@ -257,9 +260,11 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                           key={cell.id}
                           style={{
                             position: "absolute",
-                            top: "0px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
                             left: `${cell.column.getStart()}px`,
                             width: cell.column.getSize(),
+                            // backgroundColor: "inherit",
                           }}
                         >
                           {flexRender(
@@ -275,7 +280,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
             </Table>
           </div>
         </div>
-        <Table className="hide-scrollbar">
+        <Table className="hide-scrollbar ">
           <TableFooter className="sticky bottom-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar">
             <TableRow id="tt-tunes-grid-footer">
               <TableCell
