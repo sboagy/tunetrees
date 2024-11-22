@@ -508,3 +508,116 @@ export async function deleteTune(
     return { detail: `Unable to delete tune: ${(error as Error).message}` };
   }
 }
+
+export interface IPlaylist {
+  playlist_id: number;
+  user_ref?: number;
+  instrument?: string;
+}
+
+/**
+ * Retrieve playlists by user reference.
+ *
+ * @param userRef - The user reference ID.
+ * @returns A promise that resolves to the requested Playlist objects, or an error message.
+ */
+export async function getPlaylists(
+  userRef: number,
+): Promise<IPlaylist[] | { detail: string }> {
+  try {
+    const response = await client.get<IPlaylist[] | { detail: string }>(
+      "/playlist",
+      {
+        params: { user_ref: userRef },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error in getPlaylists(${userRef})`, error);
+    return { detail: `Unable to fetch playlists: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Create a new playlist.
+ *
+ * @param playlist - The playlist data to create.
+ * @returns A promise that resolves to the created Playlist object, or an error message.
+ */
+export async function createPlaylist(
+  playlist: IPlaylist,
+): Promise<IPlaylist | { detail: string }> {
+  try {
+    const response = await client.post<IPlaylist | { detail: string }>(
+      "/playlist",
+      playlist,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in createPlaylist: ", error);
+    return { detail: `Unable to create playlist: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Update a specific playlist.
+ *
+ * @param playlistId - The ID of the playlist.
+ * @param playlistUpdate - The fields to update (all optional).
+ * @returns A promise that resolves to the updated Playlist object, or an error message.
+ */
+export async function updatePlaylist(
+  playlistId: number,
+  playlistUpdate: Partial<IPlaylist>,
+): Promise<IPlaylist | { detail: string }> {
+  try {
+    const response = await client.put<IPlaylist | { detail: string }>(
+      `/playlist/${playlistId}`,
+      playlistUpdate,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in updatePlaylist: ", error);
+    return { detail: `Unable to update playlist: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Delete a specific playlist.
+ *
+ * @param playlistId - The ID of the playlist.
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function deletePlaylist(
+  playlistId: number,
+): Promise<{ success?: string; detail?: string }> {
+  try {
+    const response = await client.delete<{ success?: string; detail?: string }>(
+      `/playlist/${playlistId}`,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in deletePlaylist: ", error);
+    return { detail: `Unable to delete playlist: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Retrieve a specific playlist by its ID.
+ *
+ * @param playlistId - The ID of the playlist.
+ * @returns A promise that resolves to the requested Playlist object, or an error message.
+ */
+export async function getPlaylistById(
+  playlistId: number,
+): Promise<IPlaylist | { detail: string }> {
+  try {
+    const response = await client.get<IPlaylist | { detail: string }>(
+      `/playlist/${playlistId}`,
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error in getPlaylistById(${playlistId})`, error);
+    return { detail: `Unable to fetch playlist: ${(error as Error).message}` };
+  }
+}

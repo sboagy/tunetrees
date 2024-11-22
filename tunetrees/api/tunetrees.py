@@ -26,6 +26,7 @@ from tunetrees.app.schedule import (
 )
 from tunetrees.models.tunetrees import (
     Note,
+    Playlist,
     PlaylistTune,
     Reference,
     Tune,
@@ -36,6 +37,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 from fastapi import Query
+
+from tunetrees.models.tunetrees_pydantic import PlaylistModel
 
 logger = logging.getLogger("tunetrees.api")
 
@@ -744,3 +747,113 @@ def delete_tune(tune_ref: int = Query(...)):
     except Exception as e:
         logger.error(f"Unable to delete tune: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to delete tune: {e}")
+
+
+@router.get(
+    "/playlist",
+    response_model=List[PlaylistModel],
+    summary="Get Playlists",
+    description="Retrieve playlists by user reference.",
+    status_code=200,
+)
+def get_playlists(user_ref: int = Query(...)):
+    try:
+        with SessionLocal() as db:
+            playlists = db.query(Playlist).filter(Playlist.user_ref == user_ref).all()
+            if not playlists:
+                raise HTTPException(status_code=404, detail="Playlists not found")
+            return [PlaylistModel.model_validate(playlist) for playlist in playlists]
+    except Exception as e:
+        logger.error(f"Unable to fetch playlists: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to fetch playlists: {e}")
+
+
+@router.post(
+    "/playlist",
+    response_model=PlaylistModel,
+    summary="Create Playlist",
+    description="Create a new playlist.",
+    status_code=201,
+)
+def create_playlist(playlist: PlaylistModel):
+    try:
+        with SessionLocal() as db:
+            new_playlist = Playlist(**playlist.model_dump())
+            db.add(new_playlist)
+            db.commit()
+            db.refresh(new_playlist)
+            return PlaylistModel.model_validate(new_playlist)
+    except Exception as e:
+        logger.error(f"Unable to create playlist: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to create playlist: {e}")
+
+
+@router.put(
+    "/playlist/{playlist_id}",
+    response_model=PlaylistModel,
+    summary="Update Playlist",
+    description="Update an existing playlist by its ID.",
+    status_code=200,
+)
+def update_playlist(playlist_id: int, playlist: PlaylistModel = Body(...)):
+    try:
+        with SessionLocal() as db:
+            existing_playlist = (
+                db.query(Playlist).filter(Playlist.playlist_id == playlist_id).first()
+            )
+            if not existing_playlist:
+                raise HTTPException(status_code=404, detail="Playlist not found")
+
+            for key, value in playlist.model_dump(exclude_unset=True).items():
+                setattr(existing_playlist, key, value)
+
+            db.commit()
+            db.refresh(existing_playlist)
+            return PlaylistModel.model_validate(existing_playlist)
+    except Exception as e:
+        logger.error(f"Unable to update playlist: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to update playlist: {e}")
+
+
+@router.delete(
+    "/playlist/{playlist_id}",
+    summary="Delete Playlist",
+    description="Delete an existing playlist by its ID.",
+    status_code=204,
+)
+def delete_playlist(playlist_id: int):
+    try:
+        with SessionLocal() as db:
+            existing_playlist = (
+                db.query(Playlist).filter(Playlist.playlist_id == playlist_id).first()
+            )
+            if not existing_playlist:
+                raise HTTPException(status_code=404, detail="Playlist not found")
+
+            db.delete(existing_playlist)
+            db.commit()
+            return
+    except Exception as e:
+        logger.error(f"Unable to delete playlist: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to delete playlist: {e}")
+
+
+@router.get(
+    "/playlist/{playlist_id}",
+    response_model=PlaylistModel,
+    summary="Get Playlist by ID",
+    description="Retrieve a playlist by its ID.",
+    status_code=200,
+)
+def get_playlist_by_id(playlist_id: int):
+    try:
+        with SessionLocal() as db:
+            playlist = (
+                db.query(Playlist).filter(Playlist.playlist_id == playlist_id).first()
+            )
+            if not playlist:
+                raise HTTPException(status_code=404, detail="Playlist not found")
+            return PlaylistModel.model_validate(playlist)
+    except Exception as e:
+        logger.error(f"Unable to fetch playlist: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to fetch playlist: {e}")
