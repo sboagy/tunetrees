@@ -20,7 +20,7 @@ export const useSaveTableState = (
   useEffect(() => {
     const saveTableStateAsync = (eventString: string) => {
       console.debug(
-        `TunesGrid: calling createOrUpdateTableState in ${eventString} for tablePurpose: ${tablePurpose}`,
+        `LF1 TunesGrid: calling createOrUpdateTableState in ${eventString} for tablePurpose: ${tablePurpose}`,
       );
       const tableState: TableState = table.getState();
       void createOrUpdateTableState(
@@ -47,7 +47,7 @@ export const useSaveTableState = (
       // set up to handle global events such as closing the browser tab or switching
       // to another application.
       console.debug(
-        "TunesGrid: adding beforeunload and visibilitychange event listeners for tablePurpose: ",
+        "LF1 TunesGrid: adding beforeunload and visibilitychange event listeners for tablePurpose: ",
         tablePurpose,
       );
       window.addEventListener("beforeunload", handleBeforeUnload);
