@@ -77,13 +77,18 @@ module.exports = {
 		({ addUtilities }) => {
 			addUtilities({
 				".hide-scrollbar": {
-					/* Hide scrollbar for IE, Edge, and Firefox */
-					"-ms-overflow-style": "none" /* IE and Edge */,
-					"scrollbar-width": "none" /* Firefox */,
-					/* Hide scrollbar for Chrome, Safari, and Opera */
+					/* IE and Edge */
+					"-ms-overflow-style": "none",
+					/* Firefox */
+					"scrollbar-width": "none",
+					/* Chrome, Safari and Opera */
 					"&::-webkit-scrollbar": {
 						display: "none",
+						width: "0px",
+						background: "transparent"
 					},
+					/* Universal */
+					"overflow-y": "scroll"
 				},
 			});
 		},
