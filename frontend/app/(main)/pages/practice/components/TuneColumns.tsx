@@ -427,7 +427,7 @@ export function get_columns(
       },
       enableSorting: true,
       enableHiding: true,
-      size: 130,
+      size: 145,
     },
     {
       accessorKey: "mode",
