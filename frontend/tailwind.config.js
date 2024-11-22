@@ -76,21 +76,22 @@ module.exports = {
 		require("tailwindcss-animate"),
 		({ addUtilities }) => {
 			addUtilities({
-				".hide-scrollbar": {
-					/* IE and Edge */
-					"-ms-overflow-style": "none",
-					/* Firefox */
-					"scrollbar-width": "none",
-					/* Chrome, Safari and Opera */
-					"&::-webkit-scrollbar": {
-						display: "none",
-						width: "0px",
-						background: "transparent"
-					},
-					/* Universal */
-					"overflow-y": "scroll"
-				},
-			});
+        ".hide-scrollbar": {
+          /* IE and Edge */
+          "-ms-overflow-style": "none",
+          /* Firefox */
+          "scrollbar-width": "none",
+          /* Chrome, Safari and Opera */
+          "&::-webkit-scrollbar": {
+            display: "none",
+            width: "0px",
+            background: "transparent",
+          },
+          /* Universal */
+          "overflow-y": "hidden",
+          "overflow-x": "hidden",
+        },
+      });
 		},
 	],
 };
