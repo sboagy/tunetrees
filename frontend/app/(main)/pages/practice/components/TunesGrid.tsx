@@ -11,7 +11,7 @@ import type { Row, Table as TanstackTable } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { TablePurpose, Tune } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -46,7 +46,12 @@ type Props = {
 };
 
 const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
-  const { currentTune, setCurrentTune } = useTune();
+  const {
+    currentTune,
+    setCurrentTune,
+    currentTablePurpose,
+    setCurrentTablePurpose,
+  } = useTune();
   const { setCurrentView } = useMainPaneView();
   const rowRefs = useRef<{ [key: number]: HTMLTableRowElement | null }>({});
 
@@ -55,21 +60,27 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
 
   const tableBodyRef = useRef<HTMLDivElement>(null);
 
-  // const handleRowClick = useCallback(
-  //   (row: Row<Tune>) => {
-  //     const tuneId = row.original.id;
-  //     setCurrentTune(tuneId ?? null);
-  //     console.log("handleRowClick: tuneId=", tuneId);
-  //     saveTableState(table, userId, tablePurpose, tuneId ?? -1);
-  //   },
-  //   [setCurrentTune, table, userId, tablePurpose],
-  // );
   const handleRowClick = useCallback(
     (row: Row<Tune>) => {
       const previousTune = currentTune;
       const newTune = row.original.id;
 
-      if (newTune) setCurrentTune(newTune);
+      const rowIndex = table
+        .getRowModel()
+        .rows.findIndex((row) => row.original.id === currentTune);
+
+      if (newTune) {
+        setCurrentTune(newTune);
+        setCurrentTablePurpose(tablePurpose); // probably not actually needed
+      }
+
+      const rowIndexNew = table
+        .getRowModel()
+        .rows.findIndex((row) => row.original.id === newTune);
+
+      console.log(
+        `LF1 TunesGrid handleRowClick: currentTune=${currentTune} rowIndex=${rowIndex} newTune=${newTune} rowIndexNew=${rowIndexNew}`,
+      );
 
       // Update styles of the previously selected row
       if (previousTune && rowRefs.current[previousTune]) {
@@ -89,7 +100,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
         );
       }
     },
-    [currentTune, setCurrentTune],
+    [currentTune, setCurrentTune, table, setCurrentTablePurpose, tablePurpose],
   );
 
   const handleRowDoubleClick = (row: Row<Tune>) => {
@@ -114,6 +125,45 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Only need or want this to execute if current tune changes.
+  useEffect(() => {
+    if (currentTablePurpose !== tablePurpose) {
+      return;
+    }
+
+    const scrollToTune = (attempt = 0) => {
+      if (attempt >= 4) {
+        console.error(
+          `Failed to find row for currentTune=${currentTune} after 4 attempts`,
+        );
+        return;
+      }
+
+      const rowIndex = table
+        .getRowModel()
+        .rows.findIndex((row) => row.original.id === currentTune);
+
+      if (rowIndex !== -1 && currentTune !== null) {
+        rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
+
+        if (rowRefs.current[currentTune]) {
+          rowRefs.current[currentTune].scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      } else {
+        setTimeout(() => scrollToTune(attempt + 1), 200);
+      }
+    };
+
+    if (currentTune && rowRefs.current[currentTune]) {
+      // Row is already in view, no need to scroll
+    } else if (currentTune) {
+      scrollToTune();
+    }
+  }, [currentTune, currentTablePurpose, table, rowVirtualizer]);
+
   return (
     <tableContext.Provider value={table}>
       <div
@@ -123,7 +173,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           maxHeight: "calc(100vh - 270px)",
         }}
       >
-        <Table>
+        <Table className="hide-scrollbar">
           <TableHeader
             id="tt-tunes-grid-header"
             className="block top-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar"
@@ -155,8 +205,9 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           ref={tableBodyRef}
           className="flex-grow overflow-y-auto"
           style={{
-            minHeight: "calc(100vh - 270px - 100px)", // Adjust for header/footer
-            maxHeight: "calc(100vh - 270px - 100px)", // Adjust for header/footer
+            minHeight: "calc(100vh - 270px - 100px)",
+            maxHeight: "calc(100vh - 270px - 100px)",
+            WebkitOverflowScrolling: "touch",
           }}
         >
           <div style={{ height: `${totalSize}px`, position: "relative" }}>
@@ -224,7 +275,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
             </Table>
           </div>
         </div>
-        <Table>
+        <Table className="hide-scrollbar">
           <TableFooter className="sticky bottom-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar">
             <TableRow id="tt-tunes-grid-footer">
               <TableCell

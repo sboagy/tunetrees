@@ -91,7 +91,7 @@ export function TunesTableComponent({
   selectionChangedCallback = null,
   filterStringCallback,
 }: IScheduledTunesType): null {
-  const { currentTune, setCurrentTune } = useTune();
+  const { currentTune, setCurrentTune, setCurrentTablePurpose } = useTune();
 
   const [tableStateFromDb, setTableStateFromDb] =
     React.useState<TableState | null>(null);
@@ -195,6 +195,7 @@ export function TunesTableComponent({
         if (tableStateFromDb) {
           setTableStateFromDb(tableStateFromDb);
           setCurrentTune(tableStateTable?.current_tune ?? null);
+          setCurrentTablePurpose(tablePurpose);
           table.setRowSelection(tableStateFromDb.rowSelection);
           table.setColumnVisibility(tableStateFromDb.columnVisibility);
           table.setColumnFilters(tableStateFromDb.columnFilters);
@@ -202,7 +203,7 @@ export function TunesTableComponent({
           if (filterStringCallback) {
             filterStringCallback(tableStateFromDb.globalFilter);
           }
-          table.resetPagination();
+          table.setPagination(tableStateFromDb.pagination);
         }
       } catch (error) {
         console.error(error);
@@ -211,7 +212,14 @@ export function TunesTableComponent({
     };
 
     void fetchTableState();
-  }, [userId, tablePurpose, table, filterStringCallback, setCurrentTune]);
+  }, [
+    userId,
+    tablePurpose,
+    table,
+    filterStringCallback,
+    setCurrentTune,
+    setCurrentTablePurpose,
+  ]);
 
   const interceptedRowSelectionChange = (
     newRowSelectionState:
