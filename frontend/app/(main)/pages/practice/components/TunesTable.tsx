@@ -17,13 +17,13 @@ import {
 import * as React from "react";
 import { createOrUpdateTableState, getTableStateTable } from "../settings";
 import type { TablePurpose, Tune } from "../types";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
 import { get_columns } from "./TuneColumns";
 
 export interface IScheduledTunesType {
   tunes: Tune[];
   userId: number;
-  playlistId: number;
   tablePurpose: TablePurpose;
   globalFilter?: string;
   onRecallEvalChange?: (tuneId: number, newValue: string) => void;
@@ -83,7 +83,6 @@ export const saveTableState = async (
 export function TunesTableComponent({
   tunes,
   userId,
-  playlistId,
   tablePurpose,
   globalFilter = "",
   onRecallEvalChange,
@@ -92,6 +91,10 @@ export function TunesTableComponent({
   filterStringCallback,
 }: IScheduledTunesType): null {
   const { currentTune, setCurrentTune, setCurrentTablePurpose } = useTune();
+  const { currentPlaylist: playlistId } = usePlaylist();
+  console.log(
+    `LF1 render TunesTableComponent: playlistId=${playlistId}, userId=${userId}`,
+  );
 
   const [tableStateFromDb, setTableStateFromDb] =
     React.useState<TableState | null>(null);

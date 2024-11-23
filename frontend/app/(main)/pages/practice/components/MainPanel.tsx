@@ -6,8 +6,9 @@ import {
 } from "@/components/ui/resizable";
 import { useEffect, useRef } from "react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
-import "./MainPanel.css";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
+import "./MainPanel.css";
 import { useMainPaneView } from "./MainPaneViewContext";
 import Sidebar from "./Sidebar";
 import TabGroupMain from "./TabGroupMain";
@@ -15,13 +16,16 @@ import TuneEditor from "./TuneEditor";
 
 interface IMainPanelProps {
   userId: number;
-  playlistId: number;
 }
 
-const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
+const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
   const { currentView } = useMainPaneView();
   const { currentTune } = useTune();
   const sidebarRef = useRef<ImperativePanelHandle>(null);
+  const { currentPlaylist: currentPlaylistId } = usePlaylist();
+  console.log(
+    `LF1 render MainPanel: playlistId=${currentPlaylistId}, userId=${userId}`,
+  );
 
   const toggleSidebar = () => {
     if (sidebarRef.current) {
@@ -52,7 +56,10 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
           minSize={12} // Adjust minimum size based on collapsed state
           // maxSize={35} // Adjust maximum size based on collapsed state
         >
-          <Sidebar userId={Number(userId)} playlistId={Number(playlistId)} />{" "}
+          <Sidebar
+            userId={Number(userId)}
+            playlistId={Number(currentPlaylistId)}
+          />{" "}
           {/* Pass currentTune to Sidebar */}
         </ResizablePanel>
         <ResizableHandle
@@ -63,15 +70,16 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId, playlistId }) => {
           className="content-panel flex-grow"
           collapsedSize={0} // Set collapsed size to 0
           collapsible={true} // Enable collapsing
+          defaultSize={100} // Use current width
           minSize={65}
         >
           <div className="flex flex-col h-full">
             {currentView === "tabs" ? (
-              <TabGroupMain userId={userId} playlistId={playlistId} />
+              <TabGroupMain userId={userId} playlistId={currentPlaylistId} />
             ) : currentTune ? (
               <TuneEditor
                 userId={userId}
-                playlistId={playlistId}
+                playlistId={currentPlaylistId}
                 tuneId={currentTune}
               />
             ) : (

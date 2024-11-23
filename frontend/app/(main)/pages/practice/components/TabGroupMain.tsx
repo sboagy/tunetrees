@@ -26,10 +26,7 @@ const tabSpec = [
   { id: "analysis", name: "Analysis", content: "Practice Analytics." },
 ];
 
-export default function TabGroupMain({
-  userId,
-  playlistId,
-}: IPracticeProps): JSX.Element {
+export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
   console.log("LF1: TabGroupMain Rendering...");
 
   // As a sort of work-around, setting the default to a non-tunes tab
@@ -40,7 +37,7 @@ export default function TabGroupMain({
   const changeActiveTab = (whichTag: string) => {
     console.log("tabGroupMainState changeActiveTab:", whichTag);
     setActiveTab(whichTag);
-    const tabGroupMainState: ITabGroupMainStateModel = {
+    const tabGroupMainState: Partial<ITabGroupMainStateModel> = {
       user_id: userId,
       which_tab: whichTag,
     };
@@ -92,10 +89,10 @@ export default function TabGroupMain({
         ))}
       </TabsList>
       <TabsContent value="scheduled">
-        <ScheduledTunesGrid userId={userId} playlistId={playlistId} />
+        <ScheduledTunesGrid userId={userId} />
       </TabsContent>
       <TabsContent value="repertoire">
-        <RepertoireTunesGrid userId={userId} playlistId={playlistId} />
+        <RepertoireTunesGrid userId={userId} />
       </TabsContent>
       <TabsContent value="analysis">
         <Card>

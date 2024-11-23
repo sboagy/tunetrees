@@ -28,7 +28,7 @@ export async function getPracticeListScheduled(
   }
 }
 
-export async function getRecentlyPracticed(
+export async function getTunesInPlaylistForUser(
   userId: number,
   playlistId: number,
 ): Promise<Tune[]> {

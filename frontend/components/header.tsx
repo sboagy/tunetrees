@@ -1,3 +1,4 @@
+"use client";
 import { MainNav } from "./MainNav";
 import PlaylistChooser from "./PlaylistChooser";
 import UserButton from "./UserButton";

@@ -10,6 +10,7 @@ import { getPracticeListScheduled } from "../queries";
 import { deleteTableTransientData } from "../settings";
 import type { Tune } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 import FlashcardPanel from "./FlashcardPanel";
 import NewTuneButton from "./NewTuneButton";
 import { useScheduledTunes } from "./ScheduledTunesContext";
@@ -21,18 +22,21 @@ type ReviewMode = "grid" | "flashcard";
 
 type ScheduledTunesGridProps = {
   userId: number;
-  playlistId: number;
 };
 
 export default function ScheduledTunesGrid({
   userId,
-  playlistId,
 }: ScheduledTunesGridProps): JSX.Element {
   const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =
     useScheduledTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { currentPlaylist: playlistId } = usePlaylist();
+
+  console.log(
+    `LF1 render ScheduledTunesGrid: playlistId=${playlistId}, userId=${userId}`,
+  );
 
   useEffect(() => {
     const hasNonEmptyRecallEval = tunes.some((tune) => tune.recall_eval);
@@ -108,7 +112,6 @@ export default function ScheduledTunesGrid({
   const [tableComponent, table] = useTunesTable({
     tunes,
     userId,
-    playlistId,
     tablePurpose: "practice",
     globalFilter: "",
     onRecallEvalChange: handleRecallEvalChange,

@@ -13,8 +13,9 @@ import type {
 } from "@tanstack/react-table";
 import { FastForward } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
-import { getRecentlyPracticed } from "../queries";
+import { getTunesInPlaylistForUser } from "../queries";
 import type { Tune } from "../types";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 import NewTuneButton from "./NewTuneButton";
 import { useRepertoireTunes } from "./RepertoireTunesContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
@@ -33,7 +34,6 @@ async function fetchFilterFromDB(
 
 type RepertoireGridProps = {
   userId: number;
-  playlistId: number;
 };
 
 /**
@@ -48,7 +48,6 @@ type RepertoireGridProps = {
  */
 export default function RepertoireTunesGrid({
   userId,
-  playlistId,
 }: RepertoireGridProps): JSX.Element {
   const [isAddToReviewQueueEnabled, setIsAddToReviewQueueEnabled] =
     useState(false);
@@ -61,6 +60,11 @@ export default function RepertoireTunesGrid({
   };
   const [globalFilter, setGlobalFilter] = useState("");
   const [isFilterLoaded, setIsFilterLoaded] = useState(false);
+  const { currentPlaylist: playlistId } = usePlaylist();
+
+  console.log(
+    `LF1 render RepertoireTunesGrid: playlistId=${playlistId}, userId=${userId}`,
+  );
 
   // The tunes are persisted in a context to avoid fetching them multiple times
   // during the life of the app if they haven't changed. The tunesRefreshId,
@@ -81,7 +85,10 @@ export default function RepertoireTunesGrid({
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
-        const result: Tune[] = await getRecentlyPracticed(userId, playlistId);
+        const result: Tune[] = await getTunesInPlaylistForUser(
+          userId,
+          playlistId,
+        );
         setTunesRefreshId(refreshId);
         setTunes(result);
         isRefreshing.current = false;
@@ -96,7 +103,11 @@ export default function RepertoireTunesGrid({
   );
 
   useEffect(() => {
-    if (tunesRefreshId !== refreshId && !isRefreshing.current) {
+    if (
+      playlistId > 0 &&
+      tunesRefreshId !== refreshId &&
+      !isRefreshing.current
+    ) {
       console.log(
         `LF1 RepertoireGrid call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
       );
@@ -111,6 +122,9 @@ export default function RepertoireTunesGrid({
         .catch((error) => {
           isRefreshing.current = false;
           console.error("LF1 Error invoking refreshTunes:", error);
+        })
+        .finally(() => {
+          isRefreshing.current = false;
         });
     } else {
       console.log(
@@ -122,7 +136,6 @@ export default function RepertoireTunesGrid({
   const [tableComponent, table] = useTunesTable({
     tunes,
     userId,
-    playlistId,
     tablePurpose: "repertoire",
     globalFilter: globalFilter,
     onRecallEvalChange: undefined, // not needed for repertoire
@@ -192,7 +205,7 @@ export default function RepertoireTunesGrid({
   return (
     <div className="w-full h-full">
       {tableComponent}
-      {!isFilterLoaded || !table ? (
+      {!isFilterLoaded || !table || playlistId <= 0 ? (
         <p>Loading...</p>
       ) : (
         <>

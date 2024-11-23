@@ -18,7 +18,12 @@ const ResizablePanelGroup = ({
   />
 );
 
-const ResizablePanel = ResizablePrimitive.Panel;
+const ResizablePanel = ({
+  defaultSize,
+  ...props
+}: React.ComponentProps<typeof ResizablePrimitive.Panel> & {
+  defaultSize?: number;
+}) => <ResizablePrimitive.Panel defaultSize={defaultSize} {...props} />;
 
 const ResizableHandle = ({
   withHandle,
@@ -42,4 +47,4 @@ const ResizableHandle = ({
   </ResizablePrimitive.PanelResizeHandle>
 );
 
-export { ResizablePanelGroup, ResizablePanel, ResizableHandle };
+export { ResizableHandle, ResizablePanel, ResizablePanelGroup };

@@ -338,7 +338,9 @@ export async function deleteTableTransientData(
 
 export interface ITabGroupMainStateModel {
   user_id: number;
+  id: number;
   which_tab: string;
+  playlist_id?: number;
 }
 
 export async function getTabGroupMainState(
@@ -359,7 +361,7 @@ export async function getTabGroupMainState(
 
 export async function updateTabGroupMainState(
   userId: number,
-  tabGroupMainState: ITabGroupMainStateModel,
+  tabGroupMainState: Partial<ITabGroupMainStateModel>,
 ): Promise<number> {
   try {
     const response = await client.put(

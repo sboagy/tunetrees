@@ -1,8 +1,8 @@
-"use server";
-import { auth } from "auth";
-import defaultAvatar from "/public/avatars/flute.png";
+"use client";
+import { useSession } from "next-auth/react";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
+import defaultAvatar from "/public/avatars/flute.png";
 
 import {
   DemoUser,
@@ -22,10 +22,11 @@ import {
 } from "./ui/dropdown-menu";
 import { ModeToggle } from "./ui/mode-toggle";
 
-export default async function UserButton() {
+export default function UserButton() {
   // console.log("here in the user button");
   // debugger
-  const session = await auth();
+
+  const { data: session } = useSession();
   if (!session) {
     console.log("No session found (UserButton)");
   } else {
