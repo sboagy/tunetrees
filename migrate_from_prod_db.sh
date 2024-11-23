@@ -6,6 +6,8 @@ backup_file="backup_practice_$(date +%b_%d).sqlite3"
 # Copy the remote database to a local backup file
 scp -i ~/.ssh/id_rsa_ttdroplet -r sboag@165.227.182.140:tunetrees/tunetrees.sqlite3 "$backup_file"
 
+scp -i ~/.ssh/id_rsa_ttdroplet -r sboag@165.227.182.140:tunetrees/tunetrees.sqlite3 "tunetrees_do.sqlite3"
+
 cp tunetrees.sqlite3 tunetrees_$(date +%b_%d).sqlite3.bak
 
 # Execute the SQL script, setting the :source_db parameter
