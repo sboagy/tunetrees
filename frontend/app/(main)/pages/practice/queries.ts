@@ -513,6 +513,7 @@ export interface IPlaylist {
   playlist_id: number;
   user_ref?: number;
   instrument?: string;
+  description?: string;
 }
 
 /**

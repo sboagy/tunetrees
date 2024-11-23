@@ -28,7 +28,7 @@ class PurposeEnum(str, Enum):
 
 class PlaylistTuneModel(BaseModel):
     playlist_ref: int
-    tune_ref: str
+    tune_ref: int  # Changed from str to int
     current: str
     learned: str
 
@@ -113,8 +113,7 @@ class PlaylistModel(BaseModel):
     playlist_id: int
     user_ref: Optional[int]
     instrument: Optional[str]
-    practice_record: List["PracticeRecordModel"]
-    table_transient_data: List["TableTransientDataModel"]
+    description: Optional[str]  # Added description field
 
     class Config:
         orm_mode = True

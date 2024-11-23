@@ -167,10 +167,16 @@ class Account(Base):
 
 class Playlist(Base):
     __tablename__ = "playlist"
+    __table_args__ = (
+        UniqueConstraint("user_ref", "instrument"),
+        Index("idx_playlist_instrument", "instrument"),
+        Index("idx_playlist_user_ref", "user_ref"),
+    )
 
     playlist_id = mapped_column(Integer, primary_key=True)
     user_ref = mapped_column(ForeignKey("user.id"))
     instrument = mapped_column(Text)
+    description = mapped_column(Text)
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="playlist")
     note: Mapped[List["Note"]] = relationship(
