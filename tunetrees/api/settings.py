@@ -9,7 +9,9 @@ from tunetrees.app.database import SessionLocal
 from tunetrees.models.tunetrees import TabGroupMainState, TableState, TableTransientData
 from pydantic import BaseModel
 from tunetrees.models.tunetrees_pydantic import (
-    TableTransientDataModel as TableTransientDataModelPydantic,
+    TabGroupMainStateModel,
+    TabGroupMainStateModelPartial,
+    TableTransientDataModel,
 )
 
 # TODO: Rename this route to "states" instead of "settings"
@@ -325,7 +327,7 @@ def stage_table_transient_data(
     summary="Retrieve a table transient data entry",
     description="Retrieve an entry from the table_transient_data table",
     status_code=status.HTTP_200_OK,
-    response_model=TableTransientDataModelPydantic,
+    response_model=TableTransientDataModel,
 )
 def get_table_transient_data(
     user_id: Annotated[
@@ -353,7 +355,7 @@ def get_table_transient_data(
             description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
         ),
     ],
-) -> TableTransientDataModelPydantic:
+) -> TableTransientDataModel:
     with SessionLocal() as db:
         try:
             table_transient_data: TableTransientData | None = (
@@ -371,8 +373,8 @@ def get_table_transient_data(
                 raise HTTPException(
                     status_code=404, detail="Table transient data not found"
                 )
-            table_transient_data_pydantic: TableTransientDataModelPydantic = (
-                TableTransientDataModelPydantic.model_validate(table_transient_data)
+            table_transient_data_pydantic: TableTransientDataModel = (
+                TableTransientDataModel.model_validate(table_transient_data)
             )
             return table_transient_data_pydantic
         except Exception as e:
@@ -447,14 +449,6 @@ def delete_table_transient_data(
             raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
-class TabGroupMainStateModel(BaseModel):
-    user_id: int
-    which_tab: str
-
-    class Config:
-        orm_mode = True
-
-
 @settings_router.get(
     "/tab_group_main_state/{user_id}",
     response_model=TabGroupMainStateModel,
@@ -479,6 +473,7 @@ def get_tab_group_main_state(
                 raise HTTPException(
                     status_code=404, detail="Tab group main state not found"
                 )
+            # return TabGroupMainStateModel.model_validate(tab_group_main_state)
             return tab_group_main_state
         except Exception as e:
             logging.getLogger().error("Unknown error: %s" % e)
@@ -524,7 +519,7 @@ def update_tab_group_main_state(
             description="Should be a valid user id that corresponds to a user in the user table"
         ),
     ],
-    tab_group_main_state: TabGroupMainStateModel,
+    tab_group_main_state: TabGroupMainStateModelPartial,
 ):
     with SessionLocal() as db:
         try:

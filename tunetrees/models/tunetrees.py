@@ -222,6 +222,7 @@ class TabGroupMainState(Base):
     which_tab = mapped_column(
         Enum("scheduled", "repertoire", "analysis"), server_default=text("'practice'")
     )
+    playlist_id = mapped_column(Integer)
 
     user: Mapped["User"] = relationship("User", back_populates="tab_group_main_state")
 

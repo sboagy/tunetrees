@@ -38,7 +38,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 from fastapi import Query
 
-from tunetrees.models.tunetrees_pydantic import PlaylistModel
+from tunetrees.models.tunetrees_pydantic import PlaylistModel, TuneModel
 
 logger = logging.getLogger("tunetrees.api")
 
@@ -632,22 +632,9 @@ class TuneUpdate(BaseModel):
     genre: Optional[str] = None
 
 
-class TuneResponse(BaseModel):
-    id: int
-    title: str
-    type: str
-    structure: str
-    mode: str
-    incipit: str
-    genre: str
-
-    class Config:
-        from_attributes = True
-
-
 @router.get(
     "/tune",
-    response_model=TuneResponse,
+    response_model=TuneModel,
     summary="Get Tune",
     description="Retrieve a tune by its reference ID.",
     status_code=200,
@@ -657,19 +644,23 @@ def get_tune(tune_ref: int = Query(...)):
         with SessionLocal() as db:
             tune = db.query(Tune).filter(Tune.id == tune_ref).first()
             if not tune:
-                raise HTTPException(status_code=404, detail="Tune not found")
-            return TuneResponse.model_validate(tune)
+                raise HTTPException(
+                    status_code=404, detail=f"Tune({tune_ref}) not found"
+                )
+            return TuneModel.model_validate(tune)
     except Exception as e:
-        logger.error(f"Unable to fetch tune: {e}")
+        logger.error(f"Unable to fetch tune({tune_ref}): {e}")
         if isinstance(e, HTTPException):
             raise e
         else:
-            raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Unable to fetch tune({tune_ref}): {e}"
+            )
 
 
 @router.post(
     "/tune",
-    response_model=TuneResponse,
+    response_model=TuneModel,
     summary="Create Tune",
     description="Create a new tune.",
     status_code=201,
@@ -697,7 +688,7 @@ def create_tune(tune: TuneCreate, playlist_ref: Optional[int] = None):
             db.commit()
             db.refresh(new_tune)
             print(f"Created tune: {new_tune.id}")
-            return TuneResponse.model_validate(new_tune)
+            return TuneModel.model_validate(new_tune)
     except Exception as e:
         logger.error(f"Unable to create tune: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to create tune: {e}")
@@ -705,7 +696,7 @@ def create_tune(tune: TuneCreate, playlist_ref: Optional[int] = None):
 
 @router.put(
     "/tune",
-    response_model=TuneResponse,
+    response_model=TuneModel,
     summary="Update Tune",
     description="Update an existing tune by its reference ID.",
     status_code=200,
@@ -722,7 +713,7 @@ def update_tune(tune_ref: int = Query(...), tune: TuneUpdate = Body(...)):
 
             db.commit()
             db.refresh(existing_tune)
-            return TuneResponse.model_validate(existing_tune)
+            return TuneModel.model_validate(existing_tune)
     except Exception as e:
         logger.error(f"Unable to update tune: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to update tune: {e}")
