@@ -6,7 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
-import { Check, Delete, Edit, Plus, Save, Star, XCircle } from "lucide-react";
+import {
+  Check,
+  Edit,
+  Plus,
+  Save,
+  Star,
+  TrashIcon,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { createNote, deleteNote, getNotes, updateNote } from "../queries";
 import { type INote, UpdateActionType } from "../types";
@@ -129,7 +137,7 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
                 title="Delete reference"
                 // disabled={!isModified()} // Disable the button if no modifications are made
               >
-                <Delete className="h-4 w-4" />
+                <TrashIcon className="h-4 w-4" />
               </Button>
               {isOpen ? (
                 <>

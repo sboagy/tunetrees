@@ -546,7 +546,7 @@ export async function getPlaylists(
  * @returns A promise that resolves to the created Playlist object, or an error message.
  */
 export async function createPlaylist(
-  playlist: IPlaylist,
+  playlist: Partial<IPlaylist>,
 ): Promise<IPlaylist | { detail: string }> {
   try {
     const response = await client.post<IPlaylist | { detail: string }>(

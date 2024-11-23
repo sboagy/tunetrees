@@ -3,8 +3,11 @@ from datetime import datetime, timezone
 from os import environ
 from typing import Annotated, Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Form, HTTPException
+from fastapi import APIRouter, Body, Form, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import ColumnElement, Table
+from sqlalchemy.future import select
+from sqlalchemy.orm import Session
 from starlette import status as status
 from starlette.responses import HTMLResponse, RedirectResponse
 
@@ -17,11 +20,11 @@ from tunetrees.app.queries import (
     query_tune_staged,
 )
 from tunetrees.app.schedule import (
-    TuneScheduleUpdate,
     TuneFeedbackUpdate,
+    TuneScheduleUpdate,
     query_and_print_tune_by_id,
-    update_practice_record,
     update_practice_feedbacks,
+    update_practice_record,
     update_practice_schedules,
 )
 from tunetrees.models.tunetrees import (
@@ -30,15 +33,14 @@ from tunetrees.models.tunetrees import (
     PlaylistTune,
     Reference,
     Tune,
-    t_practice_list_staged,
     t_practice_list_joined,
+    t_practice_list_staged,
 )
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from sqlalchemy.future import select
-from fastapi import Query
-
-from tunetrees.models.tunetrees_pydantic import PlaylistModel, TuneModel
+from tunetrees.models.tunetrees_pydantic import (
+    PlaylistModel,
+    PlaylistModelPartial,
+    TuneModel,
+)
 
 logger = logging.getLogger("tunetrees.api")
 
@@ -766,7 +768,7 @@ def get_playlists(user_ref: int = Query(...)):
     description="Create a new playlist.",
     status_code=201,
 )
-def create_playlist(playlist: PlaylistModel):
+def create_playlist(playlist: PlaylistModelPartial):
     try:
         with SessionLocal() as db:
             new_playlist = Playlist(**playlist.model_dump())
@@ -786,7 +788,7 @@ def create_playlist(playlist: PlaylistModel):
     description="Update an existing playlist by its ID.",
     status_code=200,
 )
-def update_playlist(playlist_id: int, playlist: PlaylistModel = Body(...)):
+def update_playlist(playlist_id: int, playlist: PlaylistModelPartial = Body(...)):
     try:
         with SessionLocal() as db:
             existing_playlist = (

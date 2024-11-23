@@ -6,6 +6,8 @@ import {
   getReferences,
   updateReference,
 } from "@/app/(main)/pages/practice/queries";
+import AutoResizingRichTextarea from "@/components/AutoResizingRichTextarea";
+import AutoResizingTextarea from "@/components/AutoResizingTextarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
@@ -14,12 +16,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Check, Delete, Edit, Plus, Save, Star, XCircle } from "lucide-react";
+import {
+  Check,
+  Edit,
+  Plus,
+  Save,
+  Star,
+  TrashIcon,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { type IReferenceData, UpdateActionType } from "../types";
 import "./ReferenceCards.css"; // Import the CSS file
-import AutoResizingRichTextarea from "@/components/AutoResizingRichTextarea";
-import AutoResizingTextarea from "@/components/AutoResizingTextarea";
 
 interface IReferenceCardProps {
   reference: IReferenceData;
@@ -158,7 +166,7 @@ function ReferenceCard({
                 title="Delete reference"
                 // disabled={!isModified()} // Disable the button if no modifications are made
               >
-                <Delete className="h-4 w-4" />
+                <TrashIcon className="h-4 w-4" />
               </Button>
               {isOpen ? (
                 <>

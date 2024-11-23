@@ -19,7 +19,10 @@ import { get_columns } from "./TuneColumns";
 import { tableContext } from "./TunesTable";
 import { useSaveTableState } from "./use-save-table-state";
 
-export const getColorForEvaluation = (review_status: string | null): string => {
+export const getColorForEvaluation = (
+  review_status: string | null,
+  isTrigger = false,
+): string => {
   switch (review_status) {
     case "blackout":
       return "bg-red-100 dark:bg-red-900";
@@ -34,6 +37,9 @@ export const getColorForEvaluation = (review_status: string | null): string => {
     case "perfect":
       return "bg-green-100 dark:bg-green-900";
     default:
+      if (isTrigger) {
+        return "bg-slate-95 dark:bg-slate-800";
+      }
       return "";
   }
 };
@@ -175,7 +181,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           maxHeight: "calc(100vh - 270px)",
         }}
       >
-        <Table className="hide-scrollbar overflow-hidden">
+        <Table className="hide-scrollbar overflow-clipped">
           <TableHeader
             id="tt-tunes-grid-header"
             className="block top-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar"
@@ -183,7 +189,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
-                className="h-auto w-full flex flex-row"
+                className="hide-scrollbar h-auto w-full flex flex-row overflow-clipped"
               >
                 {headerGroup.headers.map((header) => (
                   <TableHead
@@ -250,7 +256,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                         currentTune === row.original.id
                           ? "outline outline-2 outline-blue-500"
                           : ""
-                      } ${getColorForEvaluation(row.original.recall_eval || null)}`}
+                      } ${getColorForEvaluation(row.original.recall_eval || null, false)}`}
                       onClick={handleRowClick.bind(null, row)}
                       onDoubleClick={() => handleRowDoubleClick(row)}
                       data-state={row.getIsSelected() && "selected"}

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import type { CellContext } from "@tanstack/react-table";
-import { Check } from "lucide-react";
+import { Check, ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 import {
   createOrUpdateTableTransientData,
@@ -132,8 +132,9 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`w-[9em] sm:w-[18em] h-[2em] justify-between whitespace-nowrap overflow-hidden text-ellipsis ${getColorForEvaluation(
+          className={`w-[9em] sm:w-[18em] h-[2em] justify-between whitespace-nowrap overflow-hidden text-ellipsis  ${getColorForEvaluation(
             selectedQuality ?? null,
+            true,
           )}`}
           style={{
             textAlign: "left",
@@ -143,9 +144,14 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
             setIsOpen((prev) => !prev);
           }}
         >
-          {selectedQuality
-            ? qualityList.find((q) => q.value === selectedQuality)?.label2
-            : "Recall Quality..."}
+          <div className="flex justify-between items-center">
+            <span className="truncate ml-[1em]">
+              {selectedQuality
+                ? qualityList.find((q) => q.value === selectedQuality)?.label2
+                : "Recall Quality..."}
+            </span>
+            <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+          </div>
         </button>
       </PopoverTrigger>
       <PopoverContent align="end">

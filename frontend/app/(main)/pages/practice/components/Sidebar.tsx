@@ -5,11 +5,11 @@ import { Edit } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getTune } from "../queries";
 import type { Tune } from "../types";
+import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import NoteCards from "./NoteCards";
 import ReferenceCards from "./ReferenceCards";
 import "./Sidebar.css";
-import { useTune } from "./CurrentTuneContext";
 
 interface ISidebarProps {
   userId: number;
@@ -51,8 +51,8 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
   return currentTune ? (
     <div className="flex flex-col h-full">
       <div className="sidebar flex-grow overflow-y-auto">
-        <div className="flex items-center justify-between mb-2 cursor-auto">
-          <h4>{tuneTitle}</h4>
+        <div className="flex items-center justify-between mb-2 mt-4 cursor-auto">
+          <h2 className="text-xl font-bold">{tuneTitle}</h2>
           <Button
             variant="ghost"
             size="icon"
