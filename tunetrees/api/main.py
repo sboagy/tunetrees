@@ -13,7 +13,7 @@ tags_metadata = [
     },
     {
         "name": "tunetrees",
-        "description": "Core TuneTrees operations relating to practice, scheduling, and repertoire management.",
+        "description": "Core TuneTrees operations relating to scheduling, repertoire, and overall tunes db management.",
     },
     {
         "name": "settings",

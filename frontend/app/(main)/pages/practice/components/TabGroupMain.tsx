@@ -2,12 +2,15 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { JSX } from "react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   type ITabGroupMainStateModel,
   getTabGroupMainState,
   updateTabGroupMainState,
 } from "../settings";
+import type { ITabSpec } from "./TabsStateContext";
+import { useTabsState } from "./TabsStateContext";
+import TunesGridAll from "./TunesGridAll";
 import TunesGridRepertoire from "./TunesGridRepertoire";
 import TunesGridScheduled from "./TunesGridScheduled";
 
@@ -16,23 +19,10 @@ interface IPracticeProps {
   playlistId: number;
 }
 
-const tabSpec = [
-  {
-    id: "scheduled",
-    name: "Practice",
-    content: "Review and practice your scheduled tunes.",
-  },
-  { id: "repertoire", name: "Repertoire", content: "Manage your repertoire." },
-  { id: "analysis", name: "Analysis", content: "Practice Analytics." },
-];
-
 export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
   console.log("LF1: TabGroupMain Rendering...");
 
-  // As a sort of work-around, setting the default to a non-tunes tab
-  // avoids initial render attempt on the server, and avoids problems
-  // with client-side rendering on the conplex tunes grid..
-  const [activeTab, setActiveTab] = useState<string>("");
+  const { tabSpec, activeTab, setActiveTab } = useTabsState(); // Use the context
 
   const changeActiveTab = (whichTag: string) => {
     console.log("tabGroupMainState changeActiveTab:", whichTag);
@@ -66,7 +56,7 @@ export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
       }
     };
     void doInitialization();
-  }, [userId]);
+  }, [userId, tabSpec, setActiveTab]);
 
   return (
     <Tabs
@@ -76,23 +66,32 @@ export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
     >
       <TabsList
         id="tt-tabs"
-        className="grid w-full grid-cols-3 rounded-none bg-transparent p-0 gap-2"
+        className="grid w-full grid-cols-4 rounded-none bg-transparent p-0 gap-2"
       >
-        {tabSpec.map((tab) => (
-          <TabsTrigger
-            key={tab.id}
-            value={tab.id}
-            className={`rounded-t-lg border-t border-l border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors duration-200 ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
-          >
-            {tab.name}
-          </TabsTrigger>
-        ))}
+        {tabSpec
+          .filter((tab) => tab.visible)
+          .map(
+            (
+              tab: ITabSpec, // Ensure tab is typed as ITabSpec
+            ) => (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className={`rounded-t-lg border-t border-l border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors duration-200 ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
+              >
+                {tab.name}
+              </TabsTrigger>
+            ),
+          )}
       </TabsList>
       <TabsContent value="scheduled">
         <TunesGridScheduled userId={userId} />
       </TabsContent>
       <TabsContent value="repertoire">
         <TunesGridRepertoire userId={userId} />
+      </TabsContent>
+      <TabsContent value="all">
+        <TunesGridAll userId={userId} />
       </TabsContent>
       <TabsContent value="analysis">
         <Card>

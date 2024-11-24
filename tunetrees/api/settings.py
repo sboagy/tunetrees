@@ -24,7 +24,7 @@ settings_router = APIRouter(prefix="/settings", tags=["settings"])
 class TableStateBase(BaseModel):
     user_id: int
     screen_size: Literal["small", "full"]
-    purpose: Literal["practice", "repertoire", "analysis"]
+    purpose: Literal["practice", "repertoire", "all", "analysis"]
     settings: str
     current_tune: Optional[int] = None
 
@@ -59,6 +59,7 @@ class PurposeEnum(str, Enum):
     practice = "practice"
     repertoire = "repertoire"
     analysis = "analysis"
+    all = "all"
 
 
 @settings_router.get(
@@ -78,7 +79,7 @@ def get_table_state(
     ),
     purpose: PurposeEnum = Query(
         ...,
-        description="Associated purpose, one of 'practice', 'repertoire', or 'analysis'",
+        description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
     ),
 ) -> TableStateResponse:
     try:
@@ -137,8 +138,8 @@ def update_table_state(
     ),
     purpose: str = Query(
         ...,
-        enum=["practice", "repertoire", "analysis"],
-        description="Associated purpose, one of 'practice', 'repertoire', or 'analysis'",
+        enum=["practice", "repertoire", "all", "analysis"],
+        description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
     ),
     table_state_update: TableStateUpdate = Depends(),
 ) -> TableStateResponse:
@@ -184,8 +185,8 @@ def delete_table_state(
     ),
     purpose: str = Query(
         ...,
-        enum=["practice", "repertoire", "analysis"],
-        description="Associated purpose, one of 'practice', 'repertoire', or 'analysis'",
+        enum=["practice", "repertoire", "all", "analysis"],
+        description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
     ),
 ) -> None:
     try:
@@ -298,8 +299,8 @@ def stage_table_transient_data(
     purpose: Annotated[
         str,
         Path(
-            enum_values=["practice", "repertoire", "suggestions"],
-            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+            enum_values=["practice", "repertoire", "all," "analysis"],
+            description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
         ),
     ],
     field_data: TableTransientDataFields = Body(...),
@@ -351,8 +352,8 @@ def get_table_transient_data(
     purpose: Annotated[
         str,
         Path(
-            enum_values=["practice", "repertoire", "suggestions"],
-            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+            enum_values=["practice", "repertoire", "all" "anylysis"],
+            description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'anylysis'",
         ),
     ],
 ) -> TableTransientDataModel:
@@ -410,8 +411,8 @@ def delete_table_transient_data(
     purpose: Annotated[
         str,
         Path(
-            enum_values=["practice", "repertoire", "suggestions"],
-            description="Associated purpose, one of 'practice', 'repertoire', or 'suggestions'",
+            enum_values=["practice", "repertoire", "all", "analysis"],
+            description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
         ),
     ],
 ) -> None:

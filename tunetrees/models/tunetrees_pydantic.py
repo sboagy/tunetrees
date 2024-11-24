@@ -26,6 +26,7 @@ class AlgTypeEnum(str, Enum):
 class WhichTabEnum(str, Enum):
     scheduled = "scheduled"
     repertoire = "repertoire"
+    all = "all"
     analysis = "analysis"
 
 
@@ -37,8 +38,8 @@ class ScreenSizeEnum(str, Enum):
 class PurposeEnum(str, Enum):
     practice = "practice"
     repertoire = "repertoire"
+    all = "all"
     analysis = "analysis"
-    suggestions = "suggestions"
 
 
 class PlaylistTuneModel(BaseModel):

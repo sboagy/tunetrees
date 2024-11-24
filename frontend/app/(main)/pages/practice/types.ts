@@ -52,7 +52,7 @@ export type PlaylistTune = {
 
 export type ScreenSize = "small" | "full";
 
-export type TablePurpose = "practice" | "repertoire" | "suggestions";
+export type TablePurpose = "practice" | "repertoire" | "all";
 
 export type TableTransientData = {
   user_id: number;

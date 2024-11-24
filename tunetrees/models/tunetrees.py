@@ -220,7 +220,8 @@ class TabGroupMainState(Base):
     user_id = mapped_column(ForeignKey("user.id"), nullable=False)
     id = mapped_column(Integer, primary_key=True)
     which_tab = mapped_column(
-        Enum("scheduled", "repertoire", "analysis"), server_default=text("'practice'")
+        Enum("scheduled", "repertoire", "all", "analysis"),
+        server_default=text("'practice'"),
     )
     playlist_id = mapped_column(Integer)
 
@@ -233,7 +234,9 @@ class TableState(Base):
     user_id = mapped_column(ForeignKey("user.id"), primary_key=True, nullable=False)
     screen_size = mapped_column(Enum("small", "full"), primary_key=True, nullable=False)
     purpose = mapped_column(
-        Enum("practice", "repertoire", "analysis"), primary_key=True, nullable=False
+        Enum("practice", "repertoire", "all", "analysis"),
+        primary_key=True,
+        nullable=False,
     )
     settings = mapped_column(Text)
     current_tune = mapped_column(Integer, server_default=text("null"))
