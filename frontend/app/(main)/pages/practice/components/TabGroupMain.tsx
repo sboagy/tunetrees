@@ -8,8 +8,8 @@ import {
   getTabGroupMainState,
   updateTabGroupMainState,
 } from "../settings";
-import RepertoireTunesGrid from "./RepertoireTunesGrid";
-import ScheduledTunesGrid from "./ScheduledTunesGrid";
+import TunesGridRepertoire from "./TunesGridRepertoire";
+import TunesGridScheduled from "./TunesGridScheduled";
 
 interface IPracticeProps {
   userId: number;
@@ -89,10 +89,10 @@ export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
         ))}
       </TabsList>
       <TabsContent value="scheduled">
-        <ScheduledTunesGrid userId={userId} />
+        <TunesGridScheduled userId={userId} />
       </TabsContent>
       <TabsContent value="repertoire">
-        <RepertoireTunesGrid userId={userId} />
+        <TunesGridRepertoire userId={userId} />
       </TabsContent>
       <TabsContent value="analysis">
         <Card>

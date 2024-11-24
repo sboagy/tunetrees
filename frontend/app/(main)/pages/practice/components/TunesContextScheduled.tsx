@@ -2,18 +2,18 @@ import type React from "react";
 import { type ReactNode, createContext, useContext, useState } from "react";
 import type { Tune } from "../types";
 
-interface IRepertoireTunesContextType {
+interface IScheduledTunesContextType {
   tunes: Tune[];
   setTunes: React.Dispatch<React.SetStateAction<Tune[]>>;
   tunesRefreshId: number | null;
   setTunesRefreshId: (newRefreshId: number) => void;
 }
 
-const RepertoireTunesContext = createContext<
-  IRepertoireTunesContextType | undefined
+const TunesContextScheduled = createContext<
+  IScheduledTunesContextType | undefined
 >(undefined);
 
-export const RepertoireTunesProvider = ({
+export const TunesProviderScheduled = ({
   children,
 }: {
   children: ReactNode;
@@ -22,16 +22,16 @@ export const RepertoireTunesProvider = ({
   const [tunesRefreshId, setTunesRefreshId] = useState<number | null>(null);
 
   return (
-    <RepertoireTunesContext.Provider
+    <TunesContextScheduled.Provider
       value={{ tunes, setTunes, tunesRefreshId, setTunesRefreshId }}
     >
       {children}
-    </RepertoireTunesContext.Provider>
+    </TunesContextScheduled.Provider>
   );
 };
 
-export const useRepertoireTunes = () => {
-  const context = useContext(RepertoireTunesContext);
+export const useScheduledTunes = () => {
+  const context = useContext(TunesContextScheduled);
   if (!context) {
     throw new Error("useTunes must be used within a TunesProvider");
   }

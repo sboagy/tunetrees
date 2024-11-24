@@ -13,8 +13,8 @@ import ColumnsMenu from "./ColumnsMenu";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import FlashcardPanel from "./FlashcardPanel";
 import NewTuneButton from "./NewTuneButton";
-import { useScheduledTunes } from "./ScheduledTunesContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
+import { useScheduledTunes } from "./TunesContextScheduled";
 import TunesGrid from "./TunesGrid";
 import { useTunesTable } from "./TunesTable";
 
@@ -24,7 +24,7 @@ type ScheduledTunesGridProps = {
   userId: number;
 };
 
-export default function ScheduledTunesGrid({
+export default function TunesGridScheduled({
   userId,
 }: ScheduledTunesGridProps): JSX.Element {
   const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =

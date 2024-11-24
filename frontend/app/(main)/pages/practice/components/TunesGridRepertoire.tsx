@@ -17,8 +17,8 @@ import { getTunesInPlaylistForUser } from "../queries";
 import type { Tune } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import NewTuneButton from "./NewTuneButton";
-import { useRepertoireTunes } from "./RepertoireTunesContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
+import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
 
 async function fetchFilterFromDB(
@@ -46,7 +46,7 @@ type RepertoireGridProps = {
  * - The component includes a filter input, a button to add selected tunes to the review queue, and a grid to display the tunes.
  * - The `addToReviewQueue` function handles adding selected tunes to the review queue and submitting feedback.
  */
-export default function RepertoireTunesGrid({
+export default function TunesGridRepertoire({
   userId,
 }: RepertoireGridProps): JSX.Element {
   const [isAddToReviewQueueEnabled, setIsAddToReviewQueueEnabled] =
