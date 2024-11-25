@@ -7,6 +7,7 @@ import {
   createPlaylist,
   deletePlaylist,
   getPlaylists,
+  getTunesInPlaylistForUser, // Import getTunesInPlaylistForUser
   updatePlaylist,
 } from "@/app/(main)/pages/practice/queries";
 import { getTabGroupMainState } from "@/app/(main)/pages/practice/settings";
@@ -151,6 +152,29 @@ export default function PlaylistChooser() {
         }
       }
 
+      // Pre-check for playlists containing tunes
+      for (const playlistId of existingPlaylistIds) {
+        if (!editedPlaylistIds.has(playlistId)) {
+          const tunes = await getTunesInPlaylistForUser(
+            session?.user?.id ? Number(session.user.id) : -1,
+            playlistId,
+          );
+          if (tunes && tunes.length > 0) {
+            alert(
+              "Cannot delete Repertoire that contains tunes. Please first go to the corresponding Repertoire tab and delete all its tunes first.",
+            );
+            // Add the playlist back to the editedPlaylists list
+            const playlistToRestore = playlists.find(
+              (playlist) => playlist.playlist_id === playlistId,
+            );
+            if (playlistToRestore) {
+              setEditedPlaylists((prev) => [...prev, playlistToRestore]);
+            }
+            return;
+          }
+        }
+      }
+
       // Delete playlists that are not in the editedPlaylists array
       for (const playlistId of existingPlaylistIds) {
         if (!editedPlaylistIds.has(playlistId)) {
@@ -193,7 +217,7 @@ export default function PlaylistChooser() {
           className="px-4 py-2 border rounded bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out flex items-center space-x-2"
           title={currentPlaylistDescription} // Add hover text
         >
-          <span>Playlist: {currentPlaylistName}</span>
+          <span>Repertoire: {currentPlaylistName}</span>
           <ChevronDownIcon className="w-5 h-5 text-gray-500" />
         </DropdownMenuTrigger>
         <DropdownMenuContent className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded shadow-lg">
@@ -211,7 +235,7 @@ export default function PlaylistChooser() {
             onSelect={() => setIsDialogOpen(true)}
             className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
           >
-            Manage Playlists...
+            Edit Repertoire List...
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -219,7 +243,7 @@ export default function PlaylistChooser() {
         <DialogContent>
           <DialogHeader>
             <div className="flex items-center">
-              <DialogTitle>Manage Playlists</DialogTitle>
+              <DialogTitle>Edit Repertoire List</DialogTitle>
               <Button
                 variant="secondary"
                 className="flex items-center ml-12" // Align with the baseline of the DialogTitle text and add right margin of 3em
@@ -264,7 +288,7 @@ export default function PlaylistChooser() {
               onClick={() => void handleSubmit()}
               disabled={!hasChanges || hasEmptyVisibleInstrument}
             >
-              Submit
+              Update
             </Button>
           </DialogFooter>
         </DialogContent>
