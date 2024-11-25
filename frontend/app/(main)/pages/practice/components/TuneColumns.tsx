@@ -17,7 +17,6 @@ import type {
   ColumnDef,
   Row,
   SortingFn,
-  TableState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
 import {
@@ -28,7 +27,6 @@ import {
   EyeOff,
   Filter,
 } from "lucide-react";
-import { createOrUpdateTableState, getTableCurrentTune } from "../settings";
 import type { TablePurpose, Tune, TunesGridColumnGeneralType } from "../types";
 
 function columnControlMenu() {
@@ -131,6 +129,7 @@ export function get_columns(
   playlistId: number,
   purpose: TablePurpose,
   onRecallEvalChange?: (tuneId: number, newValue: string) => void,
+  setTunesRefreshId?: (newRefreshId: number) => void,
 ): ColumnDef<Tune, TunesGridColumnGeneralType>[] {
   const determineHeaderCheckedState = (
     table: TanstackTable<Tune>,
@@ -141,65 +140,13 @@ export function get_columns(
     const noneSelected = Object.keys(rowSelection).length === 0;
     return allSelected ? true : noneSelected ? false : "indeterminate";
   };
+  // const { triggerRefresh } = useTuneDataRefresh();
 
-  // const saveTableState = async (
-  //   table: TanstackTable<Tune>,
-  //   user_id: string,
-  //   table_purpose: TablePurpose,
-  //   currentTune: number | null,
-  // ) => {
-  //   const tableState: TableState = table.getState();
-
-  //   try {
-  //     const response = await createOrUpdateTableState(
-  //       Number.parseInt(user_id),
-  //       "full",
-  //       table_purpose,
-  //       tableState,
-  //       currentTune,
-  //     );
-  //     // Handle the response as needed
-  //     console.log("Server response:", response);
-  //     return response;
-  //   } catch (error) {
-  //     console.error("Error calling server function:", error);
-  //     return null;
-  //   } finally {
-  //     // setIsLoading(false);
-  //   }
-  // };
-
-  const updateTableState = async (
-    table: TanstackTable<Tune>,
-    user_id: string,
-    table_purpose: TablePurpose,
-  ) => {
-    const tableState: TableState = table.getState();
-    let currentTune = -1;
-    getTableCurrentTune(Number(user_id), "full", table_purpose)
-      .then((result) => {
-        currentTune = result;
-      })
-      .catch((error) => {
-        console.error("Error getTableCurrentTune:", error);
-        throw error;
-      });
-    try {
-      const response = await createOrUpdateTableState(
-        Number.parseInt(user_id),
-        "full",
-        table_purpose,
-        tableState,
-        currentTune,
-      );
-      // Handle the response as needed
-      console.log("Server response:", response);
-      return response;
-    } catch (error) {
-      console.error("Error calling server function:", error);
-      throw error;
-    } finally {
-      // setIsLoading(false);
+  const updateTableState = () => {
+    // An optimization would be to only trigger a refresh on the table that
+    // changes, rather than signal that the overall data has changed.
+    if (setTunesRefreshId) {
+      setTunesRefreshId(0);
     }
   };
 
@@ -224,21 +171,7 @@ export function get_columns(
       table.getState().rowSelection = rowSelection;
     }
 
-    const result = updateTableState(table, userId.toString(), purpose);
-    result
-      .then((result) => {
-        console.log(
-          "-> handleHeaderCheckboxChange - saveTableState result: ",
-          result,
-        );
-      })
-      .catch((error) => {
-        console.error(
-          "handleHeaderCheckboxChange - Error saveTableState: ",
-          error,
-        );
-        throw error;
-      });
+    updateTableState();
   };
 
   // const isIndeterminate = () => {
@@ -277,9 +210,6 @@ export function get_columns(
 
   function RowSelectedCheckBox(
     info: CellContext<Tune, TunesGridColumnGeneralType>,
-    userId: number,
-    playlistId: number,
-    purpose: TablePurpose,
   ) {
     const handleItemCheckboxChange = () => {
       refreshHeader(info);
@@ -297,8 +227,8 @@ export function get_columns(
         }
       }
       info.table.getState().rowSelection = rowSelection;
-
-      void updateTableState(info.table, userId.toString(), purpose);
+      refreshHeader(info);
+      updateTableState();
     };
 
     return (
@@ -357,7 +287,7 @@ export function get_columns(
           header: ({ column, table }) => selectionHeader(column, table),
           enableHiding: false,
           cell: (info: CellContext<Tune, TunesGridColumnGeneralType>) =>
-            RowSelectedCheckBox(info, userId, playlistId, purpose),
+            RowSelectedCheckBox(info),
           accessorFn: () => null, // Return null since we don't need a value
           meta: {
             type: "boolean", // Set the type to boolean for consistency

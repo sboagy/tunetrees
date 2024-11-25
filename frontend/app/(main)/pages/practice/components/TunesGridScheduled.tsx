@@ -115,6 +115,7 @@ export default function TunesGridScheduled({
     tablePurpose: "practice",
     globalFilter: "",
     onRecallEvalChange: handleRecallEvalChange,
+    setTunesRefreshId,
   });
 
   const submitPracticeFeedbacksHandler = () => {

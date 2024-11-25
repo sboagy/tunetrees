@@ -136,6 +136,7 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
     globalFilter: globalFilter,
     onRecallEvalChange: undefined, // not needed for All
     selectionChangedCallback,
+    setTunesRefreshId,
   });
 
   useEffect(() => {

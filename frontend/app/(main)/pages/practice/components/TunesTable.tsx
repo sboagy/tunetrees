@@ -35,6 +35,7 @@ export interface IScheduledTunesType {
       ) => void)
     | null;
   filterStringCallback?: (filter: string) => void;
+  setTunesRefreshId?: (newRefreshId: number) => void;
 }
 
 export const tableContext = React.createContext<TanstackTable<Tune> | null>(
@@ -89,6 +90,7 @@ export function TunesTableComponent({
   onTableCreated,
   selectionChangedCallback = null,
   filterStringCallback,
+  setTunesRefreshId,
 }: IScheduledTunesType): null {
   const { currentTune, setCurrentTune, setCurrentTablePurpose } = useTune();
   const { currentPlaylist: playlistId } = usePlaylist();
@@ -164,6 +166,7 @@ export function TunesTableComponent({
     playlistId,
     tablePurpose,
     onRecallEvalChange,
+    setTunesRefreshId,
   );
 
   const table: TanstackTable<Tune> = useReactTable({

@@ -140,6 +140,7 @@ export default function TunesGridRepertoire({
     globalFilter: globalFilter,
     onRecallEvalChange: undefined, // not needed for repertoire
     selectionChangedCallback,
+    setTunesRefreshId,
   });
 
   useEffect(() => {
