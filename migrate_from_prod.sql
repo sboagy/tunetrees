@@ -64,8 +64,8 @@ FROM source_db.session;
 
 -- Tab Group Main State Table Migration
 -- ommitted tab_spec column for migration
-INSERT OR REPLACE INTO main.tab_group_main_state (user_id, which_tab, id, playlist_id)
-SELECT user_id, which_tab, id, playlist_id
+INSERT OR REPLACE INTO main.tab_group_main_state (user_id, which_tab, id, playlist_id, tab_spec)
+SELECT user_id, which_tab, id, playlist_id, tab_spec
 FROM source_db.tab_group_main_state;
 
 -- Table State Table Migration
