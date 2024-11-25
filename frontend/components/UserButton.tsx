@@ -6,7 +6,6 @@ import defaultAvatar from "/public/avatars/flute.png";
 
 import {
   DemoUser,
-  ManagePlaylistMenuItem,
   NewUser,
   SignIn,
   SignOut,
@@ -105,9 +104,6 @@ export default function UserButton() {
           })()}
           <DropdownMenuItem className="h-8">
             <UserSettingsMenuItem />
-          </DropdownMenuItem>
-          <DropdownMenuItem className="h-8">
-            <ManagePlaylistMenuItem />
           </DropdownMenuItem>
           {/* <DropdownMenuSeparator className="my-2 border-t border-dark-gray-200" /> */}
           <DropdownMenuItem className="h-8">

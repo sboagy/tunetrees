@@ -107,24 +107,3 @@ export function UserSettingsMenuItem(
     </form>
   );
 }
-
-export function ManagePlaylistMenuItem(
-  props: React.ComponentPropsWithRef<typeof Button>,
-) {
-  const router = useRouter();
-  console.log("Constructing the ManagePlaylist button");
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    console.log("Handling User Settings request");
-    router.push("/user-settings");
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="w-full">
-      <Button variant="ghost" {...props}>
-        Manage Playlist
-      </Button>
-    </form>
-  );
-}
