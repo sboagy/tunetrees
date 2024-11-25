@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { createTune } from "../queries";
 import type { Tune } from "../types";
+import { useTune } from "./CurrentTuneContext";
+import { useMainPaneView } from "./MainPaneViewContext";
 
 interface INewTuneButtonProps {
   userId: number;
@@ -14,7 +15,8 @@ export default function NewTuneButton({
   userId,
   playlistId,
 }: INewTuneButtonProps): JSX.Element {
-  const router = useRouter();
+  const { setCurrentView } = useMainPaneView();
+  const { setCurrentTune } = useTune();
 
   const handleClick = () => {
     const newTune: Tune = {
@@ -43,9 +45,12 @@ export default function NewTuneButton({
         console.log(
           `Tune created successfully /pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tune.id}`,
         );
-        router.push(
-          `/pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tune.id}`,
-        );
+        if (tune?.id === undefined) {
+          console.error("Error creating tune: tune.id is undefined");
+          return;
+        }
+        setCurrentTune(tune.id);
+        setCurrentView("edit");
         // void refreshData();
       })
       .catch((error) => {
