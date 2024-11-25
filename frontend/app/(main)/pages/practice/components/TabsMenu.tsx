@@ -13,6 +13,10 @@ import { useTabsState } from "./TabsStateContext";
 const TabsMenu = () => {
   const { tabSpec, setTabVisibility } = useTabsState();
 
+  const handleCheckedChange = (tabId: string) => (value: boolean) => {
+    setTabVisibility(tabId, value);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -27,7 +31,7 @@ const TabsMenu = () => {
             key={tab.id}
             className="capitalize"
             checked={tab.visible}
-            onCheckedChange={(value) => setTabVisibility(tab.id, value)}
+            onCheckedChange={handleCheckedChange(tab.id)}
           >
             {tab.name}
           </DropdownMenuCheckboxItem>

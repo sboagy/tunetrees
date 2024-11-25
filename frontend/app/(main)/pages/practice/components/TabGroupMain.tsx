@@ -2,12 +2,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { JSX } from "react";
-import { useEffect } from "react";
-import {
-  type ITabGroupMainStateModel,
-  getTabGroupMainState,
-  updateTabGroupMainState,
-} from "../settings";
+import type { ITabGroupMainStateModel } from "../settings";
 import type { ITabSpec } from "./TabsStateContext";
 import { useTabsState } from "./TabsStateContext";
 import TunesGridAll from "./TunesGridAll";
@@ -35,28 +30,7 @@ export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
       "tabGroupMainState updateTabGroupMainState:",
       tabGroupMainState.which_tab,
     );
-    void updateTabGroupMainState(userId, tabGroupMainState);
   };
-
-  useEffect(() => {
-    const doInitialization = async () => {
-      try {
-        console.log("LF1: TabGroupMain Initializing...");
-        const tabGroupMainState: ITabGroupMainStateModel | null =
-          await getTabGroupMainState(userId);
-        if (tabGroupMainState !== null) {
-          console.log("tabGroupMainState (init):", tabGroupMainState.which_tab);
-          setActiveTab(tabGroupMainState.which_tab);
-        } else {
-          console.log("tabGroupMainState tabSpec[0].id:", tabSpec[0].id);
-          setActiveTab(tabSpec[0].id);
-        }
-      } catch (error) {
-        console.error("Error fetching active tab:", error);
-      }
-    };
-    void doInitialization();
-  }, [userId, tabSpec, setActiveTab]);
 
   return (
     <Tabs

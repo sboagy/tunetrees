@@ -269,6 +269,7 @@ class TabGroupMainStateModel(BaseModel):
     id: int
     which_tab: WhichTabEnum
     playlist_id: int
+    tab_spec: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -280,6 +281,7 @@ class TabGroupMainStateModelPartial(BaseModel):
     id: Optional[int] = None
     which_tab: Optional[WhichTabEnum] = None
     playlist_id: Optional[int] = None
+    tab_spec: Optional[str] = None
 
     class Config:
         orm_mode = True

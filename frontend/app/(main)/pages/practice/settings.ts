@@ -2,6 +2,7 @@
 
 import type { TableState } from "@tanstack/react-table";
 import axios, { isAxiosError } from "axios";
+import type { ITabSpec } from "./components/TabsStateContext";
 import type {
   ITableStateTable,
   ScreenSize,
@@ -341,6 +342,7 @@ export interface ITabGroupMainStateModel {
   id: number;
   which_tab: string;
   playlist_id?: number;
+  tab_spec?: string | ITabSpec[];
 }
 
 export async function getTabGroupMainState(
@@ -349,6 +351,11 @@ export async function getTabGroupMainState(
   try {
     const response = await client.get(`/tab_group_main_state/${userId}`);
     console.log("getTabGroupMainState response status: ", response.status);
+    if (response.data.tab_spec !== null) {
+      response.data.tab_spec = JSON.parse(
+        response.data.tab_spec as string,
+      ) as ITabSpec[];
+    }
     return response.data as ITabGroupMainStateModel;
   } catch (error) {
     if (isAxiosError(error) && error.response?.status === 404) {
@@ -364,6 +371,9 @@ export async function updateTabGroupMainState(
   tabGroupMainState: Partial<ITabGroupMainStateModel>,
 ): Promise<number> {
   try {
+    if (tabGroupMainState.tab_spec !== null) {
+      tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+    }
     const response = await client.put(
       `/tab_group_main_state/${userId}`,
       tabGroupMainState,
@@ -381,6 +391,9 @@ export async function createTabGroupMainState(
   tabGroupMainState: ITabGroupMainStateModel,
 ): Promise<number> {
   try {
+    if (tabGroupMainState.tab_spec !== null) {
+      tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+    }
     const response = await client.post(
       `/tab_group_main_state/${userId}`,
       tabGroupMainState,

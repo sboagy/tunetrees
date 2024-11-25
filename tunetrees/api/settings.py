@@ -474,8 +474,8 @@ def get_tab_group_main_state(
                 raise HTTPException(
                     status_code=404, detail="Tab group main state not found"
                 )
-            # return TabGroupMainStateModel.model_validate(tab_group_main_state)
             return tab_group_main_state
+            # return tab_group_main_state
         except Exception as e:
             logging.getLogger().error("Unknown error: %s" % e)
             raise HTTPException(status_code=500, detail="Unknown error occurred")
@@ -532,7 +532,10 @@ def update_tab_group_main_state(
                     status_code=404, detail="Tab group main state not found"
                 )
 
-            existing_tab_group_main_state.which_tab = tab_group_main_state.which_tab
+            update_data = tab_group_main_state.model_dump(exclude_unset=True)
+            for key, value in update_data.items():
+                setattr(existing_tab_group_main_state, key, value)
+
             db.commit()
             db.refresh(existing_tab_group_main_state)
             return existing_tab_group_main_state

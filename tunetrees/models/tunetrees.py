@@ -224,6 +224,7 @@ class TabGroupMainState(Base):
         server_default=text("'practice'"),
     )
     playlist_id = mapped_column(Integer)
+    tab_spec = mapped_column(Text)
 
     user: Mapped["User"] = relationship("User", back_populates="tab_group_main_state")
 
