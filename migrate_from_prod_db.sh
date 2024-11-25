@@ -16,4 +16,4 @@ sqlite3 tunetrees.sqlite3 <<EOF
 .read /Users/sboag/gittt/tunetrees/migrate_from_prod.sql
 EOF
 
-scp -i ~/.ssh/id_rsa_ttdroplet -r "tunetrees.sqlite3" sboag@165.227.182.140:tunetrees/tunetrees.sqlite3 
+# scp -i ~/.ssh/id_rsa_ttdroplet -r "tunetrees.sqlite3" sboag@165.227.182.140:tunetrees/tunetrees.sqlite3 
