@@ -222,7 +222,11 @@ export default function TunesGridScheduled({
                   visibility: mode === "flashcard" ? "hidden" : "visible",
                 }}
               >
-                <ColumnsMenu user_id={userId} table={table} />
+                <ColumnsMenu
+                  user_id={userId}
+                  table={table}
+                  triggerRefresh={triggerRefresh}
+                />
               </div>
               <NewTuneButton userId={userId} playlistId={playlistId} />
             </div>

@@ -200,6 +200,10 @@ export function TunesTableComponent({
           setCurrentTune(tableStateTable?.current_tune ?? null);
           setCurrentTablePurpose(tablePurpose);
           table.setRowSelection(tableStateFromDb.rowSelection);
+          console.log(
+            "LF1 TunesTableComponent: new read from db. columnVisibility: ",
+            tableStateFromDb.columnVisibility,
+          );
           table.setColumnVisibility(tableStateFromDb.columnVisibility);
           table.setColumnFilters(tableStateFromDb.columnFilters);
           table.setSorting(tableStateFromDb.sorting);
@@ -207,6 +211,8 @@ export function TunesTableComponent({
             filterStringCallback(tableStateFromDb.globalFilter);
           }
           table.setPagination(tableStateFromDb.pagination);
+        } else {
+          console.log("LF1 TunesTableComponent: no table state found in db");
         }
       } catch (error) {
         console.error(error);
@@ -214,6 +220,7 @@ export function TunesTableComponent({
       }
     };
 
+    console.log("LF1 TunesTableComponent: calling fetchTableState");
     void fetchTableState();
   }, [
     userId,
@@ -277,7 +284,13 @@ export function TunesTableComponent({
         ? newVisibilityState(columnVisibility)
         : newVisibilityState;
 
+    console.log(
+      "LF1 interceptedSetColumnVisibility: resolvedVisibilityState=",
+      resolvedVisibilityState,
+    );
+
     originalSetColumnVisibilityRef.current(resolvedVisibilityState);
+    console.log("LF1 interceptedSetColumnVisibility: calling saveTableState");
     void saveTableState(table, userId, tablePurpose, currentTune);
   };
 
@@ -303,6 +316,13 @@ export function useTunesTable(
   props: IScheduledTunesType,
 ): [React.JSX.Element, TanstackTable<Tune> | null] {
   const [table, setTable] = React.useState<TanstackTable<Tune> | null>(null);
+
+  React.useEffect(() => {
+    console.log("useTunesTable: table changed", table?.getVisibleFlatColumns());
+    return () => {
+      console.log("useTunesTable: cleanup");
+    };
+  }, [table]);
 
   const tableComponent = (
     <TunesTableComponent

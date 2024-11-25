@@ -265,7 +265,11 @@ export default function TunesGridRepertoire({
               >
                 {">"}
               </Button> */}
-              <ColumnsMenu user_id={userId} table={table} />
+              <ColumnsMenu
+                user_id={userId}
+                table={table}
+                triggerRefresh={triggerRefresh}
+              />
               <NewTuneButton userId={userId} playlistId={playlistId} />
               <DeleteTuneButton
                 userId={userId}

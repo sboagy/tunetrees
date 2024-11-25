@@ -18,15 +18,41 @@ const ColumnsMenu = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   user_id,
   table,
+  triggerRefresh,
 }: {
   user_id: number;
   table: Table<Tune>;
+  triggerRefresh: () => void;
 }) => {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    const columns = table.getAllColumns();
+    for (const column of columns) {
+      const col = table.getColumn(column.id);
+      if (col) {
+        console.log(`Column ${column.id} visibility:`, col.getIsVisible());
+      }
+    }
+  }, [table]);
+
+  function handleCheckedChange(columnId: string) {
+    return (value: boolean) => {
+      console.log("toggleVisibility (requested)", value);
+      const column = table.getColumn(columnId);
+      if (column) {
+        console.log("toggleVisibility (before)", column.getIsVisible());
+        column.toggleVisibility(value);
+        triggerRefresh();
+      } else {
+        console.log("column not found", columnId);
+      }
+    };
+  }
 
   return (
     <DropdownMenu>
@@ -46,7 +72,7 @@ const ColumnsMenu = ({
                 key={column.id}
                 className="capitalize"
                 checked={column.getIsVisible()}
-                onCheckedChange={(value) => column.toggleVisibility(value)}
+                onCheckedChange={handleCheckedChange(column.id)}
               >
                 {column.id}
               </DropdownMenuCheckboxItem>
