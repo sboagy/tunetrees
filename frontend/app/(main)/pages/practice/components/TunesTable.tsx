@@ -200,10 +200,6 @@ export function TunesTableComponent({
           setCurrentTune(tableStateTable?.current_tune ?? null);
           setCurrentTablePurpose(tablePurpose);
           table.setRowSelection(tableStateFromDb.rowSelection);
-          console.log(
-            "LF1 TunesTableComponent: new read from db. columnVisibility: ",
-            tableStateFromDb.columnVisibility,
-          );
           table.setColumnVisibility(tableStateFromDb.columnVisibility);
           table.setColumnFilters(tableStateFromDb.columnFilters);
           table.setSorting(tableStateFromDb.sorting);
