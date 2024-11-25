@@ -16,6 +16,7 @@ import { submitPracticeFeedbacks } from "../commands";
 import { getTunesInPlaylistForUser } from "../queries";
 import type { Tune } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
+import DeleteTuneButton from "./DeleteTuneButton";
 import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useAllTunes } from "./TunesContextAll";
@@ -46,14 +47,13 @@ type AllGridProps = {
  * - The `addToReviewQueue` function handles adding selected tunes to the review queue and submitting feedback.
  */
 export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
-  const [isAddToReviewQueueEnabled, setIsAddToReviewQueueEnabled] =
-    useState(false);
+  const [isRowsSelected, setIsRowsSelected] = useState(false);
   const selectionChangedCallback = (
     table: TanstackTable<Tune>,
     rowSelectionState: RowSelectionState,
   ): void => {
     const selectedRowsCount = Object.keys(rowSelectionState).length;
-    setIsAddToReviewQueueEnabled(selectedRowsCount > 0);
+    setIsRowsSelected(selectedRowsCount > 0);
   };
   const [globalFilter, setGlobalFilter] = useState("");
   const [isFilterLoaded, setIsFilterLoaded] = useState(false);
@@ -211,7 +211,7 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
           >
             <div className="flex items-center space-x-4 mb-4">
               <Button
-                disabled={!isAddToReviewQueueEnabled}
+                disabled={!isRowsSelected}
                 variant="outline"
                 onClick={() => addToReviewQueue()}
                 title="Add selected tunes to review queue"
@@ -263,6 +263,11 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
               </Button> */}
               <ColumnsMenu user_id={userId} table={table} />
               <NewTuneButton userId={userId} playlistId={playlistId} />
+              <DeleteTuneButton
+                userId={userId}
+                playlistId={playlistId}
+                disabled={!isRowsSelected}
+              />
             </div>
           </div>
           <TunesGrid

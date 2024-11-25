@@ -223,8 +223,7 @@ export function get_columns(
       }
       table.getState().rowSelection = rowSelection;
     }
-    const rowSelection = table.getState().rowSelection;
-    console.log("rowSelection: ", rowSelection);
+
     const result = updateTableState(table, userId.toString(), purpose);
     result
       .then((result) => {
@@ -283,9 +282,6 @@ export function get_columns(
     purpose: TablePurpose,
   ) {
     const handleItemCheckboxChange = () => {
-      console.log(
-        `-> handleItemCheckboxChange - row.id: ${info.row.id}, ${JSON.stringify(info.table.getState().rowSelection)}`,
-      );
       refreshHeader(info);
 
       info.row.toggleSelected();
@@ -302,23 +298,7 @@ export function get_columns(
       }
       info.table.getState().rowSelection = rowSelection;
 
-      console.log(
-        `<- handleItemCheckboxChange - row.id: ${info.row.id}, ${JSON.stringify(info.table.getState().rowSelection)}`,
-      );
-      const promise = updateTableState(info.table, userId.toString(), purpose);
-      promise
-        .then((result) => {
-          console.log(
-            "handleItemCheckboxChange - saveTableState result: ",
-            result,
-          );
-        })
-        .catch((error) => {
-          console.error(
-            "handleItemCheckboxChange - Error saveTableState: ",
-            error,
-          );
-        });
+      void updateTableState(info.table, userId.toString(), purpose);
     };
 
     return (

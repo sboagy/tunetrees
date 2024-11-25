@@ -52,11 +52,11 @@ export const saveTableState = async (
   tablePurpose: TablePurpose,
   currentTuneId: number | null,
 ): Promise<number> => {
-  console.log("LF1 saveTableState: input variables", {
-    userId,
-    tablePurpose,
-    currentTuneId,
-  });
+  // console.log("LF1 saveTableState: input variables", {
+  //   userId,
+  //   tablePurpose,
+  //   currentTuneId,
+  // });
   const tableState: TableState = table.getState();
 
   const status = await createOrUpdateTableState(
@@ -236,10 +236,6 @@ export function TunesTableComponent({
 
     originalSetRowSelectionRef.current(resolvedRowSelectionState);
 
-    console.log(
-      "=> interceptedRowSelectionChange - resolvedRowSelectionState: ",
-      resolvedRowSelectionState,
-    );
     void saveTableState(table, userId, tablePurpose, currentTune);
 
     if (selectionChangedCallback) {
@@ -258,9 +254,6 @@ export function TunesTableComponent({
         : newColumnFiltersState;
 
     originalColumnFiltersRef.current(resolvedColumnFiltersState);
-    console.log(
-      `=> interceptedOnColumnFiltersChange - resolvedColumnFiltersState: ${JSON.stringify(resolvedColumnFiltersState)}`,
-    );
     void saveTableState(table, userId, tablePurpose, currentTune);
   };
 
@@ -285,9 +278,6 @@ export function TunesTableComponent({
         : newVisibilityState;
 
     originalSetColumnVisibilityRef.current(resolvedVisibilityState);
-    console.log(
-      `=> interceptedSetColumnVisibility - resolvedVisibilityState: ${JSON.stringify(resolvedVisibilityState)}`,
-    );
     void saveTableState(table, userId, tablePurpose, currentTune);
   };
 
