@@ -177,8 +177,8 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
       <div
         className="w-full h-full flex flex-col"
         style={{
-          minHeight: "calc(100vh - 270px)",
-          maxHeight: "calc(100vh - 270px)",
+          minHeight: "calc(104vh - 270px)",
+          maxHeight: "calc(104vh - 270px)",
         }}
       >
         <Table className="hide-scrollbar overflow-clipped">
@@ -213,8 +213,8 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           ref={tableBodyRef}
           className="flex-grow overflow-y-auto"
           style={{
-            minHeight: "calc(100vh - 270px - 100px)",
-            maxHeight: "calc(100vh - 270px - 100px)",
+            minHeight: "calc(104vh - 270px - 100px)",
+            maxHeight: "calc(104vh - 270px - 100px)",
             WebkitOverflowScrolling: "touch",
           }}
         >
@@ -229,6 +229,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                 style={{
                   display: "block",
                   position: "relative",
+                  marginTop: "2px",
                   height: `${totalSize}px`, // Set the total height for the body
                 }}
               >
@@ -243,7 +244,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                         }
                       }}
                       style={{
-                        top: `${virtualRow.start}px`, // Position the row based on virtual start
+                        top: `${virtualRow.start - 1}px`, // Position the row based on virtual start
                         height: `${virtualRow.size}px`, // Set the height of the row
                       }}
                       // className={`absolute h-16 cursor-pointer w-full ${
