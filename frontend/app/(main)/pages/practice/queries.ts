@@ -514,6 +514,7 @@ export interface IPlaylist {
   user_ref?: number;
   instrument?: string;
   description?: string;
+  genre_default?: string;
 }
 
 /**

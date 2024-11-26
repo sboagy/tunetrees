@@ -207,6 +207,7 @@ class PlaylistModel(BaseModel):
     user_ref: Optional[int]
     instrument: Optional[str]
     description: Optional[str]  # Added description field
+    genre_default: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -218,6 +219,7 @@ class PlaylistModelPartial(BaseModel):
     user_ref: Optional[int] = None
     instrument: Optional[str] = None
     description: Optional[str] = None
+    genre_default: Optional[str] = None
 
     class Config:
         orm_mode = True

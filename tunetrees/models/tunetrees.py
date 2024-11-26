@@ -177,6 +177,7 @@ class Playlist(Base):
     user_ref = mapped_column(ForeignKey("user.id"))
     instrument = mapped_column(Text)
     description = mapped_column(Text)
+    genre_default = mapped_column(Text)
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="playlist")
     note: Mapped[List["Note"]] = relationship(

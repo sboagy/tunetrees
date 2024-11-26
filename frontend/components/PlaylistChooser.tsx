@@ -210,6 +210,25 @@ export default function PlaylistChooser() {
     (playlist) => playlist.instrument === "",
   );
 
+  // temp hard-coded genre IDs for now.  These should be fetched from the database.
+  const genreIds: string[] = [
+    "ITRAD",
+    "OTIME",
+    "BGRA",
+    "CONTRA",
+    "FRCAN",
+    "SCOT",
+    "NFLD",
+    "KLEZM",
+    "FLAM",
+    "BLUES",
+    "CAJUN",
+    "TEXMX",
+    "SAMBA",
+    "FADO",
+    "GAME",
+  ];
+
   return (
     <div className="flex items-center space-x-2">
       <DropdownMenu>
@@ -244,17 +263,23 @@ export default function PlaylistChooser() {
           <DialogHeader>
             <div className="flex items-center">
               <DialogTitle>Edit Repertoire List</DialogTitle>
-              <Button
-                variant="secondary"
-                className="flex items-center ml-12" // Align with the baseline of the DialogTitle text and add right margin of 3em
-                onClick={handleAddPlaylist}
-              >
-                <PlusIcon className="w-5 h-5" />
-              </Button>
             </div>
           </DialogHeader>
+          <div className="flex space-x-4 mt-4 font-bold">
+            <span className="w-36 mt-2">Instrument</span>
+            <span className="w-40 mt-2">Genre Default</span>
+            <span className="w-1/4 mt-2">Description</span>
+            <Button
+              variant="ghost"
+              className="flex items-center" // Align with the baseline of the DialogTitle text and add right margin of 3em
+              onClick={handleAddPlaylist}
+            >
+              <PlusIcon className="w-5 h-5" />
+            </Button>
+          </div>
+
           {editedPlaylists.map((playlist, index) => (
-            <div key={playlist.playlist_id} className="flex space-x-2 mb-2">
+            <div key={playlist.playlist_id} className="flex space-x-3 mb-2">
               <Input
                 value={playlist.instrument ?? ""} // Ensure value is not null
                 onChange={(e) =>
@@ -262,6 +287,22 @@ export default function PlaylistChooser() {
                 }
                 placeholder="Instrument"
               />
+              <select
+                value={playlist.genre_default ?? ""}
+                onChange={(e) =>
+                  handleEditPlaylist(index, "genre_default", e.target.value)
+                }
+                className="px-4 py-2 border rounded bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out"
+              >
+                <option value="" disabled>
+                  Select Genre
+                </option>
+                {genreIds.map((genre) => (
+                  <option key={genre} value={genre}>
+                    {genre}
+                  </option>
+                ))}
+              </select>
               <Input
                 value={playlist.description ?? ""} // Ensure value is not null
                 onChange={(e) =>
