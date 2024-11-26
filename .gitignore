@@ -267,6 +267,9 @@ scratch.md
 
 # Ignore my practice backups
 tunetrees_db_backup
+tunetrees_do_backup
+tunetrees_local_backup
+
 backup_practice*.sqlite
 backup_practice*.sqlite3
 tunetrees_*.sqlite3.bak
