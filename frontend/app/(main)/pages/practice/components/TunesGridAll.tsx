@@ -270,8 +270,8 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
               <NewTuneButton userId={userId} playlistId={playlistId} />
               <DeleteTuneButton
                 userId={userId}
-                playlistId={playlistId}
                 disabled={!isRowsSelected}
+                table={table}
               />
             </div>
           </div>

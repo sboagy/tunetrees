@@ -276,6 +276,7 @@ export default function TunesGridRepertoire({
                 userId={userId}
                 playlistId={playlistId}
                 disabled={!isRowsSelected}
+                table={table}
               />
             </div>
           </div>

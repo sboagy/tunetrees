@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import type { Table as TanstackTable } from "@tanstack/react-table";
 import { TrashIcon } from "lucide-react";
 import type { JSX } from "react";
 import { deleteTune } from "../queries";
@@ -10,37 +11,48 @@ interface IDeleteTuneButtonProps {
   userId: number;
   playlistId?: number;
   disabled?: boolean;
+  table: TanstackTable<Tune>;
 }
 
 export default function DeleteTuneButton({
   userId,
   playlistId,
   disabled,
+  table,
 }: IDeleteTuneButtonProps): JSX.Element {
   const { setCurrentView } = useMainPaneView();
-  const { setCurrentTune } = useTune();
+  const { currentTune, setCurrentTune } = useTune();
 
   const handleClick = () => {
-    // scaffold
-    // deleteTune(newTune, Number(playlistId))
-    if (userId !== undefined && playlistId !== undefined && playlistId < -7) {
-      deleteTune(-1)
-        .then((result) => {
-          const tune = result as Tune;
-          console.log(
-            `Tune created successfully /pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tune.id}`,
-          );
-          if (tune?.id === undefined) {
-            console.error("Error creating tune: tune.id is undefined");
-            return;
-          }
-          setCurrentTune(tune.id);
-          setCurrentView("edit");
-          // void refreshData();
-        })
-        .catch((error) => {
-          console.error("Error creating tune:", error);
-        });
+    // If playlistId is undefined, the operation is on the all tunes table.
+    // For now, in that case, just mark the tune as deleted, but don't actually delete from
+    // the database, because outstanding references to the tune may exist.  Then, filter the
+    // tune from (just) the all tunes table.  Play lists may still show the tune.
+    //
+    // If playlistId is defined, delete the tune from the `playlist_tunes` table.
+    // Maybe in this we should also mark the tune as deleted, but not actually delete it?
+
+    const selectedTunes: Tune[] = table
+      .getSelectedRowModel()
+      .rows.map((row) => row.original);
+
+    if (userId !== undefined && playlistId !== undefined) {
+      for (const tune of selectedTunes) {
+        deleteTune(tune.id as number)
+          .then((result: { success?: string; detail?: string }) => {
+            console.log(
+              `Tune deleted successfully: ${tune.id}, result: ${result.detail}`,
+            );
+            if (currentTune === tune.id) {
+              setCurrentTune(null);
+            }
+            setCurrentView("tabs");
+            // void refreshData();
+          })
+          .catch((error) => {
+            console.error(`Error deleting tune ${tune.id}:`, error);
+          });
+      }
     } else {
       alert("Delete tunes");
     }
