@@ -16,11 +16,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import {
   Check,
   Edit,
   Plus,
   Save,
+  SquareChevronDown,
+  SquareChevronRight,
   Star,
   TrashIcon,
   XCircle,
@@ -361,6 +364,7 @@ export default function ReferenceCards({
   displayPublic,
 }: IReferenceCardsProps) {
   const [references, setReferences] = useState<IReferenceData[]>([]);
+  const [isCollapsibleOpen, setIsCollapsibleOpen] = useState(true);
 
   useEffect(() => {
     const fetchReferences = async () => {
@@ -454,47 +458,65 @@ export default function ReferenceCards({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <Collapsible
+      className="space-y-4"
+      open={isCollapsibleOpen}
+      onOpenChange={setIsCollapsibleOpen}
+    >
+      <div className="flex items-center justify-between space-x-4 px-4">
         <span>References</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Add new reference"
-          onClick={() => {
-            // Logic to create a new reference entry
-            const newReference: IReferenceData = {
-              id: Date.now(), // Temporary ID, replace with actual ID from the database
-              tune_ref: tuneRef,
-              user_ref: userRef,
-              url: "",
-              title: "",
-              ref_type: "website",
-              favorite: 0,
-              public: 0,
-              comment: "",
-              isNew: true,
-            };
-            setReferences((prevReferences) => [
-              newReference,
-              ...prevReferences,
-            ]);
-          }}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
+        <div className="flex space-x-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Add new reference"
+            title="Add new reference"
+            onClick={() => {
+              // Logic to create a new reference entry
+              const newReference: IReferenceData = {
+                id: Date.now(), // Temporary ID, replace with actual ID from the database
+                tune_ref: tuneRef,
+                user_ref: userRef,
+                url: "",
+                title: "",
+                ref_type: "website",
+                favorite: 0,
+                public: 0,
+                comment: "",
+                isNew: true,
+              };
+              setReferences((prevReferences) => [
+                newReference,
+                ...prevReferences,
+              ]);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
 
-      {references.map((reference) => (
-        <ReferenceCard
-          key={reference.id}
-          reference={reference}
-          onToggle={handleToggle}
-          // onCommentChange={handleCommentChange}
-          displayPublic={displayPublic}
-          onUpdate={handleUpdateReference}
-        />
-      ))}
-    </div>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm">
+              {isCollapsibleOpen ? (
+                <SquareChevronDown className="h-5 w-5" />
+              ) : (
+                <SquareChevronRight className="h-5 w-5" />
+              )}
+            </Button>
+          </CollapsibleTrigger>
+        </div>
+      </div>
+      <CollapsibleContent>
+        {references.map((reference) => (
+          <ReferenceCard
+            key={reference.id}
+            reference={reference}
+            onToggle={handleToggle}
+            // onCommentChange={handleCommentChange}
+            displayPublic={displayPublic}
+            onUpdate={handleUpdateReference}
+          />
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

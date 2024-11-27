@@ -4,13 +4,19 @@ import AutoResizingRichTextarea from "@/components/AutoResizingRichTextarea";
 // import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import {
   Check,
   Edit,
   Plus,
   Save,
+  SquareChevronDown,
+  SquareChevronRight,
   Star,
   TrashIcon,
   XCircle,
@@ -275,6 +281,7 @@ export default function NoteCards({
   displayPublic,
 }: INotesProps) {
   const [notes, setNotes] = useState<INote[]>([]);
+  const [isCollapsibleOpen, setIsCollapsibleOpen] = useState(true);
 
   useEffect(() => {
     const fetchNotes = async () => {
@@ -344,36 +351,51 @@ export default function NoteCards({
   };
 
   return (
-    <div className="space-y-4 justify-center">
-      <div className="flex items-center justify-between">
-        <span className="font-medium">Notes</span>
-        {/* <h2 className="text-2xl font-bold mb-4">Notes for Tune {tuneRef}</h2> */}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="New Note"
-          className="p-0 h-auto"
-          title="New Note"
-          onClick={() => {
-            const newNote: INote = {
-              tune_ref: tuneRef,
-              user_ref: userRef,
-              created_date: new Date().toISOString().split("T")[0],
-              note_text: "",
-              public: false,
-              favorite: false,
-              isNew: true,
-            };
-            // Here you would typically make an API call to create the note on the server
-            void setNotes((notes) => [newNote, ...notes]);
-          }}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
+    <Collapsible
+      className="space-y-4"
+      open={isCollapsibleOpen}
+      onOpenChange={setIsCollapsibleOpen}
+    >
+      <div className="flex items-center justify-between space-x-4 px-4">
+        <span>Notes</span>
+        <div className="flex space-x-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="New Note"
+            className="p-0 h-auto"
+            title="New Note"
+            onClick={() => {
+              const newNote: INote = {
+                tune_ref: tuneRef,
+                user_ref: userRef,
+                created_date: new Date().toISOString().split("T")[0],
+                note_text: "",
+                public: false,
+                favorite: false,
+                isNew: true,
+              };
+              setNotes((notes) => [newNote, ...notes]);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm">
+              {isCollapsibleOpen ? (
+                <SquareChevronDown className="h-5 w-5" />
+              ) : (
+                <SquareChevronRight className="h-5 w-5" />
+              )}
+            </Button>
+          </CollapsibleTrigger>
+        </div>
       </div>
-      {notes.map((note) => (
-        <NoteCard key={note.id} note={note} onUpdate={handleUpdateNote} />
-      ))}
-    </div>
+      <CollapsibleContent>
+        {notes.map((note) => (
+          <NoteCard key={note.id} note={note} onUpdate={handleUpdateNote} />
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

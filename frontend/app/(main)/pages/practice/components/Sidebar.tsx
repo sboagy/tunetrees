@@ -48,7 +48,7 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
     setCurrentView("edit");
   };
 
-  return currentTune ? (
+  return currentTune && currentTune > 0 ? (
     <div className="flex flex-col h-full">
       <div className="sidebar flex-grow overflow-y-auto">
         <div className="flex items-center justify-between mb-2 mt-4 cursor-auto">
