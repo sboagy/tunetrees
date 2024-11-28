@@ -5,8 +5,10 @@ import type { TableState } from "@tanstack/react-table";
 import type { JSX } from "react";
 
 // add the id in a derived class?
-export type Tune = {
+export type TuneOverview = {
   id?: number;
+  user_ref?: number | null;
+  playlist_ref?: number | null;
   title: string;
   type: string | null;
   structure: string | null;
@@ -20,34 +22,13 @@ export type Tune = {
   interval: number | null;
   repetitions: number | null;
   review_date: string | null;
-  backup_practiced: string | null;
+  backup_practiced?: string | null;
   external_ref?: string | null;
   tags?: string | null;
   recall_eval?: string | null;
   notes?: string | null;
   favorite_url?: string | null;
-};
-
-export type PlaylistTune = {
-  id?: number;
-  title?: string;
-  type?: string;
-  structure?: string;
-  mode?: string;
-  incipit?: string;
-  genre?: string;
-  learned?: string;
-  practiced?: string;
-  quality?: number;
-  easiness?: number;
-  interval?: number;
-  repetitions?: number;
-  review_date?: string;
-  tags?: string;
-  user_ref?: number;
-  playlist_ref?: number;
-  notes?: string;
-  favorite_url?: string;
+  deleted?: boolean | null;
 };
 
 export type ScreenSize = "small" | "full";
@@ -72,12 +53,12 @@ export type TableTransientDataFields = {
 
 // Define the type for the function parameters
 export type FilteredDataParams = {
-  data: Tune[];
-  criteria: (item: Tune) => boolean;
+  data: TuneOverview[];
+  criteria: (item: TuneOverview) => boolean;
 };
 
 // Define the return type of the function
-export type FilteredDataReturnType = Tune[];
+export type FilteredDataReturnType = TuneOverview[];
 
 // Create the type definition for the filteredData function
 export type FilteredDataType = (
@@ -107,6 +88,7 @@ export interface IReferenceData {
   favorite: number | null;
   comment: string | null;
   title?: string;
+  deleted?: boolean | false;
   isNew?: boolean;
 }
 
@@ -119,6 +101,7 @@ export interface INote {
   note_text: string | null;
   public: boolean | false;
   favorite: boolean | false;
+  deleted?: boolean | false;
   isNew?: boolean;
 }
 
@@ -137,4 +120,5 @@ export interface ITune {
   mode?: string | null;
   incipit?: string | null;
   genre?: string | null;
+  deleted?: boolean | false;
 }

@@ -101,6 +101,11 @@ export const viewSettingsDefault = {
         visible: false,
         enabled: true, // is this column enabled at all for this table?
       }, // Note: Columns with `id` instead of `accessorKey` are not included in the dictionary
+      deleted: {
+        sort_direction: null, // null, "asc", "desc"
+        visible: false,
+        enabled: true, // is this column enabled at all for this table?
+      }, // Note: Columns with `id` instead of `accessorKey` are not included in the dictionary
     },
   },
   repertoire_pane: {

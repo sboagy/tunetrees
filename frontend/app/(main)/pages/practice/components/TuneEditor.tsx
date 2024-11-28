@@ -14,7 +14,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { ERROR_PLAYLIST_TUNE } from "../mocks";
 import { getPlaylistTune, updatePlaylistTune } from "../queries";
-import type { PlaylistTune } from "../types";
+import type { TuneOverview } from "../types";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import "./TuneEditor.css"; // Import the CSS file
@@ -93,7 +93,7 @@ export default function TuneEditor({
     };
   }, [headerFooterHeight, mainElement]);
 
-  const [tune, setTune] = useState<PlaylistTune | null>(null);
+  const [tune, setTune] = useState<TuneOverview | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -104,9 +104,9 @@ export default function TuneEditor({
     const fetchTune = () => {
       getPlaylistTune(userId, playlistId, tuneId)
         .then((tuneData) => {
-          if (tuneData && (tuneData as PlaylistTune).id !== undefined) {
-            setTune(tuneData as PlaylistTune);
-            form.reset(tuneData as PlaylistTune);
+          if (tuneData && (tuneData as TuneOverview).id !== undefined) {
+            setTune(tuneData as TuneOverview);
+            form.reset(tuneData as TuneOverview);
           } else {
             console.error(
               `Failed to fetch tune: ${userId} ${playlistId} ${tuneId}`,
@@ -132,7 +132,7 @@ export default function TuneEditor({
       userId,
       playlistId,
       tuneId,
-      data as PlaylistTune,
+      data as TuneOverview,
     );
     if ("detail" in result) {
       console.error("Failed to update tune:", result.detail);

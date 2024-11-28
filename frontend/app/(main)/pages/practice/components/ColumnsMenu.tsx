@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Table } from "@tanstack/react-table";
 import { useEffect, useState } from "react";
-import type { Tune } from "../types";
+import type { TuneOverview } from "../types";
 
 const ColumnsMenu = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -21,7 +21,7 @@ const ColumnsMenu = ({
   triggerRefresh,
 }: {
   user_id: number;
-  table: Table<Tune>;
+  table: Table<TuneOverview>;
   triggerRefresh: () => void;
 }) => {
   const [isClient, setIsClient] = useState(false);

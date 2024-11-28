@@ -2,21 +2,21 @@
 import React from "react";
 
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 import type { CellContext } from "@tanstack/react-table";
 
-import type { Tune } from "../types";
+import type { TuneOverview } from "../types";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function RecallEvalRadioGroup(info: CellContext<Tune, unknown>) {
+export function RecallEvalRadioGroup(info: CellContext<TuneOverview, unknown>) {
   const [position, setPosition] = React.useState("...");
 
   return (

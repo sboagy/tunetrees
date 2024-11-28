@@ -16,21 +16,21 @@ import {
 } from "@tanstack/react-table";
 import * as React from "react";
 import { createOrUpdateTableState, getTableStateTable } from "../settings";
-import type { TablePurpose, Tune } from "../types";
+import type { TablePurpose, TuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
 import { get_columns } from "./TuneColumns";
 
 export interface IScheduledTunesType {
-  tunes: Tune[];
+  tunes: TuneOverview[];
   userId: number;
   tablePurpose: TablePurpose;
   globalFilter?: string;
   onRecallEvalChange?: (tuneId: number, newValue: string) => void;
-  onTableCreated?: (table: TanstackTable<Tune>) => void;
+  onTableCreated?: (table: TanstackTable<TuneOverview>) => void;
   selectionChangedCallback?:
     | ((
-        table: TanstackTable<Tune>,
+        table: TanstackTable<TuneOverview>,
         rowSelectionState: RowSelectionState,
       ) => void)
     | null;
@@ -38,9 +38,8 @@ export interface IScheduledTunesType {
   setTunesRefreshId?: (newRefreshId: number) => void;
 }
 
-export const tableContext = React.createContext<TanstackTable<Tune> | null>(
-  null,
-);
+export const tableContext =
+  React.createContext<TanstackTable<TuneOverview> | null>(null);
 
 export const useTableContext = () => {
   const context = React.useContext(tableContext);
@@ -48,7 +47,7 @@ export const useTableContext = () => {
 };
 
 export const saveTableState = async (
-  table: TanstackTable<Tune>,
+  table: TanstackTable<TuneOverview>,
   userId: number,
   tablePurpose: TablePurpose,
   currentTuneId: number | null,
@@ -143,6 +142,7 @@ export function TunesTableComponent({
             notes_private: true,
             notes_public: true,
             tags: false,
+            deleted: false,
           },
     );
 
@@ -169,7 +169,7 @@ export function TunesTableComponent({
     setTunesRefreshId,
   );
 
-  const table: TanstackTable<Tune> = useReactTable({
+  const table: TanstackTable<TuneOverview> = useReactTable({
     data: tunes,
     columns: columns,
     globalFilterFn: "auto",
@@ -313,8 +313,10 @@ export function TunesTableComponent({
 // Create a hook to use the table
 export function useTunesTable(
   props: IScheduledTunesType,
-): [React.JSX.Element, TanstackTable<Tune> | null] {
-  const [table, setTable] = React.useState<TanstackTable<Tune> | null>(null);
+): [React.JSX.Element, TanstackTable<TuneOverview> | null] {
+  const [table, setTable] = React.useState<TanstackTable<TuneOverview> | null>(
+    null,
+  );
 
   React.useEffect(() => {
     console.log("useTunesTable: table changed", table?.getVisibleFlatColumns());

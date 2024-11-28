@@ -12,7 +12,7 @@ import { flexRender } from "@tanstack/react-table";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useRef } from "react";
-import type { TablePurpose, Tune } from "../types";
+import type { TablePurpose, TuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
@@ -45,7 +45,7 @@ export const getColorForEvaluation = (
 };
 
 type Props = {
-  table: TanstackTable<Tune>;
+  table: TanstackTable<TuneOverview>;
   userId: number;
   playlistId: number;
   tablePurpose: TablePurpose;
@@ -67,7 +67,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const tableBodyRef = useRef<HTMLDivElement>(null);
 
   const handleRowClick = useCallback(
-    (row: Row<Tune>) => {
+    (row: Row<TuneOverview>) => {
       const previousTune = currentTune;
       const newTune = row.original.id;
 
@@ -109,7 +109,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
     [currentTune, setCurrentTune, table, setCurrentTablePurpose, tablePurpose],
   );
 
-  const handleRowDoubleClick = (row: Row<Tune>) => {
+  const handleRowDoubleClick = (row: Row<TuneOverview>) => {
     console.log(
       "handleRowDoubleClick (current tune should already be set): tuneId=",
       row.original.id,

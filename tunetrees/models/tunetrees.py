@@ -41,6 +41,7 @@ class PlaylistTune(Base):
     tune_ref = mapped_column(Integer, primary_key=True)
     current = mapped_column(Text)
     learned = mapped_column(Text)
+    deleted = mapped_column(Boolean, server_default=text("FALSE"))
 
 
 t_practice_list_joined = Table(
@@ -63,6 +64,7 @@ t_practice_list_joined = Table(
     Column("tags", Text),
     Column("playlist_ref", Integer),
     Column("user_ref", Integer),
+    Column("deleted", Boolean),
     Column("notes", NullType),
     Column("favorite_url", Text),
 )
@@ -82,6 +84,7 @@ t_practice_list_staged = Table(
     Column("user_ref", Integer),
     Column("playlist_id", Integer),
     Column("instrument", Text),
+    Column("deleted", Boolean),
     Column("practiced", Text),
     Column("quality", Text),
     Column("easiness", Float),
@@ -108,6 +111,7 @@ class User(Base):
     email = mapped_column(Text)
     email_verified = mapped_column(Text, server_default=text("NULL"))
     image = mapped_column(Text)
+    deleted = mapped_column(Boolean, server_default=text("FALSE"))
 
     account: Mapped[List["Account"]] = relationship(
         "Account", uselist=True, back_populates="user"
@@ -178,6 +182,7 @@ class Playlist(Base):
     instrument = mapped_column(Text)
     description = mapped_column(Text)
     genre_default = mapped_column(Text)
+    deleted = mapped_column(Boolean, server_default=text("FALSE"))
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="playlist")
     note: Mapped[List["Note"]] = relationship(
@@ -256,6 +261,7 @@ class Tune(Base):
     mode = mapped_column(Text)
     incipit = mapped_column(Text)
     genre = mapped_column(ForeignKey("genre.id"))
+    deleted = mapped_column(Boolean, server_default=text("FALSE"))
 
     genre_: Mapped[Optional["Genre"]] = relationship("Genre", back_populates="tune")
     note: Mapped[List["Note"]] = relationship(
@@ -299,6 +305,7 @@ class Note(Base):
     note_text = mapped_column(Text)
     public = mapped_column(Boolean, server_default=text("FALSE"))
     favorite = mapped_column(Integer)
+    deleted = mapped_column(Boolean, server_default=text("FALSE"))
 
     playlist: Mapped[Optional["Playlist"]] = relationship(
         "Playlist", back_populates="note"
@@ -352,6 +359,7 @@ class Reference(Base):
     user_ref = mapped_column(Integer)
     comment = mapped_column(Text)
     title = mapped_column(Text)
+    deleted = mapped_column(Boolean, server_default=text("FALSE"))
 
     tune: Mapped["Tune"] = relationship("Tune", back_populates="reference")
 
@@ -403,6 +411,7 @@ class UserAnnotationSet(Base):
     note_public = mapped_column(Text)
     tags = mapped_column(Text)
     user_ref = mapped_column(ForeignKey("user.id"), primary_key=True)
+    deleted = mapped_column(Boolean, server_default=text("FALSE"))
 
     tune: Mapped[Optional["Tune"]] = relationship(
         "Tune", back_populates="user_annotation_set"

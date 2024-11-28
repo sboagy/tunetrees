@@ -7,7 +7,7 @@ from sqlalchemy.engine.row import Row
 
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
-    query_practice_list_recently_played,
+    query_repertoire_list,
     query_practice_list_scheduled,
 )
 from tunetrees.models.tunetrees import Tune
@@ -20,9 +20,7 @@ async def render_practice_page(review_sitdown_date: Optional[datetime] = None) -
         tunes_scheduled: List[Row[Any]] = query_practice_list_scheduled(
             db, limit=10, review_sitdown_date=review_sitdown_date
         )
-        tunes_recently_played: List[Tune] = query_practice_list_recently_played(
-            db, limit=25
-        )
+        tunes_recently_played: List[Tune] = query_repertoire_list(db, limit=25)
         tunetrees_package_top = Path(__file__).parent.parent
         assert tunetrees_package_top.exists()
         templates_folder = tunetrees_package_top.joinpath("templates")

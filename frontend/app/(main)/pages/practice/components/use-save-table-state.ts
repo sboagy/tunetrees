@@ -1,7 +1,7 @@
 import type { TableState, Table as TanstackTable } from "@tanstack/react-table";
 import { useEffect } from "react";
 import { createOrUpdateTableState } from "../settings";
-import type { TablePurpose, Tune } from "../types";
+import type { TablePurpose, TuneOverview } from "../types";
 
 /**
  * Custom hook to save the state of a table when the user navigates away from the page.
@@ -12,7 +12,7 @@ import type { TablePurpose, Tune } from "../types";
  * is unmounted, such as when switching tabs within the application.
  */
 export const useSaveTableState = (
-  table: TanstackTable<Tune>,
+  table: TanstackTable<TuneOverview>,
   userId: number,
   tablePurpose: TablePurpose,
   currentTune: number | null,

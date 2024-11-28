@@ -3,7 +3,7 @@ import type { Table as TanstackTable } from "@tanstack/react-table";
 import { TrashIcon } from "lucide-react";
 import type { JSX } from "react";
 import { deleteTune } from "../queries";
-import type { Tune } from "../types";
+import type { TuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 
@@ -11,7 +11,7 @@ interface IDeleteTuneButtonProps {
   userId: number;
   playlistId?: number;
   disabled?: boolean;
-  table: TanstackTable<Tune>;
+  table: TanstackTable<TuneOverview>;
 }
 
 export default function DeleteTuneButton({
@@ -32,7 +32,7 @@ export default function DeleteTuneButton({
     // If playlistId is defined, delete the tune from the `playlist_tunes` table.
     // Maybe in this we should also mark the tune as deleted, but not actually delete it?
 
-    const selectedTunes: Tune[] = table
+    const selectedTunes: TuneOverview[] = table
       .getSelectedRowModel()
       .rows.map((row) => row.original);
 

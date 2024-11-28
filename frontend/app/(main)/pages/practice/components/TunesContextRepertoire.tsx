@@ -1,10 +1,10 @@
 import type React from "react";
 import { type ReactNode, createContext, useContext, useState } from "react";
-import type { Tune } from "../types";
+import type { TuneOverview } from "../types";
 
 interface IRepertoireTunesContextType {
-  tunes: Tune[];
-  setTunes: React.Dispatch<React.SetStateAction<Tune[]>>;
+  tunes: TuneOverview[];
+  setTunes: React.Dispatch<React.SetStateAction<TuneOverview[]>>;
   tunesRefreshId: number | null;
   setTunesRefreshId: (newRefreshId: number) => void;
 }
@@ -18,7 +18,7 @@ export const TunesProviderRepertoire = ({
 }: {
   children: ReactNode;
 }) => {
-  const [tunes, setTunes] = useState<Tune[]>([]);
+  const [tunes, setTunes] = useState<TuneOverview[]>([]);
   const [tunesRefreshId, setTunesRefreshId] = useState<number | null>(null);
 
   return (

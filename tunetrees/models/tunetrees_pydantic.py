@@ -47,6 +47,7 @@ class PlaylistTuneModel(BaseModel):
     tune_ref: int  # Changed from str to int
     current: str
     learned: str
+    deleted: Optional[bool]
 
     class Config:
         orm_mode = True
@@ -57,6 +58,7 @@ class PlaylistTuneModelPartial(BaseModel):
     tune_ref: Optional[int] = None
     current: Optional[str] = None
     learned: Optional[str] = None
+    deleted: Optional[bool]
 
     class Config:
         orm_mode = True
@@ -70,6 +72,7 @@ class TuneModel(BaseModel):
     mode: Optional[str]
     incipit: Optional[str]
     genre: Optional[str]
+    deleted: Optional[bool]
 
     class Config:
         orm_mode = True
@@ -84,10 +87,20 @@ class TuneModelPartial(BaseModel):
     mode: Optional[str] = None
     incipit: Optional[str] = None
     genre: Optional[str] = None
+    deleted: Optional[bool]
 
     class Config:
         orm_mode = True
         from_attributes = True
+
+
+class TuneModelCreate(BaseModel):
+    title: str
+    type: str
+    structure: str
+    mode: str
+    incipit: str
+    genre: str
 
 
 class UserModel(BaseModel):
@@ -105,6 +118,7 @@ class UserModel(BaseModel):
     table_state: List["TableStateModel"]
     user_annotation_set: List["UserAnnotationSetModel"]
     table_transient_data: List["TableTransientDataModel"]
+    deleted: Optional[bool]
 
     class Config:
         orm_mode = True
@@ -125,6 +139,7 @@ class UserModelPartial(BaseModel):
     table_state: Optional[List["TableStateModel"]] = None
     user_annotation_set: Optional[List["UserAnnotationSetModel"]] = None
     table_transient_data: Optional[List["TableTransientDataModel"]] = None
+    deleted: Optional[bool] = None
 
     class Config:
         orm_mode = True
@@ -208,6 +223,7 @@ class PlaylistModel(BaseModel):
     instrument: Optional[str]
     description: Optional[str]  # Added description field
     genre_default: Optional[str] = None
+    deleted: Optional[bool]
 
     class Config:
         orm_mode = True
@@ -220,6 +236,7 @@ class PlaylistModelPartial(BaseModel):
     instrument: Optional[str] = None
     description: Optional[str] = None
     genre_default: Optional[str] = None
+    deleted: Optional[bool] = None
 
     class Config:
         orm_mode = True
@@ -316,6 +333,7 @@ class UserAnnotationSetModel(BaseModel):
     note_public: Optional[str]
     tags: Optional[str]
     user_ref: int
+    deleted: Optional[bool]
 
     class Config:
         orm_mode = True
@@ -327,6 +345,7 @@ class UserAnnotationSetModelPartial(BaseModel):
     note_public: Optional[str] = None
     tags: Optional[str] = None
     user_ref: Optional[int] = None
+    deleted: Optional[bool] = None
 
     class Config:
         orm_mode = True
@@ -396,3 +415,119 @@ class TableTransientDataModelPartial(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class NoteModel(BaseModel):
+    id: int
+    user_ref: int
+    tune_ref: int
+    playlist_ref: Optional[int]
+    created_date: Optional[str]
+    note_text: Optional[str]
+    public: Optional[bool]
+    favorite: Optional[int]
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class NoteModelPartial(BaseModel):
+    id: Optional[int]
+    user_ref: Optional[int]
+    tune_ref: Optional[int]
+    playlist_ref: Optional[int]
+    created_date: Optional[str]
+    note_text: Optional[str]
+    public: Optional[bool]
+    favorite: Optional[int]
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class NoteModelCreate(BaseModel):
+    user_ref: int
+    tune_ref: int
+    playlist_ref: Optional[int] = None
+    created_date: Optional[str] = None
+    note_text: Optional[str] = None
+    public: Optional[bool] = False
+    favorite: Optional[int] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class ReferenceModel(BaseModel):
+    tune_ref: int
+    user_ref: int
+    public: int | None
+    id: int
+    url: str
+    ref_type: str
+    favorite: int | None
+    comment: str | None
+    title: str | None
+    deleted: Optional[bool]
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class ReferenceModelPartial(BaseModel):
+    tune_ref: Optional[int]
+    user_ref: Optional[int]
+    public: Optional[int]
+    id: Optional[int]
+    url: Optional[str]
+    ref_type: Optional[str]
+    favorite: Optional[int]
+    comment: Optional[str]
+    title: Optional[str]
+    deleted: Optional[bool] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class ReferenceModelCreate(BaseModel):
+    tune_ref: int
+    user_ref: int
+    public: int | None
+    url: str
+    ref_type: str
+    favorite: int | None
+    comment: str | None
+    title: str | None
+
+
+class PlaylistTuneJoinedModel(BaseModel):
+    id: Optional[int] = None
+    title: Optional[str] = None
+    type: Optional[str] = None
+    structure: Optional[str] = None
+    mode: Optional[str] = None
+    incipit: Optional[str] = None
+    genre: Optional[str] = None
+    learned: Optional[str] = None
+    practiced: Optional[str] = None
+    quality: Optional[int] = None
+    easiness: Optional[float] = None
+    interval: Optional[int] = None
+    repetitions: Optional[int] = None
+    review_date: Optional[str] = None
+    tags: Optional[str] = None
+    user_ref: Optional[int] = None
+    playlist_ref: Optional[int] = None
+    notes: Optional[str] = None
+    favorite_url: Optional[str] = None
+    deleted: Optional[bool] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True

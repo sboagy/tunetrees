@@ -4,7 +4,6 @@ from os import environ
 from typing import Annotated, Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Form, HTTPException, Query
-from pydantic import BaseModel
 from sqlalchemy import ColumnElement, Table
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
@@ -15,7 +14,7 @@ from tunetrees.api.mappers.tunes_mapper import tunes_mapper
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.practice import render_practice_page
 from tunetrees.app.queries import (
-    query_practice_list_recently_played,
+    query_repertoire_list,
     query_practice_list_scheduled,
     query_tune_staged,
 )
@@ -40,6 +39,15 @@ from tunetrees.models.tunetrees_pydantic import (
     PlaylistModel,
     PlaylistModelPartial,
     TuneModel,
+    NoteModelCreate,
+    NoteModelPartial,
+    NoteModel,
+    ReferenceModelCreate,
+    ReferenceModelPartial,
+    ReferenceModel,
+    PlaylistTuneJoinedModel,
+    TuneModelCreate,
+    TuneModelPartial,
 )
 
 logger = logging.getLogger("tunetrees.api")
@@ -64,14 +72,18 @@ async def practice_page():
     return html_result
 
 
-@router.get("/get_practice_list_scheduled/{user_id}/{playlist_ref}")
-async def get_scheduled(
-    user_id: str, playlist_ref: str
+@router.get("/scheduled_tunes_overview/{user_id}/{playlist_ref}")
+async def get_scheduled_tunes_overview(
+    user_id: str, playlist_ref: str, show_deleted: bool = Query(False)
 ) -> List[dict[str, Any]] | dict[str, str]:
     try:
         with SessionLocal() as db:
             tunes_scheduled = query_practice_list_scheduled(
-                db, limit=10, user_ref=int(user_id), playlist_ref=int(playlist_ref)
+                db,
+                limit=10,
+                user_ref=int(user_id),
+                playlist_ref=int(playlist_ref),
+                show_deleted=show_deleted,
             )
             tune_list = [
                 tunes_mapper(tune, t_practice_list_staged) for tune in tunes_scheduled
@@ -82,14 +94,17 @@ async def get_scheduled(
         return {"error": f"Unable to fetch scheduled practice list: {e}"}
 
 
-@router.get("/get_tunes_recently_played/{user_id}/{playlist_ref}")
-async def get_recently_played(
-    user_id: str, playlist_ref: str
+@router.get("/repertoire_tunes_overview/{user_id}/{playlist_ref}")
+async def get_repertoire_tunes_overview(
+    user_id: str, playlist_ref: str, show_deleted: bool = Query(False)
 ) -> List[dict[str, Any]] | dict[str, str]:
     try:
         with SessionLocal() as db:
-            tunes_recently_played: List[Tune] = query_practice_list_recently_played(
-                db, user_ref=int(user_id), playlist_ref=int(playlist_ref)
+            tunes_recently_played: List[Tune] = query_repertoire_list(
+                db,
+                user_ref=int(user_id),
+                playlist_ref=int(playlist_ref),
+                show_deleted=show_deleted,
             )
             tune_list = []
             for tune in tunes_recently_played:
@@ -186,32 +201,6 @@ async def feedback(
     return html_result
 
 
-class PlaylistTuneJoinedModel(BaseModel):
-    id: Optional[int] = None
-    title: Optional[str] = None
-    type: Optional[str] = None
-    structure: Optional[str] = None
-    mode: Optional[str] = None
-    incipit: Optional[str] = None
-    genre: Optional[str] = None
-    learned: Optional[str] = None
-    practiced: Optional[str] = None
-    quality: Optional[int] = None
-    easiness: Optional[float] = None
-    interval: Optional[int] = None
-    repetitions: Optional[int] = None
-    review_date: Optional[str] = None
-    tags: Optional[str] = None
-    user_ref: Optional[int] = None
-    playlist_ref: Optional[int] = None
-    notes: Optional[str] = None
-    favorite_url: Optional[str] = None
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
 def update_table(
     db: Session,
     table: Table,
@@ -222,7 +211,51 @@ def update_table(
     db.execute(stmt)
 
 
-@router.delete("/playlist-tune/{user_id}/{playlist_ref}/{tune_id}", response_model=dict)
+@router.get(
+    "/playlist-tune-overview/{user_id}/{playlist_ref}/{tune_id}",
+    response_model=PlaylistTuneJoinedModel,
+)
+async def get_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
+    """
+    Retrieve a tune from the database.
+
+    Args:
+        user_id (int): Unique user ID.
+        playlist_ref (int): Unique playlist ID.
+        tune_id (int): Unique tune ID.
+
+    Returns:
+        PlaylistTuneJoinedModel | dict[str, str]: The retrieved tune data or an error message.
+            Example:
+                PlaylistTune object
+                {"detail": "Tune not found"}
+                {"detail": "Unable to fetch tune: <error_message>"}
+    """
+    try:
+        with SessionLocal() as db:
+            result = (
+                db.query(t_practice_list_joined)
+                .filter(
+                    t_practice_list_joined.c.user_ref == user_id,
+                    t_practice_list_joined.c.playlist_ref == playlist_ref,
+                    t_practice_list_joined.c.id == tune_id,
+                )
+                .first()
+            )
+
+            if result is None:
+                raise HTTPException(
+                    status_code=404, detail=f"Tune not found: ({tune_id})"
+                )
+            return PlaylistTuneJoinedModel.model_validate(result)
+    except Exception as e:
+        logger.error(f"Unable to fetch tune ({tune_id}): {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
+
+
+@router.delete(
+    "/playlist-tune-overview/{user_id}/{playlist_ref}/{tune_id}", response_model=dict
+)
 async def delete_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
     """
     Delete a tune from the database.
@@ -257,93 +290,8 @@ async def delete_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
 
 
 @router.get(
-    "/playlist-tune/{user_id}/{playlist_ref}/{tune_id}",
-    response_model=PlaylistTuneJoinedModel,
-)
-async def get_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
-    """
-    Retrieve a tune from the database.
-
-    Args:
-        user_id (int): Unique user ID.
-        playlist_ref (int): Unique playlist ID.
-        tune_id (int): Unique tune ID.
-
-    Returns:
-        PlaylistTune | dict[str, str]: The retrieved tune data or an error message.
-            Example:
-                PlaylistTune object
-                {"detail": "Tune not found"}
-                {"detail": "Unable to fetch tune: <error_message>"}
-    """
-    try:
-        with SessionLocal() as db:
-            result = (
-                db.query(t_practice_list_joined)
-                .filter(
-                    t_practice_list_joined.c.user_ref == user_id,
-                    t_practice_list_joined.c.playlist_ref == playlist_ref,
-                    t_practice_list_joined.c.id == tune_id,
-                )
-                .first()
-            )
-
-            if result is None:
-                raise HTTPException(
-                    status_code=404, detail=f"Tune not found: ({tune_id})"
-                )
-            return PlaylistTuneJoinedModel.model_validate(result)
-    except Exception as e:
-        logger.error(f"Unable to fetch tune ({tune_id}): {e}")
-        raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
-
-
-class ReferenceCreate(BaseModel):
-    tune_ref: int
-    user_ref: int
-    public: int | None
-    url: str
-    ref_type: str
-    favorite: int | None
-    comment: str | None
-    title: str | None
-
-
-class ReferenceUpdate(BaseModel):
-    tune_ref: Optional[int]
-    user_ref: Optional[int]
-    public: Optional[int]
-    id: Optional[int]
-    url: Optional[str]
-    ref_type: Optional[str]
-    favorite: Optional[int]
-    comment: Optional[str]
-    title: Optional[str]
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
-class ReferenceResponse(BaseModel):
-    tune_ref: int
-    user_ref: int
-    public: int | None
-    id: int
-    url: str
-    ref_type: str
-    favorite: int | None
-    comment: str | None
-    title: str | None
-
-    class Config:
-        # orm_mode = True
-        from_attributes = True
-
-
-@router.get(
     "/references",
-    response_model=List[ReferenceResponse],
+    response_model=List[ReferenceModel],
     summary="Get References",
     description="Get all references for a user and tune or public references.",
     status_code=200,
@@ -378,7 +326,7 @@ def get_references(
                 print(f"Reference type: {type(reference)}, Reference: {reference}")
 
             result = [
-                ReferenceResponse.model_validate(reference) for reference in references
+                ReferenceModel.model_validate(reference) for reference in references
             ]
             return result
     except Exception as e:
@@ -390,19 +338,19 @@ def get_references(
 
 @router.post(
     "/references",
-    response_model=ReferenceResponse,
+    response_model=ReferenceModel,
     summary="Create Reference",
     description="Create a new reference.",
     status_code=201,
 )
-def create_reference(reference: ReferenceCreate):
+def create_reference(reference: ReferenceModelCreate):
     try:
         with SessionLocal() as db:
             new_reference = Reference(**reference.model_dump())
             db.add(new_reference)
             db.commit()
             db.refresh(new_reference)
-            return ReferenceResponse.model_validate(new_reference)
+            return ReferenceModel.model_validate(new_reference)
     except Exception as e:
         logger.error(f"Unable to create reference: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to create reference: {e}")
@@ -410,14 +358,14 @@ def create_reference(reference: ReferenceCreate):
 
 @router.put(
     "/references",
-    response_model=ReferenceResponse,
+    response_model=ReferenceModel,
     summary="Update Reference",
     description="Update an existing reference.",
     status_code=200,
 )
 def update_reference(
     id: int,
-    reference: ReferenceUpdate = Body(...),
+    reference: ReferenceModelPartial = Body(...),
 ):
     try:
         with SessionLocal() as db:
@@ -436,7 +384,7 @@ def update_reference(
 
             db.commit()
             db.refresh(existing_reference)
-            return ReferenceResponse.model_validate(existing_reference)
+            return ReferenceModel.model_validate(existing_reference)
     except Exception as e:
         logger.error(f"Unable to update reference ({id}: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to update reference: {e}")
@@ -469,48 +417,9 @@ def delete_reference(id: int):  # noqa: C901
         raise HTTPException(status_code=500, detail=f"Unable to delete reference: {e}")
 
 
-class NoteCreate(BaseModel):
-    user_ref: int
-    tune_ref: int
-    playlist_ref: Optional[int] = None
-    created_date: Optional[str] = None
-    note_text: Optional[str] = None
-    public: Optional[bool] = False
-    favorite: Optional[int] = None
-
-
-class NoteUpdate(BaseModel):
-    id: Optional[int]
-    user_ref: Optional[int]
-    tune_ref: Optional[int]
-    playlist_ref: Optional[int]
-    created_date: Optional[str]
-    note_text: Optional[str]
-    public: Optional[bool]
-    favorite: Optional[int]
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
-class NoteResponse(BaseModel):
-    id: int
-    user_ref: int
-    tune_ref: int
-    playlist_ref: Optional[int]
-    created_date: Optional[str]
-    note_text: Optional[str]
-    public: Optional[bool]
-    favorite: Optional[int]
-
-    class Config:
-        from_attributes = True
-
-
 @router.get(
     "/notes",
-    response_model=List[NoteResponse],
+    response_model=List[NoteModel],
     summary="Get Notes",
     description="Retrieve notes based on tune_ref and optional playlist_ref, user_ref, or public.",
     status_code=200,
@@ -531,7 +440,7 @@ def get_notes(
             )
             result = db.execute(stmt)
             notes = result.scalars().all()
-            return [NoteResponse.model_validate(note) for note in notes]
+            return [NoteModel.model_validate(note) for note in notes]
     except Exception as e:
         logger.error(f"Unable to fetch notes: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to fetch notes: {e}")
@@ -539,19 +448,19 @@ def get_notes(
 
 @router.post(
     "/notes",
-    response_model=NoteResponse,
+    response_model=NoteModel,
     summary="Create Note",
     description="Create a new note.",
     status_code=201,
 )
-def create_note(note: NoteCreate):
+def create_note(note: NoteModelCreate):
     try:
         with SessionLocal() as db:
             new_note = Note(**note.model_dump())
             db.add(new_note)
             db.commit()
             db.refresh(new_note)
-            return NoteResponse.model_validate(new_note)
+            return NoteModel.model_validate(new_note)
     except Exception as e:
         logger.error(f"Unable to create note: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to create note: {e}")
@@ -559,14 +468,14 @@ def create_note(note: NoteCreate):
 
 @router.put(
     "/notes",
-    response_model=NoteResponse,
+    response_model=NoteModel,
     summary="Update Note",
     description="Update an existing note.",
     status_code=200,
 )
 def update_note(
     id: int,
-    note: NoteUpdate = Body(...),
+    note: NoteModelPartial = Body(...),
 ):
     try:
         with SessionLocal() as db:
@@ -582,7 +491,7 @@ def update_note(
 
             db.commit()
             db.refresh(existing_note)
-            return NoteResponse.model_validate(existing_note)
+            return NoteModel.model_validate(existing_note)
     except Exception as e:
         logger.error(f"Unable to update note ({id}): {e}")
         raise HTTPException(status_code=500, detail=f"Unable to update note: {e}")
@@ -614,24 +523,6 @@ def delete_note(
     except Exception as e:
         logger.error(f"Unable to delete note ({note_id}): {e}")
         raise HTTPException(status_code=500, detail=f"Unable to delete note: {e}")
-
-
-class TuneCreate(BaseModel):
-    title: str
-    type: str
-    structure: str
-    mode: str
-    incipit: str
-    genre: str
-
-
-class TuneUpdate(BaseModel):
-    title: Optional[str] = None
-    type: Optional[str] = None
-    structure: Optional[str] = None
-    mode: Optional[str] = None
-    incipit: Optional[str] = None
-    genre: Optional[str] = None
 
 
 @router.get(
@@ -667,7 +558,7 @@ def get_tune(tune_ref: int = Query(...)):
     description="Create a new tune.",
     status_code=201,
 )
-def create_tune(tune: TuneCreate, playlist_ref: Optional[int] = None):
+def create_tune(tune: TuneModelCreate, playlist_ref: Optional[int] = None):
     try:
         with SessionLocal() as db:
             new_tune = Tune(**tune.model_dump())
@@ -703,7 +594,7 @@ def create_tune(tune: TuneCreate, playlist_ref: Optional[int] = None):
     description="Update an existing tune by its reference ID.",
     status_code=200,
 )
-def update_tune(tune_ref: int = Query(...), tune: TuneUpdate = Body(...)):
+def update_tune(tune_ref: int = Query(...), tune: TuneModelPartial = Body(...)):
     try:
         with SessionLocal() as db:
             existing_tune = db.query(Tune).filter(Tune.id == tune_ref).first()

@@ -18,7 +18,11 @@ import {
   createOrUpdateTableTransientData,
   deleteTableTransientData,
 } from "../settings";
-import type { TablePurpose, Tune, TunesGridColumnGeneralType } from "../types";
+import type {
+  TablePurpose,
+  TuneOverview,
+  TunesGridColumnGeneralType,
+} from "../types";
 import { getColorForEvaluation } from "./TunesGrid";
 
 // #     Quality: The quality of recalling the answer from a scale of 0 to 5.
@@ -76,7 +80,7 @@ const qualityList = [
 ];
 
 type RecallEvalComboBoxProps = {
-  info: CellContext<Tune, TunesGridColumnGeneralType>;
+  info: CellContext<TuneOverview, TunesGridColumnGeneralType>;
   userId: number;
   playlistId: number;
   purpose: TablePurpose;

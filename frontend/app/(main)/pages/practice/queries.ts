@@ -2,23 +2,27 @@
 
 import axios from "axios";
 import { ERROR_TUNE } from "./mocks";
-import type { INote, IReferenceData, ITune, PlaylistTune, Tune } from "./types";
+import type { INote, IReferenceData, ITune, TuneOverview } from "./types";
 
 const client = axios.create({
   // baseURL: process.env.TT_API_BASE_URL
   baseURL: process.env.NEXT_PUBLIC_TT_BASE_URL,
 });
 
-export async function getPracticeListScheduled(
+export async function getScheduledTunesOverview(
   userId: number,
   playlistId: number,
-): Promise<Tune[]> {
+  showDeleted = false,
+): Promise<TuneOverview[]> {
   try {
     // console.log("Environment Variables:", process.env);
-    console.log("In getPracticeListScheduled: baseURL: %s", client.getUri());
+    console.log("In getScheduledTunesOverview: baseURL: %s", client.getUri());
     console.log("user_id: %s, playlist_id: %s", userId, playlistId);
-    const response = await client.get<Tune[]>(
-      `/get_practice_list_scheduled/${userId}/${playlistId}`,
+    const response = await client.get<TuneOverview[]>(
+      `/scheduled_tunes_overview/${userId}/${playlistId}`,
+      {
+        params: { show_deleted: showDeleted },
+      },
     );
     return response.data;
   } catch (error) {
@@ -28,13 +32,17 @@ export async function getPracticeListScheduled(
   }
 }
 
-export async function getTunesInPlaylistForUser(
+export async function getRepertoireTunesOverview(
   userId: number,
   playlistId: number,
-): Promise<Tune[]> {
+  showDeleted = false,
+): Promise<TuneOverview[]> {
   try {
-    const response = await client.get<Tune[]>(
-      `/get_tunes_recently_played/${userId}/${playlistId}`,
+    const response = await client.get<TuneOverview[]>(
+      `/repertoire_tunes_overview/${userId}/${playlistId}`,
+      {
+        params: { show_deleted: showDeleted },
+      },
     );
     return response.data;
   } catch (error) {
@@ -52,12 +60,12 @@ export async function getTuneStaged(
   user_id: string,
   playlist_id: string,
   tune_id: string,
-): Promise<Tune[]> {
+): Promise<TuneOverview[]> {
   console.warn(
     "getTuneStaged is deprecated. Please use getPlaylistTune instead.",
   );
   try {
-    const response = await client.get<Tune[]>(
+    const response = await client.get<TuneOverview[]>(
       `/get_tune_staged/${user_id}/${playlist_id}/${tune_id}`,
     );
     return response.data;
@@ -81,8 +89,8 @@ export async function updatePlaylistTune(
   user_id: number,
   playlist_ref: number,
   tune_id: number,
-  tune_update: Partial<PlaylistTune>,
-): Promise<Partial<PlaylistTune> | { detail?: string }> {
+  tune_update: Partial<TuneOverview>,
+): Promise<Partial<TuneOverview> | { detail?: string }> {
   try {
     const dbTune = await getPlaylistTune(user_id, playlist_ref, tune_id);
     if ("detail" in dbTune) {
@@ -132,7 +140,7 @@ export async function deletePlaylistTune(
 ): Promise<{ success?: string; detail?: string }> {
   try {
     const response = await client.delete<{ success?: string; detail?: string }>(
-      `/playlist-tune/${user_id}/${playlist_ref}/${tune_id}`,
+      `/playlist-tune-overview/${user_id}/${playlist_ref}/${tune_id}`,
     );
     return response.data;
   } catch (error) {
@@ -153,10 +161,10 @@ export async function getPlaylistTune(
   user_id: number,
   playlist_ref: number,
   tune_id: number,
-): Promise<PlaylistTune | { detail: string }> {
+): Promise<TuneOverview | { detail: string }> {
   try {
-    const response = await client.get<PlaylistTune | { detail: string }>(
-      `/playlist-tune/${user_id}/${playlist_ref}/${tune_id}`,
+    const response = await client.get<TuneOverview | { detail: string }>(
+      `/playlist-tune-overview/${user_id}/${playlist_ref}/${tune_id}`,
     );
     return response.data;
   } catch (error) {
@@ -176,11 +184,11 @@ export async function getPlaylistTune(
 export async function createPlaylistTune(
   user_id: string,
   playlist_ref: string,
-  tune: PlaylistTune,
+  tune: TuneOverview,
 ): Promise<{ success?: string; detail?: string }> {
   try {
     const response = await client.post<{ success?: string; detail?: string }>(
-      `/playlist-tune/${user_id}/${playlist_ref}`,
+      `/playlist-tune-overview/${user_id}/${playlist_ref}`,
       tune,
     );
     return response.data;
@@ -412,11 +420,14 @@ export async function deleteNote(
  */
 export async function getTune(
   tuneRef: number,
-): Promise<Tune | { detail: string }> {
+): Promise<TuneOverview | { detail: string }> {
   try {
-    const response = await client.get<Tune | { detail: string }>("/tune", {
-      params: { tune_ref: tuneRef },
-    });
+    const response = await client.get<TuneOverview | { detail: string }>(
+      "/tune",
+      {
+        params: { tune_ref: tuneRef },
+      },
+    );
     return response.data;
   } catch (error) {
     console.error(`Error in getTune(${tuneRef})`, error);
@@ -433,7 +444,7 @@ export async function getTune(
  */
 export async function updateTune(
   tuneRef: number,
-  tuneUpdate: Partial<Tune>,
+  tuneUpdate: Partial<TuneOverview>,
 ): Promise<{ success?: string; detail?: string }> {
   try {
     const response = await client.put<{ success?: string; detail?: string }>(
@@ -460,14 +471,14 @@ export interface ITuneCreate {
 /**
  * Creates a new tune and associates it with the specified playlist.
  *
- * @param {Tune} tune - The tune object to be created.
+ * @param {TuneOverview} tune - The tune object to be created.
  * @param {number} playlistRef - The reference ID of the playlist to associate the tune with.
- * @return {Promise<Tune | { success?: string; detail?: string }>} A promise that resolves to the created tune or an object with success or detail messages.
+ * @return {Promise<TuneOverview | { success?: string; detail?: string }>} A promise that resolves to the created tune or an object with success or detail messages.
  */
 export async function createTune(
-  tune: Tune,
+  tune: TuneOverview,
   playlistRef: number,
-): Promise<Tune | { success?: string; detail?: string }> {
+): Promise<TuneOverview | { success?: string; detail?: string }> {
   try {
     const tuneCreateInput: ITuneCreate = {
       title: tune.title,
@@ -478,7 +489,7 @@ export async function createTune(
       genre: tune.genre ?? "",
     };
     const response = await client.post<
-      Tune | { success?: string; detail?: string }
+      TuneOverview | { success?: string; detail?: string }
     >(`/tune?playlist_ref=${playlistRef}`, tuneCreateInput);
     console.log("createTune response: ", response.data);
     return response.data;

@@ -103,6 +103,7 @@ def query_practice_list_scheduled(
     acceptable_delinquency_window=7,
     playlist_ref=1,
     user_ref=1,
+    show_deleted=False,
 ) -> List[Row[Any]]:
     """Get a list of tunes to practice on the review_sitdown_date.
     (This version uses the practice_list_joined view, instead of
@@ -141,14 +142,17 @@ def query_practice_list_scheduled(
 
     # Create the query
     try:
-        practice_list_query = db.query(t_practice_list_staged).filter(
-            and_(
-                t_practice_list_staged.c.user_ref == user_ref,
-                t_practice_list_staged.c.playlist_id == playlist_ref,
-                t_practice_list_staged.c.review_date > lower_bound_date,
-                t_practice_list_staged.c.review_date <= review_sitdown_date,
-            )
-        )
+        filters = [
+            t_practice_list_staged.c.user_ref == user_ref,
+            t_practice_list_staged.c.playlist_id == playlist_ref,
+            t_practice_list_staged.c.review_date > lower_bound_date,
+            t_practice_list_staged.c.review_date <= review_sitdown_date,
+        ]
+        if not show_deleted:
+            filters.append(t_practice_list_staged.c.deleted.is_(False))
+
+        practice_list_query = db.query(t_practice_list_staged).filter(and_(*filters))
+
     except Exception as e:
         logging.getLogger().error(
             f"An error occurred while querying the practice list: {e}"
@@ -278,20 +282,23 @@ def query_practice_list_scheduled(
 #     return rows
 
 
-def query_practice_list_recently_played(
+def query_repertoire_list(
     db: Session,
     skip: int = 0,
     limit: int = 100000,
     print_table=False,
     playlist_ref=1,
     user_ref=1,
+    show_deleted=False,
 ) -> List[Tune]:
-    query = db.query(t_practice_list_staged).filter(
-        and_(
-            t_practice_list_staged.c.user_ref == user_ref,
-            t_practice_list_staged.c.playlist_id == playlist_ref,
-        )
-    )
+    filters = [
+        t_practice_list_staged.c.user_ref == user_ref,
+        t_practice_list_staged.c.playlist_id == playlist_ref,
+    ]
+    if not show_deleted:
+        filters.append(t_practice_list_staged.c.deleted.is_(False))
+
+    query = db.query(t_practice_list_staged).filter(and_(*filters))
     query_sorted = query.order_by(
         func.DATE(t_practice_list_staged.c.review_date).desc()
     )

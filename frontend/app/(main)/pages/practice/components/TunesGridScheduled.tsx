@@ -6,9 +6,9 @@ import { Switch } from "@/components/ui/switch";
 import { Upload } from "lucide-react";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
-import { getPracticeListScheduled } from "../queries";
+import { getScheduledTunesOverview } from "../queries";
 import { deleteTableTransientData } from "../settings";
-import type { Tune } from "../types";
+import type { TuneOverview } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import FlashcardPanel from "./FlashcardPanel";
@@ -33,6 +33,7 @@ export default function TunesGridScheduled({
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { currentPlaylist: playlistId } = usePlaylist();
+  const showDeleted = false; // Should become a state variable at some point
 
   console.log(
     `LF1 render ScheduledTunesGrid: playlistId=${playlistId}, userId=${userId}`,
@@ -45,9 +46,10 @@ export default function TunesGridScheduled({
 
   const handleRecallEvalChange = useCallback(
     (tuneId: number, newValue: string): void => {
-      setTunes((prevTunes) =>
-        prevTunes.map((tune) =>
-          tune.id === tuneId ? { ...tune, recall_eval: newValue } : tune,
+      setTunes((prevTunes: TuneOverview[]) =>
+        prevTunes.map(
+          (tune): TuneOverview =>
+            tune.id === tuneId ? { ...tune, recall_eval: newValue } : tune,
         ),
       );
     },
@@ -60,9 +62,10 @@ export default function TunesGridScheduled({
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
-        const result: Tune[] = await getPracticeListScheduled(
+        const result: TuneOverview[] = await getScheduledTunesOverview(
           userId,
           playlistId,
+          showDeleted,
         );
         setTunesRefreshId(refreshId);
         setTunes(result);
@@ -84,7 +87,7 @@ export default function TunesGridScheduled({
       isRefreshing.current = true;
       setIsLoading(true);
       refreshTunes(userId, playlistId, refreshId)
-        .then((result: Tune[]) => {
+        .then((result: TuneOverview[]) => {
           console.log(`LF1 ScheduledTunesGrid number tunes: ${result.length}`);
           console.log(
             `LF1 ScheduledTunesGrid back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
