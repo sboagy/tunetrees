@@ -2,25 +2,25 @@
 
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle,
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import type {
-    CellContext,
-    Table as TanstackTable,
+  CellContext,
+  Table as TanstackTable,
 } from "@tanstack/react-table";
 import type { TablePurpose, TuneOverview } from "../types";
 import RecallEvalComboBox from "./RowRecallEvalComboBox";

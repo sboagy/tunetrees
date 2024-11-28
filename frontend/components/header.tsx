@@ -1,8 +1,8 @@
 "use client";
+import TabsMenu from "@/app/(main)/pages/practice/components/TabsMenu"; // Add this import
 import { MainNav } from "./MainNav";
 import PlaylistChooser from "./PlaylistChooser";
 import UserButton from "./UserButton";
-import TabsMenu from "@/app/(main)/pages/practice/components/TabsMenu"; // Add this import
 
 export default function Header() {
   return (

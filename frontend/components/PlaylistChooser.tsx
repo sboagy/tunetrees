@@ -3,12 +3,12 @@
 import { usePlaylist } from "@/app/(main)/pages/practice/components/CurrentPlaylistProvider";
 import { useTuneDataRefresh } from "@/app/(main)/pages/practice/components/TuneDataRefreshContext";
 import {
-    type IPlaylist,
-    createPlaylist,
-    deletePlaylist,
-    getPlaylists,
-    getRepertoireTunesOverview, // Import getTunesInPlaylistForUser
-    updatePlaylist,
+  type IPlaylist,
+  createPlaylist,
+  deletePlaylist,
+  getPlaylists,
+  getRepertoireTunesOverview, // Import getTunesInPlaylistForUser
+  updatePlaylist,
 } from "@/app/(main)/pages/practice/queries";
 import { getTabGroupMainState } from "@/app/(main)/pages/practice/settings";
 import deepEqual from "fast-deep-equal"; // Import deepEqual
@@ -17,18 +17,18 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "./ui/dialog";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Input } from "./ui/input";
 
