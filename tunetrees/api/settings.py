@@ -10,7 +10,6 @@ from tunetrees.models.tunetrees import TabGroupMainState, TableState, TableTrans
 from pydantic import BaseModel
 from tunetrees.models.tunetrees_pydantic import (
     TabGroupMainStateModel,
-    TabGroupMainStateModelPartial,
     TableTransientDataModel,
 )
 
@@ -506,7 +505,7 @@ def create_tab_group_main_state(
             raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
-@settings_router.put(
+@settings_router.patch(
     "/tab_group_main_state/{user_id}",
     response_model=TabGroupMainStateModel,
     summary="Update the tab group main state for a user",
@@ -520,7 +519,7 @@ def update_tab_group_main_state(
             description="Should be a valid user id that corresponds to a user in the user table"
         ),
     ],
-    tab_group_main_state: TabGroupMainStateModelPartial,
+    tab_group_main_state: TabGroupMainStateModel,
 ):
     with SessionLocal() as db:
         try:

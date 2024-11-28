@@ -37,17 +37,13 @@ from tunetrees.models.tunetrees import (
 )
 from tunetrees.models.tunetrees_pydantic import (
     PlaylistModel,
-    PlaylistModelPartial,
     TuneModel,
     NoteModelCreate,
-    NoteModelPartial,
     NoteModel,
     ReferenceModelCreate,
-    ReferenceModelPartial,
     ReferenceModel,
     PlaylistTuneJoinedModel,
     TuneModelCreate,
-    TuneModelPartial,
 )
 
 logger = logging.getLogger("tunetrees.api")
@@ -356,7 +352,7 @@ def create_reference(reference: ReferenceModelCreate):
         raise HTTPException(status_code=500, detail=f"Unable to create reference: {e}")
 
 
-@router.put(
+@router.patch(
     "/references",
     response_model=ReferenceModel,
     summary="Update Reference",
@@ -365,7 +361,7 @@ def create_reference(reference: ReferenceModelCreate):
 )
 def update_reference(
     id: int,
-    reference: ReferenceModelPartial = Body(...),
+    reference: ReferenceModel = Body(...),
 ):
     try:
         with SessionLocal() as db:
@@ -466,7 +462,7 @@ def create_note(note: NoteModelCreate):
         raise HTTPException(status_code=500, detail=f"Unable to create note: {e}")
 
 
-@router.put(
+@router.patch(
     "/notes",
     response_model=NoteModel,
     summary="Update Note",
@@ -475,7 +471,7 @@ def create_note(note: NoteModelCreate):
 )
 def update_note(
     id: int,
-    note: NoteModelPartial = Body(...),
+    note: NoteModel = Body(...),
 ):
     try:
         with SessionLocal() as db:
@@ -587,14 +583,14 @@ def create_tune(tune: TuneModelCreate, playlist_ref: Optional[int] = None):
         raise HTTPException(status_code=500, detail=f"Unable to create tune: {e}")
 
 
-@router.put(
+@router.patch(
     "/tune",
     response_model=TuneModel,
     summary="Update Tune",
     description="Update an existing tune by its reference ID.",
     status_code=200,
 )
-def update_tune(tune_ref: int = Query(...), tune: TuneModelPartial = Body(...)):
+def update_tune(tune_ref: int = Query(...), tune: TuneModel = Body(...)):
     try:
         with SessionLocal() as db:
             existing_tune = db.query(Tune).filter(Tune.id == tune_ref).first()
@@ -652,14 +648,14 @@ def get_playlists(user_ref: int = Query(...)):
         raise HTTPException(status_code=500, detail=f"Unable to fetch playlists: {e}")
 
 
-@router.post(
+@router.patch(
     "/playlist",
     response_model=PlaylistModel,
     summary="Create Playlist",
     description="Create a new playlist.",
     status_code=201,
 )
-def create_playlist(playlist: PlaylistModelPartial):
+def create_playlist(playlist: PlaylistModel):
     try:
         with SessionLocal() as db:
             new_playlist = Playlist(**playlist.model_dump())
@@ -672,14 +668,14 @@ def create_playlist(playlist: PlaylistModelPartial):
         raise HTTPException(status_code=500, detail=f"Unable to create playlist: {e}")
 
 
-@router.put(
+@router.patch(
     "/playlist/{playlist_id}",
     response_model=PlaylistModel,
     summary="Update Playlist",
     description="Update an existing playlist by its ID.",
     status_code=200,
 )
-def update_playlist(playlist_id: int, playlist: PlaylistModelPartial = Body(...)):
+def update_playlist(playlist_id: int, playlist: PlaylistModel = Body(...)):
     try:
         with SessionLocal() as db:
             existing_playlist = (

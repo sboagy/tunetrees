@@ -374,7 +374,7 @@ export async function updateTabGroupMainState(
     if (tabGroupMainState.tab_spec !== null) {
       tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
     }
-    const response = await client.put(
+    const response = await client.patch(
       `/tab_group_main_state/${userId}`,
       tabGroupMainState,
     );

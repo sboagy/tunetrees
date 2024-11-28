@@ -7,15 +7,9 @@ from pydantic import BaseModel
 # It is dissapointing that SQLAlchemy models can't be directly used as Pydantic models,
 # or that that FastAPI doesn't support SQLAlchemy models directly.
 #
-# Each Pydantic model has a variant that is partial, which is used for partial updates.
-# Future versions of Python or type checkers might introduce features that allow for
-# more dynamic type hints, potentially making a create_partial_model approach directly usable,
-# or it will support something like `Partial[T]`, similar to of Partial<T> in TypeScript,
-# to allow for partial updates.
-# But for now, we have to define the partial models manually.
-#
 # BUT, SQLModel supports both the latest SQLAlchemy (2.0.35 as of November 23, 2024)
-# and Pydantic 2.8.2.
+# and Pydantic 2.8.2.  Unfortunately, sqlacodegen_v2 isn't quite there yet with generating
+# latest SQLModel code.  So, we're stuck with this for now, until sqlacodegen_v2 catches up.
 
 
 class AlgTypeEnum(str, Enum):
@@ -51,17 +45,7 @@ class PlaylistTuneModel(BaseModel):
 
     class Config:
         orm_mode = True
-
-
-class PlaylistTuneModelPartial(BaseModel):
-    playlist_ref: Optional[int] = None
-    tune_ref: Optional[int] = None
-    current: Optional[str] = None
-    learned: Optional[str] = None
-    deleted: Optional[bool]
-
-    class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TuneModel(BaseModel):
@@ -72,21 +56,6 @@ class TuneModel(BaseModel):
     mode: Optional[str]
     incipit: Optional[str]
     genre: Optional[str]
-    deleted: Optional[bool]
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
-class TuneModelPartial(BaseModel):
-    id: Optional[int] = None
-    type: Optional[str] = None
-    structure: Optional[str] = None
-    title: Optional[str] = None
-    mode: Optional[str] = None
-    incipit: Optional[str] = None
-    genre: Optional[str] = None
     deleted: Optional[bool]
 
     class Config:
@@ -124,40 +93,10 @@ class UserModel(BaseModel):
         orm_mode = True
 
 
-class UserModelPartial(BaseModel):
-    id: Optional[int] = None
-    hash: Optional[str] = None
-    name: Optional[str] = None
-    email: Optional[str] = None
-    email_verified: Optional[str] = None
-    image: Optional[str] = None
-    account: Optional[List["AccountModel"]] = None
-    playlist: Optional[List["PlaylistModel"]] = None
-    prefs_spaced_repetition: Optional[List["PrefsSpacedRepetitionModel"]] = None
-    session: Optional[List["SessionModel"]] = None
-    tab_group_main_state: Optional[List["TabGroupMainStateModel"]] = None
-    table_state: Optional[List["TableStateModel"]] = None
-    user_annotation_set: Optional[List["UserAnnotationSetModel"]] = None
-    table_transient_data: Optional[List["TableTransientDataModel"]] = None
-    deleted: Optional[bool] = None
-
-    class Config:
-        orm_mode = True
-
-
 class VerificationTokenModel(BaseModel):
     identifier: str
     token: str
     expires: str
-
-    class Config:
-        orm_mode = True
-
-
-class VerificationTokenModelPartial(BaseModel):
-    identifier: Optional[str] = None
-    token: Optional[str] = None
-    expires: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -180,38 +119,11 @@ class AccountModel(BaseModel):
         orm_mode = True
 
 
-class AccountModelPartial(BaseModel):
-    user_id: Optional[int] = None
-    provider_account_id: Optional[str] = None
-    provider: Optional[str] = None
-    type: Optional[str] = None
-    access_token: Optional[str] = None
-    id_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    scope: Optional[str] = None
-    expires_at: Optional[int] = None
-    session_state: Optional[str] = None
-    token_type: Optional[str] = None
-
-    class Config:
-        orm_mode = True
-
-
 class ExternalRefModel(BaseModel):
     id: int
     url: str
     tune_ref: int
     ref_type: Optional[str]
-
-    class Config:
-        orm_mode = True
-
-
-class ExternalRefModelPartial(BaseModel):
-    id: Optional[int] = None
-    url: Optional[str] = None
-    tune_ref: Optional[int] = None
-    ref_type: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -230,19 +142,6 @@ class PlaylistModel(BaseModel):
         from_attributes = True
 
 
-class PlaylistModelPartial(BaseModel):
-    playlist_id: Optional[int] = None
-    user_ref: Optional[int] = None
-    instrument: Optional[str] = None
-    description: Optional[str] = None
-    genre_default: Optional[str] = None
-    deleted: Optional[bool] = None
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
 class PrefsSpacedRepetitionModel(BaseModel):
     alg_type: AlgTypeEnum
     user_id: int
@@ -254,30 +153,10 @@ class PrefsSpacedRepetitionModel(BaseModel):
         orm_mode = True
 
 
-class PrefsSpacedRepetitionModelPartial(BaseModel):
-    alg_type: Optional[AlgTypeEnum] = None
-    user_id: Optional[int] = None
-    fsrs_weights: Optional[str] = None
-    request_retention: Optional[float] = None
-    maximum_interval: Optional[int] = None
-
-    class Config:
-        orm_mode = True
-
-
 class SessionModel(BaseModel):
     expires: Optional[str]
     session_token: str
     user_id: Optional[int]
-
-    class Config:
-        orm_mode = True
-
-
-class SessionModelPartial(BaseModel):
-    expires: Optional[str] = None
-    session_token: Optional[str] = None
-    user_id: Optional[int] = None
 
     class Config:
         orm_mode = True
@@ -295,33 +174,11 @@ class TabGroupMainStateModel(BaseModel):
         from_attributes = True
 
 
-class TabGroupMainStateModelPartial(BaseModel):
-    user_id: Optional[int] = None
-    id: Optional[int] = None
-    which_tab: Optional[WhichTabEnum] = None
-    playlist_id: Optional[int] = None
-    tab_spec: Optional[str] = None
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
 class TableStateModel(BaseModel):
     user_id: int
     screen_size: ScreenSizeEnum
     purpose: PurposeEnum
     settings: Optional[str]
-
-    class Config:
-        orm_mode = True
-
-
-class TableStateModelPartial(BaseModel):
-    user_id: Optional[int] = None
-    screen_size: Optional[ScreenSizeEnum] = None
-    purpose: Optional[PurposeEnum] = None
-    settings: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -334,18 +191,6 @@ class UserAnnotationSetModel(BaseModel):
     tags: Optional[str]
     user_ref: int
     deleted: Optional[bool]
-
-    class Config:
-        orm_mode = True
-
-
-class UserAnnotationSetModelPartial(BaseModel):
-    tune_ref: Optional[int] = None
-    note_private: Optional[str] = None
-    note_public: Optional[str] = None
-    tags: Optional[str] = None
-    user_ref: Optional[int] = None
-    deleted: Optional[bool] = None
 
     class Config:
         orm_mode = True
@@ -371,26 +216,6 @@ class PracticeRecordModel(BaseModel):
         orm_mode = True
 
 
-class PracticeRecordModelPartial(BaseModel):
-    playlist_ref: Optional[int] = None
-    tune_ref: Optional[int] = None
-    practiced: Optional[str] = None
-    quality: Optional[str] = None
-    id: Optional[int] = None
-    easiness: Optional[float] = None
-    interval: Optional[int] = None
-    repetitions: Optional[int] = None
-    review_date: Optional[str] = None
-    backup_practiced: Optional[str] = None
-    stability: Optional[float] = None
-    elapsed_days: Optional[int] = None
-    lapses: Optional[int] = None
-    state: Optional[int] = None
-
-    class Config:
-        orm_mode = True
-
-
 class TableTransientDataModel(BaseModel):
     user_id: int
     tune_id: int
@@ -404,38 +229,10 @@ class TableTransientDataModel(BaseModel):
         orm_mode = True
 
 
-class TableTransientDataModelPartial(BaseModel):
-    user_id: Optional[int] = None
-    tune_id: Optional[int] = None
-    playlist_id: Optional[int] = None
-    purpose: Optional[PurposeEnum] = None
-    note_private: Optional[str] = None
-    note_public: Optional[str] = None
-    recall_eval: Optional[str] = None
-
-    class Config:
-        orm_mode = True
-
-
 class NoteModel(BaseModel):
     id: int
     user_ref: int
     tune_ref: int
-    playlist_ref: Optional[int]
-    created_date: Optional[str]
-    note_text: Optional[str]
-    public: Optional[bool]
-    favorite: Optional[int]
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
-class NoteModelPartial(BaseModel):
-    id: Optional[int]
-    user_ref: Optional[int]
-    tune_ref: Optional[int]
     playlist_ref: Optional[int]
     created_date: Optional[str]
     note_text: Optional[str]
@@ -472,23 +269,6 @@ class ReferenceModel(BaseModel):
     comment: str | None
     title: str | None
     deleted: Optional[bool]
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
-class ReferenceModelPartial(BaseModel):
-    tune_ref: Optional[int]
-    user_ref: Optional[int]
-    public: Optional[int]
-    id: Optional[int]
-    url: Optional[str]
-    ref_type: Optional[str]
-    favorite: Optional[int]
-    comment: Optional[str]
-    title: Optional[str]
-    deleted: Optional[bool] = None
 
     class Config:
         orm_mode = True

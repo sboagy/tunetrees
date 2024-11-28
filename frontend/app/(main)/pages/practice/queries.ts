@@ -113,7 +113,7 @@ export async function updatePlaylistTune(
       if (tune_update.genre !== dbTune.genre)
         tuneUpdateData.genre = tune_update.genre;
     }
-    const response = await client.put<{
+    const response = await client.patch<{
       success?: string;
       detail?: string;
     }>("/tune", tuneUpdateData, { params: { tune_ref: tune_id } });
@@ -269,7 +269,7 @@ export async function updateReference(
   referenceUpdate: Partial<IReferenceData>,
 ): Promise<IReferenceData | { success?: string; detail?: string }> {
   try {
-    const response = await client.put<
+    const response = await client.patch<
       IReferenceData | { success?: string; detail?: string }
     >("/references", referenceUpdate, { params: { id: referenceId } });
     return response.data;
@@ -365,7 +365,7 @@ export async function updateNote(
   note_update: Partial<INote>,
 ): Promise<{ success?: string; detail?: string }> {
   try {
-    const response = await client.put<{ success?: string; detail?: string }>(
+    const response = await client.patch<{ success?: string; detail?: string }>(
       "/notes",
       note_update,
       { params: { id: note_id } },
@@ -447,7 +447,7 @@ export async function updateTune(
   tuneUpdate: Partial<TuneOverview>,
 ): Promise<{ success?: string; detail?: string }> {
   try {
-    const response = await client.put<{ success?: string; detail?: string }>(
+    const response = await client.patch<{ success?: string; detail?: string }>(
       "/tune",
       tuneUpdate,
       { params: { tune_ref: tuneRef } },
@@ -584,7 +584,7 @@ export async function updatePlaylist(
   playlistUpdate: Partial<IPlaylist>,
 ): Promise<IPlaylist | { detail: string }> {
   try {
-    const response = await client.put<IPlaylist | { detail: string }>(
+    const response = await client.patch<IPlaylist | { detail: string }>(
       `/playlist/${playlistId}`,
       playlistUpdate,
     );
