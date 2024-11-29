@@ -305,11 +305,6 @@ def query_repertoire_list(
 
     rows: List[Tune] = query_sorted.offset(skip).limit(limit).all()
 
-    # TODO: make a decent print_table function
-    # if print_table:
-    #     print("\n--------")
-    #     print(tabulate(rows, headers=t_practice_list_staged.columns.keys()))
-
     return rows
 
 

@@ -8,14 +8,13 @@ from sqlalchemy import ColumnElement, Table
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from starlette import status as status
-from starlette.responses import HTMLResponse, RedirectResponse
+from starlette.responses import RedirectResponse
 
 from tunetrees.api.mappers.tunes_mapper import tunes_mapper
 from tunetrees.app.database import SessionLocal
-from tunetrees.app.practice import render_practice_page
 from tunetrees.app.queries import (
-    query_repertoire_list,
     query_practice_list_scheduled,
+    query_repertoire_list,
     query_tune_staged,
 )
 from tunetrees.app.schedule import (
@@ -36,14 +35,20 @@ from tunetrees.models.tunetrees import (
     t_practice_list_staged,
 )
 from tunetrees.models.tunetrees_pydantic import (
-    PlaylistModel,
-    TuneModel,
-    NoteModelCreate,
     NoteModel,
-    ReferenceModelCreate,
-    ReferenceModel,
+    NoteModelCreate,
+    NoteModelPartial,
+    PlaylistModel,
+    PlaylistModelPartial,
     PlaylistTuneJoinedModel,
+    PlaylistTuneModelPartial,
+    ReferenceModel,
+    ReferenceModelCreate,
+    ReferenceModelPartial,
+    ResponseStatusModel,
+    TuneModel,
     TuneModelCreate,
+    TuneModelPartial,
 )
 
 logger = logging.getLogger("tunetrees.api")
@@ -53,19 +58,8 @@ router = APIRouter(
     tags=["tunetrees"],
 )
 
+
 tt_review_sitdown_date_str = environ.get("TT_REVIEW_SITDOWN_DATE", None)
-
-
-@router.get("/practice", response_class=HTMLResponse)
-async def practice_page():
-    tt_review_sitdown_date = (
-        datetime.fromisoformat(tt_review_sitdown_date_str)
-        if tt_review_sitdown_date_str
-        else None
-    )
-
-    html_result = await render_practice_page(review_sitdown_date=tt_review_sitdown_date)
-    return html_result
 
 
 @router.get("/scheduled_tunes_overview/{user_id}/{playlist_ref}")
@@ -211,7 +205,7 @@ def update_table(
     "/playlist-tune-overview/{user_id}/{playlist_ref}/{tune_id}",
     response_model=PlaylistTuneJoinedModel,
 )
-async def get_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
+async def get_playlist_tune_overview(user_id: int, playlist_ref: int, tune_id: int):
     """
     Retrieve a tune from the database.
 
@@ -283,6 +277,53 @@ async def delete_playlist_tune(user_id: int, playlist_ref: int, tune_id: int):
     except Exception as e:
         logger.error(f"Unable to delete tune ({tune_id}): {e}")
         raise HTTPException(status_code=500, detail=f"Unable to delete tune: {e}")
+
+
+@router.patch(
+    "/playlist_tunes",
+    response_model=ResponseStatusModel,
+    summary="Update Multiple Playlist Tunes",
+    description="Update multiple playlist tunes by their reference ID.  Note this is only updating the playlist_tune table, not the tune table.",
+    status_code=200,
+)
+def update_playlist_tunes(
+    tune_refs: list[int] = Query(...),
+    playlist_ref: int = Query(...),
+    tune: PlaylistTuneModelPartial = Body(...),
+):
+    try:
+        with SessionLocal() as db:
+            updated_playlist_tunes = []
+            for tune_ref in tune_refs:
+                existing_tune = (
+                    db.query(PlaylistTune)
+                    .filter(
+                        PlaylistTune.tune_ref == tune_ref,
+                        PlaylistTune.playlist_ref == playlist_ref,
+                    )
+                    .first()
+                )
+                if not existing_tune:
+                    raise HTTPException(status_code=404, detail="Tune not found")
+
+                for key, value in tune.model_dump(exclude_unset=True).items():
+                    setattr(existing_tune, key, value)
+                db.flush()  # Stage changes for this tune
+                updated_playlist_tunes.append(existing_tune)
+
+            db.commit()  # Commit all changes at once
+
+            # Refresh the session to ensure views reflect the latest data
+            db.expire_all()
+
+            # If we need the updated objects immediately:
+            for playlist_tune in updated_playlist_tunes:
+                db.refresh(playlist_tune)
+
+            return ResponseStatusModel(status="Tunes updated successfully")
+    except Exception as e:
+        logger.error(f"Unable to update tune: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to update tune: {e}")
 
 
 @router.get(
@@ -361,7 +402,7 @@ def create_reference(reference: ReferenceModelCreate):
 )
 def update_reference(
     id: int,
-    reference: ReferenceModel = Body(...),
+    reference: ReferenceModelPartial = Body(...),
 ):
     try:
         with SessionLocal() as db:
@@ -471,7 +512,7 @@ def create_note(note: NoteModelCreate):
 )
 def update_note(
     id: int,
-    note: NoteModel = Body(...),
+    note: NoteModelPartial = Body(...),
 ):
     try:
         with SessionLocal() as db:
@@ -590,7 +631,7 @@ def create_tune(tune: TuneModelCreate, playlist_ref: Optional[int] = None):
     description="Update an existing tune by its reference ID.",
     status_code=200,
 )
-def update_tune(tune_ref: int = Query(...), tune: TuneModel = Body(...)):
+def update_tune(tune_ref: int = Query(...), tune: TuneModelPartial = Body(...)):
     try:
         with SessionLocal() as db:
             existing_tune = db.query(Tune).filter(Tune.id == tune_ref).first()
@@ -603,6 +644,42 @@ def update_tune(tune_ref: int = Query(...), tune: TuneModel = Body(...)):
             db.commit()
             db.refresh(existing_tune)
             return TuneModel.model_validate(existing_tune)
+    except Exception as e:
+        logger.error(f"Unable to update tune: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to update tune: {e}")
+
+
+@router.patch(
+    "/tunes",
+    response_model=ResponseStatusModel,
+    summary="Update Multiple Tunes",
+    description="Update multiple tunes by their reference IDs.",
+    status_code=200,
+)
+def update_tunes(tune_refs: list[int] = Query(...), tune: TuneModelPartial = Body(...)):
+    try:
+        with SessionLocal() as db:
+            updated_tunes = []
+            for tune_ref in tune_refs:
+                existing_tune = db.query(Tune).filter(Tune.id == tune_ref).first()
+                if not existing_tune:
+                    raise HTTPException(status_code=404, detail="Tune not found")
+
+                for key, value in tune.model_dump(exclude_unset=True).items():
+                    setattr(existing_tune, key, value)
+                db.flush()  # Stage changes for this tune
+                updated_tunes.append(existing_tune)
+
+            db.commit()  # Commit all changes at once
+
+            # Refresh the session to ensure views reflect the latest data
+            db.expire_all()
+
+            # If we need the updated objects immediately:
+            for tune in updated_tunes:
+                db.refresh(tune)
+
+            return ResponseStatusModel(status="Tunes updated successfully")
     except Exception as e:
         logger.error(f"Unable to update tune: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to update tune: {e}")
@@ -648,7 +725,7 @@ def get_playlists(user_ref: int = Query(...)):
         raise HTTPException(status_code=500, detail=f"Unable to fetch playlists: {e}")
 
 
-@router.patch(
+@router.post(
     "/playlist",
     response_model=PlaylistModel,
     summary="Create Playlist",
@@ -675,7 +752,7 @@ def create_playlist(playlist: PlaylistModel):
     description="Update an existing playlist by its ID.",
     status_code=200,
 )
-def update_playlist(playlist_id: int, playlist: PlaylistModel = Body(...)):
+def update_playlist(playlist_id: int, playlist: PlaylistModelPartial = Body(...)):
     try:
         with SessionLocal() as db:
             existing_playlist = (

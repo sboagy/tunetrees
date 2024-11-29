@@ -11,7 +11,7 @@ SELECT
        playlist.user_ref AS user_ref,
        playlist.playlist_id AS playlist_id,
        playlist.instrument AS instrument,
-       playlist.deleted,
+       playlist_tune.deleted,
        practice_record.practiced,
        practice_record.quality,
        practice_record.easiness,

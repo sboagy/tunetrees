@@ -62,7 +62,7 @@ def register_exception(app: FastAPI):
         """catch FastAPI RequestValidationError"""
 
         exc_str = f"{exc}".replace("\n", " ").replace("   ", " ")
-        logger.error(request.method, request.url, exc)
+        logger.error("%s %s %s", request.method, request.url, exc)
         # content = exc.errors()
         content = {"code": StatusCode.validator_error, "message": exc_str, "data": None}
         return JSONResponse(

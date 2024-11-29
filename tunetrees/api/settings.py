@@ -10,6 +10,7 @@ from tunetrees.models.tunetrees import TabGroupMainState, TableState, TableTrans
 from pydantic import BaseModel
 from tunetrees.models.tunetrees_pydantic import (
     TabGroupMainStateModel,
+    TabGroupMainStateModelPartial,
     TableTransientDataModel,
 )
 
@@ -519,7 +520,7 @@ def update_tab_group_main_state(
             description="Should be a valid user id that corresponds to a user in the user table"
         ),
     ],
-    tab_group_main_state: TabGroupMainStateModel,
+    tab_group_main_state: TabGroupMainStateModelPartial = Body(...),
 ):
     with SessionLocal() as db:
         try:

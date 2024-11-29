@@ -122,3 +122,24 @@ export interface ITune {
   genre?: string | null;
   deleted?: boolean | false;
 }
+
+export type IPlaylistTune = {
+  playlist_ref: number;
+  tune_ref: number;
+  current: string;
+  learned: string;
+  deleted?: boolean | null;
+};
+
+export interface IPlaylist {
+  playlist_id: number;
+  user_ref?: number;
+  instrument?: string;
+  description?: string;
+  genre_default?: string;
+}
+
+export interface ITTResponseInfo {
+  success?: string;
+  detail?: string;
+}

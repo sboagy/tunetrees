@@ -17,7 +17,7 @@ SELECT
     user_annotation_set.tags,
     playlist_tune.playlist_ref,
     playlist.user_ref,
-    playlist.deleted,
+    playlist_tune.deleted,
     (SELECT group_concat(note.note_text, ' ')
         FROM note
         WHERE note.tune_ref = tune.id

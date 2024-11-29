@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import type { JSX } from "react";
-import { createTune } from "../queries";
+import { createEmptyTune } from "../queries";
 import type { TuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -39,7 +39,7 @@ export default function NewTuneButton({
       recall_eval: null,
       notes: null,
     };
-    createTune(newTune, Number(playlistId))
+    createEmptyTune(newTune, Number(playlistId))
       .then((result) => {
         const tune = result as TuneOverview;
         console.log(

@@ -1,8 +1,17 @@
 "use server";
 
+import { parseParamsWithArrays } from "@/lib/utils";
 import axios from "axios";
 import { ERROR_TUNE } from "./mocks";
-import type { INote, IReferenceData, ITune, TuneOverview } from "./types";
+import type {
+  INote,
+  IPlaylist,
+  IPlaylistTune,
+  IReferenceData,
+  ITTResponseInfo,
+  ITune,
+  TuneOverview,
+} from "./types";
 
 const client = axios.create({
   // baseURL: process.env.TT_API_BASE_URL
@@ -79,20 +88,26 @@ export async function getTuneStaged(
 /**
  * Update a specific tune in a user's playlist.
  *
+ * Note: Good chance this function will be removed in future releases.
+ *
  * @param user_id - The ID of the user.
  * @param playlist_ref - The ID of the playlist.
  * @param tune_id - The ID of the tune.
  * @param tune_update - The fields to update (all optional).
  * @returns A promise that resolves to a success or error message.
  */
-export async function updatePlaylistTune(
+export async function updateTuneInPlaylistFromTuneOverview(
   user_id: number,
   playlist_ref: number,
   tune_id: number,
   tune_update: Partial<TuneOverview>,
 ): Promise<Partial<TuneOverview> | { detail?: string }> {
   try {
-    const dbTune = await getPlaylistTune(user_id, playlist_ref, tune_id);
+    const dbTune = await getPlaylistTuneOverview(
+      user_id,
+      playlist_ref,
+      tune_id,
+    );
     if ("detail" in dbTune) {
       console.error("Error in updatePlaylistTune: ", dbTune.detail);
       return { detail: "Unable to update tune: Tune not found" };
@@ -126,30 +141,6 @@ export async function updatePlaylistTune(
 }
 
 /**
- * Delete a specific tune from a user's playlist.
- *
- * @param user_id - The ID of the user.
- * @param playlist_ref - The ID of the playlist.
- * @param tune_id - The ID of the tune.
- * @returns A promise that resolves to a success or error message.
- */
-export async function deletePlaylistTune(
-  user_id: string,
-  playlist_ref: string,
-  tune_id: string,
-): Promise<{ success?: string; detail?: string }> {
-  try {
-    const response = await client.delete<{ success?: string; detail?: string }>(
-      `/playlist-tune-overview/${user_id}/${playlist_ref}/${tune_id}`,
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Error in deletePlaylistTune: ", error);
-    return { detail: `Unable to delete tune: ${(error as Error).message}` };
-  }
-}
-
-/**
  * Retrieve a specific tune from a user's playlist.
  *
  * @param user_id - The ID of the user.
@@ -157,7 +148,7 @@ export async function deletePlaylistTune(
  * @param tune_id - The ID of the tune.
  * @returns A promise that resolves to the requested PlaylistTune object, or an error message.
  */
-export async function getPlaylistTune(
+export async function getPlaylistTuneOverview(
   user_id: number,
   playlist_ref: number,
   tune_id: number,
@@ -170,31 +161,6 @@ export async function getPlaylistTune(
   } catch (error) {
     console.error("Error in getPlaylistTune: ", error);
     return { detail: `Unable to fetch tune: ${(error as Error).message}` };
-  }
-}
-
-/**
- * Create a new tune in a user's playlist.
- *
- * @param user_id - The ID of the user.
- * @param playlist_ref - The ID of the playlist.
- * @param tune - The tune data to create.
- * @returns A promise that resolves to a success or error message.
- */
-export async function createPlaylistTune(
-  user_id: string,
-  playlist_ref: string,
-  tune: TuneOverview,
-): Promise<{ success?: string; detail?: string }> {
-  try {
-    const response = await client.post<{ success?: string; detail?: string }>(
-      `/playlist-tune-overview/${user_id}/${playlist_ref}`,
-      tune,
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Error in createPlaylistTune: ", error);
-    return { detail: `Unable to create tune: ${(error as Error).message}` };
   }
 }
 
@@ -267,11 +233,13 @@ export async function getReferenceFavorite(
 export async function updateReference(
   referenceId: number,
   referenceUpdate: Partial<IReferenceData>,
-): Promise<IReferenceData | { success?: string; detail?: string }> {
+): Promise<IReferenceData | ITTResponseInfo> {
   try {
-    const response = await client.patch<
-      IReferenceData | { success?: string; detail?: string }
-    >("/references", referenceUpdate, { params: { id: referenceId } });
+    const response = await client.patch<IReferenceData | ITTResponseInfo>(
+      "/references",
+      referenceUpdate,
+      { params: { id: referenceId } },
+    );
     return response.data;
   } catch (error) {
     console.error("Error in updateReference: ", error);
@@ -312,9 +280,9 @@ export async function createReference(
  */
 export async function deleteReference(
   referenceId: number,
-): Promise<{ success?: string; detail?: string }> {
+): Promise<ITTResponseInfo> {
   try {
-    const response = await client.delete<{ success?: string; detail?: string }>(
+    const response = await client.delete<ITTResponseInfo>(
       `/references/${referenceId}`,
     );
     return response.data;
@@ -363,9 +331,9 @@ export async function getNotes(
 export async function updateNote(
   note_id: number,
   note_update: Partial<INote>,
-): Promise<{ success?: string; detail?: string }> {
+): Promise<ITTResponseInfo> {
   try {
-    const response = await client.patch<{ success?: string; detail?: string }>(
+    const response = await client.patch<ITTResponseInfo>(
       "/notes",
       note_update,
       { params: { id: note_id } },
@@ -398,13 +366,9 @@ export async function createNote(note: INote): Promise<INote> {
  * @param note_id - The ID of the note.
  * @returns A promise that resolves to a success or error message.
  */
-export async function deleteNote(
-  note_id: number,
-): Promise<{ success?: string; detail?: string }> {
+export async function deleteNote(note_id: number): Promise<ITTResponseInfo> {
   try {
-    const response = await client.delete<{ success?: string; detail?: string }>(
-      `/notes/${note_id}`,
-    );
+    const response = await client.delete<ITTResponseInfo>(`/notes/${note_id}`);
     return response.data;
   } catch (error) {
     console.error("Error in deleteNote: ", error);
@@ -445,12 +409,47 @@ export async function getTune(
 export async function updateTune(
   tuneRef: number,
   tuneUpdate: Partial<TuneOverview>,
-): Promise<{ success?: string; detail?: string }> {
+): Promise<ITTResponseInfo> {
   try {
-    const response = await client.patch<{ success?: string; detail?: string }>(
-      "/tune",
+    const response = await client.patch<ITTResponseInfo>("/tune", tuneUpdate, {
+      params: { tune_ref: tuneRef },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error in updateTune: ", error);
+    return { detail: `Unable to update tune: ${(error as Error).message}` };
+  }
+}
+
+export async function updateTunes(
+  tuneRefs: number[],
+  tuneUpdate: Partial<ITune>,
+): Promise<ITTResponseInfo> {
+  try {
+    const response = await client.patch<ITTResponseInfo>("/tunes", tuneUpdate, {
+      params: { tune_refs: tuneRefs },
+      paramsSerializer: parseParamsWithArrays,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error in updateTune: ", error);
+    return { detail: `Unable to update tune: ${(error as Error).message}` };
+  }
+}
+
+export async function updatePlaylistTunes(
+  tuneRefs: number[],
+  playlistRef: number,
+  tuneUpdate: Partial<IPlaylistTune>,
+): Promise<ITTResponseInfo> {
+  try {
+    const response = await client.patch<ITTResponseInfo>(
+      "/playlist_tunes",
       tuneUpdate,
-      { params: { tune_ref: tuneRef } },
+      {
+        params: { tune_refs: tuneRefs, playlist_ref: playlistRef },
+        paramsSerializer: parseParamsWithArrays,
+      },
     );
     return response.data;
   } catch (error) {
@@ -459,28 +458,19 @@ export async function updateTune(
   }
 }
 
-export interface ITuneCreate {
-  title: string;
-  type: string;
-  structure: string;
-  mode: string;
-  incipit: string;
-  genre: string;
-}
-
 /**
- * Creates a new tune and associates it with the specified playlist.
+ * Creates a new empty tune.  If a playlist is specified, will alsi associate it with the specified playlist.
  *
  * @param {TuneOverview} tune - The tune object to be created.
- * @param {number} playlistRef - The reference ID of the playlist to associate the tune with.
- * @return {Promise<TuneOverview | { success?: string; detail?: string }>} A promise that resolves to the created tune or an object with success or detail messages.
+ * @param {number} playlistRef - If specified, the reference ID of the playlist to associate the tune with.
+ * @return {Promise<TuneOverview | ITTResponseInfo>} A promise that resolves to the created tune or an object with success or detail messages.
  */
-export async function createTune(
+export async function createEmptyTune(
   tune: TuneOverview,
-  playlistRef: number,
-): Promise<TuneOverview | { success?: string; detail?: string }> {
+  playlistRef?: number,
+): Promise<TuneOverview | ITTResponseInfo> {
   try {
-    const tuneCreateInput: ITuneCreate = {
+    const tuneCreateInput: ITune = {
       title: tune.title,
       type: tune.type ?? "",
       structure: tune.structure ?? "",
@@ -488,9 +478,16 @@ export async function createTune(
       incipit: tune.incipit ?? "",
       genre: tune.genre ?? "",
     };
-    const response = await client.post<
-      TuneOverview | { success?: string; detail?: string }
-    >(`/tune?playlist_ref=${playlistRef}`, tuneCreateInput);
+
+    type CreateTuneResponse = TuneOverview | ITTResponseInfo;
+
+    const response = await client.post<CreateTuneResponse>(
+      "/tune",
+      tuneCreateInput,
+      {
+        params: { playlist_ref: playlistRef },
+      },
+    );
     console.log("createTune response: ", response.data);
     return response.data;
   } catch (error) {
@@ -505,27 +502,16 @@ export async function createTune(
  * @param tuneRef - The reference ID of the tune.
  * @returns A promise that resolves to a success or error message.
  */
-export async function deleteTune(
-  tuneRef: number,
-): Promise<{ success?: string; detail?: string }> {
+export async function deleteTune(tuneRef: number): Promise<ITTResponseInfo> {
   try {
-    const response = await client.delete<{ success?: string; detail?: string }>(
-      "/tune",
-      { params: { tune_ref: tuneRef } },
-    );
+    const response = await client.delete<ITTResponseInfo>("/tune", {
+      params: { tune_ref: tuneRef },
+    });
     return response.data;
   } catch (error) {
     console.error("Error in deleteTune: ", error);
     return { detail: `Unable to delete tune: ${(error as Error).message}` };
   }
-}
-
-export interface IPlaylist {
-  playlist_id: number;
-  user_ref?: number;
-  instrument?: string;
-  description?: string;
-  genre_default?: string;
 }
 
 /**
@@ -603,9 +589,9 @@ export async function updatePlaylist(
  */
 export async function deletePlaylist(
   playlistId: number,
-): Promise<{ success?: string; detail?: string }> {
+): Promise<ITTResponseInfo> {
   try {
-    const response = await client.delete<{ success?: string; detail?: string }>(
+    const response = await client.delete<ITTResponseInfo>(
       `/playlist/${playlistId}`,
     );
     return response.data;
