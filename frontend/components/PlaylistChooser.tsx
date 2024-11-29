@@ -3,7 +3,6 @@
 import { usePlaylist } from "@/app/(main)/pages/practice/components/CurrentPlaylistProvider";
 import { useTuneDataRefresh } from "@/app/(main)/pages/practice/components/TuneDataRefreshContext";
 import {
-  type IPlaylist,
   createPlaylist,
   deletePlaylist,
   getPlaylists,
@@ -11,6 +10,7 @@ import {
   updatePlaylist,
 } from "@/app/(main)/pages/practice/queries";
 import { getTabGroupMainState } from "@/app/(main)/pages/practice/settings";
+import type { IPlaylist } from "@/app/(main)/pages/practice/types";
 import deepEqual from "fast-deep-equal"; // Import deepEqual
 import { ChevronDownIcon, MinusIcon, PlusIcon, TrashIcon } from "lucide-react"; // Import the TrashIcon
 import { useSession } from "next-auth/react";
@@ -137,11 +137,11 @@ export default function PlaylistChooser() {
 
   const handleSubmit = async () => {
     try {
-      const existingPlaylistIds = playlists.map(
-        (playlist) => playlist.playlist_id,
+      const existingPlaylistIds = playlists.map((playlist) =>
+        Number(playlist.playlist_id),
       );
       const editedPlaylistIds = new Set(
-        editedPlaylists.map((playlist) => playlist.playlist_id),
+        editedPlaylists.map((playlist) => Number(playlist.playlist_id)),
       );
 
       // Check for existing playlists with an empty "instrument" field
@@ -164,11 +164,13 @@ export default function PlaylistChooser() {
               "Cannot delete Repertoire that contains tunes. Please first go to the corresponding Repertoire tab and delete all its tunes first.",
             );
             // Add the playlist back to the editedPlaylists list
-            const playlistToRestore = playlists.find(
+            const playlistToRestore: IPlaylist | undefined = playlists.find(
               (playlist) => playlist.playlist_id === playlistId,
             );
             if (playlistToRestore) {
-              setEditedPlaylists((prev) => [...prev, playlistToRestore]);
+              setEditedPlaylists((prev: IPlaylist[]): IPlaylist[] => {
+                return [...prev, playlistToRestore] as IPlaylist[];
+              });
             }
             return;
           }

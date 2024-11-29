@@ -63,6 +63,13 @@ export default function DeleteTuneButton({
     }
 
     if (playlistId !== undefined) {
+      if (
+        !confirm(
+          `Are you sure you want to delete the selected tunes from your repertoire with IDs: ${selectedTuneIds.join(", ")}?`,
+        )
+      ) {
+        return;
+      }
       updatePlaylistTunes(selectedTuneIds, playlistId, {
         deleted: true,
       })
@@ -74,6 +81,13 @@ export default function DeleteTuneButton({
           console.error("Error deleting tunes:", error);
         });
     } else {
+      if (
+        !confirm(
+          `Are you sure you want to delete the selected tunes from TuneTrees with IDs: ${selectedTuneIds.join(", ")}?`,
+        )
+      ) {
+        return;
+      }
       updateTunes(selectedTuneIds, { deleted: true })
         .then((result) => {
           console.log("Tunes deleted successfully:", result);
