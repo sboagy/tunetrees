@@ -16,6 +16,7 @@ const CurrentTuneContext = createContext<ITuneContextType | undefined>(
 
 export const CurrentTuneProvider = ({ children }: { children: ReactNode }) => {
   const [currentTune, setCurrentTune] = useState<number | null>(null);
+
   const [currentTablePurpose, setCurrentTablePurpose] =
     useState<TablePurpose | null>(null);
   return (

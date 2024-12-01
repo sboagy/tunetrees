@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from pydantic import BaseModel
 
@@ -314,12 +314,14 @@ class TabGroupMainStateModelPartial(BaseModel):
 
 class TableStateModel(BaseModel):
     user_id: int
-    screen_size: ScreenSizeEnum
-    purpose: PurposeEnum
-    settings: Optional[str]
+    screen_size: Literal["small", "full"]
+    purpose: Literal["practice", "repertoire", "all", "analysis"]
+    settings: str
+    current_tune: Optional[int] = None
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class TableStateModelPartial(BaseModel):
@@ -327,9 +329,11 @@ class TableStateModelPartial(BaseModel):
     screen_size: Optional[ScreenSizeEnum] = None
     purpose: Optional[PurposeEnum] = None
     settings: Optional[str] = None
+    current_tune: Optional[int] = None
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class UserAnnotationSetModel(BaseModel):

@@ -2,6 +2,7 @@ import type { TableState, Table as TanstackTable } from "@tanstack/react-table";
 import { useEffect } from "react";
 import { createOrUpdateTableState } from "../settings";
 import type { TablePurpose, TuneOverview } from "../types";
+import { useTune } from "./CurrentTuneContext";
 
 /**
  * Custom hook to save the state of a table when the user navigates away from the page.
@@ -15,12 +16,12 @@ export const useSaveTableState = (
   table: TanstackTable<TuneOverview>,
   userId: number,
   tablePurpose: TablePurpose,
-  currentTune: number | null,
 ) => {
+  const { currentTune } = useTune();
   useEffect(() => {
     const saveTableStateAsync = (eventString: string) => {
       console.debug(
-        `LF1 TunesGrid: calling createOrUpdateTableState in ${eventString} for tablePurpose: ${tablePurpose}`,
+        `LF6 useSaveTableState: calling createOrUpdateTableState in ${eventString} for tablePurpose: ${tablePurpose}, currentTune=${currentTune}`,
       );
       const tableState: TableState = table.getState();
       void createOrUpdateTableState(
@@ -33,11 +34,19 @@ export const useSaveTableState = (
     };
 
     const handleBeforeUnload = () => {
+      console.log(
+        "LF6 useSaveTableState handleBeforeUnload for tablePurpose: ",
+        tablePurpose,
+      );
       saveTableStateAsync("BeforeUnloadEvent");
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
+        console.log(
+          "LF6 useSaveTableState handleVisibilityChange for tablePurpose: ",
+          tablePurpose,
+        );
         saveTableStateAsync("VisibilityChangeEvent");
       }
     };
@@ -47,7 +56,7 @@ export const useSaveTableState = (
       // set up to handle global events such as closing the browser tab or switching
       // to another application.
       console.debug(
-        "LF1 TunesGrid: adding beforeunload and visibilitychange event listeners for tablePurpose: ",
+        "LF6 TunesGrid: adding beforeunload and visibilitychange event listeners for tablePurpose: ",
         tablePurpose,
       );
       window.addEventListener("beforeunload", handleBeforeUnload);
@@ -57,7 +66,7 @@ export const useSaveTableState = (
     return () => {
       if (typeof window !== "undefined") {
         console.debug(
-          "TunesGrid: removing handleBeforeUnload for tablePurpose: ",
+          "LF6 TunesGrid: removing handleBeforeUnload for tablePurpose: ",
           tablePurpose,
         );
         window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -70,7 +79,11 @@ export const useSaveTableState = (
       // Component Cleanup: The component's cleanup function in the useEffect hook ensures
       // that the state is saved when the component is unmounted, which happens when
       // switching tabs within the app.
-      saveTableStateAsync("cleanup");
+      // console.debug(
+      //   "LF6 useSaveTableState cleanup for tablePurpose: ",
+      //   tablePurpose,
+      // );
+      // saveTableStateAsync("cleanup");
     };
   }, [table, userId, tablePurpose, currentTune]);
 };

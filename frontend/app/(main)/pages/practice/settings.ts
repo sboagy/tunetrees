@@ -31,6 +31,9 @@ export async function createOrUpdateTableState(
   currentTune: number | null,
 ): Promise<number> {
   try {
+    console.log(
+      `LF6 => createOrUpdateTableState: purpose=${purpose}, currentTune=${currentTune})}`,
+    );
     // console.log(
     //   `=> createOrUpdateTableState rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
     // );
@@ -43,6 +46,74 @@ export async function createOrUpdateTableState(
       current_tune: currentTune === null ? -1 : currentTune,
     };
     const response = await client.post<ITableStateTable>(
+      "/table_state",
+      tableStateTable,
+      {
+        params: {
+          user_id: userId,
+          screen_size: screenSize,
+          purpose: purpose,
+        },
+      },
+    );
+    // console.log("<= createOrUpdateTableState: ", response?.status);
+    return response.status;
+  } catch (error) {
+    console.error("<= createOrUpdateTableState: ", error);
+    return 500;
+  }
+}
+
+export async function updateTableStateInDb(
+  userId: number,
+  screenSize: ScreenSize,
+  purpose: TablePurpose,
+  tableStates: TableState,
+): Promise<number> {
+  try {
+    // console.log(
+    //   `=> createOrUpdateTableState rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
+    // );
+    const tableStatesStr = JSON.stringify(tableStates);
+    const tableStateTable: Partial<ITableStateTable> = {
+      user_id: userId,
+      screen_size: screenSize,
+      purpose: purpose,
+      settings: tableStatesStr,
+    };
+    const response = await client.put<Partial<ITableStateTable>>(
+      "/table_state",
+      tableStateTable,
+      {
+        params: {
+          user_id: userId,
+          screen_size: screenSize,
+          purpose: purpose,
+        },
+      },
+    );
+    // console.log("<= createOrUpdateTableState: ", response?.status);
+    return response.status;
+  } catch (error) {
+    console.error("<= createOrUpdateTableState: ", error);
+    return 500;
+  }
+}
+
+export async function updateCurrentTuneInDb(
+  userId: number,
+  screenSize: ScreenSize,
+  purpose: TablePurpose,
+  currentTune: number | null,
+): Promise<number> {
+  try {
+    console.log(
+      `LF6 => updateCurrentTuneInDb: purpose=${purpose}, currentTune=${currentTune})}`,
+    );
+    const tableStateTable: Partial<ITableStateTable> = {
+      current_tune: currentTune === null ? -1 : currentTune,
+    };
+    const response = await client.put<Partial<ITableStateTable>>(
       "/table_state",
       tableStateTable,
       {

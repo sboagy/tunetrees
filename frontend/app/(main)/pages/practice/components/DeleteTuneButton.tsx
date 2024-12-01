@@ -45,16 +45,22 @@ export default function DeleteTuneButton({
     function resetCurrentTuneAndView() {
       table.resetRowSelection();
       if (selectedTuneIds.includes(currentTune as number)) {
+        console.log(
+          `LF6 resetCurrentTuneAndView (DeleteTuneButton) to null: currentTune (before change)=${currentTune}`,
+        );
         setCurrentTune(null);
         const rows = table.getRowModel().rows;
         const currentIndex = rows.findIndex(
           (row) => row.original.id === currentTune,
         );
+        let tuneToSet = null;
         if (currentIndex >= 0 && currentIndex < rows.length - 1) {
-          setCurrentTune(rows[currentIndex + 1].original.id ?? null);
-        } else {
-          setCurrentTune(null);
+          tuneToSet = rows[currentIndex + 1].original.id ?? null;
         }
+        console.log(
+          `LF6 resetCurrentTuneAndView (DeleteTuneButton): tuneToSet=${tuneToSet}`,
+        );
+        setCurrentTune(tuneToSet);
       }
       if (currentView === "edit") {
         setCurrentView("tabs");

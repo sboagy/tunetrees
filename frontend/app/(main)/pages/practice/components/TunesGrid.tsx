@@ -12,6 +12,7 @@ import { flexRender } from "@tanstack/react-table";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useRef } from "react";
+import { updateCurrentTuneInDb } from "../settings";
 import type { TablePurpose, TuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -62,7 +63,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const rowRefs = useRef<{ [key: number]: HTMLTableRowElement | null }>({});
 
   // Invoke useEffect hook for the table state
-  useSaveTableState(table, userId, tablePurpose, currentTune);
+  useSaveTableState(table, userId, tablePurpose);
 
   const tableBodyRef = useRef<HTMLDivElement>(null);
 
@@ -76,8 +77,13 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
         .rows.findIndex((row) => row.original.id === currentTune);
 
       if (newTune) {
+        console.log(`LF6 TunesGrid handleRowClick: newTune=${newTune}`);
         setCurrentTune(newTune);
         setCurrentTablePurpose(tablePurpose); // probably not actually needed
+        console.log(
+          `LF6 TunesGrid handleRowClick calling updateCurrentTuneInDb: tablePurpose=${tablePurpose} newTune=${newTune}`,
+        );
+        void updateCurrentTuneInDb(userId, "full", tablePurpose, newTune);
       }
 
       const rowIndexNew = table
@@ -106,7 +112,14 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
         );
       }
     },
-    [currentTune, setCurrentTune, table, setCurrentTablePurpose, tablePurpose],
+    [
+      currentTune,
+      setCurrentTune,
+      table,
+      setCurrentTablePurpose,
+      tablePurpose,
+      userId,
+    ],
   );
 
   const handleRowDoubleClick = (row: Row<TuneOverview>) => {

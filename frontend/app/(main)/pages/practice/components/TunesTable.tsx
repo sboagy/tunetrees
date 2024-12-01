@@ -15,7 +15,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import * as React from "react";
-import { createOrUpdateTableState, getTableStateTable } from "../settings";
+import { getTableStateTable, updateTableStateInDb } from "../settings";
 import type { TablePurpose, TuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
@@ -59,12 +59,14 @@ export const saveTableState = async (
   // });
   const tableState: TableState = table.getState();
 
-  const status = await createOrUpdateTableState(
+  console.log(
+    `LF6 saveTableState calling createOrUpdateTableState: tablePurpose=${tablePurpose} tableState=${currentTuneId}`,
+  );
+  const status = await updateTableStateInDb(
     userId,
     "full",
     tablePurpose,
     tableState,
-    currentTuneId,
   );
   return status;
   // .then((result) => {
@@ -200,7 +202,15 @@ export function TunesTableComponent({
         const tableStateFromDb = tableStateTable?.settings as TableState;
         if (tableStateFromDb) {
           setTableStateFromDb(tableStateFromDb);
-          setCurrentTune(tableStateTable?.current_tune ?? null);
+          const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
+          console.log(
+            `LF6 TunesTableComponent: currentTuneState=${currentTuneState}`,
+          );
+          if (currentTuneState > 0) {
+            setCurrentTune(currentTuneState);
+          } else {
+            setCurrentTune(null);
+          }
           setCurrentTablePurpose(tablePurpose);
           table.setRowSelection(tableStateFromDb.rowSelection);
           table.setColumnVisibility(tableStateFromDb.columnVisibility);
@@ -210,9 +220,8 @@ export function TunesTableComponent({
             filterStringCallback(tableStateFromDb.globalFilter);
           }
           table.setPagination(tableStateFromDb.pagination);
-        } else {
+        } else
           console.log("LF1 TunesTableComponent: no table state found in db");
-        }
       } catch (error) {
         console.error(error);
         throw error;
@@ -242,6 +251,9 @@ export function TunesTableComponent({
 
     originalSetRowSelectionRef.current(resolvedRowSelectionState);
 
+    console.log(
+      `LF6 TunesTableComponent (interceptedRowSelectionChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
+    );
     void saveTableState(table, userId, tablePurpose, currentTune);
 
     if (selectionChangedCallback) {
@@ -260,6 +272,9 @@ export function TunesTableComponent({
         : newColumnFiltersState;
 
     originalColumnFiltersRef.current(resolvedColumnFiltersState);
+    console.log(
+      `LF6 TunesTableComponent (interceptedOnColumnFiltersChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
+    );
     void saveTableState(table, userId, tablePurpose, currentTune);
   };
 
@@ -270,6 +285,9 @@ export function TunesTableComponent({
       newSorting instanceof Function ? newSorting(sorting) : newSorting;
 
     originalSetSortingRef.current(resolvedSorting);
+    console.log(
+      `LF6 TunesTableComponent (interceptedSetSorting) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
+    );
     void saveTableState(table, userId, tablePurpose, currentTune);
   };
 
@@ -290,6 +308,9 @@ export function TunesTableComponent({
 
     originalSetColumnVisibilityRef.current(resolvedVisibilityState);
     console.log("LF1 interceptedSetColumnVisibility: calling saveTableState");
+    console.log(
+      `LF6 TunesTableComponent (interceptedSetColumnVisibility) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
+    );
     void saveTableState(table, userId, tablePurpose, currentTune);
   };
 

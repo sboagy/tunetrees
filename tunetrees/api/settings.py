@@ -1,16 +1,19 @@
-from enum import Enum
 import logging
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Body, HTTPException, Path, Query
+from pydantic import BaseModel
 from starlette import status as status
 
 from tunetrees.app.database import SessionLocal
 from tunetrees.models.tunetrees import TabGroupMainState, TableState, TableTransientData
-from pydantic import BaseModel
 from tunetrees.models.tunetrees_pydantic import (
+    PurposeEnum,
+    ScreenSizeEnum,
     TabGroupMainStateModel,
     TabGroupMainStateModelPartial,
+    TableStateModel,
+    TableStateModelPartial,
     TableTransientDataModel,
 )
 
@@ -21,50 +24,9 @@ logger = logging.getLogger(__name__)
 settings_router = APIRouter(prefix="/settings", tags=["settings"])
 
 
-class TableStateBase(BaseModel):
-    user_id: int
-    screen_size: Literal["small", "full"]
-    purpose: Literal["practice", "repertoire", "all", "analysis"]
-    settings: str
-    current_tune: Optional[int] = None
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
-class TableStateCreate(TableStateBase):
-    pass
-
-
-class TableStateUpdate(BaseModel):
-    settings: Optional[str] = None
-    current_tune: Optional[int] = None
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
-class TableStateResponse(TableStateBase):
-    pass
-
-
-class ScreenSizeEnum(str, Enum):
-    small = "small"
-    full = "full"
-
-
-class PurposeEnum(str, Enum):
-    practice = "practice"
-    repertoire = "repertoire"
-    analysis = "analysis"
-    all = "all"
-
-
 @settings_router.get(
     "/table_state",
-    response_model=TableStateResponse,
+    response_model=TableStateModel,
     summary="Get Table State",
     description="Retrieve the stored datagrid table state for a user, for a specific screen size and purpose.",
     status_code=status.HTTP_200_OK,
@@ -81,7 +43,7 @@ def get_table_state(
         ...,
         description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
     ),
-) -> TableStateResponse:
+) -> TableStateModel:
     try:
         with SessionLocal() as db:
             table_state = (
@@ -91,7 +53,7 @@ def get_table_state(
             )
             if not table_state:
                 raise HTTPException(status_code=404, detail="Table state not found")
-            return TableStateResponse.model_validate(table_state)
+            return TableStateModel.model_validate(table_state)
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -101,19 +63,19 @@ def get_table_state(
 
 @settings_router.post(
     "/table_state",
-    response_model=TableStateResponse,
+    response_model=TableStateModel,
     summary="Create Table State",
     description="Create a new datagrid table state for a user, for a specific screen size and purpose.",
     status_code=status.HTTP_201_CREATED,
 )
-def create_table_state(table_state: TableStateCreate) -> TableStateResponse:
+def create_table_state(table_state: TableStateModel) -> TableStateModel:
     try:
         with SessionLocal() as db:
             new_table_state = TableState(**table_state.model_dump())
             db.add(new_table_state)
             db.commit()
             db.refresh(new_table_state)
-            return TableStateResponse.model_validate(new_table_state)
+            return TableStateModel.model_validate(new_table_state)
     except Exception as e:
         logger.error(f"Unable to create table state: {e}")
         raise HTTPException(status_code=500, detail="Unable to create table state")
@@ -121,7 +83,7 @@ def create_table_state(table_state: TableStateCreate) -> TableStateResponse:
 
 @settings_router.put(
     "/table_state",
-    response_model=TableStateResponse,
+    response_model=TableStateModel,
     summary="Update Table State",
     description="Update an existing datagrid table state for a user, for a specific screen size and purpose.",
     status_code=status.HTTP_200_OK,
@@ -141,8 +103,8 @@ def update_table_state(
         enum=["practice", "repertoire", "all", "analysis"],
         description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
     ),
-    table_state_update: TableStateUpdate = Depends(),
-) -> TableStateResponse:
+    table_state_update: TableStateModelPartial = Body(...),
+) -> TableStateModel:
     try:
         with SessionLocal() as db:
             table_state = (
@@ -153,13 +115,13 @@ def update_table_state(
             if not table_state:
                 raise HTTPException(status_code=404, detail="Table state not found")
 
-        update_data = table_state_update.model_dump(exclude_unset=True)
-        for key, value in update_data.items():
-            setattr(table_state, key, value)
+            update_data = table_state_update.model_dump(exclude_unset=True)
+            for key, value in update_data.items():
+                setattr(table_state, key, value)
 
-        db.commit()
-        db.refresh(table_state)
-        return TableStateResponse.model_validate(table_state)
+            db.commit()
+            db.refresh(table_state)
+            return TableStateModel.model_validate(table_state)
     except HTTPException as e:
         raise e
     except Exception as e:

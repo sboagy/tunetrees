@@ -7,10 +7,11 @@ import { Upload } from "lucide-react";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
 import { getScheduledTunesOverview } from "../queries";
-import { deleteTableTransientData } from "../settings";
+import { deleteTableTransientData, updateCurrentTuneInDb } from "../settings";
 import type { TuneOverview } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import { usePlaylist } from "./CurrentPlaylistProvider";
+import { useTune } from "./CurrentTuneContext";
 import FlashcardPanel from "./FlashcardPanel";
 import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
@@ -34,10 +35,18 @@ export default function TunesGridScheduled({
   const [isLoading, setIsLoading] = useState(false);
   const { currentPlaylist: playlistId } = usePlaylist();
   const showDeleted = false; // Should become a state variable at some point
+  const { currentTune, setCurrentTune } = useTune();
 
   console.log(
     `LF1 render ScheduledTunesGrid: playlistId=${playlistId}, userId=${userId}`,
   );
+
+  // useEffect(() => {
+  //   console.log(
+  //     `LF6 ScheduledTunesGrid (useEffect[currentTune, userId]) calling updateCurrentTuneInDb, currentTune=${currentTune}`,
+  //   );
+  //   void updateCurrentTuneInDb(userId, "full", "practice", currentTune);
+  // }, [currentTune, userId]);
 
   useEffect(() => {
     const hasNonEmptyRecallEval = tunes.some((tune) => tune.recall_eval);
@@ -137,6 +146,11 @@ export default function TunesGridScheduled({
 
       if (feedback) {
         updates[idString] = { feedback: feedback };
+      }
+      if (tune.id === currentTune) {
+        console.log(`LF6 setting current tune to null: ${currentTune}`);
+        setCurrentTune(null);
+        void updateCurrentTuneInDb(userId, "full", "practice", null);
       }
     }
 
