@@ -605,15 +605,18 @@ def get_tune(tune_ref: int = Query(...)):
 def get_tunes(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(
-        10000, ge=1, le=10000, description="Maximum number of records to return"
+        -1, ge=-1, le=10000, description="Maximum number of records to return"
     ),
     show_deleted: bool = Query(False),
 ):
     try:
         with SessionLocal() as db:
-            query = db.query(Tune).offset(skip).limit(limit)
+            query = db.query(Tune)
             if not show_deleted:
-                query = query.filter(t_practice_list_staged.c.deleted.is_(False))
+                query = query.filter(Tune.deleted.is_(False))
+            query = query.offset(skip)
+            if limit > 0:
+                query = query.limit(limit)
             tunes = query.all()
             return tunes
     except Exception as e:
