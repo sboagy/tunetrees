@@ -98,6 +98,40 @@ export async function getTunesOnly(showDeleted = false): Promise<ITune[]> {
   }
 }
 
+export async function getTunesOnlyIntoOverview(
+  showDeleted = false,
+): Promise<ITuneOverview[]> {
+  try {
+    const response = await client.get<ITune[]>("/tunes", {
+      params: { show_deleted: showDeleted },
+    });
+
+    return response.data.map((tune) => ({
+      ...tune,
+      user_ref: null,
+      playlist_ref: null,
+      learned: null,
+      practiced: null,
+      quality: null,
+      easiness: null,
+      interval: null,
+      repetitions: null,
+      review_date: null,
+      backup_practiced: null,
+      external_ref: null,
+      tags: null,
+      recall_eval: null,
+      notes: null,
+      favorite_url: null,
+      playlist_deleted: null,
+    }));
+  } catch (error) {
+    console.error("Error in getTunesOnly: ", error);
+    // Return a dummy Tune object to avoid breaking the UI
+    throw error;
+  }
+}
+
 /**
  * Update a specific tune in a user's playlist.
  *
