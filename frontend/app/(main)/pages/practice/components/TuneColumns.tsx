@@ -245,7 +245,7 @@ export function get_columns(
     );
   }
 
-  return [
+  const columns: ColumnDef<ITuneOverview, TunesGridColumnGeneralType>[] = [
     {
       id: "id",
       // header: ({ column }) => sortableHeader(column, "Id"),
@@ -379,165 +379,181 @@ export function get_columns(
       size: 200,
     },
     {
-      accessorKey: "learned",
-      header: ({ column }) => sortableHeader(column, "Learned"),
+      accessorKey: "deleted",
+      header: ({ column }) => sortableHeader(column, "Deleted?"),
       cell: (info) => {
-        return info.getValue();
+        return info.getValue() ? "Yes" : "No";
       },
-      enableSorting: true,
-      enableHiding: true,
-      sortingFn: datetimeTextSortingFn,
-      size: 120,
     },
-    {
-      accessorKey: "practiced",
-      header: ({ column }) => sortableHeader(column, "Practiced"),
-      cell: (info) => {
-        return info.getValue();
+  ];
+
+  if ("all" !== purpose) {
+    const columnsUserSpecific: ColumnDef<
+      ITuneOverview,
+      TunesGridColumnGeneralType
+    >[] = [
+      {
+        accessorKey: "learned",
+        header: ({ column }) => sortableHeader(column, "Learned"),
+        cell: (info) => {
+          return info.getValue();
+        },
+        enableSorting: true,
+        enableHiding: true,
+        sortingFn: datetimeTextSortingFn,
+        size: 120,
       },
-      enableSorting: true,
-      enableHiding: true,
-      sortingFn: datetimeTextSortingFn,
-      size: 120,
-    },
-    {
-      accessorKey: "quality",
-      header: ({ column }) => sortableHeader(column, "Quality"),
-      cell: (info) => {
-        return info.getValue();
+      {
+        accessorKey: "practiced",
+        header: ({ column }) => sortableHeader(column, "Practiced"),
+        cell: (info) => {
+          return info.getValue();
+        },
+        enableSorting: true,
+        enableHiding: true,
+        sortingFn: datetimeTextSortingFn,
+        size: 120,
       },
-      enableSorting: true,
-      enableHiding: true,
-    },
-    {
-      accessorKey: "easiness",
-      header: ({ column }) => sortableHeader(column, "Easiness"),
-      cell: (info) => {
-        return info.getValue();
+      {
+        accessorKey: "quality",
+        header: ({ column }) => sortableHeader(column, "Quality"),
+        cell: (info) => {
+          return info.getValue();
+        },
+        enableSorting: true,
+        enableHiding: true,
       },
-      enableSorting: true,
-      enableHiding: true,
-    },
-    {
-      accessorKey: "interval",
-      header: ({ column }) => sortableHeader(column, "Interval"),
-      cell: (info) => {
-        return info.getValue();
+      {
+        accessorKey: "easiness",
+        header: ({ column }) => sortableHeader(column, "Easiness"),
+        cell: (info) => {
+          return info.getValue();
+        },
+        enableSorting: true,
+        enableHiding: true,
       },
-      enableSorting: true,
-      enableHiding: true,
-    },
-    {
-      accessorKey: "repetitions",
-      header: ({ column }) => sortableHeader(column, "Repetitions"),
-      cell: (info) => {
-        return info.getValue();
+      {
+        accessorKey: "interval",
+        header: ({ column }) => sortableHeader(column, "Interval"),
+        cell: (info) => {
+          return info.getValue();
+        },
+        enableSorting: true,
+        enableHiding: true,
       },
-      enableSorting: true,
-      enableHiding: true,
-    },
-    {
-      accessorKey: "review_date",
-      header: ({ column }) => sortableHeader(column, "Scheduled"),
-      cell: (info) => {
-        return new Date(info.getValue() as string).toLocaleDateString();
+      {
+        accessorKey: "repetitions",
+        header: ({ column }) => sortableHeader(column, "Repetitions"),
+        cell: (info) => {
+          return info.getValue();
+        },
+        enableSorting: true,
+        enableHiding: true,
       },
-      enableSorting: true,
-      enableHiding: true,
-      sortingFn: datetimeTextSortingFn,
-    },
-    // {
-    //   accessorKey: "backup_practiced",
-    //   header: "Backup Practiced",
-    //   cell: (info) => {
-    //     return info.getValue();
-    //   },
-    //   enableSorting: true,
-    //   enableHiding: true,
-    // },
-    {
-      accessorKey: "external_ref",
-      header: ({ column }) => sortableHeader(column, "External Ref"),
-      cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
-        // return info.getValue();
-        if (!info.row.original.external_ref) {
+      {
+        accessorKey: "review_date",
+        header: ({ column }) => sortableHeader(column, "Scheduled"),
+        cell: (info) => {
+          return new Date(info.getValue() as string).toLocaleDateString();
+        },
+        enableSorting: true,
+        enableHiding: true,
+        sortingFn: datetimeTextSortingFn,
+      },
+      // {
+      //   accessorKey: "backup_practiced",
+      //   header: "Backup Practiced",
+      //   cell: (info) => {
+      //     return info.getValue();
+      //   },
+      //   enableSorting: true,
+      //   enableHiding: true,
+      // },
+      {
+        accessorKey: "external_ref",
+        header: ({ column }) => sortableHeader(column, "External Ref"),
+        cell: (
+          info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
+        ) => {
+          // return info.getValue();
+          if (!info.row.original.external_ref) {
+            return (
+              <a
+                href={`https://www.irishtune.info/tune/${info.row.original.id}/`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 underline"
+              >
+                {`https://www.irishtune.info/tune/${info.row.original.id}/`}
+              </a>
+            );
+          }
           return (
             <a
-              href={`https://www.irishtune.info/tune/${info.row.original.id}/`}
+              href={info.row.original.external_ref}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-500 underline"
             >
-              {`https://www.irishtune.info/tune/${info.row.original.id}/`}
+              {info.row.original.external_ref}
             </a>
           );
-        }
-        return (
-          <a
-            href={info.row.original.external_ref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-500 underline"
-          >
-            {info.row.original.external_ref}
-          </a>
-        );
+        },
+        enableSorting: true,
+        enableHiding: true,
       },
-      enableSorting: true,
-      enableHiding: true,
-    },
-    // {
-    //   accessorKey: "note_private",
-    //   header: "Private Note",
-    //   cell: (info) => {
-    //     return info.getValue();
-    //   },
-    //   enableSorting: true,
-    //   enableHiding: true,
-    // },
-    // {
-    //   accessorKey: "note_public",
-    //   header: "Public Note",
-    //   cell: (info) => {
-    //     return info.getValue();
-    //   },
-    //   enableSorting: true,
-    //   enableHiding: true,
-    // },
-    {
-      accessorKey: "tags",
-      header: ({ column }) => sortableHeader(column, "Tags"),
-      cell: (info) => {
-        return info.getValue();
+      // {
+      //   accessorKey: "note_private",
+      //   header: "Private Note",
+      //   cell: (info) => {
+      //     return info.getValue();
+      //   },
+      //   enableSorting: true,
+      //   enableHiding: true,
+      // },
+      // {
+      //   accessorKey: "note_public",
+      //   header: "Public Note",
+      //   cell: (info) => {
+      //     return info.getValue();
+      //   },
+      //   enableSorting: true,
+      //   enableHiding: true,
+      // },
+      {
+        accessorKey: "tags",
+        header: ({ column }) => sortableHeader(column, "Tags"),
+        cell: (info) => {
+          return info.getValue();
+        },
+        enableSorting: true,
+        enableHiding: true,
       },
-      enableSorting: true,
-      enableHiding: true,
-    },
-    {
-      accessorKey: "notes",
-      header: ({ column }) => sortableHeader(column, "Notes"),
-      cell: (info) => {
-        return (
-          <div className="truncate" style={{ maxWidth: "30ch" }}>
-            {info.getValue()}
-          </div>
-        );
+      {
+        accessorKey: "notes",
+        header: ({ column }) => sortableHeader(column, "Notes"),
+        cell: (info) => {
+          return (
+            <div className="truncate" style={{ maxWidth: "30ch" }}>
+              {info.getValue()}
+            </div>
+          );
+        },
+        enableSorting: true,
+        enableHiding: true,
       },
-      enableSorting: true,
-      enableHiding: true,
-    },
-    {
-      accessorKey: "deleted",
-      header: ({ column }) => sortableHeader(column, "Deleted?"),
-      cell: (info) => {
-        return (
-          <div className="truncate" style={{ maxWidth: "30ch" }}>
-            {info.getValue()}
-          </div>
-        );
+      {
+        accessorKey: "playlist_deleted",
+        header: ({ column }) =>
+          sortableHeader(column, "Deleted in Repertoire?"),
+        cell: (info) => {
+          return info.getValue() ? "Yes" : "No";
+        },
+        enableSorting: true,
+        enableHiding: true,
       },
-      enableSorting: true,
-      enableHiding: true,
-    },
-  ];
+    ];
+    columns.push(...columnsUserSpecific);
+  }
+  return columns;
 }

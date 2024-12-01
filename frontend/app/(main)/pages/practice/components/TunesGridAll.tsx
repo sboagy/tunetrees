@@ -13,7 +13,7 @@ import type {
 } from "@tanstack/react-table";
 import { FastForward } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
-import { getRepertoireTunesOverview } from "../queries";
+import { getTunesOnlyIntoOverview } from "../queries";
 import type { ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
@@ -78,13 +78,13 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
   // persist across renders without causing re-renders.
   const isRefreshing = useRef(false);
 
+  const showDeleted = false; // Should become a state variable at some point
+
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
-        const result: ITuneOverview[] = await getRepertoireTunesOverview(
-          userId,
-          playlistId,
-        );
+        const result: ITuneOverview[] =
+          await getTunesOnlyIntoOverview(showDeleted);
         setTunesRefreshId(refreshId);
         setTunes(result);
         isRefreshing.current = false;
