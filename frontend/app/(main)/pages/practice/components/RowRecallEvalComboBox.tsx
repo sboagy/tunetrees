@@ -19,8 +19,8 @@ import {
   deleteTableTransientData,
 } from "../settings";
 import type {
+  ITuneOverview,
   TablePurpose,
-  TuneOverview,
   TunesGridColumnGeneralType,
 } from "../types";
 import { getColorForEvaluation } from "./TunesGrid";
@@ -80,7 +80,7 @@ const qualityList = [
 ];
 
 type RecallEvalComboBoxProps = {
-  info: CellContext<TuneOverview, TunesGridColumnGeneralType>;
+  info: CellContext<ITuneOverview, TunesGridColumnGeneralType>;
   userId: number;
   playlistId: number;
   purpose: TablePurpose;

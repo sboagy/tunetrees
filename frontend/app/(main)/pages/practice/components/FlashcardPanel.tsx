@@ -2,36 +2,36 @@
 
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardContent,
+    CardFooter,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import type {
-  CellContext,
-  Table as TanstackTable,
+    CellContext,
+    Table as TanstackTable,
 } from "@tanstack/react-table";
-import type { TablePurpose, TuneOverview } from "../types";
+import type { ITuneOverview, TablePurpose } from "../types";
 import RecallEvalComboBox from "./RowRecallEvalComboBox";
 
 function getCellContext(
-  table: TanstackTable<TuneOverview>,
+  table: TanstackTable<ITuneOverview>,
   userId: number,
   playlistId: number,
   purpose: TablePurpose,
   tableIndex: number,
-): CellContext<TuneOverview, string> {
+): CellContext<ITuneOverview, string> {
   const row = table.getRow(tableIndex.toString());
   const cells = row.getAllCells();
   const cell = cells.find((cell) => cell.column.id === "recall_eval");
@@ -40,11 +40,11 @@ function getCellContext(
     throw Error("Cell not found");
   }
 
-  return cell.getContext() as CellContext<TuneOverview, string>;
+  return cell.getContext() as CellContext<ITuneOverview, string>;
 }
 
 type Props = {
-  table: TanstackTable<TuneOverview>;
+  table: TanstackTable<ITuneOverview>;
   userId: number;
   playlistId: number;
   purpose: TablePurpose;

@@ -103,7 +103,8 @@ def query_practice_list_scheduled(
     acceptable_delinquency_window=7,
     playlist_ref=1,
     user_ref=1,
-    show_deleted=False,
+    show_deleted=True,
+    show_playlist_deleted=False,
 ) -> List[Row[Any]]:
     """Get a list of tunes to practice on the review_sitdown_date.
     (This version uses the practice_list_joined view, instead of
@@ -150,6 +151,8 @@ def query_practice_list_scheduled(
         ]
         if not show_deleted:
             filters.append(t_practice_list_staged.c.deleted.is_(False))
+        if not show_playlist_deleted:
+            filters.append(t_practice_list_staged.c.playlist_deleted.is_(False))
 
         practice_list_query = db.query(t_practice_list_staged).filter(and_(*filters))
 
@@ -289,7 +292,8 @@ def query_repertoire_list(
     print_table=False,
     playlist_ref=1,
     user_ref=1,
-    show_deleted=False,
+    show_deleted=True,
+    show_playlist_deleted=False,
 ) -> List[Tune]:
     filters = [
         t_practice_list_staged.c.user_ref == user_ref,
@@ -297,6 +301,8 @@ def query_repertoire_list(
     ]
     if not show_deleted:
         filters.append(t_practice_list_staged.c.deleted.is_(False))
+    if not show_playlist_deleted:
+        filters.append(t_practice_list_staged.c.playlist_deleted.is_(False))
 
     query = db.query(t_practice_list_staged).filter(and_(*filters))
     query_sorted = query.order_by(

@@ -3,7 +3,7 @@ import type { Table as TanstackTable } from "@tanstack/react-table";
 import { TrashIcon } from "lucide-react";
 import type { JSX } from "react";
 import { updatePlaylistTunes, updateTunes } from "../queries";
-import type { TuneOverview } from "../types";
+import type { ITuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
@@ -12,7 +12,7 @@ interface IDeleteTuneButtonProps {
   userId: number;
   playlistId?: number;
   disabled?: boolean;
-  table: TanstackTable<TuneOverview>;
+  table: TanstackTable<ITuneOverview>;
 }
 
 export default function DeleteTuneButton({
@@ -36,7 +36,7 @@ export default function DeleteTuneButton({
     // hasn't been referenced anywhere yet. In that case, it's probably safe to
     // delete it?
 
-    const selectedTunes: TuneOverview[] = table
+    const selectedTunes: ITuneOverview[] = table
       .getSelectedRowModel()
       .rows.map((row) => row.original);
 

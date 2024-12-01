@@ -8,7 +8,7 @@ import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
 import { getScheduledTunesOverview } from "../queries";
 import { deleteTableTransientData, updateCurrentTuneInDb } from "../settings";
-import type { TuneOverview } from "../types";
+import type { ITuneOverview } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
@@ -55,9 +55,9 @@ export default function TunesGridScheduled({
 
   const handleRecallEvalChange = useCallback(
     (tuneId: number, newValue: string): void => {
-      setTunes((prevTunes: TuneOverview[]) =>
+      setTunes((prevTunes: ITuneOverview[]) =>
         prevTunes.map(
-          (tune): TuneOverview =>
+          (tune): ITuneOverview =>
             tune.id === tuneId ? { ...tune, recall_eval: newValue } : tune,
         ),
       );
@@ -71,7 +71,7 @@ export default function TunesGridScheduled({
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
-        const result: TuneOverview[] = await getScheduledTunesOverview(
+        const result: ITuneOverview[] = await getScheduledTunesOverview(
           userId,
           playlistId,
           showDeleted,
@@ -96,7 +96,7 @@ export default function TunesGridScheduled({
       isRefreshing.current = true;
       setIsLoading(true);
       refreshTunes(userId, playlistId, refreshId)
-        .then((result: TuneOverview[]) => {
+        .then((result: ITuneOverview[]) => {
           console.log(`LF1 ScheduledTunesGrid number tunes: ${result.length}`);
           console.log(
             `LF1 ScheduledTunesGrid back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,

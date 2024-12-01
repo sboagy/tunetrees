@@ -1,10 +1,10 @@
 import type React from "react";
 import { type ReactNode, createContext, useContext, useState } from "react";
-import type { TuneOverview } from "../types";
+import type { ITuneOverview } from "../types";
 
 interface IScheduledTunesContextType {
-  tunes: TuneOverview[];
-  setTunes: React.Dispatch<React.SetStateAction<TuneOverview[]>>;
+  tunes: ITuneOverview[];
+  setTunes: React.Dispatch<React.SetStateAction<ITuneOverview[]>>;
   tunesRefreshId: number | null;
   setTunesRefreshId: (newRefreshId: number) => void;
 }
@@ -18,7 +18,7 @@ export const TunesProviderScheduled = ({
 }: {
   children: ReactNode;
 }) => {
-  const [tunes, setTunes] = useState<TuneOverview[]>([]);
+  const [tunes, setTunes] = useState<ITuneOverview[]>([]);
   const [tunesRefreshId, setTunesRefreshId] = useState<number | null>(null);
 
   return (

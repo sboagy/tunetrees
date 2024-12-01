@@ -64,7 +64,10 @@ tt_review_sitdown_date_str = environ.get("TT_REVIEW_SITDOWN_DATE", None)
 
 @router.get("/scheduled_tunes_overview/{user_id}/{playlist_ref}")
 async def get_scheduled_tunes_overview(
-    user_id: str, playlist_ref: str, show_deleted: bool = Query(False)
+    user_id: str,
+    playlist_ref: str,
+    show_deleted: bool = Query(False),
+    show_playlist_deleted: bool = Query(False),
 ) -> List[dict[str, Any]] | dict[str, str]:
     try:
         with SessionLocal() as db:
@@ -74,6 +77,7 @@ async def get_scheduled_tunes_overview(
                 user_ref=int(user_id),
                 playlist_ref=int(playlist_ref),
                 show_deleted=show_deleted,
+                show_playlist_deleted=show_playlist_deleted,
             )
             tune_list = [
                 tunes_mapper(tune, t_practice_list_staged) for tune in tunes_scheduled
@@ -86,7 +90,10 @@ async def get_scheduled_tunes_overview(
 
 @router.get("/repertoire_tunes_overview/{user_id}/{playlist_ref}")
 async def get_repertoire_tunes_overview(
-    user_id: str, playlist_ref: str, show_deleted: bool = Query(False)
+    user_id: str,
+    playlist_ref: str,
+    show_deleted: bool = Query(False),
+    show_playlist_deleted: bool = Query(False),
 ) -> List[dict[str, Any]] | dict[str, str]:
     try:
         with SessionLocal() as db:
@@ -95,6 +102,7 @@ async def get_repertoire_tunes_overview(
                 user_ref=int(user_id),
                 playlist_ref=int(playlist_ref),
                 show_deleted=show_deleted,
+                show_playlist_deleted=show_playlist_deleted,
             )
             tune_list = []
             for tune in tunes_recently_played:
@@ -586,6 +594,31 @@ def get_tune(tune_ref: int = Query(...)):
             raise HTTPException(
                 status_code=500, detail=f"Unable to fetch tune({tune_ref}): {e}"
             )
+
+
+@router.get(
+    "/tunes",
+    response_model=List[TuneModel],
+    summary="Get Tunes",
+    description="Retrieve tunes with pagination.",
+)
+def get_tunes(
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(
+        10000, ge=1, le=10000, description="Maximum number of records to return"
+    ),
+    show_deleted: bool = Query(False),
+):
+    try:
+        with SessionLocal() as db:
+            query = db.query(Tune).offset(skip).limit(limit)
+            if not show_deleted:
+                query = query.filter(t_practice_list_staged.c.deleted.is_(False))
+            tunes = query.all()
+            return tunes
+    except Exception as e:
+        logger.error(f"Unable to fetch tunes: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post(

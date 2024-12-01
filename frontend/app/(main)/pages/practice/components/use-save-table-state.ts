@@ -1,7 +1,7 @@
 import type { TableState, Table as TanstackTable } from "@tanstack/react-table";
 import { useEffect } from "react";
 import { createOrUpdateTableState } from "../settings";
-import type { TablePurpose, TuneOverview } from "../types";
+import type { ITuneOverview, TablePurpose } from "../types";
 import { useTune } from "./CurrentTuneContext";
 
 /**
@@ -13,7 +13,7 @@ import { useTune } from "./CurrentTuneContext";
  * is unmounted, such as when switching tabs within the application.
  */
 export const useSaveTableState = (
-  table: TanstackTable<TuneOverview>,
+  table: TanstackTable<ITuneOverview>,
   userId: number,
   tablePurpose: TablePurpose,
 ) => {

@@ -5,10 +5,10 @@ import axios, { isAxiosError } from "axios";
 import type { ITabSpec } from "./components/TabsStateContext";
 import type {
   ITableStateTable,
+  ITableTransientData,
+  ITableTransientDataFields,
   ScreenSize,
   TablePurpose,
-  TableTransientData,
-  TableTransientDataFields,
 } from "./types";
 
 const client = axios.create({
@@ -310,7 +310,7 @@ export async function createOrUpdateTableTransientData(
   recallEval: string | null,
 ): Promise<number> {
   try {
-    const transientData: TableTransientDataFields = {
+    const transientData: ITableTransientDataFields = {
       note_private: notesPrivate,
       note_public: notesPublic,
       recall_eval: recallEval,
@@ -335,7 +335,7 @@ export async function getTableTransientData(
   tuneId: number,
   playlistId: number,
   purpose: TablePurpose,
-): Promise<TableTransientData | null> {
+): Promise<ITableTransientData | null> {
   try {
     const response = await client.get(
       `/table_transient_data/${userId}/${tuneId}/${playlistId}/${purpose}`,
@@ -343,9 +343,9 @@ export async function getTableTransientData(
     // Handle successful response
     const transientDataStr: string = response.data as string;
     // Not very confident about this reconstitution of TableTransientData
-    const transientData: TableTransientData = JSON.parse(
+    const transientData: ITableTransientData = JSON.parse(
       transientDataStr,
-    ) as TableTransientData;
+    ) as ITableTransientData;
     console.error("getTableTransientData response status: ", response.status);
     return transientData;
   } catch (error) {

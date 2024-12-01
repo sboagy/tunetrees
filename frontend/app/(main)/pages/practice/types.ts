@@ -4,38 +4,11 @@
 import type { TableState } from "@tanstack/react-table";
 import type { JSX } from "react";
 
-// add the id in a derived class?
-export type TuneOverview = {
-  id?: number;
-  user_ref?: number | null;
-  playlist_ref?: number | null;
-  title: string;
-  type: string | null;
-  structure: string | null;
-  mode: string | null;
-  incipit: string | null;
-  genre: string | null;
-  learned: string | null;
-  practiced: string | null;
-  quality: number | null;
-  easiness: number | null;
-  interval: number | null;
-  repetitions: number | null;
-  review_date: string | null;
-  backup_practiced?: string | null;
-  external_ref?: string | null;
-  tags?: string | null;
-  recall_eval?: string | null;
-  notes?: string | null;
-  favorite_url?: string | null;
-  deleted?: boolean | null;
-};
-
 export type ScreenSize = "small" | "full";
 
 export type TablePurpose = "practice" | "repertoire" | "all";
 
-export type TableTransientData = {
+export interface ITableTransientData {
   user_id: number;
   tune_id: number;
   playlist_id: number;
@@ -43,26 +16,26 @@ export type TableTransientData = {
   note_private: string | null;
   note_public: string | null;
   recall_eval: string | null;
-};
+}
 
-export type TableTransientDataFields = {
+export interface ITableTransientDataFields {
   note_private: string | null;
   note_public: string | null;
   recall_eval: string | null;
-};
+}
 
 // Define the type for the function parameters
-export type FilteredDataParams = {
-  data: TuneOverview[];
-  criteria: (item: TuneOverview) => boolean;
-};
+export interface IFilteredDataParams {
+  data: ITuneOverview[];
+  criteria: (item: ITuneOverview) => boolean;
+}
 
 // Define the return type of the function
-export type FilteredDataReturnType = TuneOverview[];
+export type FilteredDataReturnType = ITuneOverview[];
 
 // Create the type definition for the filteredData function
 export type FilteredDataType = (
-  params: FilteredDataParams,
+  params: IFilteredDataParams,
 ) => FilteredDataReturnType;
 
 export type TunesGridColumnGeneralType =
@@ -114,6 +87,7 @@ export interface ITableStateTable {
 }
 
 export interface ITune {
+  id?: number;
   title?: string | null;
   type?: string | null;
   structure?: string | null;
@@ -123,13 +97,32 @@ export interface ITune {
   deleted?: boolean | false;
 }
 
-export type IPlaylistTune = {
+export interface ITuneOverview extends ITune {
+  user_ref?: number | null;
+  playlist_ref?: number | null;
+  learned: string | null;
+  practiced: string | null;
+  quality: number | null;
+  easiness: number | null;
+  interval: number | null;
+  repetitions: number | null;
+  review_date: string | null;
+  backup_practiced?: string | null;
+  external_ref?: string | null;
+  tags?: string | null;
+  recall_eval?: string | null;
+  notes?: string | null;
+  favorite_url?: string | null;
+  playlist_deleted?: boolean | null;
+}
+
+export interface IPlaylistTune {
   playlist_ref: number;
   tune_ref: number;
   current: string;
   learned: string;
   deleted?: boolean | null;
-};
+}
 
 export interface IPlaylist {
   playlist_id: number;

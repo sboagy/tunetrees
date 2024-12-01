@@ -28,8 +28,8 @@ import {
   Filter,
 } from "lucide-react";
 import type {
+  ITuneOverview,
   TablePurpose,
-  TuneOverview,
   TunesGridColumnGeneralType,
 } from "../types";
 
@@ -75,9 +75,9 @@ function columnControlMenu() {
   );
 }
 
-const datetimeTextSortingFn: SortingFn<TuneOverview> = (
-  rowA: Row<TuneOverview>,
-  rowB: Row<TuneOverview>,
+const datetimeTextSortingFn: SortingFn<ITuneOverview> = (
+  rowA: Row<ITuneOverview>,
+  rowB: Row<ITuneOverview>,
   columnId: string,
 ) => {
   const dateA = new Date(rowA.getValue(columnId));
@@ -134,9 +134,9 @@ export function get_columns(
   purpose: TablePurpose,
   onRecallEvalChange?: (tuneId: number, newValue: string) => void,
   setTunesRefreshId?: (newRefreshId: number) => void,
-): ColumnDef<TuneOverview, TunesGridColumnGeneralType>[] {
+): ColumnDef<ITuneOverview, TunesGridColumnGeneralType>[] {
   const determineHeaderCheckedState = (
-    table: TanstackTable<TuneOverview>,
+    table: TanstackTable<ITuneOverview>,
   ): CheckedState => {
     const rowSelection = table.getState().rowSelection;
     const allSelected =
@@ -156,7 +156,7 @@ export function get_columns(
 
   const handleHeaderCheckboxChange = (
     checked: boolean | string,
-    table: TanstackTable<TuneOverview>,
+    table: TanstackTable<ITuneOverview>,
   ) => {
     const checkedResolved =
       typeof checked === "string" ? checked === "true" : checked;
@@ -186,7 +186,7 @@ export function get_columns(
 
   function selectionHeader<TData, TValue>(
     column: Column<TData, TValue>,
-    table: TanstackTable<TuneOverview>,
+    table: TanstackTable<ITuneOverview>,
   ) {
     // console.log("column: ", column);
     return (
@@ -207,7 +207,7 @@ export function get_columns(
   }
 
   function refreshHeader(
-    info: CellContext<TuneOverview, TunesGridColumnGeneralType>,
+    info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
   ) {
     // Ugly trick to force a refresh of the header
     info.table.getColumn(info.column.id)?.toggleVisibility();
@@ -215,7 +215,7 @@ export function get_columns(
   }
 
   function RowSelectedCheckBox(
-    info: CellContext<TuneOverview, TunesGridColumnGeneralType>,
+    info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
   ) {
     const handleItemCheckboxChange = () => {
       refreshHeader(info);
@@ -250,7 +250,7 @@ export function get_columns(
       id: "id",
       // header: ({ column }) => sortableHeader(column, "Id"),
       header: ({ column }) => sortableHeader(column, "Id"),
-      cell: (info: CellContext<TuneOverview, TunesGridColumnGeneralType>) => {
+      cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
         return info.getValue();
         // if (!info.row.original?.external_ref) {
         //   return (
@@ -277,7 +277,7 @@ export function get_columns(
           header: ({ column }) => sortableHeader(column, "Evaluation"),
           enableHiding: false,
           cell: (
-            info: CellContext<TuneOverview, TunesGridColumnGeneralType>,
+            info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
           ) => (
             <RecallEvalComboBox
               info={info}
@@ -294,8 +294,9 @@ export function get_columns(
           accessorKey: "select",
           header: ({ column, table }) => selectionHeader(column, table),
           enableHiding: false,
-          cell: (info: CellContext<TuneOverview, TunesGridColumnGeneralType>) =>
-            RowSelectedCheckBox(info),
+          cell: (
+            info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
+          ) => RowSelectedCheckBox(info),
           accessorFn: () => null, // Return null since we don't need a value
           meta: {
             type: "boolean", // Set the type to boolean for consistency
@@ -305,7 +306,7 @@ export function get_columns(
     {
       accessorKey: "title",
       header: ({ column }) => sortableHeader(column, "Title"),
-      cell: (info: CellContext<TuneOverview, TunesGridColumnGeneralType>) => {
+      cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
         const favoriteUrl = info.row.original.favorite_url;
         return favoriteUrl ? (
           <a
@@ -457,7 +458,7 @@ export function get_columns(
     {
       accessorKey: "external_ref",
       header: ({ column }) => sortableHeader(column, "External Ref"),
-      cell: (info: CellContext<TuneOverview, TunesGridColumnGeneralType>) => {
+      cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
         // return info.getValue();
         if (!info.row.original.external_ref) {
           return (

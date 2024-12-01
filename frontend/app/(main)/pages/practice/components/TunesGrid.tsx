@@ -13,7 +13,7 @@ import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useRef } from "react";
 import { updateCurrentTuneInDb } from "../settings";
-import type { TablePurpose, TuneOverview } from "../types";
+import type { ITuneOverview, TablePurpose } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
@@ -46,7 +46,7 @@ export const getColorForEvaluation = (
 };
 
 type Props = {
-  table: TanstackTable<TuneOverview>;
+  table: TanstackTable<ITuneOverview>;
   userId: number;
   playlistId: number;
   tablePurpose: TablePurpose;
@@ -68,7 +68,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const tableBodyRef = useRef<HTMLDivElement>(null);
 
   const handleRowClick = useCallback(
-    (row: Row<TuneOverview>) => {
+    (row: Row<ITuneOverview>) => {
       const previousTune = currentTune;
       const newTune = row.original.id;
 
@@ -122,7 +122,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
     ],
   );
 
-  const handleRowDoubleClick = (row: Row<TuneOverview>) => {
+  const handleRowDoubleClick = (row: Row<ITuneOverview>) => {
     console.log(
       "handleRowDoubleClick (current tune should already be set): tuneId=",
       row.original.id,

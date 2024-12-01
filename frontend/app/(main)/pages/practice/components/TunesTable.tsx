@@ -16,21 +16,21 @@ import {
 } from "@tanstack/react-table";
 import * as React from "react";
 import { getTableStateTable, updateTableStateInDb } from "../settings";
-import type { TablePurpose, TuneOverview } from "../types";
+import type { ITuneOverview, TablePurpose } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
 import { get_columns } from "./TuneColumns";
 
 export interface IScheduledTunesType {
-  tunes: TuneOverview[];
+  tunes: ITuneOverview[];
   userId: number;
   tablePurpose: TablePurpose;
   globalFilter?: string;
   onRecallEvalChange?: (tuneId: number, newValue: string) => void;
-  onTableCreated?: (table: TanstackTable<TuneOverview>) => void;
+  onTableCreated?: (table: TanstackTable<ITuneOverview>) => void;
   selectionChangedCallback?:
     | ((
-        table: TanstackTable<TuneOverview>,
+        table: TanstackTable<ITuneOverview>,
         rowSelectionState: RowSelectionState,
       ) => void)
     | null;
@@ -39,7 +39,7 @@ export interface IScheduledTunesType {
 }
 
 export const tableContext =
-  React.createContext<TanstackTable<TuneOverview> | null>(null);
+  React.createContext<TanstackTable<ITuneOverview> | null>(null);
 
 export const useTableContext = () => {
   const context = React.useContext(tableContext);
@@ -47,7 +47,7 @@ export const useTableContext = () => {
 };
 
 export const saveTableState = async (
-  table: TanstackTable<TuneOverview>,
+  table: TanstackTable<ITuneOverview>,
   userId: number,
   tablePurpose: TablePurpose,
   currentTuneId: number | null,
@@ -171,7 +171,7 @@ export function TunesTableComponent({
     setTunesRefreshId,
   );
 
-  const table: TanstackTable<TuneOverview> = useReactTable({
+  const table: TanstackTable<ITuneOverview> = useReactTable({
     data: tunes,
     columns: columns,
     globalFilterFn: "auto",
@@ -334,8 +334,8 @@ export function TunesTableComponent({
 // Create a hook to use the table
 export function useTunesTable(
   props: IScheduledTunesType,
-): [React.JSX.Element, TanstackTable<TuneOverview> | null] {
-  const [table, setTable] = React.useState<TanstackTable<TuneOverview> | null>(
+): [React.JSX.Element, TanstackTable<ITuneOverview> | null] {
+  const [table, setTable] = React.useState<TanstackTable<ITuneOverview> | null>(
     null,
   );
 

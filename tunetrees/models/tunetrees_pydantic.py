@@ -523,6 +523,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     mode: Optional[str] = None
     incipit: Optional[str] = None
     genre: Optional[str] = None
+    deleted: Optional[bool] = None
     learned: Optional[str] = None
     practiced: Optional[str] = None
     quality: Optional[int] = None
@@ -535,7 +536,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     playlist_ref: Optional[int] = None
     notes: Optional[str] = None
     favorite_url: Optional[str] = None
-    deleted: Optional[bool] = None
+    playlist_deleted: Optional[bool] = None
 
     class Config:
         orm_mode = True

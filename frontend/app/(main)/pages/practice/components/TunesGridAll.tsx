@@ -14,7 +14,7 @@ import type {
 import { FastForward } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
 import { getRepertoireTunesOverview } from "../queries";
-import type { TuneOverview } from "../types";
+import type { ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
 import NewTuneButton from "./NewTuneButton";
@@ -49,7 +49,7 @@ type AllGridProps = {
 export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
   const [isRowsSelected, setIsRowsSelected] = useState(false);
   const selectionChangedCallback = (
-    table: TanstackTable<TuneOverview>,
+    table: TanstackTable<ITuneOverview>,
     rowSelectionState: RowSelectionState,
   ): void => {
     const selectedRowsCount = Object.keys(rowSelectionState).length;
@@ -81,7 +81,7 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
-        const result: TuneOverview[] = await getRepertoireTunesOverview(
+        const result: ITuneOverview[] = await getRepertoireTunesOverview(
           userId,
           playlistId,
         );
@@ -109,7 +109,7 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
       );
       isRefreshing.current = true;
       refreshTunes(userId, playlistId, refreshId)
-        .then((result: TuneOverview[]) => {
+        .then((result: ITuneOverview[]) => {
           console.log(`LF1 AllGrid number tunes: ${result.length}`);
           console.log(
             `LF1 AllGrid back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,

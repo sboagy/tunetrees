@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
 import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,10 +14,10 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { ERROR_PLAYLIST_TUNE } from "../mocks";
 import {
-  getPlaylistTuneOverview,
-  updateTuneInPlaylistFromTuneOverview,
+    getPlaylistTuneOverview,
+    updateTuneInPlaylistFromTuneOverview,
 } from "../queries";
-import type { TuneOverview } from "../types";
+import type { ITuneOverview } from "../types";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import "./TuneEditor.css"; // Import the CSS file
@@ -96,7 +96,7 @@ export default function TuneEditor({
     };
   }, [headerFooterHeight, mainElement]);
 
-  const [tune, setTune] = useState<TuneOverview | null>(null);
+  const [tune, setTune] = useState<ITuneOverview | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -107,9 +107,9 @@ export default function TuneEditor({
     const fetchTune = () => {
       getPlaylistTuneOverview(userId, playlistId, tuneId)
         .then((tuneData) => {
-          if (tuneData && (tuneData as TuneOverview).id !== undefined) {
-            setTune(tuneData as TuneOverview);
-            form.reset(tuneData as TuneOverview);
+          if (tuneData && (tuneData as ITuneOverview).id !== undefined) {
+            setTune(tuneData as ITuneOverview);
+            form.reset(tuneData as ITuneOverview);
           } else {
             console.error(
               `Failed to fetch tune: ${userId} ${playlistId} ${tuneId}`,
@@ -135,7 +135,7 @@ export default function TuneEditor({
       userId,
       playlistId,
       tuneId,
-      data as TuneOverview,
+      data as ITuneOverview,
     );
     if ("detail" in result) {
       console.error("Failed to update tune:", result.detail);

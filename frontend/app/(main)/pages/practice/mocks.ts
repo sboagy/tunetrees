@@ -7,7 +7,7 @@
 /**
  * Generates a mock Tune object with predefined data.
  *
- * @returns {TuneOverview} A mock Tune object with sample data.
+ * @returns {ITuneOverview} A mock Tune object with sample data.
  */
 
 /**
@@ -17,9 +17,9 @@
  * @param {number} userId - The ID of the user.
  * @param {number} playlistId - The ID of the playlist.
  * @param {TablePurpose} purpose - The purpose of the table.
- * @param {keyof TuneOverview} [columnId="recall_eval"] - The ID of the column to target. Defaults to "recall_eval".
- * @param {TuneOverview} [mockTune] - An optional mock Tune object. If not provided, a default mock Tune will be used.
- * @returns {CellContext<TuneOverview, TCellValue>} The context of the targeted cell in the mock Tune table.
+ * @param {keyof ITuneOverview} [columnId="recall_eval"] - The ID of the column to target. Defaults to "recall_eval".
+ * @param {ITuneOverview} [mockTune] - An optional mock Tune object. If not provided, a default mock Tune will be used.
+ * @returns {CellContext<ITuneOverview, TCellValue>} The context of the targeted cell in the mock Tune table.
  * @throws Will throw an error if the cell with the specified column ID is not found.
  */
 import type {
@@ -34,10 +34,10 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { get_columns } from "./components/TuneColumns";
-import type { TablePurpose, TuneOverview } from "./types";
+import type { ITuneOverview, TablePurpose } from "./types";
 
-export function getMockTune(): TuneOverview {
-  const tuneData: TuneOverview = {
+export function getMockTune(): ITuneOverview {
+  const tuneData: ITuneOverview = {
     id: 1,
     title: "Mock Tune",
     type: "Folk",
@@ -69,16 +69,16 @@ export function createMockTuneCellContext<
   userId: number,
   playlistId: number,
   purpose: TablePurpose,
-  columnId: keyof TuneOverview = "recall_eval",
-  mockTune?: TuneOverview,
-): CellContext<TuneOverview, TCellValue> {
-  const tuneData: TuneOverview = mockTune ?? getMockTune();
+  columnId: keyof ITuneOverview = "recall_eval",
+  mockTune?: ITuneOverview,
+): CellContext<ITuneOverview, TCellValue> {
+  const tuneData: ITuneOverview = mockTune ?? getMockTune();
 
   const mockTunes = [tuneData];
 
   const columns = get_columns(userId, playlistId, purpose);
 
-  const table: TanstackTable<TuneOverview> = useReactTable({
+  const table: TanstackTable<ITuneOverview> = useReactTable({
     data: mockTunes,
     columns: columns,
     getCoreRowModel: getCoreRowModel(),
@@ -99,10 +99,10 @@ export function createMockTuneCellContext<
     );
   }
 
-  return targetCell.getContext() as CellContext<TuneOverview, TCellValue>;
+  return targetCell.getContext() as CellContext<ITuneOverview, TCellValue>;
 }
 
-export const ERROR_TUNE: TuneOverview[] = [
+export const ERROR_TUNE: ITuneOverview[] = [
   {
     id: 0,
     title: "Error",
@@ -126,7 +126,7 @@ export const ERROR_TUNE: TuneOverview[] = [
 ];
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-export const ERROR_PLAYLIST_TUNE: TuneOverview = {
+export const ERROR_PLAYLIST_TUNE: ITuneOverview = {
   id: 0,
   title: "Error",
   type: "Error",

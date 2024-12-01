@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getTune } from "../queries";
-import type { TuneOverview } from "../types";
+import type { ITuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import NoteCards from "./NoteCards";
@@ -28,7 +28,7 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
       const tune = getTune(currentTune);
       tune
         .then((result) => {
-          const tuneBare = result as TuneOverview;
+          const tuneBare = result as ITuneOverview;
           setTuneTitle(tuneBare.title);
         })
         .catch((error) => {

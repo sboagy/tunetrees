@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import type { JSX } from "react";
 import { createEmptyTune } from "../queries";
-import type { TuneOverview } from "../types";
+import type { ITuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 
@@ -19,7 +19,7 @@ export default function NewTuneButton({
   const { setCurrentTune } = useTune();
 
   const handleClick = () => {
-    const newTune: TuneOverview = {
+    const newTune: ITuneOverview = {
       title: "New Tune",
       type: "",
       structure: null,
@@ -41,7 +41,7 @@ export default function NewTuneButton({
     };
     createEmptyTune(newTune, Number(playlistId))
       .then((result) => {
-        const tune = result as TuneOverview;
+        const tune = result as ITuneOverview;
         console.log(
           `Tune created successfully /pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tune.id}`,
         );

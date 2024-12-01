@@ -7,6 +7,7 @@ SELECT
     tune.mode,
     tune.incipit,
     tune.genre,
+    tune.deleted,
     playlist_tune.learned,
     practice_record.practiced,
     practice_record.quality,
@@ -17,7 +18,7 @@ SELECT
     user_annotation_set.tags,
     playlist_tune.playlist_ref,
     playlist.user_ref,
-    playlist_tune.deleted,
+    playlist_tune.deleted as playlist_deleted,
     (SELECT group_concat(note.note_text, ' ')
         FROM note
         WHERE note.tune_ref = tune.id
