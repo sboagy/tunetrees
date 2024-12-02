@@ -414,7 +414,7 @@ def delete_table_transient_data(
 
 @settings_router.get(
     "/tab_group_main_state/{user_id}",
-    response_model=TabGroupMainStateModel,
+    response_model=TabGroupMainStateModel | None,
     summary="Retrieve the tab group main state for a user",
     description="Retrieve the tab group main state for a user, which indicates the currently active tab.",
     status_code=status.HTTP_200_OK,
@@ -432,10 +432,6 @@ def get_tab_group_main_state(
             tab_group_main_state = (
                 db.query(TabGroupMainState).filter_by(user_id=user_id).first()
             )
-            if not tab_group_main_state:
-                raise HTTPException(
-                    status_code=404, detail="Tab group main state not found"
-                )
             return tab_group_main_state
             # return tab_group_main_state
         except Exception as e:
@@ -451,18 +447,27 @@ def get_tab_group_main_state(
     status_code=status.HTTP_201_CREATED,
 )
 def create_tab_group_main_state(
-    tab_group_main_state: TabGroupMainStateModel,
+    tab_group_main_state: TabGroupMainStateModelPartial = Body(...),
 ):
     with SessionLocal() as db:
         try:
             new_tab_group_main_state = TabGroupMainState(
                 user_id=tab_group_main_state.user_id,
                 which_tab=tab_group_main_state.which_tab,
+                playlist_id=tab_group_main_state.playlist_id,
             )
+            if tab_group_main_state.tab_spec is not None:
+                new_tab_group_main_state.tab_spec = tab_group_main_state.tab_spec
             db.add(new_tab_group_main_state)
             db.commit()
             db.refresh(new_tab_group_main_state)
-            return new_tab_group_main_state
+            tab_group_main_state_from_db = (
+                db.query(TabGroupMainState)
+                .filter_by(user_id=tab_group_main_state.user_id)
+                .first()
+            )
+
+            return tab_group_main_state_from_db
         except Exception as e:
             logging.getLogger().error("Unknown error: %s" % e)
             raise HTTPException(status_code=500, detail="Unknown error occurred")

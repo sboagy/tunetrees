@@ -50,17 +50,11 @@ export const saveTableState = async (
   table: TanstackTable<ITuneOverview>,
   userId: number,
   tablePurpose: TablePurpose,
-  currentTuneId: number | null,
 ): Promise<number> => {
-  // console.log("LF1 saveTableState: input variables", {
-  //   userId,
-  //   tablePurpose,
-  //   currentTuneId,
-  // });
   const tableState: TableState = table.getState();
 
   console.log(
-    `LF6 saveTableState calling createOrUpdateTableState: tablePurpose=${tablePurpose} tableState=${currentTuneId}`,
+    `LF6 saveTableState calling createOrUpdateTableState: tablePurpose=${tablePurpose}`,
   );
   const status = await updateTableStateInDb(
     userId,
@@ -254,7 +248,7 @@ export function TunesTableComponent({
     console.log(
       `LF6 TunesTableComponent (interceptedRowSelectionChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose, currentTune);
+    void saveTableState(table, userId, tablePurpose);
 
     if (selectionChangedCallback) {
       selectionChangedCallback(table, resolvedRowSelectionState);
@@ -275,7 +269,7 @@ export function TunesTableComponent({
     console.log(
       `LF6 TunesTableComponent (interceptedOnColumnFiltersChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose, currentTune);
+    void saveTableState(table, userId, tablePurpose);
   };
 
   const interceptedSetSorting = (
@@ -288,7 +282,7 @@ export function TunesTableComponent({
     console.log(
       `LF6 TunesTableComponent (interceptedSetSorting) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose, currentTune);
+    void saveTableState(table, userId, tablePurpose);
   };
 
   const interceptedSetColumnVisibility = (
@@ -311,7 +305,7 @@ export function TunesTableComponent({
     console.log(
       `LF6 TunesTableComponent (interceptedSetColumnVisibility) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose, currentTune);
+    void saveTableState(table, userId, tablePurpose);
   };
 
   table.setOptions((prev) => ({

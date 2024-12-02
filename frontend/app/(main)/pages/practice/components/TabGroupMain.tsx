@@ -1,11 +1,11 @@
 "use client";
+import type { ITabSpec } from "@/app/(main)/pages/practice/tab-spec";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { JSX } from "react";
 import type { ITabGroupMainStateModel } from "../settings";
-import type { ITabSpec } from "./TabsStateContext";
 import { useTabsState } from "./TabsStateContext";
-import TunesGridAll from "./TunesGridAll";
+import TunesGridCatalog from "./TunesGridCatalog";
 import TunesGridRepertoire from "./TunesGridRepertoire";
 import TunesGridScheduled from "./TunesGridScheduled";
 
@@ -65,7 +65,7 @@ export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
         <TunesGridRepertoire userId={userId} />
       </TabsContent>
       <TabsContent value="all">
-        <TunesGridAll userId={userId} />
+        <TunesGridCatalog userId={userId} />
       </TabsContent>
       <TabsContent value="analysis">
         <Card>

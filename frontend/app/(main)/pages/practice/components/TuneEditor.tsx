@@ -106,10 +106,14 @@ export default function TuneEditor({
   useEffect(() => {
     const fetchTune = () => {
       getPlaylistTuneOverview(userId, playlistId, tuneId)
-        .then((tuneData) => {
+        .then((tuneData : ITuneOverview | {detail: string}) => {
           if (tuneData && (tuneData as ITuneOverview).id !== undefined) {
-            setTune(tuneData as ITuneOverview);
-            form.reset(tuneData as ITuneOverview);
+            const tuneOverview = tuneData as ITuneOverview
+            setTune(tuneOverview);
+            form.reset({
+              ...tuneOverview,
+              title: tuneOverview.title ?? undefined,
+            });
           } else {
             console.error(
               `Failed to fetch tune: ${userId} ${playlistId} ${tuneId}`,

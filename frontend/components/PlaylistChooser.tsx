@@ -34,7 +34,7 @@ import { Input } from "./ui/input";
 
 export default function PlaylistChooser() {
   const { data: session } = useSession();
-  const { setCurrentPlaylist } = usePlaylist();
+  const { currentPlaylist, setCurrentPlaylist } = usePlaylist();
   const [currentPlaylistName, setCurrentPlaylistName] = useState<string>("");
   const [currentPlaylistDescription, setCurrentPlaylistDescription] =
     useState<string>("");
@@ -56,7 +56,10 @@ export default function PlaylistChooser() {
       if (Array.isArray(playlists)) {
         setPlaylists(playlists);
         setEditedPlaylists(playlists);
-        const tabGroupMainState = await getTabGroupMainState(userId);
+        const tabGroupMainState = await getTabGroupMainState(
+          userId,
+          currentPlaylist,
+        );
         const playlistId = tabGroupMainState?.playlist_id ?? 1;
         setCurrentPlaylist(playlistId);
         triggerRefresh();
@@ -76,7 +79,7 @@ export default function PlaylistChooser() {
         return -1;
       }
     } catch (error) {
-      console.error("Error fetching playlists and setting current:", error);
+      console.log("Error fetching playlists and setting current:", error);
       return -1;
     }
     return 0;

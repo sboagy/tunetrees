@@ -2,7 +2,7 @@
 
 import type { TableState } from "@tanstack/react-table";
 import axios, { isAxiosError } from "axios";
-import type { ITabSpec } from "./components/TabsStateContext";
+import { type ITabSpec, initialTabSpec } from "./tab-spec";
 import type {
   ITableStateTable,
   ITableTransientData,
@@ -418,10 +418,28 @@ export interface ITabGroupMainStateModel {
 
 export async function getTabGroupMainState(
   userId: number,
+  playlistId: number,
 ): Promise<ITabGroupMainStateModel | null> {
   try {
-    const response = await client.get(`/tab_group_main_state/${userId}`);
+    let response = await client.get(`/tab_group_main_state/${userId}`);
     console.log("getTabGroupMainState response status: ", response.status);
+    if (response.data === null) {
+      // const initialTabSpecString = JSON.stringify(initialTabSpec);
+      const tabGroupMainStateModel: Partial<ITabGroupMainStateModel> = {
+        user_id: userId,
+        which_tab: initialTabSpec[0].id,
+        // tab_spec: initialTabSpecString,
+        playlist_id: playlistId,
+      };
+      response = await client.post(
+        "/tab_group_main_state",
+        tabGroupMainStateModel,
+      );
+      if (response.status !== 200) {
+        console.error("Error creating tab group main state:", response.status);
+        throw new Error("Error creating tab group main state");
+      }
+    }
     if (response.data.tab_spec !== null) {
       response.data.tab_spec = JSON.parse(
         response.data.tab_spec as string,
@@ -459,7 +477,7 @@ export async function updateTabGroupMainState(
 
 export async function createTabGroupMainState(
   userId: number,
-  tabGroupMainState: ITabGroupMainStateModel,
+  tabGroupMainState: Partial<ITabGroupMainStateModel>,
 ): Promise<number> {
   try {
     if (tabGroupMainState.tab_spec !== null) {

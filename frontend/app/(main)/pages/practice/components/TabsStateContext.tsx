@@ -1,7 +1,17 @@
+import {
+  type ITabSpec,
+  initialTabSpec,
+} from "@/app/(main)/pages/practice/tab-spec";
 import { useSession } from "next-auth/react";
 import type { ReactNode } from "react";
 import { createContext, useContext, useEffect, useState } from "react";
-import { getTabGroupMainState, updateTabGroupMainState } from "../settings";
+import {
+  type ITabGroupMainStateModel,
+  createTabGroupMainState,
+  getTabGroupMainState,
+  updateTabGroupMainState,
+} from "../settings";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 
 // For this context, I'm going to use a bit of a different approach to the one
 // I used in the other contexts, in that I'm going to implement the persistence
@@ -9,13 +19,6 @@ import { getTabGroupMainState, updateTabGroupMainState } from "../settings";
 // it's a viable approach to take with the other contexts, and, if successful,
 // may isolate the persistence logic from the components that use the context,
 // which seems like a good idea to me.
-
-export interface ITabSpec {
-  id: string;
-  name: string;
-  content: string;
-  visible: boolean;
-}
 
 interface ITabsStateContextType {
   tabSpec: ITabSpec[];
@@ -29,38 +32,12 @@ const TabsStateContext = createContext<ITabsStateContextType | undefined>(
   undefined,
 );
 
-const initialTabSpec: ITabSpec[] = [
-  {
-    id: "scheduled",
-    name: "Practice",
-    content: "Review and practice your scheduled tunes.",
-    visible: true,
-  },
-  {
-    id: "repertoire",
-    name: "Repertoire",
-    content: "Manage your repertoire.",
-    visible: true,
-  },
-  {
-    id: "all",
-    name: "All",
-    content: "Add tunes to repertoire from TuneTrees Database.",
-    visible: true,
-  },
-  {
-    id: "analysis",
-    name: "Analysis",
-    content: "Practice Analytics.",
-    visible: true,
-  },
-];
-
 export const TabsStateProvider = ({ children }: { children: ReactNode }) => {
   const [tabSpec, setTabSpec] = useState<ITabSpec[]>(initialTabSpec);
   const [activeTab, setActiveTab] = useState<string>(initialTabSpec[0].id);
   const { data: session } = useSession();
   const userId = session?.user?.id ? Number.parseInt(session?.user?.id) : -1;
+  const { currentPlaylist: playlistId } = usePlaylist();
 
   const setTabVisibility = (id: string, visible: boolean) => {
     setTabSpec((prevTabSpec) =>
@@ -86,7 +63,10 @@ export const TabsStateProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       try {
-        const tabGroupMainState = await getTabGroupMainState(userId);
+        const tabGroupMainState = await getTabGroupMainState(
+          userId,
+          playlistId,
+        );
         if (tabGroupMainState) {
           setTabSpec(
             tabGroupMainState.tab_spec
@@ -98,16 +78,26 @@ export const TabsStateProvider = ({ children }: { children: ReactNode }) => {
           setTabSpec(initialTabSpec);
           setActiveTab(initialTabSpec[0].id);
         }
-      } catch (error) {
-        console.error("Error fetching tab group main state:", error);
+      } catch {
         setTabSpec(initialTabSpec);
         setActiveTab(initialTabSpec[0].id);
-        alert("Error fetching tab group main state (using default state)");
+        const tabGroupMainStateModel: Partial<ITabGroupMainStateModel> = {
+          user_id: userId,
+          which_tab: initialTabSpec[0].id,
+          tab_spec: initialTabSpec,
+        };
+        try {
+          await createTabGroupMainState(userId, tabGroupMainStateModel);
+        } catch (error) {
+          console.error("Error creating tab group main state:", error);
+          throw error;
+        }
+        // alert("Error fetching tab group main state (using default state)");
       }
     };
     // fetch in the background
     void fetchTabGroupMainState();
-  }, [userId]);
+  }, [userId, playlistId]);
 
   useEffect(() => {
     // Save the tab group main state to the database when the tab spec or active tab changes,
