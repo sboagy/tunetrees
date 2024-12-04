@@ -15,7 +15,11 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import * as React from "react";
-import { getTableStateTable, updateTableStateInDb } from "../settings";
+import {
+  createOrUpdateTableState,
+  getTableStateTable,
+  updateTableStateInDb,
+} from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
@@ -50,6 +54,7 @@ export const saveTableState = async (
   table: TanstackTable<ITuneOverview>,
   userId: number,
   tablePurpose: TablePurpose,
+  playlistId: number,
 ): Promise<number> => {
   const tableState: TableState = table.getState();
 
@@ -60,6 +65,7 @@ export const saveTableState = async (
     userId,
     "full",
     tablePurpose,
+    playlistId,
     tableState,
   );
   return status;
@@ -188,11 +194,26 @@ export function TunesTableComponent({
   React.useEffect(() => {
     const fetchTableState = async () => {
       try {
-        const tableStateTable = await getTableStateTable(
+        console.log(
+          `LF6 TunesTableComponent: calling getTableStateTable(${userId}, 'full', tablePurpose=${tablePurpose} playlistId=${playlistId}`,
+        );
+        let tableStateTable = await getTableStateTable(
           userId,
           "full",
           tablePurpose,
+          playlistId,
         );
+        if (!tableStateTable) {
+          console.log("LF1 TunesTableComponent: no table state found in db");
+          tableStateTable = await createOrUpdateTableState(
+            userId,
+            "full",
+            tablePurpose,
+            playlistId,
+            table.getState(),
+            currentTune,
+          );
+        }
         const tableStateFromDb = tableStateTable?.settings as TableState;
         if (tableStateFromDb) {
           setTableStateFromDb(tableStateFromDb);
@@ -222,8 +243,14 @@ export function TunesTableComponent({
       }
     };
 
-    console.log("LF1 TunesTableComponent: calling fetchTableState");
-    void fetchTableState();
+    if (playlistId !== undefined && playlistId > 0) {
+      console.log("LF1 TunesTableComponent: calling fetchTableState");
+      void fetchTableState();
+    } else {
+      console.log(
+        "LF1 TunesTableComponent: playlistId not set, skipping table state fetch",
+      );
+    }
   }, [
     userId,
     tablePurpose,
@@ -231,6 +258,8 @@ export function TunesTableComponent({
     filterStringCallback,
     setCurrentTune,
     setCurrentTablePurpose,
+    playlistId,
+    currentTune,
   ]);
 
   const interceptedRowSelectionChange = (
@@ -248,7 +277,7 @@ export function TunesTableComponent({
     console.log(
       `LF6 TunesTableComponent (interceptedRowSelectionChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose);
+    void saveTableState(table, userId, tablePurpose, playlistId);
 
     if (selectionChangedCallback) {
       selectionChangedCallback(table, resolvedRowSelectionState);
@@ -269,7 +298,7 @@ export function TunesTableComponent({
     console.log(
       `LF6 TunesTableComponent (interceptedOnColumnFiltersChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose);
+    void saveTableState(table, userId, tablePurpose, playlistId);
   };
 
   const interceptedSetSorting = (
@@ -282,7 +311,7 @@ export function TunesTableComponent({
     console.log(
       `LF6 TunesTableComponent (interceptedSetSorting) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose);
+    void saveTableState(table, userId, tablePurpose, playlistId);
   };
 
   const interceptedSetColumnVisibility = (
@@ -305,7 +334,7 @@ export function TunesTableComponent({
     console.log(
       `LF6 TunesTableComponent (interceptedSetColumnVisibility) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose);
+    void saveTableState(table, userId, tablePurpose, playlistId);
   };
 
   table.setOptions((prev) => ({

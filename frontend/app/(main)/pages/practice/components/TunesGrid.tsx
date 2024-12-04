@@ -63,7 +63,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const rowRefs = useRef<{ [key: number]: HTMLTableRowElement | null }>({});
 
   // Invoke useEffect hook for the table state
-  useSaveTableState(table, userId, tablePurpose);
+  useSaveTableState(table, userId, tablePurpose, playlistId);
 
   const tableBodyRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +83,13 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
         console.log(
           `LF6 TunesGrid handleRowClick calling updateCurrentTuneInDb: tablePurpose=${tablePurpose} newTune=${newTune}`,
         );
-        void updateCurrentTuneInDb(userId, "full", tablePurpose, newTune);
+        void updateCurrentTuneInDb(
+          userId,
+          "full",
+          tablePurpose,
+          playlistId,
+          newTune,
+        );
       }
 
       const rowIndexNew = table
@@ -119,6 +125,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
       setCurrentTablePurpose,
       tablePurpose,
       userId,
+      playlistId,
     ],
   );
 

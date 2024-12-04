@@ -19,7 +19,7 @@ export const initialTabSpec: ITabSpec[] = [
     visible: true,
   },
   {
-    id: "all",
+    id: "catalog",
     name: "Catalog",
     content:
       "View full tune catalog, and add tunes from catalog to repertoire.",

@@ -23,6 +23,7 @@ import { usePlaylist } from "./CurrentPlaylistProvider";
 interface ITabsStateContextType {
   tabSpec: ITabSpec[];
   activeTab: string;
+  tabsContextLoading: boolean;
   setActiveTab: (tabId: string) => void;
   setTabVisibility: (id: string, visible: boolean) => void;
   setTabSpec: (tabSpec: ITabSpec[]) => void;
@@ -34,24 +35,43 @@ const TabsStateContext = createContext<ITabsStateContextType | undefined>(
 
 export const TabsStateProvider = ({ children }: { children: ReactNode }) => {
   const [tabSpec, setTabSpec] = useState<ITabSpec[]>(initialTabSpec);
-  const [activeTab, setActiveTab] = useState<string>(initialTabSpec[0].id);
+  const [activeTab, setActiveTabState] = useState<string>(initialTabSpec[0].id);
   const { data: session } = useSession();
   const userId = session?.user?.id ? Number.parseInt(session?.user?.id) : -1;
   const { currentPlaylist: playlistId } = usePlaylist();
+  const [tabsContextLoading, setLoading] = useState<boolean>(true);
+
+  const setActiveTab = (tabId: string) => {
+    setActiveTabState(tabId);
+    void updateTabGroupMainState(userId, {
+      user_id: userId,
+      which_tab: tabId,
+      tab_spec: tabSpec,
+    });
+  };
 
   const setTabVisibility = (id: string, visible: boolean) => {
-    setTabSpec((prevTabSpec) =>
+    setTabSpec((prevTabSpec: ITabSpec[]) =>
       prevTabSpec.map((tab) => (tab.id === id ? { ...tab, visible } : tab)),
     );
-
+    let activeTab2 = activeTab;
     if (!visible && activeTab === id) {
       const nextVisibleTab = tabSpec.find(
         (tab) => tab.id !== id && tab.visible,
       );
       if (nextVisibleTab) {
         setActiveTab(nextVisibleTab.id);
+        activeTab2 = nextVisibleTab.id;
       }
     }
+    const tabSpec2 = tabSpec.map((tab) =>
+      tab.id === id ? { ...tab, visible } : tab,
+    );
+    void updateTabGroupMainState(userId, {
+      user_id: userId,
+      which_tab: activeTab2,
+      tab_spec: tabSpec2,
+    });
   };
 
   useEffect(() => {
@@ -73,14 +93,16 @@ export const TabsStateProvider = ({ children }: { children: ReactNode }) => {
               ? (tabGroupMainState.tab_spec as ITabSpec[])
               : initialTabSpec,
           );
-          setActiveTab(tabGroupMainState.which_tab ?? initialTabSpec[0].id);
+          setActiveTabState(
+            tabGroupMainState.which_tab ?? initialTabSpec[0].id,
+          );
         } else {
           setTabSpec(initialTabSpec);
-          setActiveTab(initialTabSpec[0].id);
+          setActiveTabState(initialTabSpec[0].id);
         }
       } catch {
         setTabSpec(initialTabSpec);
-        setActiveTab(initialTabSpec[0].id);
+        setActiveTabState(initialTabSpec[0].id);
         const tabGroupMainStateModel: Partial<ITabGroupMainStateModel> = {
           user_id: userId,
           which_tab: initialTabSpec[0].id,
@@ -93,42 +115,50 @@ export const TabsStateProvider = ({ children }: { children: ReactNode }) => {
           throw error;
         }
         // alert("Error fetching tab group main state (using default state)");
-      }
+      } finally {
+        setLoading(false);
+      } // Ensure loading is set to false
     };
     // fetch in the background
     void fetchTabGroupMainState();
   }, [userId, playlistId]);
 
-  useEffect(() => {
-    // Save the tab group main state to the database when the tab spec or active tab changes,
-    // but only if the user is logged in.
-    const saveTabGroupMainState = async () => {
-      if (userId === -1) {
-        // This is a normal state when the user is not logged in
-        return;
-      }
-      try {
-        const tabGroupMainState = {
-          user_id: userId,
-          which_tab: activeTab,
-          tab_spec: tabSpec,
-        };
-        await updateTabGroupMainState(userId, tabGroupMainState);
-      } catch (error) {
-        console.error("Error saving tab group main state:", error);
-        alert("Error saving tab group main state");
-      }
-    };
-    // Debounce the save operation to reduce the number of requests to the server
-    const debounceSave = setTimeout(() => {
-      void saveTabGroupMainState();
-    }, 300); // Debounce for 300ms
-    return () => clearTimeout(debounceSave); // Cleanup on unmount or state change
-  }, [tabSpec, activeTab, userId]);
+  // useEffect(() => {
+  //   // Save the tab group main state to the database when the tab spec or active tab changes,
+  //   // but only if the user is logged in.
+  //   const saveTabGroupMainState = async () => {
+  //     if (userId === -1) {
+  //       // This is a normal state when the user is not logged in
+  //       return;
+  //     }
+  //     try {
+  //       await updateTabGroupMainState(userId, {
+  //         user_id: userId,
+  //         which_tab: activeTab,
+  //         tab_spec: tabSpec,
+  //       });
+  //     } catch (error) {
+  //       console.error("Error saving tab group main state:", error);
+  //       alert("Error saving tab group main state");
+  //     }
+  //   };
+  //   // Debounce the save operation to reduce the number of requests to the server
+  //   const debounceSave = setTimeout(() => {
+  //     void saveTabGroupMainState();
+  //   }, 300); // Debounce for 300ms
+  //   return () => clearTimeout(debounceSave); // Cleanup on unmount or state change
+  // }, [tabSpec, activeTab, userId]);
 
   return (
     <TabsStateContext.Provider
-      value={{ tabSpec, activeTab, setActiveTab, setTabVisibility, setTabSpec }}
+      value={{
+        tabSpec,
+        activeTab,
+        tabsContextLoading,
+        setActiveTab,
+        setTabVisibility,
+        setTabSpec,
+      }}
     >
       {children}
     </TabsStateContext.Provider>

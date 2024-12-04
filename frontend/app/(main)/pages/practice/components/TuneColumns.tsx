@@ -16,6 +16,7 @@ import type {
   Column,
   ColumnDef,
   Row,
+  RowSelectionState,
   SortingFn,
   Table as TanstackTable,
 } from "@tanstack/react-table";
@@ -138,10 +139,9 @@ export function get_columns(
   const determineHeaderCheckedState = (
     table: TanstackTable<ITuneOverview>,
   ): CheckedState => {
-    const rowSelection = table.getState().rowSelection;
-    const allSelected =
-      Object.keys(rowSelection).length === table.getRowCount();
-    const noneSelected = Object.keys(rowSelection).length === 0;
+    const selectedCount = Object.keys(table.getState().rowSelection).length;
+    const allSelected = selectedCount === table.getRowCount();
+    const noneSelected = selectedCount === 0;
     return allSelected ? true : noneSelected ? false : "indeterminate";
   };
   // const { triggerRefresh } = useTuneDataRefresh();
@@ -167,8 +167,10 @@ export function get_columns(
     if (!checkedResolved) {
       table.getState().rowSelection = {};
     } else {
-      const rowSelection = table.getState().rowSelection;
-      for (let i = 0; i < table.getRowCount(); i++) {
+      // const rowSelection: RowSelectionState = table.getState().rowSelection;
+      const rowCount = table.getRowCount();
+      const rowSelection: RowSelectionState = {};
+      for (let i = 0; i < rowCount; i++) {
         const row = table.getRow(i.toString());
         rowSelection[row.id] = true;
       }
@@ -222,10 +224,11 @@ export function get_columns(
 
       info.row.toggleSelected();
       const rowSelection = { ...info.table.getState().rowSelection };
-      rowSelection[info.row.id] =
-        rowSelection[info.row.id] === undefined
+      const rowIdAsString = info.row.id.toString();
+      rowSelection[rowIdAsString] =
+        rowSelection[rowIdAsString] === undefined
           ? true
-          : !rowSelection[info.row.id];
+          : !rowSelection[rowIdAsString];
 
       for (const key in rowSelection) {
         if (!rowSelection[key]) {
@@ -387,7 +390,7 @@ export function get_columns(
     },
   ];
 
-  if ("all" !== purpose) {
+  if ("catalog" !== purpose) {
     const columnsUserSpecific: ColumnDef<
       ITuneOverview,
       TunesGridColumnGeneralType

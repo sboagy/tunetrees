@@ -16,6 +16,7 @@ export const useSaveTableState = (
   table: TanstackTable<ITuneOverview>,
   userId: number,
   tablePurpose: TablePurpose,
+  playlistId: number,
 ) => {
   const { currentTune } = useTune();
   useEffect(() => {
@@ -28,6 +29,7 @@ export const useSaveTableState = (
         userId,
         "full",
         tablePurpose,
+        playlistId,
         tableState,
         currentTune,
       );
@@ -85,5 +87,5 @@ export const useSaveTableState = (
       // );
       // saveTableStateAsync("cleanup");
     };
-  }, [table, userId, tablePurpose, currentTune]);
+  }, [table, userId, tablePurpose, playlistId, currentTune]);
 };

@@ -17,24 +17,15 @@ import {
   getTunesOnlyIntoOverview,
   intersectPlaylistTunes,
 } from "../queries";
+import { fetchFilterFromDB } from "../settings";
 import type { IPlaylistTune, ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
 import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useAllTunes } from "./TunesContextAll";
+import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
-
-async function fetchFilterFromDB(
-  userId: number,
-  purpose: string,
-): Promise<string> {
-  const response = await fetch(
-    `/api/getFilter?userId=${userId}&purpose=${purpose}`,
-  );
-  const data = await response.json();
-  return String(data.filter);
-}
 
 type AllGridProps = {
   userId: number;
@@ -63,6 +54,8 @@ export default function TunesGridCatalog({
   const [globalFilter, setGlobalFilter] = useState("");
   const [isFilterLoaded, setIsFilterLoaded] = useState(false);
   const { currentPlaylist: playlistId } = usePlaylist();
+  const { setTunesRefreshId: setRepertoireTunesRefreshId } =
+    useRepertoireTunes();
 
   console.log(
     `LF1 render TunesGridAll: playlistId=${playlistId}, userId=${userId}`,
@@ -138,7 +131,7 @@ export default function TunesGridCatalog({
   const [tableComponent, table] = useTunesTable({
     tunes,
     userId,
-    tablePurpose: "all",
+    tablePurpose: "catalog",
     globalFilter: globalFilter,
     onRecallEvalChange: undefined, // not needed for All
     selectionChangedCallback,
@@ -147,7 +140,7 @@ export default function TunesGridCatalog({
 
   useEffect(() => {
     const getFilter = () => {
-      fetchFilterFromDB(userId, "all")
+      fetchFilterFromDB(userId, "catalog", playlistId)
         .then((filter) => {
           setGlobalFilter(filter);
           setIsFilterLoaded(true);
@@ -159,7 +152,7 @@ export default function TunesGridCatalog({
     };
 
     getFilter();
-  }, [userId]);
+  }, [userId, playlistId]);
 
   // const [preset, setPreset] = useState("");
 
@@ -235,13 +228,14 @@ export default function TunesGridCatalog({
       console.log("Selected row:", row.original);
       row.toggleSelected();
     }
+    setRepertoireTunesRefreshId(0);
 
     // const rowSelectionCopy = { ...table.getState().rowSelection };
     // for (const tuneId of tunesToAddToPlaylist) {
     //   delete rowSelectionCopy[tuneId];
     // }
     // table.setState({ ...table.getState(), rowSelection: rowSelectionCopy });
-    // const status = await saveTableState(table, userId, "all");
+    // const status = await saveTableState(table, userId, "catalog");
     // console.log("saveTableState status:", status);
     // triggerRefresh();
   };
@@ -326,7 +320,7 @@ export default function TunesGridCatalog({
             table={table}
             userId={userId}
             playlistId={playlistId}
-            tablePurpose={"all"}
+            tablePurpose={"catalog"}
           />
         </>
       )}

@@ -14,6 +14,7 @@ import type {
 import { FastForward } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
 import { getRepertoireTunesOverview } from "../queries";
+import { fetchFilterFromDB } from "../settings";
 import type { ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
@@ -21,17 +22,6 @@ import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
-
-async function fetchFilterFromDB(
-  userId: number,
-  purpose: string,
-): Promise<string> {
-  const response = await fetch(
-    `/api/getFilter?userId=${userId}&purpose=${purpose}`,
-  );
-  const data = await response.json();
-  return String(data.filter);
-}
 
 type RepertoireGridProps = {
   userId: number;
@@ -147,7 +137,7 @@ export default function TunesGridRepertoire({
 
   useEffect(() => {
     const getFilter = () => {
-      fetchFilterFromDB(userId, "repertoire")
+      fetchFilterFromDB(userId, "repertoire", playlistId)
         .then((filter) => {
           setGlobalFilter(filter);
           setIsFilterLoaded(true);
@@ -159,7 +149,7 @@ export default function TunesGridRepertoire({
     };
 
     getFilter();
-  }, [userId]);
+  }, [userId, playlistId]);
 
   // const [preset, setPreset] = useState("");
 
