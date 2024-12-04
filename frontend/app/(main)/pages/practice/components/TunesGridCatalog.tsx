@@ -11,7 +11,7 @@ import type {
   RowSelectionState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
-import { FastForward } from "lucide-react";
+import { BetweenHorizontalEnd } from "lucide-react";
 import {
   createPlaylistTune,
   getTunesOnlyIntoOverview,
@@ -258,7 +258,7 @@ export default function TunesGridCatalog({
                 onClick={() => void addToRepertoire()}
                 title="Add selected tunes to review queue"
               >
-                <FastForward />
+                <BetweenHorizontalEnd />
                 {window.innerWidth < 768 ? "" : " Add To Repertoire"}
               </Button>
               {/* <Select value={preset} onValueChange={handlePresetChange}>

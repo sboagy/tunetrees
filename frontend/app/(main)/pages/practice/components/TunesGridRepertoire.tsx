@@ -11,7 +11,7 @@ import type {
   RowSelectionState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
-import { FastForward } from "lucide-react";
+import { BetweenHorizontalEnd } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
 import { getRepertoireTunesOverview } from "../queries";
 import { fetchFilterFromDB } from "../settings";
@@ -213,7 +213,7 @@ export default function TunesGridRepertoire({
                 onClick={() => addToReviewQueue()}
                 title="Add selected tunes to review queue"
               >
-                <FastForward />
+                <BetweenHorizontalEnd />
                 {window.innerWidth < 768 ? "" : " Add To Review"}
               </Button>
               {/* <Select value={preset} onValueChange={handlePresetChange}>
