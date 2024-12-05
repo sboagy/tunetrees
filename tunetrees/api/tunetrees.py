@@ -41,6 +41,7 @@ from tunetrees.models.tunetrees_pydantic import (
     PlaylistModel,
     PlaylistModelPartial,
     PlaylistTuneJoinedModel,
+    PlaylistTuneModel,
     PlaylistTuneModelPartial,
     ReferenceModel,
     ReferenceModelCreate,
@@ -249,6 +250,104 @@ async def get_playlist_tune_overview(user_id: int, playlist_ref: int, tune_id: i
     except Exception as e:
         logger.error(f"Unable to fetch tune ({tune_id}): {e}")
         raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
+
+
+@router.get(
+    "/playlist_tune",
+    response_model=PlaylistTuneModel | None,
+    summary="Get Playlist Tune (unjoined)",
+    description="Retrieve a playlist tune by its tune ID and playlist ID.",
+    status_code=200,
+)
+def get_playlist_tune(tune_ref: int = Query(...), playlist_ref: int = Query(...)):
+    try:
+        with SessionLocal() as db:
+            playlist_tune = (
+                db.query(PlaylistTune)
+                .filter(
+                    PlaylistTune.tune_ref == tune_ref,
+                    PlaylistTune.playlist_ref == playlist_ref,
+                )
+                .first()
+            )
+            return playlist_tune
+    except Exception as e:
+        logger.error(f"Unable to fetch tune({tune_ref}): {e}")
+        if isinstance(e, HTTPException):
+            raise e
+        else:
+            raise HTTPException(
+                status_code=500, detail=f"Unable to fetch tune({tune_ref}): {e}"
+            )
+
+
+@router.get(
+    "/intersect_playlist_tunes",
+    response_model=List[int] | None,
+    summary="Return Tune IDs that are in the Playlist that match the tune_refs passed in",
+    description="Retrieve a playlist tune by its tune ID and playlist ID.",
+    status_code=200,
+)
+def intersect_playlist_tunes(
+    tune_refs: List[int] = Query(...), playlist_ref: int = Query(...)
+) -> List[int]:
+    try:
+        with SessionLocal() as db:
+            playlist_tunes = (
+                db.query(PlaylistTune)
+                .filter(
+                    PlaylistTune.tune_ref.in_(tune_refs),
+                    PlaylistTune.playlist_ref == playlist_ref,
+                )
+                .all()
+            )
+            playlist_tunes_ids = [
+                playlist_tune.tune_ref for playlist_tune in playlist_tunes
+            ]
+            return playlist_tunes_ids
+    except Exception as e:
+        logger.error(f"Unable to fetch tune({tune_refs}): {e}")
+        if isinstance(e, HTTPException):
+            raise e
+        else:
+            raise HTTPException(
+                status_code=500, detail=f"Unable to fetch tune({tune_refs}): {e}"
+            )
+
+
+@router.post(
+    "/playlist_tune",
+    response_model=PlaylistTuneModel,
+    summary="Create Playlist Tune",
+    description="Create a new playlist tune entry.",
+    status_code=201,
+)
+def playlist_tune_create(
+    playlist_tune: PlaylistTuneModelPartial, playlist_ref: Optional[int] = None
+):
+    try:
+        with SessionLocal() as db:
+            new_tune = PlaylistTune(**playlist_tune.model_dump())
+            db.add(new_tune)
+            db.flush()  # Explicitly flush the session
+            db.commit()
+            db.refresh(new_tune)
+            print(
+                f"Created playlist tune: {new_tune.tune_ref}, {new_tune.playlist_ref}"
+            )
+
+            playlist_tune_from_db = (
+                db.query(PlaylistTune)
+                .filter(
+                    PlaylistTune.tune_ref == playlist_tune.tune_ref,
+                    PlaylistTune.playlist_ref == playlist_tune.playlist_ref,
+                )
+                .first()
+            )
+            return playlist_tune_from_db
+    except Exception as e:
+        logger.error(f"Unable to create tune: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to create tune: {e}")
 
 
 @router.delete(
@@ -605,15 +704,18 @@ def get_tune(tune_ref: int = Query(...)):
 def get_tunes(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(
-        10000, ge=1, le=10000, description="Maximum number of records to return"
+        -1, ge=-1, le=10000, description="Maximum number of records to return"
     ),
     show_deleted: bool = Query(False),
 ):
     try:
         with SessionLocal() as db:
-            query = db.query(Tune).offset(skip).limit(limit)
+            query = db.query(Tune)
             if not show_deleted:
-                query = query.filter(t_practice_list_staged.c.deleted.is_(False))
+                query = query.filter(Tune.deleted.is_(False))
+            query = query.offset(skip)
+            if limit > 0:
+                query = query.limit(limit)
             tunes = query.all()
             return tunes
     except Exception as e:

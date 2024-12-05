@@ -6,7 +6,7 @@ import type { JSX } from "react";
 
 export type ScreenSize = "small" | "full";
 
-export type TablePurpose = "practice" | "repertoire" | "all";
+export type TablePurpose = "practice" | "repertoire" | "catalog";
 
 export interface ITableTransientData {
   user_id: number;
@@ -82,6 +82,7 @@ export interface ITableStateTable {
   user_id: number;
   screen_size: ScreenSize;
   purpose: TablePurpose;
+  playlist_id: number;
   settings: string | TableState;
   current_tune?: number | null;
 }

@@ -30,15 +30,15 @@ const ColumnsMenu = ({
     setIsClient(true);
   }, []);
 
-  useEffect(() => {
-    const columns = table.getAllColumns();
-    for (const column of columns) {
-      const col = table.getColumn(column.id);
-      if (col) {
-        console.log(`Column ${column.id} visibility:`, col.getIsVisible());
-      }
-    }
-  }, [table]);
+  // useEffect(() => {
+  //   const columns = table.getAllColumns();
+  //   for (const column of columns) {
+  //     const col = table.getColumn(column.id);
+  //     if (col) {
+  //       console.log(`Column ${column.id} visibility:`, col.getIsVisible());
+  //     }
+  //   }
+  // }, [table]);
 
   function handleCheckedChange(columnId: string) {
     return (value: boolean) => {

@@ -98,6 +98,40 @@ export async function getTunesOnly(showDeleted = false): Promise<ITune[]> {
   }
 }
 
+export async function getTunesOnlyIntoOverview(
+  showDeleted = false,
+): Promise<ITuneOverview[]> {
+  try {
+    const response = await client.get<ITune[]>("/tunes", {
+      params: { show_deleted: showDeleted },
+    });
+
+    return response.data.map((tune) => ({
+      ...tune,
+      user_ref: null,
+      playlist_ref: null,
+      learned: null,
+      practiced: null,
+      quality: null,
+      easiness: null,
+      interval: null,
+      repetitions: null,
+      review_date: null,
+      backup_practiced: null,
+      external_ref: null,
+      tags: null,
+      recall_eval: null,
+      notes: null,
+      favorite_url: null,
+      playlist_deleted: null,
+    }));
+  } catch (error) {
+    console.error("Error in getTunesOnly: ", error);
+    // Return a dummy Tune object to avoid breaking the UI
+    throw error;
+  }
+}
+
 /**
  * Update a specific tune in a user's playlist.
  *
@@ -447,6 +481,81 @@ export async function updateTunes(
   } catch (error) {
     console.error("Error in updateTune: ", error);
     return { detail: `Unable to update tune: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Retrieve a specific playlist tune.
+ *
+ * @param tuneRef - The reference ID of the tune.
+ * @returns A promise that resolves to the requested Tune object, or an error message.
+ */
+export async function getPlaylistTune(
+  tuneRef: number,
+  playlistRef: number,
+): Promise<IPlaylistTune | { detail: string }> {
+  try {
+    const response = await client.get<IPlaylistTune | { detail: string }>(
+      "/playlist_tune",
+      {
+        params: {
+          tune_ref: tuneRef,
+          playlist_ref: playlistRef,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error in getPlaylistTune(${tuneRef})`, error);
+    return {
+      detail: `Unable to fetch playlist tune: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Create a playlist tune entry.
+ *
+ * @param playlist - The playlist data to create.
+ * @returns A promise that resolves to the created PlaylistTune object, or an error message.
+ */
+export async function createPlaylistTune(
+  playlist: Partial<IPlaylistTune>,
+): Promise<IPlaylistTune | { detail: string }> {
+  try {
+    const response = await client.post<IPlaylistTune | { detail: string }>(
+      "/playlist_tune",
+      playlist,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in createPlaylist: ", error);
+    return { detail: `Unable to create playlist: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Retrieve a specific playlist tune.
+ *
+ * @param tuneRef - The reference ID of the tune.
+ * @returns A promise that resolves to the requested Tune object, or an error message.
+ */
+export async function intersectPlaylistTunes(
+  tuneRefs: number[],
+  playlistRef: number,
+): Promise<number[]> {
+  try {
+    const response = await client.get<number[]>("/intersect_playlist_tunes", {
+      params: {
+        tune_refs: tuneRefs,
+        playlist_ref: playlistRef,
+      },
+      paramsSerializer: parseParamsWithArrays,
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error in getPlaylistTunes(${tuneRefs.join(", ")})`, error);
+    return [];
   }
 }
 

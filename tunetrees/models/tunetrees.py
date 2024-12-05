@@ -130,11 +130,11 @@ class User(Base):
     tab_group_main_state: Mapped[List["TabGroupMainState"]] = relationship(
         "TabGroupMainState", uselist=True, back_populates="user"
     )
-    table_state: Mapped[List["TableState"]] = relationship(
-        "TableState", uselist=True, back_populates="user"
-    )
     note: Mapped[List["Note"]] = relationship(
         "Note", uselist=True, back_populates="user"
+    )
+    table_state: Mapped[List["TableState"]] = relationship(
+        "TableState", uselist=True, back_populates="user"
     )
     table_transient_data: Mapped[List["TableTransientData"]] = relationship(
         "TableTransientData", uselist=True, back_populates="user"
@@ -193,6 +193,9 @@ class Playlist(Base):
     practice_record: Mapped[List["PracticeRecord"]] = relationship(
         "PracticeRecord", uselist=True, back_populates="playlist"
     )
+    table_state: Mapped[List["TableState"]] = relationship(
+        "TableState", uselist=True, back_populates="playlist"
+    )
     table_transient_data: Mapped[List["TableTransientData"]] = relationship(
         "TableTransientData", uselist=True, back_populates="playlist"
     )
@@ -228,29 +231,13 @@ class TabGroupMainState(Base):
     user_id = mapped_column(ForeignKey("user.id"), nullable=False)
     id = mapped_column(Integer, primary_key=True)
     which_tab = mapped_column(
-        Enum("scheduled", "repertoire", "all", "analysis"),
+        Enum("scheduled", "repertoire", "catalog", "analysis"),
         server_default=text("'practice'"),
     )
     playlist_id = mapped_column(Integer)
     tab_spec = mapped_column(Text)
 
     user: Mapped["User"] = relationship("User", back_populates="tab_group_main_state")
-
-
-class TableState(Base):
-    __tablename__ = "table_state"
-
-    user_id = mapped_column(ForeignKey("user.id"), primary_key=True, nullable=False)
-    screen_size = mapped_column(Enum("small", "full"), primary_key=True, nullable=False)
-    purpose = mapped_column(
-        Enum("practice", "repertoire", "all", "analysis"),
-        primary_key=True,
-        nullable=False,
-    )
-    settings = mapped_column(Text)
-    current_tune = mapped_column(Integer, server_default=text("null"))
-
-    user: Mapped["User"] = relationship("User", back_populates="table_state")
 
 
 class Tune(Base):
@@ -364,6 +351,31 @@ class Reference(Base):
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
 
     tune: Mapped["Tune"] = relationship("Tune", back_populates="reference")
+
+
+class TableState(Base):
+    __tablename__ = "table_state"
+    __table_args__ = (
+        UniqueConstraint("user_id", "purpose", "playlist_id", "screen_size"),
+    )
+
+    user_id = mapped_column(ForeignKey("user.id"), primary_key=True, nullable=False)
+    screen_size = mapped_column(Enum("small", "full"), primary_key=True, nullable=False)
+    purpose = mapped_column(
+        Enum("practice", "repertoire", "catalog", "analysis"),
+        primary_key=True,
+        nullable=False,
+    )
+    playlist_id = mapped_column(
+        ForeignKey("playlist.playlist_id"), primary_key=True, nullable=False
+    )
+    settings = mapped_column(Text)
+    current_tune = mapped_column(Integer, server_default=text("null"))
+
+    playlist: Mapped["Playlist"] = relationship(
+        "Playlist", back_populates="table_state"
+    )
+    user: Mapped["User"] = relationship("User", back_populates="table_state")
 
 
 class TableTransientData(Base):

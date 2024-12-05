@@ -9,29 +9,24 @@ import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   RowSelectionState,
+  TableState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
-import { FastForward } from "lucide-react";
-import { submitPracticeFeedbacks } from "../commands";
-import { getRepertoireTunesOverview } from "../queries";
-import type { ITuneOverview } from "../types";
+import { BetweenHorizontalEnd } from "lucide-react";
+import {
+  createPlaylistTune,
+  getTunesOnlyIntoOverview,
+  intersectPlaylistTunes,
+} from "../queries";
+import { fetchFilterFromDB, updateTableStateInDb } from "../settings";
+import type { IPlaylistTune, ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
 import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useAllTunes } from "./TunesContextAll";
+import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
-
-async function fetchFilterFromDB(
-  userId: number,
-  purpose: string,
-): Promise<string> {
-  const response = await fetch(
-    `/api/getFilter?userId=${userId}&purpose=${purpose}`,
-  );
-  const data = await response.json();
-  return String(data.filter);
-}
 
 type AllGridProps = {
   userId: number;
@@ -46,7 +41,9 @@ type AllGridProps = {
  * - The component includes a filter input, a button to add selected tunes to the review queue, and a grid to display the tunes.
  * - The `addToReviewQueue` function handles adding selected tunes to the review queue and submitting feedback.
  */
-export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
+export default function TunesGridCatalog({
+  userId,
+}: AllGridProps): JSX.Element {
   const [isRowsSelected, setIsRowsSelected] = useState(false);
   const selectionChangedCallback = (
     table: TanstackTable<ITuneOverview>,
@@ -58,6 +55,8 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
   const [globalFilter, setGlobalFilter] = useState("");
   const [isFilterLoaded, setIsFilterLoaded] = useState(false);
   const { currentPlaylist: playlistId } = usePlaylist();
+  const { setTunesRefreshId: setRepertoireTunesRefreshId } =
+    useRepertoireTunes();
 
   console.log(
     `LF1 render TunesGridAll: playlistId=${playlistId}, userId=${userId}`,
@@ -70,6 +69,7 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
   // used to compare to tunesRefreshId to trigger a refresh of the tunes when it changes.
   const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } = useAllTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
+  // const { currentTune } = useTune();
 
   // Due to the asynchronous nature of setTunesRefreshId, the state update may not
   // complete before the useEffect hook exits. This can lead to multiple refreshes
@@ -78,13 +78,13 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
   // persist across renders without causing re-renders.
   const isRefreshing = useRef(false);
 
+  const showDeleted = false; // Should become a state variable at some point
+
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
-        const result: ITuneOverview[] = await getRepertoireTunesOverview(
-          userId,
-          playlistId,
-        );
+        const result: ITuneOverview[] =
+          await getTunesOnlyIntoOverview(showDeleted);
         setTunesRefreshId(refreshId);
         setTunes(result);
         isRefreshing.current = false;
@@ -132,7 +132,7 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
   const [tableComponent, table] = useTunesTable({
     tunes,
     userId,
-    tablePurpose: "all",
+    tablePurpose: "catalog",
     globalFilter: globalFilter,
     onRecallEvalChange: undefined, // not needed for All
     selectionChangedCallback,
@@ -141,7 +141,7 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
 
   useEffect(() => {
     const getFilter = () => {
-      fetchFilterFromDB(userId, "all")
+      fetchFilterFromDB(userId, "catalog", playlistId)
         .then((filter) => {
           setGlobalFilter(filter);
           setIsFilterLoaded(true);
@@ -153,7 +153,30 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
     };
 
     getFilter();
-  }, [userId]);
+  }, [userId, playlistId]);
+
+  const handleGlobalFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    if (table !== null) {
+      console.log("LF7: Saving table state on filter change: ", value);
+      // If I try to go through `table.setGlobalFilter(value)`, and then
+      // `saveTableState(table, userId, "repertoire", playlistId)`, it doesn't work
+      // so well, always being one character behind, presumably because it feeds through
+      // the useState hook. So, instead directly get the state here, update it, and then
+      // save it into the database.  Note that updateTableStateInDb will lock while it's
+      // updating the database, so hopefully not a problem with getting ahead of the writes.
+      const tableState: TableState = table.getState();
+      tableState.globalFilter = value;
+      void updateTableStateInDb(
+        userId,
+        "full",
+        "catalog",
+        playlistId,
+        tableState,
+      );
+    }
+  };
 
   // const [preset, setPreset] = useState("");
 
@@ -162,41 +185,83 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
   //   // Implement preset logic here
   // };
 
-  const addToReviewQueue = () => {
-    console.log("addToReviewQueue!");
+  const addToRepertoire = async () => {
+    console.log("addToRepertoire!");
     if (table === null) {
-      console.log("addToReviewQueue: table is null");
+      console.log("addToRepertoire: table is null");
       return;
     }
     const selectedTunes = table
       .getSelectedRowModel()
       .rows.map((row) => row.original);
-    const updates: { [key: string]: { feedback: string } } = {};
 
-    for (const tune of selectedTunes) {
-      const idString = `${tune.id}`;
-      updates[idString] = { feedback: "rescheduled" };
-    }
-    console.log("updates", updates);
+    const selectedTuneIds = selectedTunes.map((tune) => tune.id ?? -1);
+    console.log("Selected tune IDs:", selectedTuneIds);
 
-    const promiseResult = submitPracticeFeedbacks({
+    const alreadyInRepertoire = await intersectPlaylistTunes(
+      selectedTuneIds,
       playlistId,
-      updates,
-    });
-    promiseResult
-      .then((result) => {
-        console.log("submit_practice_feedbacks_result result:", result);
-        if (table !== null) {
-          table.resetRowSelection();
-        }
-        triggerRefresh();
-      })
-      .catch((error) => {
-        console.error("Error submit_practice_feedbacks_result:", error);
-        throw error;
-      });
+    );
 
-    // const updates: { [key: string]: TuneUpdate } = {};
+    const tunesToAddToPlaylist: number[] = selectedTuneIds.filter(
+      (id) => !alreadyInRepertoire.includes(id),
+    );
+
+    let userConfirmed = true;
+
+    if (alreadyInRepertoire.length > 0) {
+      if (tunesToAddToPlaylist.length > 0) {
+        userConfirmed = window.confirm(
+          `The following tunes are already in the current repertoir: ${alreadyInRepertoire.join(",")}. Do you want to add tunes with ids ${tunesToAddToPlaylist.join(",")} to your repertoire?`,
+        );
+      } else {
+        window.alert(
+          `All the selected tunes are already in the current repertoir: ${alreadyInRepertoire.join(",")}.`,
+        );
+        return;
+      }
+    } else if (tunesToAddToPlaylist.length > 10) {
+      userConfirmed = window.confirm(
+        `You are about to add ${tunesToAddToPlaylist.length} tunes to your repertoire. Are you sure?`,
+      );
+    }
+
+    if (!userConfirmed) {
+      console.log("User canceled adding tunes to repertoire.");
+      return;
+    }
+
+    for (const tuneId of tunesToAddToPlaylist) {
+      const playlistTune: IPlaylistTune = {
+        tune_ref: tuneId,
+        playlist_ref: playlistId,
+        current: "T",
+        learned: new Date().toISOString().replace("T", " ").slice(0, 19),
+        deleted: false,
+      };
+      createPlaylistTune(playlistTune)
+        .then((result) => {
+          console.log("Added tune to repertoire:", result);
+        })
+        .catch((error) => {
+          console.error("Error adding tune to repertoire:", error);
+        });
+    }
+    const rows = table.getSelectedRowModel().rows;
+    for (const row of rows) {
+      console.log("Selected row:", row.original);
+      row.toggleSelected();
+    }
+    setRepertoireTunesRefreshId(0);
+
+    // const rowSelectionCopy = { ...table.getState().rowSelection };
+    // for (const tuneId of tunesToAddToPlaylist) {
+    //   delete rowSelectionCopy[tuneId];
+    // }
+    // table.setState({ ...table.getState(), rowSelection: rowSelectionCopy });
+    // const status = await saveTableState(table, userId, "catalog");
+    // console.log("saveTableState status:", status);
+    // triggerRefresh();
   };
 
   return (
@@ -214,11 +279,11 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
               <Button
                 disabled={!isRowsSelected}
                 variant="outline"
-                onClick={() => addToReviewQueue()}
+                onClick={() => void addToRepertoire()}
                 title="Add selected tunes to review queue"
               >
-                <FastForward />
-                {window.innerWidth < 768 ? "" : " Add To Review"}
+                <BetweenHorizontalEnd />
+                {window.innerWidth < 768 ? "" : " Add To Repertoire"}
               </Button>
               {/* <Select value={preset} onValueChange={handlePresetChange}>
                 <SelectTrigger className="w-[200px]">
@@ -239,10 +304,7 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
               <Input
                 placeholder="Filter"
                 value={globalFilter}
-                onChange={(e) => {
-                  setGlobalFilter(e.target.value);
-                  // void handleSave();
-                }}
+                onChange={handleGlobalFilterChange}
               />
             </div>
             <div className="flex items-center space-x-4 mb-4">
@@ -279,7 +341,7 @@ export default function TunesGridAll({ userId }: AllGridProps): JSX.Element {
             table={table}
             userId={userId}
             playlistId={playlistId}
-            tablePurpose={"all"}
+            tablePurpose={"catalog"}
           />
         </>
       )}

@@ -9,11 +9,13 @@ import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   RowSelectionState,
+  TableState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
-import { FastForward } from "lucide-react";
+import { BetweenHorizontalEnd } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
 import { getRepertoireTunesOverview } from "../queries";
+import { fetchFilterFromDB, updateTableStateInDb } from "../settings";
 import type { ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
@@ -21,17 +23,6 @@ import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
-
-async function fetchFilterFromDB(
-  userId: number,
-  purpose: string,
-): Promise<string> {
-  const response = await fetch(
-    `/api/getFilter?userId=${userId}&purpose=${purpose}`,
-  );
-  const data = await response.json();
-  return String(data.filter);
-}
 
 type RepertoireGridProps = {
   userId: number;
@@ -56,6 +47,9 @@ export default function TunesGridRepertoire({
     rowSelectionState: RowSelectionState,
   ): void => {
     const selectedRowsCount = Object.keys(rowSelectionState).length;
+    console.log(
+      `LF7: selectionChangedCallback rowSelectionState=${JSON.stringify(rowSelectionState)}, selectedRowsCount:${selectedRowsCount}`,
+    );
     setIsRowsSelected(selectedRowsCount > 0);
   };
   const [globalFilter, setGlobalFilter] = useState("");
@@ -147,7 +141,7 @@ export default function TunesGridRepertoire({
 
   useEffect(() => {
     const getFilter = () => {
-      fetchFilterFromDB(userId, "repertoire")
+      fetchFilterFromDB(userId, "repertoire", playlistId)
         .then((filter) => {
           setGlobalFilter(filter);
           setIsFilterLoaded(true);
@@ -159,7 +153,40 @@ export default function TunesGridRepertoire({
     };
 
     getFilter();
-  }, [userId]);
+  }, [userId, playlistId]);
+
+  const handleGlobalFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    if (table !== null) {
+      console.log("LF7: Saving table state on filter change: ", value);
+      // If I try to go through `table.setGlobalFilter(value)`, and then
+      // `saveTableState(table, userId, "repertoire", playlistId)`, it doesn't work
+      // so well, always being one character behind, presumably because it feeds through
+      // the useState hook. So, instead directly get the state here, update it, and then
+      // save it into the database.  Note that updateTableStateInDb will lock while it's
+      // updating the database, so hopefully not a problem with getting ahead of the writes.
+      const tableState: TableState = table.getState();
+      tableState.globalFilter = value;
+      void updateTableStateInDb(
+        userId,
+        "full",
+        "repertoire",
+        playlistId,
+        tableState,
+      );
+    }
+  };
+
+  // useEffect(() => {
+  //   return () => {
+  //     if (table !== null) {
+  //       console.log("LF7: Saving table state on filter change: ", globalFilter);
+  //       table.setGlobalFilter(globalFilter);
+  //       void saveTableState(table, userId, "repertoire", playlistId);
+  //     }
+  //   };
+  // }, [globalFilter, table, userId, playlistId]);
 
   // const [preset, setPreset] = useState("");
 
@@ -223,7 +250,7 @@ export default function TunesGridRepertoire({
                 onClick={() => addToReviewQueue()}
                 title="Add selected tunes to review queue"
               >
-                <FastForward />
+                <BetweenHorizontalEnd />
                 {window.innerWidth < 768 ? "" : " Add To Review"}
               </Button>
               {/* <Select value={preset} onValueChange={handlePresetChange}>
@@ -245,10 +272,7 @@ export default function TunesGridRepertoire({
               <Input
                 placeholder="Filter"
                 value={globalFilter}
-                onChange={(e) => {
-                  setGlobalFilter(e.target.value);
-                  // void handleSave();
-                }}
+                onChange={handleGlobalFilterChange}
               />
             </div>
             <div className="flex items-center space-x-4 mb-4">
