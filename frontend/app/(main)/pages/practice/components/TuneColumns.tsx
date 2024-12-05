@@ -34,6 +34,7 @@ import type {
   TablePurpose,
   TunesGridColumnGeneralType,
 } from "../types";
+import { saveTableState } from "./TunesTable";
 
 function columnControlMenu() {
   return (
@@ -140,10 +141,25 @@ export function get_columns(
   const determineHeaderCheckedState = (
     table: TanstackTable<ITuneOverview>,
   ): CheckedState => {
-    const selectedCount = Object.keys(table.getState().rowSelection).length;
-    const allSelected = selectedCount === table.getRowCount();
+    // Over-assigning to variables for logging purposes
+    // const selectedCount = Object.keys(table.getState().rowSelection).length;
+    const selectedCount = table.getFilteredSelectedRowModel().rows.length;
+    const rowCount = table.getFilteredRowModel().rows.length;
+    const allSelected = selectedCount === rowCount;
     const noneSelected = selectedCount === 0;
-    return allSelected ? true : noneSelected ? false : "indeterminate";
+    const checkedState = allSelected
+      ? true
+      : noneSelected
+        ? false
+        : "indeterminate";
+
+    console.log(
+      `LF6: selectionHeader->determineHeaderCheckedState: selectedCount=${selectedCount}, ` +
+        `rowCount=${rowCount} noneSelected=${noneSelected}, allSelected=${allSelected}, ` +
+        `checkedState=${checkedState}`,
+    );
+
+    return checkedState;
   };
   // const { triggerRefresh } = useTuneDataRefresh();
 
@@ -177,6 +193,7 @@ export function get_columns(
       }
       table.getState().rowSelection = rowSelection;
     }
+    void saveTableState(table, userId, purpose, playlistId);
 
     triggerRefreshGuarded();
   };
