@@ -1,6 +1,7 @@
 "use server";
 
 import type { TableState } from "@tanstack/react-table";
+import { Mutex } from "async-mutex";
 import axios, { isAxiosError } from "axios";
 import { type ITabSpec, initialTabSpec } from "./tab-spec";
 import type {
@@ -16,6 +17,8 @@ const client = axios.create({
   timeout: 2000, // Increase timeout to 2 seconds
 });
 
+const tableStateMutex = new Mutex();
+
 export async function createOrUpdateTableState(
   userId: number,
   screenSize: ScreenSize,
@@ -24,55 +27,65 @@ export async function createOrUpdateTableState(
   tableStates: TableState,
   currentTune: number | null,
 ): Promise<ITableStateTable> {
-  try {
-    console.log(
-      `LF6 => createOrUpdateTableState: purpose=${purpose}, currentTune=${currentTune})}`,
-    );
-    if (userId <= 0) {
-      throw new Error("createOrUpdateTableState: userId is invalid");
-    }
-    if (playlistId <= 0) {
-      throw new Error("createOrUpdateTableState: playlistId is invalid");
-    }
+  console.log(
+    `LF6: createOrUpdateTableState: purpose=${purpose} playlistId=${playlistId}, currentTune=${currentTune}, rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
+  );
+  return tableStateMutex.runExclusive(async () => {
+    try {
+      console.log(
+        `=> createOrUpdateTableState: purpose=${purpose}, currentTune=${currentTune})}`,
+      );
+      if (userId <= 0) {
+        throw new Error("createOrUpdateTableState: userId is invalid");
+      }
+      if (playlistId <= 0) {
+        throw new Error("createOrUpdateTableState: playlistId is invalid");
+      }
 
-    const tableStatesStr = JSON.stringify(tableStates);
-    const tableStateTable: ITableStateTable = {
-      user_id: userId,
-      screen_size: screenSize,
-      purpose: purpose,
-      playlist_id: playlistId,
-      settings: tableStatesStr,
-      current_tune: currentTune ?? -1,
-    };
-    const response = await client.post<ITableStateTable>(
-      "/table_state",
-      tableStateTable,
-      {
-        params: {
-          user_id: userId,
-          screen_size: screenSize,
-          purpose: purpose,
-          playlist_id: playlistId,
+      const tableStatesStr = JSON.stringify(tableStates);
+      const tableStateTable: ITableStateTable = {
+        user_id: userId,
+        screen_size: screenSize,
+        purpose: purpose,
+        playlist_id: playlistId,
+        settings: tableStatesStr,
+        current_tune: currentTune ?? -1,
+      };
+      const response = await client.post<ITableStateTable>(
+        "/table_state",
+        tableStateTable,
+        {
+          params: {
+            user_id: userId,
+            screen_size: screenSize,
+            purpose: purpose,
+            playlist_id: playlistId,
+          },
         },
-      },
-    );
-    console.log(
-      "<= createOrUpdateTableState: response status: ",
-      response?.status,
-    );
-    if (response.data?.settings) {
-      response.data.settings = JSON.parse(
-        response.data.settings as string,
-      ) as TableState;
-    } else {
-      console.error("createOrUpdateTableState: response.data.settings is null");
+      );
+      console.log(
+        "<= createOrUpdateTableState: response status: ",
+        response?.status,
+      );
+      if (response.data?.settings) {
+        response.data.settings = JSON.parse(
+          response.data.settings as string,
+        ) as TableState;
+      } else {
+        console.error(
+          "createOrUpdateTableState: response.data.settings is null",
+        );
+      }
+      const tableStateTableResult: ITableStateTable = response.data;
+      console.log(
+        `=> createOrUpdateTableState: response.status=${response.status} purpose=${purpose}, playlistId=${playlistId})}`,
+      );
+      return tableStateTableResult;
+    } catch (error) {
+      console.error("<= createOrUpdateTableState: ", error);
+      throw error;
     }
-    const tableStateTableResult: ITableStateTable = response.data;
-    return tableStateTableResult;
-  } catch (error) {
-    console.error("<= createOrUpdateTableState: ", error);
-    throw error;
-  }
+  });
 }
 
 export async function updateTableStateInDb(
@@ -82,41 +95,48 @@ export async function updateTableStateInDb(
   playlistId: number,
   tableStates: TableState,
 ): Promise<number> {
-  if (playlistId <= 0 || playlistId === undefined) {
-    console.error("updateTableStateInDb: playlistId is invalid");
-    throw new Error("updateTableStateInDb: playlistId is invalid");
-  }
+  console.log(
+    `LF6: updateTableStateInDb: purpose=${purpose} playlistId=${playlistId}, rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
+  );
+  return tableStateMutex.runExclusive(async () => {
+    if (playlistId <= 0 || playlistId === undefined) {
+      console.error("updateTableStateInDb: playlistId is invalid");
+      throw new Error("updateTableStateInDb: playlistId is invalid");
+    }
 
-  try {
-    // console.log(
-    //   `=> createOrUpdateTableState rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
-    // );
-    const tableStatesStr = JSON.stringify(tableStates);
-    const tableStateTable: Partial<ITableStateTable> = {
-      user_id: userId,
-      screen_size: screenSize,
-      purpose: purpose,
-      playlist_id: playlistId,
-      settings: tableStatesStr,
-    };
-    const response = await client.put<Partial<ITableStateTable>>(
-      "/table_state",
-      tableStateTable,
-      {
-        params: {
-          user_id: userId,
-          screen_size: screenSize,
-          purpose: purpose,
-          playlist_id: playlistId,
+    try {
+      console.log(
+        `=> updateTableStateInDb: purpose=${purpose}, playlistId=${playlistId})}`,
+      );
+      const tableStatesStr = JSON.stringify(tableStates);
+      const tableStateTable: Partial<ITableStateTable> = {
+        user_id: userId,
+        screen_size: screenSize,
+        purpose: purpose,
+        playlist_id: playlistId,
+        settings: tableStatesStr,
+      };
+      const response = await client.patch<Partial<ITableStateTable>>(
+        "/table_state",
+        tableStateTable,
+        {
+          params: {
+            user_id: userId,
+            screen_size: screenSize,
+            purpose: purpose,
+            playlist_id: playlistId,
+          },
         },
-      },
-    );
-    // console.log("<= createOrUpdateTableState: ", response?.status);
-    return response.status;
-  } catch (error) {
-    console.error("<= createOrUpdateTableState: ", error);
-    return 500;
-  }
+      );
+      console.log(
+        `=> updateTableStateInDb: response.status=${response.status} purpose=${purpose}, playlistId=${playlistId})}`,
+      );
+      return response.status;
+    } catch (error) {
+      console.error("<= createOrUpdateTableState: ", error);
+      return 500;
+    }
+  });
 }
 
 export async function updateCurrentTuneInDb(
@@ -126,31 +146,38 @@ export async function updateCurrentTuneInDb(
   playlistId: number,
   currentTune: number | null,
 ): Promise<number> {
-  const tableStateTable: Partial<ITableStateTable> = {
-    current_tune: currentTune === null ? -1 : currentTune,
-  };
-  try {
-    console.log(
-      `LF6 => updateCurrentTuneInDb: purpose=${purpose}, currentTune=${currentTune})}`,
-    );
-    const response = await client.put<Partial<ITableStateTable>>(
-      "/table_state",
-      tableStateTable,
-      {
-        params: {
-          user_id: userId,
-          screen_size: screenSize,
-          purpose: purpose,
-          playlist_id: playlistId,
+  console.log(
+    `LF6: updateCurrentTuneInDb: purpose=${purpose} playlistId=${playlistId}, currentTune=${currentTune}`,
+  );
+  return tableStateMutex.runExclusive(async () => {
+    const tableStateTable: Partial<ITableStateTable> = {
+      current_tune: currentTune === null ? -1 : currentTune,
+    };
+    try {
+      console.log(
+        `=> updateCurrentTuneInDb: purpose=${purpose}, currentTune=${currentTune})}`,
+      );
+      const response = await client.patch<Partial<ITableStateTable>>(
+        "/table_state",
+        tableStateTable,
+        {
+          params: {
+            user_id: userId,
+            screen_size: screenSize,
+            purpose: purpose,
+            playlist_id: playlistId,
+          },
         },
-      },
-    );
-    // console.log("<= createOrUpdateTableState: ", response?.status);
-    return response.status;
-  } catch (error) {
-    console.error("<= createOrUpdateTableState: ", error);
-    return 500;
-  }
+      );
+      console.log(
+        `=> updateCurrentTuneInDb: response.status=${response.status} purpose=${purpose}, currentTune=${currentTune})}`,
+      );
+      return response.status;
+    } catch (error) {
+      console.error("<= createOrUpdateTableState: ", error);
+      return 500;
+    }
+  });
 }
 
 export async function getTableStateTable(
@@ -159,11 +186,22 @@ export async function getTableStateTable(
   purpose: TablePurpose,
   playlistId: number,
 ): Promise<ITableStateTable | null> {
+  console.log(
+    `LF6: getTableStateTable: purpose=${purpose} playlistId=${playlistId}`,
+  );
   if (playlistId <= 0 || playlistId === undefined) {
     console.error("getTableStateTable: playlistId is invalid");
     throw new Error("getTableStateTable: playlistId is invalid");
   }
+  // Check if a write is in progress
+  if (tableStateMutex.isLocked()) {
+    console.log(`=> getTableStateTable (waitForUnlock): purpose=${purpose}`);
+    await tableStateMutex.waitForUnlock();
+    // Proceed with GET
+  }
+
   try {
+    console.log(`=> getTableStateTable: purpose=${purpose}`);
     const response = await client.get<ITableStateTable>("/table_state", {
       params: {
         user_id: userId,
@@ -183,7 +221,12 @@ export async function getTableStateTable(
       response.data.settings as string,
     ) as TableState;
     const tableStateTable: ITableStateTable = response.data;
-    console.log("getTableStateTable response status: ", response.status);
+    // rowSelection: ${JSON.stringify(tableStateTable.settings.rowSelection)}
+    const tableSettings = tableStateTable.settings as TableState;
+    console.log(
+      `LF6: getTableStateTable: purpose=${purpose} playlistId=${playlistId}, currentTune=${tableStateTable.current_tune} rowSelection: ${JSON.stringify(tableSettings.rowSelection)}`,
+    );
+    console.log("=> getTableStateTable response status: ", response.status);
     return tableStateTable;
   } catch (error) {
     if (axios.isAxiosError(error)) {

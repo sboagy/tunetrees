@@ -96,7 +96,7 @@ def create_table_state(table_state: TableStateModel) -> TableStateModel:
         raise HTTPException(status_code=500, detail="Unable to create table state")
 
 
-@settings_router.put(
+@settings_router.patch(
     "/table_state",
     response_model=TableStateModel,
     summary="Update Table State",
@@ -108,14 +108,12 @@ def update_table_state(
         ...,
         description="Should be a valid user id that corresponds to a user in the user table",
     ),
-    screen_size: str = Query(
+    screen_size: ScreenSizeEnum = Query(
         ...,
-        enum=["small", "full"],
         description="Associated screen size, one of 'small' or 'full'",
     ),
-    purpose: str = Query(
+    purpose: PurposeEnum = Query(
         ...,
-        enum=["practice", "repertoire", "catalog", "analysis"],
         description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
     ),
     playlist_id: int = Query(
