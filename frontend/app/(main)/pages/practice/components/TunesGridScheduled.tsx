@@ -150,7 +150,13 @@ export default function TunesGridScheduled({
       if (tune.id === currentTune) {
         console.log(`LF6 setting current tune to null: ${currentTune}`);
         setCurrentTune(null);
-        void updateCurrentTuneInDb(userId, "full", "practice", null);
+        void updateCurrentTuneInDb(
+          userId,
+          "full",
+          "practice",
+          playlistId,
+          null,
+        );
       }
     }
 

@@ -9,7 +9,11 @@ import {
   getRepertoireTunesOverview, // Import getTunesInPlaylistForUser
   updatePlaylist,
 } from "@/app/(main)/pages/practice/queries";
-import { getTabGroupMainState } from "@/app/(main)/pages/practice/settings";
+import {
+  type ITabGroupMainStateModel,
+  getTabGroupMainState,
+  updateTabGroupMainState,
+} from "@/app/(main)/pages/practice/settings";
 import type { IPlaylist } from "@/app/(main)/pages/practice/types";
 import deepEqual from "fast-deep-equal"; // Import deepEqual
 import { ChevronDownIcon, MinusIcon, PlusIcon, TrashIcon } from "lucide-react"; // Import the TrashIcon
@@ -34,7 +38,7 @@ import { Input } from "./ui/input";
 
 export default function PlaylistChooser() {
   const { data: session } = useSession();
-  const { setCurrentPlaylist } = usePlaylist();
+  const { currentPlaylist, setCurrentPlaylist } = usePlaylist();
   const [currentPlaylistName, setCurrentPlaylistName] = useState<string>("");
   const [currentPlaylistDescription, setCurrentPlaylistDescription] =
     useState<string>("");
@@ -43,6 +47,7 @@ export default function PlaylistChooser() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editedPlaylists, setEditedPlaylists] = useState<IPlaylist[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchPlaylistsAndSetCurrent = async (
     userId: number,
@@ -56,7 +61,10 @@ export default function PlaylistChooser() {
       if (Array.isArray(playlists)) {
         setPlaylists(playlists);
         setEditedPlaylists(playlists);
-        const tabGroupMainState = await getTabGroupMainState(userId);
+        const tabGroupMainState = await getTabGroupMainState(
+          userId,
+          currentPlaylist,
+        );
         const playlistId = tabGroupMainState?.playlist_id ?? 1;
         setCurrentPlaylist(playlistId);
         triggerRefresh();
@@ -76,27 +84,45 @@ export default function PlaylistChooser() {
         return -1;
       }
     } catch (error) {
-      console.error("Error fetching playlists and setting current:", error);
+      console.log("Error fetching playlists and setting current:", error);
       return -1;
     }
     return 0;
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
-    const fetchData = () => {
-      const userId = session?.user?.id
-        ? Number.parseInt(session?.user?.id)
-        : -1;
-      void fetchPlaylistsAndSetCurrent(userId);
+    // This may be a problem if the user is not logged in, or going from not logged in to logged in
+    const fetchData = async () => {
+      try {
+        if (isLoading) {
+          const userId = session?.user?.id
+            ? Number.parseInt(session?.user?.id)
+            : -1;
+          await fetchPlaylistsAndSetCurrent(userId);
+        }
+      } finally {
+        setIsLoading(false);
+      }
     };
-    fetchData();
-  }, [session]);
+    void fetchData();
+  });
 
   const handleSelect = (playlistObject: IPlaylist) => {
     setCurrentPlaylist(playlistObject.playlist_id);
     setCurrentPlaylistName(playlistObject.instrument ?? "NULL INSTRUMENT");
     setCurrentPlaylistDescription(playlistObject.description ?? "");
+    // export interface ITabGroupMainStateModel {
+    //   user_id: number;
+    //   id: number;
+    //   which_tab: string;
+    //   playlist_id?: number;
+    //   tab_spec?: string | ITabSpec[];
+    // }
+    const tabGroupMainStateUpdate: Partial<ITabGroupMainStateModel> = {
+      playlist_id: playlistObject.playlist_id,
+    };
+    const userId = session?.user?.id ? Number.parseInt(session?.user?.id) : -1;
+    void updateTabGroupMainState(userId, tabGroupMainStateUpdate);
     triggerRefresh();
   };
 

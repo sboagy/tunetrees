@@ -1,8 +1,9 @@
 "use server";
 
 import type { TableState } from "@tanstack/react-table";
+import { Mutex } from "async-mutex";
 import axios, { isAxiosError } from "axios";
-import type { ITabSpec } from "./components/TabsStateContext";
+import { type ITabSpec, initialTabSpec } from "./tab-spec";
 import type {
   ITableStateTable,
   ITableTransientData,
@@ -16,169 +17,223 @@ const client = axios.create({
   timeout: 2000, // Increase timeout to 2 seconds
 });
 
-// interface ColumnRecordModel {
-//   userId: number;
-//   screenSize: string;
-//   purpose: string;
-//   columnSettings: ColumnSettingsModel;
-// }
+const tableStateMutex = new Mutex();
 
 export async function createOrUpdateTableState(
   userId: number,
   screenSize: ScreenSize,
   purpose: TablePurpose,
+  playlistId: number,
   tableStates: TableState,
   currentTune: number | null,
-): Promise<number> {
-  try {
-    console.log(
-      `LF6 => createOrUpdateTableState: purpose=${purpose}, currentTune=${currentTune})}`,
-    );
-    // console.log(
-    //   `=> createOrUpdateTableState rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
-    // );
-    const tableStatesStr = JSON.stringify(tableStates);
-    const tableStateTable: ITableStateTable = {
-      user_id: userId,
-      screen_size: screenSize,
-      purpose: purpose,
-      settings: tableStatesStr,
-      current_tune: currentTune === null ? -1 : currentTune,
-    };
-    const response = await client.post<ITableStateTable>(
-      "/table_state",
-      tableStateTable,
-      {
-        params: {
-          user_id: userId,
-          screen_size: screenSize,
-          purpose: purpose,
+): Promise<ITableStateTable> {
+  console.log(
+    `LF6: createOrUpdateTableState: purpose=${purpose} playlistId=${playlistId}, currentTune=${currentTune}, rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
+  );
+  return tableStateMutex.runExclusive(async () => {
+    try {
+      console.log(
+        `=> createOrUpdateTableState: purpose=${purpose}, currentTune=${currentTune})}`,
+      );
+      if (userId <= 0) {
+        throw new Error("createOrUpdateTableState: userId is invalid");
+      }
+      if (playlistId <= 0) {
+        throw new Error("createOrUpdateTableState: playlistId is invalid");
+      }
+
+      const tableStatesStr = JSON.stringify(tableStates);
+      const tableStateTable: ITableStateTable = {
+        user_id: userId,
+        screen_size: screenSize,
+        purpose: purpose,
+        playlist_id: playlistId,
+        settings: tableStatesStr,
+        current_tune: currentTune ?? -1,
+      };
+      const response = await client.post<ITableStateTable>(
+        "/table_state",
+        tableStateTable,
+        {
+          params: {
+            user_id: userId,
+            screen_size: screenSize,
+            purpose: purpose,
+            playlist_id: playlistId,
+          },
         },
-      },
-    );
-    // console.log("<= createOrUpdateTableState: ", response?.status);
-    return response.status;
-  } catch (error) {
-    console.error("<= createOrUpdateTableState: ", error);
-    return 500;
-  }
+      );
+      console.log(
+        "<= createOrUpdateTableState: response status: ",
+        response?.status,
+      );
+      if (response.data?.settings) {
+        response.data.settings = JSON.parse(
+          response.data.settings as string,
+        ) as TableState;
+      } else {
+        console.error(
+          "createOrUpdateTableState: response.data.settings is null",
+        );
+      }
+      const tableStateTableResult: ITableStateTable = response.data;
+      console.log(
+        `=> createOrUpdateTableState: response.status=${response.status} purpose=${purpose}, playlistId=${playlistId})}`,
+      );
+      return tableStateTableResult;
+    } catch (error) {
+      console.error("<= createOrUpdateTableState: ", error);
+      throw error;
+    }
+  });
 }
 
 export async function updateTableStateInDb(
   userId: number,
   screenSize: ScreenSize,
   purpose: TablePurpose,
+  playlistId: number,
   tableStates: TableState,
 ): Promise<number> {
-  try {
-    // console.log(
-    //   `=> createOrUpdateTableState rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
-    // );
-    const tableStatesStr = JSON.stringify(tableStates);
-    const tableStateTable: Partial<ITableStateTable> = {
-      user_id: userId,
-      screen_size: screenSize,
-      purpose: purpose,
-      settings: tableStatesStr,
-    };
-    const response = await client.put<Partial<ITableStateTable>>(
-      "/table_state",
-      tableStateTable,
-      {
-        params: {
-          user_id: userId,
-          screen_size: screenSize,
-          purpose: purpose,
+  console.log(
+    `LF6: updateTableStateInDb: purpose=${purpose} playlistId=${playlistId}, rowSelection: ${JSON.stringify(tableStates.rowSelection)}`,
+  );
+  return tableStateMutex.runExclusive(async () => {
+    if (playlistId <= 0 || playlistId === undefined) {
+      console.error("updateTableStateInDb: playlistId is invalid");
+      throw new Error("updateTableStateInDb: playlistId is invalid");
+    }
+
+    try {
+      console.log(
+        `=> updateTableStateInDb: purpose=${purpose}, playlistId=${playlistId})}`,
+      );
+      const tableStatesStr = JSON.stringify(tableStates);
+      const tableStateTable: Partial<ITableStateTable> = {
+        user_id: userId,
+        screen_size: screenSize,
+        purpose: purpose,
+        playlist_id: playlistId,
+        settings: tableStatesStr,
+      };
+      const response = await client.patch<Partial<ITableStateTable>>(
+        "/table_state",
+        tableStateTable,
+        {
+          params: {
+            user_id: userId,
+            screen_size: screenSize,
+            purpose: purpose,
+            playlist_id: playlistId,
+          },
         },
-      },
-    );
-    // console.log("<= createOrUpdateTableState: ", response?.status);
-    return response.status;
-  } catch (error) {
-    console.error("<= createOrUpdateTableState: ", error);
-    return 500;
-  }
+      );
+      console.log(
+        `=> updateTableStateInDb: response.status=${response.status} purpose=${purpose}, playlistId=${playlistId})}`,
+      );
+      return response.status;
+    } catch (error) {
+      console.error("<= createOrUpdateTableState: ", error);
+      return 500;
+    }
+  });
 }
 
 export async function updateCurrentTuneInDb(
   userId: number,
   screenSize: ScreenSize,
   purpose: TablePurpose,
+  playlistId: number,
   currentTune: number | null,
 ): Promise<number> {
-  try {
-    console.log(
-      `LF6 => updateCurrentTuneInDb: purpose=${purpose}, currentTune=${currentTune})}`,
-    );
+  console.log(
+    `LF6: updateCurrentTuneInDb: purpose=${purpose} playlistId=${playlistId}, currentTune=${currentTune}`,
+  );
+  return tableStateMutex.runExclusive(async () => {
     const tableStateTable: Partial<ITableStateTable> = {
       current_tune: currentTune === null ? -1 : currentTune,
     };
-    const response = await client.put<Partial<ITableStateTable>>(
-      "/table_state",
-      tableStateTable,
-      {
-        params: {
-          user_id: userId,
-          screen_size: screenSize,
-          purpose: purpose,
+    try {
+      console.log(
+        `=> updateCurrentTuneInDb: purpose=${purpose}, currentTune=${currentTune})}`,
+      );
+      const response = await client.patch<Partial<ITableStateTable>>(
+        "/table_state",
+        tableStateTable,
+        {
+          params: {
+            user_id: userId,
+            screen_size: screenSize,
+            purpose: purpose,
+            playlist_id: playlistId,
+          },
         },
-      },
-    );
-    // console.log("<= createOrUpdateTableState: ", response?.status);
-    return response.status;
-  } catch (error) {
-    console.error("<= createOrUpdateTableState: ", error);
-    return 500;
-  }
+      );
+      console.log(
+        `=> updateCurrentTuneInDb: response.status=${response.status} purpose=${purpose}, currentTune=${currentTune})}`,
+      );
+      return response.status;
+    } catch (error) {
+      console.error("<= createOrUpdateTableState: ", error);
+      return 500;
+    }
+  });
 }
-
-// export async function updateTableStateOnly(
-//   userId: number,
-//   screenSize: ScreenSize,
-//   purpose: TablePurpose,
-//   tableStates: TableState,
-// ): Promise<number> {
-//   try {
-//     const tableStatesStr = JSON.stringify(tableStates);
-//     const response = await client.put<ITableStateTable>(
-//       "/table_state",
-//       { settings: tableStatesStr },
-//       {
-//         params: {
-//           user_id: userId,
-//           screen_size: screenSize,
-//           purpose: purpose,
-//         },
-//       },
-//     );
-//     console.log("updateTableState: ", response?.status);
-//     return response.status;
-//   } catch (error) {
-//     console.error("updateTableState: ", error);
-//     return 500;
-//   }
-// }
 
 export async function getTableStateTable(
   userId: number,
   screenSize: ScreenSize,
   purpose: TablePurpose,
+  playlistId: number,
 ): Promise<ITableStateTable | null> {
+  console.log(
+    `LF6: getTableStateTable: purpose=${purpose} playlistId=${playlistId}`,
+  );
+  if (playlistId <= 0 || playlistId === undefined) {
+    console.error("getTableStateTable: playlistId is invalid");
+    throw new Error("getTableStateTable: playlistId is invalid");
+  }
+  // Check if a write is in progress
+  if (tableStateMutex.isLocked()) {
+    console.log(`=> getTableStateTable (waitForUnlock): purpose=${purpose}`);
+    await tableStateMutex.waitForUnlock();
+    // Proceed with GET
+  }
+
   try {
+    console.log(`=> getTableStateTable: purpose=${purpose}`);
     const response = await client.get<ITableStateTable>("/table_state", {
       params: {
         user_id: userId,
         screen_size: screenSize,
         purpose: purpose,
+        playlist_id: playlistId,
       },
     });
+    if (response.data === null) {
+      console.log(
+        "getTableStateTable response is null, status: ",
+        response.status,
+      );
+      return null;
+    }
     response.data.settings = JSON.parse(
       response.data.settings as string,
     ) as TableState;
     const tableStateTable: ITableStateTable = response.data;
-    console.log("getTableStateTable response status: ", response.status);
+    // rowSelection: ${JSON.stringify(tableStateTable.settings.rowSelection)}
+    const tableSettings = tableStateTable.settings as TableState;
+    console.log(
+      `LF6: getTableStateTable: purpose=${purpose} playlistId=${playlistId}, currentTune=${tableStateTable.current_tune} rowSelection: ${JSON.stringify(tableSettings.rowSelection)}`,
+    );
+    console.log("=> getTableStateTable response status: ", response.status);
     return tableStateTable;
   } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error(
+        `getTableStateTable error: ${error.response?.status} ${error.response?.data}`,
+      );
+    }
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       return null; // Return null for 404 status
     }
@@ -191,17 +246,50 @@ export async function getTableState(
   userId: number,
   screenSize: ScreenSize,
   purpose: TablePurpose,
+  playlistId: number,
 ): Promise<TableState | null> {
-  const tableStateTable = await getTableStateTable(userId, screenSize, purpose);
+  const tableStateTable = await getTableStateTable(
+    userId,
+    screenSize,
+    purpose,
+    playlistId,
+  );
   return tableStateTable?.settings as TableState;
+}
+
+export async function fetchFilterFromDB(
+  userId: number,
+  purpose: TablePurpose,
+  playlistId: number,
+): Promise<string> {
+  if (playlistId !== undefined && playlistId > 0) {
+    const tableStateFromDb = await getTableState(
+      userId,
+      "full",
+      purpose,
+      playlistId,
+    );
+
+    if (tableStateFromDb) {
+      const filter: string = tableStateFromDb.globalFilter;
+      return filter;
+    }
+  }
+  return "";
 }
 
 export async function getTableCurrentTune(
   userId: number,
   screenSize: ScreenSize,
   purpose: TablePurpose,
+  playlistId: number,
 ): Promise<number> {
-  const tableStateTable = await getTableStateTable(userId, screenSize, purpose);
+  const tableStateTable = await getTableStateTable(
+    userId,
+    screenSize,
+    purpose,
+    playlistId,
+  );
   return tableStateTable?.current_tune ?? -1;
 }
 
@@ -209,6 +297,7 @@ export async function deleteTableState(
   userId: number,
   screenSize: ScreenSize,
   purpose: TablePurpose,
+  playlistId: number,
 ): Promise<number> {
   try {
     const response = await client.delete("/table_state", {
@@ -216,6 +305,7 @@ export async function deleteTableState(
         user_id: userId,
         screen_size: screenSize,
         purpose: purpose,
+        playlist_id: playlistId,
       },
     });
     console.log("deleteTableState: ", response?.status);
@@ -408,6 +498,8 @@ export async function deleteTableTransientData(
 //   }
 // }
 
+const tabGroupMainStateMutex = new Mutex();
+
 export interface ITabGroupMainStateModel {
   user_id: number;
   id: number;
@@ -418,10 +510,47 @@ export interface ITabGroupMainStateModel {
 
 export async function getTabGroupMainState(
   userId: number,
+  playlistId: number,
 ): Promise<ITabGroupMainStateModel | null> {
+  if (tabGroupMainStateMutex.isLocked()) {
+    console.log(
+      `=> getTabGroupMainState (waitForUnlock): playlistId=${playlistId}`,
+    );
+    await tabGroupMainStateMutex.waitForUnlock();
+    // Proceed with GET
+  }
+
   try {
-    const response = await client.get(`/tab_group_main_state/${userId}`);
-    console.log("getTabGroupMainState response status: ", response.status);
+    let response = await client.get(`/tab_group_main_state/${userId}`);
+    console.log(
+      "getTabGroupMainState response status from GET: ",
+      response.status,
+    );
+    if (response.data === null) {
+      console.log(
+        "getTabGroupMainState response.data is null, creating new tab group main state",
+      );
+
+      // const initialTabSpecString = JSON.stringify(initialTabSpec);
+      const tabGroupMainStateModel: Partial<ITabGroupMainStateModel> = {
+        user_id: userId,
+        which_tab: initialTabSpec[0].id,
+        // tab_spec: initialTabSpecString,
+        playlist_id: playlistId,
+      };
+      response = await client.post(
+        "/tab_group_main_state",
+        tabGroupMainStateModel,
+      );
+      console.log(
+        "getTabGroupMainState response status from POST: ",
+        response.status,
+      );
+      if (response.status !== 200) {
+        console.error("Error creating tab group main state:", response.status);
+        throw new Error("Error creating tab group main state");
+      }
+    }
     if (response.data.tab_spec !== null) {
       response.data.tab_spec = JSON.parse(
         response.data.tab_spec as string,
@@ -441,49 +570,55 @@ export async function updateTabGroupMainState(
   userId: number,
   tabGroupMainState: Partial<ITabGroupMainStateModel>,
 ): Promise<number> {
-  try {
-    if (tabGroupMainState.tab_spec !== null) {
-      tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+  return tabGroupMainStateMutex.runExclusive(async () => {
+    try {
+      if (tabGroupMainState.tab_spec !== null) {
+        tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+      }
+      const response = await client.patch(
+        `/tab_group_main_state/${userId}`,
+        tabGroupMainState,
+      );
+      console.log("updateTabGroupMainState response status: ", response.status);
+      return response.status;
+    } catch (error) {
+      console.error("updateTabGroupMainState error: ", error);
+      return 500;
     }
-    const response = await client.patch(
-      `/tab_group_main_state/${userId}`,
-      tabGroupMainState,
-    );
-    console.log("updateTabGroupMainState response status: ", response.status);
-    return response.status;
-  } catch (error) {
-    console.error("updateTabGroupMainState error: ", error);
-    return 500;
-  }
+  });
 }
 
 export async function createTabGroupMainState(
   userId: number,
-  tabGroupMainState: ITabGroupMainStateModel,
+  tabGroupMainState: Partial<ITabGroupMainStateModel>,
 ): Promise<number> {
-  try {
-    if (tabGroupMainState.tab_spec !== null) {
-      tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+  return tabGroupMainStateMutex.runExclusive(async () => {
+    try {
+      if (tabGroupMainState.tab_spec !== null) {
+        tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+      }
+      const response = await client.post(
+        `/tab_group_main_state/${userId}`,
+        tabGroupMainState,
+      );
+      console.log("createTabGroupMainState response status: ", response.status);
+      return response.status;
+    } catch (error) {
+      console.error("createTabGroupMainState error: ", error);
+      return 500;
     }
-    const response = await client.post(
-      `/tab_group_main_state/${userId}`,
-      tabGroupMainState,
-    );
-    console.log("createTabGroupMainState response status: ", response.status);
-    return response.status;
-  } catch (error) {
-    console.error("createTabGroupMainState error: ", error);
-    return 500;
-  }
+  });
 }
 
 export async function deleteTabGroupMainState(userId: number): Promise<number> {
-  try {
-    const response = await client.delete(`/tab_group_main_state/${userId}`);
-    console.log("deleteTabGroupMainState response status: ", response.status);
-    return response.status;
-  } catch (error) {
-    console.error("deleteTabGroupMainState error: ", error);
-    return 500;
-  }
+  return tabGroupMainStateMutex.runExclusive(async () => {
+    try {
+      const response = await client.delete(`/tab_group_main_state/${userId}`);
+      console.log("deleteTabGroupMainState response status: ", response.status);
+      return response.status;
+    } catch (error) {
+      console.error("deleteTabGroupMainState error: ", error);
+      return 500;
+    }
+  });
 }

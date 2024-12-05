@@ -484,6 +484,81 @@ export async function updateTunes(
   }
 }
 
+/**
+ * Retrieve a specific playlist tune.
+ *
+ * @param tuneRef - The reference ID of the tune.
+ * @returns A promise that resolves to the requested Tune object, or an error message.
+ */
+export async function getPlaylistTune(
+  tuneRef: number,
+  playlistRef: number,
+): Promise<IPlaylistTune | { detail: string }> {
+  try {
+    const response = await client.get<IPlaylistTune | { detail: string }>(
+      "/playlist_tune",
+      {
+        params: {
+          tune_ref: tuneRef,
+          playlist_ref: playlistRef,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error in getPlaylistTune(${tuneRef})`, error);
+    return {
+      detail: `Unable to fetch playlist tune: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Create a playlist tune entry.
+ *
+ * @param playlist - The playlist data to create.
+ * @returns A promise that resolves to the created PlaylistTune object, or an error message.
+ */
+export async function createPlaylistTune(
+  playlist: Partial<IPlaylistTune>,
+): Promise<IPlaylistTune | { detail: string }> {
+  try {
+    const response = await client.post<IPlaylistTune | { detail: string }>(
+      "/playlist_tune",
+      playlist,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in createPlaylist: ", error);
+    return { detail: `Unable to create playlist: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Retrieve a specific playlist tune.
+ *
+ * @param tuneRef - The reference ID of the tune.
+ * @returns A promise that resolves to the requested Tune object, or an error message.
+ */
+export async function intersectPlaylistTunes(
+  tuneRefs: number[],
+  playlistRef: number,
+): Promise<number[]> {
+  try {
+    const response = await client.get<number[]>("/intersect_playlist_tunes", {
+      params: {
+        tune_refs: tuneRefs,
+        playlist_ref: playlistRef,
+      },
+      paramsSerializer: parseParamsWithArrays,
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error in getPlaylistTunes(${tuneRefs.join(", ")})`, error);
+    return [];
+  }
+}
+
 export async function updatePlaylistTunes(
   tuneRefs: number[],
   playlistRef: number,

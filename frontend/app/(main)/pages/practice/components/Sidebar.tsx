@@ -27,9 +27,9 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
     if (currentTune !== null) {
       const tune = getTune(currentTune);
       tune
-        .then((result) => {
+        .then((result: ITuneOverview | { detail: string }) => {
           const tuneBare = result as ITuneOverview;
-          setTuneTitle(tuneBare.title);
+          setTuneTitle(tuneBare.title ?? "No Title");
         })
         .catch((error) => {
           console.error("Error fetching tune:", error);

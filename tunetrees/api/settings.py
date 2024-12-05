@@ -26,7 +26,7 @@ settings_router = APIRouter(prefix="/settings", tags=["settings"])
 
 @settings_router.get(
     "/table_state",
-    response_model=TableStateModel,
+    response_model=TableStateModel | None,
     summary="Get Table State",
     description="Retrieve the stored datagrid table state for a user, for a specific screen size and purpose.",
     status_code=status.HTTP_200_OK,
@@ -43,17 +43,24 @@ def get_table_state(
         ...,
         description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
     ),
+    playlist_id: int = Query(
+        ...,
+        description="Associated playlist",
+    ),
 ) -> TableStateModel:
     try:
         with SessionLocal() as db:
             table_state = (
                 db.query(TableState)
-                .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
+                .filter_by(
+                    user_id=user_id,
+                    screen_size=screen_size,
+                    purpose=purpose,
+                    playlist_id=playlist_id,
+                )
                 .first()
             )
-            if not table_state:
-                raise HTTPException(status_code=404, detail="Table state not found")
-            return TableStateModel.model_validate(table_state)
+            return table_state
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -70,18 +77,26 @@ def get_table_state(
 )
 def create_table_state(table_state: TableStateModel) -> TableStateModel:
     try:
+        TableStateModel.model_validate(table_state)
         with SessionLocal() as db:
-            new_table_state = TableState(**table_state.model_dump())
+            new_table_state = TableState(
+                user_id=table_state.user_id,
+                screen_size=table_state.screen_size,
+                purpose=table_state.purpose,
+                settings=table_state.settings,
+                current_tune=table_state.current_tune,
+                playlist_id=table_state.playlist_id,
+            )
             db.add(new_table_state)
             db.commit()
             db.refresh(new_table_state)
-            return TableStateModel.model_validate(new_table_state)
+            return new_table_state
     except Exception as e:
         logger.error(f"Unable to create table state: {e}")
         raise HTTPException(status_code=500, detail="Unable to create table state")
 
 
-@settings_router.put(
+@settings_router.patch(
     "/table_state",
     response_model=TableStateModel,
     summary="Update Table State",
@@ -93,15 +108,17 @@ def update_table_state(
         ...,
         description="Should be a valid user id that corresponds to a user in the user table",
     ),
-    screen_size: str = Query(
+    screen_size: ScreenSizeEnum = Query(
         ...,
-        enum=["small", "full"],
         description="Associated screen size, one of 'small' or 'full'",
     ),
-    purpose: str = Query(
+    purpose: PurposeEnum = Query(
         ...,
-        enum=["practice", "repertoire", "all", "analysis"],
         description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
+    ),
+    playlist_id: int = Query(
+        ...,
+        description="Associated playlist",
     ),
     table_state_update: TableStateModelPartial = Body(...),
 ) -> TableStateModel:
@@ -109,7 +126,12 @@ def update_table_state(
         with SessionLocal() as db:
             table_state = (
                 db.query(TableState)
-                .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
+                .filter_by(
+                    user_id=user_id,
+                    screen_size=screen_size,
+                    purpose=purpose,
+                    playlist_id=playlist_id,
+                )
                 .first()
             )
             if not table_state:
@@ -121,7 +143,7 @@ def update_table_state(
 
             db.commit()
             db.refresh(table_state)
-            return TableStateModel.model_validate(table_state)
+            return table_state
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -147,15 +169,24 @@ def delete_table_state(
     ),
     purpose: str = Query(
         ...,
-        enum=["practice", "repertoire", "all", "analysis"],
+        enum=["practice", "repertoire", "catalog", "analysis"],
         description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
+    ),
+    playlist_id: int = Query(
+        ...,
+        description="Associated playlist",
     ),
 ) -> None:
     try:
         with SessionLocal() as db:
             table_state = (
                 db.query(TableState)
-                .filter_by(user_id=user_id, screen_size=screen_size, purpose=purpose)
+                .filter_by(
+                    user_id=user_id,
+                    screen_size=screen_size,
+                    purpose=purpose,
+                    playlist_id=playlist_id,
+                )
                 .first()
             )
             if not table_state:
@@ -314,7 +345,7 @@ def get_table_transient_data(
     purpose: Annotated[
         str,
         Path(
-            enum_values=["practice", "repertoire", "all" "anylysis"],
+            enum_values=["practice", "repertoire", "catalog" "anylysis"],
             description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'anylysis'",
         ),
     ],
@@ -373,7 +404,7 @@ def delete_table_transient_data(
     purpose: Annotated[
         str,
         Path(
-            enum_values=["practice", "repertoire", "all", "analysis"],
+            enum_values=["practice", "repertoire", "catalog", "analysis"],
             description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
         ),
     ],
@@ -414,7 +445,7 @@ def delete_table_transient_data(
 
 @settings_router.get(
     "/tab_group_main_state/{user_id}",
-    response_model=TabGroupMainStateModel,
+    response_model=TabGroupMainStateModel | None,
     summary="Retrieve the tab group main state for a user",
     description="Retrieve the tab group main state for a user, which indicates the currently active tab.",
     status_code=status.HTTP_200_OK,
@@ -432,10 +463,6 @@ def get_tab_group_main_state(
             tab_group_main_state = (
                 db.query(TabGroupMainState).filter_by(user_id=user_id).first()
             )
-            if not tab_group_main_state:
-                raise HTTPException(
-                    status_code=404, detail="Tab group main state not found"
-                )
             return tab_group_main_state
             # return tab_group_main_state
         except Exception as e:
@@ -451,18 +478,27 @@ def get_tab_group_main_state(
     status_code=status.HTTP_201_CREATED,
 )
 def create_tab_group_main_state(
-    tab_group_main_state: TabGroupMainStateModel,
+    tab_group_main_state: TabGroupMainStateModelPartial = Body(...),
 ):
     with SessionLocal() as db:
         try:
             new_tab_group_main_state = TabGroupMainState(
                 user_id=tab_group_main_state.user_id,
                 which_tab=tab_group_main_state.which_tab,
+                playlist_id=tab_group_main_state.playlist_id,
             )
+            if tab_group_main_state.tab_spec is not None:
+                new_tab_group_main_state.tab_spec = tab_group_main_state.tab_spec
             db.add(new_tab_group_main_state)
             db.commit()
             db.refresh(new_tab_group_main_state)
-            return new_tab_group_main_state
+            tab_group_main_state_from_db = (
+                db.query(TabGroupMainState)
+                .filter_by(user_id=tab_group_main_state.user_id)
+                .first()
+            )
+
+            return tab_group_main_state_from_db
         except Exception as e:
             logging.getLogger().error("Unknown error: %s" % e)
             raise HTTPException(status_code=500, detail="Unknown error occurred")
