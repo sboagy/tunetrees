@@ -9,12 +9,13 @@ import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   RowSelectionState,
+  TableState,
   Table as TanstackTable,
 } from "@tanstack/react-table";
 import { BetweenHorizontalEnd } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
 import { getRepertoireTunesOverview } from "../queries";
-import { fetchFilterFromDB } from "../settings";
+import { fetchFilterFromDB, updateTableStateInDb } from "../settings";
 import type { ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
@@ -154,6 +155,39 @@ export default function TunesGridRepertoire({
     getFilter();
   }, [userId, playlistId]);
 
+  const handleGlobalFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setGlobalFilter(value);
+    if (table !== null) {
+      console.log("LF7: Saving table state on filter change: ", value);
+      // If I try to go through `table.setGlobalFilter(value)`, and then
+      // `saveTableState(table, userId, "repertoire", playlistId)`, it doesn't work
+      // so well, always being one character behind, presumably because it feeds through
+      // the useState hook. So, instead directly get the state here, update it, and then
+      // save it into the database.  Note that updateTableStateInDb will lock while it's
+      // updating the database, so hopefully not a problem with getting ahead of the writes.
+      const tableState: TableState = table.getState();
+      tableState.globalFilter = value;
+      void updateTableStateInDb(
+        userId,
+        "full",
+        "repertoire",
+        playlistId,
+        tableState,
+      );
+    }
+  };
+
+  // useEffect(() => {
+  //   return () => {
+  //     if (table !== null) {
+  //       console.log("LF7: Saving table state on filter change: ", globalFilter);
+  //       table.setGlobalFilter(globalFilter);
+  //       void saveTableState(table, userId, "repertoire", playlistId);
+  //     }
+  //   };
+  // }, [globalFilter, table, userId, playlistId]);
+
   // const [preset, setPreset] = useState("");
 
   // const handlePresetChange = (value: string) => {
@@ -238,10 +272,7 @@ export default function TunesGridRepertoire({
               <Input
                 placeholder="Filter"
                 value={globalFilter}
-                onChange={(e) => {
-                  setGlobalFilter(e.target.value);
-                  // void handleSave();
-                }}
+                onChange={handleGlobalFilterChange}
               />
             </div>
             <div className="flex items-center space-x-4 mb-4">
