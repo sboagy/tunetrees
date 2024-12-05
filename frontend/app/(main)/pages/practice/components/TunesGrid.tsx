@@ -18,7 +18,6 @@ import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
 import { tableContext } from "./TunesTable";
-import { useSaveTableState } from "./use-save-table-state";
 
 export const getColorForEvaluation = (
   review_status: string | null,
@@ -63,7 +62,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
   const rowRefs = useRef<{ [key: number]: HTMLTableRowElement | null }>({});
 
   // Invoke useEffect hook for the table state
-  useSaveTableState(table, userId, tablePurpose, playlistId);
+  // useSaveTableState(table, userId, tablePurpose, playlistId);
 
   const tableBodyRef = useRef<HTMLDivElement>(null);
 
@@ -77,11 +76,11 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
         .rows.findIndex((row) => row.original.id === currentTune);
 
       if (newTune) {
-        console.log(`LF6 TunesGrid handleRowClick: newTune=${newTune}`);
+        console.log(`LF7 TunesGrid handleRowClick: newTune=${newTune}`);
         setCurrentTune(newTune);
         setCurrentTablePurpose(tablePurpose); // probably not actually needed
         console.log(
-          `LF6 TunesGrid handleRowClick calling updateCurrentTuneInDb: tablePurpose=${tablePurpose} newTune=${newTune}`,
+          `LF7 TunesGrid handleRowClick calling updateCurrentTuneInDb: tablePurpose=${tablePurpose} newTune=${newTune}`,
         );
         void updateCurrentTuneInDb(
           userId,
@@ -97,7 +96,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
         .rows.findIndex((row) => row.original.id === newTune);
 
       console.log(
-        `LF1 TunesGrid handleRowClick: currentTune=${currentTune} rowIndex=${rowIndex} newTune=${newTune} rowIndexNew=${rowIndexNew}`,
+        `LF7 TunesGrid handleRowClick: currentTune=${currentTune} rowIndex=${rowIndex} newTune=${newTune} rowIndexNew=${rowIndexNew}`,
       );
 
       // Update styles of the previously selected row

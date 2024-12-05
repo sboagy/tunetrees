@@ -59,7 +59,7 @@ export const saveTableState = async (
   const tableState: TableState = table.getState();
 
   console.log(
-    `LF6 saveTableState calling createOrUpdateTableState: tablePurpose=${tablePurpose}`,
+    `LF7 saveTableState calling updateTableStateInDb: tablePurpose=${tablePurpose}`,
   );
   const status = await updateTableStateInDb(
     userId,
@@ -107,18 +107,18 @@ export function TunesTableComponent({
   );
   const originalSetSortingRef = React.useRef(setSorting);
 
-  React.useEffect(() => {
-    originalSetSortingRef.current = setSorting;
-  }, []);
+  // React.useEffect(() => {
+  //   originalSetSortingRef.current = setSorting;
+  // }, []);
 
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     tableStateFromDb ? tableStateFromDb.columnFilters : [],
   );
   const originalColumnFiltersRef = React.useRef(setColumnFilters);
 
-  React.useEffect(() => {
-    originalColumnFiltersRef.current = setColumnFilters;
-  }, []);
+  // React.useEffect(() => {
+  //   originalColumnFiltersRef.current = setColumnFilters;
+  // }, []);
 
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>(
@@ -150,18 +150,18 @@ export function TunesTableComponent({
 
   const originalSetColumnVisibilityRef = React.useRef(setColumnVisibility);
 
-  React.useEffect(() => {
-    originalSetColumnVisibilityRef.current = setColumnVisibility;
-  }, []);
+  // React.useEffect(() => {
+  //   originalSetColumnVisibilityRef.current = setColumnVisibility;
+  // }, []);
 
   const [rowSelection, setRowSelection] = React.useState(
-    tableStateFromDb ? tableStateFromDb.rowSelection : {},
+    tableStateFromDb ? tableStateFromDb.rowSelection : { "2": true },
   );
   const originalSetRowSelectionRef = React.useRef(setRowSelection);
 
-  React.useEffect(() => {
-    originalSetRowSelectionRef.current = setRowSelection;
-  }, []);
+  // React.useEffect(() => {
+  //   originalSetRowSelectionRef.current = setRowSelection;
+  // }, []);
 
   const columns = get_columns(
     userId,
@@ -191,76 +191,79 @@ export function TunesTableComponent({
     },
   });
 
+  const [isLoading, setLoading] = React.useState<boolean>(true);
+
   React.useEffect(() => {
-    const fetchTableState = async () => {
-      try {
-        console.log(
-          `LF6 TunesTableComponent: calling getTableStateTable(${userId}, 'full', tablePurpose=${tablePurpose} playlistId=${playlistId}`,
-        );
-        let tableStateTable = await getTableStateTable(
-          userId,
-          "full",
-          tablePurpose,
-          playlistId,
-        );
-        if (!tableStateTable) {
-          console.log("LF1 TunesTableComponent: no table state found in db");
-          tableStateTable = await createOrUpdateTableState(
+    if (isLoading) {
+      // On initial render effect, load table state from the database
+      const fetchTableState = async () => {
+        try {
+          console.log(
+            `LF7 TunesTableComponent: ===> calling getTableStateTable(${userId}, 'full', tablePurpose=${tablePurpose} playlistId=${playlistId}`,
+          );
+          let tableStateTable = await getTableStateTable(
             userId,
             "full",
             tablePurpose,
             playlistId,
-            table.getState(),
-            currentTune,
           );
+          if (!tableStateTable) {
+            console.log("LF7 TunesTableComponent: no table state found in db");
+            tableStateTable = await createOrUpdateTableState(
+              userId,
+              "full",
+              tablePurpose,
+              playlistId,
+              table.getState(),
+              currentTune,
+            );
+          }
+          const tableStateFromDb = tableStateTable?.settings as TableState;
+          if (tableStateFromDb) {
+            setTableStateFromDb(tableStateFromDb);
+            const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
+            console.log(
+              `LF6 TunesTableComponent: currentTuneState=${currentTuneState}`,
+            );
+            if (currentTuneState > 0) {
+              setCurrentTune(currentTuneState);
+            } else {
+              setCurrentTune(null);
+            }
+            setCurrentTablePurpose(tablePurpose);
+            console.log(
+              `LF7 TunesTableComponent: setting rowSelection db: ${JSON.stringify(
+                tableStateFromDb.rowSelection,
+              )}`,
+            );
+            table.setRowSelection(tableStateFromDb.rowSelection);
+            table.setColumnVisibility(tableStateFromDb.columnVisibility);
+            table.setColumnFilters(tableStateFromDb.columnFilters);
+            table.setSorting(tableStateFromDb.sorting);
+            if (filterStringCallback) {
+              filterStringCallback(tableStateFromDb.globalFilter);
+            }
+            table.setPagination(tableStateFromDb.pagination);
+          } else
+            console.log("LF1 TunesTableComponent: no table state found in db");
+        } catch (error) {
+          console.error(error);
+          throw error;
+        } finally {
+          setLoading(false);
         }
-        const tableStateFromDb = tableStateTable?.settings as TableState;
-        if (tableStateFromDb) {
-          setTableStateFromDb(tableStateFromDb);
-          const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
-          console.log(
-            `LF6 TunesTableComponent: currentTuneState=${currentTuneState}`,
-          );
-          if (currentTuneState > 0) {
-            setCurrentTune(currentTuneState);
-          } else {
-            setCurrentTune(null);
-          }
-          setCurrentTablePurpose(tablePurpose);
-          table.setRowSelection(tableStateFromDb.rowSelection);
-          table.setColumnVisibility(tableStateFromDb.columnVisibility);
-          table.setColumnFilters(tableStateFromDb.columnFilters);
-          table.setSorting(tableStateFromDb.sorting);
-          if (filterStringCallback) {
-            filterStringCallback(tableStateFromDb.globalFilter);
-          }
-          table.setPagination(tableStateFromDb.pagination);
-        } else
-          console.log("LF1 TunesTableComponent: no table state found in db");
-      } catch (error) {
-        console.error(error);
-        throw error;
-      }
-    };
+      };
 
-    if (playlistId !== undefined && playlistId > 0) {
-      console.log("LF1 TunesTableComponent: calling fetchTableState");
-      void fetchTableState();
-    } else {
-      console.log(
-        "LF1 TunesTableComponent: playlistId not set, skipping table state fetch",
-      );
+      if (playlistId !== undefined && playlistId > 0) {
+        console.log("LF1 TunesTableComponent: calling fetchTableState");
+        void fetchTableState();
+      } else {
+        console.log(
+          "LF1 TunesTableComponent: playlistId not set, skipping table state fetch",
+        );
+      }
     }
-  }, [
-    userId,
-    tablePurpose,
-    table,
-    filterStringCallback,
-    setCurrentTune,
-    setCurrentTablePurpose,
-    playlistId,
-    currentTune,
-  ]);
+  }); // don't add dependencies here!
 
   const interceptedRowSelectionChange = (
     newRowSelectionState:
@@ -275,11 +278,16 @@ export function TunesTableComponent({
     originalSetRowSelectionRef.current(resolvedRowSelectionState);
 
     console.log(
-      `LF6 TunesTableComponent (interceptedRowSelectionChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
+      `LF7 ==>TunesTableComponent<== (interceptedRowSelectionChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}, ${JSON.stringify(newRowSelectionState)}}`,
     );
     void saveTableState(table, userId, tablePurpose, playlistId);
 
     if (selectionChangedCallback) {
+      console.log(
+        "LF7 TunesTableComponent: calling selectionChangedCallback",
+        table,
+        resolvedRowSelectionState,
+      );
       selectionChangedCallback(table, resolvedRowSelectionState);
     }
   };
@@ -296,7 +304,7 @@ export function TunesTableComponent({
 
     originalColumnFiltersRef.current(resolvedColumnFiltersState);
     console.log(
-      `LF6 TunesTableComponent (interceptedOnColumnFiltersChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
+      `LF7 TunesTableComponent (interceptedOnColumnFiltersChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
     void saveTableState(table, userId, tablePurpose, playlistId);
   };
@@ -309,7 +317,7 @@ export function TunesTableComponent({
 
     originalSetSortingRef.current(resolvedSorting);
     console.log(
-      `LF6 TunesTableComponent (interceptedSetSorting) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
+      `LF7 TunesTableComponent (interceptedSetSorting) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
     void saveTableState(table, userId, tablePurpose, playlistId);
   };
@@ -330,9 +338,8 @@ export function TunesTableComponent({
     );
 
     originalSetColumnVisibilityRef.current(resolvedVisibilityState);
-    console.log("LF1 interceptedSetColumnVisibility: calling saveTableState");
     console.log(
-      `LF6 TunesTableComponent (interceptedSetColumnVisibility) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
+      `LF7 TunesTableComponent (interceptedSetColumnVisibility) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
     void saveTableState(table, userId, tablePurpose, playlistId);
   };
@@ -362,12 +369,12 @@ export function useTunesTable(
     null,
   );
 
-  React.useEffect(() => {
-    console.log("useTunesTable: table changed", table?.getVisibleFlatColumns());
-    return () => {
-      console.log("useTunesTable: cleanup");
-    };
-  }, [table]);
+  // React.useEffect(() => {
+  //   console.log("useTunesTable: table changed", table?.getVisibleFlatColumns());
+  //   return () => {
+  //     console.log("useTunesTable: cleanup");
+  //   };
+  // }, [table]);
 
   const tableComponent = (
     <TunesTableComponent

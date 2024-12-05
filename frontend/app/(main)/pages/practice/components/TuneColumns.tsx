@@ -28,6 +28,7 @@ import {
   EyeOff,
   Filter,
 } from "lucide-react";
+import { updateTableStateInDb } from "../settings";
 import type {
   ITuneOverview,
   TablePurpose,
@@ -146,7 +147,7 @@ export function get_columns(
   };
   // const { triggerRefresh } = useTuneDataRefresh();
 
-  const updateTableState = () => {
+  const triggerRefreshGuarded = () => {
     // An optimization would be to only trigger a refresh on the table that
     // changes, rather than signal that the overall data has changed.
     if (setTunesRefreshId) {
@@ -177,7 +178,7 @@ export function get_columns(
       table.getState().rowSelection = rowSelection;
     }
 
-    updateTableState();
+    triggerRefreshGuarded();
   };
 
   // const isIndeterminate = () => {
@@ -237,7 +238,19 @@ export function get_columns(
       }
       info.table.getState().rowSelection = rowSelection;
       refreshHeader(info);
-      updateTableState();
+
+      console.log(
+        "LF7: handleItemCheckboxChange, calling updateTableStateInDb rowSelection: ",
+        rowSelection,
+      );
+      void updateTableStateInDb(
+        userId,
+        "full",
+        purpose,
+        playlistId,
+        info.table.getState(),
+      );
+      triggerRefreshGuarded();
     };
 
     return (

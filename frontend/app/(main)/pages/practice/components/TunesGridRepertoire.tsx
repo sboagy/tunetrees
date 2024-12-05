@@ -46,6 +46,9 @@ export default function TunesGridRepertoire({
     rowSelectionState: RowSelectionState,
   ): void => {
     const selectedRowsCount = Object.keys(rowSelectionState).length;
+    console.log(
+      `LF7: selectionChangedCallback rowSelectionState=${JSON.stringify(rowSelectionState)}, selectedRowsCount:${selectedRowsCount}`,
+    );
     setIsRowsSelected(selectedRowsCount > 0);
   };
   const [globalFilter, setGlobalFilter] = useState("");
