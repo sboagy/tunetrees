@@ -498,6 +498,8 @@ export async function deleteTableTransientData(
 //   }
 // }
 
+const tabGroupMainStateMutex = new Mutex();
+
 export interface ITabGroupMainStateModel {
   user_id: number;
   id: number;
@@ -510,6 +512,14 @@ export async function getTabGroupMainState(
   userId: number,
   playlistId: number,
 ): Promise<ITabGroupMainStateModel | null> {
+  if (tabGroupMainStateMutex.isLocked()) {
+    console.log(
+      `=> getTabGroupMainState (waitForUnlock): playlistId=${playlistId}`,
+    );
+    await tabGroupMainStateMutex.waitForUnlock();
+    // Proceed with GET
+  }
+
   try {
     let response = await client.get(`/tab_group_main_state/${userId}`);
     console.log(
@@ -560,49 +570,55 @@ export async function updateTabGroupMainState(
   userId: number,
   tabGroupMainState: Partial<ITabGroupMainStateModel>,
 ): Promise<number> {
-  try {
-    if (tabGroupMainState.tab_spec !== null) {
-      tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+  return tabGroupMainStateMutex.runExclusive(async () => {
+    try {
+      if (tabGroupMainState.tab_spec !== null) {
+        tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+      }
+      const response = await client.patch(
+        `/tab_group_main_state/${userId}`,
+        tabGroupMainState,
+      );
+      console.log("updateTabGroupMainState response status: ", response.status);
+      return response.status;
+    } catch (error) {
+      console.error("updateTabGroupMainState error: ", error);
+      return 500;
     }
-    const response = await client.patch(
-      `/tab_group_main_state/${userId}`,
-      tabGroupMainState,
-    );
-    console.log("updateTabGroupMainState response status: ", response.status);
-    return response.status;
-  } catch (error) {
-    console.error("updateTabGroupMainState error: ", error);
-    return 500;
-  }
+  });
 }
 
 export async function createTabGroupMainState(
   userId: number,
   tabGroupMainState: Partial<ITabGroupMainStateModel>,
 ): Promise<number> {
-  try {
-    if (tabGroupMainState.tab_spec !== null) {
-      tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+  return tabGroupMainStateMutex.runExclusive(async () => {
+    try {
+      if (tabGroupMainState.tab_spec !== null) {
+        tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+      }
+      const response = await client.post(
+        `/tab_group_main_state/${userId}`,
+        tabGroupMainState,
+      );
+      console.log("createTabGroupMainState response status: ", response.status);
+      return response.status;
+    } catch (error) {
+      console.error("createTabGroupMainState error: ", error);
+      return 500;
     }
-    const response = await client.post(
-      `/tab_group_main_state/${userId}`,
-      tabGroupMainState,
-    );
-    console.log("createTabGroupMainState response status: ", response.status);
-    return response.status;
-  } catch (error) {
-    console.error("createTabGroupMainState error: ", error);
-    return 500;
-  }
+  });
 }
 
 export async function deleteTabGroupMainState(userId: number): Promise<number> {
-  try {
-    const response = await client.delete(`/tab_group_main_state/${userId}`);
-    console.log("deleteTabGroupMainState response status: ", response.status);
-    return response.status;
-  } catch (error) {
-    console.error("deleteTabGroupMainState error: ", error);
-    return 500;
-  }
+  return tabGroupMainStateMutex.runExclusive(async () => {
+    try {
+      const response = await client.delete(`/tab_group_main_state/${userId}`);
+      console.log("deleteTabGroupMainState response status: ", response.status);
+      return response.status;
+    } catch (error) {
+      console.error("deleteTabGroupMainState error: ", error);
+      return 500;
+    }
+  });
 }
