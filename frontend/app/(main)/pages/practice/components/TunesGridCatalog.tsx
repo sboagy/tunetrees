@@ -160,12 +160,7 @@ export default function TunesGridCatalog({
     setGlobalFilter(value);
     if (table !== null) {
       console.log("LF7: Saving table state on filter change: ", value);
-      // If I try to go through `table.setGlobalFilter(value)`, and then
-      // `saveTableState(table, userId, "repertoire", playlistId)`, it doesn't work
-      // so well, always being one character behind, presumably because it feeds through
-      // the useState hook. So, instead directly get the state here, update it, and then
-      // save it into the database.  Note that updateTableStateInDb will lock while it's
-      // updating the database, so hopefully not a problem with getting ahead of the writes.
+      // (See comment in TunesGridRepertoire.tsx handleGlobalFilterChange)
       const tableState: TableState = table.getState();
       tableState.globalFilter = value;
       void updateTableStateInDb(
@@ -326,6 +321,8 @@ export default function TunesGridCatalog({
               </Button> */}
               <ColumnsMenu
                 user_id={userId}
+                tablePurpose="catalog"
+                playlistId={playlistId}
                 table={table}
                 triggerRefresh={triggerRefresh}
               />

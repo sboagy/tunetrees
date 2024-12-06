@@ -248,6 +248,8 @@ export default function TunesGridScheduled({
               >
                 <ColumnsMenu
                   user_id={userId}
+                  tablePurpose={"practice"}
+                  playlistId={playlistId}
                   table={table}
                   triggerRefresh={triggerRefresh}
                 />

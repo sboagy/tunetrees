@@ -131,6 +131,15 @@ function sortableHeader<TData, TValue>(
   );
 }
 
+export interface IColumnMeta {
+  headerLabel?: string;
+  type?: string;
+}
+
+export type ExtendedColumnDef<TData, TValue> = ColumnDef<TData, TValue> & {
+  meta?: IColumnMeta;
+};
+
 export function get_columns(
   userId: number,
   playlistId: number,
@@ -278,7 +287,10 @@ export function get_columns(
     );
   }
 
-  const columns: ColumnDef<ITuneOverview, TunesGridColumnGeneralType>[] = [
+  const columns: ExtendedColumnDef<
+    ITuneOverview,
+    TunesGridColumnGeneralType
+  >[] = [
     {
       id: "id",
       // header: ({ column }) => sortableHeader(column, "Id"),
@@ -579,6 +591,9 @@ export function get_columns(
         accessorKey: "playlist_deleted",
         header: ({ column }) =>
           sortableHeader(column, "Deleted in Repertoire?"),
+        meta: {
+          headerLabel: "Deleted in Repertoire?", // Store headerLabel in meta
+        },
         cell: (info) => {
           return info.getValue() ? "Yes" : "No";
         },

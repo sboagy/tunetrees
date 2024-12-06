@@ -294,6 +294,8 @@ export default function TunesGridRepertoire({
               </Button> */}
               <ColumnsMenu
                 user_id={userId}
+                tablePurpose="repertoire"
+                playlistId={playlistId}
                 table={table}
                 triggerRefresh={triggerRefresh}
               />

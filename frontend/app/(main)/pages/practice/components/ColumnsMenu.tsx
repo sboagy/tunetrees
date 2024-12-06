@@ -10,17 +10,22 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Table } from "@tanstack/react-table";
+import type { Table, TableState } from "@tanstack/react-table";
 import { useEffect, useState } from "react";
-import type { ITuneOverview } from "../types";
+import { updateTableStateInDb } from "../settings";
+import type { ITuneOverview, TablePurpose } from "../types";
+import type { IColumnMeta } from "./TuneColumns";
 
 const ColumnsMenu = ({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   user_id,
+  tablePurpose,
+  playlistId,
   table,
   triggerRefresh,
 }: {
   user_id: number;
+  tablePurpose: TablePurpose;
+  playlistId: number;
   table: Table<ITuneOverview>;
   triggerRefresh: () => void;
 }) => {
@@ -47,6 +52,18 @@ const ColumnsMenu = ({
       if (column) {
         console.log("toggleVisibility (before)", column.getIsVisible());
         column.toggleVisibility(value);
+        console.log("LF7: Saving table state on filter change: ", value);
+        // (See comment in TunesGridRepertoire.tsx handleGlobalFilterChange)
+        const tableState: TableState = table.getState();
+        tableState.columnVisibility[columnId] = value;
+        void updateTableStateInDb(
+          user_id,
+          "full",
+          tablePurpose,
+          playlistId,
+          tableState,
+        );
+
         triggerRefresh();
       } else {
         console.log("column not found", columnId);
@@ -67,6 +84,15 @@ const ColumnsMenu = ({
           .getAllColumns()
           .filter((column) => column.getCanHide())
           .map((column) => {
+            const meta = column.columnDef.meta as IColumnMeta | undefined;
+
+            const headerLabel =
+              meta?.headerLabel ||
+              // If headerLabel is not available, use the column ID or a default value
+              (typeof column.columnDef.header === "string"
+                ? column.columnDef.header
+                : column.id);
+
             return (
               <DropdownMenuCheckboxItem
                 key={column.id}
@@ -74,7 +100,7 @@ const ColumnsMenu = ({
                 checked={column.getIsVisible()}
                 onCheckedChange={handleCheckedChange(column.id)}
               >
-                {column.id}
+                {headerLabel}
               </DropdownMenuCheckboxItem>
             );
           })}
