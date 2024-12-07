@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from os import environ
 from typing import Annotated, Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Form, HTTPException, Query
+from fastapi import APIRouter, Body, Form, HTTPException, Query, Path
 from sqlalchemy import ColumnElement, Table
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
@@ -253,31 +253,35 @@ async def get_playlist_tune_overview(user_id: int, playlist_ref: int, tune_id: i
 
 
 @router.get(
-    "/playlist_tune",
+    "/playlist_tune/{user_id}/{playlist_ref}/{tune_id}",
     response_model=PlaylistTuneModel | None,
     summary="Get Playlist Tune (unjoined)",
     description="Retrieve a playlist tune by its tune ID and playlist ID.",
     status_code=200,
 )
-def get_playlist_tune(tune_ref: int = Query(...), playlist_ref: int = Query(...)):
+def get_playlist_tune(
+    user_id: int = Path(..., description="User ID"),
+    playlist_ref: int = Path(..., description="Playlist reference ID"),
+    tune_id: int = Path(..., description="Tune ID"),
+):
     try:
         with SessionLocal() as db:
             playlist_tune = (
                 db.query(PlaylistTune)
                 .filter(
-                    PlaylistTune.tune_ref == tune_ref,
+                    PlaylistTune.tune_ref == tune_id,
                     PlaylistTune.playlist_ref == playlist_ref,
                 )
                 .first()
             )
             return playlist_tune
     except Exception as e:
-        logger.error(f"Unable to fetch tune({tune_ref}): {e}")
+        logger.error(f"Unable to fetch tune({tune_id}): {e}")
         if isinstance(e, HTTPException):
             raise e
         else:
             raise HTTPException(
-                status_code=500, detail=f"Unable to fetch tune({tune_ref}): {e}"
+                status_code=500, detail=f"Unable to fetch tune({tune_id}): {e}"
             )
 
 
@@ -434,15 +438,15 @@ def update_playlist_tunes(
 
 
 @router.get(
-    "/references",
+    "/references/{user_ref}/{tune_ref}",
     response_model=List[ReferenceModel],
     summary="Get References",
     description="Get all references for a user and tune or public references.",
     status_code=200,
 )
 def get_references(
-    user_ref: int = Query(...),
-    tune_ref: int = Query(...),
+    user_ref: int = Path(..., description="User reference ID"),
+    tune_ref: int = Path(..., description="Tune reference ID"),
     public: int = Query(0, ge=0, le=1),
 ):
     try:
@@ -501,14 +505,14 @@ def create_reference(reference: ReferenceModelCreate):
 
 
 @router.patch(
-    "/references",
+    "/references/{id}",
     response_model=ReferenceModel,
     summary="Update Reference",
     description="Update an existing reference.",
     status_code=200,
 )
 def update_reference(
-    id: int,
+    id: int = Path(..., description="Reference ID"),
     reference: ReferenceModelPartial = Body(...),
 ):
     try:
@@ -562,16 +566,16 @@ def delete_reference(id: int):  # noqa: C901
 
 
 @router.get(
-    "/notes",
+    "/notes/{user_ref}/{tune_ref}",
     response_model=List[NoteModel],
     summary="Get Notes",
     description="Retrieve notes based on tune_ref and optional playlist_ref, user_ref, or public.",
     status_code=200,
 )
 def get_notes(
-    tune_ref: int = Query(...),
+    user_ref: int = Path(..., description="User reference ID"),
+    tune_ref: int = Path(..., description="Tune reference ID"),
     playlist_ref: Optional[int] = Query(None),
-    user_ref: Optional[int] = Query(None),
     public: Optional[int] = Query(None, ge=0, le=1),
 ):
     try:
@@ -611,24 +615,26 @@ def create_note(note: NoteModelCreate):
 
 
 @router.patch(
-    "/notes",
+    "/notes/{note_id}",
     response_model=NoteModel,
     summary="Update Note",
     description="Update an existing note.",
     status_code=200,
 )
 def update_note(
-    id: int,
+    note_id: int = Path(..., description="Note ID"),
     note: NoteModelPartial = Body(...),
 ):
     try:
         with SessionLocal() as db:
-            stmt = select(Note).where(Note.id == id)
+            stmt = select(Note).where(Note.id == note_id)
             result = db.execute(stmt)
             existing_note = result.scalars().first()
 
             if not existing_note:
-                raise HTTPException(status_code=404, detail=f"Note not found: {id}")
+                raise HTTPException(
+                    status_code=404, detail=f"Note not found: {note_id}"
+                )
 
             for key, value in note.model_dump(exclude_unset=True).items():
                 setattr(existing_note, key, value)
@@ -637,7 +643,7 @@ def update_note(
             db.refresh(existing_note)
             return NoteModel.model_validate(existing_note)
     except Exception as e:
-        logger.error(f"Unable to update note ({id}): {e}")
+        logger.error(f"Unable to update note ({note_id}): {e}")
         raise HTTPException(status_code=500, detail=f"Unable to update note: {e}")
 
 
@@ -648,7 +654,7 @@ def update_note(
     status_code=204,
 )
 def delete_note(
-    note_id: int,
+    note_id: int = Path(..., description="Note ID"),
 ):
     try:
         with SessionLocal() as db:
@@ -670,13 +676,15 @@ def delete_note(
 
 
 @router.get(
-    "/tune",
+    "/tune/{tune_ref}",
     response_model=TuneModel,
     summary="Get Tune",
     description="Retrieve a tune by its reference ID.",
     status_code=200,
 )
-def get_tune(tune_ref: int = Query(...)):
+def get_tune(
+    tune_ref: int = Path(..., description="Tune reference ID"),
+):
     try:
         with SessionLocal() as db:
             tune = db.query(Tune).filter(Tune.id == tune_ref).first()
@@ -760,13 +768,16 @@ def create_tune(tune: TuneModelCreate, playlist_ref: Optional[int] = None):
 
 
 @router.patch(
-    "/tune",
+    "/tune/{tune_ref}",
     response_model=TuneModel,
     summary="Update Tune",
     description="Update an existing tune by its reference ID.",
     status_code=200,
 )
-def update_tune(tune_ref: int = Query(...), tune: TuneModelPartial = Body(...)):
+def update_tune(
+    tune_ref: int = Path(..., description="Tune reference ID"),
+    tune: TuneModelPartial = Body(...),
+):
     try:
         with SessionLocal() as db:
             existing_tune = db.query(Tune).filter(Tune.id == tune_ref).first()
@@ -791,7 +802,10 @@ def update_tune(tune_ref: int = Query(...), tune: TuneModelPartial = Body(...)):
     description="Update multiple tunes by their reference IDs.",
     status_code=200,
 )
-def update_tunes(tune_refs: list[int] = Query(...), tune: TuneModelPartial = Body(...)):
+def update_tunes(
+    tune_refs: list[int] = Query(...),
+    tune: TuneModelPartial = Body(...),
+):
     try:
         with SessionLocal() as db:
             updated_tunes = []
@@ -821,12 +835,14 @@ def update_tunes(tune_refs: list[int] = Query(...), tune: TuneModelPartial = Bod
 
 
 @router.delete(
-    "/tune",
+    "/tune/{tune_ref}",
     summary="Delete Tune",
     description="Delete an existing tune by its reference ID.",
     status_code=204,
 )
-def delete_tune(tune_ref: int = Query(...)):
+def delete_tune(
+    tune_ref: int = Path(..., description="Tune reference ID"),
+):
     try:
         with SessionLocal() as db:
             existing_tune = db.query(Tune).filter(Tune.id == tune_ref).first()
@@ -848,7 +864,9 @@ def delete_tune(tune_ref: int = Query(...)):
     description="Retrieve playlists by user reference.",
     status_code=200,
 )
-def get_playlists(user_ref: int = Query(...)):
+def get_playlists(
+    user_ref: int = Query(..., description="User reference ID"),
+):
     try:
         with SessionLocal() as db:
             playlists = db.query(Playlist).filter(Playlist.user_ref == user_ref).all()
@@ -887,7 +905,10 @@ def create_playlist(playlist: PlaylistModel):
     description="Update an existing playlist by its ID.",
     status_code=200,
 )
-def update_playlist(playlist_id: int, playlist: PlaylistModelPartial = Body(...)):
+def update_playlist(
+    playlist_id: int = Path(..., description="Playlist ID"),
+    playlist: PlaylistModelPartial = Body(...),
+):
     try:
         with SessionLocal() as db:
             existing_playlist = (
@@ -913,7 +934,9 @@ def update_playlist(playlist_id: int, playlist: PlaylistModelPartial = Body(...)
     description="Delete an existing playlist by its ID.",
     status_code=204,
 )
-def delete_playlist(playlist_id: int):
+def delete_playlist(
+    playlist_id: int = Path(..., description="Playlist ID"),
+):
     try:
         with SessionLocal() as db:
             existing_playlist = (
@@ -937,7 +960,9 @@ def delete_playlist(playlist_id: int):
     description="Retrieve a playlist by its ID.",
     status_code=200,
 )
-def get_playlist_by_id(playlist_id: int):
+def get_playlist_by_id(
+    playlist_id: int = Path(..., description="Playlist ID"),
+):
     try:
         with SessionLocal() as db:
             playlist = (
