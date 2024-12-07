@@ -1,7 +1,7 @@
 import logging
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Path, Query
+from fastapi import APIRouter, Body, HTTPException, Path
 from pydantic import BaseModel
 from starlette import status as status
 
@@ -25,28 +25,17 @@ settings_router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 @settings_router.get(
-    "/table_state",
+    "/table_state/{user_id}/{playlist_id}/{screen_size}/{purpose}",
     response_model=TableStateModel | None,
     summary="Get Table State",
     description="Retrieve the stored datagrid table state for a user, for a specific screen size and purpose.",
     status_code=status.HTTP_200_OK,
 )
 def get_table_state(
-    user_id: int = Query(
-        ...,
-        description="Should be a valid user id that corresponds to a user in the user table",
-    ),
-    screen_size: ScreenSizeEnum = Query(
-        ..., description="Associated screen size, one of 'small' or 'full'"
-    ),
-    purpose: PurposeEnum = Query(
-        ...,
-        description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
-    ),
-    playlist_id: int = Query(
-        ...,
-        description="Associated playlist",
-    ),
+    user_id: int = Path(..., description="User ID"),
+    playlist_id: int = Path(..., description="Playlist ID"),
+    screen_size: ScreenSizeEnum = Path(..., description="Screen size"),
+    purpose: PurposeEnum = Path(..., description="Purpose"),
 ) -> TableStateModel:
     try:
         with SessionLocal() as db:
@@ -97,29 +86,17 @@ def create_table_state(table_state: TableStateModel) -> TableStateModel:
 
 
 @settings_router.patch(
-    "/table_state",
+    "/table_state/{user_id}/{playlist_id}/{screen_size}/{purpose}",
     response_model=TableStateModel,
     summary="Update Table State",
     description="Update an existing datagrid table state for a user, for a specific screen size and purpose.",
     status_code=status.HTTP_200_OK,
 )
 def update_table_state(
-    user_id: int = Query(
-        ...,
-        description="Should be a valid user id that corresponds to a user in the user table",
-    ),
-    screen_size: ScreenSizeEnum = Query(
-        ...,
-        description="Associated screen size, one of 'small' or 'full'",
-    ),
-    purpose: PurposeEnum = Query(
-        ...,
-        description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
-    ),
-    playlist_id: int = Query(
-        ...,
-        description="Associated playlist",
-    ),
+    user_id: int = Path(..., description="User ID"),
+    playlist_id: int = Path(..., description="Playlist ID"),
+    screen_size: ScreenSizeEnum = Path(..., description="Screen size"),
+    purpose: PurposeEnum = Path(..., description="Purpose"),
     table_state_update: TableStateModelPartial = Body(...),
 ) -> TableStateModel:
     try:
@@ -152,30 +129,16 @@ def update_table_state(
 
 
 @settings_router.delete(
-    "/table_state",
+    "/table_state/{user_id}/{playlist_id}/{screen_size}/{purpose}",
     summary="Delete Table State",
     description="Delete an existing datagrid table state for a user, for a specific screen size and purpose.",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 def delete_table_state(
-    user_id: int = Query(
-        ...,
-        description="Should be a valid user id that corresponds to a user in the user table",
-    ),
-    screen_size: str = Query(
-        ...,
-        enum=["small", "full"],
-        description="Associated screen size, one of 'small' or 'full'",
-    ),
-    purpose: str = Query(
-        ...,
-        enum=["practice", "repertoire", "catalog", "analysis"],
-        description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
-    ),
-    playlist_id: int = Query(
-        ...,
-        description="Associated playlist",
-    ),
+    user_id: int = Path(..., description="User ID"),
+    playlist_id: int = Path(..., description="Playlist ID"),
+    screen_size: ScreenSizeEnum = Path(..., description="Screen size"),
+    purpose: PurposeEnum = Path(..., description="Purpose"),
 ) -> None:
     try:
         with SessionLocal() as db:
