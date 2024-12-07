@@ -232,7 +232,12 @@ export async function getReferences(
       `Request URL: /references?user_ref=${userRef}&tune_ref=${tuneRef}&public=0`,
     );
     const response = await client.get<IReferenceData[]>(
-      `/references?tune_ref=${tuneRef}&user_ref=${userRef}&public=0`,
+      `/references/${userRef ?? ""}/${tuneRef}`,
+      {
+        params: {
+          public: 0,
+        },
+      },
     );
     console.log("getReferences response: ", response.data);
     return response.data;
@@ -283,9 +288,8 @@ export async function updateReference(
 ): Promise<IReferenceData | ITTResponseInfo> {
   try {
     const response = await client.patch<IReferenceData | ITTResponseInfo>(
-      "/references",
+      `/references/${referenceId}`,
       referenceUpdate,
-      { params: { id: referenceId } },
     );
     return response.data;
   } catch (error) {
@@ -348,16 +352,14 @@ export async function deleteReference(
  */
 export async function getNotes(
   tuneRef: number,
-  playlistRef?: number,
-  userRef?: number,
+  playlistRef: number,
+  userRef: number,
   displayPublic?: boolean,
 ): Promise<INote[]> {
   try {
-    const response = await client.get<INote[]>("/notes", {
+    const response = await client.get<INote[]>(`/notes/${userRef}/${tuneRef}`, {
       params: {
-        tune_ref: tuneRef,
         playlist_ref: playlistRef,
-        user_ref: userRef,
         public: displayPublic ? 1 : 0,
       },
     });
@@ -381,9 +383,8 @@ export async function updateNote(
 ): Promise<ITTResponseInfo> {
   try {
     const response = await client.patch<ITTResponseInfo>(
-      "/notes",
+      `/notes/${note_id}`,
       note_update,
-      { params: { id: note_id } },
     );
     return response.data;
   } catch (error) {
@@ -434,10 +435,7 @@ export async function getTune(
 ): Promise<ITuneOverview | { detail: string }> {
   try {
     const response = await client.get<ITuneOverview | { detail: string }>(
-      "/tune",
-      {
-        params: { tune_ref: tuneRef },
-      },
+      `/tune/${tuneRef}`,
     );
     return response.data;
   } catch (error) {
@@ -458,9 +456,10 @@ export async function updateTune(
   tuneUpdate: Partial<ITuneOverview>,
 ): Promise<ITTResponseInfo> {
   try {
-    const response = await client.patch<ITTResponseInfo>("/tune", tuneUpdate, {
-      params: { tune_ref: tuneRef },
-    });
+    const response = await client.patch<ITTResponseInfo>(
+      `/tune/${tuneRef}`,
+      tuneUpdate,
+    );
     return response.data;
   } catch (error) {
     console.error("Error in updateTune: ", error);
@@ -481,6 +480,22 @@ export async function updateTunes(
   } catch (error) {
     console.error("Error in updateTune: ", error);
     return { detail: `Unable to update tune: ${(error as Error).message}` };
+  }
+}
+
+/**
+ * Delete a specific tune.
+ *
+ * @param tuneRef - The reference ID of the tune.
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function deleteTune(tuneRef: number): Promise<ITTResponseInfo> {
+  try {
+    const response = await client.delete<ITTResponseInfo>(`/tune/${tuneRef}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error in deleteTune: ", error);
+    return { detail: `Unable to delete tune: ${(error as Error).message}` };
   }
 }
 
@@ -615,24 +630,6 @@ export async function createEmptyTune(
   } catch (error) {
     console.error("Error in createTune: ", error);
     return { detail: `Unable to create tune: ${(error as Error).message}` };
-  }
-}
-
-/**
- * Delete a specific tune.
- *
- * @param tuneRef - The reference ID of the tune.
- * @returns A promise that resolves to a success or error message.
- */
-export async function deleteTune(tuneRef: number): Promise<ITTResponseInfo> {
-  try {
-    const response = await client.delete<ITTResponseInfo>("/tune", {
-      params: { tune_ref: tuneRef },
-    });
-    return response.data;
-  } catch (error) {
-    console.error("Error in deleteTune: ", error);
-    return { detail: `Unable to delete tune: ${(error as Error).message}` };
   }
 }
 

@@ -117,16 +117,8 @@ export async function updateTableStateInDb(
         settings: tableStatesStr,
       };
       const response = await client.patch<Partial<ITableStateTable>>(
-        "/table_state",
+        `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
         tableStateTable,
-        {
-          params: {
-            user_id: userId,
-            screen_size: screenSize,
-            purpose: purpose,
-            playlist_id: playlistId,
-          },
-        },
       );
       console.log(
         `=> updateTableStateInDb: response.status=${response.status} purpose=${purpose}, playlistId=${playlistId})}`,
@@ -202,14 +194,9 @@ export async function getTableStateTable(
 
   try {
     console.log(`=> getTableStateTable: purpose=${purpose}`);
-    const response = await client.get<ITableStateTable>("/table_state", {
-      params: {
-        user_id: userId,
-        screen_size: screenSize,
-        purpose: purpose,
-        playlist_id: playlistId,
-      },
-    });
+    const response = await client.get<ITableStateTable>(
+      `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
+    );
     if (response.data === null) {
       console.log(
         "getTableStateTable response is null, status: ",
@@ -300,14 +287,9 @@ export async function deleteTableState(
   playlistId: number,
 ): Promise<number> {
   try {
-    const response = await client.delete("/table_state", {
-      params: {
-        user_id: userId,
-        screen_size: screenSize,
-        purpose: purpose,
-        playlist_id: playlistId,
-      },
-    });
+    const response = await client.delete(
+      `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
+    );
     console.log("deleteTableState: ", response?.status);
     return response.status;
   } catch (error) {
