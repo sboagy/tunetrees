@@ -49,4 +49,4 @@ COPY requirements.txt requirements.txt
 EXPOSE 8000
 
 # Run the application.
-CMD uvicorn 'tunetrees.api.main:app' --host 0.0.0.0 --port 8000 --reload
+CMD ["uvicorn", "tunetrees.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
