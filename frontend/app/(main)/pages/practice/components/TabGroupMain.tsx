@@ -3,6 +3,7 @@ import type { ITabSpec } from "@/app/(main)/pages/practice/tab-spec";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { JSX } from "react";
+import TabsMenu from "./TabsMenu";
 import { useTabsState } from "./TabsStateContext";
 import TunesGridCatalog from "./TunesGridCatalog";
 import TunesGridRepertoire from "./TunesGridRepertoire";
@@ -34,10 +35,7 @@ export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
       onValueChange={changeActiveTab}
       className="flex h-full w-full flex-col"
     >
-      <TabsList
-        id="tt-tabs"
-        className="grid w-full grid-cols-4 rounded-none bg-transparent p-0 gap-2"
-      >
+      <TabsList id="tt-tabs" className="bg-transparent">
         {tabSpec
           .filter((tab) => tab.visible)
           .map(
@@ -47,12 +45,13 @@ export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
-                className={`rounded-t-lg border-t border-l border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors duration-200 ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
+                className={`w-80 rounded-t-lg border-t border-l border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors duration-200 ${activeTab === tab.id ? "bg-gray-500 text-gray-900" : "bg-gray-900 text-gray-100 hover:bg-gray-600"}`}
               >
                 {tab.name}
               </TabsTrigger>
             ),
           )}
+        <TabsMenu />
       </TabsList>
       <TabsContent value="scheduled">
         <TunesGridScheduled userId={userId} />
