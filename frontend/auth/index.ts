@@ -288,7 +288,14 @@ const config = {
     logo: "/logo4.png", // Absolute URL to image
     // buttonText: "", // Hex color code
   },
-  basePath: BASE_PATH,
+  // By default, NextAuth expects the authentication routes to be under /api/auth.
+  // Removing the basePath option ensures that NextAuth uses the default paths,
+  // aligning your client and server routes.  Otherwise a ClientFetchError may occur
+  // on the client side, and
+  //    [auth][error] UnknownAction: Cannot parse action at /api/auth/session
+  // on the server side.  The error occured when switching to a new browser tab,
+  // and switching back.
+  // basePath: BASE_PATH,
   secret: process.env.NEXTAUTH_SECRET,
   events: {
     signIn(message: {
