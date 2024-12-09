@@ -4,6 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { useSession } from "next-auth/react";
 import { useEffect, useRef } from "react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import { usePlaylist } from "./CurrentPlaylistProvider";
@@ -43,6 +44,20 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
       sidebarRef.current.collapse();
     }
   }, []);
+
+  const { status } = useSession();
+  console.log("MainPanel ===> MainPanel.tsx:53 ~ status", status);
+
+  if (status === "loading") {
+    // I'm not sure if this will occur, but it's here just in case.
+    return <div>Loading...</div>;
+  }
+  // Add extra logic to make double-sure the user is authenticated.
+  // But the user should be always authenticated before they get here,
+  // and it's a bug if they're not.
+  if (status === "unauthenticated") {
+    return <div>Not authenticated</div>;
+  }
 
   return (
     <div className="main-panel">
