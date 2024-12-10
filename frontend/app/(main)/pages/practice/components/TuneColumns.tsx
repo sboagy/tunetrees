@@ -28,49 +28,51 @@ import {
   EyeOff,
   Filter,
 } from "lucide-react";
+import { useState } from "react";
 import { updateTableStateInDb } from "../settings";
 import type {
   ITuneOverview,
   TablePurpose,
   TunesGridColumnGeneralType,
 } from "../types";
+import "./TuneColumns.css";
 import { saveTableState } from "./TunesTable";
 
 function columnControlMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="text-black">
+        <Button variant="ghost" className="p-1">
           {" "}
-          <span className="font-bold">&#8942;</span>
+          <span className="font-bold text-opacity-100">&#8942;</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         {/* <DropdownMenuLabel>Column Control</DropdownMenuLabel> */}
         <DropdownMenuItem>
-          <ArrowUp className="mr-2 h-4 w-4" />
+          <ArrowUp size={16} className="column-menu-icon-style" />
           <span>Sort ascending</span>
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <ArrowDown className="mr-2 h-4 w-4" />
+          <ArrowDown size={16} className="column-menu-icon-style" />
           <span>Sort descending</span>
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <ArrowUpDown className="mr-2 h-4 w-4" />
+          <ArrowUpDown size={16} className="column-menu-icon-style" />
           <span>Unsort</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <Filter className="mr-2 h-4 w-4" />
+          <Filter size={16} className="column-menu-icon-style" />
           <span>Filter...</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <EyeOff className="mr-2 h-4 w-4" />
+          <EyeOff size={16} className="column-menu-icon-style" />
           <span>Hide Column</span>
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <Columns className="mr-2 h-4 w-4" />
+          <Columns size={16} className="column-menu-icon-style" />
           <span>Manage Columns...</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -100,6 +102,7 @@ function rotateSorting<TData, TValue>(column: Column<TData, TValue>) {
     column.toggleSorting(false, true);
   }
   console.log("column.getIsSorted(): ", column.getIsSorted());
+
   // column.toggleSorting(column.getIsSorted() === "asc");
 }
 
@@ -107,25 +110,27 @@ function sortableHeader<TData, TValue>(
   column: Column<TData, TValue>,
   title: string,
 ) {
-  // console.log("column: ", column);
-  const isSorted = column.getIsSorted();
-  column.getCanMultiSort();
+  const [, setRenderKey] = useState(0);
+
   return (
-    <div
-      className="flex items-center"
-      onClick={() => rotateSorting(column)}
-      onKeyDown={() => {}}
-      onKeyUp={() => {}}
-      onKeyPress={() => {}}
-    >
-      {title}
-      {isSorted === "asc" ? (
-        <ArrowUp className="ml-2 h-4 w-4" />
-      ) : isSorted === "desc" ? (
-        <ArrowDown className="ml-2 h-4 w-4" />
-      ) : (
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      )}
+    <div className="flex items-center space-x-1 whitespace-nowrap">
+      <span>{title}</span>
+      <Button
+        variant="ghost"
+        className="p-1"
+        onClick={() => {
+          rotateSorting(column);
+          setRenderKey((prev) => prev + 1); // Force button re-render, special magic
+        }}
+      >
+        {column.getIsSorted() === "asc" ? (
+          <ArrowUp size={16} className="flex-shrink-0 column-icon-style" />
+        ) : column.getIsSorted() === "desc" ? (
+          <ArrowDown size={16} className="flex-shrink-0 column-icon-style" />
+        ) : (
+          <ArrowUpDown size={16} className="flex-shrink-0 column-icon-style" />
+        )}
+      </Button>
       {columnControlMenu()}
     </div>
   );

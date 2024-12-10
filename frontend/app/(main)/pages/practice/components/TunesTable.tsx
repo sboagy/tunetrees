@@ -315,11 +315,33 @@ export function TunesTableComponent({
     const resolvedSorting: SortingState =
       newSorting instanceof Function ? newSorting(sorting) : newSorting;
 
+    console.log(
+      "interceptedSetSorting ===> TunesTable.tsx:318 ~ resolvedSorting",
+      resolvedSorting,
+    );
+
     originalSetSortingRef.current(resolvedSorting);
     console.log(
       `LF7 TunesTableComponent (interceptedSetSorting) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose, playlistId);
+    const tableState = table.getState();
+    tableState.sorting = resolvedSorting;
+    updateTableStateInDb(userId, "full", tablePurpose, playlistId, tableState)
+      .then((result) => {
+        console.log(
+          "LF1 interceptedSetSorting, call to updateTableStateInDb: result=",
+          result ? "success" : "empty result",
+        );
+        return result;
+      })
+      .catch((error) => {
+        console.error(
+          "LF1 interceptedSetSorting Error calling updateTableStateInDb:",
+          error,
+        );
+      });
+
+    // void saveTableState(table, userId, tablePurpose, playlistId);
   };
 
   const interceptedSetColumnVisibility = (

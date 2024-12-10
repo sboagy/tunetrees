@@ -1,0 +1,8 @@
+.column-icon-style {
+  @apply ml-2 h-4 w-4;
+}
+
+.column-menu-icon-style {
+  @apply ml-2 mr-2 h-4 w-4;
+}
+
