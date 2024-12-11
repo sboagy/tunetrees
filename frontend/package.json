@@ -66,7 +66,7 @@
     "install": "^0.13.0",
     "jodit-react": "^4.1.2",
     "lucide-react": "^0.468.0",
-    "next": "15.0.4",
+    "next": "^15.1.0",
     "next-auth": "^5.0.0-beta.25",
     "next-auth-http-adapter": "^0.3.0",
     "next-themes": "^0.4.3",
