@@ -200,40 +200,12 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           maxHeight: "calc(104vh - 270px)",
         }}
       >
-        <Table className="hide-scrollbar overflow-clipped">
-          <TableHeader
-            id="tt-tunes-grid-header"
-            className="block top-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar"
-          >
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow
-                key={headerGroup.id}
-                className="hide-scrollbar h-auto w-full flex flex-row overflow-clipped"
-              >
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    // className="p-2 align-top"
-                    style={{ width: header.column.getSize() }}
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-        </Table>
         <div
           ref={tableBodyRef}
           className="flex-grow overflow-y-auto"
           style={{
-            minHeight: "calc(104vh - 270px - 100px)",
-            maxHeight: "calc(104vh - 270px - 100px)",
+            minHeight: "calc(104vh - 270px - 50x)",
+            maxHeight: "calc(104vh - 270px - 50px)",
             WebkitOverflowScrolling: "touch",
           }}
         >
@@ -244,6 +216,32 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                 height: "100%",
               }}
             >
+              <TableHeader
+                id="tt-tunes-grid-header"
+                className="sticky block top-0 bg-white dark:bg-gray-800 z-10"
+              >
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow
+                    key={headerGroup.id}
+                    className="hide-scrollbar h-auto w-full flex flex-row overflow-clipped"
+                  >
+                    {headerGroup.headers.map((header) => (
+                      <TableHead
+                        key={header.id}
+                        // className="p-2 align-top"
+                        style={{ width: header.column.getSize() }}
+                      >
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHeader>
               <TableBody
                 style={{
                   display: "block",
