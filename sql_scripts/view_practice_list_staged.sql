@@ -22,9 +22,9 @@ SELECT
        practice_record.backup_practiced,
        user_annotation_set.tags,
        td.purpose AS purpose,
-       td.note_private AS staged_notes_private,
-       td.note_public AS staged_notes_public,
-       td.recall_eval AS staged_recall_eval,
+       td.note_private AS note_private,
+       td.note_public AS note_public,
+       td.recall_eval AS recall_eval,
        (SELECT group_concat(note.note_text, ' ')
         FROM note
         WHERE note.tune_ref = tune.id

@@ -557,6 +557,45 @@ class PlaylistTuneJoinedModel(BaseModel):
         from_attributes = True
 
 
+class PracticeListStagedModel(BaseModel):
+    id: Optional[int] = None
+    title: Optional[str] = None
+    type: Optional[str] = None
+    structure: Optional[str] = None
+    mode: Optional[str] = None
+    incipit: Optional[str] = None
+    genre: Optional[str] = None
+    deleted: Optional[bool] = None
+    learned: Optional[str] = None
+    user_ref: Optional[int] = None
+    playlist_id: Optional[int] = None
+    instrument: Optional[str] = None
+    playlist_deleted: Optional[bool] = None
+    practiced: Optional[str] = None
+    quality: Optional[str] = None
+    easiness: Optional[float] = None
+    interval: Optional[int] = None
+    repetitions: Optional[int] = None
+    review_date: Optional[str] = None
+    backup_practiced: Optional[str] = None
+    tags: Optional[str] = None
+    purpose: Optional[str] = None
+    note_private: Optional[str] = None
+    note_public: Optional[str] = None
+    recall_eval: Optional[str] = None
+    notes: Optional[str] = None
+    favorite_url: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
 class ResponseStatusModel(BaseModel):
     status: str
     message: Optional[str] = None
+
+
+class ColumnSort(BaseModel):
+    desc: bool
+    id: str

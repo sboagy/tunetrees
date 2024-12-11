@@ -7,7 +7,6 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Query, Session
 from tabulate import tabulate
 
-
 from tunetrees.models.tunetrees import (
     Playlist,
     PracticeRecord,
@@ -283,70 +282,6 @@ def query_practice_list_scheduled(
 #     #     print(tabulate(rows, headers=t_practice_list_staged.columns.keys()))
 
 #     return rows
-
-
-def query_repertoire_list(
-    db: Session,
-    skip: int = 0,
-    limit: int = 100000,
-    print_table=False,
-    playlist_ref=1,
-    user_ref=1,
-    show_deleted=True,
-    show_playlist_deleted=False,
-) -> List[Tune]:
-    filters = [
-        t_practice_list_staged.c.user_ref == user_ref,
-        t_practice_list_staged.c.playlist_id == playlist_ref,
-    ]
-    if not show_deleted:
-        filters.append(t_practice_list_staged.c.deleted.is_(False))
-    if not show_playlist_deleted:
-        filters.append(t_practice_list_staged.c.playlist_deleted.is_(False))
-
-    query = db.query(t_practice_list_staged).filter(and_(*filters))
-    query_sorted = query.order_by(
-        func.DATE(t_practice_list_staged.c.review_date).desc()
-    )
-
-    rows: List[Tune] = query_sorted.offset(skip).limit(limit).all()
-
-    return rows
-
-
-def query_tune_staged(
-    db: Session,
-    playlist_ref=1,
-    user_ref=1,
-    tune_id: int = 0,
-) -> List[Tune]:
-    """Get a single tune from the practice_list_staged table.  Even though the tune_id is unique,
-    the playlist and user refs are still needed for the user-specific view of the tune, which
-    includes the user's practice record, as well as the user's notes, and other data.  (The user_ref
-    is maybe not strictly necessary, but it is included for consistency).
-
-    Args:
-        db (Session): Database session handle.
-        tune_id (int, optional): Unique ID to the tune. Defaults to 0.
-        playlist_ref (int, optional): Playlist ID for user-specific tune info. Defaults to 1.
-        user_ref (int, optional): User reference which the playlist is associated to, included for
-                    consistency. Defaults to 1.
-
-    Returns:
-        List[Tune]: A list of one tune, or an empty list if the tune is not found.
-    """
-    query = db.query(t_practice_list_staged).filter(
-        and_(
-            t_practice_list_staged.c.id == tune_id,
-            t_practice_list_staged.c.user_ref == user_ref,
-            t_practice_list_staged.c.playlist_id == playlist_ref,
-        )
-    )
-
-    rows: List[Tune] = query.all()
-
-    return rows
-
 
 # def _run_experiment():
 #     db = None

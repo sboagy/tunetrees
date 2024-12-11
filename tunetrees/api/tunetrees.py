@@ -1,12 +1,16 @@
+import json
 import logging
 from datetime import datetime, timezone
+import urllib.parse
 from os import environ
 from typing import Annotated, Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Form, HTTPException, Query, Path
-from sqlalchemy import ColumnElement, Table
+import pydantic
+from fastapi import APIRouter, Body, Form, HTTPException, Path, Query
+from sqlalchemy import ColumnElement, Table, and_
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.query import Query as QueryOrm
 from starlette import status as status
 from starlette.responses import RedirectResponse
 
@@ -14,8 +18,6 @@ from tunetrees.api.mappers.tunes_mapper import tunes_mapper
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
     query_practice_list_scheduled,
-    query_repertoire_list,
-    query_tune_staged,
 )
 from tunetrees.app.schedule import (
     TuneFeedbackUpdate,
@@ -35,6 +37,7 @@ from tunetrees.models.tunetrees import (
     t_practice_list_staged,
 )
 from tunetrees.models.tunetrees_pydantic import (
+    ColumnSort,
     NoteModel,
     NoteModelCreate,
     NoteModelPartial,
@@ -43,6 +46,7 @@ from tunetrees.models.tunetrees_pydantic import (
     PlaylistTuneJoinedModel,
     PlaylistTuneModel,
     PlaylistTuneModelPartial,
+    PracticeListStagedModel,
     ReferenceModel,
     ReferenceModelCreate,
     ReferenceModelPartial,
@@ -89,49 +93,95 @@ async def get_scheduled_tunes_overview(
         return {"error": f"Unable to fetch scheduled practice list: {e}"}
 
 
-@router.get("/repertoire_tunes_overview/{user_id}/{playlist_ref}")
-async def get_repertoire_tunes_overview(
-    user_id: str,
-    playlist_ref: str,
+@router.get(
+    "/repertoire_tunes_overview/{user_id}/{playlist_ref}",
+    response_model=List[PracticeListStagedModel],
+    description="Retrieve an overview of repertoire tunes for a user and playlist with optional filters and pagination.",
+)
+async def get_tunes_staged(
+    user_id: int,
+    playlist_ref: int,
     show_deleted: bool = Query(False),
     show_playlist_deleted: bool = Query(False),
-) -> List[dict[str, Any]] | dict[str, str]:
+    sorting: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(
+        100, ge=1, le=100000, description="Maximum number of records to return"
+    ),
+) -> List[PracticeListStagedModel]:
     try:
         with SessionLocal() as db:
-            tunes_recently_played: List[Tune] = query_repertoire_list(
+            filters = [
+                t_practice_list_staged.c.user_ref == user_id,
+                t_practice_list_staged.c.playlist_id == playlist_ref,
+            ]
+            if not show_deleted:
+                filters.append(t_practice_list_staged.c.deleted.is_(False))
+            if not show_playlist_deleted:
+                filters.append(t_practice_list_staged.c.playlist_deleted.is_(False))
+
+            query = build_query(
                 db,
-                user_ref=int(user_id),
-                playlist_ref=int(playlist_ref),
-                show_deleted=show_deleted,
-                show_playlist_deleted=show_playlist_deleted,
+                filters,
+                sorting,
             )
-            tune_list = []
-            for tune in tunes_recently_played:
-                tune_list.append(tunes_mapper(tune, t_practice_list_staged))
-            return tune_list
+            tunes_recently_played = query.offset(skip).limit(limit).all()
+            return tunes_recently_played
     except Exception as e:
-        return {"error": f"Unable to fetch recently played tunes: {e}"}
+        logger.error(f"Unable to fetch recently played tunes: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to fetch recently played tunes: {e}"
+        )
 
 
-@router.get("/get_tune_staged/{user_id}/{playlist_ref}/{tune_id}")
+def build_query(
+    db: Session, filters: List[ColumnElement[bool]], sorting: Optional[str]
+) -> QueryOrm[Any]:
+    query = db.query(t_practice_list_staged).filter(and_(*filters))
+    if sorting:
+        try:
+            unencoded_sorting = urllib.parse.unquote(sorting)
+            sortingLoaded = json.loads(unencoded_sorting)
+            column_sorts: List[ColumnSort] = pydantic.TypeAdapter(
+                List[ColumnSort]
+            ).validate_python(sortingLoaded)
+        except (json.JSONDecodeError, pydantic.ValidationError) as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unable to fetch recently played tunes: Invalid sorting parameter: {e}",
+            )
+        for sort_spec in column_sorts:
+            column = getattr(t_practice_list_staged.c, sort_spec.id, None)
+            if column is not None:
+                query = query.order_by(
+                    column.desc() if sort_spec.desc else column.asc()
+                )
+    return query
+
+
+@router.get(
+    "/get_tune_staged/{user_id}/{playlist_ref}/{tune_id}",
+    response_model=PracticeListStagedModel | None,
+    description="Retrieve a repertoire tune for a user and playlist.",
+)
 async def get_tune_staged(
     user_id: str, playlist_ref: str, tune_id: str
-) -> List[dict[str, Any]] | dict[str, str]:
+) -> PracticeListStagedModel | None:
     try:
         with SessionLocal() as db:
-            tunes_recently_played: List[Tune] = query_tune_staged(
-                db,
-                user_ref=int(user_id),
-                playlist_ref=int(playlist_ref),
-                tune_id=int(tune_id),
+            query = db.query(t_practice_list_staged).filter(
+                and_(
+                    t_practice_list_staged.c.id == tune_id,
+                    t_practice_list_staged.c.user_ref == user_id,
+                    t_practice_list_staged.c.playlist_id == playlist_ref,
+                )
             )
-            tune_list = [
-                tunes_mapper(tune, t_practice_list_staged)
-                for tune in tunes_recently_played
-            ]
-            return tune_list
+
+            tune = query.first()
+            return tune
     except Exception as e:
-        return {"error": f"Unable to fetch recently played tunes: {e}"}
+        logger.error(f"Unable to fetch tune: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
 
 
 @router.post("/practice/submit_feedback")

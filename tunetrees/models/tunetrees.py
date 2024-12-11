@@ -96,9 +96,9 @@ t_practice_list_staged = Table(
     Column("backup_practiced", Text),
     Column("tags", Text),
     Column("purpose", Text),
-    Column("staged_notes_private", Text),
-    Column("staged_notes_public", Text),
-    Column("staged_recall_eval", Text),
+    Column("note_private", Text),
+    Column("note_public", Text),
+    Column("recall_eval", Text),
     Column("notes", NullType),
     Column("favorite_url", Text),
 )
