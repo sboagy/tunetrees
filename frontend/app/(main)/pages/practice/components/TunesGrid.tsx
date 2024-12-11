@@ -204,8 +204,8 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           ref={tableBodyRef}
           className="flex-grow overflow-y-auto"
           style={{
-            minHeight: "calc(104vh - 270px - 100px)",
-            maxHeight: "calc(104vh - 270px - 100px)",
+            minHeight: "calc(104vh - 270px - 50x)",
+            maxHeight: "calc(104vh - 270px - 50px)",
             WebkitOverflowScrolling: "touch",
           }}
         >
@@ -241,7 +241,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
                     ))}
                   </TableRow>
                 ))}
-              </TableHeader>{" "}
+              </TableHeader>
               <TableBody
                 style={{
                   display: "block",
