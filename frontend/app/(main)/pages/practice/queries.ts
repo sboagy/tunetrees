@@ -1,6 +1,7 @@
 "use server";
 
 import { parseParamsWithArrays } from "@/lib/utils";
+import type { SortingState } from "@tanstack/react-table";
 import axios from "axios";
 import { ERROR_TUNE } from "./mocks";
 import type {
@@ -45,12 +46,23 @@ export async function getRepertoireTunesOverview(
   userId: number,
   playlistId: number,
   showDeleted = false,
+  sortingState: SortingState | null = null,
+  skip = 0,
+  limit = 10000,
 ): Promise<ITuneOverview[]> {
   try {
+    const sortingStateSerialized = sortingState
+      ? encodeURIComponent(JSON.stringify(sortingState))
+      : null;
     const response = await client.get<ITuneOverview[]>(
       `/repertoire_tunes_overview/${userId}/${playlistId}`,
       {
-        params: { show_playlist_deleted: showDeleted },
+        params: {
+          show_playlist_deleted: showDeleted,
+          sorting: sortingStateSerialized,
+          skip,
+          limit,
+        },
       },
     );
     return response.data;

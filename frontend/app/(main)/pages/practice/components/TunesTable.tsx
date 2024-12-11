@@ -25,6 +25,8 @@ import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
 import { get_columns } from "./TuneColumns";
 
+export const globalFlagManualSorting = false;
+
 export interface IScheduledTunesType {
   tunes: ITuneOverview[];
   userId: number;
@@ -175,6 +177,7 @@ export function TunesTableComponent({
     data: tunes,
     columns: columns,
     globalFilterFn: "auto",
+    manualSorting: globalFlagManualSorting,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
@@ -311,6 +314,7 @@ export function TunesTableComponent({
 
   const interceptedSetSorting = (
     newSorting: SortingState | ((state: SortingState) => SortingState),
+    setTunesRefreshId?: (newRefreshId: number) => void,
   ): void => {
     const resolvedSorting: SortingState =
       newSorting instanceof Function ? newSorting(sorting) : newSorting;
@@ -332,6 +336,9 @@ export function TunesTableComponent({
           "LF1 interceptedSetSorting, call to updateTableStateInDb: result=",
           result ? "success" : "empty result",
         );
+        if (setTunesRefreshId) {
+          setTunesRefreshId(0);
+        }
         return result;
       })
       .catch((error) => {
@@ -368,7 +375,8 @@ export function TunesTableComponent({
 
   table.setOptions((prev) => ({
     ...prev,
-    onSortingChange: interceptedSetSorting,
+    onSortingChange: (newSorting) =>
+      interceptedSetSorting(newSorting, setTunesRefreshId),
     onColumnFiltersChange: interceptedOnColumnFiltersChange,
     onRowSelectionChange: interceptedRowSelectionChange,
     onColumnVisibilityChange: interceptedSetColumnVisibility,

@@ -3,13 +3,6 @@
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { CheckedState } from "@radix-ui/react-checkbox";
 import type {
   CellContext,
@@ -20,14 +13,7 @@ import type {
   SortingFn,
   Table as TanstackTable,
 } from "@tanstack/react-table";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Columns,
-  EyeOff,
-  Filter,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useState } from "react";
 import { updateTableStateInDb } from "../settings";
 import type {
@@ -38,47 +24,54 @@ import type {
 import "./TuneColumns.css";
 import { saveTableState } from "./TunesTable";
 
-function columnControlMenu() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="p-1">
-          {" "}
-          <span className="font-bold text-opacity-100">&#8942;</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        {/* <DropdownMenuLabel>Column Control</DropdownMenuLabel> */}
-        <DropdownMenuItem>
-          <ArrowUp size={16} className="column-menu-icon-style" />
-          <span>Sort ascending</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <ArrowDown size={16} className="column-menu-icon-style" />
-          <span>Sort descending</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <ArrowUpDown size={16} className="column-menu-icon-style" />
-          <span>Unsort</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <Filter size={16} className="column-menu-icon-style" />
-          <span>Filter...</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <EyeOff size={16} className="column-menu-icon-style" />
-          <span>Hide Column</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Columns size={16} className="column-menu-icon-style" />
-          <span>Manage Columns...</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+// =================================================================================================
+// For now, I'm going to feature-down the column control menu, as it's going to be more complex than
+// I need to maintain column filters, sync the menu sort state with visible arrows, etc.  Also, it's
+// less cluttered without them.  For filters, might be better to just have a qualifier that one can type
+// in the global filter box.
+//
+// function columnControlMenu() {
+//   return (
+//     <DropdownMenu>
+//       <DropdownMenuTrigger asChild>
+//         <Button variant="ghost" className="p-1">
+//           {" "}
+//           <span className="font-bold text-opacity-100">&#8942;</span>
+//         </Button>
+//       </DropdownMenuTrigger>
+//       <DropdownMenuContent>
+//         {/* <DropdownMenuLabel>Column Control</DropdownMenuLabel> */}
+//         <DropdownMenuItem>
+//           <ArrowUp size={16} className="column-menu-icon-style" />
+//           <span>Sort ascending</span>
+//         </DropdownMenuItem>
+//         <DropdownMenuItem>
+//           <ArrowDown size={16} className="column-menu-icon-style" />
+//           <span>Sort descending</span>
+//         </DropdownMenuItem>
+//         <DropdownMenuItem>
+//           <ArrowUpDown size={16} className="column-menu-icon-style" />
+//           <span>Unsort</span>
+//         </DropdownMenuItem>
+//         {/* <DropdownMenuSeparator />
+//         <DropdownMenuItem>
+//           <Filter size={16} className="column-menu-icon-style" />
+//           <span>Filter...</span>
+//         </DropdownMenuItem>
+//         <DropdownMenuSeparator />
+//         <DropdownMenuItem>
+//           <EyeOff size={16} className="column-menu-icon-style" />
+//           <span>Hide Column</span>
+//         </DropdownMenuItem>
+//         <DropdownMenuItem>
+//           <Columns size={16} className="column-menu-icon-style" />
+//           <span>Manage Columns...</span>
+//         </DropdownMenuItem> */}
+//       </DropdownMenuContent>
+//     </DropdownMenu>
+//   );
+// }
+// =================================================================================================
 
 const datetimeTextSortingFn: SortingFn<ITuneOverview> = (
   rowA: Row<ITuneOverview>,
@@ -122,6 +115,13 @@ function sortableHeader<TData, TValue>(
           rotateSorting(column);
           setRenderKey((prev) => prev + 1); // Force button re-render, special magic
         }}
+        title={
+          column.getIsSorted() === "asc"
+            ? "Ascending column sort"
+            : column.getIsSorted() === "desc"
+              ? "Descending column sort"
+              : "Column not sorted"
+        } // For screen readers
       >
         {column.getIsSorted() === "asc" ? (
           <ArrowUp size={16} className="flex-shrink-0 column-icon-style" />
@@ -131,7 +131,8 @@ function sortableHeader<TData, TValue>(
           <ArrowUpDown size={16} className="flex-shrink-0 column-icon-style" />
         )}
       </Button>
-      {columnControlMenu()}
+      {/* See coment above about not doing a column menu, for now. */}
+      {/* {columnControlMenu()} */}
     </div>
   );
 }

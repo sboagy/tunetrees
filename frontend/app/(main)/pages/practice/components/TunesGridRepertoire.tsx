@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import ColumnsMenu from "./ColumnsMenu";
-import { useTunesTable } from "./TunesTable"; // Add this import
+import { globalFlagManualSorting, useTunesTable } from "./TunesTable"; // Add this import
 
 import { Input } from "@/components/ui/input";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
@@ -15,8 +15,12 @@ import type {
 import { BetweenHorizontalEnd } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
 import { getRepertoireTunesOverview } from "../queries";
-import { fetchFilterFromDB, updateTableStateInDb } from "../settings";
-import type { ITuneOverview } from "../types";
+import {
+  fetchFilterFromDB,
+  getTableStateTable,
+  updateTableStateInDb,
+} from "../settings";
+import type { ITableStateTable, ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
 import NewTuneButton from "./NewTuneButton";
@@ -68,6 +72,7 @@ export default function TunesGridRepertoire({
   // used to compare to tunesRefreshId to trigger a refresh of the tunes when it changes.
   const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =
     useRepertoireTunes();
+
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
 
   // Due to the asynchronous nature of setTunesRefreshId, the state update may not
@@ -80,10 +85,24 @@ export default function TunesGridRepertoire({
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
+        // Given the sequence, since table isn't really created yet, not sure how
+        // to better keep the sorting state up to date.  A bit of a chcken and egg
+        // problem.  So, for now, just get the sorting state from the database every
+        // time.  We'll see if this can be optimized later.  There may be some other
+        // state that will have the same problem, like column filters, so, probably
+        // best to wait until functionaly complete before trying to optimize.
+        let sortingState = null;
+        if (globalFlagManualSorting) {
+          const tableStateTable: ITableStateTable | null =
+            await getTableStateTable(userId, "full", "repertoire", playlistId);
+          sortingState =
+            (tableStateTable?.settings as TableState)?.sorting ?? null;
+        }
         const result: ITuneOverview[] = await getRepertoireTunesOverview(
           userId,
           playlistId,
           showDeleted,
+          sortingState,
         );
         setTunesRefreshId(refreshId);
         setTunes(result);

@@ -6,7 +6,7 @@ interface IRepertoireTunesContextType {
   tunes: ITuneOverview[];
   setTunes: React.Dispatch<React.SetStateAction<ITuneOverview[]>>;
   tunesRefreshId: number | null;
-  setTunesRefreshId: (newRefreshId: number) => void;
+  setTunesRefreshId: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
 const TunesContextRepertoire = createContext<
@@ -23,7 +23,12 @@ export const TunesProviderRepertoire = ({
 
   return (
     <TunesContextRepertoire.Provider
-      value={{ tunes, setTunes, tunesRefreshId, setTunesRefreshId }}
+      value={{
+        tunes,
+        setTunes,
+        tunesRefreshId,
+        setTunesRefreshId,
+      }}
     >
       {children}
     </TunesContextRepertoire.Provider>
