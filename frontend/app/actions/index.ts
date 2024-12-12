@@ -1,13 +1,10 @@
 "use server";
 
-import { signIn, signOut } from "@/auth";
+import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 
 export async function doSocialLogin(formData: FormData) {
   const action = formData.get("action");
-  //   if (action === null){
-  //     throw Error("No action provided");
-  //   }
   try {
     return await signIn(action as string, { redirectTo: "/home" });
   } catch (error) {
@@ -17,14 +14,4 @@ export async function doSocialLogin(formData: FormData) {
     console.error(error);
     throw error;
   }
-}
-
-export async function doLogout() {
-  await signOut({ redirectTo: "/" });
-}
-
-export async function doSignOut() {
-  // const session = await auth();
-  console.log("Handling SignOut request");
-  await signOut();
 }

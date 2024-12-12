@@ -13,19 +13,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import axios from "axios";
 import Image from "next/image";
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+
 import type { JSX } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { emailSchema } from "../auth-types";
 import { authorizeWithPassword } from "../password-login-only/validate-signin";
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-function LoginDialog(props: any): JSX.Element {
-  let email = props.searchParams.email || "";
-  if (email === "" && typeof window !== "undefined") {
-    const searchParams = new URLSearchParams(window.location.search);
-    email = searchParams.get("email") || email;
-  }
+function LoginDialog(): JSX.Element {
+  const searchParams = useSearchParams();
+  const email = searchParams.get("email") || "";
 
   const [userEmail, setUserEmail] = useState(email);
   const [password, setPassword] = useState("");

@@ -1,6 +1,6 @@
 "use client";
-import { doSignOut } from "@/app/actions";
 import { signIn } from "auth";
+import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation"; // Use the next/navigation module for client-side navigation
 import { Button } from "./ui/button";
 
@@ -72,18 +72,21 @@ export function DemoUser(props: React.ComponentPropsWithRef<typeof Button>) {
 export function SignOut(props: React.ComponentPropsWithRef<typeof Button>) {
   console.log("Constructing the SignOut button");
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleClick = () => {
     console.log("Handling SignOut request");
-    void doSignOut();
+    signOut()
+      .then((result) => {
+        console.log("SignOut result", result);
+      })
+      .catch((error) => {
+        console.error("SignOut error", error);
+      });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="w-full">
-      <Button variant="ghost" {...props}>
-        Sign Out
-      </Button>
-    </form>
+    <Button variant="ghost" onClick={handleClick} {...props}>
+      Sign Out
+    </Button>
   );
 }
 
