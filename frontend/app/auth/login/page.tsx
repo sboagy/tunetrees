@@ -110,7 +110,7 @@ function LoginDialog(): JSX.Element {
             <div className="flex justify-center mb-4">
               <Image
                 src="/logo4.png"
-                alt="Company Logo"
+                alt="TuneTrees Logo"
                 width={64}
                 height={64}
                 priority
