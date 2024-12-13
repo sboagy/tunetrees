@@ -75,9 +75,9 @@ export default function PlaylistChooser() {
           setCurrentPlaylistName(playlist.instrument ?? "NULL INSTRUMENT");
           setCurrentPlaylistDescription(playlist.description ?? "");
         } else {
-          console.error("Playlist not found in playlists array!");
-          setCurrentPlaylistName("??? INSTRUMENT ???");
-          setCurrentPlaylistDescription("");
+          console.log("Playlist not found in playlists array!");
+          // setCurrentPlaylistName("??? INSTRUMENT ???");
+          // setCurrentPlaylistDescription("");
         }
       } else {
         console.error("playlists should be an array!");
