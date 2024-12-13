@@ -5,10 +5,10 @@ export const accountFormSchema = z
     csrfToken: z
       .string()
       .min(2, {
-        message: "User Name must be at least 2 characters.",
+        message: "csrfToken must be at least 2 characters.",
       })
       .max(30, {
-        message: "User Name must not be longer than 30 characters.",
+        message: "csrfToken must not be longer than 30 characters.",
       }),
     // username: z
     //     .string()

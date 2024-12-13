@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 
 import Image from "next/image";
@@ -19,13 +19,12 @@ import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 // import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type ControllerRenderProps, useForm } from "react-hook-form";
 
 // import { cookies } from "next/headers";
 import {
   type AccountFormValues,
   accountFormSchema,
-  defaultValues,
 } from "@/app/auth/newuser/account-form";
 import { providerMap } from "@/auth";
 import { SocialLoginButtons } from "@/components/AuthSocialLogin";
@@ -57,12 +56,23 @@ const languages = [
 
 // const _crsfToken = client
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-export default function SignInPage(props: any): JSX.Element {
-  let email = props.searchParams.email || "";
+export default function SignInPage(): JSX.Element {
+  const searchParams = useSearchParams();
+  let email = searchParams.get("email") || "";
+
+  // Move the _crsfToken declaration here
+  const [_crsfToken, setCrsfToken] = useState("abcdef");
+  console.log("SignInPage(): setCrsfToken:", setCrsfToken);
+
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
-    defaultValues,
+    defaultValues: {
+      email: email || "", // Ensure email has an initial value
+      password: "", // Add initial value for password
+      password_confirmation: "", // Add initial value for password_confirmation
+      name: "", // Add initial value for name
+      csrfToken: _crsfToken || "", // Add initial value for csrfToken if needed
+    },
   });
 
   if (email === "" && typeof window !== "undefined") {
@@ -70,15 +80,11 @@ export default function SignInPage(props: any): JSX.Element {
     email = searchParams.get("email") || email;
   }
 
-  const [userEmail, setUserEmail] = useState(email);
-  const [password, setPassword] = useState("");
-  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordConfirmationError, setPasswordConfirmationError] = useState<
     string | null
   >(null);
-  const [userName, setUserName] = useState("");
 
   const validateEmail = useCallback((email: string): boolean => {
     if (email === "") {
@@ -98,22 +104,31 @@ export default function SignInPage(props: any): JSX.Element {
   }, []);
 
   useEffect(() => {
-    validateEmail(email);
-  }, [email, validateEmail]);
+    validateEmail(form.getValues("email"));
+  }, [form, validateEmail]);
 
-  const handleEmailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEmailChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "email">,
+  ) => {
     const newEmail = e.target.value;
-    setUserEmail(newEmail);
+    console.log("handleEmailChange: email:", newEmail);
+    field.onChange(e); // Update the form state
     validateEmail(newEmail);
 
-    const user = await getUser(newEmail);
-    if (user) {
-      setEmailError("Email already in use");
+    if (newEmail) {
+      const user = await getUser(newEmail);
+      if (user) {
+        setEmailError("Email already in use");
+      } else {
+        setEmailError(null);
+      }
     }
-    form.setValue("email", newEmail);
   };
 
-  function check_password(pw: string, pwc: string) {
+  function check_password() {
+    const pw = form.getValues("password");
+    const pwc = form.getValues("password_confirmation");
     if (!pw || !pwc) {
       setPasswordError(null);
       setPasswordConfirmationError(null);
@@ -126,81 +141,52 @@ export default function SignInPage(props: any): JSX.Element {
     }
   }
 
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const pw = e.target.value;
-    setPassword(pw);
-    check_password(pw, passwordConfirmation);
+  const handlePasswordChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "password">,
+  ) => {
+    console.log("handlePasswordChange: password:", e.target.value);
+    field.onChange(e); // Update the form state
+    check_password();
     void form.trigger("password");
-    form.setValue("password", pw);
-    // form.trigger("password");
   };
 
   const handlePasswordConfirmationChange = (
     e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "password_confirmation">,
   ) => {
-    const pwc = e.target.value;
-    setPasswordConfirmation(pwc);
-    check_password(password, pwc);
-    form.setValue("password_confirmation", pwc);
-    // form.trigger("password_confirmation");
+    console.log(
+      "handlePasswordConfirmationChange: password_confirmation:",
+      e.target.value,
+    );
+    field.onChange(e); // Update the form state
+    check_password();
   };
 
-  const handleUserNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const userNameValue = e.target.value;
-    setUserName(userNameValue);
-    form.setValue("name", userNameValue);
-    // form.trigger("password_confirmation");
+  const handleUserNameChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "name">,
+  ) => {
+    console.log("handleUserNameChange: name:", e.target.value);
+    field.onChange(e); // Update the form state
   };
 
-  // if I don't get the router via useState, I get a huge error,
-  // but, I don't need or want to call setRouter, so this seems
-  // really goofy.  There must be a better way.
-  const [router, setRouter] = useState(useRouter());
-  console.log("SignInPage(): setRouter: ", setRouter);
+  // Use useRouter directly
+  const router = useRouter();
 
-  const onSubmit = useCallback(
-    async (data: AccountFormValues) => {
-      const host = window.location.host;
-      // const response = await fetch("/api/user", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ data, host }),
-      // });
+  // Define onSubmit as a regular async function
+  const onSubmit = async (data: AccountFormValues) => {
+    console.log("onSubmit called with data:", data);
+    const host = window.location.host;
 
-      const result = await newUser(data, host);
+    const result = await newUser(data, host);
+    console.log(result);
 
-      // const result = await response.json();
-      console.log(result);
-
-      router.push("/auth/verify-request");
-
-      // Redirect to a success page or handle the result as needed
-      // redirect("/auth/verify-request");
-    },
-    [router],
-  );
-
-  // function onSubmit(data: AccountFormValues) {
-  //   console.log("In onSubmit in the newuser page", { data });
-  //   toast({
-  //     title: "You submitted the following values:",
-  //     description: (
-  //       <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-  //         <code className="text-white">{JSON.stringify(data, null, 2)}</code>
-  //       </pre>
-  //     ),
-  //   });
-  // }
-
-  // const { data: session } = useSession
-  // console.log("SignInPage(): session
-  // console.log("SignInPage(): session
-  // console.log("SignInPage(): session
-  // console.log("SignInPage(): session
+    router.push("/auth/verify-request");
+  };
 
   // let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
-  const [_crsfToken, setCrsfToken] = useState("abcdef");
-  console.log("SignInPage(): setCrsfToken:", setCrsfToken);
+  console.log("SignInPage(): csrfToken: %s", _crsfToken);
 
   // useEffect(() => {
   //   const fetchCrsfToken = async () => {
@@ -215,7 +201,6 @@ export default function SignInPage(props: any): JSX.Element {
 
   //   fetchCrsfToken();
   // }, []);
-  console.log("SignInPage(): csrfToken: %s", _crsfToken);
 
   return (
     <div className="flex items-center justify-center mb-0 mt-20">
@@ -239,7 +224,9 @@ export default function SignInPage(props: any): JSX.Element {
         <CardContent>
           <Form {...form}>
             <form
-              onSubmit={void form.handleSubmit(onSubmit)}
+              onSubmit={(e) => {
+                void form.handleSubmit(onSubmit)(e);
+              }}
               className="space-y-6"
             >
               <FormField
@@ -267,7 +254,7 @@ export default function SignInPage(props: any): JSX.Element {
                       <Input
                         placeholder="person@example.com"
                         {...field}
-                        onChange={void handleEmailChange}
+                        onChange={(e) => void handleEmailChange(e, field)}
                       />
                     </FormControl>
                     {/* <FormDescription>
@@ -299,7 +286,7 @@ export default function SignInPage(props: any): JSX.Element {
                         placeholder="password"
                         autoComplete="new-password"
                         {...field}
-                        onChange={handlePasswordChange}
+                        onChange={(e) => handlePasswordChange(e, field)}
                       />
                     </FormControl>
                     {/* <FormDescription>
@@ -331,7 +318,9 @@ export default function SignInPage(props: any): JSX.Element {
                         placeholder="repeat password"
                         autoComplete="new-password"
                         {...field}
-                        onChange={handlePasswordConfirmationChange}
+                        onChange={(e) =>
+                          handlePasswordConfirmationChange(e, field)
+                        }
                       />
                     </FormControl>
                     {/* <FormDescription>
@@ -356,7 +345,7 @@ export default function SignInPage(props: any): JSX.Element {
                       <Input
                         placeholder="Your name"
                         {...field}
-                        onChange={handleUserNameChange}
+                        onChange={(e) => handleUserNameChange(e, field)}
                       />
                     </FormControl>
                     {/* <FormDescription>
@@ -374,10 +363,10 @@ export default function SignInPage(props: any): JSX.Element {
                   !!emailError ||
                   !!passwordError ||
                   !!passwordConfirmationError ||
-                  !password ||
-                  !passwordConfirmation ||
-                  !userEmail ||
-                  !userName
+                  !form.getValues("password") ||
+                  !form.getValues("password_confirmation") ||
+                  !form.getValues("email") ||
+                  !form.getValues("name")
                 }
                 className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
               >

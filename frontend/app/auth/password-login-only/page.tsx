@@ -11,23 +11,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import axios from "axios";
 import Image from "next/image";
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+
+import { zodResolver } from "@hookform/resolvers/zod";
 import type { JSX } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Controller,
+  type ControllerRenderProps,
+  useForm,
+} from "react-hook-form";
 import { emailSchema } from "../auth-types";
-import { authorizeWithPassword } from "./validate-signin";
+import { type LoginFormValues, loginFormSchema } from "../login/login-form";
+import { authorizeWithPassword, getUser } from "./validate-signin"; // Import getUser function
 
-// export default function LoginDialog({ email = "" }: ILoginDialogProps) {
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-export default function LoginDialog(props: any): JSX.Element {
-  let email = props.searchParams.email || "";
-  if (email === "" && typeof window !== "undefined") {
-    const searchParams = new URLSearchParams(window.location.search);
-    email = searchParams.get("email") || email;
-  }
+export default function LoginDialog(): JSX.Element {
+  const searchParams = useSearchParams();
 
-  const [userEmail, setUserEmail] = useState(email);
+  // Initialize userEmail state
+  const [userEmail, setUserEmail] = useState<string>("");
+
+  const [_crsfToken, setCrsfToken] = useState("abcdef");
+  console.log("SignInPage(): setCrsfToken:", setCrsfToken);
+
+  // Fetch email from searchParams asynchronously
+  useEffect(() => {
+    const emailParam = searchParams.get("email") || "";
+    setUserEmail(emailParam);
+    console.log("Extracted email from searchParams:", emailParam);
+  }, [searchParams]);
+
   const [password, setPassword] = useState("");
+  const [csrfToken, setCsrfToken] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
@@ -43,45 +58,80 @@ export default function LoginDialog(props: any): JSX.Element {
   }, []);
 
   useEffect(() => {
-    validateEmail(email);
-  }, [email, validateEmail]);
+    validateEmail(userEmail);
+  }, [userEmail, validateEmail]);
 
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginFormSchema),
+    defaultValues: {
+      email: "", // Start with empty string
+      password: "",
+      csrfToken: _crsfToken || "", // Add initial value for csrfToken if needed
+    },
+  });
+
+  // Update the form's email field when userEmail state changes
+  useEffect(() => {
+    form.setValue("email", userEmail);
+  }, [userEmail, form]);
+
+  const handleEmailChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<LoginFormValues, "email">,
+  ) => {
     const newEmail = e.target.value;
-    setUserEmail(newEmail);
+    console.log("handleEmailChange: email:", newEmail);
+    field.onChange(e); // Update the form state
+    setUserEmail(newEmail); // Update userEmail state
     validateEmail(newEmail);
+
+    if (newEmail) {
+      const user = await getUser(newEmail);
+      if (!user) {
+        setEmailError("User not found");
+      } else {
+        setEmailError(null);
+      }
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmitOnInvalid = async (
+    errors: object,
+    // e?: Event,
+  ): Promise<void> => {
+    console.log("onSubmitInvalid called with errors:", errors);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+
+  const onSubmitHandler = async (data: LoginFormValues): Promise<void> => {
+    console.log("onSubmit called with data:", data);
     if (validateEmail(userEmail)) {
-      // Handle login logic here
-      console.log("Sign in attempt with:", { user_email: userEmail, password });
+      console.log("Sign in attempt with:", {
+        user_email: userEmail,
+        password: data.password,
+        csrfToken: data.csrfToken,
+      });
       try {
-        // const user = authorizeWithPassword(user_email, password);
-        const user = await authorizeWithPassword(userEmail, password);
+        const user = await authorizeWithPassword(userEmail, data.password);
         if (!user) {
           setPasswordError("Sign in failed");
         } else {
           console.log("Sign in successful");
-          // Redirect to the home page
           if (typeof window !== "undefined") {
             const response = await axios.get("/api/verify-user", {
               params: {
                 email: userEmail,
-                password: password,
+                password: data.password,
               },
             });
             console.log("verify-user response:", response);
             if (response.status === 200) {
-              // Redirect to the home page
               window.location.href = "/";
             } else {
               setPasswordError(response.statusText);
               console.log("Could not sign in user");
             }
           } else {
-            // Hopefully this never happens??
             setPasswordError("Problem redirecting to home page");
             console.log("Sign in successful, but window is undefined");
           }
@@ -90,9 +140,6 @@ export default function LoginDialog(props: any): JSX.Element {
         setPasswordError(`${(error as Error).message}`);
         console.error((error as Error).message);
       }
-
-      // TODO: Implement password check and authorization logic, then redirect
-      // to the to the home page.
     }
   };
 
@@ -113,18 +160,37 @@ export default function LoginDialog(props: any): JSX.Element {
             <CardTitle className="text-2xl text-center">Sign in</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-6">
-            <form onSubmit={void handleSubmit} className="space-y-6">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                form
+                  .handleSubmit(onSubmitHandler, onSubmitOnInvalid)()
+                  .then(() => {
+                    console.log("Form submitted");
+                  })
+                  .catch((error) => {
+                    console.error("Form submission error:", error);
+                  });
+              }}
+              className="space-y-6"
+            >
               <div className="space-y-2">
                 <Label htmlFor="user_email">Email</Label>
-                <Input
-                  id="user_email"
-                  name="user_email"
-                  type="email"
-                  placeholder="m@example.com"
-                  value={userEmail}
-                  onChange={handleEmailChange}
-                  required
-                  className={emailError ? "border-red-500" : ""}
+                <Controller
+                  name="email"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Input
+                      id="user_email"
+                      name="user_email"
+                      type="email"
+                      placeholder="m@example.com"
+                      value={userEmail}
+                      onChange={(e) => void handleEmailChange(e, field)}
+                      required
+                      className={emailError ? "border-red-500" : ""}
+                    />
+                  )}
                 />
                 {emailError && (
                   <p className="text-red-500 text-sm" role="alert">
@@ -134,14 +200,23 @@ export default function LoginDialog(props: any): JSX.Element {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
+                <Controller
                   name="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoFocus
-                  required
+                  control={form.control}
+                  render={({ field }) => (
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        field.onChange(e);
+                      }}
+                      autoFocus
+                      required
+                    />
+                  )}
                 />
                 {passwordError && (
                   <p className="text-red-500 text-sm" role="alert">
@@ -149,18 +224,45 @@ export default function LoginDialog(props: any): JSX.Element {
                   </p>
                 )}
               </div>
+              <Controller
+                name="csrfToken"
+                control={form.control}
+                render={({ field }) => (
+                  <Input
+                    type="hidden"
+                    value={csrfToken}
+                    onChange={(e) => {
+                      setCsrfToken(e.target.value);
+                      field.onChange(e);
+                    }}
+                  />
+                )}
+              />
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={
+                  !!emailError ||
+                  !!passwordError ||
+                  !password ||
+                  !form.getValues("email")
+                }
+                className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
+              >
+                Sign In
+              </Button>
             </form>
           </CardContent>
           <CardFooter>
-            <Button
-              className="w-full"
-              type="submit"
-              onClick={void handleSubmit}
-              disabled={!!emailError}
-              variant="outline"
-            >
-              Sign In
-            </Button>
+            {/* <Button
+                className="w-full"
+                type="submit"
+                onClick={void handleSubmit}
+                disabled={!!emailError}
+                variant="outline"
+              >
+                Sign In
+              </Button> */}
           </CardFooter>
         </Card>
       </div>

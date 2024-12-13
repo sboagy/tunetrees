@@ -93,22 +93,18 @@ export const providers: Provider[] = [
         type: "password",
       },
     },
-    async authorize(credentials, req) {
-      //   assertIsDefined(ttHttpAdapter.getUserByEmail);
-
-      const email = credentials.email as string;
+    async authorize(
+      credentials: Partial<Record<"email" | "password", unknown>>,
+      request: Request,
+    ) {
+      // Use credentials object directly instead of URL search params
+      const email: string | undefined | unknown = credentials?.email;
 
       if (!email) {
         throw new Error("Empty Email.");
       }
 
-      // const secret = process.env.NEXTAUTH_SECRET;
-
-      // Unfortunately, this will strip off the hash
-      // let user = await ttHttpAdapter.getUserByEmail(email);
-
-      // So instead we use a customized variant
-      const user = await getUserExtendedByEmail(email);
+      const user = await getUserExtendedByEmail(email as string);
 
       // psuedo-logic:
       // is there any password set?  (if not, then this is a new user, goto "no" below, but with
@@ -135,24 +131,30 @@ export const providers: Provider[] = [
       // 2. How to set that message?  Do we need to go back to trying to get a custom
       //    signin page to work?
 
-      const host = req.headers.get("host");
+      const host = request.headers.get("host");
 
       if (!user) {
         // No user found, so this is their first attempt to login
         // meaning this is also the place we can do registration
         // ...If you return null then an error will be displayed advising the user to check their details.
+
+        // Do a magic check to see if this is a test email address, and if so, send the email to me.
+        const toEmail = (email as string).includes("test658.com")
+          ? "sboagy@gmail.com"
+          : (email as string);
+
         await sendGrid({
-          to: email,
+          to: toEmail,
           from: "admin@tunetrees.com",
           subject: "Email Verification",
           html: verification_mail_html({
-            url: `https://${host}/verify?email=${email}`,
+            url: `https://${host}/verify?email=${email as string}`,
             host: `https://${host}`,
             // theme: { colorScheme: "auto", logo: "/logo4.png" },
             theme: { brandColor: "auto", buttonText: "Verify Email" },
           }),
           text: verification_mail_text({
-            url: `https://${host}/verify?email=${email}`,
+            url: `https://${host}/verify?email=${email as string}`,
             host: `https://${host}:3000`,
           }),
           dynamicTemplateData: {
