@@ -916,12 +916,10 @@ def delete_tune(
 )
 def get_playlists(
     user_ref: int = Query(..., description="User reference ID"),
-):
+) -> List[PlaylistModel]:
     try:
         with SessionLocal() as db:
             playlists = db.query(Playlist).filter(Playlist.user_ref == user_ref).all()
-            if not playlists:
-                raise HTTPException(status_code=404, detail="Playlists not found")
             return [PlaylistModel.model_validate(playlist) for playlist in playlists]
     except Exception as e:
         logger.error(f"Unable to fetch playlists: {e}")
