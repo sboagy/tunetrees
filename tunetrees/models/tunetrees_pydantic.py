@@ -127,6 +127,7 @@ class UserModel(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class UserModelPartial(BaseModel):
@@ -148,6 +149,7 @@ class UserModelPartial(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class VerificationTokenModel(BaseModel):
@@ -157,6 +159,7 @@ class VerificationTokenModel(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class VerificationTokenModelPartial(BaseModel):
@@ -166,6 +169,7 @@ class VerificationTokenModelPartial(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class AccountModel(BaseModel):
@@ -183,6 +187,7 @@ class AccountModel(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class AccountModelPartial(BaseModel):
@@ -200,6 +205,7 @@ class AccountModelPartial(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class ExternalRefModel(BaseModel):
@@ -210,6 +216,7 @@ class ExternalRefModel(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class ExternalRefModelPartial(BaseModel):
@@ -220,6 +227,7 @@ class ExternalRefModelPartial(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class PlaylistModel(BaseModel):
@@ -257,6 +265,7 @@ class PrefsSpacedRepetitionModel(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class PrefsSpacedRepetitionModelPartial(BaseModel):
@@ -268,6 +277,7 @@ class PrefsSpacedRepetitionModelPartial(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class SessionModel(BaseModel):
@@ -277,6 +287,7 @@ class SessionModel(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class SessionModelPartial(BaseModel):
@@ -286,6 +297,7 @@ class SessionModelPartial(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class TabGroupMainStateModel(BaseModel):
@@ -360,6 +372,7 @@ class UserAnnotationSetModel(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class UserAnnotationSetModelPartial(BaseModel):
@@ -372,6 +385,7 @@ class UserAnnotationSetModelPartial(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class PracticeRecordModel(BaseModel):
@@ -392,6 +406,7 @@ class PracticeRecordModel(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class PracticeRecordModelPartial(BaseModel):
@@ -412,6 +427,7 @@ class PracticeRecordModelPartial(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class TableTransientDataModel(BaseModel):
@@ -425,6 +441,7 @@ class TableTransientDataModel(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class TableTransientDataModelPartial(BaseModel):
@@ -438,6 +455,7 @@ class TableTransientDataModelPartial(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
 
 
 class NoteModel(BaseModel):
