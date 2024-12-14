@@ -120,8 +120,6 @@ export default function SignInPage(): JSX.Element {
       const user = await getUser(newEmail);
       if (user) {
         setEmailError("Email already in use");
-      } else {
-        setEmailError(null);
       }
     }
   };
@@ -252,9 +250,13 @@ export default function SignInPage(): JSX.Element {
                     <FormLabel>EMail</FormLabel>
                     <FormControl>
                       <Input
+                        type="email"
                         placeholder="person@example.com"
                         {...field}
                         onChange={(e) => void handleEmailChange(e, field)}
+                        required
+                        className={emailError ? "border-red-500" : ""}
+                        autoFocus
                       />
                     </FormControl>
                     {/* <FormDescription>

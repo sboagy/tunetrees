@@ -1,4 +1,5 @@
 "use client";
+
 import { providerMap } from "@/auth";
 import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 import { Button } from "@/components/ui/button";
@@ -9,23 +10,46 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-
 import type { JSX } from "react";
 import { useCallback, useEffect, useState } from "react";
+import { type ControllerRenderProps, useForm } from "react-hook-form";
 import { emailSchema } from "../auth-types";
 import { authorizeWithPassword } from "../password-login-only/validate-signin";
+import { type LoginFormValues, loginFormSchema } from "./login-form";
 
-function LoginDialog(): JSX.Element {
+// ...existing code...
+
+export default function LoginDialog(): JSX.Element {
   const searchParams = useSearchParams();
-  const email = searchParams.get("email") || "";
 
-  const [userEmail, setUserEmail] = useState(email);
+  // Initialize userEmail state
+  const [userEmail, setUserEmail] = useState<string>("");
+
+  // Fetch email from searchParams asynchronously
+  useEffect(() => {
+    const emailParam = searchParams.get("email") || "";
+    setUserEmail(emailParam);
+    console.log("Extracted email from searchParams:", emailParam);
+  }, [searchParams]);
+
   const [password, setPassword] = useState("");
+
+  const [_crsfToken, setCrsfToken] = useState("abcdef");
+  console.log("SignInPage(): setCrsfToken:", setCrsfToken);
+
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
@@ -46,59 +70,81 @@ function LoginDialog(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    validateEmail(email);
-  }, [email, validateEmail]);
+    validateEmail(userEmail);
+  }, [userEmail, validateEmail]);
 
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginFormSchema),
+    defaultValues: {
+      email: "", // Start with empty string
+      password: "",
+      csrfToken: _crsfToken || "", // Add initial value for csrfToken if needed
+      // csrfToken: "",
+    },
+  });
+
+  // Update the form's email field when userEmail state changes
+  useEffect(() => {
+    form.setValue("email", userEmail);
+  }, [userEmail, form]);
+
+  const handleEmailChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<LoginFormValues, "email">,
+  ): Promise<void> => {
     const newEmail = e.target.value;
-    setUserEmail(newEmail);
+    console.log("handleEmailChange: email:", newEmail);
+    field.onChange(e); // Update the form state
+    setUserEmail(newEmail); // Update userEmail state
     validateEmail(newEmail);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    // if (newEmail) {
+    //   const user = await getUser(newEmail);
+    //   if (!user) {
+    //     setEmailError("User not found");
+    //   } else {
+    //     setEmailError(null);
+    //   }
+    // }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: LoginFormValues) => {
+    console.log("onSubmit called with data:", data);
     if (validateEmail(userEmail)) {
-      // Handle login logic here
-      console.log("Sign in attempt with:", { user_email: userEmail, password });
-      authorizeWithPassword(userEmail, password)
-        .then((user) => {
-          if (!user) {
-            setPasswordError("Sign in failed");
-          } else {
-            console.log("Sign in successful");
-            // Redirect to the home page
-            if (typeof window !== "undefined") {
-              axios
-                .get("/api/verify-user", {
-                  params: {
-                    email: userEmail,
-                    password: password,
-                  },
-                })
-                .then((response) => {
-                  if (response.status === 200) {
-                    // Redirect to the home page
-                    window.location.href = "/";
-                  } else {
-                    setPasswordError(response.statusText);
-                    console.log("Could not sign in user");
-                  }
-                })
-                .catch((error) => {
-                  setPasswordError(`${error}`);
-                  console.error(error);
-                });
+      console.log("Sign in attempt with:", {
+        email: userEmail,
+        password: data.password,
+        csrfToken: data.csrfToken,
+      });
+      try {
+        const user = await authorizeWithPassword(userEmail, data.password);
+        if (!user) {
+          setPasswordError("Sign in failed");
+        } else {
+          console.log("Sign in successful");
+          if (typeof window !== "undefined") {
+            const response = await axios.get("/api/verify-user", {
+              params: {
+                email: userEmail,
+                password: data.password,
+              },
+            });
+            console.log("verify-user response:", response);
+            if (response.status === 200) {
+              window.location.href = "/";
             } else {
-              // Hopefully this never happens??
-              setPasswordError("Problem redirecting to home page");
-              console.log("Sign in successful, but window is undefined");
+              setPasswordError(response.statusText);
+              console.log("Could not sign in user");
             }
+          } else {
+            setPasswordError("Problem redirecting to home page");
+            console.log("Sign in successful, but window is undefined");
           }
-        })
-        .catch((error) => {
-          setPasswordError(`${error}`);
-          console.error(error);
-        });
+        }
+      } catch (error) {
+        setPasswordError(`${(error as Error).message}`);
+        console.error((error as Error).message);
+      }
     }
   };
 
@@ -119,58 +165,102 @@ function LoginDialog(): JSX.Element {
             <CardTitle className="text-2xl text-center">Sign in</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="user_email">Email</Label>
-                <Input
-                  id="user_email"
-                  name="user_email"
-                  type="email"
-                  placeholder="m@example.com"
-                  value={userEmail}
-                  onChange={handleEmailChange}
-                  required
-                  className={emailError ? "border-red-500" : ""}
+            <Form {...form}>
+              <form
+                onSubmit={(e) => {
+                  void form.handleSubmit(onSubmit)(e);
+                }}
+                className="space-y-6"
+              >
+                <FormField
+                  control={form.control}
+                  name="csrfToken"
+                  defaultValue={_crsfToken}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          placeholder="csrfToken"
+                          type="hidden"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          id="user_email"
+                          name="user_email"
+                          type="email"
+                          placeholder="person@example.com"
+                          value={userEmail}
+                          onChange={(e) => void handleEmailChange(e, field)}
+                          required
+                          className={emailError ? "border-red-500" : ""}
+                          autoFocus
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
                 {emailError && (
                   <p className="text-red-500 text-sm" role="alert">
                     {emailError}
                   </p>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
+                <FormField
+                  control={form.control}
                   name="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          id="password"
+                          name="password"
+                          type="password"
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            field.onChange(e);
+                          }}
+                          // autoFocus
+                          required
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
                 {passwordError && (
                   <p className="text-red-500 text-sm" role="alert">
                     {passwordError}
                   </p>
                 )}
-              </div>
-            </form>
-            <Button
-              className="w-full"
-              type="submit"
-              onClick={handleSubmit}
-              disabled={!!emailError}
-              variant="secondary"
-            >
-              Sign In
-            </Button>
-            <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
-              <div className="flex-1 bg-neutral-300 h-[1px]" />
-              <span className="text-xs leading-4 uppercase text-neutral-500">
-                or sign in with
-              </span>
-              <div className="flex-1 bg-neutral-300 h-[1px]" />
-            </div>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  disabled={
+                    !!emailError ||
+                    !!passwordError ||
+                    !password ||
+                    !form.getValues("email")
+                  }
+                  className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
+                >
+                  Sign In
+                </Button>
+              </form>
+            </Form>
           </CardContent>
           <CardFooter className="flex justify-between">
             {SocialLoginButtons(providerMap)}
@@ -180,5 +270,3 @@ function LoginDialog(): JSX.Element {
     </div>
   );
 }
-
-export default LoginDialog;
