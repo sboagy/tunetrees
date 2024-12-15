@@ -97,7 +97,7 @@ export const newUser = async (data: AccountFormValues, host: string) => {
   const emailTo = "sboagy@gmail.com";
 
   // const linkBackURL = `https://${host}/api/verify-user?email=${email}&password=${data.password}`;
-  const linkBackURL = `https://${host}/auth/password-login-only?email=${email}`;
+  const linkBackURL = `https://${host}/auth/login?email=${email}`;
 
   const sendGridResponse = await sendGrid({
     to: emailTo,

@@ -27,8 +27,8 @@ import type { JSX } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { type ControllerRenderProps, useForm } from "react-hook-form";
 import { emailSchema } from "../auth-types";
-import { authorizeWithPassword } from "../password-login-only/validate-signin";
 import { type LoginFormValues, loginFormSchema } from "./login-form";
+import { authorizeWithPassword } from "./validate-signin";
 
 // ...existing code...
 
@@ -37,11 +37,13 @@ export default function LoginDialog(): JSX.Element {
 
   // Initialize userEmail state
   const [userEmail, setUserEmail] = useState<string>("");
+  const [userEmailParam, setUserEmailParam] = useState<string>("");
 
   // Fetch email from searchParams asynchronously
   useEffect(() => {
     const emailParam = searchParams.get("email") || "";
     setUserEmail(emailParam);
+    setUserEmailParam(emailParam);
     console.log("Extracted email from searchParams:", emailParam);
   }, [searchParams]);
 
@@ -205,7 +207,7 @@ export default function LoginDialog(): JSX.Element {
                           onChange={(e) => void handleEmailChange(e, field)}
                           required
                           className={emailError ? "border-red-500" : ""}
-                          autoFocus
+                          autoFocus={userEmailParam === ""}
                         />
                       </FormControl>
                       <FormMessage />
@@ -233,7 +235,7 @@ export default function LoginDialog(): JSX.Element {
                             setPassword(e.target.value);
                             field.onChange(e);
                           }}
-                          // autoFocus
+                          autoFocus={userEmailParam !== ""}
                           required
                         />
                       </FormControl>
@@ -260,10 +262,19 @@ export default function LoginDialog(): JSX.Element {
                   Sign In
                 </Button>
               </form>
+              {userEmailParam === "" && (
+                <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
+                  <div className="flex-1 bg-neutral-300 h-[1px]" />
+                  <span className="text-xs leading-4 uppercase text-neutral-500">
+                    or sign in with
+                  </span>
+                  <div className="flex-1 bg-neutral-300 h-[1px]" />
+                </div>
+              )}
             </Form>
           </CardContent>
           <CardFooter className="flex justify-between">
-            {SocialLoginButtons(providerMap)}
+            {userEmailParam === "" && SocialLoginButtons(providerMap)}
           </CardFooter>
         </Card>
       </div>

@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { emailSchema } from "../auth-types";
-import { getUser } from "../password-login-only/validate-signin";
+import { getUser } from "../login/validate-signin";
 import { newUser } from "./newuser-actions";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
