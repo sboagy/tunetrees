@@ -3,8 +3,8 @@
 import parse from "html-react-parser";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
 import type React from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./AutoResizingRichTextarea.css";
 // import JoditEditor from "jodit-react";
 
@@ -35,6 +35,9 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
   style,
   readOnly,
 }) => {
+  console.log(
+    `render ===> AutoResizingRichTextarea.tsx:39 ~ id=${id}, value=${value}, className=${className}, readOnly=${readOnly}`,
+  );
   const [editorValue, setEditorValue] = useState(value);
 
   useEffect(() => {
@@ -45,7 +48,6 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
       setEditorValue(value);
     }
   }, [value]);
-  console.log("AutoResizingRichTextarea: ", className);
 
   const handleChange = (content: string) => {
     setEditorValue(content);
