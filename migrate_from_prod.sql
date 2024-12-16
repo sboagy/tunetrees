@@ -1,6 +1,6 @@
 -- Attach the source database
 ATTACH DATABASE 'tunetrees_do.sqlite3' AS source_db;
-PRAGMA foreign_keys = ON;
+PRAGMA foreign_keys = OFF;
 
 -- Tune Table Migration
 INSERT OR REPLACE INTO main.tune (id, type, structure, title, mode, incipit, genre)
@@ -68,9 +68,8 @@ INSERT OR REPLACE INTO main.tab_group_main_state (user_id, which_tab, id, playli
 SELECT user_id, which_tab, id, playlist_id, tab_spec
 FROM source_db.tab_group_main_state;
 
--- Table State Table Migration
-INSERT OR REPLACE INTO main.table_state (user_id, screen_size, purpose, settings, current_tune)
-SELECT user_id, screen_size, purpose, settings, current_tune
+INSERT OR REPLACE INTO main.table_state (user_id, screen_size, purpose, settings, current_tune, playlist_id)
+SELECT user_id, screen_size, purpose, settings, current_tune, playlist_id
 FROM source_db.table_state;
 
 -- Table Transient Data Table Migration
