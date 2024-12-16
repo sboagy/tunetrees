@@ -16,6 +16,7 @@ from starlette.responses import RedirectResponse
 
 from tunetrees.api.mappers.tunes_mapper import tunes_mapper
 from tunetrees.app.database import SessionLocal
+import time
 from tunetrees.app.queries import (
     query_practice_list_scheduled,
 )
@@ -66,6 +67,8 @@ router = APIRouter(
 
 tt_review_sitdown_date_str = environ.get("TT_REVIEW_SITDOWN_DATE", None)
 
+DEBUG_SLOWDOWN = int(environ.get("DEBUG_SLOWDOWN", 0))
+
 
 @router.get("/scheduled_tunes_overview/{user_id}/{playlist_ref}")
 async def get_scheduled_tunes_overview(
@@ -76,6 +79,8 @@ async def get_scheduled_tunes_overview(
 ) -> List[dict[str, Any]] | dict[str, str]:
     try:
         with SessionLocal() as db:
+            if DEBUG_SLOWDOWN > 0:
+                time.sleep(DEBUG_SLOWDOWN)
             tunes_scheduled = query_practice_list_scheduled(
                 db,
                 limit=10,
@@ -111,6 +116,8 @@ async def get_tunes_staged(
 ) -> List[PracticeListStagedModel]:
     try:
         with SessionLocal() as db:
+            if DEBUG_SLOWDOWN > 0:
+                time.sleep(DEBUG_SLOWDOWN)
             filters = [
                 t_practice_list_staged.c.user_ref == user_id,
                 t_practice_list_staged.c.playlist_id == playlist_ref,
@@ -768,6 +775,8 @@ def get_tunes(
 ):
     try:
         with SessionLocal() as db:
+            if DEBUG_SLOWDOWN > 0:
+                time.sleep(DEBUG_SLOWDOWN)
             query = db.query(Tune)
             if not show_deleted:
                 query = query.filter(Tune.deleted.is_(False))
