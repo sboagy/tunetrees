@@ -26,7 +26,10 @@ export async function getScheduledTunesOverview(
 ): Promise<ITuneOverview[]> {
   try {
     // console.log("Environment Variables:", process.env);
-    console.log("In getScheduledTunesOverview: baseURL: %s", client.getUri());
+    console.log(
+      "============> queries.ts:30 ~ In getScheduledTunesOverview: baseURL: %s",
+      client.getUri(),
+    );
     console.log("user_id: %s, playlist_id: %s", userId, playlistId);
     const response = await client.get<ITuneOverview[]>(
       `/scheduled_tunes_overview/${userId}/${playlistId}`,
