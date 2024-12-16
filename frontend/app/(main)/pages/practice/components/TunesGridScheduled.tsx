@@ -156,7 +156,7 @@ export default function TunesGridScheduled({
 
     const updates: { [key: string]: ITuneUpdate } = {};
 
-    for (const [i, tune] of tunes.entries()) {
+    for (const [, tune] of tunes.entries()) {
       const idString = `${tune.id}`;
       const row = table.getRow(idString);
 
