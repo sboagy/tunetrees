@@ -239,7 +239,7 @@ export async function getReferences(
 ): Promise<IReferenceData[]> {
   try {
     console.log(
-      "In getReferences (server): tuneRef: %s, userRef: %s",
+      "===> queries.ts:242 ~ In getReferences (server): tuneRef: %s, userRef: %s",
       tuneRef,
       userRef,
     );
@@ -268,7 +268,7 @@ export async function getReferenceFavorite(
 ): Promise<IReferenceData | null> {
   try {
     console.log(
-      "In getReferences (server): tuneRef: %s, userRef: %s",
+      "===> queries.ts:271 ~ In getReferenceFavorite (server): tuneRef: %s, userRef: %s",
       tuneRef,
       userRef,
     );
