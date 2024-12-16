@@ -75,10 +75,6 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
       const previousTune = currentTune;
       const newTune = row.original.id;
 
-      const rowIndex = table
-        .getRowModel()
-        .rows.findIndex((row) => row.original.id === currentTune);
-
       if (newTune) {
         console.log(`LF7 TunesGrid handleRowClick: newTune=${newTune}`);
         setCurrentTune(newTune);
@@ -102,12 +98,8 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           console.log(
             `===> TunesGrid.tsx:100 ~ rowSelection, changing from: ${JSON.stringify(table.getState().rowSelection)}`,
           );
-          const rowNumber = table
-            .getRowModel()
-            .rows.findIndex((row) => row.original.id === newTune);
-          console.log(`Row number for newTune=${newTune} is ${rowNumber}`);
           const rowSelectionState: RowSelectionState = {
-            [String(rowNumber)]: true, // use a Computed Property Name, horrible ECMAScript 2015 (ES6) syntax!
+            [String(newTune)]: true, // use a Computed Property Name, horrible ECMAScript 2015 (ES6) syntax!
           };
           table.setRowSelection(rowSelectionState);
           const tableState = table.getState();
@@ -124,14 +116,6 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           );
         }
       }
-
-      const rowIndexNew = table
-        .getRowModel()
-        .rows.findIndex((row) => row.original.id === newTune);
-
-      console.log(
-        `LF7 TunesGrid handleRowClick: currentTune=${currentTune} rowIndex=${rowIndex} newTune=${newTune} rowIndexNew=${rowIndexNew}`,
-      );
 
       // Update styles of the previously selected row
       if (previousTune && rowRefs.current[previousTune]) {

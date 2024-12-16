@@ -161,113 +161,6 @@ export function TunesTableComponent({
   );
   const originalSetRowSelectionRef = React.useRef(setRowSelection);
 
-  // React.useEffect(() => {
-  //   originalSetRowSelectionRef.current = setRowSelection;
-  // }, []);
-
-  const columns = get_columns(
-    userId,
-    playlistId,
-    tablePurpose,
-    onRecallEvalChange,
-    setTunesRefreshId,
-  );
-
-  const table: TanstackTable<ITuneOverview> = useReactTable({
-    data: tunes,
-    columns: columns,
-    globalFilterFn: "auto",
-    manualSorting: globalFlagManualSorting,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    state: {
-      sorting,
-      columnFilters,
-      rowSelection,
-      columnVisibility,
-      globalFilter,
-    },
-  });
-
-  const [isLoading, setLoading] = React.useState<boolean>(true);
-
-  React.useEffect(() => {
-    if (isLoading) {
-      // On initial render effect, load table state from the database
-      const fetchTableState = async () => {
-        try {
-          console.log(
-            `useEffect ===> TunesTable.tsx:205 ~ (no actual dependencies) fetchTableState calling getTableStateTable(${userId}, 'full', tablePurpose=${tablePurpose} playlistId=${playlistId}`,
-          );
-          let tableStateTable = await getTableStateTable(
-            userId,
-            "full",
-            tablePurpose,
-            playlistId,
-          );
-          if (!tableStateTable) {
-            console.log("LF7 TunesTableComponent: no table state found in db");
-            tableStateTable = await createOrUpdateTableState(
-              userId,
-              "full",
-              tablePurpose,
-              playlistId,
-              table.getState(),
-              currentTune,
-            );
-          }
-          const tableStateFromDb = tableStateTable?.settings as TableState;
-          if (tableStateFromDb) {
-            setTableStateFromDb(tableStateFromDb);
-            const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
-            console.log(
-              `LF6 TunesTableComponent: currentTuneState=${currentTuneState}`,
-            );
-            if (currentTuneState > 0) {
-              setCurrentTune(currentTuneState);
-            } else {
-              setCurrentTune(null);
-            }
-            setCurrentTablePurpose(tablePurpose);
-            console.log(
-              `LF7 TunesTableComponent: setting rowSelection db: ${JSON.stringify(
-                tableStateFromDb.rowSelection,
-              )}`,
-            );
-            table.setRowSelection(tableStateFromDb.rowSelection);
-            table.setColumnVisibility(tableStateFromDb.columnVisibility);
-            table.setColumnFilters(tableStateFromDb.columnFilters);
-            table.setSorting(tableStateFromDb.sorting);
-            if (filterStringCallback) {
-              filterStringCallback(tableStateFromDb.globalFilter);
-            }
-            table.setPagination(tableStateFromDb.pagination);
-          } else
-            console.log("LF1 TunesTableComponent: no table state found in db");
-        } catch (error) {
-          console.error(error);
-          throw error;
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      if (playlistId !== undefined && playlistId > 0) {
-        console.log("LF1 TunesTableComponent: calling fetchTableState");
-        void fetchTableState();
-      } else {
-        console.log(
-          "LF1 TunesTableComponent: playlistId not set, skipping table state fetch",
-        );
-      }
-    }
-  }); // don't add dependencies here!
-
   const interceptedRowSelectionChange = (
     newRowSelectionState:
       | RowSelectionState
@@ -381,14 +274,120 @@ export function TunesTableComponent({
     void saveTableState(table, userId, tablePurpose, playlistId);
   };
 
-  table.setOptions((prev) => ({
-    ...prev,
+  // React.useEffect(() => {
+  //   originalSetRowSelectionRef.current = setRowSelection;
+  // }, []);
+
+  const columns = get_columns(
+    userId,
+    playlistId,
+    tablePurpose,
+    onRecallEvalChange,
+    setTunesRefreshId,
+  );
+
+  const table: TanstackTable<ITuneOverview> = useReactTable({
+    data: tunes,
+    columns: columns,
+    globalFilterFn: "auto",
+    manualSorting: globalFlagManualSorting,
     onSortingChange: (newSorting) =>
       interceptedSetSorting(newSorting, setTunesRefreshId),
     onColumnFiltersChange: interceptedOnColumnFiltersChange,
-    onRowSelectionChange: interceptedRowSelectionChange,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: interceptedSetColumnVisibility,
-  }));
+    onRowSelectionChange: interceptedRowSelectionChange,
+    state: {
+      sorting,
+      columnFilters,
+      rowSelection,
+      columnVisibility,
+      globalFilter,
+    },
+    getRowId: (
+      originalRow: ITuneOverview,
+      // index: number,
+      // parent?: Row<ITuneOverview>,
+    ) => (originalRow.id ?? 0).toString(),
+  });
+
+  // (property) getRowId?: ((originalRow: ITuneOverview, index: number, parent?: Row<ITuneOverview> | undefined) => string) | undefined
+
+  const [isLoading, setLoading] = React.useState<boolean>(true);
+
+  React.useEffect(() => {
+    if (isLoading) {
+      // On initial render effect, load table state from the database
+      const fetchTableState = async () => {
+        try {
+          console.log(
+            `useEffect ===> TunesTable.tsx:205 ~ (no actual dependencies) fetchTableState calling getTableStateTable(${userId}, 'full', tablePurpose=${tablePurpose} playlistId=${playlistId}`,
+          );
+          let tableStateTable = await getTableStateTable(
+            userId,
+            "full",
+            tablePurpose,
+            playlistId,
+          );
+          if (!tableStateTable) {
+            console.log("LF7 TunesTableComponent: no table state found in db");
+            tableStateTable = await createOrUpdateTableState(
+              userId,
+              "full",
+              tablePurpose,
+              playlistId,
+              table.getState(),
+              currentTune,
+            );
+          }
+          const tableStateFromDb = tableStateTable?.settings as TableState;
+          if (tableStateFromDb) {
+            setTableStateFromDb(tableStateFromDb);
+            const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
+            console.log(
+              `LF6 TunesTableComponent: currentTuneState=${currentTuneState}`,
+            );
+            if (currentTuneState > 0) {
+              setCurrentTune(currentTuneState);
+            } else {
+              setCurrentTune(null);
+            }
+            setCurrentTablePurpose(tablePurpose);
+            console.log(
+              `LF7 TunesTableComponent: setting rowSelection db: ${JSON.stringify(
+                tableStateFromDb.rowSelection,
+              )}`,
+            );
+            table.setRowSelection(tableStateFromDb.rowSelection);
+            table.setColumnVisibility(tableStateFromDb.columnVisibility);
+            table.setColumnFilters(tableStateFromDb.columnFilters);
+            table.setSorting(tableStateFromDb.sorting);
+            if (filterStringCallback) {
+              filterStringCallback(tableStateFromDb.globalFilter);
+            }
+            table.setPagination(tableStateFromDb.pagination);
+          } else
+            console.log("LF1 TunesTableComponent: no table state found in db");
+        } catch (error) {
+          console.error(error);
+          throw error;
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      if (playlistId !== undefined && playlistId > 0) {
+        console.log("LF1 TunesTableComponent: calling fetchTableState");
+        void fetchTableState();
+      } else {
+        console.log(
+          "LF1 TunesTableComponent: playlistId not set, skipping table state fetch",
+        );
+      }
+    }
+  }); // don't add dependencies here!
 
   React.useEffect(() => {
     if (onTableCreated) {

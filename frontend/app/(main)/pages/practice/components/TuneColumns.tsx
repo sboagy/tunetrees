@@ -200,12 +200,13 @@ export function get_columns(
       table.getState().rowSelection = {};
     } else {
       // const rowSelection: RowSelectionState = table.getState().rowSelection;
-      const rowCount = table.getRowCount();
       const rowSelection: RowSelectionState = {};
-      for (let i = 0; i < rowCount; i++) {
-        const row = table.getRow(i.toString());
-        rowSelection[row.id] = true;
+      for (const row of table.getCoreRowModel().rows) {
+        if (row.original.id !== undefined) {
+          rowSelection[row.original.id] = true;
+        }
       }
+
       table.getState().rowSelection = rowSelection;
     }
     void saveTableState(table, userId, purpose, playlistId);
