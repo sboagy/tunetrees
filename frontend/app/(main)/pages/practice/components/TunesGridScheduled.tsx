@@ -56,7 +56,7 @@ export default function TunesGridScheduled({
     console.log("useEffect ===> TunesGridScheduled.tsx:52 ~ tunes");
     const hasNonEmptyRecallEval = tunes.some((tune) => tune.recall_eval);
     setIsSubmitEnabled(hasNonEmptyRecallEval);
-    setIsLoading(false);
+    // setIsLoading(false);
   }, [tunes]);
 
   const handleRecallEvalChange = useCallback(
@@ -114,7 +114,6 @@ export default function TunesGridScheduled({
       isRefreshing.current = true;
       setIsLoading(true);
       const isSoftRefresh = scheduledTunesRefreshId === -1;
-      console.profile("ScheduledTunesGrid refreshTunes");
       refreshTunes(userId, playlistId, refreshId, isSoftRefresh)
         .then((result: ITuneOverview[]) => {
           console.log(`LF1 ScheduledTunesGrid number tunes: ${result.length}`);
@@ -131,7 +130,6 @@ export default function TunesGridScheduled({
         .finally(() => {
           isRefreshing.current = false;
           setIsLoading(false);
-          console.profileEnd();
         });
     } else {
       console.log(
@@ -148,6 +146,7 @@ export default function TunesGridScheduled({
     globalFilter: "",
     onRecallEvalChange: handleRecallEvalChange,
     setTunesRefreshId,
+    setIsLoading,
   });
 
   const submitPracticeFeedbacksHandler = () => {

@@ -42,6 +42,7 @@ export interface IScheduledTunesType {
     | null;
   filterStringCallback?: (filter: string) => void;
   setTunesRefreshId?: (newRefreshId: number) => void;
+  setIsLoading?: (isLoading: boolean) => void;
 }
 
 export const tableContext =
@@ -94,6 +95,7 @@ export function TunesTableComponent({
   selectionChangedCallback = null,
   filterStringCallback,
   setTunesRefreshId,
+  setIsLoading,
 }: IScheduledTunesType): null {
   const { currentTune, setCurrentTune, setCurrentTablePurpose } = useTune();
   const { currentPlaylist: playlistId } = usePlaylist();
@@ -208,6 +210,9 @@ export function TunesTableComponent({
   const interceptedSetSorting = (
     newSorting: SortingState | ((state: SortingState) => SortingState),
   ): void => {
+    if (setIsLoading) {
+      setIsLoading(false);
+    }
     const resolvedSorting: SortingState =
       newSorting instanceof Function ? newSorting(sorting) : newSorting;
 
