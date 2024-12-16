@@ -207,7 +207,6 @@ export function TunesTableComponent({
 
   const interceptedSetSorting = (
     newSorting: SortingState | ((state: SortingState) => SortingState),
-    setTunesRefreshId?: (newRefreshId: number) => void,
   ): void => {
     const resolvedSorting: SortingState =
       newSorting instanceof Function ? newSorting(sorting) : newSorting;
@@ -236,9 +235,6 @@ export function TunesTableComponent({
           console.log(
             `LF1 interceptedSetSorting ===> TunesTable.tsx:344 ~ result: ${result ? "success" : "empty result"} <=== ${JSON.stringify(resolvedSorting)}`,
           );
-          if (setTunesRefreshId) {
-            setTunesRefreshId(-1);
-          }
           return result;
         })
         .catch((error) => {
@@ -291,8 +287,7 @@ export function TunesTableComponent({
     columns: columns,
     globalFilterFn: "auto",
     manualSorting: globalFlagManualSorting,
-    onSortingChange: (newSorting) =>
-      interceptedSetSorting(newSorting, setTunesRefreshId),
+    onSortingChange: (newSorting) => interceptedSetSorting(newSorting),
     onColumnFiltersChange: interceptedOnColumnFiltersChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -375,6 +370,7 @@ export function TunesTableComponent({
           throw error;
         } finally {
           setLoading(false);
+          if (onTableCreated) onTableCreated(table);
         }
       };
 
@@ -419,8 +415,8 @@ export function useTunesTable(
   const tableComponent = (
     <TunesTableComponent
       {...props}
-      onTableCreated={(newTable, force = false) => {
-        if (table !== newTable || force) {
+      onTableCreated={(newTable) => {
+        if (table !== newTable) {
           console.log(
             `useEffect ===> TunesTable.tsx:418 ~ Table created/updated with ${props.tunes.length} tunes`,
           );

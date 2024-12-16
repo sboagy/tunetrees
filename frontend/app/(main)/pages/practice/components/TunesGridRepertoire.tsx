@@ -259,7 +259,13 @@ export default function TunesGridRepertoire({
     <div className="w-full h-full">
       {tableComponent}
       {!isFilterLoaded || !table || playlistId <= 0 ? (
-        <p>Loading...</p>
+        <div className="w-full h-full flex items-center justify-center">
+          {playlistId <= 0 ? (
+            <p className="text-lg">No Playlist</p>
+          ) : (
+            <p className="text-lg">Loading...</p>
+          )}
+        </div>
       ) : (
         <>
           <div

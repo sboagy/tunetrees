@@ -36,7 +36,7 @@ export default function TunesGridScheduled({
   } = useScheduledTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { currentPlaylist: playlistId } = usePlaylist();
   const showDeleted = false; // Should become a state variable at some point
   const { currentTune, setCurrentTune } = useTune();
@@ -56,6 +56,7 @@ export default function TunesGridScheduled({
     console.log("useEffect ===> TunesGridScheduled.tsx:52 ~ tunes");
     const hasNonEmptyRecallEval = tunes.some((tune) => tune.recall_eval);
     setIsSubmitEnabled(hasNonEmptyRecallEval);
+    setIsLoading(false);
   }, [tunes]);
 
   const handleRecallEvalChange = useCallback(
@@ -113,6 +114,7 @@ export default function TunesGridScheduled({
       isRefreshing.current = true;
       setIsLoading(true);
       const isSoftRefresh = scheduledTunesRefreshId === -1;
+      console.profile("ScheduledTunesGrid refreshTunes");
       refreshTunes(userId, playlistId, refreshId, isSoftRefresh)
         .then((result: ITuneOverview[]) => {
           console.log(`LF1 ScheduledTunesGrid number tunes: ${result.length}`);
@@ -121,7 +123,6 @@ export default function TunesGridScheduled({
           );
         })
         .catch((error) => {
-          isRefreshing.current = false;
           console.error(
             "LF1 ScheduledTunesGrid Error invoking refreshTunes:",
             error,
@@ -130,6 +131,7 @@ export default function TunesGridScheduled({
         .finally(() => {
           isRefreshing.current = false;
           setIsLoading(false);
+          console.profileEnd();
         });
     } else {
       console.log(
@@ -231,7 +233,7 @@ export default function TunesGridScheduled({
   return (
     <div className="w-full h-full">
       {tableComponent}
-      {isLoading || !table ? (
+      {isLoading || !table || playlistId <= 0 ? (
         <div className="w-full h-full flex items-center justify-center">
           <div className="text-lg">Loading tunes...</div>
         </div>
