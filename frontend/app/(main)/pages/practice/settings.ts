@@ -54,14 +54,6 @@ export async function createOrUpdateTableState(
       const response = await client.post<ITableStateTable>(
         "/table_state",
         tableStateTable,
-        {
-          params: {
-            user_id: userId,
-            screen_size: screenSize,
-            purpose: purpose,
-            playlist_id: playlistId,
-          },
-        },
       );
       console.log(
         "<= createOrUpdateTableState: response status: ",
@@ -150,23 +142,15 @@ export async function updateCurrentTuneInDb(
         `=> updateCurrentTuneInDb: purpose=${purpose}, currentTune=${currentTune})}`,
       );
       const response = await client.patch<Partial<ITableStateTable>>(
-        "/table_state",
+        `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
         tableStateTable,
-        {
-          params: {
-            user_id: userId,
-            screen_size: screenSize,
-            purpose: purpose,
-            playlist_id: playlistId,
-          },
-        },
       );
       console.log(
         `=> updateCurrentTuneInDb: response.status=${response.status} purpose=${purpose}, currentTune=${currentTune})}`,
       );
       return response.status;
     } catch (error) {
-      console.error("<= createOrUpdateTableState: ", error);
+      console.error("<= updateCurrentTuneInDb: ", error);
       return 500;
     }
   });
