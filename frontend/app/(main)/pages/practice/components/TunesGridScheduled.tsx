@@ -158,12 +158,14 @@ export default function TunesGridScheduled({
 
     for (const [i, tune] of tunes.entries()) {
       const idString = `${tune.id}`;
-      const row = table.getRow(i.toString());
+      const row = table.getRow(idString);
 
       const feedback: string | null | undefined = row.original.recall_eval;
 
       if (feedback) {
         updates[idString] = { feedback: feedback };
+      } else {
+        continue;
       }
       if (tune.id === currentTune) {
         console.log(`LF6 setting current tune to null: ${currentTune}`);
