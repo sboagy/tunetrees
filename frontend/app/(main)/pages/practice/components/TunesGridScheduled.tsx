@@ -28,8 +28,12 @@ type ScheduledTunesGridProps = {
 export default function TunesGridScheduled({
   userId,
 }: ScheduledTunesGridProps): JSX.Element {
-  const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =
-    useScheduledTunes();
+  const {
+    tunes,
+    setTunes,
+    tunesRefreshId: scheduledTunesRefreshId,
+    setTunesRefreshId,
+  } = useScheduledTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,6 +53,7 @@ export default function TunesGridScheduled({
   // }, [currentTune, userId]);
 
   useEffect(() => {
+    console.log("useEffect ===> TunesGridScheduled.tsx:52 ~ tunes");
     const hasNonEmptyRecallEval = tunes.some((tune) => tune.recall_eval);
     setIsSubmitEnabled(hasNonEmptyRecallEval);
   }, [tunes]);
@@ -69,37 +74,50 @@ export default function TunesGridScheduled({
   const isRefreshing = useRef(false);
 
   const refreshTunes = useCallback(
-    async (userId: number, playlistId: number, refreshId: number) => {
+    async (
+      userId: number,
+      playlistId: number,
+      refreshId: number,
+      isSoftRefresh = false,
+    ) => {
       try {
+        if (isSoftRefresh) {
+          console.log("============> TunesGridScheduled.tsx:85 ~ SOFT REFRESH");
+          setTunesRefreshId(refreshId);
+          return tunes;
+        }
+        console.log(
+          "============> TunesGridScheduled.tsx:90 ~ awaiting getScheduledTunesOverview",
+        );
         const result: ITuneOverview[] = await getScheduledTunesOverview(
           userId,
           playlistId,
           showDeleted,
         );
-        setTunesRefreshId(refreshId);
         setTunes(result);
-
+        setTunesRefreshId(refreshId);
         return result;
       } catch (error) {
         console.error("LF1 ScheduledTunesGrid Error refreshing tunes:", error);
         throw error;
       }
     },
-    [setTunes, setTunesRefreshId],
+    [setTunes, setTunesRefreshId, tunes],
   );
 
   useEffect(() => {
-    if (tunesRefreshId !== refreshId && !isRefreshing.current) {
+    if (scheduledTunesRefreshId !== refreshId && !isRefreshing.current) {
       console.log(
-        `LF1 ScheduledTunesGrid call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+        `useEffect ===> TunesGridScheduled.tsx:94 ~ call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${scheduledTunesRefreshId} isRefreshing: ${isRefreshing.current}`,
       );
       isRefreshing.current = true;
       setIsLoading(true);
-      refreshTunes(userId, playlistId, refreshId)
+      const isSoftRefresh = scheduledTunesRefreshId === -1;
+      refreshTunes(userId, playlistId, refreshId, isSoftRefresh)
         .then((result: ITuneOverview[]) => {
           console.log(`LF1 ScheduledTunesGrid number tunes: ${result.length}`);
           console.log(
-            `LF1 ScheduledTunesGrid back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+            `LF1 ScheduledTunesGrid back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${scheduledTunesRefreshId} isRefreshing: ${isRefreshing.current}`,
           );
         })
         .catch((error) => {
@@ -115,10 +133,10 @@ export default function TunesGridScheduled({
         });
     } else {
       console.log(
-        `LF1 ScheduledTunesGrid skipping refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+        `useEffect ===> TunesGridScheduled.tsx:118 ~  SKIPPING refreshId: ${refreshId} tunesRefreshId: ${scheduledTunesRefreshId} isRefreshing: ${isRefreshing.current}`,
       );
     }
-  }, [refreshId, tunesRefreshId, userId, playlistId, refreshTunes]);
+  }, [refreshId, scheduledTunesRefreshId, userId, playlistId, refreshTunes]);
 
   // Move table creation after tunes are loaded
   const [tableComponent, table] = useTunesTable({

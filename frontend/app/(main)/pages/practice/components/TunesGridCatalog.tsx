@@ -85,14 +85,15 @@ export default function TunesGridCatalog({
       try {
         const result: ITuneOverview[] =
           await getTunesOnlyIntoOverview(showDeleted);
-        setTunesRefreshId(refreshId);
         setTunes(result);
-        isRefreshing.current = false;
+        setTunesRefreshId(refreshId);
         console.log(`LF1 AllGrid setTunesRefreshId(${refreshId})`);
         return result;
       } catch (error) {
         console.error("LF1 Error refreshing tunes:", error);
         throw error;
+      } finally {
+        isRefreshing.current = false;
       }
     },
     [setTunes, setTunesRefreshId],
@@ -105,18 +106,17 @@ export default function TunesGridCatalog({
       !isRefreshing.current
     ) {
       console.log(
-        `LF1 AllGrid call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+        `useEffect ===> TunesGridCatalog.tsx:108 ~ [refreshId=${refreshId}, tunesRefreshId=${tunesRefreshId}, userId=${userId}, playlist=${playlistId}, refreshTunes(callback)]`,
       );
       isRefreshing.current = true;
       refreshTunes(userId, playlistId, refreshId)
         .then((result: ITuneOverview[]) => {
-          console.log(`LF1 AllGrid number tunes: ${result.length}`);
+          console.log(`LF1 TunesGridCatalog number tunes: ${result.length}`);
           console.log(
-            `LF1 AllGrid back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+            `LF1 TunesGridCatalog back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
           );
         })
         .catch((error) => {
-          isRefreshing.current = false;
           console.error("LF1 Error invoking refreshTunes:", error);
         })
         .finally(() => {
@@ -124,7 +124,7 @@ export default function TunesGridCatalog({
         });
     } else {
       console.log(
-        `LF1 AllGrid skipping refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+        `useEffect ===> TunesGridCatalog.tsx:127 ~ SKIPPING [refreshId=${refreshId}, tunesRefreshId=${tunesRefreshId}, userId=${userId}, playlist=${playlistId}, refreshTunes(callback)]`,
       );
     }
   }, [refreshId, tunesRefreshId, userId, playlistId, refreshTunes]);
@@ -152,6 +152,9 @@ export default function TunesGridCatalog({
         });
     };
 
+    console.log(
+      `useEffect ===> TunesGridCatalog.tsx:156 ~ [userId=${userId}}, playlistId=${playlistId}]`,
+    );
     getFilter();
   }, [userId, playlistId]);
 

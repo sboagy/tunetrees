@@ -202,7 +202,7 @@ export function TunesTableComponent({
       const fetchTableState = async () => {
         try {
           console.log(
-            `LF7 TunesTableComponent: ===> calling getTableStateTable(${userId}, 'full', tablePurpose=${tablePurpose} playlistId=${playlistId}`,
+            `useEffect ===> TunesTable.tsx:205 ~ (no actual dependencies) fetchTableState calling getTableStateTable(${userId}, 'full', tablePurpose=${tablePurpose} playlistId=${playlistId}`,
           );
           let tableStateTable = await getTableStateTable(
             userId,
@@ -329,24 +329,32 @@ export function TunesTableComponent({
       `LF7 TunesTableComponent (interceptedSetSorting) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
     const tableState = table.getState();
-    tableState.sorting = resolvedSorting;
-    updateTableStateInDb(userId, "full", tablePurpose, playlistId, tableState)
-      .then((result) => {
-        console.log(
-          "LF1 interceptedSetSorting, call to updateTableStateInDb: result=",
-          result ? "success" : "empty result",
-        );
-        if (setTunesRefreshId) {
-          setTunesRefreshId(0);
-        }
-        return result;
-      })
-      .catch((error) => {
-        console.error(
-          "LF1 interceptedSetSorting Error calling updateTableStateInDb:",
-          error,
-        );
-      });
+    if (
+      tableState.sorting &&
+      resolvedSorting &&
+      JSON.stringify(tableState.sorting) !== JSON.stringify(resolvedSorting)
+    ) {
+      console.log(
+        `LF1 interceptedSetSorting ===> TunesTable.tsx:338 ~  <=== resolvedSorting=${JSON.stringify(resolvedSorting)} tableState.sorting=${JSON.stringify(tableState.sorting)}`,
+      );
+      tableState.sorting = resolvedSorting;
+      updateTableStateInDb(userId, "full", tablePurpose, playlistId, tableState)
+        .then((result) => {
+          console.log(
+            `LF1 interceptedSetSorting ===> TunesTable.tsx:344 ~ result: ${result ? "success" : "empty result"} <=== ${JSON.stringify(resolvedSorting)}`,
+          );
+          if (setTunesRefreshId) {
+            setTunesRefreshId(-1);
+          }
+          return result;
+        })
+        .catch((error) => {
+          console.error(
+            "LF1 interceptedSetSorting Error calling updateTableStateInDb:",
+            error,
+          );
+        });
+    }
 
     // void saveTableState(table, userId, tablePurpose, playlistId);
   };
@@ -384,9 +392,12 @@ export function TunesTableComponent({
 
   React.useEffect(() => {
     if (onTableCreated) {
+      console.log(
+        `useEffect ===> TunesTable.tsx:388 ~ tablePurpose=${tablePurpose} [table=(table), onTableCreated=(callback)]`,
+      );
       onTableCreated(table);
     }
-  }, [table, onTableCreated]);
+  }, [table, onTableCreated, tablePurpose]);
 
   return null;
 }
@@ -409,9 +420,17 @@ export function useTunesTable(
   const tableComponent = (
     <TunesTableComponent
       {...props}
-      onTableCreated={(newTable) => {
-        console.log("Table created/updated with", props.tunes.length, "tunes");
-        setTable(newTable);
+      onTableCreated={(newTable, force = false) => {
+        if (table !== newTable || force) {
+          console.log(
+            `useEffect ===> TunesTable.tsx:418 ~ Table created/updated with ${props.tunes.length} tunes`,
+          );
+          setTable(newTable);
+        } else {
+          console.log(
+            `useEffect ===> TunesTable.tsx:423 ~ SKIPPING Table already created with ${props.tunes.length} tunes`,
+          );
+        }
       }}
     />
   );

@@ -7,12 +7,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Row, Table as TanstackTable } from "@tanstack/react-table";
+import type {
+  Row,
+  RowSelectionState,
+  Table as TanstackTable,
+} from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useRef } from "react";
-import { updateCurrentTuneInDb } from "../settings";
+import { updateCurrentTuneInDb, updateTableStateInDb } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -82,6 +86,7 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
         console.log(
           `LF7 TunesGrid handleRowClick calling updateCurrentTuneInDb: tablePurpose=${tablePurpose} newTune=${newTune}`,
         );
+
         void updateCurrentTuneInDb(
           userId,
           "full",
@@ -89,6 +94,35 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
           playlistId,
           newTune,
         );
+
+        // TODO: This is a hack to get the row selection to work in
+        // practice mode, but this code should be refactored into
+        // TunesGridScheduled.tsx.
+        if (tablePurpose === "practice") {
+          console.log(
+            `===> TunesGrid.tsx:100 ~ rowSelection, changing from: ${JSON.stringify(table.getState().rowSelection)}`,
+          );
+          const rowNumber = table
+            .getRowModel()
+            .rows.findIndex((row) => row.original.id === newTune);
+          console.log(`Row number for newTune=${newTune} is ${rowNumber}`);
+          const rowSelectionState: RowSelectionState = {
+            [String(rowNumber)]: true, // use a Computed Property Name, horrible ECMAScript 2015 (ES6) syntax!
+          };
+          table.setRowSelection(rowSelectionState);
+          const tableState = table.getState();
+          tableState.rowSelection = rowSelectionState;
+          console.log(
+            `===> TunesGrid.tsx:113 ~ rowSelection, changing to: ${JSON.stringify(tableState.rowSelection)}`,
+          );
+          void updateTableStateInDb(
+            userId,
+            "full",
+            tablePurpose,
+            playlistId,
+            tableState,
+          );
+        }
       }
 
       const rowIndexNew = table
@@ -165,6 +199,10 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
         );
         return;
       }
+
+      console.log(
+        `useEffect ===> TunesGrid.tsx:170 ~ in scrollToTune currentTablePurpose: ${currentTablePurpose}, currentTune: ${currentTune}`,
+      );
 
       const rowIndex = table
         .getRowModel()

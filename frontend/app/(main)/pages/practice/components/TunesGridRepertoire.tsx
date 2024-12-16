@@ -106,12 +106,13 @@ export default function TunesGridRepertoire({
         );
         setTunesRefreshId(refreshId);
         setTunes(result);
-        isRefreshing.current = false;
         console.log(`LF1 RepertoireGrid setTunesRefreshId(${refreshId})`);
         return result;
       } catch (error) {
         console.error("LF1 Error refreshing tunes:", error);
         throw error;
+      } finally {
+        isRefreshing.current = false;
       }
     },
     [setTunes, setTunesRefreshId],
@@ -124,7 +125,7 @@ export default function TunesGridRepertoire({
       !isRefreshing.current
     ) {
       console.log(
-        `LF1 RepertoireGrid call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+        `useEffect ===> TunesGridRepertoire.tsx:127 ~ call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
       );
       isRefreshing.current = true;
       refreshTunes(userId, playlistId, refreshId)
@@ -143,7 +144,7 @@ export default function TunesGridRepertoire({
         });
     } else {
       console.log(
-        `LF1 RepertoireGrid skipping refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
+        `useEffect ===> TunesGridRepertoire.tsx:146 ~ SKIPPING refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
       );
     }
   }, [refreshId, tunesRefreshId, userId, playlistId, refreshTunes]);
@@ -171,6 +172,9 @@ export default function TunesGridRepertoire({
         });
     };
 
+    console.log(
+      `useEffect ===> TunesGridRepertoire.tsx:173 ~ [userId=${userId}, playlistId=${playlistId}]`,
+    );
     getFilter();
   }, [userId, playlistId]);
 
