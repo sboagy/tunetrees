@@ -87,7 +87,7 @@ COPY package.json package-lock.json ./
 RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=package-lock.json,target=package-lock.json \
     --mount=type=cache,target=/root/.npm \
-    npm ci  --legacy-peer-deps --omit=dev
+    npm ci --omit=dev
 
 ################################################################################
 # Create a stage for building the application.
@@ -101,7 +101,7 @@ WORKDIR /usr/src/app
 RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=package-lock.json,target=package-lock.json \
     --mount=type=cache,target=/root/.npm \
-    npm ci --legacy-peer-deps
+    npm ci
 
 # Copy the main application directories.
 COPY app app
