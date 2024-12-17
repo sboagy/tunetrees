@@ -7,16 +7,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type {
-  Row,
-  RowSelectionState,
-  Table as TanstackTable,
-} from "@tanstack/react-table";
+import type { Row, Table as TanstackTable } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useRef } from "react";
-import { updateCurrentTuneInDb, updateTableStateInDb } from "../settings";
+import { updateCurrentTuneInDb } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -53,9 +49,16 @@ type Props = {
   userId: number;
   playlistId: number;
   tablePurpose: TablePurpose;
+  onRowClickCallback?: (newTune: number) => void;
 };
 
-const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
+const TunesGrid = ({
+  table,
+  userId,
+  playlistId,
+  tablePurpose,
+  onRowClickCallback,
+}: Props) => {
   const {
     currentTune,
     setCurrentTune,
@@ -94,26 +97,8 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
         // TODO: This is a hack to get the row selection to work in
         // practice mode, but this code should be refactored into
         // TunesGridScheduled.tsx.
-        if (tablePurpose === "practice") {
-          console.log(
-            `===> TunesGrid.tsx:100 ~ rowSelection, changing from: ${JSON.stringify(table.getState().rowSelection)}`,
-          );
-          const rowSelectionState: RowSelectionState = {
-            [String(newTune)]: true, // use a Computed Property Name, horrible ECMAScript 2015 (ES6) syntax!
-          };
-          table.setRowSelection(rowSelectionState);
-          const tableState = table.getState();
-          tableState.rowSelection = rowSelectionState;
-          console.log(
-            `===> TunesGrid.tsx:113 ~ rowSelection, changing to: ${JSON.stringify(tableState.rowSelection)}`,
-          );
-          void updateTableStateInDb(
-            userId,
-            "full",
-            tablePurpose,
-            playlistId,
-            tableState,
-          );
+        if (onRowClickCallback) {
+          onRowClickCallback(newTune);
         }
       }
 
@@ -138,11 +123,11 @@ const TunesGrid = ({ table, userId, playlistId, tablePurpose }: Props) => {
     [
       currentTune,
       setCurrentTune,
-      table,
       setCurrentTablePurpose,
       tablePurpose,
       userId,
       playlistId,
+      onRowClickCallback,
     ],
   );
 

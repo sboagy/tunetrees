@@ -3,11 +3,16 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import type { RowSelectionState } from "@tanstack/react-table";
 import { Upload } from "lucide-react";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
 import { getScheduledTunesOverview } from "../queries";
-import { deleteTableTransientData, updateCurrentTuneInDb } from "../settings";
+import {
+  deleteTableTransientData,
+  updateCurrentTuneInDb,
+  updateTableStateInDb,
+} from "../settings";
 import type { ITuneOverview } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import { usePlaylist } from "./CurrentPlaylistProvider";
@@ -36,7 +41,6 @@ export default function TunesGridScheduled({
   } = useScheduledTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const { currentPlaylist: playlistId } = usePlaylist();
   const showDeleted = false; // Should become a state variable at some point
   const { currentTune, setCurrentTune } = useTune();
@@ -70,6 +74,8 @@ export default function TunesGridScheduled({
     },
     [setTunes],
   );
+
+  const [isLoading, setIsLoading] = useState(true);
 
   // See comment for isRefreshing in RepertoireTunesGrid.tsx.
   const isRefreshing = useRef(false);
@@ -112,7 +118,6 @@ export default function TunesGridScheduled({
         `useEffect ===> TunesGridScheduled.tsx:94 ~ call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${scheduledTunesRefreshId} isRefreshing: ${isRefreshing.current}`,
       );
       isRefreshing.current = true;
-      setIsLoading(true);
       const isSoftRefresh = scheduledTunesRefreshId === -1;
       refreshTunes(userId, playlistId, refreshId, isSoftRefresh)
         .then((result: ITuneOverview[]) => {
@@ -228,6 +233,30 @@ export default function TunesGridScheduled({
     setMode(mode === "grid" ? "flashcard" : "grid");
   };
 
+  const onRowClickCallback = (newTune: number): void => {
+    if (table !== null) {
+      console.log(
+        `===> TunesGrid.tsx:100 ~ rowSelection, changing from: ${JSON.stringify(table.getState().rowSelection)}`,
+      );
+      const rowSelectionState: RowSelectionState = {
+        [String(newTune)]: true, // use a Computed Property Name, horrible ECMAScript 2015 (ES6) syntax!
+      };
+      table.setRowSelection(rowSelectionState);
+      const tableState = table.getState();
+      tableState.rowSelection = rowSelectionState;
+      console.log(
+        `===> TunesGrid.tsx:113 ~ rowSelection, changing to: ${JSON.stringify(tableState.rowSelection)}`,
+      );
+      void updateTableStateInDb(
+        userId,
+        "full",
+        "practice",
+        playlistId,
+        tableState,
+      );
+    }
+  };
+
   // Update loading condition to only show loading when we're actually loading
   return (
     <div className="w-full h-full">
@@ -284,6 +313,7 @@ export default function TunesGridScheduled({
               userId={userId}
               playlistId={userId}
               tablePurpose={"practice"}
+              onRowClickCallback={onRowClickCallback}
             />
           ) : (
             <FlashcardPanel
