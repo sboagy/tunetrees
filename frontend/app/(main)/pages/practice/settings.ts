@@ -564,7 +564,7 @@ export async function createTabGroupMainState(
         tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
       }
       const response = await client.post(
-        `/tab_group_main_state/${userId}`,
+        "/tab_group_main_state",
         tabGroupMainState,
       );
       console.log("createTabGroupMainState response status: ", response.status);
