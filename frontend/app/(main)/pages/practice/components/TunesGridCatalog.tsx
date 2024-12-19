@@ -28,7 +28,7 @@ import { useAllTunes } from "./TunesContextAll";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
 
-type AllGridProps = {
+type CatalogGridProps = {
   userId: number;
 };
 
@@ -43,7 +43,7 @@ type AllGridProps = {
  */
 export default function TunesGridCatalog({
   userId,
-}: AllGridProps): JSX.Element {
+}: CatalogGridProps): JSX.Element {
   const [isRowsSelected, setIsRowsSelected] = useState(false);
   const selectionChangedCallback = (
     table: TanstackTable<ITuneOverview>,
@@ -100,11 +100,7 @@ export default function TunesGridCatalog({
   );
 
   useEffect(() => {
-    if (
-      playlistId > 0 &&
-      tunesRefreshId !== refreshId &&
-      !isRefreshing.current
-    ) {
+    if (tunesRefreshId !== refreshId && !isRefreshing.current) {
       console.log(
         `useEffect ===> TunesGridCatalog.tsx:108 ~ [refreshId=${refreshId}, tunesRefreshId=${tunesRefreshId}, userId=${userId}, playlist=${playlistId}, refreshTunes(callback)]`,
       );
@@ -265,7 +261,7 @@ export default function TunesGridCatalog({
   return (
     <div className="w-full h-full">
       {tableComponent}
-      {!isFilterLoaded || !table || playlistId <= 0 ? (
+      {!isFilterLoaded || !table ? (
         <p>Loading...</p>
       ) : (
         <>
