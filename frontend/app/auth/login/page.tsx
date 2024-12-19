@@ -59,15 +59,18 @@ export default function LoginDialog(): JSX.Element {
     if (email === "") {
       // setEmailError("Email cannot be empty");
       setEmailError(null);
+      setPasswordError(null);
       return false;
     }
     // TODO: implement token validation logic
     const result = emailSchema.safeParse(email);
     if (!result.success) {
       setEmailError(result.error.issues[0].message);
+      setPasswordError(null);
       return false;
     }
     setEmailError(null);
+    setPasswordError(null);
     return true;
   }, []);
 
@@ -145,7 +148,9 @@ export default function LoginDialog(): JSX.Element {
         }
       } catch (error) {
         setPasswordError(`${(error as Error).message}`);
-        console.error((error as Error).message);
+        console.log(
+          `User not found ===> page.tsx:149 ~ ${(error as Error).message}`,
+        );
       }
     }
   };
@@ -232,6 +237,7 @@ export default function LoginDialog(): JSX.Element {
                           type="password"
                           value={password}
                           onChange={(e) => {
+                            setPasswordError(null);
                             setPassword(e.target.value);
                             field.onChange(e);
                           }}
