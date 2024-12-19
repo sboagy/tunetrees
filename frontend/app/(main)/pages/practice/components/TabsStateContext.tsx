@@ -107,6 +107,7 @@ export const TabsStateProvider = ({ children }: { children: ReactNode }) => {
           user_id: userId,
           which_tab: initialTabSpec[0].id,
           tab_spec: initialTabSpec,
+          playlist_id: playlistId,
         };
         try {
           await createTabGroupMainState(userId, tabGroupMainStateModel);
