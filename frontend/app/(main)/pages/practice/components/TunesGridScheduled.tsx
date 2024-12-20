@@ -263,7 +263,11 @@ export default function TunesGridScheduled({
       {tableComponent}
       {isLoading || !table || playlistId <= 0 ? (
         <div className="w-full h-full flex items-center justify-center">
-          <div className="text-lg">Loading tunes...</div>
+          {playlistId <= 0 ? (
+            <p className="text-lg">No Playlist</p>
+          ) : (
+            <p className="text-lg">Loading...</p>
+          )}
         </div>
       ) : (
         <>
