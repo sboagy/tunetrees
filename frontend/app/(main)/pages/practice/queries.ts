@@ -655,7 +655,7 @@ export async function createEmptyTune(
  * @returns A promise that resolves to the requested Playlist objects, or an error message.
  */
 export async function getPlaylists(
-  userRef: number,
+  userRef = -1,
 ): Promise<IPlaylist[] | { detail: string }> {
   try {
     const response = await client.get<IPlaylist[] | { detail: string }>(

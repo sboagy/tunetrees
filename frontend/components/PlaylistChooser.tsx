@@ -53,7 +53,9 @@ export default function PlaylistChooser() {
     userId: number,
   ): Promise<number> => {
     try {
-      const playlists = await getPlaylists(userId);
+      // const playlists = await getPlaylists(userId);
+      // Let's try getting all playlists for now
+      const playlists = await getPlaylists();
       if (typeof playlists === "string") {
         console.error("Error fetching playlists:", playlists);
         return -1;
@@ -218,7 +220,12 @@ export default function PlaylistChooser() {
           continue; // Skip new items with an empty "instrument" field
         }
         await (playlist_id < 0
-          ? createPlaylist({ ...playlistData, instrument: playlist.instrument })
+          ? createPlaylist({
+              ...playlistData,
+              instrument: playlist.instrument,
+              genre_default: playlist.genre_default,
+              deleted: false,
+            })
           : updatePlaylist(playlist_id, playlistData));
       }
 
@@ -264,7 +271,9 @@ export default function PlaylistChooser() {
           className="px-4 py-2 border rounded bg-white dark:bg-background hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-white-500 transition duration-150 ease-in-out flex items-center space-x-2"
           title={currentPlaylistDescription} // Add hover text
         >
-          <span>Instrument: {currentPlaylistName}</span>
+          <span>
+            Instrument: {currentPlaylistName} (id-{currentPlaylist})
+          </span>
           <ChevronDownIcon className="w-5 h-5 text-gray-500" />
         </DropdownMenuTrigger>
         <DropdownMenuContent className="bg-white dark:bg-background border border-gray-300 dark:border-gray-700 rounded shadow-lg">
@@ -272,9 +281,14 @@ export default function PlaylistChooser() {
             <DropdownMenuItem
               key={playlist.playlist_id}
               onSelect={() => handleSelect(playlist)}
-              className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+              className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center space-x-2"
             >
-              {playlist.instrument}
+              {playlist.playlist_id === currentPlaylist && (
+                <span className="text-green-500">✔</span>
+              )}
+              <span>
+                {playlist.instrument} (id-{playlist.playlist_id})
+              </span>
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator className="border-t border-gray-400 dark:border-gray-600 my-2" />
@@ -287,19 +301,24 @@ export default function PlaylistChooser() {
         </DropdownMenuContent>
       </DropdownMenu>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <div className="flex items-center">
-              <DialogTitle>Edit Repertoire List</DialogTitle>
-            </div>
+        {/* Make the dialog wider with min-w-[600px] (adjust as needed) */}
+        <DialogContent className="max-w-[40rem] w-full min-w-[40rem]">
+          <DialogHeader className="flex items-center justify-between">
+            {/* Left-aligned title */}
+            <DialogTitle className="text-left">
+              Edit Repertoire List
+            </DialogTitle>
+            {/* The built-in close 'x' is automatically placed here on the far right */}
           </DialogHeader>
+
           <div className="flex space-x-4 mt-4 font-bold">
-            <span className="w-36 mt-2">Instrument</span>
+            <span className="w-14 mt-2">Id</span>
+            <span className="w-48 mt-2">Instrument</span>
             <span className="w-40 mt-2">Genre Default</span>
             <span className="w-1/4 mt-2">Description</span>
             <Button
               variant="ghost"
-              className="flex items-center" // Align with the baseline of the DialogTitle text and add right margin of 3em
+              className="flex items-center"
               onClick={handleAddPlaylist}
             >
               <PlusIcon className="w-5 h-5" />
@@ -309,7 +328,13 @@ export default function PlaylistChooser() {
           {editedPlaylists.map((playlist, index) => (
             <div key={playlist.playlist_id} className="flex space-x-3 mb-2">
               <Input
-                value={playlist.instrument ?? ""} // Ensure value is not null
+                value={playlist.playlist_id ?? "?"}
+                placeholder="Id"
+                disabled
+                className="w-12"
+              />
+              <Input
+                value={playlist.instrument ?? ""}
                 onChange={(e) =>
                   handleEditPlaylist(index, "instrument", e.target.value)
                 }
@@ -332,7 +357,7 @@ export default function PlaylistChooser() {
                 ))}
               </select>
               <Input
-                value={playlist.description ?? ""} // Ensure value is not null
+                value={playlist.description ?? ""}
                 onChange={(e) =>
                   handleEditPlaylist(index, "description", e.target.value)
                 }
@@ -340,7 +365,7 @@ export default function PlaylistChooser() {
               />
               <Button
                 variant="destructive"
-                className="bg-transparent" // Match the dialog background color
+                className="bg-transparent"
                 onClick={() => handleDeletePlaylist(index)}
               >
                 {playlist.playlist_id > 0 ? (
@@ -351,6 +376,7 @@ export default function PlaylistChooser() {
               </Button>
             </div>
           ))}
+
           <DialogFooter>
             <Button
               variant="ghost"
@@ -361,7 +387,7 @@ export default function PlaylistChooser() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog>{" "}
     </div>
   );
 }

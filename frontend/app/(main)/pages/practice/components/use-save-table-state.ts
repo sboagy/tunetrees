@@ -25,6 +25,7 @@ export const useSaveTableState = (
         `LF6 useSaveTableState: calling createOrUpdateTableState in ${eventString} for tablePurpose: ${tablePurpose}, currentTune=${currentTune}`,
       );
       const tableState: TableState = table.getState();
+      console.log("===> use-save-table-state.ts:29 ~ ");
       void createOrUpdateTableState(
         userId,
         "full",

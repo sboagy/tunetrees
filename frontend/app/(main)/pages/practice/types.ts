@@ -131,6 +131,7 @@ export interface IPlaylist {
   instrument?: string;
   description?: string;
   genre_default?: string;
+  deleted?: boolean | null;
 }
 
 export interface ITTResponseInfo {

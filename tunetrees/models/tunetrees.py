@@ -355,9 +355,6 @@ class Reference(Base):
 
 class TableState(Base):
     __tablename__ = "table_state"
-    __table_args__ = (
-        UniqueConstraint("user_id", "purpose", "playlist_id", "screen_size"),
-    )
 
     user_id = mapped_column(ForeignKey("user.id"), primary_key=True, nullable=False)
     screen_size = mapped_column(Enum("small", "full"), primary_key=True, nullable=False)

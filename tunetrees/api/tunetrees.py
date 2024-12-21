@@ -924,11 +924,16 @@ def delete_tune(
     status_code=200,
 )
 def get_playlists(
-    user_ref: int = Query(..., description="User reference ID"),
+    user_ref: int = Query(
+        -1, description="User reference ID, defaults to -1 meaning all playlists"
+    ),
 ) -> List[PlaylistModel]:
     try:
         with SessionLocal() as db:
-            playlists = db.query(Playlist).filter(Playlist.user_ref == user_ref).all()
+            query = db.query(Playlist)
+            if user_ref != -1:
+                query = query.filter(Playlist.user_ref == user_ref)
+            playlists = query.all()
             return [PlaylistModel.model_validate(playlist) for playlist in playlists]
     except Exception as e:
         logger.error(f"Unable to fetch playlists: {e}")
@@ -942,7 +947,7 @@ def get_playlists(
     description="Create a new playlist.",
     status_code=201,
 )
-def create_playlist(playlist: PlaylistModel):
+def create_playlist(playlist: PlaylistModelPartial):
     try:
         with SessionLocal() as db:
             new_playlist = Playlist(**playlist.model_dump())
