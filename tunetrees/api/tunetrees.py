@@ -29,6 +29,7 @@ from tunetrees.app.schedule import (
     update_practice_schedules,
 )
 from tunetrees.models.tunetrees import (
+    Genre,
     Note,
     Playlist,
     PlaylistTune,
@@ -55,6 +56,9 @@ from tunetrees.models.tunetrees_pydantic import (
     TuneModel,
     TuneModelCreate,
     TuneModelPartial,
+    GenreModel,
+    GenreModelCreate,
+    GenreModelPartial,
 )
 
 logger = logging.getLogger("tunetrees.api")
@@ -927,12 +931,15 @@ def get_playlists(
     user_ref: int = Query(
         -1, description="User reference ID, defaults to -1 meaning all playlists"
     ),
+    show_deleted: bool = Query(False, description="Show deleted playlists if true"),
 ) -> List[PlaylistModel]:
     try:
         with SessionLocal() as db:
             query = db.query(Playlist)
             if user_ref != -1:
                 query = query.filter(Playlist.user_ref == user_ref)
+            if not show_deleted:
+                query = query.filter(Playlist.deleted.is_(False))
             playlists = query.all()
             return [PlaylistModel.model_validate(playlist) for playlist in playlists]
     except Exception as e:
@@ -1036,3 +1043,114 @@ def get_playlist_by_id(
     except Exception as e:
         logger.error(f"Unable to fetch playlist: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to fetch playlist: {e}")
+
+
+@router.get(
+    "/genres",
+    response_model=List[GenreModel],
+    summary="Get all genres",
+    description="Retrieve all genres from the database.",
+    status_code=200,
+)
+def get_genres() -> List[GenreModel]:
+    """
+    Returns all genres.
+    """
+    try:
+        with SessionLocal() as db:
+            # We assume there's a Genre model in tunetrees/models/tunetrees.py
+            genres = db.query(Genre).all()
+            return [GenreModel.model_validate(g) for g in genres]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/genres/{genre_id}",
+    response_model=GenreModel,
+    summary="Get a genre",
+    description="Retrieve a genre by its ID.",
+    status_code=200,
+)
+def get_genre(genre_id: int) -> GenreModel:
+    """
+    Returns a single genre by ID.
+    """
+    try:
+        with SessionLocal() as db:
+            genre = db.get(Genre, genre_id)
+            if not genre:
+                raise HTTPException(status_code=404, detail="Genre not found")
+            return GenreModel(**genre.model_dump())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/genres",
+    response_model=GenreModel,
+    summary="Create a new genre",
+    description="Create a new genre with name and description (optional).",
+    status_code=201,
+)
+def create_genre(new_genre: GenreModelCreate) -> GenreModel:
+    """
+    Creates a genre in the database.
+    """
+    try:
+        with SessionLocal() as db:
+            genre = Genre(name=new_genre.name, description=new_genre.description)
+            db.add(genre)
+            db.commit()
+            db.refresh(genre)
+            return GenreModel(**genre.model_dump())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put(
+    "/genres/{genre_id}",
+    response_model=GenreModel,
+    summary="Update a genre",
+    description="Update an existing genre by its ID, changing name and/or description.",
+    status_code=200,
+)
+def update_genre(genre_id: int, genre_update: GenreModelPartial) -> GenreModel:
+    """
+    Updates the genre's fields.
+    """
+    try:
+        with SessionLocal() as db:
+            genre = db.get(Genre, genre_id)
+            if not genre:
+                raise HTTPException(status_code=404, detail="Genre not found")
+            if genre_update.name is not None:
+                genre.name = genre_update.name
+            if genre_update.description is not None:
+                genre.description = genre_update.description
+            db.commit()
+            db.refresh(genre)
+            return GenreModel(**genre.model_dump())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete(
+    "/genres/{genre_id}",
+    summary="Delete a genre",
+    description="Delete an existing genre by its ID.",
+    status_code=204,
+)
+def delete_genre(genre_id: int) -> None:
+    """
+    Deletes a genre from the database.
+    """
+    try:
+        with SessionLocal() as db:
+            genre = db.get(Genre, genre_id)
+            if not genre:
+                raise HTTPException(status_code=404, detail="Genre not found")
+            db.delete(genre)
+            db.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
