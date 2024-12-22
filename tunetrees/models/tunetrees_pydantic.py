@@ -617,3 +617,26 @@ class ResponseStatusModel(BaseModel):
 class ColumnSort(BaseModel):
     desc: bool
     id: str
+
+
+class GenreModel(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    region: str | None = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class GenreModelCreate(BaseModel):
+    name: str
+    description: str | None = None
+    region: str | None = None
+
+
+class GenreModelPartial(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    region: str | None = None
