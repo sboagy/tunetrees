@@ -5,6 +5,7 @@ import { useTuneDataRefresh } from "@/app/(main)/pages/practice/components/TuneD
 import {
   createPlaylist,
   deletePlaylist,
+  getAllGenres,
   getPlaylists,
   getRepertoireTunesOverview, // Import getTunesInPlaylistForUser
   updatePlaylist,
@@ -14,7 +15,7 @@ import {
   getTabGroupMainState,
   updateTabGroupMainState,
 } from "@/app/(main)/pages/practice/settings";
-import type { IPlaylist } from "@/app/(main)/pages/practice/types";
+import type { IGenre, IPlaylist } from "@/app/(main)/pages/practice/types";
 import deepEqual from "fast-deep-equal"; // Import deepEqual
 import { ChevronDownIcon, MinusIcon, PlusIcon, TrashIcon } from "lucide-react"; // Import the TrashIcon
 import { useSession } from "next-auth/react";
@@ -46,6 +47,14 @@ export default function PlaylistChooser() {
   const [playlists, setPlaylists] = useState<IPlaylist[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editedPlaylists, setEditedPlaylists] = useState<IPlaylist[]>([]);
+
+  useEffect(() => {
+    // Reset editedPlaylists whenever the dialog is opened
+    if (isDialogOpen) {
+      setEditedPlaylists(playlists);
+    }
+  }, [isDialogOpen, playlists]);
+
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -245,24 +254,31 @@ export default function PlaylistChooser() {
     (playlist) => playlist.instrument === "",
   );
 
-  // temp hard-coded genre IDs for now.  These should be fetched from the database.
-  const genreIds: string[] = [
-    "ITRAD",
-    "OTIME",
-    "BGRA",
-    "CONTRA",
-    "FRCAN",
-    "SCOT",
-    "NFLD",
-    "KLEZM",
-    "FLAM",
-    "BLUES",
-    "CAJUN",
-    "TEXMX",
-    "SAMBA",
-    "FADO",
-    "GAME",
-  ];
+  const [genres, setGenres] = useState<IGenre[]>([]);
+  const [isGenresLoading, setIsGenresLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchGenres = async () => {
+      try {
+        const genresData = await getAllGenres();
+        if (Array.isArray(genresData)) {
+          setGenres(genresData);
+        } else {
+          console.error("Error fetching genres:", genresData);
+        }
+      } catch (error) {
+        console.error("Error fetching genres:", error);
+      } finally {
+        setIsGenresLoading(false);
+      }
+    };
+
+    void fetchGenres();
+  }, []);
+
+  if (isGenresLoading) {
+    return <div>Loading...</div>; // Render a loading indicator while fetching data
+  }
 
   return (
     <div className="flex items-center space-x-2">
@@ -340,22 +356,31 @@ export default function PlaylistChooser() {
                 }
                 placeholder="Instrument"
               />
-              <select
-                value={playlist.genre_default ?? ""}
-                onChange={(e) =>
-                  handleEditPlaylist(index, "genre_default", e.target.value)
-                }
-                className="px-4 py-2 border rounded bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out"
-              >
-                <option value="" disabled>
-                  Select Genre
-                </option>
-                {genreIds.map((genre) => (
-                  <option key={genre} value={genre}>
-                    {genre}
-                  </option>
-                ))}
-              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger className="w-[25rem] mt-2 flex items-center justify-between">
+                  {playlist.genre_default || "(not set)"}{" "}
+                  <ChevronDownIcon className="w-5 h-5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="max-h-60 overflow-y-auto">
+                  {genres.map((genre) => (
+                    <DropdownMenuItem
+                      key={genre.id}
+                      onSelect={() => {
+                        handleEditPlaylist(index, "genre_default", genre.id);
+                      }}
+                      className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                    >
+                      <div className="text-xs">
+                        <div>{genre.id}</div>
+                        <div>Name: {genre.name}</div>
+                        <div>Region: {genre.region}</div>
+                        <div>Description: {genre.description}</div>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Input
                 value={playlist.description ?? ""}
                 onChange={(e) =>
