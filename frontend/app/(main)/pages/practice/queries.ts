@@ -5,6 +5,7 @@ import type { SortingState } from "@tanstack/react-table";
 import axios from "axios";
 import { ERROR_TUNE } from "./mocks";
 import type {
+  IGenre,
   INote,
   IPlaylist,
   IPlaylistTune,
@@ -723,10 +724,19 @@ export async function updatePlaylist(
  */
 export async function deletePlaylist(
   playlistId: number,
-): Promise<ITTResponseInfo> {
+  hardDelete = false,
+): Promise<IPlaylist | { detail: string }> {
   try {
-    const response = await client.delete<ITTResponseInfo>(
+    if (hardDelete) {
+      const responseDelete = await client.delete<
+        IPlaylist | { detail: string }
+      >(`/playlist/${playlistId}`);
+      return responseDelete.data;
+    }
+    const playlistUpdate = { deleted: true };
+    const response = await client.patch<IPlaylist | { detail: string }>(
       `/playlist/${playlistId}`,
+      playlistUpdate,
     );
     return response.data;
   } catch (error) {
@@ -752,5 +762,64 @@ export async function getPlaylistById(
   } catch (error) {
     console.error(`Error in getPlaylistById(${playlistId})`, error);
     return { detail: `Unable to fetch playlist: ${(error as Error).message}` };
+  }
+}
+
+export async function getAllGenres(): Promise<IGenre[]> {
+  try {
+    const response = await client.get<IGenre[]>("/genres");
+    return response.data;
+  } catch (error) {
+    console.error("Error in getAllGenres:", error);
+    return [];
+  }
+}
+
+export async function getGenreById(
+  genreId: number,
+): Promise<IGenre | { detail: string }> {
+  try {
+    const response = await client.get<IGenre>(`/genres/${genreId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error in getGenreById:", error);
+    return { detail: `Unable to fetch genre: ${(error as Error).message}` };
+  }
+}
+
+export async function createGenre(
+  genreData: Omit<IGenre, "id">,
+): Promise<IGenre | { detail: string }> {
+  try {
+    const response = await client.post<IGenre>("/genres", genreData);
+    return response.data;
+  } catch (error) {
+    console.error("Error in createGenre:", error);
+    return { detail: `Unable to create genre: ${(error as Error).message}` };
+  }
+}
+
+export async function updateGenre(
+  genreId: number,
+  genreData: Partial<Omit<IGenre, "id">>,
+): Promise<IGenre | { detail: string }> {
+  try {
+    const response = await client.put<IGenre>(`/genres/${genreId}`, genreData);
+    return response.data;
+  } catch (error) {
+    console.error("Error in updateGenre:", error);
+    return { detail: `Unable to update genre: ${(error as Error).message}` };
+  }
+}
+
+export async function deleteGenre(
+  genreId: number,
+): Promise<{ detail?: string }> {
+  try {
+    await client.delete(`/genres/${genreId}`);
+    return {};
+  } catch (error) {
+    console.error("Error in deleteGenre:", error);
+    return { detail: `Unable to delete genre: ${(error as Error).message}` };
   }
 }

@@ -138,3 +138,10 @@ export interface ITTResponseInfo {
   success?: string;
   detail?: string;
 }
+
+export interface IGenre {
+  id: string;
+  name: string;
+  description?: string;
+  region?: string;
+}
