@@ -11,7 +11,7 @@ SELECT
        playlist_tune.learned,
        playlist.user_ref AS user_ref,
        playlist.playlist_id AS playlist_id,
-       playlist.instrument AS instrument,
+       instrument.instrument AS instrument,
        playlist_tune.deleted as playlist_deleted,
        practice_record.practiced,
        practice_record.quality,
@@ -41,6 +41,8 @@ LEFT JOIN
     playlist_tune ON playlist_tune.tune_ref = tune.id
 LEFT JOIN
     playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+LEFT JOIN
+    instrument ON instrument.id = playlist.instrument_ref
 LEFT JOIN
     practice_record ON practice_record.tune_ref = tune.id AND practice_record.playlist_ref = playlist_tune.playlist_ref
 LEFT JOIN
