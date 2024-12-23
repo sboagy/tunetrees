@@ -30,6 +30,7 @@ from tunetrees.app.schedule import (
 )
 from tunetrees.models.tunetrees import (
     Genre,
+    Instrument,
     Note,
     Playlist,
     PlaylistTune,
@@ -37,9 +38,12 @@ from tunetrees.models.tunetrees import (
     Tune,
     t_practice_list_joined,
     t_practice_list_staged,
+    t_view_playlist_joined,
 )
 from tunetrees.models.tunetrees_pydantic import (
     ColumnSort,
+    InstrumentModel,
+    InstrumentModelPartial,
     NoteModel,
     NoteModelCreate,
     NoteModelPartial,
@@ -59,6 +63,7 @@ from tunetrees.models.tunetrees_pydantic import (
     GenreModel,
     GenreModelCreate,
     GenreModelPartial,
+    ViewPlaylistJoinedModel,
 )
 
 logger = logging.getLogger("tunetrees.api")
@@ -1154,3 +1159,168 @@ def delete_genre(genre_id: int) -> None:
             db.commit()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/instruments",
+    response_model=List[InstrumentModel],
+    summary="Get Instruments",
+    description="Retrieve all instruments.",
+    status_code=200,
+)
+def get_instruments(
+    user_ref: Optional[int] = Query(None, description="User reference ID"),
+) -> List[InstrumentModel]:
+    try:
+        with SessionLocal() as db:
+            query = db.query(Instrument)
+            if user_ref is not None:
+                query = query.filter(Instrument.private_to_user == user_ref)
+            instruments = query.all()
+            return [
+                InstrumentModel.model_validate(instrument) for instrument in instruments
+            ]
+    except Exception as e:
+        logger.error(f"Unable to fetch instruments: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to fetch instruments: {e}")
+
+
+@router.get(
+    "/instruments/{instrument_id}",
+    response_model=InstrumentModel,
+    summary="Get Instrument by ID",
+    description="Retrieve an instrument by its ID.",
+    status_code=200,
+)
+def get_instrument_by_id(
+    instrument_id: int = Path(..., description="Instrument ID"),
+) -> InstrumentModel:
+    try:
+        with SessionLocal() as db:
+            instrument = (
+                db.query(Instrument).filter(Instrument.id == instrument_id).first()
+            )
+            if not instrument:
+                raise HTTPException(status_code=404, detail="Instrument not found")
+            return InstrumentModel.model_validate(instrument)
+    except Exception as e:
+        logger.error(f"Unable to fetch instrument: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to fetch instrument: {e}")
+
+
+@router.post(
+    "/instruments",
+    response_model=InstrumentModel,
+    summary="Create Instrument",
+    description="Create a new instrument.",
+    status_code=201,
+)
+def create_instrument(instrument: InstrumentModelPartial):
+    try:
+        with SessionLocal() as db:
+            new_instrument = Instrument(**instrument.model_dump())
+            db.add(new_instrument)
+            db.commit()
+            db.refresh(new_instrument)
+            return InstrumentModel.model_validate(new_instrument)
+    except Exception as e:
+        logger.error(f"Unable to create instrument: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to create instrument: {e}")
+
+
+@router.patch(
+    "/instruments/{instrument_id}",
+    response_model=InstrumentModel,
+    summary="Update Instrument",
+    description="Update an existing instrument by its ID.",
+    status_code=200,
+)
+def update_instrument(
+    instrument_id: int = Path(..., description="Instrument ID"),
+    instrument: InstrumentModelPartial = Body(...),
+):
+    try:
+        with SessionLocal() as db:
+            existing_instrument = (
+                db.query(Instrument).filter(Instrument.id == instrument_id).first()
+            )
+            if not existing_instrument:
+                raise HTTPException(status_code=404, detail="Instrument not found")
+
+            for key, value in instrument.model_dump(exclude_unset=True).items():
+                setattr(existing_instrument, key, value)
+
+            db.commit()
+            db.refresh(existing_instrument)
+            return InstrumentModel.model_validate(existing_instrument)
+    except Exception as e:
+        logger.error(f"Unable to update instrument: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to update instrument: {e}")
+
+
+@router.delete(
+    "/instruments/{instrument_id}",
+    summary="Delete Instrument",
+    description="Delete an existing instrument by its ID.",
+    status_code=204,
+)
+def delete_instrument(
+    instrument_id: int = Path(..., description="Instrument ID"),
+):
+    try:
+        with SessionLocal() as db:
+            existing_instrument = (
+                db.query(Instrument).filter(Instrument.id == instrument_id).first()
+            )
+            if not existing_instrument:
+                raise HTTPException(status_code=404, detail="Instrument not found")
+
+            db.delete(existing_instrument)
+            db.commit()
+            return
+    except Exception as e:
+        logger.error(f"Unable to delete instrument: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to delete instrument: {e}")
+
+
+@router.get(
+    "/view_playlist_joined/{user_id}",
+    response_model=List[ViewPlaylistJoinedModel],
+    summary="Get View Playlist Joined",
+    description="Retrieve the joined playlist and instrument data for a user.",
+    status_code=200,
+)
+async def get_view_playlist_joined(
+    user_id: int,
+    instrument_ref: Optional[int] = Query(None),
+    show_deleted: bool = Query(False),
+    show_playlist_deleted: bool = Query(False),
+    all_public: bool = Query(
+        False, description="Include public records (user_id == 0)"
+    ),
+) -> List[ViewPlaylistJoinedModel]:
+    try:
+        with SessionLocal() as db:
+            query = db.query(t_view_playlist_joined).filter(
+                (t_view_playlist_joined.c.user_ref == user_id)
+                | (all_public and t_view_playlist_joined.c.private_to_user == 0)
+            )
+            if instrument_ref is not None:
+                query = query.filter(
+                    t_view_playlist_joined.c.instrument_ref == instrument_ref
+                )
+            if not show_deleted:
+                query = query.filter(
+                    t_view_playlist_joined.c.instrument_deleted.is_(False)
+                )
+            if not show_playlist_deleted:
+                query = query.filter(
+                    t_view_playlist_joined.c.playlist_deleted.is_(False)
+                )
+            result = query.all()
+            return [ViewPlaylistJoinedModel.model_validate(record) for record in result]
+    except Exception as e:
+        logger.error(f"Unable to fetch view playlist joined: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to fetch view playlist joined: {e}"
+        )

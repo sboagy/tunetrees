@@ -233,9 +233,7 @@ class ExternalRefModelPartial(BaseModel):
 class PlaylistModel(BaseModel):
     playlist_id: int
     user_ref: Optional[int]
-    instrument: Optional[str]
-    description: Optional[str]  # Added description field
-    genre_default: Optional[str] = None
+    instrument_ref: Optional[int]
     deleted: Optional[bool]
 
     class Config:
@@ -246,6 +244,30 @@ class PlaylistModel(BaseModel):
 class PlaylistModelPartial(BaseModel):
     playlist_id: Optional[int] = None
     user_ref: Optional[int] = None
+    instrument_ref: Optional[int] = None
+    deleted: Optional[bool] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class InstrumentModel(BaseModel):
+    id: int
+    private_to_user: Optional[int]
+    instrument: str
+    description: Optional[str]
+    genre_default: Optional[str]
+    deleted: Optional[bool]
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class InstrumentModelPartial(BaseModel):
+    id: Optional[int] = None
+    private_to_user: Optional[int] = None
     instrument: Optional[str] = None
     description: Optional[str] = None
     genre_default: Optional[str] = None
@@ -640,3 +662,19 @@ class GenreModelPartial(BaseModel):
     name: str | None = None
     description: str | None = None
     region: str | None = None
+
+
+class ViewPlaylistJoinedModel(BaseModel):
+    playlist_id: int
+    user_ref: int
+    playlist_deleted: bool
+    instrument_ref: int
+    private_to_user: Optional[int]
+    instrument: str
+    description: Optional[str]
+    genre_default: Optional[str]
+    instrument_deleted: bool
+
+    class Config:
+        orm_mode = True
+        from_attributes = True

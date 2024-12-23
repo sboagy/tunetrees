@@ -127,8 +127,15 @@ export interface IPlaylistTune {
 
 export interface IPlaylist {
   playlist_id: number;
-  user_ref?: number;
-  instrument?: string;
+  user_ref: number;
+  instrument_ref: number;
+  deleted?: boolean | null;
+}
+
+export interface IInstrument {
+  id: number;
+  private_to_user: number;
+  instrument: string;
   description?: string;
   genre_default?: string;
   deleted?: boolean | null;
@@ -144,4 +151,16 @@ export interface IGenre {
   name: string;
   description?: string;
   region?: string;
+}
+
+export interface IViewPlaylistJoined {
+  playlist_id: number;
+  user_ref: number;
+  playlist_deleted: boolean;
+  instrument_ref: number;
+  private_to_user?: number;
+  instrument: string;
+  description?: string;
+  genre_default?: string;
+  instrument_deleted?: boolean;
 }

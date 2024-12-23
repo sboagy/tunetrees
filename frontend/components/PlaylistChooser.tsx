@@ -3,10 +3,10 @@
 import { usePlaylist } from "@/app/(main)/pages/practice/components/CurrentPlaylistProvider";
 import { useTuneDataRefresh } from "@/app/(main)/pages/practice/components/TuneDataRefreshContext";
 import {
-  createPlaylist,
+  createPlaylistJoined,
   deletePlaylist,
+  fetchViewPlaylistJoined,
   getAllGenres,
-  getPlaylists,
   getRepertoireTunesOverview, // Import getTunesInPlaylistForUser
   updatePlaylist,
 } from "@/app/(main)/pages/practice/queries";
@@ -15,9 +15,20 @@ import {
   getTabGroupMainState,
   updateTabGroupMainState,
 } from "@/app/(main)/pages/practice/settings";
-import type { IGenre, IPlaylist } from "@/app/(main)/pages/practice/types";
+import type {
+  IGenre,
+  IViewPlaylistJoined,
+} from "@/app/(main)/pages/practice/types";
 import deepEqual from "fast-deep-equal"; // Import deepEqual
-import { ChevronDownIcon, MinusIcon, PlusIcon, TrashIcon } from "lucide-react"; // Import the TrashIcon
+import {
+  ChevronDownIcon,
+  ListChecksIcon,
+  MinusIcon,
+  PlusIcon,
+  SquareCheckBigIcon,
+  SquareIcon,
+  TrashIcon,
+} from "lucide-react"; // Import the TrashIcon
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
@@ -44,16 +55,33 @@ export default function PlaylistChooser() {
   const [currentPlaylistDescription, setCurrentPlaylistDescription] =
     useState<string>("");
   const { triggerRefresh } = useTuneDataRefresh();
-  const [playlists, setPlaylists] = useState<IPlaylist[]>([]);
+  const [playlists, setPlaylists] = useState<IViewPlaylistJoined[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editedPlaylists, setEditedPlaylists] = useState<IPlaylist[]>([]);
+  const [editedPlaylists, setEditedPlaylists] = useState<IViewPlaylistJoined[]>(
+    [],
+  );
 
   useEffect(() => {
     // Reset editedPlaylists whenever the dialog is opened
     if (isDialogOpen) {
-      setEditedPlaylists(playlists);
+      const fetchAndSetEditedPlaylists = async (userId: number) => {
+        const playlistsEditList = await fetchViewPlaylistJoined(
+          userId,
+          undefined,
+          false,
+          false,
+          true,
+        );
+        setEditedPlaylists(playlistsEditList);
+      };
+
+      void fetchAndSetEditedPlaylists(
+        session?.user?.id ? Number(session?.user?.id) : -1,
+      );
+    } else {
+      setEditedPlaylists([]);
     }
-  }, [isDialogOpen, playlists]);
+  }, [isDialogOpen, session?.user?.id]);
 
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,14 +92,13 @@ export default function PlaylistChooser() {
     try {
       // const playlists = await getPlaylists(userId);
       // Let's try getting all playlists for now
-      const playlists = await getPlaylists();
+      const playlists = await fetchViewPlaylistJoined(userId);
       if (typeof playlists === "string") {
         console.error("Error fetching playlists:", playlists);
         return -1;
       }
       if (Array.isArray(playlists)) {
         setPlaylists(playlists);
-        setEditedPlaylists(playlists);
         const tabGroupMainState = await getTabGroupMainState(
           userId,
           currentPlaylist,
@@ -118,7 +145,20 @@ export default function PlaylistChooser() {
     void fetchData();
   });
 
-  const handleSelect = (playlistObject: IPlaylist) => {
+  const handleToggleUserTuneSetList = (
+    editedPlaylistRow: IViewPlaylistJoined,
+  ): void => {
+    const updatedPlaylists = playlists.some(
+      (playlist) => playlist.playlist_id === editedPlaylistRow.playlist_id,
+    )
+      ? playlists.filter(
+          (playlist) => playlist.playlist_id !== editedPlaylistRow.playlist_id,
+        )
+      : [...playlists, editedPlaylistRow];
+    setPlaylists(updatedPlaylists);
+  };
+
+  const handleSelect = (playlistObject: IViewPlaylistJoined) => {
     setCurrentPlaylist(playlistObject.playlist_id);
     setCurrentPlaylistName(playlistObject.instrument ?? "NULL INSTRUMENT");
     setCurrentPlaylistDescription(playlistObject.description ?? "");
@@ -142,9 +182,12 @@ export default function PlaylistChooser() {
       ...editedPlaylists,
       {
         playlist_id: -Date.now(), // Use negative ID for new playlists
-        user_ref: session?.user?.id ? Number(session.user.id) : undefined,
+        user_ref: session?.user?.id ? Number(session.user.id) : 0,
+        instrument_ref: 0,
         instrument: "",
         description: "",
+        playlist_deleted: false,
+        genre_default: "",
       },
     ]);
     setHasChanges(true);
@@ -152,7 +195,7 @@ export default function PlaylistChooser() {
 
   const handleEditPlaylist = (
     index: number,
-    field: keyof IPlaylist,
+    field: keyof IViewPlaylistJoined,
     value: string,
   ) => {
     const updatedPlaylists = [...editedPlaylists];
@@ -201,13 +244,14 @@ export default function PlaylistChooser() {
               "Cannot delete Repertoire that contains tunes. Please first go to the corresponding Repertoire tab and delete all its tunes first.",
             );
             // Add the playlist back to the editedPlaylists list
-            const playlistToRestore: IPlaylist | undefined = playlists.find(
-              (playlist) => playlist.playlist_id === playlistId,
-            );
+            const playlistToRestore: IViewPlaylistJoined | undefined =
+              playlists.find((playlist) => playlist.playlist_id === playlistId);
             if (playlistToRestore) {
-              setEditedPlaylists((prev: IPlaylist[]): IPlaylist[] => {
-                return [...prev, playlistToRestore] as IPlaylist[];
-              });
+              setEditedPlaylists(
+                (prev: IViewPlaylistJoined[]): IViewPlaylistJoined[] => {
+                  return [...prev, playlistToRestore] as IViewPlaylistJoined[];
+                },
+              );
             }
             return;
           }
@@ -229,11 +273,10 @@ export default function PlaylistChooser() {
           continue; // Skip new items with an empty "instrument" field
         }
         await (playlist_id < 0
-          ? createPlaylist({
+          ? createPlaylistJoined({
               ...playlistData,
               instrument: playlist.instrument,
               genre_default: playlist.genre_default,
-              deleted: false,
             })
           : updatePlaylist(playlist_id, playlistData));
       }
@@ -318,8 +361,8 @@ export default function PlaylistChooser() {
       </DropdownMenu>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         {/* Make the dialog wider with min-w-[600px] (adjust as needed) */}
-        <DialogContent className="max-w-[40rem] w-full min-w-[40rem]">
-          <DialogHeader className="flex items-center justify-between">
+        <DialogContent className="max-w-[53rem] w-full min-w-[53rem]">
+          <DialogHeader className="flex justify-between">
             {/* Left-aligned title */}
             <DialogTitle className="text-left">
               Edit Repertoire List
@@ -328,10 +371,13 @@ export default function PlaylistChooser() {
           </DialogHeader>
 
           <div className="flex space-x-4 mt-4 font-bold">
-            <span className="w-14 mt-2">Id</span>
+            <span className="w-11 ml-3 mt-2">
+              <ListChecksIcon className="w-5 h-5" />
+            </span>
+            <span className="w-12 mt-2">Id</span>
             <span className="w-48 mt-2">Instrument</span>
             <span className="w-40 mt-2">Genre Default</span>
-            <span className="w-1/4 mt-2">Description</span>
+            <span className="w-[15rem] mt-2">Description</span>
             <Button
               variant="ghost"
               className="flex items-center"
@@ -341,64 +387,101 @@ export default function PlaylistChooser() {
             </Button>
           </div>
 
-          {editedPlaylists.map((playlist, index) => (
-            <div key={playlist.playlist_id} className="flex space-x-3 mb-2">
+          {editedPlaylists.map((editedPlaylistRow, index) => (
+            <div
+              key={editedPlaylistRow.playlist_id}
+              className="flex space-x-3 mb-2"
+            >
+              <Button
+                variant="ghost"
+                onClick={() => handleToggleUserTuneSetList(editedPlaylistRow)}
+              >
+                {playlists.some(
+                  (playlist) =>
+                    playlist.playlist_id === editedPlaylistRow.playlist_id,
+                ) ? (
+                  <SquareCheckBigIcon className="w-5 h-5 mt-2 text-green-500" />
+                ) : (
+                  <SquareIcon className="w-5 h-5 mt-2" />
+                )}
+              </Button>
               <Input
-                value={playlist.playlist_id ?? "?"}
+                value={editedPlaylistRow.playlist_id ?? "?"}
                 placeholder="Id"
                 disabled
                 className="w-12"
               />
-              <Input
-                value={playlist.instrument ?? ""}
-                onChange={(e) =>
-                  handleEditPlaylist(index, "instrument", e.target.value)
-                }
-                placeholder="Instrument"
-              />
-              <DropdownMenu>
-                <DropdownMenuTrigger className="w-[25rem] mt-2 flex items-center justify-between">
-                  {playlist.genre_default || "(not set)"}{" "}
-                  <ChevronDownIcon className="w-5 h-5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="max-h-60 overflow-y-auto">
-                  {genres.map((genre) => (
-                    <DropdownMenuItem
-                      key={genre.id}
-                      onSelect={() => {
-                        handleEditPlaylist(index, "genre_default", genre.id);
-                      }}
-                      className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                    >
-                      <div className="text-xs">
-                        <div>{genre.id}</div>
-                        <div>Name: {genre.name}</div>
-                        <div>Region: {genre.region}</div>
-                        <div>Description: {genre.description}</div>
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Input
-                value={playlist.description ?? ""}
-                onChange={(e) =>
-                  handleEditPlaylist(index, "description", e.target.value)
-                }
-                placeholder="Description"
-              />
-              <Button
-                variant="destructive"
-                className="bg-transparent"
-                onClick={() => handleDeletePlaylist(index)}
-              >
-                {playlist.playlist_id > 0 ? (
-                  <TrashIcon className="w-5 h-5" />
-                ) : (
-                  <MinusIcon className="w-5 h-5" />
-                )}
-              </Button>
+              {editedPlaylistRow.private_to_user === 0 ? (
+                <div className="w-[14rem] pl-[1rem] mt-2 flex items-left">
+                  {editedPlaylistRow.instrument ?? "??"}
+                </div>
+              ) : (
+                <Input
+                  value={editedPlaylistRow.instrument ?? ""}
+                  onChange={(e) =>
+                    handleEditPlaylist(index, "instrument", e.target.value)
+                  }
+                  placeholder="Instrument"
+                  className="w-[14rem] mt-0 flex items-left"
+                />
+              )}
+              {editedPlaylistRow.private_to_user === 0 ? (
+                <div className="w-[10rem] mt-2 flex items-left">
+                  {editedPlaylistRow.genre_default ?? ""}
+                </div>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="w-[10rem] mt-0 flex items-center justify-between">
+                    {editedPlaylistRow.genre_default || "(not set)"}{" "}
+                    <ChevronDownIcon className="w-5 h-5" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="max-h-60 overflow-y-auto">
+                    {genres.map((genre) => (
+                      <DropdownMenuItem
+                        key={genre.id}
+                        onSelect={() => {
+                          handleEditPlaylist(index, "genre_default", genre.id);
+                        }}
+                        className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                      >
+                        <div className="text-xs">
+                          <div>{genre.id}</div>
+                          <div>Name: {genre.name}</div>
+                          <div>Region: {genre.region}</div>
+                          <div>Description: {genre.description}</div>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {editedPlaylistRow.private_to_user === 0 ? (
+                <div className="w-[15rem] mt-2 flex items-left">
+                  {editedPlaylistRow.description ?? ""}
+                </div>
+              ) : (
+                <Input
+                  value={editedPlaylistRow.description ?? ""}
+                  onChange={(e) =>
+                    handleEditPlaylist(index, "description", e.target.value)
+                  }
+                  placeholder="Description"
+                  className="w-[15rem] mt-0 flex items-left"
+                />
+              )}
+              {editedPlaylistRow.private_to_user !== 0 && (
+                <Button
+                  variant="destructive"
+                  className="bg-transparent"
+                  onClick={() => handleDeletePlaylist(index)}
+                >
+                  {editedPlaylistRow.playlist_id > 0 ? (
+                    <TrashIcon className="w-5 h-5" />
+                  ) : (
+                    <MinusIcon className="w-5 h-5" />
+                  )}
+                </Button>
+              )}
             </div>
           ))}
 

@@ -6,6 +6,7 @@ import axios from "axios";
 import { ERROR_TUNE } from "./mocks";
 import type {
   IGenre,
+  IInstrument,
   INote,
   IPlaylist,
   IPlaylistTune,
@@ -13,6 +14,7 @@ import type {
   ITTResponseInfo,
   ITune,
   ITuneOverview,
+  IViewPlaylistJoined,
 } from "./types";
 
 const client = axios.create({
@@ -746,6 +748,123 @@ export async function deletePlaylist(
 }
 
 /**
+ * Retrieve instruments by user reference.
+ *
+ * @param userRef - The user reference ID.
+ * @returns A promise that resolves to the requested Instrument objects, or an error message.
+ */
+export async function getInstruments(
+  userRef = -1,
+): Promise<IInstrument[] | { detail: string }> {
+  try {
+    const response = await client.get<IInstrument[] | { detail: string }>(
+      "/instruments",
+      {
+        params: { user_ref: userRef },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error in getInstruments(${userRef})`, error);
+    return {
+      detail: `Unable to fetch instruments: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Retrieve a specific instrument by its ID.
+ *
+ * @param instrumentId - The ID of the instrument.
+ * @returns A promise that resolves to the requested Instrument object, or an error message.
+ */
+export async function getInstrumentById(
+  instrumentId: number,
+): Promise<IInstrument | { detail: string }> {
+  try {
+    const response = await client.get<IInstrument | { detail: string }>(
+      `/instruments/${instrumentId}`,
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error in getInstrumentById(${instrumentId})`, error);
+    return {
+      detail: `Unable to fetch instrument: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Create a new instrument.
+ *
+ * @param instrument - The instrument data to create.
+ * @returns A promise that resolves to the created Instrument object, or an error message.
+ */
+export async function createInstrument(
+  instrument: Partial<IInstrument>,
+): Promise<IInstrument | { detail: string }> {
+  try {
+    const response = await client.post<IInstrument | { detail: string }>(
+      "/instruments",
+      instrument,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in createInstrument: ", error);
+    return {
+      detail: `Unable to create instrument: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Update a specific instrument.
+ *
+ * @param instrumentId - The ID of the instrument.
+ * @param instrumentUpdate - The fields to update (all optional).
+ * @returns A promise that resolves to the updated Instrument object, or an error message.
+ */
+export async function updateInstrument(
+  instrumentId: number,
+  instrumentUpdate: Partial<IInstrument>,
+): Promise<IInstrument | { detail: string }> {
+  try {
+    const response = await client.patch<IInstrument | { detail: string }>(
+      `/instruments/${instrumentId}`,
+      instrumentUpdate,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in updateInstrument: ", error);
+    return {
+      detail: `Unable to update instrument: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
+ * Delete a specific instrument.
+ *
+ * @param instrumentId - The ID of the instrument.
+ * @returns A promise that resolves to a success or error message.
+ */
+export async function deleteInstrument(
+  instrumentId: number,
+): Promise<{ detail?: string }> {
+  try {
+    const response = await client.delete<{ detail?: string }>(
+      `/instruments/${instrumentId}`,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in deleteInstrument: ", error);
+    return {
+      detail: `Unable to delete instrument: ${(error as Error).message}`,
+    };
+  }
+}
+
+/**
  * Retrieve a specific playlist by its ID.
  *
  * @param playlistId - The ID of the playlist.
@@ -821,5 +940,93 @@ export async function deleteGenre(
   } catch (error) {
     console.error("Error in deleteGenre:", error);
     return { detail: `Unable to delete genre: ${(error as Error).message}` };
+  }
+}
+
+export async function fetchViewPlaylistJoined(
+  userId: number,
+  instrumentId?: number,
+  showDeleted = false,
+  showPlaylistDeleted = false,
+  allPublic = false,
+): Promise<IViewPlaylistJoined[]> {
+  try {
+    const params: {
+      show_deleted: boolean;
+      show_playlist_deleted: boolean;
+      all_public?: boolean;
+      instrument_ref?: number;
+    } = {
+      show_deleted: showDeleted,
+      show_playlist_deleted: showPlaylistDeleted,
+    };
+    if (instrumentId) {
+      params.instrument_ref = instrumentId;
+    }
+    if (allPublic) {
+      params.all_public = allPublic;
+    }
+    const response = await client.get<IViewPlaylistJoined[]>(
+      `/view_playlist_joined/${userId}`,
+      {
+        params: params,
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching view playlist joined: ", error);
+    throw new Error(
+      `Error fetching view playlist joined: ${(error as Error).message}`,
+    );
+  }
+}
+
+export async function createPlaylistJoined(
+  playlist: Partial<IViewPlaylistJoined>,
+  userId?: number,
+): Promise<IViewPlaylistJoined | { detail: string }> {
+  try {
+    const instrument: Partial<IInstrument> = {};
+    if (playlist.instrument) {
+      instrument.instrument = playlist.instrument;
+    }
+    if (playlist.description) {
+      instrument.description = playlist.description;
+    }
+    if (playlist.user_ref) {
+      instrument.private_to_user = playlist.user_ref;
+    }
+    if (playlist.genre_default) {
+      instrument.genre_default = playlist.genre_default;
+    }
+    if (playlist.instrument_deleted) {
+      instrument.deleted = playlist.instrument_deleted;
+    }
+    const createdInstrument: IInstrument | { detail: string } =
+      await createInstrument(instrument);
+    if ("detail" in createdInstrument) {
+      return { detail: createdInstrument.detail };
+    }
+    const newPlaylist: Partial<IPlaylist> = {
+      user_ref: userId ?? playlist.user_ref,
+      instrument_ref: createdInstrument.id,
+      deleted: playlist.playlist_deleted,
+    };
+    const createdPlaylist = await createPlaylist(newPlaylist);
+    if ("detail" in createdPlaylist) {
+      return { detail: createdPlaylist.detail };
+    }
+    const createdPlaylistJoined: IViewPlaylistJoined[] =
+      await fetchViewPlaylistJoined(
+        userId ?? playlist.user_ref ?? 0,
+        createdInstrument.id,
+      );
+    if (createdPlaylistJoined.length === 0) {
+      return { detail: "Unable to create playlist" };
+    }
+    return createdPlaylistJoined[0];
+  } catch (error) {
+    console.error("Error in createPlaylist: ", error);
+    return { detail: `Unable to create playlist: ${(error as Error).message}` };
   }
 }

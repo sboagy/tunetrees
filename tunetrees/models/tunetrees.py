@@ -118,6 +118,9 @@ class User(Base):
     account: Mapped[List["Account"]] = relationship(
         "Account", uselist=True, back_populates="user"
     )
+    instrument: Mapped[List["Instrument"]] = relationship(
+        "Instrument", uselist=True, back_populates="user"
+    )
     playlist: Mapped[List["Playlist"]] = relationship(
         "Playlist", uselist=True, back_populates="user"
     )
@@ -153,6 +156,21 @@ class VerificationToken(Base):
     expires = mapped_column(Text)
 
 
+t_view_playlist_joined = Table(
+    "view_playlist_joined",
+    metadata,
+    Column("playlist_id", Integer),
+    Column("user_ref", Integer),
+    Column("playlist_deleted", Boolean),
+    Column("instrument_ref", Integer),
+    Column("private_to_user", Integer),
+    Column("instrument", Text),
+    Column("description", Text),
+    Column("genre_default", Text),
+    Column("instrument_deleted", Boolean),
+)
+
+
 class Account(Base):
     __tablename__ = "account"
 
@@ -171,19 +189,31 @@ class Account(Base):
     user: Mapped["User"] = relationship("User", back_populates="account")
 
 
-class Playlist(Base):
-    __tablename__ = "playlist"
+class Instrument(Base):
+    __tablename__ = "instrument"
     __table_args__ = (
-        UniqueConstraint("user_ref", "instrument"),
-        Index("idx_playlist_instrument", "instrument"),
-        Index("idx_playlist_user_ref", "user_ref"),
+        UniqueConstraint("private_to_user", "instrument"),
+        Index("idx_instrument_instrument", "instrument"),
+        Index("idx_instrument_private_to_user", "private_to_user"),
     )
 
-    playlist_id = mapped_column(Integer, primary_key=True)
-    user_ref = mapped_column(ForeignKey("user.id"))
+    id = mapped_column(Integer, primary_key=True)
+    private_to_user = mapped_column(ForeignKey("user.id"))
     instrument = mapped_column(Text)
     description = mapped_column(Text)
     genre_default = mapped_column(Text)
+    deleted = mapped_column(Boolean, server_default=text("FALSE"))
+
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="instrument")
+
+
+class Playlist(Base):
+    __tablename__ = "playlist"
+    __table_args__ = (UniqueConstraint("user_ref", "instrument_ref"),)
+
+    playlist_id = mapped_column(Integer, primary_key=True)
+    user_ref = mapped_column(ForeignKey("user.id"))
+    instrument_ref = mapped_column(Integer)
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="playlist")
