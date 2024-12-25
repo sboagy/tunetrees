@@ -1,0 +1,39 @@
+.dialog_content {
+  @apply max-w-[60rem] w-full min-w-[60rem];
+}
+
+.dialog_content .dialog_table {
+  @apply flex space-x-4 mt-4 font-bold;
+}
+
+.dialog_content .column_include {
+  @apply w-11 ml-3 mt-2;
+}
+
+.dialog_content .column_id {
+  @apply w-[6em] mt-2;
+}
+
+.dialog_content .column_instrument {
+  @apply w-[12em] mt-2;
+}
+
+.dialog_content .column_genre_default {
+  @apply w-[16em] mt-2;
+}
+
+.dialog_content .column_description {
+  @apply w-[15rem] mt-2;
+}
+
+.dialog_content .column_change_controls {
+  @apply w-11 ml-3 mt-2;
+}
+
+.dialog_content .column_change_controls button {
+  @apply mt-[-4px];
+}
+
+.dialog_content .dialog_footer {
+  @apply block text-center;
+}

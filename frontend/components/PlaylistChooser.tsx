@@ -19,11 +19,11 @@ import type {
   IGenre,
   IViewPlaylistJoined,
 } from "@/app/(main)/pages/practice/types";
-import deepEqual from "fast-deep-equal"; // Import deepEqual
+import { deepEqualIgnoreOrder } from "@/lib/compare";
 import {
   ChevronDownIcon,
   ListChecksIcon,
-  MinusIcon,
+  PenOffIcon,
   PlusIcon,
   SquareCheckBigIcon,
   SquareIcon,
@@ -31,6 +31,7 @@ import {
 } from "lucide-react"; // Import the TrashIcon
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import styles from "./PlaylistChooser.module.css";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -47,6 +48,28 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Input } from "./ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+
+function playlistsEqual(
+  label: string,
+  a: Array<IViewPlaylistJoined>,
+  b: Array<IViewPlaylistJoined>,
+): boolean {
+  // Wrap the deepEqualIgnoreOrder function to bottleneck the comparison
+  // and log the results for diagnostic purposes.
+  const isEqual = deepEqualIgnoreOrder(a, b, true);
+  console.log(
+    `===> PlaylistChooser.tsx:65 ~ label=${label} isEqual=${isEqual}`,
+  );
+  return isEqual;
+}
 
 export default function PlaylistChooser() {
   const { data: session } = useSession();
@@ -55,11 +78,26 @@ export default function PlaylistChooser() {
   const [currentPlaylistDescription, setCurrentPlaylistDescription] =
     useState<string>("");
   const { triggerRefresh } = useTuneDataRefresh();
-  const [playlists, setPlaylists] = useState<IViewPlaylistJoined[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editedPlaylists, setEditedPlaylists] = useState<IViewPlaylistJoined[]>(
+
+  // =======================
+  // There are 4 states for playlists.  The first set represents the playlists that show
+  // up in the dropdown menu.  The second set represents the playlists that are available
+  // to the user to add to the dropdown menu.  Then each of those sets has a modified
+  // version that is used to track changes to the playlists.
+  const [playlistsInMenu, setPlaylistsInMenu] = useState<IViewPlaylistJoined[]>(
     [],
   );
+  const [playlistsInMenuModified, setPlaylistsInMenuModified] = useState<
+    IViewPlaylistJoined[]
+  >([]);
+  const [playlistsAllAvailable, setPlaylistsAllAvailable] = useState<
+    IViewPlaylistJoined[]
+  >([]);
+  const [playlistsAllAvailableModified, setPlaylistsAllAvailableModified] =
+    useState<IViewPlaylistJoined[]>([]);
+  // =======================
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     // Reset editedPlaylists whenever the dialog is opened
@@ -72,18 +110,18 @@ export default function PlaylistChooser() {
           false,
           true,
         );
-        setEditedPlaylists(playlistsEditList);
+        setPlaylistsAllAvailable(playlistsEditList);
+        setPlaylistsAllAvailableModified(structuredClone(playlistsEditList));
       };
 
       void fetchAndSetEditedPlaylists(
         session?.user?.id ? Number(session?.user?.id) : -1,
       );
     } else {
-      setEditedPlaylists([]);
+      setPlaylistsAllAvailableModified([]);
     }
   }, [isDialogOpen, session?.user?.id]);
 
-  const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchPlaylistsAndSetCurrent = async (
@@ -98,7 +136,8 @@ export default function PlaylistChooser() {
         return -1;
       }
       if (Array.isArray(playlists)) {
-        setPlaylists(playlists);
+        setPlaylistsInMenu(playlists);
+        setPlaylistsInMenuModified(structuredClone(playlists));
         const tabGroupMainState = await getTabGroupMainState(
           userId,
           currentPlaylist,
@@ -148,14 +187,14 @@ export default function PlaylistChooser() {
   const handleToggleUserTuneSetList = (
     editedPlaylistRow: IViewPlaylistJoined,
   ): void => {
-    const updatedPlaylists = playlists.some(
-      (playlist) => playlist.playlist_id === editedPlaylistRow.playlist_id,
+    const updatedPlaylists = playlistsInMenuModified.some(
+      (p) => p.playlist_id === editedPlaylistRow.playlist_id,
     )
-      ? playlists.filter(
-          (playlist) => playlist.playlist_id !== editedPlaylistRow.playlist_id,
+      ? playlistsInMenuModified.filter(
+          (p) => p.playlist_id !== editedPlaylistRow.playlist_id,
         )
-      : [...playlists, editedPlaylistRow];
-    setPlaylists(updatedPlaylists);
+      : [...playlistsInMenuModified, editedPlaylistRow];
+    setPlaylistsInMenuModified(updatedPlaylists);
   };
 
   const handleSelect = (playlistObject: IViewPlaylistJoined) => {
@@ -178,8 +217,8 @@ export default function PlaylistChooser() {
   };
 
   const handleAddPlaylist = () => {
-    setEditedPlaylists([
-      ...editedPlaylists,
+    const updatedPlaylists = [
+      ...playlistsAllAvailableModified,
       {
         playlist_id: -Date.now(), // Use negative ID for new playlists
         user_ref: session?.user?.id ? Number(session.user.id) : 0,
@@ -189,8 +228,8 @@ export default function PlaylistChooser() {
         playlist_deleted: false,
         genre_default: "",
       },
-    ]);
-    setHasChanges(true);
+    ];
+    setPlaylistsAllAvailableModified(updatedPlaylists);
   };
 
   const handleEditPlaylist = (
@@ -198,34 +237,34 @@ export default function PlaylistChooser() {
     field: keyof IViewPlaylistJoined,
     value: string,
   ) => {
-    const updatedPlaylists = [...editedPlaylists];
+    const updatedPlaylists = [...playlistsAllAvailableModified];
     updatedPlaylists[index] = {
       ...updatedPlaylists[index],
       [field]: value,
     };
-    setEditedPlaylists(updatedPlaylists);
-    setHasChanges(
-      JSON.stringify(updatedPlaylists) !== JSON.stringify(playlists),
-    );
+    setPlaylistsAllAvailableModified(updatedPlaylists);
   };
 
   const handleDeletePlaylist = (index: number) => {
-    const updatedPlaylists = editedPlaylists.filter((_, i) => i !== index);
-    setEditedPlaylists(updatedPlaylists);
-    setHasChanges(!deepEqual(updatedPlaylists, playlists));
+    const updatedPlaylists = playlistsAllAvailableModified.filter(
+      (_, i) => i !== index,
+    );
+    setPlaylistsAllAvailableModified(updatedPlaylists);
   };
 
   const handleSubmit = async () => {
     try {
-      const existingPlaylistIds = playlists.map((playlist) =>
+      const existingPlaylistIds = playlistsInMenu.map((playlist) =>
         Number(playlist.playlist_id),
       );
       const editedPlaylistIds = new Set(
-        editedPlaylists.map((playlist) => Number(playlist.playlist_id)),
+        playlistsAllAvailableModified.map((playlist) =>
+          Number(playlist.playlist_id),
+        ),
       );
 
       // Check for existing playlists with an empty "instrument" field
-      for (const playlist of editedPlaylists) {
+      for (const playlist of playlistsAllAvailableModified) {
         if (playlist.playlist_id > 0 && !playlist.instrument) {
           alert("Instrument field cannot be empty for existing playlists.");
           return;
@@ -245,9 +284,11 @@ export default function PlaylistChooser() {
             );
             // Add the playlist back to the editedPlaylists list
             const playlistToRestore: IViewPlaylistJoined | undefined =
-              playlists.find((playlist) => playlist.playlist_id === playlistId);
+              playlistsInMenu.find(
+                (playlist) => playlist.playlist_id === playlistId,
+              );
             if (playlistToRestore) {
-              setEditedPlaylists(
+              setPlaylistsAllAvailableModified(
                 (prev: IViewPlaylistJoined[]): IViewPlaylistJoined[] => {
                   return [...prev, playlistToRestore] as IViewPlaylistJoined[];
                 },
@@ -266,7 +307,7 @@ export default function PlaylistChooser() {
       }
 
       // Create or update playlists
-      for (const playlist of editedPlaylists) {
+      for (const playlist of playlistsAllAvailableModified) {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         const { playlist_id, ...playlistData } = playlist;
         if (playlist_id < 0 && !playlist.instrument) {
@@ -287,15 +328,14 @@ export default function PlaylistChooser() {
       const status = await fetchPlaylistsAndSetCurrent(userId);
       console.log("fetchPlaylistsAndSetCurrent status:", status);
       setIsDialogOpen(false);
-      setHasChanges(false);
     } catch (error) {
       console.error("Error submitting playlists:", error);
     }
   };
 
-  const hasEmptyVisibleInstrument = editedPlaylists.some(
-    (playlist) => playlist.instrument === "",
-  );
+  function hasEmptyVisibleInstrument(): boolean {
+    return playlistsAllAvailableModified.some((p) => p.instrument === "");
+  }
 
   const [genres, setGenres] = useState<IGenre[]>([]);
   const [isGenresLoading, setIsGenresLoading] = useState(true);
@@ -336,7 +376,7 @@ export default function PlaylistChooser() {
           <ChevronDownIcon className="w-5 h-5 text-gray-500" />
         </DropdownMenuTrigger>
         <DropdownMenuContent className="bg-white dark:bg-background border border-gray-300 dark:border-gray-700 rounded shadow-lg">
-          {playlists.map((playlist) => (
+          {playlistsInMenu.map((playlist) => (
             <DropdownMenuItem
               key={playlist.playlist_id}
               onSelect={() => handleSelect(playlist)}
@@ -361,141 +401,215 @@ export default function PlaylistChooser() {
       </DropdownMenu>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         {/* Make the dialog wider with min-w-[600px] (adjust as needed) */}
-        <DialogContent className="max-w-[53rem] w-full min-w-[53rem]">
+        <DialogContent className={styles.dialog_content}>
           <DialogHeader className="flex justify-between">
             {/* Left-aligned title */}
             <DialogTitle className="text-left">
               Edit Repertoire List
             </DialogTitle>
             {/* The built-in close 'x' is automatically placed here on the far right */}
+            <div>
+              Add or remove tune sets from your repertoire list. Preset
+              instrument sets can be used, or you can create your own custom
+              instrument which only you can see. You can set a default genre for
+              each custom tune set. To add or modify preset instruments, contact
+              the admin.
+            </div>
           </DialogHeader>
 
-          <div className="flex space-x-4 mt-4 font-bold">
-            <span className="w-11 ml-3 mt-2">
-              <ListChecksIcon className="w-5 h-5" />
-            </span>
-            <span className="w-12 mt-2">Id</span>
-            <span className="w-48 mt-2">Instrument</span>
-            <span className="w-40 mt-2">Genre Default</span>
-            <span className="w-[15rem] mt-2">Description</span>
-            <Button
-              variant="ghost"
-              className="flex items-center"
-              onClick={handleAddPlaylist}
-            >
-              <PlusIcon className="w-5 h-5" />
-            </Button>
-          </div>
-
-          {editedPlaylists.map((editedPlaylistRow, index) => (
-            <div
-              key={editedPlaylistRow.playlist_id}
-              className="flex space-x-3 mb-2"
-            >
-              <Button
-                variant="ghost"
-                onClick={() => handleToggleUserTuneSetList(editedPlaylistRow)}
-              >
-                {playlists.some(
-                  (playlist) =>
-                    playlist.playlist_id === editedPlaylistRow.playlist_id,
-                ) ? (
-                  <SquareCheckBigIcon className="w-5 h-5 mt-2 text-green-500" />
-                ) : (
-                  <SquareIcon className="w-5 h-5 mt-2" />
-                )}
-              </Button>
-              <Input
-                value={editedPlaylistRow.playlist_id ?? "?"}
-                placeholder="Id"
-                disabled
-                className="w-12"
-              />
-              {editedPlaylistRow.private_to_user === 0 ? (
-                <div className="w-[14rem] pl-[1rem] mt-2 flex items-left">
-                  {editedPlaylistRow.instrument ?? "??"}
-                </div>
-              ) : (
-                <Input
-                  value={editedPlaylistRow.instrument ?? ""}
-                  onChange={(e) =>
-                    handleEditPlaylist(index, "instrument", e.target.value)
-                  }
-                  placeholder="Instrument"
-                  className="w-[14rem] mt-0 flex items-left"
-                />
-              )}
-              {editedPlaylistRow.private_to_user === 0 ? (
-                <div className="w-[10rem] mt-2 flex items-left">
-                  {editedPlaylistRow.genre_default ?? ""}
-                </div>
-              ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="w-[10rem] mt-0 flex items-center justify-between">
-                    {editedPlaylistRow.genre_default || "(not set)"}{" "}
-                    <ChevronDownIcon className="w-5 h-5" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="max-h-60 overflow-y-auto">
-                    {genres.map((genre) => (
-                      <DropdownMenuItem
-                        key={genre.id}
-                        onSelect={() => {
-                          handleEditPlaylist(index, "genre_default", genre.id);
-                        }}
-                        className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                      >
-                        <div className="text-xs">
-                          <div>{genre.id}</div>
-                          <div>Name: {genre.name}</div>
-                          <div>Region: {genre.region}</div>
-                          <div>Description: {genre.description}</div>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              {editedPlaylistRow.private_to_user === 0 ? (
-                <div className="w-[15rem] mt-2 flex items-left">
-                  {editedPlaylistRow.description ?? ""}
-                </div>
-              ) : (
-                <Input
-                  value={editedPlaylistRow.description ?? ""}
-                  onChange={(e) =>
-                    handleEditPlaylist(index, "description", e.target.value)
-                  }
-                  placeholder="Description"
-                  className="w-[15rem] mt-0 flex items-left"
-                />
-              )}
-              {editedPlaylistRow.private_to_user !== 0 && (
-                <Button
-                  variant="destructive"
-                  className="bg-transparent"
-                  onClick={() => handleDeletePlaylist(index)}
+          <Table>
+            <TableHeader>
+              <TableRow className={`${styles.dialog_table} h-10`}>
+                <TableHead className={styles.column_include}>
+                  <ListChecksIcon className="w-5 h-5" />
+                </TableHead>
+                <TableHead className={styles.column_id}>Id</TableHead>
+                <TableHead className={styles.column_instrument}>
+                  Instrument
+                </TableHead>
+                <TableHead className={styles.column_genre_default}>
+                  Genre Default
+                </TableHead>
+                <TableHead className={styles.column_description}>
+                  Description
+                </TableHead>
+                <TableHead
+                  className={`${styles.column_change_controls} p-0 mt-2`}
                 >
-                  {editedPlaylistRow.playlist_id > 0 ? (
-                    <TrashIcon className="w-5 h-5" />
-                  ) : (
-                    <MinusIcon className="w-5 h-5" />
-                  )}
-                </Button>
-              )}
-            </div>
-          ))}
+                  <Button
+                    variant="destructive"
+                    className="bg-transparent hover:bg-green-400/10 ml-[1em] mt-[-8px]"
+                    onClick={handleAddPlaylist}
+                  >
+                    <PlusIcon className="w-5 h-5 text-blue-500" />
+                  </Button>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {playlistsAllAvailableModified.map((editedPlaylistRow, index) => (
+                <TableRow
+                  key={editedPlaylistRow.playlist_id}
+                  className={styles.dialog_table}
+                >
+                  <TableCell className={`${styles.column_include}`}>
+                    <Button
+                      variant="ghost"
+                      onClick={() =>
+                        handleToggleUserTuneSetList(editedPlaylistRow)
+                      }
+                    >
+                      {playlistsInMenuModified.some(
+                        (p) => p.playlist_id === editedPlaylistRow.playlist_id,
+                      ) ? (
+                        <SquareCheckBigIcon className="w-5 h-5 text-green-500" />
+                      ) : (
+                        <SquareIcon className="w-5 h-5" />
+                      )}
+                    </Button>
+                  </TableCell>
+                  <TableCell className={`${styles.column_id}`}>
+                    <Input
+                      value={editedPlaylistRow.playlist_id ?? "?"}
+                      placeholder="Id"
+                      disabled
+                      // className={"p-1 mt-0"}
+                    />
+                  </TableCell>
+                  <TableCell className={styles.column_instrument}>
+                    {editedPlaylistRow.private_to_user === 0 ? (
+                      <Input
+                        value={editedPlaylistRow.instrument ?? ""}
+                        onChange={(e) =>
+                          handleEditPlaylist(
+                            index,
+                            "instrument",
+                            e.target.value,
+                          )
+                        }
+                        placeholder="Instrument"
+                        disabled
+                        className="p-0 m-0"
+                      />
+                    ) : (
+                      <Input
+                        value={editedPlaylistRow.instrument ?? ""}
+                        onChange={(e) =>
+                          handleEditPlaylist(
+                            index,
+                            "instrument",
+                            e.target.value,
+                          )
+                        }
+                        placeholder="Instrument"
+                        className="p-0 m-0"
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell className={styles.column_genre_default}>
+                    {editedPlaylistRow.private_to_user === 0 ? (
+                      (editedPlaylistRow.genre_default ?? "")
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          className={`${styles.column_genre_default} flex items-center justify-between`}
+                        >
+                          {editedPlaylistRow.genre_default || "(not set)"}
+                          <ChevronDownIcon className="w-5 h-5" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="max-h-60 overflow-y-auto">
+                          {genres.map((genre) => (
+                            <DropdownMenuItem
+                              key={genre.id}
+                              onSelect={() => {
+                                handleEditPlaylist(
+                                  index,
+                                  "genre_default",
+                                  genre.id,
+                                );
+                              }}
+                              className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                            >
+                              <div className="text-xs">
+                                <div>{genre.id}</div>
+                                <div>Name: {genre.name}</div>
+                                <div>Region: {genre.region}</div>
+                                <div>Description: {genre.description}</div>
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </TableCell>
+                  <TableCell className={styles.column_description}>
+                    {editedPlaylistRow.private_to_user === 0 ? (
+                      (editedPlaylistRow.description ?? "")
+                    ) : (
+                      <Input
+                        value={editedPlaylistRow.description ?? ""}
+                        onChange={(e) =>
+                          handleEditPlaylist(
+                            index,
+                            "description",
+                            e.target.value,
+                          )
+                        }
+                        placeholder="Description"
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className={`${styles.column_change_controls} p-4 mt-0`}
+                  >
+                    {editedPlaylistRow.private_to_user !== 0 ? (
+                      <Button
+                        variant="destructive"
+                        className="bg-transparent"
+                        onClick={() => handleDeletePlaylist(index)}
+                      >
+                        <TrashIcon className="w-5 h-5" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="destructive"
+                        className="bg-transparent"
+                        onClick={() => handleDeletePlaylist(index)}
+                        disabled
+                      >
+                        <PenOffIcon className="w-5 h-5" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
 
-          <DialogFooter>
+          <DialogFooter className={`${styles.dialog_footer}`}>
             <Button
               variant="ghost"
               onClick={() => void handleSubmit()}
-              disabled={!hasChanges || hasEmptyVisibleInstrument}
+              disabled={
+                (playlistsEqual(
+                  "editedPlaylists",
+                  playlistsAllAvailableModified,
+                  playlistsAllAvailable,
+                ) &&
+                  playlistsEqual(
+                    "playlists",
+                    playlistsInMenu,
+                    playlistsInMenuModified,
+                  )) ||
+                hasEmptyVisibleInstrument()
+              }
+              className="w-full"
             >
               Update
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>{" "}
+      </Dialog>
     </div>
   );
 }
