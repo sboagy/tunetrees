@@ -112,14 +112,25 @@ export default function PlaylistChooser() {
         );
         setPlaylistsAllAvailable(playlistsEditList);
         setPlaylistsAllAvailableModified(structuredClone(playlistsEditList));
+
+        const playlists = await fetchViewPlaylistJoined(userId);
+        if (typeof playlists === "string") {
+          console.error("Error fetching playlists:", playlists);
+          return -1;
+        }
+        if (Array.isArray(playlists)) {
+          setPlaylistsInMenu(playlists);
+          setPlaylistsInMenuModified(structuredClone(playlists));
+        } else {
+          console.error("playlists should be an array!");
+          return -1;
+        }
       };
 
       void fetchAndSetEditedPlaylists(
         session?.user?.id ? Number(session?.user?.id) : -1,
       );
-    } else {
-      setPlaylistsAllAvailableModified([]);
-    }
+    } else setPlaylistsAllAvailableModified([]);
   }, [isDialogOpen, session?.user?.id]);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -181,6 +192,7 @@ export default function PlaylistChooser() {
         setIsLoading(false);
       }
     };
+
     void fetchData();
   });
 
@@ -254,10 +266,10 @@ export default function PlaylistChooser() {
 
   const handleSubmit = async () => {
     try {
-      const existingPlaylistIds = playlistsInMenu.map((playlist) =>
+      const playlistsInMenuIds = playlistsInMenu.map((playlist) =>
         Number(playlist.playlist_id),
       );
-      const editedPlaylistIds = new Set(
+      const playlistsAllAvailableModifiedIds = new Set(
         playlistsAllAvailableModified.map((playlist) =>
           Number(playlist.playlist_id),
         ),
@@ -272,8 +284,8 @@ export default function PlaylistChooser() {
       }
 
       // Pre-check for playlists containing tunes
-      for (const playlistId of existingPlaylistIds) {
-        if (!editedPlaylistIds.has(playlistId)) {
+      for (const playlistId of playlistsInMenuIds) {
+        if (!playlistsAllAvailableModifiedIds.has(playlistId)) {
           const tunes = await getRepertoireTunesOverview(
             session?.user?.id ? Number(session.user.id) : -1,
             playlistId,
@@ -300,8 +312,8 @@ export default function PlaylistChooser() {
       }
 
       // Delete playlists that are not in the editedPlaylists array
-      for (const playlistId of existingPlaylistIds) {
-        if (!editedPlaylistIds.has(playlistId)) {
+      for (const playlistId of playlistsInMenuIds) {
+        if (!playlistsAllAvailableModifiedIds.has(playlistId)) {
           await deletePlaylist(playlistId);
         }
       }
@@ -420,10 +432,19 @@ export default function PlaylistChooser() {
           <Table>
             <TableHeader>
               <TableRow className={`${styles.dialog_table} h-10`}>
-                <TableHead className={styles.column_include}>
-                  <ListChecksIcon className="w-5 h-5" />
+                <TableHead className={`${styles.column_include} p-0 mt-0`}>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {}}
+                    disabled
+                    className="bg-transparent ml-[1em] mt-[-8px] text-inherit disabled:text-inherit disabled:opacity-100"
+                  >
+                    <ListChecksIcon className="w-5 h-5" />
+                  </Button>
                 </TableHead>
-                <TableHead className={styles.column_id}>Id</TableHead>
+                <TableHead className={`${styles.column_id}`}>
+                  <div className="pl-3">Id</div>
+                </TableHead>
                 <TableHead className={styles.column_instrument}>
                   Instrument
                 </TableHead>
