@@ -121,21 +121,26 @@ export default function PlaylistDialog({
   };
 
   const handleEditPlaylist = (
-    index: number,
+    playlist_id: number,
     field: keyof IViewPlaylistJoined,
     value: string,
   ) => {
     const updatedPlaylists = [...playlistsAllAvailableModified];
-    updatedPlaylists[index] = {
-      ...updatedPlaylists[index],
-      [field]: value,
-    };
+    const playlistIndex = updatedPlaylists.findIndex(
+      (playlist) => playlist.playlist_id === playlist_id,
+    );
+    if (playlistIndex !== -1) {
+      updatedPlaylists[playlistIndex] = {
+        ...updatedPlaylists[playlistIndex],
+        [field]: value,
+      };
+    }
     setPlaylistsAllAvailableModified(updatedPlaylists);
   };
 
-  const handleDeletePlaylist = (index: number) => {
+  const handleDeletePlaylist = (playlistId: number) => {
     const updatedPlaylists = playlistsAllAvailableModified.filter(
-      (_, i) => i !== index,
+      (playlist) => playlist.playlist_id !== playlistId,
     );
     setPlaylistsAllAvailableModified(updatedPlaylists);
   };
@@ -190,6 +195,7 @@ export default function PlaylistDialog({
       }
 
       for (const playlist of playlistsAllAvailableModified) {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
         const { playlist_id, ...playlistData } = playlist;
         if (playlist_id < 0 && !playlist.instrument) {
           continue;
@@ -280,157 +286,177 @@ export default function PlaylistDialog({
             only you can see. You can set a default genre for each custom tune
             set. To add or modify preset instruments, contact the admin.
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow
-                className={`${styles.dialog_table} h-10 bg-gray-200 dark:bg-gray-800`}
-              >
-                <TableHead className={`${styles.column_include} p-0 mt-0`}>
-                  <Button
-                    variant="ghost"
-                    onClick={() => {}}
-                    disabled
-                    className="bg-transparent ml-[1em] text-inherit disabled:text-inherit disabled:opacity-100"
-                  >
-                    <ListChecksIcon className="w-5 h-5" />
-                  </Button>
-                </TableHead>
-                <TableHead className={`${styles.column_id}`}>
-                  <div className="pl-3">Id</div>
-                </TableHead>
-                <TableHead className={styles.column_instrument}>
-                  Instrument
-                </TableHead>
-                <TableHead className={styles.column_genre_default}>
-                  Genre Default
-                </TableHead>
-                <TableHead className={styles.column_description}>
-                  Description
-                </TableHead>
-                <TableHead
-                  className={`${styles.column_change_controls} p-0 mt-2`}
-                >
-                  <Button
-                    variant="destructive"
-                    className="bg-transparent hover:bg-green-400/10 ml-[1em] mt-[-8px]"
-                    onClick={handleAddPlaylist}
-                  >
-                    <PlusIcon className="w-5 h-5 text-blue-500" />
-                  </Button>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {playlistsAllAvailableModified.map((editedPlaylistRow, index) => (
+          <div className="max-h-80 overflow-y-auto scrollbar-thumb-gray-400 scrollbar-track-gray-200">
+            <Table>
+              <TableHeader>
                 <TableRow
-                  key={editedPlaylistRow.playlist_id}
-                  className={styles.dialog_table}
+                  className={`${styles.dialog_table} h-10 bg-gray-200 dark:bg-gray-800 sticky top-[-1px] z-40`}
                 >
-                  <TableCell className={`${styles.column_include}`}>
+                  <TableHead className={`${styles.column_include} p-0 mt-0`}>
                     <Button
                       variant="ghost"
-                      onClick={() =>
-                        handleToggleUserTuneSetList(editedPlaylistRow)
-                      }
-                    >
-                      {playlistsInMenuModified.some(
-                        (p) => p.playlist_id === editedPlaylistRow.playlist_id,
-                      ) ? (
-                        <SquareCheckBigIcon className="w-5 h-5 text-green-500" />
-                      ) : (
-                        <SquareIcon className="w-5 h-5" />
-                      )}
-                    </Button>
-                  </TableCell>
-                  <TableCell className={`${styles.column_id}`}>
-                    <Input
-                      value={editedPlaylistRow.playlist_id ?? "?"}
-                      placeholder="Id"
+                      onClick={() => {}}
                       disabled
-                    />
-                  </TableCell>
-                  <TableCell className={styles.column_instrument}>
-                    <Input
-                      value={editedPlaylistRow.instrument ?? ""}
-                      onChange={(e) =>
-                        handleEditPlaylist(index, "instrument", e.target.value)
-                      }
-                      placeholder="Instrument"
-                      disabled={editedPlaylistRow.private_to_user === 0}
-                      className="p-0 m-0"
-                    />
-                  </TableCell>
-                  <TableCell className={styles.column_genre_default}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        className={`${styles.column_genre_default} flex items-center justify-between ${editedPlaylistRow.private_to_user === 0 ? "cursor-not-allowed opacity-50" : ""}`}
-                        disabled={editedPlaylistRow.private_to_user === 0}
-                      >
-                        {editedPlaylistRow.genre_default || "(not set)"}
-                        {editedPlaylistRow.private_to_user !== 0 && (
-                          <ChevronDownIcon className="w-5 h-5" />
-                        )}
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="max-h-60 overflow-y-auto">
-                        {genres.map((genre) => (
-                          <DropdownMenuItem
-                            key={genre.id}
-                            onSelect={() => {
-                              handleEditPlaylist(
-                                index,
-                                "genre_default",
-                                genre.id,
-                              );
-                            }}
-                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                          >
-                            <div className="text-xs">
-                              <div>{genre.id}</div>
-                              <div>Name: {genre.name}</div>
-                              <div>Region: {genre.region}</div>
-                              <div>Description: {genre.description}</div>
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                  <TableCell className={styles.column_description}>
-                    <Input
-                      value={`${editedPlaylistRow.description}`}
-                      onChange={(e) =>
-                        handleEditPlaylist(index, "description", e.target.value)
-                      }
-                      disabled={editedPlaylistRow.private_to_user === 0}
-                      placeholder="Description"
-                    />
-                  </TableCell>
-                  <TableCell
-                    className={`${styles.column_change_controls} p-4 mt-0`}
+                      className="bg-transparent ml-[1em] text-inherit disabled:text-inherit disabled:opacity-100"
+                    >
+                      <ListChecksIcon className="w-5 h-5" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className={`${styles.column_id}`}>
+                    <div className="pl-3">Id</div>
+                  </TableHead>
+                  <TableHead className={styles.column_instrument}>
+                    Instrument
+                  </TableHead>
+                  <TableHead className={styles.column_genre_default}>
+                    Genre Default
+                  </TableHead>
+                  <TableHead className={styles.column_description}>
+                    Description
+                  </TableHead>
+                  <TableHead
+                    className={`${styles.column_change_controls} p-0 mt-2`}
                   >
-                    {editedPlaylistRow.private_to_user !== 0 ? (
-                      <Button
-                        variant="destructive"
-                        className="bg-transparent"
-                        onClick={() => handleDeletePlaylist(index)}
-                      >
-                        <TrashIcon className="w-5 h-5" />
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="destructive"
-                        className="bg-transparent"
-                        onClick={() => handleDeletePlaylist(index)}
-                        disabled
-                      >
-                        <PenOffIcon className="w-5 h-5" />
-                      </Button>
-                    )}
-                  </TableCell>
+                    <Button
+                      variant="destructive"
+                      className="bg-transparent hover:bg-green-400/10 ml-[1em] mt-[-2px]"
+                      onClick={handleAddPlaylist}
+                    >
+                      <PlusIcon className="w-5 h-5 text-blue-500" />
+                    </Button>
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {[...playlistsAllAvailableModified]
+                  .sort(
+                    (a, b) => Math.abs(b.playlist_id) - Math.abs(a.playlist_id),
+                  )
+                  .map((editedPlaylistRow, index) => (
+                    <TableRow
+                      key={editedPlaylistRow.playlist_id}
+                      className={styles.dialog_table}
+                    >
+                      <TableCell className={`${styles.column_include}`}>
+                        <Button
+                          variant="ghost"
+                          onClick={() =>
+                            handleToggleUserTuneSetList(editedPlaylistRow)
+                          }
+                        >
+                          {playlistsInMenuModified.some(
+                            (p) =>
+                              p.playlist_id === editedPlaylistRow.playlist_id,
+                          ) ? (
+                            <SquareCheckBigIcon className="w-5 h-5 text-green-500" />
+                          ) : (
+                            <SquareIcon className="w-5 h-5" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell className={`${styles.column_id}`}>
+                        <Input
+                          value={editedPlaylistRow.playlist_id ?? "?"}
+                          placeholder="Id"
+                          disabled
+                          className="p-0 m-0 w-[3em]"
+                        />
+                      </TableCell>
+                      <TableCell className={styles.column_instrument}>
+                        <Input
+                          value={editedPlaylistRow.instrument ?? ""}
+                          onChange={(e) =>
+                            handleEditPlaylist(
+                              editedPlaylistRow.playlist_id,
+                              "instrument",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Instrument"
+                          disabled={editedPlaylistRow.private_to_user === 0}
+                          className="p-0 m-0"
+                        />
+                      </TableCell>
+                      <TableCell className={styles.column_genre_default}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            className={`${styles.column_genre_default} flex items-center justify-between ${editedPlaylistRow.private_to_user === 0 ? "cursor-not-allowed opacity-50" : ""}`}
+                            disabled={editedPlaylistRow.private_to_user === 0}
+                          >
+                            {editedPlaylistRow.genre_default || "(not set)"}
+                            {editedPlaylistRow.private_to_user !== 0 && (
+                              <ChevronDownIcon className="w-5 h-5" />
+                            )}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="max-h-60 overflow-y-auto">
+                            {genres.map((genre) => (
+                              <DropdownMenuItem
+                                key={genre.id}
+                                onSelect={() => {
+                                  handleEditPlaylist(
+                                    editedPlaylistRow.playlist_id,
+                                    "genre_default",
+                                    genre.id,
+                                  );
+                                }}
+                                className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                              >
+                                <div className="text-xs">
+                                  <div>{genre.id}</div>
+                                  <div>Name: {genre.name}</div>
+                                  <div>Region: {genre.region}</div>
+                                  <div>Description: {genre.description}</div>
+                                </div>
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                      <TableCell className={styles.column_description}>
+                        <Input
+                          value={`${editedPlaylistRow.description}`}
+                          onChange={(e) =>
+                            handleEditPlaylist(
+                              editedPlaylistRow.playlist_id,
+                              "description",
+                              e.target.value,
+                            )
+                          }
+                          disabled={editedPlaylistRow.private_to_user === 0}
+                          placeholder="Description"
+                        />
+                      </TableCell>
+                      <TableCell
+                        className={`${styles.column_change_controls} p-4 mt-0`}
+                      >
+                        {editedPlaylistRow.private_to_user !== 0 ? (
+                          <Button
+                            variant="destructive"
+                            className="bg-transparent"
+                            onClick={() =>
+                              handleDeletePlaylist(
+                                editedPlaylistRow.playlist_id,
+                              )
+                            }
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="destructive"
+                            className="bg-transparent"
+                            onClick={() => handleDeletePlaylist(index)}
+                            disabled
+                          >
+                            <PenOffIcon className="w-5 h-5" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </div>
 
           <DialogFooter className={`${styles.dialog_footer}`}>
             <Button
@@ -449,7 +475,7 @@ export default function PlaylistDialog({
                   )) ||
                 hasEmptyVisibleInstrument()
               }
-              className="w-full"
+              className="w-full mt-6 border border-gray-300"
             >
               Update
             </Button>
