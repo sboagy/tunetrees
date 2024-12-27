@@ -9,7 +9,7 @@ import {
   updateTabGroupMainState,
 } from "@/app/(main)/pages/practice/settings";
 import type { IViewPlaylistJoined } from "@/app/(main)/pages/practice/types";
-import { ChevronDownIcon } from "lucide-react"; // Import the TrashIcon
+import { ChevronDownIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import PlaylistDialog from "./PlaylistDialog";
@@ -29,22 +29,17 @@ export default function PlaylistChooser() {
     useState<string>("");
   const { triggerRefresh } = useTuneDataRefresh();
 
-  // =======================
   const [playlistsInMenu, setPlaylistsInMenu] = useState<IViewPlaylistJoined[]>(
     [],
   );
-  // =======================
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchPlaylistsAndSetCurrent = async (
     userId: number,
   ): Promise<number> => {
     try {
-      // const playlists = await getPlaylists(userId);
-      // Let's try getting all playlists for now
       const playlists = await fetchViewPlaylistJoined(userId);
       if (typeof playlists === "string") {
         console.error("Error fetching playlists:", playlists);
@@ -67,8 +62,6 @@ export default function PlaylistChooser() {
           setCurrentPlaylistDescription(playlist.description ?? "");
         } else {
           console.log("Playlist not found in playlists array!");
-          // setCurrentPlaylistName("??? INSTRUMENT ???");
-          // setCurrentPlaylistDescription("");
         }
       } else {
         console.error("playlists should be an array!");
@@ -103,13 +96,6 @@ export default function PlaylistChooser() {
     setCurrentPlaylist(playlistObject.playlist_id);
     setCurrentPlaylistName(playlistObject.instrument ?? "NULL INSTRUMENT");
     setCurrentPlaylistDescription(playlistObject.description ?? "");
-    // export interface ITabGroupMainStateModel {
-    //   user_id: number;
-    //   id: number;
-    //   which_tab: string;
-    //   playlist_id?: number;
-    //   tab_spec?: string | ITabSpec[];
-    // }
     const tabGroupMainStateUpdate: Partial<ITabGroupMainStateModel> = {
       playlist_id: playlistObject.playlist_id,
     };
@@ -123,7 +109,7 @@ export default function PlaylistChooser() {
       <DropdownMenu>
         <DropdownMenuTrigger
           className="px-4 py-2 border rounded bg-white dark:bg-background hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-white-500 transition duration-150 ease-in-out flex items-center space-x-2"
-          title={currentPlaylistDescription} // Add hover text
+          title={currentPlaylistDescription}
         >
           <span>
             Instrument: {currentPlaylistName} (id-{currentPlaylist})
@@ -157,7 +143,8 @@ export default function PlaylistChooser() {
       {isDialogOpen && (
         <PlaylistDialog
           playlistsInMenu={playlistsInMenu}
-          onOpenChange={setIsDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          fetchPlaylistsAndSetCurrent={fetchPlaylistsAndSetCurrent}
         />
       )}
     </div>
