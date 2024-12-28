@@ -1170,12 +1170,15 @@ def delete_genre(genre_id: int) -> None:
 )
 def get_instruments(
     user_ref: Optional[int] = Query(None, description="User reference ID"),
+    show_deleted: bool = Query(False),
 ) -> List[InstrumentModel]:
     try:
         with SessionLocal() as db:
             query = db.query(Instrument)
             if user_ref is not None:
                 query = query.filter(Instrument.private_to_user == user_ref)
+            if not show_deleted:
+                query = query.filter(Instrument.deleted.is_(False))
             instruments = query.all()
             return [
                 InstrumentModel.model_validate(instrument) for instrument in instruments
