@@ -659,12 +659,13 @@ export async function createEmptyTune(
  */
 export async function getPlaylists(
   userRef = -1,
+  showDeleted = false,
 ): Promise<IPlaylist[] | { detail: string }> {
   try {
     const response = await client.get<IPlaylist[] | { detail: string }>(
       "/playlist",
       {
-        params: { user_ref: userRef },
+        params: { user_ref: userRef, show_deleted: showDeleted },
       },
     );
     return response.data;
@@ -755,20 +756,32 @@ export async function deletePlaylist(
  */
 export async function getInstruments(
   userRef = -1,
-): Promise<IInstrument[] | { detail: string }> {
+  allPublic = false,
+): Promise<IInstrument[]> {
   try {
-    const response = await client.get<IInstrument[] | { detail: string }>(
-      "/instruments",
-      {
+    const [response, responsePublic] = await Promise.all([
+      client.get<IInstrument[] | { detail: string }>("/instruments", {
         params: { user_ref: userRef },
-      },
-    );
+      }),
+      allPublic
+        ? client.get<IInstrument[] | { detail: string }>("/instruments", {
+            params: { user_ref: 0 },
+          })
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    if (Array.isArray(response.data) && Array.isArray(responsePublic.data)) {
+      response.data = [...response.data, ...responsePublic.data];
+    }
+    if (!Array.isArray(response.data)) {
+      throw new TypeError(
+        `Unable to fetch instruments: ${JSON.stringify(response.data)}`,
+      );
+    }
     return response.data;
   } catch (error) {
     console.error(`Error in getInstruments(${userRef})`, error);
-    return {
-      detail: `Unable to fetch instruments: ${(error as Error).message}`,
-    };
+    throw error;
   }
 }
 
