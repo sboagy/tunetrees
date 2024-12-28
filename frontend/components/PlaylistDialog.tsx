@@ -1,13 +1,17 @@
 import {
-  createPlaylistJoined,
+  createInstrument,
+  createPlaylist,
   deletePlaylist,
-  fetchViewPlaylistJoined,
   getAllGenres,
-  getRepertoireTunesOverview,
+  getInstruments,
+  getPlaylists,
+  updateInstrument,
   updatePlaylist,
 } from "@/app/(main)/pages/practice/queries";
 import type {
   IGenre,
+  IInstrument,
+  IPlaylist,
   IViewPlaylistJoined,
 } from "@/app/(main)/pages/practice/types";
 import { deepEqualIgnoreOrder } from "@/lib/compare";
@@ -62,11 +66,11 @@ export default function PlaylistDialog({
 }: IPlaylistsInMenu): JSX.Element {
   const { data: session } = useSession();
 
-  const [playlistsAllAvailable, setPlaylistsAllAvailable] = useState<
-    IViewPlaylistJoined[]
+  const [instrumentsAllAvailable, setInstrumentsAllAvailable] = useState<
+    IInstrument[]
   >([]);
-  const [playlistsAllAvailableModified, setPlaylistsAllAvailableModified] =
-    useState<IViewPlaylistJoined[]>([]);
+  const [instrumentsAllAvailableModified, setInstrumentsAllAvailableModified] =
+    useState<IInstrument[]>([]);
 
   const [playlistsInMenuModified, setPlaylistsInMenuModified] = useState<
     IViewPlaylistJoined[]
@@ -74,15 +78,11 @@ export default function PlaylistDialog({
 
   useEffect(() => {
     const fetchAndSetEditedPlaylists = async (userId: number) => {
-      const playlistsEditList = await fetchViewPlaylistJoined(
-        userId,
-        undefined,
-        false,
-        false,
-        true,
-      );
-      setPlaylistsAllAvailable(playlistsEditList);
-      setPlaylistsAllAvailableModified(structuredClone(playlistsEditList));
+      const instruments = await getInstruments(userId, true);
+      setInstrumentsAllAvailable(instruments);
+      setInstrumentsAllAvailableModified(structuredClone(instruments));
+
+      // Reset the modified playlists to the original playlists
       setPlaylistsInMenuModified(structuredClone(playlistsInMenu));
     };
 
@@ -91,128 +91,233 @@ export default function PlaylistDialog({
     );
   }, [session?.user?.id, playlistsInMenu]);
 
-  const handleToggleUserTuneSetList = (
-    editedPlaylistRow: IViewPlaylistJoined,
-  ): void => {
-    const updatedPlaylists = playlistsInMenuModified.some(
-      (p) => p.playlist_id === editedPlaylistRow.playlist_id,
-    )
-      ? playlistsInMenuModified.filter(
-          (p) => p.playlist_id !== editedPlaylistRow.playlist_id,
+  async function matchOrCreateUnMenuedPlaylist(
+    instrument: IInstrument,
+  ): Promise<IViewPlaylistJoined> {
+    let playlistId = -Date.now();
+    try {
+      const playlists: IPlaylist[] | { detail: string } = await getPlaylists(
+        getUserId(),
+        true,
+      );
+      if (playlists && "detail" in playlists) {
+        console.log(`createPlaylist reports: ${playlists.detail}`);
+      } else {
+        const matchingPlaylist = playlists.find(
+          (p) => p.instrument_ref === instrument.id,
+        );
+        playlistId = matchingPlaylist?.playlist_id ?? -Date.now();
+      }
+    } catch (error) {
+      console.error("Error fetching playlists:", error);
+    }
+    const matchingPlaylistJoined: IViewPlaylistJoined = {
+      playlist_id: playlistId,
+      instrument_ref: instrument.id,
+      user_ref: getUserId(),
+      playlist_deleted: false,
+      instrument_deleted: instrument.deleted,
+    } as IViewPlaylistJoined;
+
+    return matchingPlaylistJoined;
+  }
+
+  const handleToggleUserTuneSetList = async (
+    instrument: IInstrument,
+  ): Promise<void> => {
+    const matchingPlaylistModified: IViewPlaylistJoined | undefined =
+      playlistsInMenuModified.find((p) => p.instrument_ref === instrument.id);
+
+    const matchingPlaylistInMenu: IViewPlaylistJoined | undefined =
+      playlistsInMenu.find((p) => p.instrument_ref === instrument.id);
+
+    const updatedPlaylists: IViewPlaylistJoined[] = matchingPlaylistModified
+      ? // If the playlist is already in the modified list, remove it
+        playlistsInMenuModified.filter(
+          (p) => p.instrument_ref !== instrument.id,
         )
-      : [...playlistsInMenuModified, editedPlaylistRow];
+      : // else if the playlist is in the original list, add it back the modified list
+        matchingPlaylistInMenu
+        ? [...playlistsInMenuModified, matchingPlaylistInMenu]
+        : // else search in the db for a matching playlist, or create a new one with temporary ID
+          [
+            ...playlistsInMenuModified,
+            await matchOrCreateUnMenuedPlaylist(instrument),
+          ];
     setPlaylistsInMenuModified(updatedPlaylists);
   };
 
-  const handleAddPlaylist = () => {
-    const updatedPlaylists = [
-      ...playlistsAllAvailableModified,
+  const handleAddInstrument = () => {
+    const updatedPlaylists: IInstrument[] = [
+      ...instrumentsAllAvailableModified,
       {
-        playlist_id: -Date.now(),
-        user_ref: session?.user?.id ? Number(session.user.id) : 0,
-        instrument_ref: 0,
+        id: -Date.now(), // Temporary ID, replace with actual ID from the database
+        private_to_user: getUserId(),
         instrument: "",
         description: "",
-        playlist_deleted: false,
         genre_default: "",
       },
     ];
-    setPlaylistsAllAvailableModified(updatedPlaylists);
+    setInstrumentsAllAvailableModified(updatedPlaylists);
   };
 
-  const handleEditPlaylist = (
-    playlist_id: number,
-    field: keyof IViewPlaylistJoined,
+  const handleEditInstrument = (
+    instrumentId: number,
+    field: keyof IInstrument,
     value: string,
   ) => {
-    const updatedPlaylists = [...playlistsAllAvailableModified];
-    const playlistIndex = updatedPlaylists.findIndex(
-      (playlist) => playlist.playlist_id === playlist_id,
+    const updatedInstruments = [...instrumentsAllAvailableModified];
+    const instrumentIndex = updatedInstruments.findIndex(
+      (p) => p.id === instrumentId,
     );
-    if (playlistIndex !== -1) {
-      updatedPlaylists[playlistIndex] = {
-        ...updatedPlaylists[playlistIndex],
+    if (instrumentIndex !== -1) {
+      updatedInstruments[instrumentIndex] = {
+        ...updatedInstruments[instrumentIndex],
         [field]: value,
       };
     }
-    setPlaylistsAllAvailableModified(updatedPlaylists);
+    setInstrumentsAllAvailableModified(updatedInstruments);
   };
 
-  const handleDeletePlaylist = (playlistId: number) => {
-    const updatedPlaylists = playlistsAllAvailableModified.filter(
-      (playlist) => playlist.playlist_id !== playlistId,
+  const handleDeleteInstrument = (instrumentId: number) => {
+    const updatedInstruments = instrumentsAllAvailableModified.filter(
+      (p) => p.id !== instrumentId,
     );
-    setPlaylistsAllAvailableModified(updatedPlaylists);
+    setInstrumentsAllAvailableModified(updatedInstruments);
   };
+
+  function getUserId(): number {
+    return session?.user?.id ? Number(session.user.id) : -1;
+  }
 
   const handleSubmit = async () => {
     try {
-      const playlistsInMenuIds = playlistsInMenu.map((playlist) =>
-        Number(playlist.playlist_id),
-      );
-      const playlistsAllAvailableModifiedIds = new Set(
-        playlistsAllAvailableModified.map((playlist) =>
-          Number(playlist.playlist_id),
-        ),
-      );
-
-      for (const playlist of playlistsAllAvailableModified) {
-        if (playlist.playlist_id > 0 && !playlist.instrument) {
+      for (const instrument of instrumentsAllAvailableModified) {
+        if (instrument.id > 0 && !instrument.instrument) {
           alert("Instrument field cannot be empty for existing playlists.");
           return;
         }
       }
 
-      for (const playlistId of playlistsInMenuIds) {
-        if (!playlistsAllAvailableModifiedIds.has(playlistId)) {
-          const tunes = await getRepertoireTunesOverview(
-            session?.user?.id ? Number(session.user.id) : -1,
-            playlistId,
-          );
-          if (tunes && tunes.length > 0) {
-            alert(
-              "Cannot delete Repertoire that contains tunes. Please first go to the corresponding Repertoire tab and delete all its tunes first.",
+      // First DELETE all instruments in the instrument table that are in the original
+      // instrumentsAllAvailable list, but NOT in the instrumentsAllAvailableModified list.
+      for (const instrument of instrumentsAllAvailable) {
+        if (
+          !instrumentsAllAvailableModified.some(
+            (p) => p.id === instrument.id,
+          ) &&
+          instrument.id > 0
+        ) {
+          const updatedInstrument = await updateInstrument(instrument.id, {
+            deleted: true,
+          });
+          if (updatedInstrument && "detail" in updatedInstrument) {
+            console.log(
+              `updateInstrument reports: ${updatedInstrument.detail}`,
             );
-            const playlistToRestore: IViewPlaylistJoined | undefined =
-              playlistsInMenu.find(
-                (playlist) => playlist.playlist_id === playlistId,
-              );
-            if (playlistToRestore) {
-              setPlaylistsAllAvailableModified((prev) => [
-                ...prev,
-                playlistToRestore,
-              ]);
-            }
-            return;
+          } else {
+            console.log(
+              `Deleted instrument: ${instrument.id}, ${instrument.deleted}`,
+            );
+            // Ok, now the instrument has been deleted, so how does that effect the
+            // playlist lists?
           }
         }
       }
 
-      for (const playlistId of playlistsInMenuIds) {
-        if (!playlistsAllAvailableModifiedIds.has(playlistId)) {
-          await deletePlaylist(playlistId);
+      // Next, ADD any instrument to the instrument table in instrumentsAllAvailableModified
+      // that's NOT in instrumentsAllAvailable.
+      for (const instrument of instrumentsAllAvailableModified) {
+        if (!instrumentsAllAvailable.some((p) => p.id === instrument.id)) {
+          const newInstrument: Partial<IInstrument> = {
+            private_to_user: getUserId(),
+            instrument: instrument.instrument,
+            description: instrument.description,
+            genre_default: instrument.genre_default,
+          };
+          const updatedInstrument = await createInstrument(newInstrument);
+          if (updatedInstrument && "detail" in updatedInstrument) {
+            console.log(
+              `createInstrument reports: ${updatedInstrument.detail}`,
+            );
+          } else {
+            console.log(
+              `Created instrument: ${instrument.id}, ${instrument.instrument}`,
+            );
+            // Ok, now a new ID has been assigned to the instrument, so how does
+            // that effect the playlist lists?
+          }
         }
       }
 
-      for (const playlist of playlistsAllAvailableModified) {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { playlist_id, ...playlistData } = playlist;
-        if (playlist_id < 0 && !playlist.instrument) {
-          continue;
+      // Next, for any playlist that's in original playlistsInMenu, but NOT in
+      // playlistsInMenuModified, DELETE it from the playlist table.
+      for (const playlist of playlistsInMenu) {
+        if (
+          !playlistsInMenuModified.some(
+            (p) => p.playlist_id === playlist.playlist_id,
+          )
+        ) {
+          const deletedPlaylist = await deletePlaylist(playlist.playlist_id);
+          if (deletedPlaylist && "detail" in deletedPlaylist) {
+            console.log(`deletePlaylist reports: ${deletedPlaylist.detail}`);
+          } else {
+            console.log(
+              `Deleted playlist: ${deletedPlaylist.playlist_id}, instrument_ref: ${deletedPlaylist.instrument_ref}`,
+            );
+          }
         }
-        await (playlist_id < 0
-          ? createPlaylistJoined({
-              ...playlistData,
-              instrument: playlist.instrument,
-              genre_default: playlist.genre_default,
-            })
-          : updatePlaylist(playlist_id, playlistData));
       }
 
-      const userId = session?.user?.id
-        ? Number.parseInt(session?.user?.id)
-        : -1;
-      await fetchPlaylistsAndSetCurrent(userId);
+      // Next, for any playlist that's in playlistsInMenuModified, but NOT in
+      // playlistsInMenu, ADD it from the playlist table.
+      for (const playlist of playlistsInMenuModified) {
+        if (
+          !playlistsInMenu.some((p) => p.playlist_id === playlist.playlist_id)
+        ) {
+          if (playlist.playlist_id < 0) {
+            // This is a temporary playlist_id, so we need to create a new playlist
+            const newPlaylist: Partial<IPlaylist> = {
+              user_ref: getUserId(),
+              instrument_ref: playlist.instrument_ref,
+              deleted: false,
+            };
+            const createdPlaylist = await createPlaylist(newPlaylist);
+            if (createdPlaylist && "detail" in createdPlaylist) {
+              console.log(`createPlaylist reports: ${createdPlaylist.detail}`);
+            } else {
+              console.log(
+                `Created playlist: ${createdPlaylist.playlist_id}, instrument_ref: ${createdPlaylist.instrument_ref}`,
+              );
+            }
+          } else {
+            // This is an existing playlist_id, so we need to update the existing playlist
+            // with the new instrument_ref.
+            const newPlaylist: Partial<IPlaylist> = {
+              user_ref: getUserId(),
+              instrument_ref: playlist.instrument_ref,
+              deleted: false,
+            };
+
+            const updatedPlaylist = await updatePlaylist(
+              playlist.playlist_id,
+              newPlaylist,
+            );
+            if (updatedPlaylist && "detail" in updatedPlaylist) {
+              console.log(`updatePlaylist reports: ${updatedPlaylist.detail}`);
+            } else {
+              console.log(
+                `Updated playlist: ${updatedPlaylist.playlist_id}, instrument_ref: ${updatedPlaylist.instrument_ref}`,
+              );
+            }
+          }
+        }
+      }
+
+      // Question: how do the two sets interact?  Let's say instruments is marked green,
+      // then I delete it, is the playlist also deleted in this case?
+
+      await fetchPlaylistsAndSetCurrent(getUserId());
       onClose();
     } catch (error) {
       console.error("Error submitting playlists:", error);
@@ -220,7 +325,19 @@ export default function PlaylistDialog({
   };
 
   function hasEmptyVisibleInstrument(): boolean {
-    return playlistsAllAvailableModified.some((p) => p.instrument === "");
+    return instrumentsAllAvailableModified.some((p) => p.instrument === "");
+  }
+
+  function instrumentListsEqual(
+    label: string,
+    a: Array<IInstrument>,
+    b: Array<IInstrument>,
+  ): boolean {
+    const isEqual = deepEqualIgnoreOrder(a, b, true);
+    console.log(
+      `instrumentListsEqual ===> PlaylistDialog.tsx:280 ~ label=${label} isEqual=${isEqual}`,
+    );
+    return isEqual;
   }
 
   function playlistsEqual(
@@ -230,7 +347,7 @@ export default function PlaylistDialog({
   ): boolean {
     const isEqual = deepEqualIgnoreOrder(a, b, true);
     console.log(
-      `===> PlaylistChooser.tsx:65 ~ label=${label} isEqual=${isEqual}`,
+      `playlistsEqual ===> PlaylistDialog.tsx:292 ~ label=${label} isEqual=${isEqual}`,
     );
     return isEqual;
   }
@@ -283,8 +400,10 @@ export default function PlaylistDialog({
           <div className="mb-6 mt-4 text-sm text-gray-300 italic">
             Add or remove tune sets from your repertoire list. Preset instrument
             sets can be used, or you can create your own custom instrument which
-            only you can see. You can set a default genre for each custom tune
-            set. To add or modify preset instruments, contact the admin.
+            only you can see. New custom instruments can be created by pressing
+            the blue "<span className="text-blue-500 text-1xl">+</span>" (plus)
+            icon. You can set a default genre for each custom tune set. To add
+            or modify preset instruments, contact the admin.
           </div>
           <div className="max-h-80 overflow-y-auto scrollbar-thumb-gray-400 scrollbar-track-gray-200">
             <Table>
@@ -303,7 +422,7 @@ export default function PlaylistDialog({
                     </Button>
                   </TableHead>
                   <TableHead className={`${styles.column_id}`}>
-                    <div className="pl-3">Id</div>
+                    <div className="pl-0">Id</div>
                   </TableHead>
                   <TableHead className={styles.column_instrument}>
                     Instrument
@@ -320,7 +439,7 @@ export default function PlaylistDialog({
                     <Button
                       variant="destructive"
                       className="bg-transparent hover:bg-green-400/10 ml-[1em] mt-[-2px]"
-                      onClick={handleAddPlaylist}
+                      onClick={handleAddInstrument}
                     >
                       <PlusIcon className="w-5 h-5 text-blue-500" />
                     </Button>
@@ -328,25 +447,24 @@ export default function PlaylistDialog({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {[...playlistsAllAvailableModified]
-                  .sort(
-                    (a, b) => Math.abs(b.playlist_id) - Math.abs(a.playlist_id),
-                  )
-                  .map((editedPlaylistRow, index) => (
+                {[...instrumentsAllAvailableModified]
+                  .sort((a, b) => Math.abs(b.id) - Math.abs(a.id))
+                  .map((editedInstrumentRow, index) => (
                     <TableRow
-                      key={editedPlaylistRow.playlist_id}
+                      key={editedInstrumentRow.id}
                       className={styles.dialog_table}
                     >
                       <TableCell className={`${styles.column_include}`}>
                         <Button
                           variant="ghost"
                           onClick={() =>
-                            handleToggleUserTuneSetList(editedPlaylistRow)
+                            void handleToggleUserTuneSetList(
+                              editedInstrumentRow,
+                            )
                           }
                         >
                           {playlistsInMenuModified.some(
-                            (p) =>
-                              p.playlist_id === editedPlaylistRow.playlist_id,
+                            (p) => p.instrument_ref === editedInstrumentRow.id,
                           ) ? (
                             <SquareCheckBigIcon className="w-5 h-5 text-green-500" />
                           ) : (
@@ -356,7 +474,7 @@ export default function PlaylistDialog({
                       </TableCell>
                       <TableCell className={`${styles.column_id}`}>
                         <Input
-                          value={editedPlaylistRow.playlist_id ?? "?"}
+                          value={editedInstrumentRow.id ?? "?"}
                           placeholder="Id"
                           disabled
                           className="p-0 m-0 w-[3em]"
@@ -364,27 +482,27 @@ export default function PlaylistDialog({
                       </TableCell>
                       <TableCell className={styles.column_instrument}>
                         <Input
-                          value={editedPlaylistRow.instrument ?? ""}
+                          value={editedInstrumentRow.instrument ?? ""}
                           onChange={(e) =>
-                            handleEditPlaylist(
-                              editedPlaylistRow.playlist_id,
+                            handleEditInstrument(
+                              editedInstrumentRow.id,
                               "instrument",
                               e.target.value,
                             )
                           }
                           placeholder="Instrument"
-                          disabled={editedPlaylistRow.private_to_user === 0}
+                          disabled={editedInstrumentRow.private_to_user === 0}
                           className="p-0 m-0"
                         />
                       </TableCell>
                       <TableCell className={styles.column_genre_default}>
                         <DropdownMenu>
                           <DropdownMenuTrigger
-                            className={`${styles.column_genre_default} flex items-center justify-between ${editedPlaylistRow.private_to_user === 0 ? "cursor-not-allowed opacity-50" : ""}`}
-                            disabled={editedPlaylistRow.private_to_user === 0}
+                            className={`${styles.column_genre_default} flex items-center justify-between ${editedInstrumentRow.private_to_user === 0 ? "cursor-not-allowed opacity-50" : ""}`}
+                            disabled={editedInstrumentRow.private_to_user === 0}
                           >
-                            {editedPlaylistRow.genre_default || "(not set)"}
-                            {editedPlaylistRow.private_to_user !== 0 && (
+                            {editedInstrumentRow.genre_default || "(not set)"}
+                            {editedInstrumentRow.private_to_user !== 0 && (
                               <ChevronDownIcon className="w-5 h-5" />
                             )}
                           </DropdownMenuTrigger>
@@ -393,8 +511,8 @@ export default function PlaylistDialog({
                               <DropdownMenuItem
                                 key={genre.id}
                                 onSelect={() => {
-                                  handleEditPlaylist(
-                                    editedPlaylistRow.playlist_id,
+                                  handleEditInstrument(
+                                    editedInstrumentRow.id,
                                     "genre_default",
                                     genre.id,
                                   );
@@ -414,29 +532,27 @@ export default function PlaylistDialog({
                       </TableCell>
                       <TableCell className={styles.column_description}>
                         <Input
-                          value={`${editedPlaylistRow.description}`}
+                          value={`${editedInstrumentRow.description}`}
                           onChange={(e) =>
-                            handleEditPlaylist(
-                              editedPlaylistRow.playlist_id,
+                            handleEditInstrument(
+                              editedInstrumentRow.id,
                               "description",
                               e.target.value,
                             )
                           }
-                          disabled={editedPlaylistRow.private_to_user === 0}
+                          disabled={editedInstrumentRow.private_to_user === 0}
                           placeholder="Description"
                         />
                       </TableCell>
                       <TableCell
                         className={`${styles.column_change_controls} p-4 mt-0`}
                       >
-                        {editedPlaylistRow.private_to_user !== 0 ? (
+                        {editedInstrumentRow.private_to_user !== 0 ? (
                           <Button
                             variant="destructive"
                             className="bg-transparent"
                             onClick={() =>
-                              handleDeletePlaylist(
-                                editedPlaylistRow.playlist_id,
-                              )
+                              handleDeleteInstrument(editedInstrumentRow.id)
                             }
                           >
                             <TrashIcon className="w-5 h-5" />
@@ -445,7 +561,7 @@ export default function PlaylistDialog({
                           <Button
                             variant="destructive"
                             className="bg-transparent"
-                            onClick={() => handleDeletePlaylist(index)}
+                            onClick={() => handleDeleteInstrument(index)}
                             disabled
                           >
                             <PenOffIcon className="w-5 h-5" />
@@ -463,10 +579,10 @@ export default function PlaylistDialog({
               variant="ghost"
               onClick={() => void handleSubmit()}
               disabled={
-                (playlistsEqual(
+                (instrumentListsEqual(
                   "editedPlaylists",
-                  playlistsAllAvailableModified,
-                  playlistsAllAvailable,
+                  instrumentsAllAvailableModified,
+                  instrumentsAllAvailable,
                 ) &&
                   playlistsEqual(
                     "playlists",
