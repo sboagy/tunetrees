@@ -32,7 +32,8 @@ function getCellContext(
   purpose: TablePurpose,
   tableIndex: number,
 ): CellContext<ITuneOverview, string> {
-  const row = table.getRow(tableIndex.toString());
+  // const row = table.getRow(tableIndex.toString());
+  const row = table.getRowModel().rows[tableIndex];
   const cells = row.getAllCells();
   const cell = cells.find((cell) => cell.column.id === "recall_eval");
 
@@ -125,7 +126,7 @@ export default function FlashcardPanel(props: Props) {
           </PopoverTrigger>
           <PopoverContent className="w-80">
             <div className="grid gap-4">
-              {Object.keys(table.getRow(tableIndex.toString()).original).map(
+              {Object.keys(table.getRowModel().rows[tableIndex].original).map(
                 (field) => (
                   <div key={field} className="flex items-center space-x-2">
                     <Switch
@@ -143,7 +144,7 @@ export default function FlashcardPanel(props: Props) {
       </CardHeader>
       <CardContent>
         <div className="grid gap-4">
-          {Object.entries(table.getRow(tableIndex.toString()).original).map(
+          {Object.entries(table.getRowModel().rows[tableIndex].original).map(
             ([key, value]) =>
               visibleFields[key] && (
                 <div key={key} className="flex flex-col space-y-1.5">
