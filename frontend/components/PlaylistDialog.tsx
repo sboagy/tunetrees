@@ -31,9 +31,10 @@ import {
   SquareCheckBigIcon,
   SquareIcon,
   TrashIcon,
+  XIcon,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { type JSX, useEffect, useState } from "react";
+import { type JSX, useEffect, useRef, useState } from "react";
 import styles from "./PlaylistChooser.module.css";
 import { Button } from "./ui/button";
 import { DialogFooter, DialogHeader } from "./ui/dialog";
@@ -76,6 +77,10 @@ export default function PlaylistDialog({
     IViewPlaylistJoined[]
   >([]);
 
+  const newInstrumentRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const focusSet = useRef(false);
+
   useEffect(() => {
     const fetchAndSetEditedPlaylists = async (userId: number) => {
       const instruments = await getInstruments(userId, true);
@@ -90,6 +95,30 @@ export default function PlaylistDialog({
       session?.user?.id ? Number(session?.user?.id) : -1,
     );
   }, [session?.user?.id, playlistsInMenu]);
+
+  useEffect(() => {
+    if (!focusSet.current) {
+      setTimeout(() => {
+        if (dialogRef.current) {
+          dialogRef.current?.focus();
+          focusSet.current = true;
+        }
+      }, 0);
+    }
+  });
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
 
   async function matchOrCreateUnMenuedPlaylist(
     instrument: IInstrument,
@@ -148,17 +177,22 @@ export default function PlaylistDialog({
   };
 
   const handleAddInstrument = () => {
-    const updatedPlaylists: IInstrument[] = [
-      ...instrumentsAllAvailableModified,
-      {
-        id: -Date.now(), // Temporary ID, replace with actual ID from the database
-        private_to_user: getUserId(),
-        instrument: "",
-        description: "",
-        genre_default: "",
-      },
-    ];
-    setInstrumentsAllAvailableModified(updatedPlaylists);
+    setInstrumentsAllAvailableModified((prevInstruments) => {
+      const updatedInstruments = [
+        {
+          id: -Date.now(), // Temporary ID, replace with actual ID from the database
+          private_to_user: getUserId(),
+          instrument: "",
+          description: "",
+          genre_default: "",
+        },
+        ...prevInstruments,
+      ];
+      return updatedInstruments;
+    });
+    setTimeout(() => {
+      newInstrumentRef.current?.focus();
+    }, 1);
   };
 
   const handleEditInstrument = (
@@ -382,7 +416,11 @@ export default function PlaylistDialog({
     <Dialog open={true} modal={true}>
       <DialogPortal>
         <DialogOverlay className="bg-black/50 fixed inset-0" />
-        <DialogContent className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[60rem] p-6 bg-white dark:bg-background rounded-md shadow-2xl border-2 border-gray-400 dark:border-gray-600">
+        <DialogContent
+          ref={dialogRef}
+          tabIndex={-1}
+          className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[60rem] p-6 bg-white dark:bg-background rounded-md shadow-2xl border-2 border-gray-400 dark:border-gray-600 focus:outline-none focus:ring-0"
+        >
           <DialogHeader className="flex justify-between">
             <DialogTitle className="text-left">
               Edit Repertoire List
@@ -393,7 +431,7 @@ export default function PlaylistDialog({
                 className="absolute top-0 right-4"
                 onClick={onClose}
               >
-                ✕
+                <XIcon className="w-5 h-5" />
               </Button>
             </DialogClose>
           </DialogHeader>
@@ -482,6 +520,7 @@ export default function PlaylistDialog({
                       </TableCell>
                       <TableCell className={styles.column_instrument}>
                         <Input
+                          ref={index === 0 ? newInstrumentRef : null}
                           value={editedInstrumentRow.instrument ?? ""}
                           onChange={(e) =>
                             handleEditInstrument(

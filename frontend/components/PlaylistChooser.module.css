@@ -1,5 +1,9 @@
 .dialog_content {
-  @apply max-w-[60rem] w-full min-w-[60rem];
+  @apply fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+         w-full max-w-[60rem] p-6 bg-white dark:bg-background rounded-md 
+         shadow-2xl border-2 border-gray-400 dark:border-gray-600 
+         focus:outline-none focus:ring-0;
+  /* @apply max-w-[60rem] w-full min-w-[60rem]; */
 }
 
 .dialog_content .dialog_table {
