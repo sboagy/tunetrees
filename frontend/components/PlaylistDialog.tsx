@@ -278,8 +278,11 @@ export default function PlaylistDialog({
             console.log(
               `Created instrument: ${instrument.id}, ${instrument.instrument}`,
             );
-            // Ok, now a new ID has been assigned to the instrument, so how does
-            // that effect the playlist lists?
+            for (const playlist of playlistsInMenuModified) {
+              if (playlist.instrument_ref === instrument.id) {
+                playlist.instrument_ref = updatedInstrument.id;
+              }
+            }
           }
         }
       }
@@ -323,6 +326,7 @@ export default function PlaylistDialog({
               console.log(
                 `Created playlist: ${createdPlaylist.playlist_id}, instrument_ref: ${createdPlaylist.instrument_ref}`,
               );
+              playlist.playlist_id = createdPlaylist.playlist_id;
             }
           } else {
             // This is an existing playlist_id, so we need to update the existing playlist
