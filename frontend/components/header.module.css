@@ -90,3 +90,32 @@
   display: inline-block;
   margin-right: 1rem;
 }
+
+.headerMenuTrigger {
+  @apply 
+    px-4 
+    py-2 
+    /* border 
+    rounded  */
+    /* bg-background  */
+    /* hover:bg-gray-500  */
+    /* focus:outline-none 
+    focus:ring-2  */
+    transition 
+    duration-150 
+    ease-in-out 
+    flex 
+    items-center 
+    space-x-2;
+}
+
+.dropDownMenuChevronDown {
+  @apply 
+    w-4 
+    h-4 
+    text-foreground;
+}
+
+.dropDownMenuTriggerInnerButton {
+  @apply focus-visible:ring-0 focus-visible:ring-offset-0;
+}

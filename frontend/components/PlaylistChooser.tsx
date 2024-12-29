@@ -13,6 +13,8 @@ import { ChevronDownIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import PlaylistDialog from "./PlaylistDialog";
+import styles from "./header.module.css";
+import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,13 +110,16 @@ export default function PlaylistChooser() {
     <div className="flex items-center space-x-2">
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="px-4 py-2 border rounded bg-white dark:bg-background hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-white-500 transition duration-150 ease-in-out flex items-center space-x-2"
+          className={`${styles.headerMenuTrigger}`}
           title={currentPlaylistDescription}
         >
-          <span>
+          <Button
+            variant="ghost"
+            className={`${styles.dropDownMenuTriggerInnerButton}`}
+          >
             Instrument: {currentPlaylistName} (id-{currentPlaylist})
-          </span>
-          <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+            <ChevronDownIcon className={`${styles.dropDownMenuChevronDown}`} />
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="bg-white dark:bg-background border border-gray-300 dark:border-gray-700 rounded shadow-lg">
           {playlistsInMenu.map((playlist) => (

@@ -1,9 +1,10 @@
 "use client";
 import { useSession } from "next-auth/react";
-import defaultAvatar from "/public/avatars/flute.png";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
+import defaultAvatar from "/public/avatars/flute.png";
 
+import { ChevronDownIcon } from "lucide-react";
 import {
   DemoUser,
   NewUser,
@@ -11,6 +12,7 @@ import {
   SignOut,
   UserSettingsMenuItem,
 } from "./AuthComponents";
+import styles from "./header.module.css";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,10 +54,10 @@ export default function UserButton() {
   return (
     <div className="flex items-center">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+        <DropdownMenuTrigger className={`${styles.headerMenuTrigger}`} asChild>
           <Button
             variant="ghost"
-            className="focus-visible:ring-0 focus-visible:ring-offset-0"
+            className={`${styles.dropDownMenuTriggerInnerButton}`}
           >
             <div className="flex items-center space-x-3 ">
               <span className="hidden text-sm sm:inline-flex">
@@ -74,6 +76,9 @@ export default function UserButton() {
                 alt={session.user.name ?? ""}
               /> */}
               </Avatar>
+              <ChevronDownIcon
+                className={`${styles.dropDownMenuChevronDown}`}
+              />
             </div>
           </Button>
         </DropdownMenuTrigger>
