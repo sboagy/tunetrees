@@ -112,6 +112,7 @@ export default function PlaylistChooser() {
         <DropdownMenuTrigger
           className={`${styles.headerMenuTrigger}`}
           title={currentPlaylistDescription}
+          asChild
         >
           <Button
             variant="ghost"
