@@ -512,7 +512,7 @@ export async function getTabGroupMainState(
         "getTabGroupMainState response status from POST: ",
         response.status,
       );
-      if (response.status !== 200) {
+      if (!(response.status >= 200 && response.status < 300)) {
         console.error("Error creating tab group main state:", response.status);
         throw new Error("Error creating tab group main state");
       }
