@@ -45,27 +45,41 @@ export default function PlaylistChooser() {
       const playlists = await fetchViewPlaylistJoined(userId);
       if (typeof playlists === "string") {
         console.error("Error fetching playlists:", playlists);
-        return -1;
+        // return -1;
       }
       if (Array.isArray(playlists)) {
+        if (playlists.length === 0 && !isDialogOpen) {
+          setIsDialogOpen(true);
+        }
         setPlaylistsInMenu(playlists);
         const tabGroupMainState = await getTabGroupMainState(
           userId,
           currentPlaylist,
         );
         const playlistId = tabGroupMainState?.playlist_id ?? 1;
-        setCurrentPlaylist(playlistId);
-        triggerRefresh();
-        const playlist = playlists.find(
+        let playlist = playlists.find(
           (playlist) => playlist.playlist_id === playlistId,
         );
+        if (playlist === undefined && playlists.length > 0) {
+          const playlistId2 = playlists[0].playlist_id;
+          playlist = playlists.find(
+            (playlist) => playlist.playlist_id === playlistId2,
+          );
+        }
         if (playlist) {
-          setCurrentPlaylistName(playlist.instrument ?? "NULL INSTRUMENT");
+          setCurrentPlaylist(playlist.playlist_id);
+          setCurrentPlaylistName(playlist.instrument ?? "(None)");
           setCurrentPlaylistDescription(playlist.description ?? "");
         } else {
           console.log("Playlist not found in playlists array!");
+          setCurrentPlaylist(-1);
+          setCurrentPlaylistName("(None)");
+          setCurrentPlaylistDescription("");
         }
+        triggerRefresh();
       } else {
+        setCurrentPlaylist(-1);
+        triggerRefresh();
         console.error("playlists should be an array!");
         return -1;
       }
