@@ -1,13 +1,15 @@
+import { FlatCompat } from "@eslint/eslintrc";
+import js from "@eslint/js";
 import typescriptEslint from "@typescript-eslint/eslint-plugin";
+import tsParser from "@typescript-eslint/parser";
 import react from "eslint-plugin-react";
 import unicorn from "eslint-plugin-unicorn";
-import tsParser from "@typescript-eslint/parser";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import js from "@eslint/js";
-import { FlatCompat } from "@eslint/eslintrc";
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 const __filename = fileURLToPath(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/naming-convention
 const __dirname = path.dirname(__filename);
 const compat = new FlatCompat({
   baseDirectory: __dirname,
@@ -28,9 +30,9 @@ export default [
       "components/ui/button.tsx",
       "components/ui/form.tsx",
       "**/images.d.ts",
-      "**/postcss.config.js",
+      "**/postcss.config.mjs",
       "**/middleware.ts",
-      "**/tailwind.config.js",
+      "**/tailwind.config.mjs",
       "**/next.config.js",
       "**/next.config.mjs",
       ".prettierrc.js",

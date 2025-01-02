@@ -1,10 +1,12 @@
+import path from "node:path";
+
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   darkMode: ["class"],
   content: [
-    "./components/**/*.{ts,tsx,css}",
-    "./app/**/*.{ts,tsx,css}",
-    "./src/**/*.{ts,tsx,css}",
+    path.join(__dirname, "./components/**/*.{ts,tsx,css}"),
+    path.join(__dirname, "./app/**/*.{ts,tsx,css}"),
+    path.join(__dirname, "./src/**/*.{ts,tsx,css}"),
   ],
   prefix: "",
   theme: {

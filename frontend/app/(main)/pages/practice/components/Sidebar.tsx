@@ -52,7 +52,9 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
     <div className="flex flex-col h-full">
       <div className="sidebar flex-grow overflow-y-auto">
         <div className="flex items-center justify-between mb-2 mt-4 cursor-auto">
-          <h2 className="text-xl font-bold">{tuneTitle}</h2>
+          <h2 id="current-tune-title" className="text-xl font-bold">
+            {tuneTitle}
+          </h2>
           <Button
             variant="ghost"
             size="icon"

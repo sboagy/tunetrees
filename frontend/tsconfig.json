@@ -10,7 +10,7 @@
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "module": "esnext",
+    "module": "ESNext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -35,6 +35,9 @@
     "next-env.d.ts",
     "app/**/*.ts",
     "app/**/*.tsx",
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "scripts/**/*.mts",
     "components/**/*.ts",
     "components/**/*.tsx",
     "auth/**/*.ts",
@@ -43,7 +46,12 @@
     ".next/**/*.tsx",
     "auth/auth-types.ts",
     "react-quill.d.ts",
-    "eslint.config.mjs"
+    "eslint.config.mjs",
+    "playwright.config.ts",
+    "postcss.config.mjs",
+    "tailwind.config.mjs",
+    "postcss.config.mjs",
+    "tailwind.config.mjs"
   ],
   "exclude": ["node_modules", "archive/**/*.ts", ".prettierrc.js"]
 }

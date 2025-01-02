@@ -16,14 +16,6 @@
         "<node_internals>/**"
       ],
       "type": "node"
-      // "preLaunchTask": "tsc: build - tsconfig.json",
-      // "outFiles": [
-      //     "${workspaceFolder}/.next/**/*.js",
-      // ],
-      // "resolveSourceMapLocations": [
-      //     "${workspaceFolder}/.next/**/*",
-      //     "${workspaceFolder}/node_modules/**/*"
-      // ],
     },
     {
       "type": "chrome",
@@ -31,14 +23,6 @@
       "name": "Next: Chrome",
       "url": "https://localhost:3000/home",
       "webRoot": "${workspaceFolder}"
-      // "preLaunchTask": "tsc: build - tsconfig.json",
-      // "outFiles": [
-      //     "${workspaceFolder}/.next/**/*.js",
-      // ],
-      // "resolveSourceMapLocations": [
-      //     "${workspaceFolder}/.next/**/*",
-      //     "${workspaceFolder}/node_modules/**/*"
-      // ],
     },
     {
       "name": "Launch",
@@ -69,9 +53,21 @@
         "${workspaceFolder}/.next/**/*.js"
       ],
       "resolveSourceMapLocations": [
-        "${workspaceFolder}/.next/**/*",
-        "${workspaceFolder}/xnode_modules/**/*"
+        "${workspaceFolder}/node_modules/**/*"
       ]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run Login Script",
+      "program": "${workspaceFolder}/scripts/run-login.mts",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--loader",
+        "ts-node/esm"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
     }
   ],
   "compounds": [
