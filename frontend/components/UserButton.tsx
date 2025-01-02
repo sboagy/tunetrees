@@ -2,7 +2,6 @@
 import { useSession } from "next-auth/react";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import defaultAvatar from "/public/avatars/flute.png";
 
 import { ChevronDownIcon } from "lucide-react";
 import {
@@ -12,7 +11,7 @@ import {
   SignOut,
   UserSettingsMenuItem,
 } from "./AuthComponents";
-import styles from "./header.module.css";
+import styles from "./Header.module.css";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,7 +64,7 @@ export default function UserButton() {
               </span>
               <Avatar className="w-8 h-8">
                 <AvatarImage
-                  src={defaultAvatar.src}
+                  src="/avatars/flute.png"
                   alt={session.user.name ?? ""}
                 />
                 {/* <AvatarImage

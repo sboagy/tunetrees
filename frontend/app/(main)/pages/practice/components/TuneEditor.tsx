@@ -18,6 +18,7 @@ import {
   updateTuneInPlaylistFromTuneOverview,
 } from "../queries";
 import type { ITuneOverview } from "../types";
+import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import "./TuneEditor.css"; // Import the CSS file
@@ -132,6 +133,8 @@ export default function TuneEditor({
     void fetchTune();
   }, [userId, playlistId, tuneId, form]);
 
+  const { triggerCurrentTuneUpdate } = useTune();
+
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     console.log(data);
 
@@ -148,6 +151,7 @@ export default function TuneEditor({
     }
     triggerRefresh();
     setCurrentView("tabs");
+    triggerCurrentTuneUpdate();
   };
 
   const handleCancel = () => {

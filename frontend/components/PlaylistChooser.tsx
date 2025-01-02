@@ -12,8 +12,8 @@ import type { IViewPlaylistJoined } from "@/app/(main)/pages/practice/types";
 import { ChevronDownIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import styles from "./PlaylistChooser.module.css";
 import PlaylistDialog from "./PlaylistDialog";
-import styles from "./header.module.css";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,

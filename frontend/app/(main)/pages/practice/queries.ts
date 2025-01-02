@@ -2,7 +2,7 @@
 
 import { parseParamsWithArrays } from "@/lib/utils";
 import type { SortingState } from "@tanstack/react-table";
-import axios from "axios";
+import axios, { type AxiosResponse } from "axios";
 import { ERROR_TUNE } from "./mocks";
 import type {
   IGenre,
@@ -166,7 +166,7 @@ export async function updateTuneInPlaylistFromTuneOverview(
   playlist_ref: number,
   tune_id: number,
   tune_update: Partial<ITuneOverview>,
-): Promise<Partial<ITuneOverview> | { detail?: string }> {
+): Promise<ITune> {
   try {
     const dbTune = await getPlaylistTuneOverview(
       user_id,
@@ -175,7 +175,7 @@ export async function updateTuneInPlaylistFromTuneOverview(
     );
     if ("detail" in dbTune) {
       console.error("Error in updatePlaylistTune: ", dbTune.detail);
-      return { detail: "Unable to update tune: Tune not found" };
+      throw new Error(dbTune.detail);
     }
     const tuneUpdateData: Partial<ITune> = {};
 
@@ -193,15 +193,16 @@ export async function updateTuneInPlaylistFromTuneOverview(
       if (tune_update.genre !== dbTune.genre)
         tuneUpdateData.genre = tune_update.genre;
     }
-    const response = await client.patch<{
-      success?: string;
-      detail?: string;
-    }>("/tune", tuneUpdateData, { params: { tune_ref: tune_id } });
+
+    const response: AxiosResponse<ITune> = await client.patch<ITune>(
+      `/tune/${tune_id}`,
+      tuneUpdateData,
+    );
 
     return response.data;
   } catch (error) {
     console.error("Error in updatePlaylistTune: ", error);
-    return { detail: `Unable to update tune: ${(error as Error).message}` };
+    throw error;
   }
 }
 

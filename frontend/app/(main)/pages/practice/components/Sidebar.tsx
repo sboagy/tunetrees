@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getTune } from "../queries";
 import type { ITuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
@@ -21,10 +21,17 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
   console.log(`Sidebar: userId=${userId}, playlistId=${playlistId}`);
 
   const [tuneTitle, setTuneTitle] = useState<string | null>(null);
-  const { currentTune } = useTune();
+  const { currentTune, currentTuneUpdate } = useTune();
+  const prevCurrentTuneUpdate = useRef<number>(currentTuneUpdate);
 
   useEffect(() => {
     if (currentTune !== null) {
+      if (prevCurrentTuneUpdate.current !== currentTuneUpdate) {
+        // This is really here just so I don't hae to disable the variable with eslint.
+        console.log(
+          "Sidebar ===> Sidebar.tsx:30 ~ useEffect triggered by currentTuneUpdate",
+        );
+      }
       const tune = getTune(currentTune);
       tune
         .then((result: ITuneOverview | { detail: string }) => {
@@ -38,7 +45,7 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
     } else {
       setTuneTitle(null);
     }
-  }, [currentTune]);
+  }, [currentTune, currentTuneUpdate]);
 
   const handleTuneEditClick = (tuneId: number) => {
     console.log(
@@ -52,7 +59,9 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
     <div className="flex flex-col h-full">
       <div className="sidebar flex-grow overflow-y-auto">
         <div className="flex items-center justify-between mb-2 mt-4 cursor-auto">
-          <h2 className="text-xl font-bold">{tuneTitle}</h2>
+          <h2 id="current-tune-title" className="text-xl font-bold">
+            {tuneTitle}
+          </h2>
           <Button
             variant="ghost"
             size="icon"

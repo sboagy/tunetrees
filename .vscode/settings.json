@@ -18,5 +18,10 @@
         ".venv",
         ".venv/**",
         ".venv/**/*.py"
-    ]
+    ],
+    "python.testing.pytestArgs": [
+        "design/ui_grammar/tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }

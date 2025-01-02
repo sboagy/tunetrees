@@ -4,7 +4,6 @@ import { useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 
 import Image from "next/image";
-import profilePic from "/public/logo4.png";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -206,7 +205,7 @@ export default function SignInPage(): JSX.Element {
         <CardHeader>
           <CardTitle className="flex justify-center">
             <Image
-              src={profilePic}
+              src="/logo4.png"
               alt="Home"
               width={75}
               height={75}

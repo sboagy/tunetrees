@@ -125,7 +125,7 @@ export async function getUserExtendedByEmail(
     select: serialize = userSerializer,
     ...fetchOptions
   } = {
-    path: `auth/get-user-by-email/${email}/`,
+    path: `auth/get-user-by-email/${email}`,
     method: "GET",
     select: userSerializer,
   };
@@ -169,7 +169,7 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
     },
     getUserByEmail(email: string): IAdapterProcedure {
       return {
-        path: `auth/get-user-by-email/${email}/`,
+        path: `auth/get-user-by-email/${email}`,
         method: "GET",
         select: userSerializer,
       };

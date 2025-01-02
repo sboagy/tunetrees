@@ -29,6 +29,25 @@
                 "--reload"
             ],
             "jinja": true
+        },
+        {
+            "name": "Python Debugger: FastAPI (test)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "TUNETREES_DB": "${workspaceFolder}/tunetrees_test.sqlite3",
+                "TUNETREES_DEPLOY_BASE_DIR": "${workspaceFolder}"
+            },
+            "args": [
+                "tunetrees.api.main:app",
+                "--reload"
+            ],
+            "jinja": true,
+            
+            "preLaunchTask": "clean_and_stop"
         }
+
     ]
 }

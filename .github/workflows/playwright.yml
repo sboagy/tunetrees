@@ -1,0 +1,76 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    environment: frontend_env
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12.2"
+      - name: Create virtual environment
+        run: python -m venv .venv
+
+      - name: Activate virtual environment and install dependencies
+        run: |
+          source .venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Install typescript
+        run: npm install -g typescript@5.7.2
+        working-directory: frontend
+
+      - name: Install node types
+        run: npm install --save-dev @types/node
+        working-directory: frontend
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: frontend
+
+      - name: Install Playwright Chromium Browser
+        run: npx playwright install chromium --with-deps
+        working-directory: frontend
+
+      - name: Run Frontend Playwright tests
+        run: npx playwright test --project=chromium
+        working-directory: frontend
+        env:
+          NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
+          NEXT_PUBLIC_TT_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}
+          AUTH_GITHUB_SECRET: ${{ secrets.AUTH_GITHUB_SECRET }}
+          AUTH_GOOGLE_ID: ${{ secrets.AUTH_GOOGLE_ID }}
+          AUTH_GOOGLE_SECRET: ${{ secrets.AUTH_GOOGLE_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_CLIENT_ID: ${{ secrets.GGITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.GGITHUB_CLIENT_SECRET }}
+          TT_AUTH_SENDGRID_API_KEY: ${{ secrets.TT_AUTH_SENDGRID_API_KEY }}
+          CI: true
+          STORAGE_STATE_TEST1: ${{ secrets.STORAGE_STATE_TEST1 }}
+          TEST1_LOGIN_USER_EMAIL: ${{ secrets.TEST1_LOGIN_USER_EMAIL }}
+          TEST1_LOGIN_USER_PASSWORD: ${{ secrets.TEST1_LOGIN_USER_PASSWORD }}
+          # ...add other test-specific environment variables as needed
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: playwright-report
+          path: frontend/test-results/
+          retention-days: 30
