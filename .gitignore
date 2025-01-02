@@ -288,3 +288,5 @@ design/.*.drawio.bkp
 tunetrees/__pycache__/__init__.cpython-312.pyc
 frontend/tests/example.spec.ts
 frontend/tests-examples/demo-todo-app.spec.ts
+frontend/storageState.json
+frontend/gists_bash.sh

@@ -1,17 +1,50 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const __filename = fileURLToPath(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const __dirname = path.dirname(__filename);
 
 // test.beforeEach(async () => {
 //   await setupDatabase();
 // });
 
-test("test", async ({ page }) => {
+// test.use({ storageState: "storageState.json" });
+
+test("test", async ({ browser }) => {
+  console.log("===> test-2.spec.ts:12 ~ ", __dirname);
+  const storageStatePath = path.resolve(
+    __dirname,
+    "storageStateSboagyLogin.json",
+  );
+  console.log("===> test-2.spec.ts:22 ~ ", storageStatePath);
+
+  const storageStateContent = await fs.readFile(storageStatePath, "utf8");
+  const storageState = JSON.parse(storageStateContent);
+
+  console.log("===> test-2.spec.ts:27 ~ Storage State:", storageState);
+
+  const context = await browser.newContext({ storageState: storageState });
+
+  // Set the storage state
+  const page = await context.newPage();
+
+  // await page.waitForTimeout(2000);
+
   await page.goto("https://127.0.0.1:3000");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.getByPlaceholder("person@example.com").fill("sboagy@gmail.com");
-  await page.getByPlaceholder("person@example.com").press("Tab");
-  await page.locator("#password").fill("abc");
-  await page.locator("#password").press("Tab");
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  // storageState: "storageState.json";
+  // await page.getByRole("button", { name: "Sign in" }).click();
+  // await page.getByPlaceholder("person@example.com").fill("sboagy@gmail.com");
+  // await page.getByPlaceholder("person@example.com").press("Tab");
+  // await page.locator("#password").fill("abc");
+  // await page.locator("#password").press("Tab");
+  // await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  // await page.waitForTimeout(3000);
+  // await page.context().storageState({ path: storageStatePath });
+
   await page.getByRole("tab", { name: "Repertoire" }).click();
   await page.getByPlaceholder("Filter").click();
   await page.getByPlaceholder("Filter").fill("lakes of");
@@ -23,13 +56,22 @@ test("test", async ({ page }) => {
     .click();
   await page.getByLabel("Title:").click();
   await page.getByLabel("Title:").fill("Lakes of Sligo x");
-  await page.getByRole("button", { name: "Save" }).click();
+  // await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Cancel" }).click();
   const tuneTitle1 = await page.locator("#current-tune-title").textContent();
-  console.log(tuneTitle1);
+  console.log("===> test-2.spec.ts:63 ~ ", tuneTitle1);
   // Bogus expect, this should test for "Lakes of Sligo x"
   expect(await page.locator("#current-tune-title").textContent()).toEqual(
     "Lakes of Sligo",
   );
+
+  // For some reason, I will not get a fetch error if I give a bit of a pause.
+  await page.waitForTimeout(1000);
+  await page.close();
+  await context.close();
+  await browser.close({ reason: "Test completed." });
+  console.log("Test completed ===> test-2.spec.ts:68 ~ success");
+
   // console.log("Test completed. Browser will remain open.");
   // await new Promise(() => {}); // Keep the script running
 });

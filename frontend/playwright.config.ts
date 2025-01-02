@@ -37,21 +37,6 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
-    // {
-    //   name: "chromium-with-storage-sboag",
-    //   use: {
-    //     ...devices["Desktop Chrome"],
-    //     viewport: { width: 1280, height: 720 },
-
-    //     /* Use the saved storage state saved in scripts/login.ts */
-    //     // storageState: "storageState.json",
-
-    //     // // Custom fixture to run setupDatabase before each test
-    //     // beforeEach: async () => {
-    //     //   await setupDatabase();
-    //     // },
-    //   },
-    // },
     {
       name: "chromium",
       use: {
@@ -59,7 +44,7 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
 
         /* Use the saved storage state saved in scripts/login.ts */
-        // storageState: "storageState.json",
+        // storageState: "tests/storageStateSboagyLogin.json",
       },
     },
 
