@@ -111,8 +111,8 @@ COPY public public
 COPY lib lib
 
 COPY middleware.ts ./
-COPY components.json next.config.js next.config.mjs postcss.config.js ./
-COPY tailwind.config.mjs tailwind.config.mjs ./
+COPY components.json next.config.js next.config.mjs postcss.config.mjs ./
+COPY tailwind.config.mjs ./
 COPY tsconfig.json ./
 COPY eslint.config.mjs .prettierrc .prettierrc.js ./
 
