@@ -37,6 +37,7 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "tests/**/*.ts",
+    "tests-examples/**/*.ts",
     "scripts/**/*.ts",
     "scripts/**/*.mts",
     "components/**/*.ts",

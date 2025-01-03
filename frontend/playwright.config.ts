@@ -1,4 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const __filename = fileURLToPath(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const __dirname = path.dirname(__filename);
 
 /**
  * Read environment variables from file.
@@ -33,10 +40,21 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
+
+    ignoreHTTPSErrors: true, // Accept self-signed certificates
   },
 
   /* Configure projects for major browsers */
   projects: [
+    {
+      name: "backend",
+      testDir: "./tests/backend",
+      use: {
+        baseURL: "http://localhost:8000",
+      },
+      // dependencies: ["frontend"],
+      testMatch: "**/*.setup.ts",
+    },
     {
       name: "chromium",
       use: {
@@ -46,6 +64,8 @@ export default defineConfig({
         /* Use the saved storage state saved in scripts/login.ts */
         // storageState: "tests/storageStateSboagyLogin.json",
       },
+      // testMatch: "test*.ts",
+      dependencies: ["backend"],
     },
 
     {
@@ -88,7 +108,11 @@ export default defineConfig({
     // url: "https://127.0.0.1:3000",
     // url: "https://127.0.0.1:3000/home",
     // reuseExistingServer: !process.env.CI,
+    // url: "https://localhost:3000/api/health",
     reuseExistingServer: true,
-    timeout: 120 * 1000, // Increase the timeout to 60 seconds
+    timeout: 20 * 1000, // Increase the timeout to 60 seconds
   },
+
+  /* Specify global teardown script */
+  globalTeardown: path.resolve(__dirname, "./scripts/global-teardown.ts"),
 });

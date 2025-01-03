@@ -297,3 +297,5 @@ design/ui_grammar/UIGrammarLexer.py
 design/ui_grammar/UIGrammarLexer.tokens
 design/ui_grammar/UIGrammarListener.py
 design/ui_grammar/UIGrammarParser.py
+tunetrees_test.sqlite3
+fastapi.pid

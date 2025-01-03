@@ -25,16 +25,20 @@ test("test", async ({ browser }) => {
   const storageStateContent = await fs.readFile(storageStatePath, "utf8");
   const storageState = JSON.parse(storageStateContent);
 
-  console.log("===> test-2.spec.ts:27 ~ Storage State:", storageState);
+  // Warning, don't normally enable this, it will show the storage state in the console.
+  // console.log("===> test-2.spec.ts:27 ~ Storage State:", storageState);
 
   const context = await browser.newContext({ storageState: storageState });
 
   // Set the storage state
   const page = await context.newPage();
 
+  // await page.waitForTimeout(5000);
+
   // await page.waitForTimeout(2000);
 
-  await page.goto("https://127.0.0.1:3000");
+  // Increase the timeout for page.goto
+  await page.goto("https://127.0.0.1:3000", { timeout: 60000 });
   // storageState: "storageState.json";
   // await page.getByRole("button", { name: "Sign in" }).click();
   // await page.getByPlaceholder("person@example.com").fill("sboagy@gmail.com");
@@ -44,6 +48,7 @@ test("test", async ({ browser }) => {
   // await page.getByRole("button", { name: "Sign In", exact: true }).click();
   // await page.waitForTimeout(3000);
   // await page.context().storageState({ path: storageStatePath });
+  await page.waitForTimeout(1000);
 
   await page.getByRole("tab", { name: "Repertoire" }).click();
   await page.getByPlaceholder("Filter").click();
