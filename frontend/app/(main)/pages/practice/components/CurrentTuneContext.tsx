@@ -8,6 +8,8 @@ interface ITuneContextType {
   setCurrentTune: (tuneId: number | null) => void;
   currentTablePurpose: TablePurpose | null;
   setCurrentTablePurpose: (purpose: TablePurpose) => void;
+  triggerCurrentTuneUpdate: () => void;
+  currentTuneUpdate: number;
 }
 
 const CurrentTuneContext = createContext<ITuneContextType | undefined>(
@@ -16,6 +18,11 @@ const CurrentTuneContext = createContext<ITuneContextType | undefined>(
 
 export const CurrentTuneProvider = ({ children }: { children: ReactNode }) => {
   const [currentTune, setCurrentTune] = useState<number | null>(null);
+  const [currentTuneUpdate, setUpdateTrigger] = useState<number>(0);
+
+  const triggerCurrentTuneUpdate = () => {
+    setUpdateTrigger((prev) => prev + 1);
+  };
 
   const [currentTablePurpose, setCurrentTablePurpose] =
     useState<TablePurpose | null>(null);
@@ -26,6 +33,8 @@ export const CurrentTuneProvider = ({ children }: { children: ReactNode }) => {
         setCurrentTune,
         currentTablePurpose,
         setCurrentTablePurpose,
+        triggerCurrentTuneUpdate,
+        currentTuneUpdate,
       }}
     >
       {children}

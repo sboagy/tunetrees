@@ -54,6 +54,8 @@ test("test", async ({ browser }) => {
   await page.getByPlaceholder("Filter").click();
   await page.getByPlaceholder("Filter").fill("lakes of");
   await page.getByRole("row", { name: "1081 Lakes of Sligo Polka" }).click();
+
+  // ========================
   await page
     .locator("div")
     .filter({ hasText: /^Lakes of Sligo$/ })
@@ -61,13 +63,40 @@ test("test", async ({ browser }) => {
     .click();
   await page.getByLabel("Title:").click();
   await page.getByLabel("Title:").fill("Lakes of Sligo x");
-  // await page.getByRole("button", { name: "Save" }).click();
+
+  // CANCEL
   await page.getByRole("button", { name: "Cancel" }).click();
+  // I think this is needed mostly for the useEffect to take effect?
+  await page.waitForTimeout(1000);
+
   const tuneTitle1 = await page.locator("#current-tune-title").textContent();
   console.log("===> test-2.spec.ts:63 ~ ", tuneTitle1);
   // Bogus expect, this should test for "Lakes of Sligo x"
   expect(await page.locator("#current-tune-title").textContent()).toEqual(
     "Lakes of Sligo",
+  );
+  // ========================
+  // await page.waitForTimeout(1000);
+  // ========================
+  // Should this be two tests?
+  await page
+    .locator("div")
+    .filter({ hasText: /^Lakes of Sligo$/ })
+    .getByLabel("Edit")
+    .click();
+  await page.getByLabel("Title:").click();
+  await page.getByLabel("Title:").fill("Lakes of Sligo x");
+
+  // Save
+  await page.getByRole("button", { name: "Save" }).click();
+  // I think this is needed mostly for the useEffect to take effect?
+  await page.waitForTimeout(1000);
+
+  const tuneTitle2 = await page.locator("#current-tune-title").textContent();
+  console.log("===> test-2.spec.ts:63 ~ ", tuneTitle2);
+  // Bogus expect, this should test for "Lakes of Sligo x"
+  expect(await page.locator("#current-tune-title").textContent()).toEqual(
+    "Lakes of Sligo x",
   );
 
   // For some reason, I will not get a fetch error if I give a bit of a pause.
