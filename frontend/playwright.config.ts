@@ -102,11 +102,15 @@ export default defineConfig({
   /* Run the local dev server before starting the tests */
   webServer: {
     command: "npm run dev", // Combine the command and arguments
-    // Setting the URL causes Playwright to hang.  I don't know why.
-    // The server starts and returns 200.
+    // Setting the URL causes Playwright to hang.  This seems to
+    // be related to using https.  "npm run dev" translates to
+    // "next dev --experimental-https" per package.json.  If I remove the
+    // --experimental-https, then the server starts and returns 200 if
+    // I set the url to "http:".  I've reached out for some help on this
+    // issue in discord.
     // url: "https://127.0.0.1:3000",
     // url: "https://127.0.0.1:3000/home",
-    // url: "http://localhost:3000/api/health",
+    // url: "https://localhost:3000/api/health",
     reuseExistingServer: !process.env.CI,
     // timeout: 2 * 1000,
   },
