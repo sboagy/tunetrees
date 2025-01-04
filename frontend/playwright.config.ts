@@ -99,18 +99,16 @@ export default defineConfig({
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
+  /* Run the local dev server before starting the tests */
   webServer: {
     command: "npm run dev", // Combine the command and arguments
     // Setting the URL causes Playwright to hang.  I don't know why.
-    // The server starts and returns 200.  CoPilot suggests maybe specifying
-    // a Health Check Endpoint, which is not a horrible idea.
+    // The server starts and returns 200.
     // url: "https://127.0.0.1:3000",
     // url: "https://127.0.0.1:3000/home",
-    // reuseExistingServer: !process.env.CI,
-    // url: "https://localhost:3000/api/health",
-    reuseExistingServer: true,
-    timeout: 20 * 1000, // Increase the timeout to 60 seconds
+    // url: "http://localhost:3000/api/health",
+    reuseExistingServer: !process.env.CI,
+    // timeout: 2 * 1000,
   },
 
   /* Specify global teardown script */
