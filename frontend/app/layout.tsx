@@ -25,7 +25,7 @@ export default async function RootLayout({
       <body className={`${inter.className} h-full`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >
