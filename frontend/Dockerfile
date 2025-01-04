@@ -9,7 +9,7 @@ FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /usr/src/app
 
 # Copy necessary configuration files
-COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.js next.config.mjs *.d.ts ./
+COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.mjs next.config.mjs *.d.ts ./
 
 # Copy necessary configuration files
 COPY tsconfig.json  ./tsconfig.json
@@ -28,7 +28,7 @@ RUN rm -rf src
 #     echo "Done checking for tsconfig-google.json (1)")
 
 # re-copy the configuration files to since gts is evil and overwrites them
-COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.js next.config.mjs *.d.ts ./
+COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.mjs next.config.mjs *.d.ts ./
 
 # Copy necessary configuration files
 COPY tsconfig.json  ./tsconfig.json
@@ -111,7 +111,7 @@ COPY public public
 COPY lib lib
 
 COPY middleware.ts ./
-COPY components.json next.config.js next.config.mjs postcss.config.mjs ./
+COPY components.json next.config.mjs next.config.mjs postcss.config.mjs ./
 COPY tailwind.config.mjs ./
 COPY tsconfig.json ./
 COPY eslint.config.mjs .prettierrc .prettierrc.js ./
