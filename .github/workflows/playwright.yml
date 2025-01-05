@@ -33,8 +33,12 @@ jobs:
         run: npx playwright install --with-deps
         working-directory: frontend
 
+      - name: Install typescript
+        run: npm install -g typescript@5.7.2
+        working-directory: frontend
+
       - name: Install dependencies
-        run: npm ci
+        run: npm install
         working-directory: frontend
 
       - name: Run Backend Playwright tests
