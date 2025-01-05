@@ -3,8 +3,8 @@
 import { useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 
+import profilePic from "logo4.png";
 import Image from "next/image";
-import profilePic from "public/logo4.png";
 
 import { Button } from "@/components/ui/button";
 import {
