@@ -67,7 +67,8 @@
     "postcss.config.mjs",
     "tailwind.config.mjs",
     "src",
-    "public"
+    "public",
+    "public/**/*.png"
   ],
   "exclude": [
     "node_modules",
