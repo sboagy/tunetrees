@@ -34,7 +34,7 @@ COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.mjs next.config.mj
 COPY tsconfig.json  ./tsconfig.json
 
 # Install TypeScript globally
-RUN npm install -g typescript@5.6.3
+RUN npm install -g typescript@5.7.2
 
 # # Verify the presence of tsconfig-google.json
 # RUN (echo "Checking for tsconfig-google.json (2)" && \
