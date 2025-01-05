@@ -65,7 +65,7 @@ export default defineConfig({
         /* Use the saved storage state saved in scripts/login.ts */
         // storageState: "tests/storageStateSboagyLogin.json",
       },
-      dependencies: ["backend"],
+      // dependencies: ["backend"],
       // testMatch: "test*.ts",
     },
 
@@ -82,7 +82,7 @@ export default defineConfig({
     {
       name: "backend-teardown",
       testDir: "./tests",
-      dependencies: ["backend", "chromium"],
+      // dependencies: ["backend", "chromium"],
       // dependencies: ["chromium", "firefox", "webkit"],
       testMatch: "**/backend-teardown.spec.ts",
     },
