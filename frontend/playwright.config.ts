@@ -120,5 +120,5 @@ export default defineConfig({
   },
 
   /* Specify global teardown script */
-  globalTeardown: path.resolve(__dirname, "./scripts/global-teardown.ts"),
+  // globalTeardown: path.resolve(__dirname, "./scripts/global-teardown.ts"),
 });
