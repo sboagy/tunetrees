@@ -29,7 +29,9 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: "html",
+  reporter: [
+    ["html", { outputFolder: "playwright-report", open: "never", merge: true }],
+  ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     headless: false, // Run tests in headed mode
@@ -52,7 +54,6 @@ export default defineConfig({
       use: {
         baseURL: "http://localhost:8000",
       },
-      // dependencies: ["frontend"],
       testMatch: "**/*.setup.ts",
     },
     {
@@ -64,8 +65,8 @@ export default defineConfig({
         /* Use the saved storage state saved in scripts/login.ts */
         // storageState: "tests/storageStateSboagyLogin.json",
       },
-      // testMatch: "test*.ts",
       dependencies: ["backend"],
+      // testMatch: "test*.ts",
     },
 
     {
@@ -76,6 +77,14 @@ export default defineConfig({
     {
       name: "webkit",
       use: { ...devices["Desktop Safari"] },
+    },
+
+    {
+      name: "backend-teardown",
+      testDir: "./tests",
+      dependencies: ["backend", "chromium"],
+      // dependencies: ["chromium", "firefox", "webkit"],
+      testMatch: "**/backend-teardown.spec.ts",
     },
 
     /* Test against mobile viewports. */

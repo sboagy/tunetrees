@@ -1,13 +1,17 @@
 name: Playwright Tests
+
 on:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    environment: frontend_env
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,11 +33,45 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
         working-directory: frontend
-      - name: Run Playwright tests
-        run: npx playwright test
+
+      - name: Run Backend Playwright tests
+        run: npx playwright test backend
         working-directory: frontend
+        env:
+          TT_REVIEW_SITDOWN_DATE: ${{ vars.TT_REVIEW_SITDOWN_DATE }}
+          BACKEND_AUTH_SECRET: ${{ secrets.BACKEND_AUTH_SECRET }}
+          # ...add other backend-specific environment variables as needed
+
+      - name: Run Frontend Playwright tests
+        run: npx playwright test "chromium"
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_TT_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}
+          AUTH_GITHUB_SECRET: ${{ secrets.AUTH_GITHUB_SECRET }}
+          AUTH_GOOGLE_ID: ${{ secrets.AUTH_GOOGLE_ID }}
+          AUTH_GOOGLE_SECRET: ${{ secrets.AUTH_GOOGLE_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_CLIENT_ID: ${{ secrets.GGITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.GGITHUB_CLIENT_SECRET }}
+          TT_AUTH_SENDGRID_API_KEY: ${{ secrets.TT_AUTH_SENDGRID_API_KEY }}
+          # ...add other frontend-specific environment variables as needed
+
+      - name: Teardown Backend
+        if: always()
+        run: npx playwright test backend-teardown
+        working-directory: frontend
+
+      # - name: Merge Playwright reports
+      #   if: always()
+      #   run: npx playwright show-report
+      #   working-directory: frontend
+
       - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         with:
           name: playwright-report
           path: frontend/playwright-report/

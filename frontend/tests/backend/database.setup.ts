@@ -30,7 +30,10 @@ test("setup", async () => {
   const serverPreUp = await checkServer();
   if (serverPreUp) {
     console.log("Server is already up and running.");
-    await fs.promises.writeFile(pidFilePath, "0");
+    // But let's not modify the PID file, in case another invocation did run it.
+    // At teardown, if it does get a stale PID (one that is not running), it's probably
+    // not the end of the world if it tries to kill it and fails.
+    // await fs.promises.writeFile(pidFilePath, "0");
     return;
   }
 
@@ -69,10 +72,14 @@ test("setup", async () => {
         PYTHONPATH: `${tunetreesBackendDeployBaseDir}:${venvLibDir}:${process.env.PYTHONPATH || ""}`,
         PYTHONDONTWRITEBYTECODE: "1",
         PYTHONUNBUFFERED: "1",
-        TUNETREES_DB: `${testDatabasePath}`,
-        TUNETREES_DEPLOY_BASE_DIR: `${tunetreesBackendDeployBaseDir}`,
-        LOGLEVEL: "DEBUG",
-        TT_REVIEW_SITDOWN_DATE: "2024-07-08 12:27:08",
+        // The following should be obtained from the running environment
+        TUNETREES_DB: process.env.TUNETREES_DB || `${testDatabasePath}`,
+        TUNETREES_DEPLOY_BASE_DIR:
+          process.env.TUNETREES_DEPLOY_BASE_DIR ||
+          `${tunetreesBackendDeployBaseDir}`,
+        LOGLEVEL: process.env.LOGLEVEL || "DEBUG",
+        TT_REVIEW_SITDOWN_DATE:
+          process.env.TT_REVIEW_SITDOWN_DATE || "2024-07-08 12:27:08",
       },
       stdio: ["pipe", "pipe", "pipe"], // Use pipe for stdio
     },
