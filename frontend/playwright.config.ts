@@ -1,11 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+// import path from "node:path";
+// import { fileURLToPath } from "node:url";
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const __filename = fileURLToPath(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const __dirname = path.dirname(__filename);
+// // eslint-disable-next-line @typescript-eslint/naming-convention
+// const __filename = fileURLToPath(import.meta.url);
+// // eslint-disable-next-line @typescript-eslint/naming-convention
+// const __dirname = path.dirname(__filename);
 
 /**
  * Read environment variables from file.
@@ -66,7 +66,7 @@ export default defineConfig({
         // storageState: "tests/storageStateSboagyLogin.json",
       },
       // dependencies: ["backend"],
-      // testMatch: "test*.ts",
+      testMatch: "test*.ts",
     },
 
     // {
