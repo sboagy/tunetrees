@@ -27,11 +27,13 @@
     "paths": {
       "@/*": ["./*"],
       "auth": ["./auth/"],
-      "components": ["./components/"]
+      "components": ["./components/"],
+      "*": ["src/*", "public/*"]
       // "next-auth-http-adapter": [
       //   "./../../../gitmisc/next-auth-http-adapter/src"
       // ]
-    }
+    },
+    "baseUrl": "./"
   },
   "include": [
     "next-env.d.ts",
@@ -54,7 +56,14 @@
     "postcss.config.mjs",
     "tailwind.config.mjs",
     "postcss.config.mjs",
-    "tailwind.config.mjs"
+    "tailwind.config.mjs",
+    "src",
+    "public"
   ],
-  "exclude": ["node_modules", "archive/**/*.ts", ".prettierrc.js"]
+  "exclude": [
+    "node_modules",
+    "archive/**/*.ts",
+    ".prettierrc.js",
+    "dist"
+  ]
 }
