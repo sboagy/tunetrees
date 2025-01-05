@@ -35,15 +35,14 @@ jobs:
         working-directory: frontend
 
       - name: Run Backend Playwright tests
-        run: npx playwright test backend
+        run: npx playwright test --project=backend
         working-directory: frontend
         env:
           TT_REVIEW_SITDOWN_DATE: ${{ vars.TT_REVIEW_SITDOWN_DATE }}
-          BACKEND_AUTH_SECRET: ${{ secrets.BACKEND_AUTH_SECRET }}
           # ...add other backend-specific environment variables as needed
 
       - name: Run Frontend Playwright tests
-        run: npx playwright test "chromium"
+        run: npx playwright test --project=chromium
         working-directory: frontend
         env:
           NEXT_PUBLIC_TT_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
@@ -62,7 +61,7 @@ jobs:
 
       - name: Teardown Backend
         if: always()
-        run: npx playwright test backend-teardown
+        run: npx playwright test --project=backend-teardown
         working-directory: frontend
 
       # - name: Merge Playwright reports
