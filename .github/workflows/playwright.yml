@@ -57,6 +57,10 @@ jobs:
         run: npm install --save-dev @types/node
         working-directory: frontend
 
+      - name: list frontend directory
+        run: ls -l
+        working-directory: frontend
+
       - name: list public directory
         run: ls -la public
         working-directory: frontend
