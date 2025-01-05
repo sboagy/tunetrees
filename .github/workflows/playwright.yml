@@ -29,12 +29,24 @@ jobs:
           source .venv/bin/activate
           pip install -r requirements.txt
 
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+      - name: Check node version
+        run: node --version
+        working-directory: frontend
+
+      - name: Check npm version
+        run: npm --version
+        working-directory: frontend
+
+      - name: Check NODE_ENV
+        run: echo $NODE_ENV
         working-directory: frontend
 
       - name: Install typescript
         run: npm install -g typescript@5.7.2
+        working-directory: frontend
+
+      - name: Install node types
+        run: npm install --save-dev @types/node
         working-directory: frontend
 
       - name: Install dependencies
@@ -47,6 +59,10 @@ jobs:
         env:
           TT_REVIEW_SITDOWN_DATE: ${{ vars.TT_REVIEW_SITDOWN_DATE }}
           # ...add other backend-specific environment variables as needed
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        working-directory: frontend
 
       - name: Run Frontend Playwright tests
         run: npx playwright test --project=chromium
