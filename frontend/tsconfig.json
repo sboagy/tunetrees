@@ -28,6 +28,12 @@
       "@/*": ["./*"],
       "auth": ["./auth/"],
       "components": ["./components/"],
+      "public/*": [
+        "./public/*"
+      ],
+      "@public/*": [
+        "./public/*"
+      ],
       "*": ["src/*", "public/*"]
       // "next-auth-http-adapter": [
       //   "./../../../gitmisc/next-auth-http-adapter/src"
