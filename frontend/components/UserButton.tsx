@@ -1,5 +1,4 @@
 "use client";
-import defaultAvatar from "@/public/avatars/flute.png";
 import { useSession } from "next-auth/react";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
@@ -65,7 +64,7 @@ export default function UserButton() {
               </span>
               <Avatar className="w-8 h-8">
                 <AvatarImage
-                  src={defaultAvatar.src}
+                  src="/avatars/flute.png"
                   alt={session.user.name ?? ""}
                 />
                 {/* <AvatarImage

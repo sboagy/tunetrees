@@ -4,7 +4,6 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-import profilePic from "@/public/logo4.png";
 import Image from "next/image";
 
 import CustomLink from "./CustomLink";
@@ -25,7 +24,7 @@ export function MainNav() {
       <CustomLink href="/">
         <Button variant="ghost" className="h-16 py-2 mt-1">
           <Image
-            src={profilePic}
+            src="/logo4.png"
             alt="Home"
             width="52"
             height="52"
