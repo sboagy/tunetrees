@@ -7,9 +7,12 @@ import { TuneDataRefreshProvider } from "@/app/(main)/pages/practice/components/
 import { TunesProviderAll } from "@/app/(main)/pages/practice/components/TunesContextAll";
 import { TunesProviderRepertoire } from "@/app/(main)/pages/practice/components/TunesContextRepertoire";
 import { TunesProviderScheduled } from "@/app/(main)/pages/practice/components/TunesContextScheduled";
+import Footer from "@/components/Footer";
+import Header from "@/components/Header";
 import "@radix-ui/themes/styles.css";
-import Footer from "./Footer";
-import Header from "./Header";
+
+// import Footer from "./Footer";
+// import Header from "./Header";
 
 const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
   return (

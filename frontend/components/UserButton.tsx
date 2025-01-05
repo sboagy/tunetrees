@@ -1,8 +1,8 @@
 "use client";
+import defaultAvatar from "@/public/avatars/flute.png";
 import { useSession } from "next-auth/react";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import defaultAvatar from "/public/avatars/flute.png";
 
 import { ChevronDownIcon } from "lucide-react";
 import {

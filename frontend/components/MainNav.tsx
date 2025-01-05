@@ -4,8 +4,8 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+import profilePic from "@/public/logo4.png";
 import Image from "next/image";
-import profilePic from "/public/logo4.png";
 
 import CustomLink from "./CustomLink";
 import { Button } from "./ui/button";

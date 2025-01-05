@@ -37,8 +37,16 @@ jobs:
         run: npm --version
         working-directory: frontend
 
-      - name: Check NODE_ENV
-        run: echo $NODE_ENV
+      - name: Check environment variables
+        run: echo "NODE_ENV=$NODE_ENV" && echo "SHELL=$SHELL" && echo "PWD=$PWD"
+        working-directory: frontend
+
+      - name: Dump all environment variables
+        run: env
+        working-directory: frontend
+
+      - name: NPM Super clean
+        run: npm cache clean --force
         working-directory: frontend
 
       - name: Install typescript
