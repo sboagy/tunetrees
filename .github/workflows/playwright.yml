@@ -29,25 +29,25 @@ jobs:
           source .venv/bin/activate
           pip install -r requirements.txt
 
-      - name: Check node version
-        run: node --version
-        working-directory: frontend
+      # - name: Check node version
+      #   run: node --version
+      #   working-directory: frontend
 
-      - name: Check npm version
-        run: npm --version
-        working-directory: frontend
+      # - name: Check npm version
+      #   run: npm --version
+      #   working-directory: frontend
 
-      - name: Check environment variables
-        run: echo "NODE_ENV=$NODE_ENV" && echo "SHELL=$SHELL" && echo "PWD=$PWD"
-        working-directory: frontend
+      # - name: Check environment variables
+      #   run: echo "NODE_ENV=$NODE_ENV" && echo "SHELL=$SHELL" && echo "PWD=$PWD"
+      #   working-directory: frontend
 
-      - name: Dump all environment variables
-        run: env
-        working-directory: frontend
+      # - name: Dump all environment variables
+      #   run: env
+      #   working-directory: frontend
 
-      - name: NPM Super clean
-        run: npm cache clean --force
-        working-directory: frontend
+      # - name: NPM Super clean
+      #   run: npm cache clean --force
+      #   working-directory: frontend
 
       - name: Install typescript
         run: npm install -g typescript@5.7.2
@@ -57,13 +57,13 @@ jobs:
         run: npm install --save-dev @types/node
         working-directory: frontend
 
-      - name: list frontend directory
-        run: ls -l
-        working-directory: frontend
+      # - name: list frontend directory
+      #   run: ls -l
+      #   working-directory: frontend
 
-      - name: list public directory
-        run: ls -la public
-        working-directory: frontend
+      # - name: list public directory
+      #   run: ls -la public
+      #   working-directory: frontend
 
       - name: Install dependencies
         run: npm install
@@ -76,8 +76,8 @@ jobs:
           TT_REVIEW_SITDOWN_DATE: ${{ vars.TT_REVIEW_SITDOWN_DATE }}
           # ...add other backend-specific environment variables as needed
 
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+      - name: Install Playwright Chromium Browser
+        run: npx playwright install chromium --with-deps
         working-directory: frontend
 
       - name: Run Frontend Playwright tests
