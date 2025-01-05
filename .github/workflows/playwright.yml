@@ -69,6 +69,10 @@ jobs:
         run: npm install
         working-directory: frontend
 
+      - name: Install Playwright Chromium Browser
+        run: npx playwright install chromium --with-deps
+        working-directory: frontend
+
       - name: Run Backend Playwright tests
         run: npx playwright test --project=backend
         working-directory: frontend
@@ -76,8 +80,8 @@ jobs:
           TT_REVIEW_SITDOWN_DATE: ${{ vars.TT_REVIEW_SITDOWN_DATE }}
           # ...add other backend-specific environment variables as needed
 
-      - name: Install Playwright Chromium Browser
-        run: npx playwright install chromium --with-deps
+      - name: Double check backend availabiltiy
+        run: curl -w "%{http_code}\n" -o /dev/null -s -X 'GET' 'http://127.0.0.1:8000/hello/test'
         working-directory: frontend
 
       - name: Run Frontend Playwright tests
