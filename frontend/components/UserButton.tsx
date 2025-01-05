@@ -11,7 +11,7 @@ import {
   SignOut,
   UserSettingsMenuItem,
 } from "./AuthComponents";
-import styles from "./header.module.css";
+import styles from "./Header.module.css";
 import {
   DropdownMenu,
   DropdownMenuContent,
