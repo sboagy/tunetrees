@@ -33,6 +33,7 @@ const nextConfig = {
     config.resolve.alias["@"] = path.resolve(__dirname, "./");
     config.resolve.alias.auth = path.resolve(__dirname, "./auth");
     config.resolve.alias.components = path.resolve(__dirname, "./components");
+    config.resolve.alias.components = path.resolve(__dirname, "./public");
 
     return config;
   },
