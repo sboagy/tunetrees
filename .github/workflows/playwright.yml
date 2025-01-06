@@ -95,7 +95,7 @@ jobs:
       # secrets being exposed to the client-side test scripts.
       - name: Start web server
         run: |
-          npm run dev &
+          npm run dev > test-results/frontend.log 2>&1 &
           echo $! > server.pid
         working-directory: frontend
         env:

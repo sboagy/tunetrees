@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import axios from "axios";
 import * as fs from "node:fs";
-import { promises as fsPromises } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -38,11 +37,11 @@ test("test", async ({ browser }) => {
   );
   console.log("===> test-2.spec.ts:39 ~ ", storageStatePath);
 
-  const storageStateContent = await fsPromises.readFile(
-    storageStatePath,
-    "utf8",
-  );
-  const storageState = JSON.parse(storageStateContent);
+  // const storageStateContent = await fsPromises.readFile(
+  //   storageStatePath,
+  //   "utf8",
+  // );
+  // const storageState = JSON.parse(storageStateContent);
 
   // Warning, don't normally enable this, it will show the storage state in the console.
   // console.log("===> test-2.spec.ts:48 ~ Storage State:", storageState);
@@ -62,7 +61,7 @@ test("test", async ({ browser }) => {
   }
 
   const context = await browser.newContext({
-    storageState: storageState,
+    // storageState: storageState,
     recordVideo: {
       dir: videoDir, // Directory to save the videos
       size: { width: 1280, height: 720 }, // Optional: specify video size
@@ -89,14 +88,15 @@ test("test", async ({ browser }) => {
   // Increase the timeout for page.goto
   await page.goto("https://localhost:3000", { timeout: 60000 });
   // storageState: "storageState.json";
-  // await page.getByRole("button", { name: "Sign in" }).click();
-  // await page.getByPlaceholder("person@example.com").fill("sboagy@gmail.com");
-  // await page.getByPlaceholder("person@example.com").press("Tab");
-  // await page.locator("#password").fill("abc");
-  // await page.locator("#password").press("Tab");
-  // await page.getByRole("button", { name: "Sign In", exact: true }).click();
-  // await page.waitForTimeout(3000);
-  // await page.context().storageState({ path: storageStatePath });
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByPlaceholder("person@example.com").fill("sboagy@gmail.com");
+  await page.getByPlaceholder("person@example.com").press("Tab");
+  await page.locator("#password").fill("abc");
+  await page.locator("#password").press("Tab");
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.waitForTimeout(3000);
+  await page.context().storageState({ path: storageStatePath });
+
   await page.waitForTimeout(1000 * 5);
 
   await page.screenshot({
