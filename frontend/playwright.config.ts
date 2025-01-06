@@ -47,9 +47,9 @@ export default defineConfig({
 
     ignoreHTTPSErrors: true, // Accept self-signed certificates
 
-    launchOptions: {
-      slowMo: 1000,
-    },
+    // launchOptions: {
+    //   slowMo: 1000,
+    // },
     screenshot: "on",
     video: "on",
   },
