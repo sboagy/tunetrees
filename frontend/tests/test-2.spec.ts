@@ -78,13 +78,6 @@ test("test", async ({ browser }) => {
   console.log(`===> test-2.spec.ts:78 ~ health check ${responseBody.status}`);
   expect(responseBody.status).toBe("ok");
 
-  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL;
-  console.log("===> test-2.spec.ts:82 ~ NEXT_PUBLIC_TT_BASE_URL:", baseUrl);
-
-  // Log AUTH_GITHUB_ID just to make sure we have secrets
-  const authGithubId = process.env.AUTH_GITHUB_ID;
-  console.log("===> test-2.spec.ts:86 ~ AUTH_GITHUB_ID:", authGithubId);
-
   console.log("===> test-2.spec.ts:88 ~ creating new page for tunetrees");
   // Set the storage state
   const page = await context.newPage();
@@ -94,7 +87,7 @@ test("test", async ({ browser }) => {
   // await page.waitForTimeout(2000);
 
   // Increase the timeout for page.goto
-  await page.goto("https://127.0.0.1:3000", { timeout: 60000 });
+  await page.goto("https://localhost:3000", { timeout: 60000 });
   // storageState: "storageState.json";
   // await page.getByRole("button", { name: "Sign in" }).click();
   // await page.getByPlaceholder("person@example.com").fill("sboagy@gmail.com");

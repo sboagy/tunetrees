@@ -91,9 +91,12 @@ jobs:
           fi
         working-directory: frontend
 
-      - name: Run Frontend Playwright tests
-        run: npx playwright test --project=chromium
-        working-directory: frontend
+      # Start the web server here, so we can pass the secrets without the 
+      # secrets being exposed to the client-side test scripts.
+      - name: Start web server
+        run: |
+          npm run dev &
+          echo $! > server.pid
         env:
           NEXT_PUBLIC_TT_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
@@ -108,7 +111,13 @@ jobs:
           GITHUB_CLIENT_SECRET: ${{ secrets.GGITHUB_CLIENT_SECRET }}
           TT_AUTH_SENDGRID_API_KEY: ${{ secrets.TT_AUTH_SENDGRID_API_KEY }}
           CI: true
-          # ...add other frontend-specific environment variables as needed
+
+      - name: Run Frontend Playwright tests
+        run: npx playwright test --project=chromium
+        working-directory: frontend
+        env:
+          CI: true
+          # ...add other test-specific environment variables as needed
 
       # - name: Merge Playwright reports
       #   if: always()
@@ -135,3 +144,8 @@ jobs:
           name: playwright-report
           path: frontend/test-results/
           retention-days: 30
+
+      - name: Stop web server
+        if: ${{ always() }}
+        run: |
+          kill $(cat server.pid)

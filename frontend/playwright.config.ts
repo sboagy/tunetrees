@@ -117,19 +117,37 @@ export default defineConfig({
     // },
   ],
 
+  // TEMPORARILY DISABLED
   /* Run the local dev server before starting the tests */
-  webServer: {
-    command: "npm run dev", // Combine the command and arguments
-    env: {
-      NEXT_PUBLIC_TT_BASE_URL: "http://localhost:8000/tunetrees",
-    },
-    url: "https://localhost:3000/api/health",
-    // Playwright seems to trip up due to SSL errors (because the self-signed certificate
-    // via "next dev --experimental-https" won't be trusted), so we ignore them.
-    ignoreHTTPSErrors: true,
-    reuseExistingServer: !process.env.CI,
-    // timeout: 2 * 1000,
-  },
+  // webServer: {
+  //   // When in the github actions CI, the server will be started by
+  //   // the playwright test runner, controlled by
+  //   // tunetrees/.github/workflows/playwright.yml,
+  //   // so this shouldn't have any effect in that environment.
+  //   command: "npm run dev", // Combine the command and arguments
+  //   env: {
+  //     NEXT_PUBLIC_TT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
+  //     AUTH_SECRET: process.env.AUTH_SECRET || "",
+  //     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",
+  //     AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
+  //     AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET || "",
+  //     AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || "",
+  //     AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET || "",
+  //     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+  //     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
+  //     GITHUB_CLIENT_ID: process.env.GGITHUB_CLIENT_ID || "",
+  //     GITHUB_CLIENT_SECRET: process.env.GGITHUB_CLIENT_SECRET || "",
+  //     TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
+  //     CI: process.env.TT_AUTH_SENDGRID_API_KEY || "",
+  //   },
+  //   url: "https://localhost:3000/api/health",
+  //   // Playwright seems to trip up due to SSL errors (because the self-signed certificate
+  //   // via "next dev --experimental-https" won't be trusted), so we ignore them.
+  //   ignoreHTTPSErrors: true,
+  //   reuseExistingServer: !process.env.CI,
+
+  //   // timeout: 2 * 1000,
+  // },
 
   /* Specify global teardown script */
   // globalTeardown: path.resolve(__dirname, "./scripts/global-teardown.ts"),
