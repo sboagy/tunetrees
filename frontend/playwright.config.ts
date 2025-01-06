@@ -33,7 +33,7 @@ export default defineConfig({
     ["html", { outputFolder: "playwright-report", open: "never", merge: true }],
   ],
   /* Ensure output directory is set */
-  outputDir: "test-results",
+  outputDir: "test-results/playwright",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     headless: !!process.env.CI, // Run tests in headed mode unless running in CI

@@ -32,11 +32,16 @@ test("test", async ({ browser }) => {
   // Warning, don't normally enable this, it will show the storage state in the console.
   // console.log("===> test-2.spec.ts:27 ~ Storage State:", storageState);
 
-  const videoDir = path.join(__dirname, "../test-results/videos");
+  const playwrightTestResulsDir = path.join(
+    __dirname,
+    "../test-results/playwright",
+  );
+
+  const videoDir = path.join(playwrightTestResulsDir, "videos");
   if (!fs.existsSync(videoDir)) {
     fs.mkdirSync(videoDir, { recursive: true });
   }
-  const screenShotDir = path.join(__dirname, "../test-results/screenshots");
+  const screenShotDir = path.join(playwrightTestResulsDir, "screenshots");
   if (!fs.existsSync(screenShotDir)) {
     fs.mkdirSync(screenShotDir, { recursive: true });
   }

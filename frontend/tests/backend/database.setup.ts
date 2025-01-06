@@ -49,7 +49,12 @@ test("setup", async () => {
     console.error("Database file is not accessible:", error);
   }
 
-  console.log(`Backend logs will be written to ${fastAPILog}}`);
+  console.log(`Backend logs will be written to ${fastAPILog}`);
+
+  // Write a timestamp to the log file
+  const timestamp = new Date().toISOString();
+  // Start the log file fresh with a timestamp
+  await fs.promises.writeFile(fastAPILog, `Server started at: ${timestamp}\n`);
 
   // Open the log file
   const fastAPIFd = fs.openSync(fastAPILog, "a");
