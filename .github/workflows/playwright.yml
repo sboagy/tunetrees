@@ -97,6 +97,7 @@ jobs:
         run: |
           npm run dev &
           echo $! > server.pid
+        working-directory: frontend
         env:
           NEXT_PUBLIC_TT_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
