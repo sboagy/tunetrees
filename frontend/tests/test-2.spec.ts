@@ -30,13 +30,16 @@ test("test", async ({ browser }) => {
 
   const context = await browser.newContext({ storageState: storageState });
 
+  console.log("===> test-2.spec.ts:33 ~ creating new page for health check");
   const pageHello = await context.newPage();
   const response = await pageHello.request.get(
     "https://127.0.0.1:3000/api/health",
   );
   const responseBody = await response.json();
+  console.log(`===> test-2.spec.ts:39 ~ health check ${responseBody.status}`);
   expect(responseBody.status).toBe("ok");
 
+  console.log("===> test-2.spec.ts:42 ~ creating new page for tunetrees");
   // Set the storage state
   const page = await context.newPage();
 
@@ -55,8 +58,9 @@ test("test", async ({ browser }) => {
   // await page.getByRole("button", { name: "Sign In", exact: true }).click();
   // await page.waitForTimeout(3000);
   // await page.context().storageState({ path: storageStatePath });
-  // await page.waitForTimeout(1000);
+  await page.waitForTimeout(1000);
 
+  console.log("===> test-2.spec.ts:42 ~ waiting for selector");
   await page.waitForSelector('role=tab[name="Repertoire"]', {
     state: "visible",
   });
