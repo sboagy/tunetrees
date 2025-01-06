@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import fs from "node:fs/promises";
+import * as fs from "node:fs";
+import { promises as fsPromises } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,16 +23,28 @@ test("test", async ({ browser }) => {
   );
   console.log("===> test-2.spec.ts:22 ~ ", storageStatePath);
 
-  const storageStateContent = await fs.readFile(storageStatePath, "utf8");
+  const storageStateContent = await fsPromises.readFile(
+    storageStatePath,
+    "utf8",
+  );
   const storageState = JSON.parse(storageStateContent);
 
   // Warning, don't normally enable this, it will show the storage state in the console.
   // console.log("===> test-2.spec.ts:27 ~ Storage State:", storageState);
 
+  const videoDir = path.join(__dirname, "../test-results/videos");
+  if (!fs.existsSync(videoDir)) {
+    fs.mkdirSync(videoDir, { recursive: true });
+  }
+  const screenShotDir = path.join(__dirname, "../test-results/screenshots");
+  if (!fs.existsSync(screenShotDir)) {
+    fs.mkdirSync(screenShotDir, { recursive: true });
+  }
+
   const context = await browser.newContext({
     storageState: storageState,
     recordVideo: {
-      dir: "test-results/videos/", // Directory to save the videos
+      dir: videoDir, // Directory to save the videos
       size: { width: 1280, height: 720 }, // Optional: specify video size
     },
   });
@@ -67,7 +80,7 @@ test("test", async ({ browser }) => {
   await page.waitForTimeout(1000);
 
   await page.screenshot({
-    path: "test-results/screenshots/page_just_loaded.png",
+    path: path.join(screenShotDir, "page_just_loaded.png"),
   });
 
   console.log("===> test-2.spec.ts:42 ~ waiting for selector");
@@ -75,7 +88,7 @@ test("test", async ({ browser }) => {
     state: "visible",
   });
   await page.screenshot({
-    path: "test-results/screenshots/page_just_after_repertoire_select.png",
+    path: path.join(screenShotDir, "page_just_after_repertoire_select.png"),
   });
   await page.waitForTimeout(1000);
   await page.getByRole("tab", { name: "Repertoire" }).click();
