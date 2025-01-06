@@ -72,13 +72,20 @@ test("test", async ({ browser }) => {
   console.log("===> test-2.spec.ts:72 ~ creating new page for health check");
   const pageHello = await context.newPage();
   const response = await pageHello.request.get(
-    "https://127.0.0.1:3000/api/health",
+    "https://localhost:3000/api/health",
   );
   const responseBody = await response.json();
   console.log(`===> test-2.spec.ts:78 ~ health check ${responseBody.status}`);
   expect(responseBody.status).toBe("ok");
 
-  console.log("===> test-2.spec.ts:81 ~ creating new page for tunetrees");
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL;
+  console.log("===> test-2.spec.ts:82 ~ NEXT_PUBLIC_TT_BASE_URL:", baseUrl);
+
+  // Log AUTH_GITHUB_ID just to make sure we have secrets
+  const authGithubId = process.env.AUTH_GITHUB_ID;
+  console.log("===> test-2.spec.ts:86 ~ AUTH_GITHUB_ID:", authGithubId);
+
+  console.log("===> test-2.spec.ts:88 ~ creating new page for tunetrees");
   // Set the storage state
   const page = await context.newPage();
 

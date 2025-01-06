@@ -40,7 +40,7 @@ export default defineConfig({
 
     /* Base URL to use in actions like `await page.goto('/')`. */
     // baseURL: 'http://127.0.0.1:3000',
-    baseURL: "https://127.0.0.1:3000",
+    baseURL: "https://localhost:3000",
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "retain-on-failure",
@@ -120,6 +120,9 @@ export default defineConfig({
   /* Run the local dev server before starting the tests */
   webServer: {
     command: "npm run dev", // Combine the command and arguments
+    env: {
+      NEXT_PUBLIC_TT_BASE_URL: "http://localhost:8000/tunetrees",
+    },
     url: "https://localhost:3000/api/health",
     // Playwright seems to trip up due to SSL errors (because the self-signed certificate
     // via "next dev --experimental-https" won't be trusted), so we ignore them.
