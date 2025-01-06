@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import axios from "axios";
 import * as fs from "node:fs";
 import { promises as fsPromises } from "node:fs";
 import path from "node:path";
@@ -16,12 +17,26 @@ const __dirname = path.dirname(__filename);
 // test.use({ storageState: "storageState.json" });
 
 test("test", async ({ browser }) => {
-  console.log("===> test-2.spec.ts:12 ~ ", __dirname);
+  const checkBackend = async () => {
+    try {
+      const response = await axios.get(
+        "http://localhost:8000/hello/testFromFrontendTest2SpecTS",
+      );
+      return response.status === 200;
+    } catch {
+      return false;
+    }
+  };
+
+  console.log("===> test-2.spec.ts:31 ~ ", "Checking backend server");
+  await checkBackend();
+
+  console.log("===> test-2.spec.ts:34 ~ ", __dirname);
   const storageStatePath = path.resolve(
     __dirname,
     "storageStateSboagyLogin.json",
   );
-  console.log("===> test-2.spec.ts:22 ~ ", storageStatePath);
+  console.log("===> test-2.spec.ts:39 ~ ", storageStatePath);
 
   const storageStateContent = await fsPromises.readFile(
     storageStatePath,
@@ -30,7 +45,7 @@ test("test", async ({ browser }) => {
   const storageState = JSON.parse(storageStateContent);
 
   // Warning, don't normally enable this, it will show the storage state in the console.
-  // console.log("===> test-2.spec.ts:27 ~ Storage State:", storageState);
+  // console.log("===> test-2.spec.ts:48 ~ Storage State:", storageState);
 
   const playwrightTestResulsDir = path.join(
     __dirname,
@@ -54,16 +69,16 @@ test("test", async ({ browser }) => {
     },
   });
 
-  console.log("===> test-2.spec.ts:33 ~ creating new page for health check");
+  console.log("===> test-2.spec.ts:72 ~ creating new page for health check");
   const pageHello = await context.newPage();
   const response = await pageHello.request.get(
     "https://127.0.0.1:3000/api/health",
   );
   const responseBody = await response.json();
-  console.log(`===> test-2.spec.ts:39 ~ health check ${responseBody.status}`);
+  console.log(`===> test-2.spec.ts:78 ~ health check ${responseBody.status}`);
   expect(responseBody.status).toBe("ok");
 
-  console.log("===> test-2.spec.ts:42 ~ creating new page for tunetrees");
+  console.log("===> test-2.spec.ts:81 ~ creating new page for tunetrees");
   // Set the storage state
   const page = await context.newPage();
 
@@ -88,7 +103,7 @@ test("test", async ({ browser }) => {
     path: path.join(screenShotDir, "page_just_loaded.png"),
   });
 
-  console.log("===> test-2.spec.ts:42 ~ waiting for selector");
+  console.log("===> test-2.spec.ts:106 ~ waiting for selector");
   await page.waitForSelector('role=tab[name="Repertoire"]', {
     state: "visible",
     timeout: 90000, // 90 seconds timeout
@@ -117,7 +132,7 @@ test("test", async ({ browser }) => {
   await page.waitForTimeout(1000);
 
   const tuneTitle1 = await page.locator("#current-tune-title").textContent();
-  console.log("===> test-2.spec.ts:63 ~ ", tuneTitle1);
+  console.log("===> test-2.spec.ts:135 ~ ", tuneTitle1);
   // Bogus expect, this should test for "Lakes of Sligo x"
   expect(await page.locator("#current-tune-title").textContent()).toEqual(
     "Lakes of Sligo",
@@ -140,7 +155,7 @@ test("test", async ({ browser }) => {
   await page.waitForTimeout(1000);
 
   const tuneTitle2 = await page.locator("#current-tune-title").textContent();
-  console.log("===> test-2.spec.ts:63 ~ ", tuneTitle2);
+  console.log("===> test-2.spec.ts:158 ~ ", tuneTitle2);
   // Bogus expect, this should test for "Lakes of Sligo x"
   expect(await page.locator("#current-tune-title").textContent()).toEqual(
     "Lakes of Sligo x",
@@ -151,7 +166,7 @@ test("test", async ({ browser }) => {
   await page.close();
   await context.close();
   await browser.close({ reason: "Test completed." });
-  console.log("Test completed ===> test-2.spec.ts:68 ~ success");
+  console.log("Test completed ===> test-2.spec.ts:169 ~ success");
 
   // console.log("Test completed. Browser will remain open.");
   // await new Promise(() => {}); // Keep the script running
