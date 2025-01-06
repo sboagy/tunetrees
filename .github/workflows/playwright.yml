@@ -110,15 +110,24 @@ jobs:
           CI: true
           # ...add other frontend-specific environment variables as needed
 
-      - name: Teardown Backend
-        if: always()
-        run: npx playwright test --project=backend-teardown
-        working-directory: frontend
-
       # - name: Merge Playwright reports
       #   if: always()
       #   run: npx playwright show-report
       #   working-directory: frontend
+
+      - name: list frontend directory
+        if: always()
+        run: ls -l
+        working-directory: frontend
+
+      - name: List test-results directory
+        run: ls -R frontend/test-results/
+
+      - name: List videos directory
+        run: ls -R frontend/test-results/videos/
+
+      - name: List screenshots directory
+        run: ls -R frontend/test-results/screenshots/
 
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
