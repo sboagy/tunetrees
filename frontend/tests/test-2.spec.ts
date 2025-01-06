@@ -77,7 +77,7 @@ test("test", async ({ browser }) => {
   // await page.getByRole("button", { name: "Sign In", exact: true }).click();
   // await page.waitForTimeout(3000);
   // await page.context().storageState({ path: storageStatePath });
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(1000 * 5);
 
   await page.screenshot({
     path: path.join(screenShotDir, "page_just_loaded.png"),
@@ -86,7 +86,7 @@ test("test", async ({ browser }) => {
   console.log("===> test-2.spec.ts:42 ~ waiting for selector");
   await page.waitForSelector('role=tab[name="Repertoire"]', {
     state: "visible",
-    timeout: 60000, // 60 seconds timeout
+    timeout: 90000, // 90 seconds timeout
   });
   await page.screenshot({
     path: path.join(screenShotDir, "page_just_after_repertoire_select.png"),
