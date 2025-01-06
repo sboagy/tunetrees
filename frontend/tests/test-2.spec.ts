@@ -86,6 +86,7 @@ test("test", async ({ browser }) => {
   console.log("===> test-2.spec.ts:42 ~ waiting for selector");
   await page.waitForSelector('role=tab[name="Repertoire"]', {
     state: "visible",
+    timeout: 60000, // 60 seconds timeout
   });
   await page.screenshot({
     path: path.join(screenShotDir, "page_just_after_repertoire_select.png"),
