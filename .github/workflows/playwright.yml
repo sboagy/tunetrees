@@ -80,8 +80,15 @@ jobs:
           TT_REVIEW_SITDOWN_DATE: ${{ vars.TT_REVIEW_SITDOWN_DATE }}
           # ...add other backend-specific environment variables as needed
 
-      - name: Double check backend availabiltiy
-        run: curl -w "%{http_code}\n" -o /dev/null -s -X 'GET' 'http://127.0.0.1:8000/hello/test'
+      - name: Check backend availability
+        run: |
+          response=$(curl -w "%{http_code}" -o /dev/null -s -X 'GET' 'http://127.0.0.1:8000/hello/test')
+          if [ "$response" -ne 200 ]; then
+            echo "Backend is not available. HTTP status code: $response"
+            exit 1
+          else
+            echo "Backend is available. HTTP status code: $response"
+          fi
         working-directory: frontend
 
       - name: Run Frontend Playwright tests
