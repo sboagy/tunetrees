@@ -29,7 +29,10 @@ export const venvLibDir = path.resolve(
   ".venv/lib/python3.12/site-packages",
 );
 
-export const fastAPILog = path.join(__dirname, "../test-results/fastapi.log");
+export const fastAPILog = path.resolve(
+  __dirname,
+  "../test-results/fastapi.log",
+);
 
 export async function setupDatabase(): Promise<void> {
   try {

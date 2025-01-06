@@ -49,6 +49,8 @@ test("setup", async () => {
     console.error("Database file is not accessible:", error);
   }
 
+  console.log(`Backend logs will be written to ${fastAPILog}}`);
+
   // Open the log file
   const fastAPIFd = fs.openSync(fastAPILog, "a");
 
