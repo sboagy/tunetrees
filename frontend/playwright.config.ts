@@ -50,8 +50,8 @@ export default defineConfig({
     launchOptions: {
       slowMo: 1000,
     },
-    screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    screenshot: "on",
+    video: "on",
   },
 
   /* Configure projects for major browsers */

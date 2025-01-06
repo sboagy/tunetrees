@@ -28,7 +28,13 @@ test("test", async ({ browser }) => {
   // Warning, don't normally enable this, it will show the storage state in the console.
   // console.log("===> test-2.spec.ts:27 ~ Storage State:", storageState);
 
-  const context = await browser.newContext({ storageState: storageState });
+  const context = await browser.newContext({
+    storageState: storageState,
+    recordVideo: {
+      dir: "test-results/videos/", // Directory to save the videos
+      size: { width: 1280, height: 720 }, // Optional: specify video size
+    },
+  });
 
   console.log("===> test-2.spec.ts:33 ~ creating new page for health check");
   const pageHello = await context.newPage();
@@ -60,9 +66,16 @@ test("test", async ({ browser }) => {
   // await page.context().storageState({ path: storageStatePath });
   await page.waitForTimeout(1000);
 
+  await page.screenshot({
+    path: "test-results/screenshots/page_just_loaded.png",
+  });
+
   console.log("===> test-2.spec.ts:42 ~ waiting for selector");
   await page.waitForSelector('role=tab[name="Repertoire"]', {
     state: "visible",
+  });
+  await page.screenshot({
+    path: "test-results/screenshots/page_just_after_repertoire_select.png",
   });
   await page.waitForTimeout(1000);
   await page.getByRole("tab", { name: "Repertoire" }).click();
