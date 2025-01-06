@@ -30,6 +30,13 @@ test("test", async ({ browser }) => {
 
   const context = await browser.newContext({ storageState: storageState });
 
+  const pageHello = await context.newPage();
+  const response = await pageHello.request.get(
+    "https://127.0.0.1:3000/api/health",
+  );
+  const responseBody = await response.json();
+  expect(responseBody.status).toBe("ok");
+
   // Set the storage state
   const page = await context.newPage();
 
