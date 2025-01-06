@@ -49,17 +49,15 @@ test("setup", async () => {
     console.error("Database file is not accessible:", error);
   }
 
-  // Create a write stream for logging
-  const logFile = fs.createWriteStream(fastAPILog, {
-    flags: "a",
-  });
+  // Open the log file
+  const fastAPIFd = fs.openSync(fastAPILog, "a");
 
   // Start the FastAPI server
   const fastapiProcess: ChildProcess = spawn(
     path.join(venvBinDir, "uvicorn"),
     [
       "tunetrees.api.main:app",
-      "--reload",
+      // "--reload",
       "--host",
       "0.0.0.0",
       "--port",
@@ -77,11 +75,12 @@ test("setup", async () => {
         TUNETREES_DEPLOY_BASE_DIR:
           process.env.TUNETREES_DEPLOY_BASE_DIR ||
           `${tunetreesBackendDeployBaseDir}`,
-        LOGLEVEL: process.env.LOGLEVEL || "DEBUG",
+        // LOGLEVEL: process.env.LOGLEVEL || "DEBUG",
+        LOGLEVEL: "DEBUG",
         TT_REVIEW_SITDOWN_DATE:
           process.env.TT_REVIEW_SITDOWN_DATE || "2024-07-08 12:27:08",
       },
-      stdio: ["pipe", "pipe", "pipe"], // Use pipe for stdio
+      stdio: ["ignore", fastAPIFd, fastAPIFd],
     },
   );
 
@@ -92,10 +91,6 @@ test("setup", async () => {
   if (fastapiProcess.pid) {
     await fs.promises.writeFile(pidFilePath, fastapiProcess.pid.toString());
   }
-
-  // Redirect stdout and stderr to the log file
-  if (fastapiProcess.stdout) fastapiProcess.stdout.pipe(logFile);
-  if (fastapiProcess.stderr) fastapiProcess.stderr.pipe(logFile);
 
   fastapiProcess.on("close", (code) => {
     console.log(`child process exited with code ${code}`);

@@ -1,0 +1,22 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "clean_test_db",
+            "type": "shell",
+            "command": "cp tunetrees_test_clean.sqlite3 tunetrees_test.sqlite3"
+        },
+        {
+            "label": "stop_server",
+            "type": "shell",
+            "command": "pkill -f 'uvicorn tunetrees.api.main:app'",
+            "problemMatcher": []
+        },
+        {
+            "label": "clean_and_stop",
+            "dependsOn": ["clean_test_db", "stop_server"]
+        }
+    ]
+}

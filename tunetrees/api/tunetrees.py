@@ -68,6 +68,8 @@ from tunetrees.models.tunetrees_pydantic import (
 
 logger = logging.getLogger("tunetrees.api")
 
+logger.debug("logger(tunetrees.api)(test debug message)")
+
 router = APIRouter(
     prefix="/tunetrees",
     tags=["tunetrees"],
@@ -516,6 +518,9 @@ def get_references(
     public: int = Query(0, ge=0, le=1),
 ):
     try:
+        logger.debug(
+            f"Fetching references for user_ref ({user_ref}) and tune_ref ({tune_ref})"
+        )
         with SessionLocal() as db:
             stmt = (
                 select(Reference).where(
@@ -527,17 +532,19 @@ def get_references(
                     (Reference.user_ref == user_ref) & (Reference.tune_ref == tune_ref)
                 )
             )
-            print(f"Generated SQL: {stmt}")
-            print(
+            logger.debug(f"Generated SQL: {stmt}")
+            logger.debug(
                 f"Parameters: user_ref={user_ref}, tune_ref={tune_ref}, public={public}"
             )
 
             result = db.execute(stmt)
             references = result.scalars().all()
             # Debugging: Print the fetched references
-            print(f"Fetched references: {references}")
+            logger.debug(f"Fetched references: {references}")
             for reference in references:
-                print(f"Reference type: {type(reference)}, Reference: {reference}")
+                logger.debug(
+                    f"Reference type: {type(reference)}, Reference: {reference}"
+                )
 
             result = [
                 ReferenceModel.model_validate(reference) for reference in references

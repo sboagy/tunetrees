@@ -48,8 +48,12 @@ test("test", async ({ browser }) => {
   // await page.getByRole("button", { name: "Sign In", exact: true }).click();
   // await page.waitForTimeout(3000);
   // await page.context().storageState({ path: storageStatePath });
-  await page.waitForTimeout(1000);
+  // await page.waitForTimeout(1000);
 
+  await page.waitForSelector('role=tab[name="Repertoire"]', {
+    state: "visible",
+  });
+  await page.waitForTimeout(1000);
   await page.getByRole("tab", { name: "Repertoire" }).click();
   await page.getByPlaceholder("Filter").click();
   await page.getByPlaceholder("Filter").fill("lakes of");

@@ -1,9 +1,36 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+import logging
+import os
+import sys
+from uvicorn.config import LOGGING_CONFIG
 
-import tunetrees.api.auth as auth
-import tunetrees.api.tunetrees as tunetrees_api
-from tunetrees.api import preferences, settings
+log_level: str = os.getenv("LOGLEVEL", "INFO").upper()
+
+# Configure the root logger
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+
+logger: logging.Logger = logging.getLogger()
+logger.setLevel(getattr(logging, log_level, logging.INFO))
+
+LOGGING_CONFIG["loggers"]["uvicorn"]["level"] = "DEBUG"
+LOGGING_CONFIG["handlers"]["default"]["stream"] = sys.stdout
+
+logger.info(f"Starting TuneTrees API, log level set to {log_level}")
+logger.debug("(test debug message)")
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+logger.debug("(tunetrees/api/main.py (26): test debug message)")
+
+import tunetrees.api.auth as auth  # noqa: E402
+import tunetrees.api.tunetrees as tunetrees_api  # noqa: E402
+from tunetrees.api import settings  # noqa: E402
+
+logger.debug("(tunetrees/api/main.py (31): test debug message)")
 
 tags_metadata = [
     {
@@ -32,7 +59,10 @@ app = FastAPI(debug=True, openapi_tags=tags_metadata)
 app.include_router(auth.router)
 app.include_router(tunetrees_api.router)
 app.include_router(settings.settings_router)
-app.include_router(preferences.preferences_router)
+
+app.include_router(auth.router)
+
+logger.debug("(tunetrees/api/main.py (65): test debug message)")
 
 
 @app.get("/")
@@ -42,6 +72,9 @@ async def root():
 
 @app.get("/hello/{name}")
 async def say_hello(name: str):
+    logger.debug(f"(tunetrees/api/main.py (75): say_hello {name} invoked!)")
+    print(f"printing: (tunetrees/api/main.py (76): say_hello {name} invoked!)")
+    sys.stdout.flush()
     return {"message": f"Hello {name}! Welcome to TuneTrees!"}
 
 
@@ -54,3 +87,5 @@ app.add_middleware(
 )
 
 auth.register_exception(app)
+
+logger.debug("(tunetrees/api/main.py (88): test debug message)")
