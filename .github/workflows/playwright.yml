@@ -90,9 +90,3 @@ jobs:
           name: playwright-report
           path: frontend/test-results/
           retention-days: 30
-
-      - name: Stop web server
-        if: ${{ always() }}
-        run: |
-          kill $(cat server.pid)
-        working-directory: frontend
