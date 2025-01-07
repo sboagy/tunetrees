@@ -1,6 +1,5 @@
 import { setFastapiProcess } from "@/test-scripts/process-store";
 import {
-  fastAPILog,
   setupDatabase,
   testDatabasePath,
   tunetreesBackendDeployBaseDir,
@@ -11,6 +10,12 @@ import axios from "axios";
 import { type ChildProcess, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const __filename = fileURLToPath(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const __dirname = path.dirname(__filename);
 
 const pidFilePath = path.resolve(tunetreesBackendDeployBaseDir, "fastapi.pid");
 
@@ -39,6 +44,13 @@ async function globalSetup() {
   } catch (error) {
     console.error("Database file is not accessible:", error);
   }
+
+  const testResultsDir = path.resolve(__dirname, "../test-results");
+  if (!fs.existsSync(testResultsDir)) {
+    fs.mkdirSync(testResultsDir, { recursive: true });
+  }
+
+  const fastAPILog = path.resolve(testResultsDir, "fastapi.log");
 
   console.log(`Backend logs will be written to ${fastAPILog}`);
 
