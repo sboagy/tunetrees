@@ -126,6 +126,7 @@ export default defineConfig({
   //   // so this shouldn't have any effect in that environment.
   //   command: "npm run dev", // Combine the command and arguments
   //   env: {
+  //     NEXT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
   //     NEXT_PUBLIC_TT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
   //     AUTH_SECRET: process.env.AUTH_SECRET || "",
   //     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",

@@ -82,7 +82,7 @@ jobs:
 
       - name: Check backend availability
         run: |
-          response=$(curl -w "%{http_code}" -o /dev/null -s -X 'GET' 'http://127.0.0.1:8000/hello/test')
+          response=$(curl -w "%{http_code}" -o /dev/null -s -X 'GET' '${{ vars.NEXT_BASE_URL }}/hello/test')
           if [ "$response" -ne 200 ]; then
             echo "Backend is not available. HTTP status code: $response"
             exit 1
@@ -138,14 +138,14 @@ jobs:
         run: ls -l
         working-directory: frontend
 
-      - name: List test-results directory
-        run: ls -R frontend/test-results/
+      # - name: List test-results directory
+      #   run: ls -R frontend/test-results/
 
-      - name: List videos directory
-        run: ls -R frontend/test-results/videos/
+      # - name: List videos directory
+      #   run: ls -R frontend/test-results/playwright/videos/
 
-      - name: List screenshots directory
-        run: ls -R frontend/test-results/screenshots/
+      # - name: List screenshots directory
+      #   run: ls -R frontend/test-results/playwright/screenshots/
 
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
@@ -158,3 +158,4 @@ jobs:
         if: ${{ always() }}
         run: |
           kill $(cat server.pid)
+        working-directory: frontend
