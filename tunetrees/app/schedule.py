@@ -417,12 +417,15 @@ def update_practice_feedbacks(  # noqa: C901
                             sm_two.first_review(quality_int, practiced_faux),
                         )
                     else:
+                        # Work in progress for other algorithms
                         card = Card()
                         due_str = datetime.strftime(card.due, TT_DATE_FORMAT)
                         review = ReviewResult(
-                            easiness=card.difficulty,
-                            interval=card.scheduled_days,
-                            repetitions=card.reps,
+                            easiness=card.difficulty
+                            if card.difficulty is not None
+                            else 0.0,
+                            interval=0,  # card.interval,
+                            repetitions=0,  # card.reps,
                             review_datetime=due_str,
                         )
                         raise ValueError(f"Unexpected algorithm type: {alg_type}")
