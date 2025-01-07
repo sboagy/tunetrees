@@ -1,19 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
-// import path from "node:path";
-// import { fileURLToPath } from "node:url";
+import * as dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-// // eslint-disable-next-line @typescript-eslint/naming-convention
-// const __filename = fileURLToPath(import.meta.url);
-// // eslint-disable-next-line @typescript-eslint/naming-convention
-// const __dirname = path.dirname(__filename);
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const __filename = fileURLToPath(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const __dirname = path.dirname(__filename);
 
-/**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-// import dotenv from 'dotenv';
-// import path from 'path';
-// dotenv.config({ path: path.resolve(__dirname, '.env') });
+if (!process.env.CI) {
+  dotenv.config({ path: path.resolve(__dirname, ".env.local") });
+}
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -35,6 +32,10 @@ export default defineConfig({
   /* Ensure output directory is set */
   outputDir: "test-results/playwright",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+
+  globalSetup: path.resolve(__dirname, "./scripts/global-setup.ts"),
+  globalTeardown: path.resolve(__dirname, "./scripts/global-teardown.ts"),
+
   use: {
     headless: !!process.env.CI, // Run tests in headed mode unless running in CI
 
@@ -56,14 +57,6 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
-    {
-      name: "backend",
-      testDir: "./tests/backend",
-      use: {
-        baseURL: "http://localhost:8000",
-      },
-      testMatch: "**/*.setup.ts",
-    },
     {
       name: "chromium",
       use: {
@@ -88,14 +81,6 @@ export default defineConfig({
     //   use: { ...devices["Desktop Safari"] },
     // },
 
-    {
-      name: "backend-teardown",
-      testDir: "./tests",
-      // dependencies: ["backend", "chromium"],
-      // dependencies: ["chromium", "firefox", "webkit"],
-      testMatch: "**/backend-teardown.spec.ts",
-    },
-
     /* Test against mobile viewports. */
     // {
     //   name: 'Mobile Chrome',
@@ -117,39 +102,35 @@ export default defineConfig({
     // },
   ],
 
-  // TEMPORARILY DISABLED
   /* Run the local dev server before starting the tests */
-  // webServer: {
-  //   // When in the github actions CI, the server will be started by
-  //   // the playwright test runner, controlled by
-  //   // tunetrees/.github/workflows/playwright.yml,
-  //   // so this shouldn't have any effect in that environment.
-  //   command: "npm run dev", // Combine the command and arguments
-  //   env: {
-  //     NEXT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
-  //     NEXT_PUBLIC_TT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
-  //     AUTH_SECRET: process.env.AUTH_SECRET || "",
-  //     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",
-  //     AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
-  //     AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET || "",
-  //     AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || "",
-  //     AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET || "",
-  //     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
-  //     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
-  //     GITHUB_CLIENT_ID: process.env.GGITHUB_CLIENT_ID || "",
-  //     GITHUB_CLIENT_SECRET: process.env.GGITHUB_CLIENT_SECRET || "",
-  //     TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
-  //     CI: process.env.TT_AUTH_SENDGRID_API_KEY || "",
-  //   },
-  //   url: "https://localhost:3000/api/health",
-  //   // Playwright seems to trip up due to SSL errors (because the self-signed certificate
-  //   // via "next dev --experimental-https" won't be trusted), so we ignore them.
-  //   ignoreHTTPSErrors: true,
-  //   reuseExistingServer: !process.env.CI,
+  webServer: {
+    // When in the github actions CI, the server will be started by
+    // the playwright test runner, controlled by
+    // tunetrees/.github/workflows/playwright.yml,
+    // so this shouldn't have any effect in that environment.
+    command: "npm run dev 2>&1 | tee test-results/frontend.log", // Combine the command and arguments
+    env: {
+      NEXT_BASE_URL: process.env.NEXT_BASE_URL || "",
+      NEXT_PUBLIC_TT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
+      AUTH_SECRET: process.env.AUTH_SECRET || "",
+      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",
+      AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
+      AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET || "",
+      AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || "",
+      AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET || "",
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
+      GITHUB_CLIENT_ID: process.env.GGITHUB_CLIENT_ID || "",
+      GITHUB_CLIENT_SECRET: process.env.GGITHUB_CLIENT_SECRET || "",
+      TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
+      CI: process.env.TT_AUTH_SENDGRID_API_KEY || "",
+    },
+    url: "https://localhost:3000/api/health",
+    // Playwright seems to trip up due to SSL errors (because the self-signed certificate
+    // via "next dev --experimental-https" won't be trusted), so we ignore them.
+    ignoreHTTPSErrors: true,
+    reuseExistingServer: !process.env.CI,
 
-  //   // timeout: 2 * 1000,
-  // },
-
-  /* Specify global teardown script */
-  // globalTeardown: path.resolve(__dirname, "./scripts/global-teardown.ts"),
+    // timeout: 2 * 1000,
+  },
 });

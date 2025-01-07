@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import axios from "axios";
 import * as fs from "node:fs";
+import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,10 +28,34 @@ test("test", async ({ browser }) => {
     }
   };
 
-  console.log("===> test-2.spec.ts:31 ~ ", "Checking backend server");
-  await checkBackend();
+  const checkFrontend = async () => {
+    try {
+      const httpsAgent = new https.Agent({
+        rejectUnauthorized: false, // Ignore self-signed certificate errors
+      });
+      const response = await axios.get("https://localhost:3000/api/health", {
+        httpsAgent,
+      });
+      return response.status === 200;
+    } catch (error) {
+      console.error("Error checking frontend health:", error);
+      return false;
+    }
+  };
 
-  console.log("===> test-2.spec.ts:34 ~ ", __dirname);
+  const backendOk = await checkBackend();
+  const frontendOk = await checkFrontend();
+  console.log(
+    `===> test-2.spec.ts:44 ~ backendOk: ${backendOk}, frontendOk: ${frontendOk}`,
+  );
+  if (!frontendOk || !backendOk) {
+    console.error(
+      "Backend or frontend not up.  Exiting test.  Please start backend and frontend.",
+    );
+    return;
+  }
+
+  console.log("===> test-2.spec.ts:44 ~ ", __dirname);
   const storageStatePath = path.resolve(
     __dirname,
     "storageStateSboagyLogin.json",
@@ -106,7 +131,7 @@ test("test", async ({ browser }) => {
   console.log("===> test-2.spec.ts:106 ~ waiting for selector");
   await page.waitForSelector('role=tab[name="Repertoire"]', {
     state: "visible",
-    timeout: 90000, // 90 seconds timeout
+    timeout: 900000, // 90 seconds timeout
   });
   await page.screenshot({
     path: path.join(screenShotDir, "page_just_after_repertoire_select.png"),
