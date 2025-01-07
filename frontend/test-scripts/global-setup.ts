@@ -1,4 +1,4 @@
-import { setFastapiProcess } from "@/scripts/process-store";
+import { setFastapiProcess } from "@/test-scripts/process-store";
 import {
   fastAPILog,
   setupDatabase,
@@ -6,7 +6,7 @@ import {
   tunetreesBackendDeployBaseDir,
   venvBinDir,
   venvLibDir,
-} from "@/scripts/setup-database";
+} from "@/test-scripts/setup-database";
 import axios from "axios";
 import { type ChildProcess, spawn } from "node:child_process";
 import fs from "node:fs";

@@ -33,8 +33,8 @@ export default defineConfig({
   outputDir: "test-results/playwright",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
 
-  globalSetup: path.resolve(__dirname, "./scripts/global-setup.ts"),
-  globalTeardown: path.resolve(__dirname, "./scripts/global-teardown.ts"),
+  globalSetup: path.resolve(__dirname, "./test-scripts/global-setup.ts"),
+  globalTeardown: path.resolve(__dirname, "./test-scripts/global-teardown.ts"),
 
   use: {
     headless: !!process.env.CI, // Run tests in headed mode unless running in CI

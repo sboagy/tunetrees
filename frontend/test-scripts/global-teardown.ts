@@ -1,7 +1,7 @@
 import {
   teardownDatabase,
   tunetreesBackendDeployBaseDir,
-} from "@/scripts/setup-database";
+} from "@/test-scripts/setup-database";
 import fs from "node:fs/promises";
 import path from "node:path";
 

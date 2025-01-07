@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
-import axios from "axios";
 import * as fs from "node:fs";
-import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkBackend, checkFrontend } from "../test-scripts/check-servers";
+import { runLogin } from "../test-scripts/run-login2";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const __filename = fileURLToPath(import.meta.url);
@@ -17,32 +17,6 @@ const __dirname = path.dirname(__filename);
 // test.use({ storageState: "storageState.json" });
 
 test("test", async ({ browser }) => {
-  const checkBackend = async () => {
-    try {
-      const response = await axios.get(
-        "http://localhost:8000/hello/testFromFrontendTest2SpecTS",
-      );
-      return response.status === 200;
-    } catch {
-      return false;
-    }
-  };
-
-  const checkFrontend = async () => {
-    try {
-      const httpsAgent = new https.Agent({
-        rejectUnauthorized: false, // Ignore self-signed certificate errors
-      });
-      const response = await axios.get("https://localhost:3000/api/health", {
-        httpsAgent,
-      });
-      return response.status === 200;
-    } catch (error) {
-      console.error("Error checking frontend health:", error);
-      return false;
-    }
-  };
-
   const backendOk = await checkBackend();
   const frontendOk = await checkFrontend();
   console.log(
@@ -54,13 +28,6 @@ test("test", async ({ browser }) => {
     );
     return;
   }
-
-  console.log("===> test-2.spec.ts:44 ~ ", __dirname);
-  const storageStatePath = path.resolve(
-    __dirname,
-    "storageStateSboagyLogin.json",
-  );
-  console.log("===> test-2.spec.ts:39 ~ ", storageStatePath);
 
   // const storageStateContent = await fsPromises.readFile(
   //   storageStatePath,
@@ -112,15 +79,8 @@ test("test", async ({ browser }) => {
 
   // Increase the timeout for page.goto
   await page.goto("https://localhost:3000", { timeout: 60000 });
-  // storageState: "storageState.json";
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.getByPlaceholder("person@example.com").fill("sboagy@gmail.com");
-  await page.getByPlaceholder("person@example.com").press("Tab");
-  await page.locator("#password").fill("abc");
-  await page.locator("#password").press("Tab");
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
-  await page.waitForTimeout(3000);
-  await page.context().storageState({ path: storageStatePath });
+
+  await runLogin(page);
 
   await page.waitForTimeout(1000 * 5);
 
