@@ -95,7 +95,7 @@ jobs:
       # secrets being exposed to the client-side test scripts.
       - name: Start web server
         run: |
-          npm run dev > test-results/frontend.log 2>&1 &
+          npm run dev 2>&1 | tee test-results/frontend.log &
           echo $! > server.pid
         working-directory: frontend
         env:
@@ -112,6 +112,13 @@ jobs:
           GITHUB_CLIENT_SECRET: ${{ secrets.GGITHUB_CLIENT_SECRET }}
           TT_AUTH_SENDGRID_API_KEY: ${{ secrets.TT_AUTH_SENDGRID_API_KEY }}
           CI: true
+
+      - name: Wait for frontend to be ready
+        run: |
+          until curl -X 'GET' 'https://localhost:3000/api/health' -w "%{http_code}" -o /dev/null -s | grep -q "200"; do
+            echo "Waiting for frontend to be ready..."
+            sleep 5
+          done
 
       - name: Run Frontend Playwright tests
         run: npx playwright test --project=chromium
