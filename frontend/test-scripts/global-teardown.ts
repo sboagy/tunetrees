@@ -1,9 +1,7 @@
-import {
-  teardownDatabase,
-  tunetreesBackendDeployBaseDir,
-} from "@/test-scripts/setup-database";
+import { teardownDatabase } from "@/test-scripts/setup-database";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { tunetreesBackendDeployBaseDir } from "./paths-for-tests";
 
 const pidFilePath = path.resolve(tunetreesBackendDeployBaseDir, "fastapi.pid");
 

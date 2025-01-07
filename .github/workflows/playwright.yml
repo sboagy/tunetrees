@@ -63,6 +63,7 @@ jobs:
           GITHUB_CLIENT_SECRET: ${{ secrets.GGITHUB_CLIENT_SECRET }}
           TT_AUTH_SENDGRID_API_KEY: ${{ secrets.TT_AUTH_SENDGRID_API_KEY }}
           CI: true
+          STORAGE_STATE_TEST1: ${{ secrets.STORAGE_STATE_TEST1 }}
           # ...add other test-specific environment variables as needed
 
       # - name: Merge Playwright reports

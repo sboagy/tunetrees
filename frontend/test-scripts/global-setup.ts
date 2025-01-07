@@ -1,16 +1,16 @@
-import { setFastapiProcess } from "@/test-scripts/process-store";
 import {
-  setupDatabase,
   testDatabasePath,
   tunetreesBackendDeployBaseDir,
   venvBinDir,
   venvLibDir,
-} from "@/test-scripts/setup-database";
+} from "@/test-scripts/paths-for-tests";
+import { setFastapiProcess } from "@/test-scripts/process-store";
 import axios from "axios";
 import { type ChildProcess, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { setupDatabase } from "./setup-database";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const __filename = fileURLToPath(import.meta.url);

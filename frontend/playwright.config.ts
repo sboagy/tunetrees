@@ -1,15 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 import * as dotenv from "dotenv";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const __filename = fileURLToPath(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const __dirname = path.dirname(__filename);
+import { frontendDirPath } from "./test-scripts/paths-for-tests";
 
 if (!process.env.CI) {
-  dotenv.config({ path: path.resolve(__dirname, ".env.local") });
+  dotenv.config({ path: path.resolve(frontendDirPath, ".env.local") });
 }
 
 /**
@@ -33,8 +28,11 @@ export default defineConfig({
   outputDir: "test-results/playwright",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
 
-  globalSetup: path.resolve(__dirname, "./test-scripts/global-setup.ts"),
-  globalTeardown: path.resolve(__dirname, "./test-scripts/global-teardown.ts"),
+  globalSetup: path.resolve(frontendDirPath, "./test-scripts/global-setup.ts"),
+  globalTeardown: path.resolve(
+    frontendDirPath,
+    "./test-scripts/global-teardown.ts",
+  ),
 
   use: {
     headless: !!process.env.CI, // Run tests in headed mode unless running in CI
@@ -51,8 +49,8 @@ export default defineConfig({
     // launchOptions: {
     //   slowMo: 1000,
     // },
-    screenshot: "on",
-    video: "on",
+    screenshot: "on-first-failure",
+    video: "retain-on-failure",
   },
 
   /* Configure projects for major browsers */
