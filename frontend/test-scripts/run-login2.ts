@@ -12,6 +12,15 @@ export async function runLogin(
   user: string | undefined,
   pw: string | undefined,
 ): Promise<void> {
+  if (user !== "sboagy@gmail.com") {
+    console.log("===> run-login2.ts:20 ~ ", "Unexpected user!");
+    throw new Error("Unexpected user!");
+  }
+  if (pw !== "abc") {
+    console.log("===> run-login2.ts:20 ~ ", "Unexpected password!");
+    throw new Error("Unexpected password!");
+  }
+
   if (
     !process.env.TEST1_LOGIN_USER_EMAIL ||
     !process.env.TEST1_LOGIN_USER_PASSWORD
@@ -35,6 +44,7 @@ export async function runLogin(
     name: "Sign In",
     exact: true,
   });
+  await passwordEntryBox.press("Tab");
 
   await page.waitForFunction(
     (button) => {
@@ -42,9 +52,8 @@ export async function runLogin(
       return !btn.disabled;
     },
     await signInButton.elementHandle(),
+    { timeout: 2000 },
   );
-
-  await passwordEntryBox.press("Tab");
 
   await signInButton.click();
   await page.waitForTimeout(3000);
