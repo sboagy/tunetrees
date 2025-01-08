@@ -34,10 +34,14 @@ export async function getScheduledTunesOverview(
       client.getUri(),
     );
     console.log("user_id: %s, playlist_id: %s", userId, playlistId);
+    const reviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
     const response = await client.get<ITuneOverview[]>(
       `/scheduled_tunes_overview/${userId}/${playlistId}`,
       {
-        params: { show_playlist_deleted: showDeleted },
+        params: {
+          show_playlist_deleted: showDeleted,
+          sitdown_date: reviewSitdownDate,
+        },
       },
     );
     return response.data;

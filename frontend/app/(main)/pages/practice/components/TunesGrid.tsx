@@ -218,6 +218,7 @@ const TunesGrid = ({
         >
           <div style={{ height: `${totalSize}px`, position: "relative" }}>
             <Table
+              data-testid="tunes-grid"
               style={{
                 width: "100%",
                 height: "100%",

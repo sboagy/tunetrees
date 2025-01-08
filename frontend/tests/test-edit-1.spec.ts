@@ -18,10 +18,15 @@ test("test-edit-1", async ({ page }) => {
 
   await page.waitForSelector("body");
 
-  console.log("===> test-edit-1.ts:106 ~ waiting for selector");
-  await page.waitForSelector('role=tab[name="Repertoire"]', {
+  const repertoireTabSelector = 'role=tab[name="Repertoire"]';
+  console.log(
+    "===> test-edit-1.ts:106 ~ waiting for selector, tabSelector: ",
+    repertoireTabSelector,
+  );
+  const repertoireTab = await page.waitForSelector(repertoireTabSelector, {
     state: "visible",
   });
+  await repertoireTab.click();
 
   await page.waitForSelector("#current-tune-title", { state: "visible" });
   await page.getByRole("tab", { name: "Repertoire" }).click();

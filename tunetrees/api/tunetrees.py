@@ -75,19 +75,20 @@ router = APIRouter(
     tags=["tunetrees"],
 )
 
-
-tt_review_sitdown_date_str = environ.get("TT_REVIEW_SITDOWN_DATE", None)
-
 DEBUG_SLOWDOWN = int(environ.get("DEBUG_SLOWDOWN", 0))
 
 
-@router.get("/scheduled_tunes_overview/{user_id}/{playlist_ref}")
+@router.get(
+    "/scheduled_tunes_overview/{user_id}/{playlist_ref}",
+    response_model=list[PlaylistTuneJoinedModel],
+)
 async def get_scheduled_tunes_overview(
     user_id: str,
     playlist_ref: str,
     show_deleted: bool = Query(False),
     show_playlist_deleted: bool = Query(False),
-) -> List[dict[str, Any]] | dict[str, str]:
+    sitdown_date: Optional[datetime] = Query(None),
+) -> list[PlaylistTuneJoinedModel]:
     try:
         with SessionLocal() as db:
             if DEBUG_SLOWDOWN > 0:
@@ -99,14 +100,22 @@ async def get_scheduled_tunes_overview(
                 playlist_ref=int(playlist_ref),
                 show_deleted=show_deleted,
                 show_playlist_deleted=show_playlist_deleted,
+                review_sitdown_date=sitdown_date,
             )
             tune_list = [
                 tunes_mapper(tune, t_practice_list_staged) for tune in tunes_scheduled
             ]
-            return tune_list
+            validated_tune_list = [
+                PlaylistTuneJoinedModel.model_validate(tune) for tune in tune_list
+            ]
+            return validated_tune_list
     except Exception as e:
         logger.error(f"Unable to fetch scheduled practice list: {e}")
-        return {"error": f"Unable to fetch scheduled practice list: {e}"}
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(
+            status_code=500, detail=f"Unable to fetch scheduled practice list: {e}"
+        )
 
 
 @router.get(
