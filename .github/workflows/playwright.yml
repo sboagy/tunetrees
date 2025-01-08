@@ -63,9 +63,9 @@ jobs:
           GITHUB_CLIENT_SECRET: ${{ secrets.GGITHUB_CLIENT_SECRET }}
           TT_AUTH_SENDGRID_API_KEY: ${{ secrets.TT_AUTH_SENDGRID_API_KEY }}
           CI: true
-          STORAGE_STATE_TEST1: ${{ secrets.STORAGE_STATE_TEST1 }},
-          TEST1_LOGIN_USER_EMAIL: ${{ secrets.TEST1_LOGIN_USER_EMAIL }},
-          TEST1_LOGIN_USER_PASSWORD: ${{ secrets.TEST1_LOGIN_USER_PASSWORD }},
+          STORAGE_STATE_TEST1: ${{ secrets.STORAGE_STATE_TEST1 }}
+          TEST1_LOGIN_USER_EMAIL: ${{ secrets.TEST1_LOGIN_USER_EMAIL }}
+          TEST1_LOGIN_USER_PASSWORD: ${{ secrets.TEST1_LOGIN_USER_PASSWORD }}
           # ...add other test-specific environment variables as needed
 
       - uses: actions/upload-artifact@v4
