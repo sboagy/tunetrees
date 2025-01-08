@@ -28,9 +28,25 @@ export async function runLogin(
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByPlaceholder("person@example.com").fill(user || "");
   await page.getByPlaceholder("person@example.com").press("Tab");
-  await page.locator("#password").fill(pw || "");
-  await page.locator("#password").press("Tab");
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  const passwordEntryBox = page.locator("#password");
+  await passwordEntryBox.fill(pw || "");
+  // await page.waitForTimeout(500);
+  const signInButton = page.getByRole("button", {
+    name: "Sign In",
+    exact: true,
+  });
+
+  await page.waitForFunction(
+    (button) => {
+      const btn = button as HTMLButtonElement;
+      return !btn.disabled;
+    },
+    await signInButton.elementHandle(),
+  );
+
+  await passwordEntryBox.press("Tab");
+
+  await signInButton.click();
   await page.waitForTimeout(3000);
   await page.context().storageState({ path: storageStatePath });
 }

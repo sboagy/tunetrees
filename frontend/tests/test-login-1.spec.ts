@@ -1,7 +1,6 @@
 import { contextCleanup } from "@/test-scripts/context-cleanup";
-import { testResultsDirPath } from "@/test-scripts/paths-for-tests";
+import { screenShotDir, videoDir } from "@/test-scripts/paths-for-tests";
 import { expect, test } from "@playwright/test";
-import * as fs from "node:fs";
 import path from "node:path";
 import { checkHealth } from "../test-scripts/check-servers";
 import { runLogin } from "../test-scripts/run-login2";
@@ -9,17 +8,6 @@ import { runLogin } from "../test-scripts/run-login2";
 test("test-login-1", async ({ browser }) => {
   console.log("===> test-login-1:21 ~ ", "Basic login test");
   await checkHealth();
-
-  const playwrightTestResulsDir = path.join(testResultsDirPath, "playwright");
-
-  const videoDir = path.join(playwrightTestResulsDir, "videos");
-  if (!fs.existsSync(videoDir)) {
-    fs.mkdirSync(videoDir, { recursive: true });
-  }
-  const screenShotDir = path.join(playwrightTestResulsDir, "screenshots");
-  if (!fs.existsSync(screenShotDir)) {
-    fs.mkdirSync(screenShotDir, { recursive: true });
-  }
 
   const context = await browser.newContext({
     // storageState: storageState,
