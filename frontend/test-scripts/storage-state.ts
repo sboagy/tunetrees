@@ -32,12 +32,6 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
   }
 
   // Debugging: Log the first few characters of the environment variable
-  console.log(
-    `Storage state environment variable first 100 (${storageStateVarName}): ${storageStateVarValue.slice(0, 100)}...`,
-  );
-  console.log(
-    `Storage state environment variable last 100 (${storageStateVarName}) end: ${storageStateVarValue.slice(-100)}...`,
-  );
 
   if (storageStateVarValue.startsWith("test-scripts/storageState")) {
     const storageStatePath = path.resolve(
@@ -48,8 +42,15 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
     // Debugging: Log the first few characters of the file content
   } else {
     // Assume it's coming from a secret and the value is already JSON
-    storageStateContent = Buffer.from(storageStateContent, "base64").toString(
+    storageStateContent = Buffer.from(storageStateVarValue, "base64").toString(
       "utf8",
+    );
+
+    console.log(
+      `Storage state environment variable first 100 (${storageStateVarName}): ${storageStateContent.slice(0, 100)}...`,
+    );
+    console.log(
+      `Storage state environment variable last 100 (${storageStateVarName}) end: ${storageStateContent.slice(-100)}...`,
     );
   }
   const storageState: StorageStateType = JSON.parse(storageStateContent);
