@@ -26,3 +26,17 @@ export const checkFrontend = async (): Promise<boolean> => {
     return false;
   }
 };
+
+export const checkHealth = async (): Promise<void> => {
+  const backendOk = await checkBackend();
+  const frontendOk = await checkFrontend();
+  console.log(
+    `===> test-login-1:44 ~ backendOk: ${backendOk}, frontendOk: ${frontendOk}`,
+  );
+  if (!frontendOk || !backendOk) {
+    console.error(
+      "Backend or frontend not up.  Exiting test.  Please start backend and frontend.",
+    );
+    throw new Error("Backend or frontend not up.  Exiting test.");
+  }
+};

@@ -1,34 +1,16 @@
 import { contextCleanup } from "@/test-scripts/context-cleanup";
+import { testResultsDirPath } from "@/test-scripts/paths-for-tests";
 import { expect, test } from "@playwright/test";
 import * as fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { checkBackend, checkFrontend } from "../test-scripts/check-servers";
+import { checkHealth } from "../test-scripts/check-servers";
 import { runLogin } from "../test-scripts/run-login2";
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const __filename = fileURLToPath(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const __dirname = path.dirname(__filename);
 
 test("test-login-1", async ({ browser }) => {
   console.log("===> test-login-1:21 ~ ", "Basic login test");
-  const backendOk = await checkBackend();
-  const frontendOk = await checkFrontend();
-  console.log(
-    `===> test-login-1:44 ~ backendOk: ${backendOk}, frontendOk: ${frontendOk}`,
-  );
-  if (!frontendOk || !backendOk) {
-    console.error(
-      "Backend or frontend not up.  Exiting test.  Please start backend and frontend.",
-    );
-    return;
-  }
+  await checkHealth();
 
-  const playwrightTestResulsDir = path.join(
-    __dirname,
-    "../test-results/playwright",
-  );
+  const playwrightTestResulsDir = path.join(testResultsDirPath, "playwright");
 
   const videoDir = path.join(playwrightTestResulsDir, "videos");
   if (!fs.existsSync(videoDir)) {
@@ -62,7 +44,11 @@ test("test-login-1", async ({ browser }) => {
 
   await page.goto("https://localhost:3000", { timeout: 40000 });
 
-  await runLogin(page);
+  await runLogin(
+    page,
+    process.env.TEST1_LOGIN_USER_EMAIL,
+    process.env.TEST1_LOGIN_USER_PASSWORD,
+  );
 
   await page.waitForTimeout(1000 * 3);
 

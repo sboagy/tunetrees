@@ -1,15 +1,10 @@
-import { frontendDirPath } from "@/test-scripts/paths-for-tests";
+import { testResultsDirPath } from "@/test-scripts/paths-for-tests";
+import { getStorageState } from "@/test-scripts/storage-state";
 import { type Page, expect, test } from "@playwright/test";
 import * as fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { checkBackend, checkFrontend } from "../test-scripts/check-servers";
+import { checkHealth } from "../test-scripts/check-servers";
 import { contextCleanup } from "../test-scripts/context-cleanup";
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const __filename = fileURLToPath(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const __dirname = path.dirname(__filename);
 
 // test.beforeEach(async () => {
 //   await setupDatabase();
@@ -18,45 +13,11 @@ const __dirname = path.dirname(__filename);
 // test.use({ storageState: "storageState.json" });
 
 test("test-edit-1", async ({ browser }) => {
-  const backendOk = await checkBackend();
-  const frontendOk = await checkFrontend();
-  console.log(
-    `===> test-edit-1.ts:44 ~ backendOk: ${backendOk}, frontendOk: ${frontendOk}`,
-  );
-  if (!frontendOk || !backendOk) {
-    console.error(
-      "Backend or frontend not up.  Exiting test.  Please start backend and frontend.",
-    );
-    return;
-  }
+  await checkHealth();
 
-  if (!process.env.STORAGE_STATE_TEST1) {
-    console.error(
-      "STORAGE_STATE_TEST1 environment variable not set. Exiting test-edit-1.",
-    );
-    return;
-  }
+  const storageState = await getStorageState("STORAGE_STATE_TEST1");
 
-  let storageStateContent = "";
-  if (process.env.STORAGE_STATE_TEST1.startsWith("test-scripts/storageState")) {
-    const storageStatePath = path.resolve(
-      frontendDirPath,
-      process.env.STORAGE_STATE_TEST1,
-    );
-    storageStateContent = await fs.promises.readFile(storageStatePath, "utf8");
-  } else {
-    // Assume it's coming from a secret and the value is already JSON
-    storageStateContent = process.env.STORAGE_STATE_TEST1;
-  }
-  const storageState = JSON.parse(storageStateContent);
-
-  // Warning, don't normally enable this, it will show the storage state in the console.
-  // console.log("===> test-edit-1.ts:48 ~ Storage State:", storageState);
-
-  const playwrightTestResulsDir = path.join(
-    __dirname,
-    "../test-results/playwright",
-  );
+  const playwrightTestResulsDir = path.join(testResultsDirPath, "playwright");
 
   const videoDir = path.join(playwrightTestResulsDir, "videos");
   if (!fs.existsSync(videoDir)) {
