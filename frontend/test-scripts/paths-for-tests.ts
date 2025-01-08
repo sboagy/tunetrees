@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,3 +28,17 @@ export const venvLibDir = path.resolve(
   tunetreesBackendDeployBaseDir,
   ".venv/lib/python3.12/site-packages",
 );
+
+export const playwrightTestResulsDir = path.join(
+  testResultsDirPath,
+  "playwright",
+);
+
+export const videoDir = path.join(playwrightTestResulsDir, "videos");
+if (!fs.existsSync(videoDir)) {
+  fs.mkdirSync(videoDir, { recursive: true });
+}
+export const screenShotDir = path.join(playwrightTestResulsDir, "screenshots");
+if (!fs.existsSync(screenShotDir)) {
+  fs.mkdirSync(screenShotDir, { recursive: true });
+}

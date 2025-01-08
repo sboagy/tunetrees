@@ -24,9 +24,7 @@ type StorageStateType =
       }>;
     };
 
-export async function getStorageState(
-  storageStateVarName: string,
-): Promise<StorageStateType> {
+export function getStorageState(storageStateVarName: string): StorageStateType {
   let storageStateContent = "";
   const storageStateVarValue = process.env[storageStateVarName];
   if (!storageStateVarValue) {
@@ -37,7 +35,7 @@ export async function getStorageState(
       frontendDirPath,
       storageStateVarValue,
     );
-    storageStateContent = await fs.promises.readFile(storageStatePath, "utf8");
+    storageStateContent = fs.readFileSync(storageStatePath, "utf8");
   } else {
     // Assume it's coming from a secret and the value is already JSON
     storageStateContent = storageStateVarValue;
