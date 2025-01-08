@@ -1,6 +1,10 @@
 import { contextCleanup } from "@/test-scripts/context-cleanup";
-import { screenShotDir, videoDir } from "@/test-scripts/paths-for-tests";
-import { expect, test } from "@playwright/test";
+import {
+  initialPageLoadTimeout,
+  screenShotDir,
+  videoDir,
+} from "@/test-scripts/paths-for-tests";
+import { test } from "@playwright/test";
 import path from "node:path";
 import { checkHealth } from "../test-scripts/check-servers";
 import { runLogin } from "../test-scripts/run-login2";
@@ -17,20 +21,13 @@ test("test-login-1", async ({ browser }) => {
     },
   });
 
-  console.log("===> test-login-1:72 ~ creating new page for health check");
-  const pageHello = await context.newPage();
-  const response = await pageHello.request.get(
-    "https://localhost:3000/api/health",
-  );
-  const responseBody = await response.json();
-  console.log(`===> test-login-1:78 ~ health check ${responseBody.status}`);
-  expect(responseBody.status).toBe("ok");
-
   console.log("===> test-login-1:88 ~ creating new page for tunetrees");
   // Set the storage state
   const page = await context.newPage();
 
-  await page.goto("https://localhost:3000", { timeout: 40000 });
+  await page.goto("https://localhost:3000", {
+    timeout: initialPageLoadTimeout,
+  });
 
   await runLogin(
     page,

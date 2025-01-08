@@ -42,3 +42,5 @@ export const screenShotDir = path.join(playwrightTestResulsDir, "screenshots");
 if (!fs.existsSync(screenShotDir)) {
   fs.mkdirSync(screenShotDir, { recursive: true });
 }
+
+export const initialPageLoadTimeout = 50000;

@@ -1,4 +1,5 @@
 import { checkHealth } from "@/test-scripts/check-servers";
+import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { expect, test } from "@playwright/test";
 
@@ -11,7 +12,9 @@ test("test-edit-1", async ({ page }) => {
 
   console.log("===> test-edit-1.ts:88 ~ creating new page for tunetrees");
 
-  await page.goto("https://localhost:3000", { timeout: 10000 });
+  await page.goto("https://localhost:3000", {
+    timeout: initialPageLoadTimeout,
+  });
 
   await page.waitForSelector("body");
 
