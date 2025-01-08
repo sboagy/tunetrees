@@ -48,7 +48,9 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
     // Debugging: Log the first few characters of the file content
   } else {
     // Assume it's coming from a secret and the value is already JSON
-    storageStateContent = storageStateVarValue;
+    storageStateContent = Buffer.from(storageStateContent, "base64").toString(
+      "utf8",
+    );
   }
   const storageState: StorageStateType = JSON.parse(storageStateContent);
   return storageState;
