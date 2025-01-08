@@ -30,12 +30,22 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
   if (!storageStateVarValue) {
     throw new Error(`Environment variable ${storageStateVarName} is not set`);
   }
+
+  // Debugging: Log the first few characters of the environment variable
+  console.log(
+    `Storage state environment variable first 100 (${storageStateVarName}): ${storageStateVarValue.slice(0, 100)}...`,
+  );
+  console.log(
+    `Storage state environment variable last 100 (${storageStateVarName}) end: ${storageStateVarValue.slice(-100)}...`,
+  );
+
   if (storageStateVarValue.startsWith("test-scripts/storageState")) {
     const storageStatePath = path.resolve(
       frontendDirPath,
       storageStateVarValue,
     );
     storageStateContent = fs.readFileSync(storageStatePath, "utf8");
+    // Debugging: Log the first few characters of the file content
   } else {
     // Assume it's coming from a secret and the value is already JSON
     storageStateContent = storageStateVarValue;
