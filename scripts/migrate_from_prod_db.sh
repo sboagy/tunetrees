@@ -1,5 +1,15 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+if [ "$PWD" = "$SCRIPT_DIR" ]; then
+    cd ..
+fi
+
+if [ ! -f "tunetrees.sqlite3" ]; then
+    echo "current directory must be the root of the tunetrees repo"
+    exit 1
+fi
+
 # Get the current date in the format "Month_Day" (e.g., "Oct_07")
 backup_file="./tunetrees_do_backup/backup_practice_$(date +%b_%d).sqlite3"
 
