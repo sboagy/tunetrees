@@ -301,3 +301,4 @@ tunetrees_test.sqlite3
 fastapi.pid
 storageStateSboagyLogin.json
 storageState*.json
+tree-*.txt
