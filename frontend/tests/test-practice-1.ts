@@ -101,6 +101,7 @@ test("test-practice-1-2", async ({ page }) => {
     .click();
   await page.getByText("1: incorrect response; the").click();
   await page.getByRole("button", { name: "Submit Practiced Tunes" }).click();
+  await page.waitForTimeout(1000);
 
   const tunesGrid = page.getByTestId("tunes-grid");
   const tunesGridRows = tunesGrid.locator("tr");
