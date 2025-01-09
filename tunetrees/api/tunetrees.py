@@ -1,7 +1,8 @@
 import json
 import logging
-from datetime import datetime, timezone
+import time
 import urllib.parse
+from datetime import datetime, timezone
 from os import environ
 from typing import Annotated, Any, Dict, List, Optional
 
@@ -16,7 +17,6 @@ from starlette.responses import RedirectResponse
 
 from tunetrees.api.mappers.tunes_mapper import tunes_mapper
 from tunetrees.app.database import SessionLocal
-import time
 from tunetrees.app.queries import (
     query_practice_list_scheduled,
 )
@@ -42,6 +42,9 @@ from tunetrees.models.tunetrees import (
 )
 from tunetrees.models.tunetrees_pydantic import (
     ColumnSort,
+    GenreModel,
+    GenreModelCreate,
+    GenreModelPartial,
     InstrumentModel,
     InstrumentModelPartial,
     NoteModel,
@@ -60,9 +63,6 @@ from tunetrees.models.tunetrees_pydantic import (
     TuneModel,
     TuneModelCreate,
     TuneModelPartial,
-    GenreModel,
-    GenreModelCreate,
-    GenreModelPartial,
     ViewPlaylistJoinedModel,
 )
 

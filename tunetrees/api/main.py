@@ -1,7 +1,10 @@
 import logging
 import os
 import sys
+
 from uvicorn.config import LOGGING_CONFIG
+
+from tunetrees.api.reload_trigger import reload_trigger_func
 
 log_level: str = os.getenv("LOGLEVEL", "INFO").upper()
 
@@ -55,6 +58,14 @@ tags_metadata = [
 ]
 
 app = FastAPI(debug=True, openapi_tags=tags_metadata)
+
+# This is an uber hacky way to enable the FastAPI server to reload,
+# when it was started with --reload.
+# CoPilot does not approve.  But I think it's massively simpler
+# for testing purposes than trying to make the signal handling work,
+# and keep vscode running in my vscode window.
+# Hopefully this will be replaced with a more robust solution down the road.
+reload_trigger_func()
 
 app.include_router(auth.router)
 app.include_router(tunetrees_api.router)

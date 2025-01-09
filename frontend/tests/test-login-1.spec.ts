@@ -1,4 +1,5 @@
 import { contextCleanup } from "@/test-scripts/context-cleanup";
+import { restartBackend } from "@/test-scripts/global-setup";
 import {
   initialPageLoadTimeout,
   screenShotDir,
@@ -8,6 +9,12 @@ import { test } from "@playwright/test";
 import path from "node:path";
 import { checkHealth } from "../test-scripts/check-servers";
 import { runLogin } from "../test-scripts/run-login2";
+
+test.afterEach(async ({ page }) => {
+  // After each test is run in this set, restore the backend to its original state.
+  await restartBackend();
+  await page.waitForTimeout(100);
+});
 
 test("test-login-1", async ({ browser }) => {
   console.log("===> test-login-1:21 ~ ", "Basic login test");

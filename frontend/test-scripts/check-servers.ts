@@ -28,6 +28,25 @@ export const checkFrontend = async (): Promise<boolean> => {
 };
 
 export const checkHealth = async (): Promise<void> => {
+  // Probably not needed any more, but just in case one of the servers is slow to
+  // start, we'll try a few times.
+  const nRetries = 5;
+  for (let attempt = 1; attempt <= nRetries; attempt++) {
+    const backendOk = await checkBackend();
+    const frontendOk = await checkFrontend();
+    if (backendOk && frontendOk) {
+      break;
+    }
+    if (attempt < nRetries) {
+      console.log(`Attempt ${attempt} failed. Retrying in 1000ms...`);
+      await new Promise((res) => setTimeout(res, 1000));
+    } else {
+      console.error(`Failed to check health after ${nRetries} attempts.`);
+      throw new Error(
+        `Backend or frontend not up after ${nRetries} attempts. Exiting test.`,
+      );
+    }
+  }
   const backendOk = await checkBackend();
   const frontendOk = await checkFrontend();
   console.log(
@@ -35,8 +54,10 @@ export const checkHealth = async (): Promise<void> => {
   );
   if (!frontendOk || !backendOk) {
     console.error(
-      "Backend or frontend not up.  Exiting test.  Please start backend and frontend.",
+      `Backend or frontend not up frontendOk=${frontendOk}, backendOk=${backendOk}.  Exiting test.  Please start backend and frontend.`,
     );
-    throw new Error("Backend or frontend not up.  Exiting test.");
+    throw new Error(
+      `Backend or frontend not up (not up frontendOk=${frontendOk}, backendOk=${backendOk}).  Exiting test.`,
+    );
   }
 };

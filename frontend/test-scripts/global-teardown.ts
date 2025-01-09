@@ -23,6 +23,8 @@ async function globalTeardown() {
       return;
     }
     process.kill(pidInt);
+    // Wait a tiny bit for the server to stop, to make it safe to start another one.
+    await new Promise((resolve) => setTimeout(resolve, 500));
     console.log("FastAPI server stopped.");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ESRCH") {

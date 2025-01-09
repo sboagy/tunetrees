@@ -1,10 +1,17 @@
 import { checkHealth } from "@/test-scripts/check-servers";
+import { restartBackend } from "@/test-scripts/global-setup";
 import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { expect, test } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
+});
+
+test.afterEach(async ({ page }) => {
+  // After each test is run in this set, restore the backend to its original state.
+  await restartBackend();
+  await page.waitForTimeout(100);
 });
 
 test("test-edit-1", async ({ page }) => {

@@ -8,6 +8,7 @@ import { setFastapiProcess } from "@/test-scripts/process-store";
 import axios from "axios";
 import { type ChildProcess, spawn } from "node:child_process";
 import fs from "node:fs";
+import fsPromises from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setupDatabase } from "./setup-database";
@@ -61,7 +62,14 @@ async function globalSetup() {
 
   const fastapiProcess: ChildProcess = spawn(
     path.join(venvBinDir, "uvicorn"),
-    ["tunetrees.api.main:app", "--host", "0.0.0.0", "--port", "8000"],
+    [
+      "tunetrees.api.main:app",
+      "--reload",
+      "--host",
+      "0.0.0.0",
+      "--port",
+      "8000",
+    ],
     {
       env: {
         ...process.env,
@@ -109,3 +117,29 @@ async function globalSetup() {
 }
 
 export default globalSetup;
+
+export const NO_PID = 0;
+export const INVALID_PID = -1;
+
+export async function restartBackend() {
+  // copy the clean database to the test database
+  await setupDatabase();
+
+  try {
+    // This is an uber hacky way to restart the FastAPI server,
+    // given it was started with --reload.
+    // and CoPilot does not approve.  But I think it's massively simpler
+    // for testing purposes than trying to make the signal handling work.
+    const reloadTriggerFile = path.resolve(
+      tunetreesBackendDeployBaseDir,
+      "tunetrees/api/reload_trigger.py",
+    );
+    await fsPromises.utimes(reloadTriggerFile, new Date(), new Date());
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    console.log("FastAPI server hopefully restarted.");
+  } catch (error) {
+    console.error("Error restarting FastAPI server:", error);
+  }
+
+  console.log("Global teardown complete.");
+}
