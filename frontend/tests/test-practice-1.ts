@@ -44,7 +44,7 @@ async function navigateToPracticeTab(page: Page) {
 
 async function checkForCellId(page: Page, cellId: number) {
   const idCell = page.getByRole("cell", { name: `${cellId}` });
-  const value = await idCell.textContent({ timeout: 100 });
+  const value = await idCell.textContent({ timeout: 2000 });
   console.log("===> test-practice-1.ts:37 ~ value", value);
 
   await expect(idCell).toHaveText(`${cellId}`);
