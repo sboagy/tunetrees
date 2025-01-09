@@ -10,7 +10,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import type { CellContext } from "@tanstack/react-table";
 import { Check, ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
@@ -35,7 +34,7 @@ import { getColorForEvaluation } from "./TunesGrid";
 
 const qualityList = [
   {
-    value: "",
+    value: "(Not Set)",
     label: "(Not Set)",
     label2: "(Not Set)",
     int_value: -1,
@@ -163,15 +162,18 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
           <CommandList className="max-h-none">
             <CommandEmpty>Recall Eval...</CommandEmpty>
             <CommandGroup>
-              {qualityList.map((qualityList) => (
+              {qualityList.map((qualityFeedbackItem) => (
                 <CommandItem
-                  key={qualityList.value}
-                  value={qualityList.value}
+                  className="flex items-left"
+                  key={qualityFeedbackItem.value}
+                  value={qualityFeedbackItem.value}
                   onSelect={(currentValue) => {
                     const newValue =
                       currentValue === info.row.original.recall_eval
                         ? ""
-                        : currentValue;
+                        : currentValue === qualityList[0].label2
+                          ? ""
+                          : currentValue;
                     setSelectedQuality(newValue);
                     info.row.original.recall_eval = newValue;
                     if (onRecallEvalChange) {
@@ -193,15 +195,13 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                     void saveData(newValue);
                   }}
                 >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      info.row.original.recall_eval === qualityList.value
-                        ? "opacity-100"
-                        : "opacity-0",
-                    )}
-                  />
-                  {qualityList.label2}
+                  {info.row.original.recall_eval ===
+                    qualityFeedbackItem.value && (
+                    <Check className="absolute left-0 mr-2 h-4 w-4 opacity-100" />
+                  )}
+                  <span className="ml-6">
+                    {qualityFeedbackItem.label2.trim()}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>
