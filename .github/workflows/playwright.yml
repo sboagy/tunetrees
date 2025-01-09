@@ -66,6 +66,7 @@ jobs:
           STORAGE_STATE_TEST1: ${{ secrets.STORAGE_STATE_TEST1 }}
           TEST1_LOGIN_USER_EMAIL: ${{ secrets.TEST1_LOGIN_USER_EMAIL }}
           TEST1_LOGIN_USER_PASSWORD: ${{ secrets.TEST1_LOGIN_USER_PASSWORD }}
+          TT_REVIEW_SITDOWN_DATE: 2024-12-31 16:47:57.671465+00:00
           # ...add other test-specific environment variables as needed
 
       - uses: actions/upload-artifact@v4
