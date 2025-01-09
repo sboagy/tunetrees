@@ -10,9 +10,15 @@ if [ ! -f "tunetrees.sqlite3" ]; then
     exit 1
 fi
 
-export TUNETREES_DEPLOY_BASE_DIR="$(pwd)"
-export TUNETREES_DB="${TUNETREES_DEPLOY_BASE_DIR}/tunetrees.sqlite3"
+# export TUNETREES_DEPLOY_BASE_DIR="$(pwd)"
+# export TUNETREES_DB="${TUNETREES_DEPLOY_BASE_DIR}/tunetrees.sqlite3"
 
+# Don't use the above, because the deploy dir is not the same as the repo dir
+# These are paths on the digital ocean server!
+export TUNETREES_DB="/home/sboag/tunetrees/tunetrees.sqlite3"
+export TUNETREES_DEPLOY_BASE_DIR="/home/sboag/tunetrees"
+
+echo "(paths are relative to the digital ocean server)"
 echo "TUNETREES_DEPLOY_BASE_DIR: $TUNETREES_DEPLOY_BASE_DIR"
 echo "TUNETREES_DB: $TUNETREES_DB"
 
