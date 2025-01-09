@@ -46,12 +46,12 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
       "utf8",
     );
 
-    console.log(
-      `Storage state environment variable first 100 (${storageStateVarName}): ${storageStateContent.slice(0, 100)}...`,
-    );
-    console.log(
-      `Storage state environment variable last 100 (${storageStateVarName}) end: ${storageStateContent.slice(-100)}...`,
-    );
+    // console.log(
+    //   `Storage state environment variable first 100 (${storageStateVarName}): ${storageStateContent.slice(0, 100)}...`,
+    // );
+    // console.log(
+    //   `Storage state environment variable last 100 (${storageStateVarName}) end: ${storageStateContent.slice(-100)}...`,
+    // );
   }
   const storageState: StorageStateType = JSON.parse(storageStateContent);
   return storageState;
