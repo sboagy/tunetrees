@@ -100,7 +100,19 @@ test("test-practice-1-2", async ({ page }) => {
     .getByRole("button")
     .click();
   await page.getByText("1: incorrect response; the").click();
-  await page.getByRole("button", { name: "Submit Practiced Tunes" }).click();
+  const submitButton = page.getByRole("button", {
+    name: "Submit Practiced Tunes",
+  });
+  await page.waitForFunction(
+    (button) => {
+      const btn = button as HTMLButtonElement;
+      return !btn.disabled;
+    },
+    await submitButton.elementHandle(),
+    { timeout: 2000 },
+  );
+
+  await submitButton.click();
   await page.waitForTimeout(1000);
 
   const tunesGrid = page.getByTestId("tunes-grid");
