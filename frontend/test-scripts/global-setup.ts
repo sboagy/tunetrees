@@ -166,10 +166,8 @@ export async function restartBackend() {
       await restartBackendHard();
       return;
     }
-    // Trying an expeiment here
-    // await new Promise((resolve) => setTimeout(resolve, 2000));
-    await restartBackendHard();
-    console.log("FastAPI server hopefully restarted.");
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    console.log("FastAPI server hopefully reloaded (but not restarted).");
   } catch (error) {
     console.error("Error restarting FastAPI server:", error);
   }
