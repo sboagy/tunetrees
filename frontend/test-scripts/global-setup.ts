@@ -7,7 +7,6 @@ import {
 import { setFastapiProcess } from "@/test-scripts/process-store";
 import axios from "axios";
 import { type ChildProcess, spawn } from "node:child_process";
-import { assert } from "node:console";
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
@@ -153,8 +152,6 @@ export async function restartBackend() {
     try {
       const dateNow = new Date();
       const timeNow = dateNow.getTime();
-      const timeNow2 = dateNow.getTime();
-      assert(timeNow === timeNow2);
 
       await fsPromises.utimes(reloadTriggerFile, dateNow, dateNow);
       // Verify the change
@@ -169,7 +166,9 @@ export async function restartBackend() {
       await restartBackendHard();
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Trying an expeiment here
+    // await new Promise((resolve) => setTimeout(resolve, 2000));
+    await restartBackendHard();
     console.log("FastAPI server hopefully restarted.");
   } catch (error) {
     console.error("Error restarting FastAPI server:", error);
