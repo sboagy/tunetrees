@@ -1,11 +1,21 @@
 import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
-import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
+import {
+  initialPageLoadTimeout,
+  videoDir,
+} from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { type Page, expect, test } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
+  video: "on",
+  contextOptions: {
+    recordVideo: {
+      dir: videoDir, // Directory to save the videos
+      size: { width: 1280, height: 720 }, // Optional: specify video size
+    },
+  },
 });
 
 test.afterEach(async ({ page }) => {
