@@ -10,6 +10,15 @@ if [ ! -f "tunetrees.sqlite3" ]; then
     exit 1
 fi
 
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+if [ "$current_branch" != "main" ]; then
+    echo "Should be on main branch to deploy"
+    read -p "Continue with branch $current_branch? (y/n): " choice
+    if [[ "$choice" != "y" && "$choice" != "Y" ]]; then
+        exit 1
+    fi
+fi
+
 # export TUNETREES_DEPLOY_BASE_DIR="$(pwd)"
 # export TUNETREES_DB="${TUNETREES_DEPLOY_BASE_DIR}/tunetrees.sqlite3"
 
