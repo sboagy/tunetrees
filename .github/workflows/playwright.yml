@@ -46,11 +46,13 @@ jobs:
         working-directory: frontend
 
       - name: Run Frontend Playwright tests
-        run: npx playwright test --project=chromium --grep "test-practice-1-2"
+        # run: npx playwright test --project=chromium --grep "test-practice-1-2"
+        run: npx playwright test --project=chromium
         working-directory: frontend
         env:
           NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
           NEXT_PUBLIC_TT_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
+          TT_API_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}

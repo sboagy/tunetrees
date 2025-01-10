@@ -46,9 +46,9 @@ export default defineConfig({
 
     ignoreHTTPSErrors: true, // Accept self-signed certificates
 
-    launchOptions: {
-      slowMo: 1000,
-    },
+    // launchOptions: {
+    //   slowMo: 1000,
+    // },
     screenshot: "on-first-failure",
     video: "retain-on-failure",
   },
@@ -110,6 +110,7 @@ export default defineConfig({
     env: {
       NEXT_BASE_URL: process.env.NEXT_BASE_URL || "",
       NEXT_PUBLIC_TT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
+      TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
       AUTH_SECRET: process.env.AUTH_SECRET || "",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",
       AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
