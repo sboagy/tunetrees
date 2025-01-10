@@ -136,10 +136,6 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
     }
   };
 
-  const forceClose = () => {
-    setIsOpen(false);
-  };
-
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
