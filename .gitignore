@@ -303,3 +303,4 @@ storageStateSboagyLogin.json
 storageState*.json
 tree-*.txt
 frontend/playwright-reports/** */
+frontend/playwright-reports/playwright*
