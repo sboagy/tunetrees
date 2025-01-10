@@ -2,13 +2,10 @@ import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
 import {
   initialPageLoadTimeout,
-  outputDir,
   videoDir,
 } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { type Page, expect, test } from "@playwright/test";
-import fs from "node:fs";
-import path from "node:path";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -25,27 +22,10 @@ test.use({
 });
 
 // testInfo.project.name,
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 test.beforeEach(({ page }, testInfo) => {
-  const fileNamePart = path.parse(testInfo.file).name;
-  const testNamePart = testInfo.title.replaceAll(/\s+/g, "_");
-  const testOutputDir = path.join(
-    outputDir,
-    `${fileNamePart}.ts-${testNamePart}-${testInfo.project.name}`,
-  );
-  console.log("===> writing console output to ", testOutputDir);
-  fs.mkdirSync(testOutputDir, { recursive: true });
-  const logFile = path.join(testOutputDir, "console.log");
-  const logStream = fs.createWriteStream(logFile, { flags: "a" });
-
-  page.on("console", (msg) => {
-    logStream.write(`${msg.type()}: ${msg.text()}\n`);
-  });
-
-  testInfo.attachments.push({
-    name: "console.log",
-    path: logFile,
-    contentType: "text/plain",
-  });
+  console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+  // doConsolelogs(page, testInfo);
 });
 
 test.afterEach(async ({ page }) => {
