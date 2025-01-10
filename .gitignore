@@ -302,3 +302,4 @@ fastapi.pid
 storageStateSboagyLogin.json
 storageState*.json
 tree-*.txt
+frontend/playwright-reports/** */
