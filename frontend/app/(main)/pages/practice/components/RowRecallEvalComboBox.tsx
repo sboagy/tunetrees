@@ -197,8 +197,6 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                       onRecallEvalChange(info.row.original.id ?? -1, newValue); // Call the callback
                     }
 
-                    forceClose();
-
                     const selectedRowModels =
                       info.table.getSelectedRowModel().rowsById;
                     for (const rowId in selectedRowModels) {
@@ -213,6 +211,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                       `===> RowRecallEvalComboBox.tsx:206 ~ calling saveDate(${newValue})`,
                     );
                     void saveData(newValue);
+                    forceClose();
                   }}
                 >
                   {info.row.original.recall_eval ===
