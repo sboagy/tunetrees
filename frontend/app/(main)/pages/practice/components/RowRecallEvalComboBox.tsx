@@ -128,8 +128,11 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
         );
         console.log(`LF17 State deleted for ${info.row.original.id}`);
       }
+      setIsOpen(false);
     } catch (error) {
       console.error("LF17 Failed to save state:", error);
+      alert("Failed to save state. Please try again.");
+      setIsOpen(false);
     }
   };
 
@@ -211,7 +214,6 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                       `===> RowRecallEvalComboBox.tsx:206 ~ calling saveDate(${newValue})`,
                     );
                     void saveData(newValue);
-                    forceClose();
                   }}
                 >
                   {info.row.original.recall_eval ===
