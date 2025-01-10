@@ -192,24 +192,37 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                     );
                     setSelectedQuality(newValue);
                     info.row.original.recall_eval = newValue;
-                    if (onRecallEvalChange) {
-                      onRecallEvalChange(info.row.original.id ?? -1, newValue); // Call the callback
-                    }
-
-                    const selectedRowModels =
-                      info.table.getSelectedRowModel().rowsById;
-                    for (const rowId in selectedRowModels) {
-                      const rowModel = selectedRowModels[rowId];
-                      rowModel.toggleSelected(false);
-                    }
-
-                    const tableState = info.table.getState();
-                    info.table.setState(tableState);
+                    // if (onRecallEvalChange) {
+                    //   onRecallEvalChange(info.row.original.id ?? -1, newValue); // Call the callback
+                    // }
 
                     console.log(
                       `===> RowRecallEvalComboBox.tsx:206 ~ calling saveDate(${newValue})`,
                     );
-                    void saveData(newValue);
+                    saveData(newValue)
+                      .then(() => {
+                        if (onRecallEvalChange) {
+                          onRecallEvalChange(
+                            info.row.original.id ?? -1,
+                            newValue,
+                          ); // Call the callback
+                        }
+                        const selectedRowModels =
+                          info.table.getSelectedRowModel().rowsById;
+                        for (const rowId in selectedRowModels) {
+                          const rowModel = selectedRowModels[rowId];
+                          rowModel.toggleSelected(false);
+                        }
+
+                        const tableState = info.table.getState();
+                        info.table.setState(tableState);
+                      })
+                      .catch((error) => {
+                        console.error(
+                          "===> RowRecallEvalComboBox.tsx:216 ~ error",
+                          error,
+                        );
+                      });
                   }}
                 >
                   {info.row.original.recall_eval ===
