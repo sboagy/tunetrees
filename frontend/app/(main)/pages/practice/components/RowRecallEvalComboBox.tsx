@@ -100,6 +100,10 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
       // but I don't think it's ever undefined in this case?
       // But, keep an eye on it.
       if (changed_value) {
+        console.log(
+          "===> RowRecallEvalComboBox.tsx:103 ~ saveData - changed_value",
+          changed_value,
+        );
         await createOrUpdateTableTransientData(
           userId,
           info.row.original.id ?? 0,
@@ -113,6 +117,9 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
           `LF17 State saved: ${changed_value} for ${info.row.original.id}`,
         );
       } else {
+        console.log(
+          "===> RowRecallEvalComboBox.tsx:121 ~ saveData calling deleteTableTransientData",
+        );
         await deleteTableTransientData(
           userId,
           info.row.original.id ?? 0,
@@ -202,6 +209,9 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                     const tableState = info.table.getState();
                     info.table.setState(tableState);
 
+                    console.log(
+                      `===> RowRecallEvalComboBox.tsx:206 ~ calling saveDate(${newValue})`,
+                    );
                     void saveData(newValue);
                   }}
                 >
