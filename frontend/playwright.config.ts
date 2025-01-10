@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import * as dotenv from "dotenv";
 import path from "node:path";
-import { frontendDirPath } from "./test-scripts/paths-for-tests";
+import { frontendDirPath, outputDir } from "./test-scripts/paths-for-tests";
 
 if (!process.env.CI) {
   dotenv.config({ path: path.resolve(frontendDirPath, ".env.local") });
@@ -25,7 +25,7 @@ export default defineConfig({
     ["html", { outputFolder: "playwright-report", open: "never", merge: true }],
   ],
   /* Ensure output directory is set */
-  outputDir: "test-results/playwright",
+  outputDir: outputDir,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
 
   globalSetup: path.resolve(frontendDirPath, "./test-scripts/global-setup.ts"),
