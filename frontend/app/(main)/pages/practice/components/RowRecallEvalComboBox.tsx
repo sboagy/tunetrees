@@ -168,12 +168,22 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                   key={qualityFeedbackItem.value}
                   value={qualityFeedbackItem.value}
                   onSelect={(currentValue) => {
+                    console.log(
+                      "===> RowRecallEvalComboBox.tsx:171 ~ onSelect - currentValue: ",
+                      currentValue,
+                    );
+
                     const newValue =
                       currentValue === info.row.original.recall_eval
                         ? ""
                         : currentValue === qualityList[0].label2
                           ? ""
                           : currentValue;
+
+                    console.log(
+                      "===> RowRecallEvalComboBox.tsx:183 ~ onSelect - newValue: ",
+                      newValue,
+                    );
                     setSelectedQuality(newValue);
                     info.row.original.recall_eval = newValue;
                     if (onRecallEvalChange) {
