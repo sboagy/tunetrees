@@ -95,12 +95,15 @@ test("test-practice-1-2", async ({ page }) => {
     .getByRole("row", { name: "1081 Recall Quality... Lakes" })
     .getByRole("button")
     .click();
+  await page.waitForTimeout(500);
   await page.getByText("3: correct response recalled").click();
   await page
     .getByRole("row", { name: "2451 Recall Quality... Church" })
     .getByRole("button")
     .click();
+  await page.waitForTimeout(500);
   await page.getByText("4: correct response after a").click();
+  await page.waitForTimeout(500);
   await page
     .getByRole("button", { name: "4: correct response after a" })
     .click();

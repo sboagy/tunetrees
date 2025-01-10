@@ -46,8 +46,8 @@ jobs:
         working-directory: frontend
 
       - name: Run Frontend Playwright tests
-        # run: npx playwright test --project=chromium --grep "test-practice-1-2"
-        run: npx playwright test --project=chromium
+        run: npx playwright test --project=chromium --grep "test-practice-1-2"
+        # run: npx playwright test --project=chromium
         working-directory: frontend
         env:
           NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
