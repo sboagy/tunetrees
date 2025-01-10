@@ -1,5 +1,6 @@
 import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
+import { doConsolelogs } from "@/test-scripts/log-utils";
 import {
   initialPageLoadTimeout,
   videoDir,
@@ -16,16 +17,16 @@ test.use({
   contextOptions: {
     recordVideo: {
       dir: videoDir, // Directory to save the videos
-      size: { width: 1280, height: 720 }, // Optional: specify video size
+      size: { width: 1728, height: 1007 }, // Optional: specify video size
     },
   },
 });
 
 // testInfo.project.name,
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 test.beforeEach(({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
-  // doConsolelogs(page, testInfo);
+  doConsolelogs(page, testInfo);
 });
 
 test.afterEach(async ({ page }) => {
