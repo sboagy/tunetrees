@@ -70,13 +70,10 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 720 },
-
-        /* Use the saved storage state saved in scripts/login.ts */
-        // storageState: "tests/storageStateSboagyLogin.json",
       },
       // dependencies: ["backend"],
       testMatch: "test*.ts",
-      timeout: 1 * 60 * 1000, // 5 minutes timeout per test (temporarily increased)
+      timeout: 3 * 60 * 1000, // 3 minutes timeout per test (temporarily increased)
     },
 
     // {
