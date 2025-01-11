@@ -1,7 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 import * as dotenv from "dotenv";
 import path from "node:path";
-import { frontendDirPath, outputDir } from "./test-scripts/paths-for-tests";
+import {
+  frontendDirPath,
+  outputDir,
+  videoDir,
+} from "./test-scripts/paths-for-tests";
 
 if (!process.env.CI) {
   dotenv.config({ path: path.resolve(frontendDirPath, ".env.local") });
@@ -51,6 +55,12 @@ export default defineConfig({
     // },
     screenshot: "on-first-failure",
     video: "retain-on-failure",
+    contextOptions: {
+      recordVideo: {
+        dir: videoDir, // Directory to save the videos
+        size: { width: 1280, height: 720 }, // Optional: specify video size
+      },
+    },
   },
 
   /* Configure projects for major browsers */

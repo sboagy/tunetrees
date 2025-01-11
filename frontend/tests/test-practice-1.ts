@@ -1,25 +1,12 @@
 import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { doConsolelogs } from "@/test-scripts/log-utils";
-import {
-  initialPageLoadTimeout,
-  videoDir,
-} from "@/test-scripts/paths-for-tests";
+import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { type Page, expect, test } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
-  video: "on",
-  // launchOptions: {
-  //   slowMo: 2000,
-  // },
-  contextOptions: {
-    recordVideo: {
-      dir: videoDir, // Directory to save the videos
-      size: { width: 1728, height: 1007 }, // Optional: specify video size
-    },
-  },
 });
 
 // testInfo.project.name,
@@ -98,7 +85,7 @@ test("test-practice-1-1", async ({ page }) => {
 });
 
 test("test-practice-1-2", async ({ page }) => {
-  const timeoutAfterClick = 500;
+  const timeoutAfterClick = 400;
   await navigateToPracticeTab(page);
 
   console.log("===> test-practice-1.ts:77 ~ ");
