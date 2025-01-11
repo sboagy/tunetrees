@@ -34,6 +34,7 @@ export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
       value={activeTab}
       onValueChange={changeActiveTab}
       className="flex h-full w-full flex-col"
+      data-testid="tt-main-tabs"
     >
       <TabsList id="tt-tabs" className="bg-transparent">
         {tabSpec
@@ -53,16 +54,16 @@ export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
           )}
         <TabsMenu />
       </TabsList>
-      <TabsContent value="scheduled">
+      <TabsContent value="scheduled" data-testid="tt-practice-tab">
         <TunesGridScheduled userId={userId} />
       </TabsContent>
-      <TabsContent value="repertoire">
+      <TabsContent value="repertoire" data-testid="tt-repertoire-tab">
         <TunesGridRepertoire userId={userId} />
       </TabsContent>
-      <TabsContent value="catalog">
+      <TabsContent value="catalog" data-testid="tt-catalog-tab">
         <TunesGridCatalog userId={userId} />
       </TabsContent>
-      <TabsContent value="analysis">
+      <TabsContent value="analysis" data-testid="tt-analysis-tab">
         <Card>
           <CardContent className="space-y-2">
             <p>
