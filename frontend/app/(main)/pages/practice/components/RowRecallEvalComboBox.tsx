@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/popover";
 import type { CellContext } from "@tanstack/react-table";
 import { Check, ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getColorForEvaluation, qualityList } from "../quality-list";
 import {
   createOrUpdateTableTransientData,
@@ -41,7 +41,14 @@ type RecallEvalComboBoxProps = {
 };
 
 export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
+  const [isMounted, setIsMounted] = useState(false);
   const { info, userId, playlistId, purpose, onRecallEvalChange } = props;
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const isDisabled = onRecallEvalChange && !isMounted;
 
   const [isOpen, setIsOpen] = useState(false);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(
@@ -92,7 +99,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
+      <PopoverTrigger asChild disabled={isDisabled}>
         <button
           type="button"
           className={`w-[9em] sm:w-[18em] h-[2em] justify-between whitespace-nowrap overflow-hidden text-ellipsis  ${getColorForEvaluation(
@@ -106,6 +113,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
             event.stopPropagation(); // Prevents the click from reaching the TableRow
             setIsOpen((prev) => !prev);
           }}
+          disabled={isDisabled}
         >
           <div className="flex justify-between items-center">
             <span className="truncate ml-[1em]">
