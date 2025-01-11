@@ -285,6 +285,8 @@ def stage_table_transient_data(
                 db.add(table_transient_data)
                 db.commit()
                 db.refresh(table_transient_data)
+
+                return {"status": "success", "code": 201}
             else:
                 table_transient_data_queried.user_id = user_id
                 table_transient_data_queried.tune_id = tune_id
@@ -295,7 +297,7 @@ def stage_table_transient_data(
                 db.commit()
                 db.refresh(table_transient_data_queried)
 
-            return {"status": "success", "code": 201}
+                return {"status": "success", "code": 200}
         except Exception as e:
             logging.getLogger().error("Unknown error: %s" % e)
             raise HTTPException(status_code=500, detail="Unknown error occurred")
