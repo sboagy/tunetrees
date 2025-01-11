@@ -23,11 +23,10 @@ test.afterEach(async ({ page }) => {
   await page.waitForTimeout(100);
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function clickWithTimeAfter(page: Page, locator: Locator, timeout = 400) {
-  await locator.click({ trial: true });
+async function clickWithTimeAfter(page: Page, locator: Locator, timeout = 500) {
+  // await locator.click({ trial: true });
   await locator.click();
-  // await page.waitForTimeout(timeout);
+  await page.waitForTimeout(timeout);
 }
 
 async function navigateToPracticeTab(page: Page) {
