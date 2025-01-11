@@ -2,10 +2,11 @@ import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
-import { type Page, expect, test } from "@playwright/test";
+import { type Locator, type Page, expect, test } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
+  // actionTimeout: 4000,
 });
 
 // testInfo.project.name,
@@ -21,6 +22,11 @@ test.afterEach(async ({ page }) => {
   await restartBackend();
   await page.waitForTimeout(100);
 });
+
+async function clickWithTimeAfter(page: Page, locator: Locator, timeout = 400) {
+  await locator.click({ timeout: timeout });
+  // await page.waitForTimeout(timeout);
+}
 
 async function navigateToPracticeTab(page: Page) {
   await checkHealth();
@@ -41,7 +47,7 @@ async function navigateToPracticeTab(page: Page) {
   const practiceTab = await page.waitForSelector(tabSelector, {
     state: "visible",
   });
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
   await practiceTab.click();
 
   const ttReviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
@@ -85,50 +91,38 @@ test("test-practice-1-1", async ({ page }) => {
 });
 
 test("test-practice-1-2", async ({ page }) => {
-  const timeoutAfterClick = 300;
   await navigateToPracticeTab(page);
 
   console.log("===> test-practice-1.ts:77 ~ ");
 
-  await page
+  const lakesRecallQualityButton = page
     .getByRole("row", { name: "1081 Recall Quality... Lakes" })
-    .getByRole("button")
-    .click();
-  // await page.waitForTimeout(timeoutAfterClick);
+    .getByRole("button");
+  await clickWithTimeAfter(page, lakesRecallQualityButton);
   const responseRecalledButton = page.getByText("3: correct response recalled");
-  await responseRecalledButton.waitFor({ timeout: timeoutAfterClick });
-  await responseRecalledButton.click();
-  // await page.waitForTimeout(timeoutAfterClick);
+  await clickWithTimeAfter(page, responseRecalledButton);
+
   const churchRecallQualityButton = page
     .getByRole("row", { name: "2451 Recall Quality... Church" })
     .getByRole("button");
-  await churchRecallQualityButton.waitFor({ timeout: timeoutAfterClick });
-  await churchRecallQualityButton.click();
-  // await page.waitForTimeout(timeoutAfterClick);
+  await clickWithTimeAfter(page, churchRecallQualityButton);
   const responseAfterAButton = page.getByText("4: correct response after a");
-  await responseAfterAButton.waitFor({ timeout: timeoutAfterClick });
-  await responseAfterAButton.click();
+  await clickWithTimeAfter(page, responseAfterAButton);
+
   const responseAfterAButtonElement = page.getByRole("button", {
     name: "4: correct response after a",
   });
-  await responseAfterAButtonElement.waitFor({ timeout: timeoutAfterClick });
-  await responseAfterAButtonElement.click();
-  // await page.waitForTimeout(timeoutAfterClick);
+  await clickWithTimeAfter(page, responseAfterAButtonElement);
   const notSetOption = page.getByRole("option", { name: "(Not Set)" });
-  await notSetOption.waitFor({ timeout: timeoutAfterClick });
-  await notSetOption.click();
-  // await page.waitForTimeout(timeoutAfterClick);
+  await clickWithTimeAfter(page, notSetOption);
+
   const roadRecallQualityButton = page
     .getByRole("row", { name: "1684 Recall Quality... Road" })
     .getByRole("button");
-
-  await roadRecallQualityButton.waitFor({ timeout: timeoutAfterClick });
-  await roadRecallQualityButton.click();
-  // await page.waitForTimeout(timeoutAfterClick);
+  await clickWithTimeAfter(page, roadRecallQualityButton);
   const incorrectResponseButton = page.getByText("1: incorrect response; the");
-  await incorrectResponseButton.waitFor({ timeout: timeoutAfterClick });
-  await incorrectResponseButton.click();
-  // await page.waitForTimeout(timeoutAfterClick);
+  await clickWithTimeAfter(page, incorrectResponseButton);
+
   const submitButton = page.getByRole("button", {
     name: "Submit Practiced Tunes",
   });
@@ -141,8 +135,7 @@ test("test-practice-1-2", async ({ page }) => {
     { timeout: 2000 },
   );
 
-  await submitButton.click();
-  await page.waitForTimeout(1000);
+  await clickWithTimeAfter(page, submitButton, 1000);
 
   const tunesGrid = page.getByTestId("tunes-grid");
   const tunesGridRows = tunesGrid.locator("tr");
