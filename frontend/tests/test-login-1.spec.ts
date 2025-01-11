@@ -3,7 +3,6 @@ import { restartBackend } from "@/test-scripts/global-setup";
 import {
   initialPageLoadTimeout,
   screenShotDir,
-  videoDir,
 } from "@/test-scripts/paths-for-tests";
 import { test } from "@playwright/test";
 import path from "node:path";
@@ -20,13 +19,7 @@ test("test-login-1", async ({ browser }) => {
   console.log("===> test-login-1:21 ~ ", "Basic login test");
   await checkHealth();
 
-  const context = await browser.newContext({
-    // storageState: storageState,
-    recordVideo: {
-      dir: videoDir, // Directory to save the videos
-      size: { width: 1280, height: 720 }, // Optional: specify video size
-    },
-  });
+  const context = await browser.newContext();
 
   console.log("===> test-login-1:88 ~ creating new page for tunetrees");
   // Set the storage state

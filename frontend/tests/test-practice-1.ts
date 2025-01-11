@@ -1,6 +1,5 @@
 import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
-import { doConsolelogs } from "@/test-scripts/log-utils";
 import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { type Page, expect, test } from "@playwright/test";
@@ -11,9 +10,10 @@ test.use({
 
 // testInfo.project.name,
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 test.beforeEach(({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
-  doConsolelogs(page, testInfo);
+  // doConsolelogs(page, testInfo);
 });
 
 test.afterEach(async ({ page }) => {
@@ -85,7 +85,7 @@ test("test-practice-1-1", async ({ page }) => {
 });
 
 test("test-practice-1-2", async ({ page }) => {
-  const timeoutAfterClick = 400;
+  const timeoutAfterClick = 300;
   await navigateToPracticeTab(page);
 
   console.log("===> test-practice-1.ts:77 ~ ");

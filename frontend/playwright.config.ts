@@ -76,7 +76,7 @@ export default defineConfig({
       },
       // dependencies: ["backend"],
       testMatch: "test*.ts",
-      timeout: 5 * 60 * 1000, // 5 minutes timeout per test (temporarily increased)
+      timeout: 1 * 60 * 1000, // 5 minutes timeout per test (temporarily increased)
     },
 
     // {
