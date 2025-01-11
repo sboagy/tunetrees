@@ -85,7 +85,7 @@ test("test-practice-1-1", async ({ page }) => {
 });
 
 test("test-practice-1-2", async ({ page }) => {
-  const timeoutAfterClick = 300;
+  const timeoutAfterClick = 100;
   await navigateToPracticeTab(page);
 
   console.log("===> test-practice-1.ts:77 ~ ");
