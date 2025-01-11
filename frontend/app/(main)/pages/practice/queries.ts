@@ -14,6 +14,7 @@ import type {
   ITTResponseInfo,
   ITune,
   ITuneOverview,
+  ITuneOverviewScheduled,
   IViewPlaylistJoined,
 } from "./types";
 
@@ -26,7 +27,7 @@ export async function getScheduledTunesOverview(
   userId: number,
   playlistId: number,
   showDeleted = false,
-): Promise<ITuneOverview[]> {
+): Promise<ITuneOverviewScheduled[]> {
   try {
     // console.log("Environment Variables:", process.env);
     console.log(
@@ -35,7 +36,7 @@ export async function getScheduledTunesOverview(
     );
     console.log("user_id: %s, playlist_id: %s", userId, playlistId);
     const reviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
-    const response = await client.get<ITuneOverview[]>(
+    const response = await client.get<ITuneOverviewScheduled[]>(
       `/scheduled_tunes_overview/${userId}/${playlistId}`,
       {
         params: {

@@ -13,6 +13,7 @@ import {
 import type { CellContext } from "@tanstack/react-table";
 import { Check, ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
+import { getColorForEvaluation, qualityList } from "../quality-list";
 import {
   createOrUpdateTableTransientData,
   deleteTableTransientData,
@@ -22,7 +23,6 @@ import type {
   TablePurpose,
   TunesGridColumnGeneralType,
 } from "../types";
-import { getColorForEvaluation } from "./TunesGrid";
 
 // #     Quality: The quality of recalling the answer from a scale of 0 to 5.
 // #         5: perfect response.
@@ -31,52 +31,6 @@ import { getColorForEvaluation } from "./TunesGrid";
 // #         2: incorrect response; where the correct one seemed easy to recall.
 // #         1: incorrect response; the correct one remembered.
 // #         0: complete blackout.
-
-const qualityList = [
-  {
-    value: "(Not Set)",
-    label: "(Not Set)",
-    label2: "(Not Set)",
-    int_value: -1,
-  },
-  {
-    value: "blackout",
-    label: "Blackout (no recall, even with hint)",
-    label2: "0: complete blackout",
-    int_value: 0,
-  },
-  {
-    value: "failed",
-    label: "Failed (but remembered after hint)",
-    label2: "1: incorrect response; the correct one remembered",
-    int_value: 1,
-  },
-  {
-    value: "barely",
-    label: "Barely Remembered Some (perhaps A part but not B part)",
-    label2:
-      "2: incorrect response; where the correct one seemed easy to recall",
-    int_value: 2,
-  },
-  {
-    value: "struggled",
-    label: "Remembered with Some Mistakes (and needed verification)",
-    label2: "3: correct response recalled with serious difficulty",
-    int_value: 3,
-  },
-  {
-    value: "trivial",
-    label: "Not Bad (but maybe not session ready)",
-    label2: "4: correct response after a hesitation",
-    int_value: 4,
-  },
-  {
-    value: "perfect",
-    label: "Good (could perform solo or lead in session)",
-    label2: "5: perfect response",
-    int_value: 5,
-  },
-];
 
 type RecallEvalComboBoxProps = {
   info: CellContext<ITuneOverview, TunesGridColumnGeneralType>;

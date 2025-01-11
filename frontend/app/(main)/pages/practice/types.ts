@@ -117,6 +117,10 @@ export interface ITuneOverview extends ITune {
   playlist_deleted?: boolean | null;
 }
 
+export interface ITuneOverviewScheduled extends ITuneOverview {
+  recall_eval?: string | null;
+}
+
 export interface IPlaylistTune {
   playlist_ref: number;
   tune_ref: number;

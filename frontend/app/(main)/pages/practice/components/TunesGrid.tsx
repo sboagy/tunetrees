@@ -12,37 +12,13 @@ import { flexRender } from "@tanstack/react-table";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useRef } from "react";
+import { getColorForEvaluation } from "../quality-list";
 import { updateCurrentTuneInDb } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
 import { tableContext } from "./TunesTable";
-
-export const getColorForEvaluation = (
-  review_status: string | null,
-  isTrigger = false,
-): string => {
-  switch (review_status) {
-    case "blackout":
-      return "bg-red-100 dark:bg-red-900";
-    case "failed":
-      return "bg-orange-100 dark:bg-orange-900";
-    case "barely":
-      return "bg-yellow-100 dark:bg-yellow-900";
-    case "struggled":
-      return "bg-blue-100 dark:bg-blue-900";
-    case "trivial":
-      return "bg-purple-100 dark:bg-purple-900";
-    case "perfect":
-      return "bg-green-100 dark:bg-green-900";
-    default:
-      if (isTrigger) {
-        return "bg-slate-95 dark:bg-slate-800";
-      }
-      return "";
-  }
-};
 
 type Props = {
   table: TanstackTable<ITuneOverview>;
