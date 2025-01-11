@@ -6,7 +6,6 @@ import { type Page, expect, test } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
-  actionTimeout: 500,
 });
 
 // testInfo.project.name,
@@ -95,28 +94,41 @@ test("test-practice-1-2", async ({ page }) => {
     .getByRole("row", { name: "1081 Recall Quality... Lakes" })
     .getByRole("button")
     .click();
-  await page.waitForTimeout(timeoutAfterClick);
-  await page.getByText("3: correct response recalled").click();
-  await page.waitForTimeout(timeoutAfterClick);
-  await page
+  // await page.waitForTimeout(timeoutAfterClick);
+  const responseRecalledButton = page.getByText("3: correct response recalled");
+  await responseRecalledButton.waitFor({ timeout: timeoutAfterClick });
+  await responseRecalledButton.click();
+  // await page.waitForTimeout(timeoutAfterClick);
+  const churchRecallQualityButton = page
     .getByRole("row", { name: "2451 Recall Quality... Church" })
-    .getByRole("button")
-    .click();
-  await page.waitForTimeout(timeoutAfterClick);
-  await page.getByText("4: correct response after a").click();
-  await page
-    .getByRole("button", { name: "4: correct response after a" })
-    .click();
-  await page.waitForTimeout(timeoutAfterClick);
-  await page.getByRole("option", { name: "(Not Set)" }).click();
-  await page.waitForTimeout(timeoutAfterClick);
-  await page
+    .getByRole("button");
+  await churchRecallQualityButton.waitFor({ timeout: timeoutAfterClick });
+  await churchRecallQualityButton.click();
+  // await page.waitForTimeout(timeoutAfterClick);
+  const responseAfterAButton = page.getByText("4: correct response after a");
+  await responseAfterAButton.waitFor({ timeout: timeoutAfterClick });
+  await responseAfterAButton.click();
+  const responseAfterAButtonElement = page.getByRole("button", {
+    name: "4: correct response after a",
+  });
+  await responseAfterAButtonElement.waitFor({ timeout: timeoutAfterClick });
+  await responseAfterAButtonElement.click();
+  // await page.waitForTimeout(timeoutAfterClick);
+  const notSetOption = page.getByRole("option", { name: "(Not Set)" });
+  await notSetOption.waitFor({ timeout: timeoutAfterClick });
+  await notSetOption.click();
+  // await page.waitForTimeout(timeoutAfterClick);
+  const roadRecallQualityButton = page
     .getByRole("row", { name: "1684 Recall Quality... Road" })
-    .getByRole("button")
-    .click();
-  await page.waitForTimeout(timeoutAfterClick);
-  await page.getByText("1: incorrect response; the").click();
-  await page.waitForTimeout(timeoutAfterClick);
+    .getByRole("button");
+
+  await roadRecallQualityButton.waitFor({ timeout: timeoutAfterClick });
+  await roadRecallQualityButton.click();
+  // await page.waitForTimeout(timeoutAfterClick);
+  const incorrectResponseButton = page.getByText("1: incorrect response; the");
+  await incorrectResponseButton.waitFor({ timeout: timeoutAfterClick });
+  await incorrectResponseButton.click();
+  // await page.waitForTimeout(timeoutAfterClick);
   const submitButton = page.getByRole("button", {
     name: "Submit Practiced Tunes",
   });
