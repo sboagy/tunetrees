@@ -27,6 +27,7 @@ test("test-login-1", async ({ browser }) => {
 
   await page.goto("https://localhost:3000", {
     timeout: initialPageLoadTimeout,
+    waitUntil: "networkidle",
   });
 
   await runLogin(

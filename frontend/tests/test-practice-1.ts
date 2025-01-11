@@ -4,73 +4,83 @@ import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { type Locator, type Page, expect, test } from "@playwright/test";
 
+test.use({
+  storageState: getStorageState("STORAGE_STATE_TEST1"),
+  // actionTimeout: 4000,
+});
+
+// testInfo.project.name,
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+test.beforeEach(({ page }, testInfo) => {
+  console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+  // doConsolelogs(page, testInfo);
+});
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+test.afterEach(async ({ page }) => {
+  // After each test is run in this set, restore the backend to its original state.
+  await restartBackend();
+});
+
+async function clickWithTimeAfter(page: Page, locator: Locator, timeout = 500) {
+  await locator.waitFor({ state: "attached", timeout: 2000 });
+  await locator.waitFor({ state: "visible", timeout: 2000 });
+  await expect(locator).toBeAttached();
+  await expect(locator).toBeVisible();
+  await expect(locator).toBeEnabled();
+  // await locator.click({ trial: true });
+  await locator.click({ timeout: timeout });
+}
+
+async function navigateToPracticeTab(page: Page) {
+  await checkHealth();
+
+  console.log("===> test-edit-1.ts:88 ~ creating new page for tunetrees");
+
+  await page.goto("https://localhost:3000/home", {
+    timeout: initialPageLoadTimeout,
+    waitUntil: "networkidle",
+  });
+  await page.waitForLoadState("domcontentloaded");
+
+  await page.waitForSelector("body");
+  const ttMainTabGroup = page.getByTestId("tt-main-tabs");
+  await ttMainTabGroup.waitFor({ state: "visible" });
+  const ttRepertoireTab = page.getByTestId("tt-repertoire-tab");
+  await ttRepertoireTab.waitFor({ state: "visible" });
+
+  const practiceTabLocator = page.getByRole("tab", { name: "Practice" });
+  await practiceTabLocator.waitFor({ state: "attached", timeout: 5000 });
+  await practiceTabLocator.waitFor({ state: "visible", timeout: 5000 });
+  await expect(practiceTabLocator).toBeAttached();
+  await expect(practiceTabLocator).toBeVisible();
+  await expect(practiceTabLocator).toBeEnabled();
+  const isEnabled = await practiceTabLocator.isEnabled();
+  console.log("===> test-practice-1.ts:52 ~ isEnabled", isEnabled);
+  await practiceTabLocator.click({ trial: true, timeout: 5000 });
+  await practiceTabLocator.click({ timeout: 5000 });
+
+  const ttPracticeTab = page.getByTestId("tt-practice-tab");
+  await ttPracticeTab.waitFor({ state: "visible" });
+
+  await expect(practiceTabLocator).toBeFocused({ timeout: 5000 });
+
+  const ttReviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
+  console.log(
+    `===> test-practice-1.ts:106 ~ check practice tunes for ${ttReviewSitdownDate}`,
+  );
+}
+
+async function checkForCellId(page: Page, cellId: number) {
+  const idCell = page.getByRole("cell", { name: `${cellId}` });
+  const value = await idCell.textContent({ timeout: 6000 });
+  console.log("===> test-practice-1.ts:37 ~ value", value);
+
+  await expect(idCell).toHaveText(`${cellId}`);
+}
+
 test.describe.serial("Practice Tests", () => {
-  test.use({
-    storageState: getStorageState("STORAGE_STATE_TEST1"),
-    // actionTimeout: 4000,
-  });
-
-  // testInfo.project.name,
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  test.beforeEach(({ page }, testInfo) => {
-    console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
-    // doConsolelogs(page, testInfo);
-  });
-
-  test.afterEach(async ({ page }) => {
-    // After each test is run in this set, restore the backend to its original state.
-    await restartBackend();
-    await page.waitForTimeout(5000);
-  });
-
-  async function clickWithTimeAfter(
-    page: Page,
-    locator: Locator,
-    timeout = 500,
-  ) {
-    // await locator.click({ trial: true });
-    await locator.click();
-    await page.waitForTimeout(timeout);
-  }
-
-  async function navigateToPracticeTab(page: Page) {
-    await checkHealth();
-
-    console.log("===> test-edit-1.ts:88 ~ creating new page for tunetrees");
-
-    await page.goto("https://localhost:3000", {
-      timeout: initialPageLoadTimeout,
-    });
-
-    await page.waitForSelector("body");
-
-    const tabSelector = 'role=tab[name="Practice"]';
-    console.log(
-      "===> test-edit-1.ts:106 ~ waiting for selector, tabSelector: ",
-      tabSelector,
-    );
-    const practiceTab = await page.waitForSelector(tabSelector, {
-      state: "visible",
-    });
-    await page.waitForTimeout(500);
-    await practiceTab.click();
-    await page.waitForTimeout(1000);
-
-    const ttReviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
-    console.log(
-      `===> test-practice-1.ts:106 ~ check practice tunes for ${ttReviewSitdownDate}`,
-    );
-  }
-
-  async function checkForCellId(page: Page, cellId: number) {
-    const idCell = page.getByRole("cell", { name: `${cellId}` });
-    const value = await idCell.textContent({ timeout: 6000 });
-    console.log("===> test-practice-1.ts:37 ~ value", value);
-
-    await expect(idCell).toHaveText(`${cellId}`);
-  }
-
   test("test-practice-1-1", async ({ page }) => {
     /**
      * Perform the following actions:

@@ -21,9 +21,12 @@ test("test-edit-1", async ({ page }) => {
 
   await page.goto("https://localhost:3000", {
     timeout: initialPageLoadTimeout,
+    waitUntil: "networkidle",
   });
 
   await page.waitForSelector("body");
+  const ttMainTabGroup = page.getByTestId("tt-main-tabs");
+  await ttMainTabGroup.waitFor({ state: "visible" });
 
   const repertoireTabSelector = 'role=tab[name="Repertoire"]';
   console.log(
@@ -76,7 +79,7 @@ test("test-edit-1", async ({ page }) => {
   await page.getByRole("button", { name: "Save" }).click();
 
   // The test may fail without this wait, not sure why.
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(1000);
 
   const tuneTitle2 = await page.locator("#current-tune-title").textContent();
   console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
