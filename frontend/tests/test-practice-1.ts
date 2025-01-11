@@ -55,6 +55,7 @@ test.describe.serial("Practice Tests", () => {
     });
     await page.waitForTimeout(500);
     await practiceTab.click();
+    await page.waitForTimeout(1000);
 
     const ttReviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
     console.log(
