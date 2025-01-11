@@ -21,7 +21,7 @@ test.describe.serial("Practice Tests", () => {
   test.afterEach(async ({ page }) => {
     // After each test is run in this set, restore the backend to its original state.
     await restartBackend();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(5000);
   });
 
   async function clickWithTimeAfter(
