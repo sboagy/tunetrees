@@ -76,7 +76,7 @@ test("test-edit-1", async ({ page }) => {
   await page.getByRole("button", { name: "Save" }).click();
 
   // The test may fail without this wait, not sure why.
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(3000);
 
   const tuneTitle2 = await page.locator("#current-tune-title").textContent();
   console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
