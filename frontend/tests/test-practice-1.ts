@@ -6,6 +6,7 @@ import { type Page, expect, test } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
+  actionTimeout: 500,
 });
 
 // testInfo.project.name,
@@ -85,7 +86,7 @@ test("test-practice-1-1", async ({ page }) => {
 });
 
 test("test-practice-1-2", async ({ page }) => {
-  const timeoutAfterClick = 100;
+  // const timeoutAfterClick = 300;
   await navigateToPracticeTab(page);
 
   console.log("===> test-practice-1.ts:77 ~ ");
@@ -94,28 +95,28 @@ test("test-practice-1-2", async ({ page }) => {
     .getByRole("row", { name: "1081 Recall Quality... Lakes" })
     .getByRole("button")
     .click();
-  await page.waitForTimeout(timeoutAfterClick);
+  // await page.waitForTimeout(timeoutAfterClick);
   await page.getByText("3: correct response recalled").click();
-  await page.waitForTimeout(timeoutAfterClick);
+  // await page.waitForTimeout(timeoutAfterClick);
   await page
     .getByRole("row", { name: "2451 Recall Quality... Church" })
     .getByRole("button")
     .click();
-  await page.waitForTimeout(timeoutAfterClick);
+  // await page.waitForTimeout(timeoutAfterClick);
   await page.getByText("4: correct response after a").click();
   await page
     .getByRole("button", { name: "4: correct response after a" })
     .click();
-  await page.waitForTimeout(timeoutAfterClick);
+  // await page.waitForTimeout(timeoutAfterClick);
   await page.getByRole("option", { name: "(Not Set)" }).click();
-  await page.waitForTimeout(timeoutAfterClick);
+  // await page.waitForTimeout(timeoutAfterClick);
   await page
     .getByRole("row", { name: "1684 Recall Quality... Road" })
     .getByRole("button")
     .click();
-  await page.waitForTimeout(timeoutAfterClick);
+  // await page.waitForTimeout(timeoutAfterClick);
   await page.getByText("1: incorrect response; the").click();
-  await page.waitForTimeout(timeoutAfterClick);
+  // await page.waitForTimeout(timeoutAfterClick);
   const submitButton = page.getByRole("button", {
     name: "Submit Practiced Tunes",
   });
