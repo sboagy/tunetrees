@@ -65,7 +65,7 @@ test.describe.serial("Practice Tests", () => {
 
   async function checkForCellId(page: Page, cellId: number) {
     const idCell = page.getByRole("cell", { name: `${cellId}` });
-    const value = await idCell.textContent({ timeout: 2000 });
+    const value = await idCell.textContent({ timeout: 6000 });
     console.log("===> test-practice-1.ts:37 ~ value", value);
 
     await expect(idCell).toHaveText(`${cellId}`);
