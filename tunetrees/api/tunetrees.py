@@ -15,7 +15,6 @@ from sqlalchemy.orm.query import Query as QueryOrm
 from starlette import status as status
 from starlette.responses import RedirectResponse
 
-from tunetrees.api.mappers.tunes_mapper import tunes_mapper
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
     query_practice_list_scheduled,
@@ -102,11 +101,8 @@ async def get_scheduled_tunes_overview(
                 show_playlist_deleted=show_playlist_deleted,
                 review_sitdown_date=sitdown_date,
             )
-            tune_list = [
-                tunes_mapper(tune, t_practice_list_staged) for tune in tunes_scheduled
-            ]
             validated_tune_list = [
-                PlaylistTuneJoinedModel.model_validate(tune) for tune in tune_list
+                PlaylistTuneJoinedModel.model_validate(tune) for tune in tunes_scheduled
             ]
             return validated_tune_list
     except Exception as e:

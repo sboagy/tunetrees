@@ -571,6 +571,8 @@ class ReferenceModelCreate(BaseModel):
 
 class PlaylistTuneJoinedModel(BaseModel):
     id: Optional[int] = None
+    user_ref: Optional[int] = None
+    playlist_ref: Optional[int] = None
     title: Optional[str] = None
     type: Optional[str] = None
     structure: Optional[str] = None
@@ -586,8 +588,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     repetitions: Optional[int] = None
     review_date: Optional[str] = None
     tags: Optional[str] = None
-    user_ref: Optional[int] = None
-    playlist_ref: Optional[int] = None
+    recall_eval: Optional[str] = None
     notes: Optional[str] = None
     favorite_url: Optional[str] = None
     playlist_deleted: Optional[bool] = None
