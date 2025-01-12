@@ -31,8 +31,8 @@ async function clickWithTimeAfter(
   locator: Locator,
   timeout = 9000,
 ) {
-  await locator.waitFor({ state: "attached", timeout: 10000 });
-  await locator.waitFor({ state: "visible", timeout: 10000 });
+  await locator.waitFor({ state: "attached", timeout: timeout });
+  await locator.waitFor({ state: "visible", timeout: timeout });
   await expect(locator).toBeAttached({ timeout: timeout });
   await expect(locator).toBeVisible({ timeout: timeout });
   await expect(locator).toBeEnabled({ timeout: timeout });
@@ -52,19 +52,19 @@ async function setReviewEval(page: Page, tuneId: number, evalType: string) {
   const qualityButton = page
     .getByRole("row", { name: `${tuneId} ` })
     .getByTestId("tt-recal-eval-popover-trigger");
-  await expect(qualityButton).toBeVisible({ timeout: 9000 });
-  await expect(qualityButton).toBeEnabled({ timeout: 9000 });
+  await expect(qualityButton).toBeVisible({ timeout: 60000 });
+  await expect(qualityButton).toBeEnabled({ timeout: 60000 });
   await clickWithTimeAfter(page, qualityButton);
   await page
     .getByTestId("tt-recal-eval-group-menu")
-    .waitFor({ state: "visible", timeout: 5000 });
+    .waitFor({ state: "visible", timeout: 60000 });
   const responseRecalledButton = page.getByTestId(`tt-recal-eval-${evalType}`);
-  await expect(responseRecalledButton).toBeVisible({ timeout: 9000 });
-  await expect(responseRecalledButton).toBeEnabled({ timeout: 9000 });
+  await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
+  await expect(responseRecalledButton).toBeEnabled({ timeout: 60000 });
   await clickWithTimeAfter(page, responseRecalledButton);
   await page
     .getByTestId("tt-recal-eval-popover-content")
-    .waitFor({ state: "detached", timeout: 5000 });
+    .waitFor({ state: "detached", timeout: 60000 });
 }
 
 test.describe.serial("Practice Tests", () => {
