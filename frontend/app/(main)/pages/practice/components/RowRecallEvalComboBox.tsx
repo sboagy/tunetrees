@@ -89,51 +89,53 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
         );
         console.log(`LF17 State deleted for ${info.row.original.id}`);
       }
-      setIsOpen(false);
     } catch (error) {
       console.error("LF17 Failed to save state:", error);
       alert("Failed to save state. Please try again.");
-      setIsOpen(false);
     }
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild disabled={isDisabled}>
-        <button
-          type="button"
-          className={`w-[9em] sm:w-[18em] h-[2em] justify-between whitespace-nowrap overflow-hidden text-ellipsis  ${getColorForEvaluation(
-            selectedQuality ?? null,
-            true,
-          )}`}
-          style={{
-            textAlign: "left",
-          }}
-          onClick={(event) => {
-            event.stopPropagation(); // Prevents the click from reaching the TableRow
-            setIsOpen((prev) => !prev);
-          }}
-          disabled={isDisabled}
-        >
-          <div className="flex justify-between items-center">
-            <span className="truncate ml-[1em]">
-              {selectedQuality
-                ? qualityList.find((q) => q.value === selectedQuality)?.label2
-                : "Recall Quality..."}
-            </span>
-            <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-          </div>
-        </button>
+    <Popover
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      data-testid="tt-recal-eval-popover"
+    >
+      <PopoverTrigger
+        asChild
+        className={`w-[9em] sm:w-[18em] h-[2em] justify-between whitespace-nowrap overflow-hidden text-ellipsis  ${getColorForEvaluation(
+          selectedQuality ?? null,
+          true,
+        )}`}
+        style={{
+          textAlign: "left",
+        }}
+        onClick={(event) => {
+          event.stopPropagation(); // Prevents the click from reaching the TableRow
+          setIsOpen((prev) => !prev);
+        }}
+        disabled={isDisabled}
+        data-testid="tt-recal-eval-popover-trigger"
+      >
+        <div className="flex justify-between items-center">
+          <span className="truncate ml-[1em]">
+            {selectedQuality
+              ? qualityList.find((q) => q.value === selectedQuality)?.label2
+              : "Recall Quality..."}
+          </span>
+          <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+        </div>
       </PopoverTrigger>
-      <PopoverContent align="end">
+      <PopoverContent align="end" data-testid="tt-recal-eval-popover-content">
         <Command>
           <CommandList className="max-h-none">
             <CommandEmpty>Recall Eval...</CommandEmpty>
-            <CommandGroup>
+            <CommandGroup data-testid="tt-recal-eval-group-menu">
               {qualityList.map((qualityFeedbackItem) => (
                 <CommandItem
                   className="flex items-left"
                   key={qualityFeedbackItem.value}
+                  data-testid={`tt-recal-eval-${qualityFeedbackItem.value}`}
                   value={qualityFeedbackItem.value}
                   onSelect={(currentValue) => {
                     console.log(
@@ -169,15 +171,11 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                             newValue,
                           ); // Call the callback
                         }
-                        const selectedRowModels =
-                          info.table.getSelectedRowModel().rowsById;
-                        for (const rowId in selectedRowModels) {
-                          const rowModel = selectedRowModels[rowId];
-                          rowModel.toggleSelected(false);
-                        }
 
                         const tableState = info.table.getState();
                         info.table.setState(tableState);
+
+                        setIsOpen(false);
                       })
                       .catch((error) => {
                         console.error(
