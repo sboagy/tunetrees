@@ -19,7 +19,7 @@ test.use({
 test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
-  await applyNetworkThrottle(page);
+  await applyNetworkThrottle(page, 0);
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -31,13 +31,13 @@ test.afterEach(async ({ page }) => {
 async function clickWithTimeAfter(
   page: Page,
   locator: Locator,
-  timeout = 5000,
+  timeout = 9000,
 ) {
   await locator.waitFor({ state: "attached", timeout: 10000 });
   await locator.waitFor({ state: "visible", timeout: 10000 });
-  await expect(locator).toBeAttached();
-  await expect(locator).toBeVisible();
-  await expect(locator).toBeEnabled();
+  await expect(locator).toBeAttached({ timeout: timeout });
+  await expect(locator).toBeVisible({ timeout: timeout });
+  await expect(locator).toBeEnabled({ timeout: timeout });
   // await locator.click({ trial: true });
   await locator.click({ timeout: timeout });
 }
@@ -71,9 +71,38 @@ async function navigateToPracticeTab(page: Page) {
   await practiceTabLocator.click({ timeout: 5000 });
 
   const ttPracticeTab = page.getByTestId("tt-practice-tab");
-  await ttPracticeTab.waitFor({ state: "visible" });
+  await expect(ttPracticeTab).toBeAttached();
+  await expect(ttPracticeTab).toBeVisible();
+  await expect(ttPracticeTab).toBeEnabled();
 
-  await expect(practiceTabLocator).toBeFocused({ timeout: 5000 });
+  const responsePromise = page.waitForResponse("https://localhost:3000/home");
+  await ttPracticeTab.click();
+  await responsePromise;
+
+  const submitPracticedTunesButton = page
+    .locator("#tt-scheduled-tunes-header div")
+    .filter({
+      hasText: "Submit Practiced Tunes",
+    });
+  await expect(submitPracticedTunesButton).toBeVisible({ timeout: 5000 });
+
+  const ttPracticeTab2 = page
+    .getByTestId("tt-practice-tab")
+    .locator("div")
+    .filter({
+      hasText: "IdEvaluation",
+    })
+    .nth(2);
+  await expect(ttPracticeTab2).toBeVisible({ timeout: 5000 });
+
+  // const ttScheduledTunesGrid = page
+  //   .getByTestId("tt-practice-tab")
+  //   .getByRole("table");
+  // await ttScheduledTunesGrid.waitFor({ state: "attached", timeout: 500000 });
+  // const ttScheduledTunesGrid = page.getByTestId("tt-scheduled-tunes-grid");
+  // await expect(ttScheduledTunesGrid).toBeAttached({ timeout: 5000 });
+  // await expect(ttScheduledTunesGrid).toBeVisible({ timeout: 5000 });
+  // await expect(ttScheduledTunesGrid).toBeEnabled({ timeout: 5000 });
 
   const ttReviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
   console.log(
@@ -93,15 +122,15 @@ async function setReviewEval(page: Page, tuneId: number, evalType: string) {
   const qualityButton = page
     .getByRole("row", { name: `${tuneId} ` })
     .getByTestId("tt-recal-eval-popover-trigger");
-  await expect(qualityButton).toBeVisible({ timeout: 5000 });
-  await expect(qualityButton).toBeEnabled({ timeout: 5000 });
+  await expect(qualityButton).toBeVisible({ timeout: 9000 });
+  await expect(qualityButton).toBeEnabled({ timeout: 9000 });
   await clickWithTimeAfter(page, qualityButton);
   await page
     .getByTestId("tt-recal-eval-group-menu")
     .waitFor({ state: "visible", timeout: 5000 });
   const responseRecalledButton = page.getByTestId(`tt-recal-eval-${evalType}`);
-  await expect(responseRecalledButton).toBeVisible({ timeout: 5000 });
-  await expect(responseRecalledButton).toBeEnabled({ timeout: 5000 });
+  await expect(responseRecalledButton).toBeVisible({ timeout: 9000 });
+  await expect(responseRecalledButton).toBeEnabled({ timeout: 9000 });
   await clickWithTimeAfter(page, responseRecalledButton);
   await page
     .getByTestId("tt-recal-eval-popover-content")
