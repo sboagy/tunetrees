@@ -67,8 +67,7 @@ async function doEditAndButtonClick(
       response.request().method() === "POST",
   );
   await page.getByRole("button", { name: buttonName }).click();
-  const response = await responsePromise;
-  console.log("===> test-edit-1.ts:47 ~ ", response);
+  await responsePromise;
 
   // Wait for the response to the POST request, which will hopefully
   // be the first response after the Save button is clicked?
