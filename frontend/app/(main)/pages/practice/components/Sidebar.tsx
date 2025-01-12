@@ -68,6 +68,7 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
             aria-label="Edit"
             className="p-0 h-auto"
             title="Edit"
+            data-testid="tt-sidebar-edit-tune"
             onClick={() => {
               console.log("Edit button clicked");
               handleTuneEditClick(currentTune);

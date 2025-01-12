@@ -11,7 +11,7 @@
         {
             "label": "stop_server",
             "type": "shell",
-            "command": "pkill -f 'uvicorn tunetrees.api.main:app'",
+            "command": "pkill -f 'uvicorn tunetrees.api.main:app' || true",
             "problemMatcher": []
         },
         {

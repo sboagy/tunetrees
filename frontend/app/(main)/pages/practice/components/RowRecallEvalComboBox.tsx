@@ -10,10 +10,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import type { CellContext } from "@tanstack/react-table";
 import { Check, ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getColorForEvaluation, qualityList } from "../quality-list";
 import {
   createOrUpdateTableTransientData,
   deleteTableTransientData,
@@ -23,7 +23,7 @@ import type {
   TablePurpose,
   TunesGridColumnGeneralType,
 } from "../types";
-import { getColorForEvaluation } from "./TunesGrid";
+import { useRowRecallEvalPopoverContext } from "./RowRecallEvalPopoverContext";
 
 // #     Quality: The quality of recalling the answer from a scale of 0 to 5.
 // #         5: perfect response.
@@ -32,52 +32,6 @@ import { getColorForEvaluation } from "./TunesGrid";
 // #         2: incorrect response; where the correct one seemed easy to recall.
 // #         1: incorrect response; the correct one remembered.
 // #         0: complete blackout.
-
-const qualityList = [
-  {
-    value: "",
-    label: "(Not Set)",
-    label2: "(Not Set)",
-    int_value: -1,
-  },
-  {
-    value: "blackout",
-    label: "Blackout (no recall, even with hint)",
-    label2: "0: complete blackout",
-    int_value: 0,
-  },
-  {
-    value: "failed",
-    label: "Failed (but remembered after hint)",
-    label2: "1: incorrect response; the correct one remembered",
-    int_value: 1,
-  },
-  {
-    value: "barely",
-    label: "Barely Remembered Some (perhaps A part but not B part)",
-    label2:
-      "2: incorrect response; where the correct one seemed easy to recall",
-    int_value: 2,
-  },
-  {
-    value: "struggled",
-    label: "Remembered with Some Mistakes (and needed verification)",
-    label2: "3: correct response recalled with serious difficulty",
-    int_value: 3,
-  },
-  {
-    value: "trivial",
-    label: "Not Bad (but maybe not session ready)",
-    label2: "4: correct response after a hesitation",
-    int_value: 4,
-  },
-  {
-    value: "perfect",
-    label: "Good (could perform solo or lead in session)",
-    label2: "5: perfect response",
-    int_value: 5,
-  },
-];
 
 type RecallEvalComboBoxProps = {
   info: CellContext<ITuneOverview, TunesGridColumnGeneralType>;
@@ -88,9 +42,20 @@ type RecallEvalComboBoxProps = {
 };
 
 export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
+  const [isMounted, setIsMounted] = useState(false);
   const { info, userId, playlistId, purpose, onRecallEvalChange } = props;
 
-  const [isOpen, setIsOpen] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const isDisabled = onRecallEvalChange && !isMounted;
+
+  // const [isOpen, setIsOpen] = useState(false);
+  const { openPopoverId, setOpenPopoverId } = useRowRecallEvalPopoverContext();
+  const isOpen = openPopoverId === info.row.original.id;
+
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(
     info.row.original.recall_eval ?? null,
   );
@@ -101,6 +66,10 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
       // but I don't think it's ever undefined in this case?
       // But, keep an eye on it.
       if (changed_value) {
+        console.log(
+          "===> RowRecallEvalComboBox.tsx:103 ~ saveData - changed_value",
+          changed_value,
+        );
         await createOrUpdateTableTransientData(
           userId,
           info.row.original.id ?? 0,
@@ -114,6 +83,9 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
           `LF17 State saved: ${changed_value} for ${info.row.original.id}`,
         );
       } else {
+        console.log(
+          "===> RowRecallEvalComboBox.tsx:121 ~ saveData calling deleteTableTransientData",
+        );
         await deleteTableTransientData(
           userId,
           info.row.original.id ?? 0,
@@ -124,84 +96,126 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
       }
     } catch (error) {
       console.error("LF17 Failed to save state:", error);
+      alert("Failed to save state. Please try again.");
     }
   };
 
-  const forceClose = () => {
-    setIsOpen(false);
+  const handleBlur = (event: React.FocusEvent<HTMLButtonElement>) => {
+    if (popoverRef.current === null) {
+      return;
+    }
+    if (!popoverRef.current.contains(event.relatedTarget as Node)) {
+      // setIsOpen(false);
+      setOpenPopoverId(isOpen ? null : (info.row.original.id ?? null));
+    }
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={`w-[9em] sm:w-[18em] h-[2em] justify-between whitespace-nowrap overflow-hidden text-ellipsis  ${getColorForEvaluation(
-            selectedQuality ?? null,
-            true,
-          )}`}
-          style={{
-            textAlign: "left",
-          }}
-          onClick={(event) => {
-            event.stopPropagation(); // Prevents the click from reaching the TableRow
-            setIsOpen((prev) => !prev);
-          }}
-        >
-          <div className="flex justify-between items-center">
-            <span className="truncate ml-[1em]">
-              {selectedQuality
-                ? qualityList.find((q) => q.value === selectedQuality)?.label2
-                : "Recall Quality..."}
-            </span>
-            <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-          </div>
-        </button>
+    <Popover
+      open={isOpen}
+      onOpenChange={(open) =>
+        setOpenPopoverId(open ? (info.row.original.id ?? null) : null)
+      }
+      data-testid="tt-recal-eval-popover"
+    >
+      <PopoverTrigger
+        asChild
+        className={`w-[9em] sm:w-[18em] h-[2em] justify-between whitespace-nowrap overflow-hidden text-ellipsis  ${getColorForEvaluation(
+          selectedQuality ?? null,
+          true,
+        )}`}
+        style={{
+          textAlign: "left",
+        }}
+        onClick={(event) => {
+          event.stopPropagation(); // Prevents the click from reaching the TableRow
+          // setIsOpen((prev) => !prev);
+          setOpenPopoverId(isOpen ? null : (info.row.original.id ?? null));
+        }}
+        onBlur={handleBlur}
+        disabled={isDisabled}
+        data-testid="tt-recal-eval-popover-trigger"
+      >
+        <div className="flex justify-between items-center">
+          <span className="truncate ml-[1em]">
+            {selectedQuality
+              ? qualityList.find((q) => q.value === selectedQuality)?.label2
+              : "Recall Quality..."}
+          </span>
+          <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+        </div>
       </PopoverTrigger>
-      <PopoverContent align="end">
+      <PopoverContent
+        align="end"
+        data-testid="tt-recal-eval-popover-content"
+        ref={popoverRef}
+      >
         <Command>
           <CommandList className="max-h-none">
             <CommandEmpty>Recall Eval...</CommandEmpty>
-            <CommandGroup>
-              {qualityList.map((qualityList) => (
+            <CommandGroup data-testid="tt-recal-eval-group-menu">
+              {qualityList.map((qualityFeedbackItem) => (
                 <CommandItem
-                  key={qualityList.value}
-                  value={qualityList.value}
+                  className="flex items-left"
+                  key={qualityFeedbackItem.value}
+                  data-testid={`tt-recal-eval-${qualityFeedbackItem.value}`}
+                  value={qualityFeedbackItem.value}
                   onSelect={(currentValue) => {
+                    console.log(
+                      "===> RowRecallEvalComboBox.tsx:171 ~ onSelect - currentValue: ",
+                      currentValue,
+                    );
+
                     const newValue =
                       currentValue === info.row.original.recall_eval
                         ? ""
-                        : currentValue;
+                        : currentValue === qualityList[0].label2
+                          ? ""
+                          : currentValue;
+
+                    console.log(
+                      "===> RowRecallEvalComboBox.tsx:183 ~ onSelect - newValue: ",
+                      newValue,
+                    );
                     setSelectedQuality(newValue);
                     info.row.original.recall_eval = newValue;
-                    if (onRecallEvalChange) {
-                      onRecallEvalChange(info.row.original.id ?? -1, newValue); // Call the callback
-                    }
+                    // if (onRecallEvalChange) {
+                    //   onRecallEvalChange(info.row.original.id ?? -1, newValue); // Call the callback
+                    // }
 
-                    forceClose();
+                    console.log(
+                      `===> RowRecallEvalComboBox.tsx:206 ~ calling saveDate(${newValue})`,
+                    );
+                    // setIsOpen(false);
+                    setOpenPopoverId(null);
 
-                    const selectedRowModels =
-                      info.table.getSelectedRowModel().rowsById;
-                    for (const rowId in selectedRowModels) {
-                      const rowModel = selectedRowModels[rowId];
-                      rowModel.toggleSelected(false);
-                    }
+                    saveData(newValue)
+                      .then(() => {
+                        if (onRecallEvalChange) {
+                          onRecallEvalChange(
+                            info.row.original.id ?? -1,
+                            newValue,
+                          ); // Call the callback
+                        }
 
-                    const tableState = info.table.getState();
-                    info.table.setState(tableState);
-
-                    void saveData(newValue);
+                        const tableState = info.table.getState();
+                        info.table.setState(tableState);
+                      })
+                      .catch((error) => {
+                        console.error(
+                          "===> RowRecallEvalComboBox.tsx:216 ~ error",
+                          error,
+                        );
+                      });
                   }}
                 >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      info.row.original.recall_eval === qualityList.value
-                        ? "opacity-100"
-                        : "opacity-0",
-                    )}
-                  />
-                  {qualityList.label2}
+                  {info.row.original.recall_eval ===
+                    qualityFeedbackItem.value && (
+                    <Check className="absolute left-0 mr-2 h-4 w-4 opacity-100" />
+                  )}
+                  <span className="ml-6">
+                    {qualityFeedbackItem.label2.trim()}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>

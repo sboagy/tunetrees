@@ -9,6 +9,8 @@ const __dirname = path.dirname(__filename);
 
 export const frontendDirPath = path.resolve(__dirname, "..");
 export const testResultsDirPath = path.resolve(frontendDirPath, "test-results");
+export const outputDir = path.resolve(testResultsDirPath, "playwright");
+
 export const tunetreesBackendDeployBaseDir = path.resolve(__dirname, "../..");
 export const backendDirPath = tunetreesBackendDeployBaseDir;
 

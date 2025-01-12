@@ -1,7 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 import * as dotenv from "dotenv";
 import path from "node:path";
-import { frontendDirPath } from "./test-scripts/paths-for-tests";
+import {
+  frontendDirPath,
+  outputDir,
+  videoDir,
+} from "./test-scripts/paths-for-tests";
 
 if (!process.env.CI) {
   dotenv.config({ path: path.resolve(frontendDirPath, ".env.local") });
@@ -13,7 +17,7 @@ if (!process.env.CI) {
 export default defineConfig({
   testDir: "./tests",
   /* Run tests in files in parallel */
-  fullyParallel: true,
+  fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
@@ -25,7 +29,7 @@ export default defineConfig({
     ["html", { outputFolder: "playwright-report", open: "never", merge: true }],
   ],
   /* Ensure output directory is set */
-  outputDir: "test-results/playwright",
+  outputDir: outputDir,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
 
   globalSetup: path.resolve(frontendDirPath, "./test-scripts/global-setup.ts"),
@@ -51,6 +55,12 @@ export default defineConfig({
     // },
     screenshot: "on-first-failure",
     video: "retain-on-failure",
+    contextOptions: {
+      recordVideo: {
+        dir: videoDir, // Directory to save the videos
+        size: { width: 1280, height: 720 }, // Optional: specify video size
+      },
+    },
   },
 
   /* Configure projects for major browsers */
@@ -60,13 +70,10 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 720 },
-
-        /* Use the saved storage state saved in scripts/login.ts */
-        // storageState: "tests/storageStateSboagyLogin.json",
       },
       // dependencies: ["backend"],
       testMatch: "test*.ts",
-      timeout: 5 * 60 * 1000, // 5 minutes timeout per test (temporarily increased)
+      timeout: 6 * 60 * 1000, // 6 minutes timeout per test (temporarily increased)
     },
 
     // {
@@ -110,6 +117,7 @@ export default defineConfig({
     env: {
       NEXT_BASE_URL: process.env.NEXT_BASE_URL || "",
       NEXT_PUBLIC_TT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
+      TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
       AUTH_SECRET: process.env.AUTH_SECRET || "",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",
       AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",

@@ -171,6 +171,7 @@ export default function TuneEditor({
         }}
         className="flex flex-col w-full space-y-4"
         style={{ height: `${height}px`, overflowY: "unset" }}
+        data-testid="tt-tune-editor-form"
       >
         <h1 className="text-2xl font-bold mb-4">Tune #{tune.id}</h1>
         <div
@@ -192,13 +193,20 @@ export default function TuneEditor({
                 control={form.control}
                 name="title"
                 render={({ field }) => (
-                  <FormItem className="tune-form-item-style">
+                  <FormItem
+                    className="tune-form-item-style"
+                    data-testid="tt-tune-editor-title"
+                  >
                     <FormLabel className="tune-form-label-style">
                       Title:{" "}
                     </FormLabel>
 
                     <FormControl className="tune-form-control-style">
-                      <Input {...field} value={field.value || ""} />
+                      <Input
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="tt-tune-editor-title-input"
+                      />
                     </FormControl>
                   </FormItem>
                 )}
@@ -207,6 +215,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="type"
+                data-testid="tt-tune-editor-type"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -223,6 +232,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="structure"
+                data-testid="tt-tune-editor-structure"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -239,6 +249,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="mode"
+                data-testid="tt-tune-editor-mode"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -255,6 +266,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="incipit"
+                data-testid="tt-tune-editor-incipit"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -271,6 +283,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="genre"
+                data-testid="tt-tune-editor-genre"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -289,6 +302,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="learned"
+                data-testid="tt-tune-editor-learned"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -310,6 +324,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="practiced"
+                data-testid="tt-tune-editor-practiced"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -331,6 +346,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="quality"
+                data-testid="tt-tune-editor-quality"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -390,6 +406,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="easiness"
+                data-testid="tt-tune-editor-easiness"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -412,6 +429,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="interval"
+                data-testid="tt-tune-editor-interval"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -434,6 +452,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="repetitions"
+                data-testid="tt-tune-editor-repetitions"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -456,6 +475,7 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="review_date"
+                data-testid="tt-tune-editor-review_date"
                 render={({ field }) => (
                   <FormItem className="tune-form-item-style">
                     <FormLabel className="tune-form-label-style">
@@ -546,6 +566,7 @@ export default function TuneEditor({
             <FormField
               control={form.control}
               name="tags"
+              data-testid="tt-tune-editor-tags"
               render={({ field }) => (
                 <FormItem className="tune-form-item-style2">
                   <FormLabel className="tune-form-label-style">
@@ -581,11 +602,18 @@ export default function TuneEditor({
           <hr className="my-4" />
 
           <div className="flex w-3/5 justify-center space-x-4 p-4">
-            <Button type="button" onClick={handleCancel} variant="outline">
+            <Button
+              type="button"
+              onClick={handleCancel}
+              variant="outline"
+              data-testid="tt-tune-editor-cancel-button"
+            >
               Cancel
             </Button>
 
-            <Button type="submit">Save</Button>
+            <Button type="submit" data-testid="tt-tune-editor-submit-button">
+              Save
+            </Button>
           </div>
         </div>
       </form>

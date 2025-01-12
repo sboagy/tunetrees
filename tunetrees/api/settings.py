@@ -263,17 +263,41 @@ def stage_table_transient_data(
 ) -> dict[str, str | int]:
     with SessionLocal() as db:
         try:
-            table_transient_data = TableTransientData(
-                user_id=user_id,
-                tune_id=tune_id,
-                playlist_id=playlist_id,
-                purpose=purpose,
-                recall_eval=field_data.recall_eval,
+            table_transient_data_queried: TableTransientData | None = (
+                db.query(TableTransientData)
+                .filter_by(
+                    user_id=user_id,
+                    tune_id=tune_id,
+                    playlist_id=playlist_id,
+                    purpose=purpose,
+                )
+                .first()
             )
-            db.add(table_transient_data)
-            db.commit()
-            db.refresh(table_transient_data)
-            return {"status": "success", "code": 201}
+
+            if not table_transient_data_queried:
+                table_transient_data = TableTransientData(
+                    user_id=user_id,
+                    tune_id=tune_id,
+                    playlist_id=playlist_id,
+                    purpose=purpose,
+                    recall_eval=field_data.recall_eval,
+                )
+                db.add(table_transient_data)
+                db.commit()
+                db.refresh(table_transient_data)
+
+                return {"status": "success", "code": 201}
+            else:
+                table_transient_data_queried.user_id = user_id
+                table_transient_data_queried.tune_id = tune_id
+                table_transient_data_queried.playlist_id = playlist_id
+                table_transient_data_queried.purpose = purpose
+                table_transient_data_queried.recall_eval = field_data.recall_eval
+
+                db.commit()
+                db.refresh(table_transient_data_queried)
+
+                return {"status": "success", "code": 200}
         except Exception as e:
             logging.getLogger().error("Unknown error: %s" % e)
             raise HTTPException(status_code=500, detail="Unknown error occurred")

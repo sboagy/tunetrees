@@ -8,8 +8,10 @@ import { setFastapiProcess } from "@/test-scripts/process-store";
 import axios from "axios";
 import { type ChildProcess, spawn } from "node:child_process";
 import fs from "node:fs";
+import fsPromises from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import globalTeardown from "./global-teardown";
 import { setupDatabase } from "./setup-database";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -19,16 +21,16 @@ const __dirname = path.dirname(__filename);
 
 const pidFilePath = path.resolve(tunetreesBackendDeployBaseDir, "fastapi.pid");
 
-async function globalSetup() {
-  const checkServer = async () => {
-    try {
-      const response = await axios.get("http://localhost:8000/hello/test");
-      return response.status === 200;
-    } catch {
-      return false;
-    }
-  };
+const checkServer = async () => {
+  try {
+    const response = await axios.get("http://localhost:8000/hello/test");
+    return response.status === 200;
+  } catch {
+    return false;
+  }
+};
 
+async function globalSetup() {
   const serverPreUp = await checkServer();
   if (serverPreUp) {
     console.log("Server is already up and running.");
@@ -61,7 +63,14 @@ async function globalSetup() {
 
   const fastapiProcess: ChildProcess = spawn(
     path.join(venvBinDir, "uvicorn"),
-    ["tunetrees.api.main:app", "--host", "0.0.0.0", "--port", "8000"],
+    [
+      "tunetrees.api.main:app",
+      "--reload",
+      "--host",
+      "0.0.0.0",
+      "--port",
+      "8000",
+    ],
     {
       env: {
         ...process.env,
@@ -109,3 +118,59 @@ async function globalSetup() {
 }
 
 export default globalSetup;
+
+export const NO_PID = 0;
+export const INVALID_PID = -1;
+
+async function restartBackendHard() {
+  console.warn(
+    "Failed to update reloadTriggerFile. Attempting fallback strategy.",
+  );
+  await globalTeardown();
+  // Make sure the server is down
+  for (let i = 0; i < 10; i++) {
+    const serverUp = await checkServer();
+    if (!serverUp) break;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  await globalSetup();
+}
+
+export async function restartBackend() {
+  // copy the clean database to the test database
+  await setupDatabase();
+
+  try {
+    // This is an uber hacky way to restart the FastAPI server,
+    // given it was started with --reload.
+    // and CoPilot does not approve.  But I think it's massively simpler
+    // for testing purposes than trying to make the signal handling work.
+    const reloadTriggerFile = path.resolve(
+      tunetreesBackendDeployBaseDir,
+      "tunetrees/api/reload_trigger.py",
+    );
+    try {
+      const dateNow = new Date();
+      const timeNow = dateNow.getTime();
+
+      await fsPromises.utimes(reloadTriggerFile, dateNow, dateNow);
+      // Verify the change
+      const stats = await fsPromises.stat(reloadTriggerFile);
+      if (stats.mtime.getTime() !== timeNow) {
+        // Fallback strategy implementation
+        await restartBackendHard();
+        return;
+      }
+    } catch {
+      // Fallback strategy implementation
+      await restartBackendHard();
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    console.log("FastAPI server hopefully reloaded (but not restarted).");
+  } catch (error) {
+    console.error("Error restarting FastAPI server:", error);
+  }
+
+  console.log("Global teardown complete.");
+}
