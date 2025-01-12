@@ -1,8 +1,13 @@
 import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
-import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
+import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+import {
+  initialPageLoadTimeout,
+  screenShotDir,
+} from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { type Locator, type Page, expect, test } from "@playwright/test";
+import path from "node:path";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -11,10 +16,10 @@ test.use({
 
 // testInfo.project.name,
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-test.beforeEach(({ page }, testInfo) => {
+test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
+  await applyNetworkThrottle(page);
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -23,9 +28,13 @@ test.afterEach(async ({ page }) => {
   await restartBackend();
 });
 
-async function clickWithTimeAfter(page: Page, locator: Locator, timeout = 500) {
-  await locator.waitFor({ state: "attached", timeout: 2000 });
-  await locator.waitFor({ state: "visible", timeout: 2000 });
+async function clickWithTimeAfter(
+  page: Page,
+  locator: Locator,
+  timeout = 5000,
+) {
+  await locator.waitFor({ state: "attached", timeout: 10000 });
+  await locator.waitFor({ state: "visible", timeout: 10000 });
   await expect(locator).toBeAttached();
   await expect(locator).toBeVisible();
   await expect(locator).toBeEnabled();
@@ -80,6 +89,25 @@ async function checkForCellId(page: Page, cellId: number) {
   await expect(idCell).toHaveText(`${cellId}`);
 }
 
+async function setReviewEval(page: Page, tuneId: number, evalType: string) {
+  const qualityButton = page
+    .getByRole("row", { name: `${tuneId} ` })
+    .getByTestId("tt-recal-eval-popover-trigger");
+  await expect(qualityButton).toBeVisible({ timeout: 5000 });
+  await expect(qualityButton).toBeEnabled({ timeout: 5000 });
+  await clickWithTimeAfter(page, qualityButton);
+  await page
+    .getByTestId("tt-recal-eval-group-menu")
+    .waitFor({ state: "visible", timeout: 5000 });
+  const responseRecalledButton = page.getByTestId(`tt-recal-eval-${evalType}`);
+  await expect(responseRecalledButton).toBeVisible({ timeout: 5000 });
+  await expect(responseRecalledButton).toBeEnabled({ timeout: 5000 });
+  await clickWithTimeAfter(page, responseRecalledButton);
+  await page
+    .getByTestId("tt-recal-eval-popover-content")
+    .waitFor({ state: "detached", timeout: 5000 });
+}
+
 test.describe.serial("Practice Tests", () => {
   test("test-practice-1-1", async ({ page }) => {
     /**
@@ -111,58 +139,36 @@ test.describe.serial("Practice Tests", () => {
     await navigateToPracticeTab(page);
 
     console.log("===> test-practice-1.ts:77 ~ ");
+    await setReviewEval(page, 1081, "struggled");
 
-    const lakesRecallQualityButton = page
-      .getByRole("row", { name: "1081 Recall Quality... Lakes" })
-      .getByRole("button");
-    await clickWithTimeAfter(page, lakesRecallQualityButton);
-    const responseRecalledButton = page.getByText(
-      "3: correct response recalled",
-    );
-    await clickWithTimeAfter(page, responseRecalledButton);
+    await setReviewEval(page, 2451, "trivial");
+    await setReviewEval(page, 2451, "(Not Set)");
 
-    const churchRecallQualityButton = page
-      .getByRole("row", { name: "2451 Recall Quality... Church" })
-      .getByRole("button");
-    await clickWithTimeAfter(page, churchRecallQualityButton);
-    const responseAfterAButton = page.getByText("4: correct response after a");
-    await clickWithTimeAfter(page, responseAfterAButton);
-
-    const responseAfterAButtonElement = page.getByRole("button", {
-      name: "4: correct response after a",
-    });
-    await clickWithTimeAfter(page, responseAfterAButtonElement);
-    const notSetOption = page.getByRole("option", { name: "(Not Set)" });
-    await clickWithTimeAfter(page, notSetOption);
-
-    const roadRecallQualityButton = page
-      .getByRole("row", { name: "1684 Recall Quality... Road" })
-      .getByRole("button");
-    await clickWithTimeAfter(page, roadRecallQualityButton);
-    const incorrectResponseButton = page.getByText(
-      "1: incorrect response; the",
-    );
-    await clickWithTimeAfter(page, incorrectResponseButton);
+    await setReviewEval(page, 1684, "failed");
 
     const submitButton = page.getByRole("button", {
       name: "Submit Practiced Tunes",
     });
-    await page.waitForFunction(
-      (button) => {
-        const btn = button as HTMLButtonElement;
-        return !btn.disabled;
-      },
-      await submitButton.elementHandle(),
-      { timeout: 2000 },
-    );
+    await submitButton.waitFor({ state: "visible" });
+    await expect(submitButton).toBeVisible();
+    await expect(submitButton).toBeEnabled({ timeout: 60 * 1000 });
 
+    await page.screenshot({
+      path: path.join(screenShotDir, "practice_just_before_submitted.png"),
+    });
     await clickWithTimeAfter(page, submitButton, 1000);
-
+    await page.screenshot({
+      path: path.join(screenShotDir, "practice_just_after_submitted.png"),
+    });
+    page.on("response", (data) => {
+      console.log("===> test-practice-1.ts:108 ~ data", data);
+    });
     const tunesGrid = page.getByTestId("tunes-grid");
     const tunesGridRows = tunesGrid.locator("tr");
     const rowCount = await tunesGridRows.count();
     console.log(`Number of rows: ${rowCount}`);
-    await expect(tunesGridRows).toHaveCount(3);
+    // Make a very long timeout to allow for the server to respond.
+    await expect(tunesGridRows).toHaveCount(3, { timeout: 60000 });
 
     await checkForCellId(page, 1820);
     await checkForCellId(page, 2451);
