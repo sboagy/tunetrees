@@ -11,6 +11,7 @@ import path from "node:path";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
+  // trace: "on",
   // actionTimeout: 4000,
 });
 
@@ -58,6 +59,10 @@ async function navigateToPracticeTab(page: Page) {
   await ttMainTabGroup.waitFor({ state: "visible" });
   const ttRepertoireTab = page.getByTestId("tt-repertoire-tab");
   await ttRepertoireTab.waitFor({ state: "visible" });
+
+  const addToReviewButton = page.getByRole("button", { name: "Add To Review" });
+
+  await expect(addToReviewButton).toBeVisible({ timeout: 60 * 1000 });
 
   const practiceTabLocator = page.getByRole("tab", { name: "Practice" });
   await practiceTabLocator.waitFor({ state: "attached", timeout: 5000 });
