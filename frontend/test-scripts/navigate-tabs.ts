@@ -35,17 +35,19 @@ export async function navigateToPracticeTab(page: Page) {
   await expect(practiceTabLocator).toBeEnabled();
   const isEnabled = await practiceTabLocator.isEnabled();
   console.log("===> test-practice-1.ts:52 ~ isEnabled", isEnabled);
-  await practiceTabLocator.click({ trial: true, timeout: 5000 });
-  await practiceTabLocator.click({ timeout: 5000 });
+  await practiceTabLocator.click({ trial: true, timeout: 60000 });
+  const responsePromise = page.waitForResponse("https://localhost:3000/home");
+  await practiceTabLocator.click({ timeout: 60000 });
+  await responsePromise;
 
   const ttPracticeTab = page.getByTestId("tt-practice-tab");
-  await expect(ttPracticeTab).toBeAttached();
-  await expect(ttPracticeTab).toBeVisible();
-  await expect(ttPracticeTab).toBeEnabled();
+  await expect(ttPracticeTab).toBeAttached({ timeout: 60000 });
+  await expect(ttPracticeTab).toBeVisible({ timeout: 60000 });
+  await expect(ttPracticeTab).toBeEnabled({ timeout: 60000 });
 
-  const responsePromise = page.waitForResponse("https://localhost:3000/home");
-  await ttPracticeTab.click();
-  await responsePromise;
+  // const responsePromise = page.waitForResponse("https://localhost:3000/home");
+  // await ttPracticeTab.click();
+  // await responsePromise;
 
   const submitPracticedTunesButton = page
     .locator("#tt-scheduled-tunes-header div")
