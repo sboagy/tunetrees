@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/popover";
 import type { CellContext } from "@tanstack/react-table";
 import { Check, ChevronDownIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getColorForEvaluation, qualityList } from "../quality-list";
 import {
   createOrUpdateTableTransientData,
@@ -23,6 +23,7 @@ import type {
   TablePurpose,
   TunesGridColumnGeneralType,
 } from "../types";
+import { useRowRecallEvalPopoverContext } from "./RowRecallEvalPopoverContext";
 
 // #     Quality: The quality of recalling the answer from a scale of 0 to 5.
 // #         5: perfect response.
@@ -50,7 +51,11 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
 
   const isDisabled = onRecallEvalChange && !isMounted;
 
-  const [isOpen, setIsOpen] = useState(false);
+  // const [isOpen, setIsOpen] = useState(false);
+  const { openPopoverId, setOpenPopoverId } = useRowRecallEvalPopoverContext();
+  const isOpen = openPopoverId === info.row.original.id;
+
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(
     info.row.original.recall_eval ?? null,
   );
@@ -95,10 +100,22 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
     }
   };
 
+  const handleBlur = (event: React.FocusEvent<HTMLButtonElement>) => {
+    if (popoverRef.current === null) {
+      return;
+    }
+    if (!popoverRef.current.contains(event.relatedTarget as Node)) {
+      // setIsOpen(false);
+      setOpenPopoverId(isOpen ? null : (info.row.original.id ?? null));
+    }
+  };
+
   return (
     <Popover
       open={isOpen}
-      onOpenChange={setIsOpen}
+      onOpenChange={(open) =>
+        setOpenPopoverId(open ? (info.row.original.id ?? null) : null)
+      }
       data-testid="tt-recal-eval-popover"
     >
       <PopoverTrigger
@@ -112,8 +129,10 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
         }}
         onClick={(event) => {
           event.stopPropagation(); // Prevents the click from reaching the TableRow
-          setIsOpen((prev) => !prev);
+          // setIsOpen((prev) => !prev);
+          setOpenPopoverId(isOpen ? null : (info.row.original.id ?? null));
         }}
+        onBlur={handleBlur}
         disabled={isDisabled}
         data-testid="tt-recal-eval-popover-trigger"
       >
@@ -126,7 +145,11 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
           <ChevronDownIcon className="w-5 h-5 text-gray-500" />
         </div>
       </PopoverTrigger>
-      <PopoverContent align="end" data-testid="tt-recal-eval-popover-content">
+      <PopoverContent
+        align="end"
+        data-testid="tt-recal-eval-popover-content"
+        ref={popoverRef}
+      >
         <Command>
           <CommandList className="max-h-none">
             <CommandEmpty>Recall Eval...</CommandEmpty>
@@ -163,6 +186,9 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                     console.log(
                       `===> RowRecallEvalComboBox.tsx:206 ~ calling saveDate(${newValue})`,
                     );
+                    // setIsOpen(false);
+                    setOpenPopoverId(null);
+
                     saveData(newValue)
                       .then(() => {
                         if (onRecallEvalChange) {
@@ -174,8 +200,6 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
 
                         const tableState = info.table.getState();
                         info.table.setState(tableState);
-
-                        setIsOpen(false);
                       })
                       .catch((error) => {
                         console.error(
