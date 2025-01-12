@@ -1,10 +1,7 @@
-import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
+import { navigateToPracticeTab } from "@/test-scripts/navigate-tabs";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
-import {
-  initialPageLoadTimeout,
-  screenShotDir,
-} from "@/test-scripts/paths-for-tests";
+import { screenShotDir } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { type Locator, type Page, expect, test } from "@playwright/test";
 import path from "node:path";
@@ -41,78 +38,6 @@ async function clickWithTimeAfter(
   await expect(locator).toBeEnabled({ timeout: timeout });
   // await locator.click({ trial: true });
   await locator.click({ timeout: timeout });
-}
-
-async function navigateToPracticeTab(page: Page) {
-  await checkHealth();
-
-  console.log("===> test-edit-1.ts:88 ~ creating new page for tunetrees");
-
-  await page.goto("https://localhost:3000/home", {
-    timeout: initialPageLoadTimeout,
-    waitUntil: "networkidle",
-  });
-  await page.waitForLoadState("domcontentloaded");
-
-  await page.waitForSelector("body");
-  const ttMainTabGroup = page.getByTestId("tt-main-tabs");
-  await ttMainTabGroup.waitFor({ state: "visible" });
-  const ttRepertoireTab = page.getByTestId("tt-repertoire-tab");
-  await ttRepertoireTab.waitFor({ state: "visible" });
-
-  const addToReviewButton = page.getByRole("button", { name: "Add To Review" });
-
-  await expect(addToReviewButton).toBeVisible({ timeout: 60 * 1000 });
-
-  const practiceTabLocator = page.getByRole("tab", { name: "Practice" });
-  await practiceTabLocator.waitFor({ state: "attached", timeout: 5000 });
-  await practiceTabLocator.waitFor({ state: "visible", timeout: 5000 });
-  await expect(practiceTabLocator).toBeAttached();
-  await expect(practiceTabLocator).toBeVisible();
-  await expect(practiceTabLocator).toBeEnabled();
-  const isEnabled = await practiceTabLocator.isEnabled();
-  console.log("===> test-practice-1.ts:52 ~ isEnabled", isEnabled);
-  await practiceTabLocator.click({ trial: true, timeout: 5000 });
-  await practiceTabLocator.click({ timeout: 5000 });
-
-  const ttPracticeTab = page.getByTestId("tt-practice-tab");
-  await expect(ttPracticeTab).toBeAttached();
-  await expect(ttPracticeTab).toBeVisible();
-  await expect(ttPracticeTab).toBeEnabled();
-
-  const responsePromise = page.waitForResponse("https://localhost:3000/home");
-  await ttPracticeTab.click();
-  await responsePromise;
-
-  const submitPracticedTunesButton = page
-    .locator("#tt-scheduled-tunes-header div")
-    .filter({
-      hasText: "Submit Practiced Tunes",
-    });
-  await expect(submitPracticedTunesButton).toBeVisible({ timeout: 5000 });
-
-  const ttPracticeTab2 = page
-    .getByTestId("tt-practice-tab")
-    .locator("div")
-    .filter({
-      hasText: "IdEvaluation",
-    })
-    .nth(2);
-  await expect(ttPracticeTab2).toBeVisible({ timeout: 5000 });
-
-  // const ttScheduledTunesGrid = page
-  //   .getByTestId("tt-practice-tab")
-  //   .getByRole("table");
-  // await ttScheduledTunesGrid.waitFor({ state: "attached", timeout: 500000 });
-  // const ttScheduledTunesGrid = page.getByTestId("tt-scheduled-tunes-grid");
-  // await expect(ttScheduledTunesGrid).toBeAttached({ timeout: 5000 });
-  // await expect(ttScheduledTunesGrid).toBeVisible({ timeout: 5000 });
-  // await expect(ttScheduledTunesGrid).toBeEnabled({ timeout: 5000 });
-
-  const ttReviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
-  console.log(
-    `===> test-practice-1.ts:106 ~ check practice tunes for ${ttReviewSitdownDate}`,
-  );
 }
 
 async function checkForCellId(page: Page, cellId: number) {
