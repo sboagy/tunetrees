@@ -322,7 +322,9 @@ async def get_playlist_tune_overview(user_id: int, playlist_ref: int, tune_id: i
             return PlaylistTuneJoinedModel.model_validate(result)
     except Exception as e:
         logger.error(f"Unable to fetch tune ({tune_id}): {e}")
-        raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to fetch tune ({tune_id}): {e}"
+        )
 
 
 @router.get(
