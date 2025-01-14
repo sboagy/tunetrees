@@ -424,7 +424,14 @@ export async function updateNote(
  */
 export async function createNote(note: INote): Promise<INote> {
   try {
-    const response = await client.post<INote>("/notes", note);
+    // Remove the ID from the note object, if present.  Which may have
+    // been assigned by the client to track the note in the UI,
+    // but should not be sent to the server.
+    const { id, ...noteWithoutId } = note;
+    if (id !== undefined && id >= 0) {
+      throw new Error("ID must be a negative number if present");
+    }
+    const response = await client.post<INote>("/notes", noteWithoutId);
     return response.data;
   } catch (error) {
     console.error("Error in createNote: ", error);

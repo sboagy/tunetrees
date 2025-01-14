@@ -155,6 +155,7 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
                     className="p-0 h-auto cursor-pointer"
                     title="Save edits"
                     disabled={!isModified()} // Disable the button if no modifications are made
+                    data-testid="tt-save-note"
                   >
                     <Save className="h-4 w-4" />
                   </Button>
@@ -367,6 +368,7 @@ export default function NoteCards({
             title="New Note"
             onClick={() => {
               const newNote: INote = {
+                id: -Math.floor(Math.random() * 1000000),
                 tune_ref: tuneRef,
                 user_ref: userRef,
                 created_date: new Date().toISOString().split("T")[0],
@@ -392,9 +394,16 @@ export default function NoteCards({
         </div>
       </div>
       <CollapsibleContent>
-        {notes.map((note) => (
-          <NoteCard key={note.id} note={note} onUpdate={handleUpdateNote} />
-        ))}
+        {notes.map((note) => {
+          const duplicate = notes.filter((n) => n.id === note.id).length > 1;
+          console.log(`Checking for duplicate id: ${note.id}`);
+          if (duplicate) {
+            console.log(`Duplicate id found: ${note.id}`);
+          }
+          return (
+            <NoteCard key={note.id} note={note} onUpdate={handleUpdateNote} />
+          );
+        })}
       </CollapsibleContent>
     </Collapsible>
   );
