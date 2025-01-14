@@ -261,6 +261,7 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
                 id={`edit-note-${note.id}`}
                 value={stagedNote.note_text ?? ""}
                 onChange={(value: string) => handleChange("note_text", value)}
+                data-testid="tt-note-text"
               />
             </div>
           </CollapsibleContent>
@@ -324,7 +325,10 @@ export default function NoteCards({
         .then((result: INote) => {
           console.log("Reference updated successfully");
           // Need to update the note with the new ID
-          setNotes((prevNotes) => [...prevNotes, result]);
+          setNotes((prevNotes) => [
+            result,
+            ...prevNotes.filter((note) => note.id !== updatedNote.id),
+          ]);
         })
         .catch((error) => {
           console.error("Error updating reference:", error);
@@ -393,7 +397,7 @@ export default function NoteCards({
           </CollapsibleTrigger>
         </div>
       </div>
-      <CollapsibleContent>
+      <CollapsibleContent data-testid="tt-notes-content">
         {notes.map((note) => {
           const duplicate = notes.filter((n) => n.id === note.id).length > 1;
           console.log(`Checking for duplicate id: ${note.id}`);
