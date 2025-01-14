@@ -155,6 +155,7 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
                     className="p-0 h-auto cursor-pointer"
                     title="Save edits"
                     disabled={!isModified()} // Disable the button if no modifications are made
+                    data-testid="tt-save-note"
                   >
                     <Save className="h-4 w-4" />
                   </Button>
@@ -260,6 +261,7 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
                 id={`edit-note-${note.id}`}
                 value={stagedNote.note_text ?? ""}
                 onChange={(value: string) => handleChange("note_text", value)}
+                data-testid="tt-note-text"
               />
             </div>
           </CollapsibleContent>
@@ -323,7 +325,10 @@ export default function NoteCards({
         .then((result: INote) => {
           console.log("Reference updated successfully");
           // Need to update the note with the new ID
-          setNotes((prevNotes) => [...prevNotes, result]);
+          setNotes((prevNotes) => [
+            result,
+            ...prevNotes.filter((note) => note.id !== updatedNote.id),
+          ]);
         })
         .catch((error) => {
           console.error("Error updating reference:", error);
@@ -367,6 +372,7 @@ export default function NoteCards({
             title="New Note"
             onClick={() => {
               const newNote: INote = {
+                id: -Math.floor(Math.random() * 1000000),
                 tune_ref: tuneRef,
                 user_ref: userRef,
                 created_date: new Date().toISOString().split("T")[0],
@@ -391,10 +397,17 @@ export default function NoteCards({
           </CollapsibleTrigger>
         </div>
       </div>
-      <CollapsibleContent>
-        {notes.map((note) => (
-          <NoteCard key={note.id} note={note} onUpdate={handleUpdateNote} />
-        ))}
+      <CollapsibleContent data-testid="tt-notes-content">
+        {notes.map((note) => {
+          const duplicate = notes.filter((n) => n.id === note.id).length > 1;
+          console.log(`Checking for duplicate id: ${note.id}`);
+          if (duplicate) {
+            console.log(`Duplicate id found: ${note.id}`);
+          }
+          return (
+            <NoteCard key={note.id} note={note} onUpdate={handleUpdateNote} />
+          );
+        })}
       </CollapsibleContent>
     </Collapsible>
   );

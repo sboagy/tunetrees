@@ -38,6 +38,10 @@ export default defineConfig({
     "./test-scripts/global-teardown.ts",
   ),
 
+  expect: {
+    timeout: 10_000,
+  },
+
   use: {
     headless: !!process.env.CI, // Run tests in headed mode unless running in CI
 
