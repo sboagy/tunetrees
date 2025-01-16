@@ -57,7 +57,30 @@ tags_metadata = [
     },
 ]
 
+# PLEASE DON'T REMOVE THIS COMMENTED OUT CODE
+# class CustomASGIMiddleware(BaseHTTPMiddleware):
+#     async def dispatch(self, request: Request, call_next):
+#         # Intercept the request here
+#         print("Request intercepted in ASGI middleware")
+#         response = await call_next(request)
+#         return response
+
+
 app = FastAPI(debug=True, openapi_tags=tags_metadata)
+
+# PLEASE DON'T REMOVE THIS COMMENTED OUT CODE
+# app.add_middleware(CustomASGIMiddleware)
+
+
+# PLEASE DON'T REMOVE THIS COMMENTED OUT CODE
+# @app.middleware("http")
+# async def add_process_time_header(
+#     request: Request, call_next: Callable[[Request], Awaitable[Response]]
+# ) -> Response:
+#     response = await call_next(request)
+#     response.headers["Content-Type"] = "application/json; charset=utf-8"
+#     return response
+
 
 # This is an uber hacky way to enable the FastAPI server to reload,
 # when it was started with --reload.
