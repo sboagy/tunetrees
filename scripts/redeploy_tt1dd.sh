@@ -31,12 +31,6 @@ echo "(paths are relative to the digital ocean server)"
 echo "TUNETREES_DEPLOY_BASE_DIR: $TUNETREES_DEPLOY_BASE_DIR"
 echo "TUNETREES_DB: $TUNETREES_DB"
 
-current_branch=$(git rev-parse --abbrev-ref HEAD)
-if [ "$current_branch" != "main" ]; then
-    echo "Error: Only deply on main branch, Current git branch is not 'main'."
-    exit 1
-fi
-
 echo "Redeploying the tt1dd stack"
 
 docker -c default buildx bake all
