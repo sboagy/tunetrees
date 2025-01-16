@@ -21,7 +21,7 @@
     "biome_lint:fix": "npx @biomejs/biome check --organize-imports-enabled=true --fix app lib components auth *.ts *.json && npx prettier --write app lib components auth *.ts *.json"
   },
   "engines": {
-    "node": ">=v22.7.0"
+    "node": ">=v22.9.0"
   },
   "dependencies": {
     "-": "^0.0.1",
@@ -75,7 +75,7 @@
     "npm": "^11.0.0",
     "nvm": "^0.0.4",
     "ofetch": "^1.4.1",
-    "package.json": "^2.0.1",
+    "package.json": "^0.0.0",
     "react": "^19.0.0",
     "react-countdown-circle-timer": "^3.2.1",
     "react-day-picker": "^9.5.0",
@@ -100,8 +100,8 @@
     "@playwright/test": "^1.49.1",
     "@stylistic/eslint-plugin": "^2.13.0",
     "@types/bcrypt": "^5.0.2",
-    "@types/node": "^22.10.5",
-    "@types/react": "^19.0.6",
+    "@types/node": "^22.10.6",
+    "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
@@ -110,7 +110,7 @@
     "eslint-config-next": "^15.1.4",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-unicorn": "^56.0.1",
-    "postcss": "^8.4.49",
+    "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
