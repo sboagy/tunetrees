@@ -9,6 +9,7 @@ test.use({
   trace: "retain-on-failure",
   // trace: "on",
   actionTimeout: 10_000,
+  viewport: { width: 1728 - 50, height: 1117 - 200 },
 });
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -78,9 +79,7 @@ test("test-newtune-1", async ({ page }) => {
   const tuneTitle2 = await currentTuneTitleLocator.textContent();
   console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
   const expectedText2 = "Sí Bheag, Sí Mhór";
-  await expect(currentTuneTitleLocator).toHaveText(expectedText2, {
-    timeout: 5000,
-  });
+  await expect(currentTuneTitleLocator).toHaveText(expectedText2);
 
   // await page.waitForTimeout(60_000 * 60);
 });
