@@ -38,28 +38,49 @@ test("test-newtune-1", async ({ page }) => {
   const catalogTabLocator = page.getByRole("tab", { name: "Catalog" });
   await expect(catalogTabLocator).toBeVisible();
   await catalogTabLocator.click();
+
+  // await page.waitForTimeout(60_000 * 60);
+
   const addToRepertoireButtonLocator = page
     .locator("#tt-all-tunes-header div")
     .filter({ hasText: "Add To Repertoire" });
+
   await expect(addToRepertoireButtonLocator).toBeVisible();
   const addTuneLoacator = page
     .getByTestId("tt-catalog-tab")
     .getByLabel("Add new reference");
   await addTuneLoacator.click();
 
-  // await page.waitForTimeout(1000 * 20);
-
   await page.getByTestId("tt-tune-editor-title-input").click();
-  await page.getByTestId("tt-tune-editor-title-input").fill("abcde");
+  // Note this is testing the accented characters in the title bug as well.
+  // See https://github.com/axios/axios/issues/6761
+  await page
+    .getByTestId("tt-tune-editor-title-input")
+    .fill("Sí Bheag, Sí Mhór");
   await page.getByLabel("Type:").click();
-  await page.getByLabel("Type:").fill("hornpipe");
+  await page.getByLabel("Type:").fill("waltz");
   await page.getByLabel("Type:").press("Tab");
   await page.getByLabel("Structure:").fill("AABB");
   await page.getByLabel("Structure:").press("Tab");
   await page.getByLabel("Mode:").fill("D Major");
   await page.getByLabel("Mode:").press("Tab");
-  await page.getByLabel("Incipit:").fill("DLJLKJDF");
+  await page.getByLabel("Incipit:").fill("de|:f3e d2|d2 de d2|B4 A2|F4 A2|");
   await page.getByLabel("Genre:").click();
   await page.getByLabel("Genre:").fill("ITRAD");
+
   await page.getByTestId("tt-tune-editor-submit-button").click();
+
+  await page.getByPlaceholder("Filter").click();
+  await page.getByPlaceholder("Filter").fill("Sí Bheag");
+  await page.getByRole("cell", { name: "Sí Bheag, Sí Mhór" }).click();
+
+  const currentTuneTitleLocator = page.locator("#current-tune-title");
+  const tuneTitle2 = await currentTuneTitleLocator.textContent();
+  console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
+  const expectedText2 = "Sí Bheag, Sí Mhór";
+  await expect(currentTuneTitleLocator).toHaveText(expectedText2, {
+    timeout: 5000,
+  });
+
+  // await page.waitForTimeout(60_000 * 60);
 });

@@ -71,10 +71,10 @@ async function doEditAndButtonClick(
 
   // Wait for the response to the POST request, which will hopefully
   // be the first response after the Save button is clicked?
-  const tuneTitle2 = await page.locator("#current-tune-title").textContent();
+  const currentTuneTitleLocator = page.locator("#current-tune-title");
+  const tuneTitle2 = await currentTuneTitleLocator.textContent();
   console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
   const expectedText2 = expectedText ?? modifiedText;
-  const currentTuneTitleLocator = page.locator("#current-tune-title");
   await expect(currentTuneTitleLocator).toHaveText(expectedText2, {
     timeout: 5000,
   });
