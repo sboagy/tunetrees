@@ -142,7 +142,7 @@ export default function TuneEditor({
       userId,
       playlistId,
       tuneId,
-      data as ITuneOverview,
+      { ...data, deleted: false } as ITuneOverview,
     );
     if ("detail" in result) {
       console.error("Failed to update tune:", result.detail);

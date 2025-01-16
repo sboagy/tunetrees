@@ -106,6 +106,7 @@ class TuneModelCreate(BaseModel):
     mode: str
     incipit: str
     genre: str
+    deleted: Optional[bool] = False
 
 
 class UserModel(BaseModel):
