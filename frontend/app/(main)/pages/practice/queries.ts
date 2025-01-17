@@ -2,7 +2,7 @@
 
 import { parseParamsWithArrays } from "@/lib/utils";
 import type { SortingState } from "@tanstack/react-table";
-import axios, { type AxiosResponse } from "axios";
+import axios from "axios";
 import { ERROR_TUNE } from "./mocks";
 import type {
   IGenre,
@@ -18,8 +18,19 @@ import type {
   IViewPlaylistJoined,
 } from "./types";
 
+// function isValidUTF8(str: string): boolean {
+//   try {
+//     const encoder = new TextEncoder();
+//     const decoder = new TextDecoder("utf8", { fatal: true });
+//     const encoded = encoder.encode(str);
+//     decoder.decode(encoded);
+//     return true;
+//   } catch {
+//     return false;
+//   }
+// }
+
 const client = axios.create({
-  // baseURL: process.env.TT_API_BASE_URL
   baseURL: process.env.NEXT_PUBLIC_TT_BASE_URL,
 });
 
@@ -173,6 +184,11 @@ export async function updateTuneInPlaylistFromTuneOverview(
   tune_update: Partial<ITuneOverview>,
 ): Promise<ITune> {
   try {
+    console.log("Input title:", tune_update.title);
+    console.log("Title bytes:", [
+      ...new TextEncoder().encode(tune_update.title || ""),
+    ]);
+
     const dbTune = await getPlaylistTuneOverview(
       user_id,
       playlist_ref,
@@ -197,14 +213,54 @@ export async function updateTuneInPlaylistFromTuneOverview(
         tuneUpdateData.incipit = tune_update.incipit;
       if (tune_update.genre !== dbTune.genre)
         tuneUpdateData.genre = tune_update.genre;
+      if (tune_update.deleted !== dbTune.deleted)
+        tuneUpdateData.deleted = tune_update.deleted;
     }
 
-    const response: AxiosResponse<ITune> = await client.patch<ITune>(
-      `/tune/${tune_id}`,
-      tuneUpdateData,
+    console.log(
+      "tuneUpdateDataStringified:",
+      JSON.stringify(tuneUpdateData, null, 2),
     );
 
-    return response.data;
+    const urlString = `${process.env.NEXT_PUBLIC_TT_BASE_URL}/tune/${tune_id}`;
+
+    console.log("===> queries.ts:215 ~ urlString", urlString);
+
+    // The axios library is throwing an error with the string "Sí Bheag, Sí Mhór",
+    // or just "í", so using fetch instead.
+    // See issue filed: https://github.com/axios/axios/issues/6761
+    // Contemplating using the fetch API for everything.
+    //
+    // const response = await axios.patch<ITune>(urlString, tuneUpdateData, {
+    //   headers: {
+    //     // accept: "application/json",
+    //     "Content-Type": "application/json; charset=utf-8",
+    //   },
+    //   timeout: 10_000,
+    // });
+    // if (!response.status || response.status < 200 || response.status >= 300) {
+    //   throw new Error(`Request failed with status code ${response.status}`);
+    // }
+    // const responseData = response.data;
+
+    const response = await fetch(urlString, {
+      method: "PATCH",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify(tuneUpdateData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status code ${response.status}`);
+    }
+
+    const responseData: ITune = await response.json();
+
+    console.log("Received response:", responseData);
+
+    return responseData;
   } catch (error) {
     console.error("Error in updatePlaylistTune: ", error);
     throw error;
@@ -485,16 +541,13 @@ export async function getTune(
 export async function updateTune(
   tuneRef: number,
   tuneUpdate: Partial<ITuneOverview>,
-): Promise<ITTResponseInfo> {
+): Promise<ITune> {
   try {
-    const response = await client.patch<ITTResponseInfo>(
-      `/tune/${tuneRef}`,
-      tuneUpdate,
-    );
+    const response = await client.patch<ITune>(`/tune/${tuneRef}`, tuneUpdate);
     return response.data;
   } catch (error) {
     console.error("Error in updateTune: ", error);
-    return { detail: `Unable to update tune: ${(error as Error).message}` };
+    throw new Error(`Unable to update tune: ${(error as Error).message}`);
   }
 }
 
@@ -645,6 +698,7 @@ export async function createEmptyTune(
       mode: tune.mode ?? "",
       incipit: tune.incipit ?? "",
       genre: tune.genre ?? "",
+      deleted: tune.deleted ?? false,
     };
 
     type CreateTuneResponse = ITuneOverview | ITTResponseInfo;

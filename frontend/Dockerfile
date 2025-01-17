@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG NODE_VERSION=22.7.0
+ARG NODE_VERSION=22.9.0
 
 # Use node image for base image for all stages.
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS deps

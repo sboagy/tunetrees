@@ -7,7 +7,14 @@ from os import environ
 from typing import Annotated, Any, Dict, List, Optional
 
 import pydantic
-from fastapi import APIRouter, Body, Form, HTTPException, Path, Query
+from fastapi import (
+    APIRouter,
+    Body,
+    Form,
+    HTTPException,
+    Path,
+    Query,
+)
 from sqlalchemy import ColumnElement, Table, and_
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
@@ -322,7 +329,9 @@ async def get_playlist_tune_overview(user_id: int, playlist_ref: int, tune_id: i
             return PlaylistTuneJoinedModel.model_validate(result)
     except Exception as e:
         logger.error(f"Unable to fetch tune ({tune_id}): {e}")
-        raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to fetch tune ({tune_id}): {e}"
+        )
 
 
 @router.get(
@@ -867,6 +876,7 @@ def update_tune(
             for key, value in tune.model_dump(exclude_unset=True).items():
                 setattr(existing_tune, key, value)
 
+            db.flush()  # Ensure changes are flushed to the database
             db.commit()
             db.refresh(existing_tune)
             return TuneModel.model_validate(existing_tune)
