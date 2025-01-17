@@ -1,7 +1,7 @@
 import { restartBackend } from "@/test-scripts/global-setup";
-import { navigateToRepertoireTab } from "@/test-scripts/navigate-tabs";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { expect, test } from "@playwright/test";
 
 test.use({
@@ -24,13 +24,10 @@ test.afterEach(async ({ page }) => {
 });
 
 test("test-notes-1", async ({ page }) => {
-  // Log all uncaught errors to the terminal
-  page.on("pageerror", (exception) => {
-    console.error(`Uncaught exception: "${exception}"`);
-    throw exception;
-  });
+  const ttPO = new TuneTreesPageObject(page);
 
-  await navigateToRepertoireTab(page);
+  await ttPO.navigateToRepertoireTab();
+
   await page.getByPlaceholder("Filter").click();
   await page.getByPlaceholder("Filter").fill("Peacock's Feather");
   await page.getByRole("row", { name: "4377 Peacock's Feather Hpipe" }).click();

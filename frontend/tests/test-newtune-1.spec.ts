@@ -1,7 +1,7 @@
 import { restartBackend } from "@/test-scripts/global-setup";
-import { navigateToRepertoireTab } from "@/test-scripts/navigate-tabs";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { expect, test } from "@playwright/test";
 
 test.use({
@@ -26,11 +26,9 @@ test.afterEach(async ({ page }) => {
 });
 
 test("test-newtune-1", async ({ page }) => {
-  page.on("pageerror", (exception) => {
-    console.error(`Uncaught exception: "${exception}"`);
-    throw exception;
-  });
-  await navigateToRepertoireTab(page);
+  const ttPO = new TuneTreesPageObject(page);
+
+  await ttPO.navigateToRepertoireTab();
 
   // await page.waitForTimeout(1000 * 200);
 

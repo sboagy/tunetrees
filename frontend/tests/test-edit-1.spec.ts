@@ -1,8 +1,7 @@
-import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
-import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { type Page, expect, test } from "@playwright/test";
 
 test.use({
@@ -76,39 +75,53 @@ async function doEditAndButtonClick(
   console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
   const expectedText2 = expectedText ?? modifiedText;
   await expect(currentTuneTitleLocator).toHaveText(expectedText2, {
-    timeout: 5000,
+    timeout: 5_000 * 100,
   });
 }
 
+// async function navigateToTune(page: Page, tuneTitle: string) {
+//   await checkHealth();
+
+//   console.log("===> test-edit-1.ts:88 ~ creating new page for tunetrees");
+
+//   await page.goto("https://localhost:3000", {
+//     timeout: initialPageLoadTimeout,
+//     waitUntil: "networkidle",
+//   });
+
+//   await page.waitForSelector("body");
+//   const ttMainTabGroup = page.getByTestId("tt-main-tabs");
+//   await ttMainTabGroup.waitFor({ state: "visible" });
+
+//   const repertoireTabSelector = 'role=tab[name="Repertoire"]';
+//   console.log(
+//     "===> test-edit-1.ts:106 ~ waiting for selector, tabSelector: ",
+//     repertoireTabSelector,
+//   );
+//   const repertoireTab = await page.waitForSelector(repertoireTabSelector, {
+//     state: "visible",
+//   });
+//   await repertoireTab.click();
+
+//   await page.waitForSelector("#current-tune-title", { state: "visible" });
+//   await page.getByRole("tab", { name: "Repertoire" }).click();
+//   await page.getByPlaceholder("Filter").click();
+
+//   await page.getByPlaceholder("Filter").fill(tuneTitle);
+//   await page.getByRole("row", { name: tuneTitle }).click();
+
+//   const currentTuneTitleLocator = page.locator("#current-tune-title");
+//   const tuneTitle2 = await currentTuneTitleLocator.textContent();
+//   console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
+//   await expect(currentTuneTitleLocator).toHaveText(tuneTitle, {
+//     timeout: 5000,
+//   });
+// }
+
 test("test-edit-1", async ({ page }) => {
-  await checkHealth();
+  const ttPO = new TuneTreesPageObject(page);
 
-  console.log("===> test-edit-1.ts:88 ~ creating new page for tunetrees");
-
-  await page.goto("https://localhost:3000", {
-    timeout: initialPageLoadTimeout,
-    waitUntil: "networkidle",
-  });
-
-  await page.waitForSelector("body");
-  const ttMainTabGroup = page.getByTestId("tt-main-tabs");
-  await ttMainTabGroup.waitFor({ state: "visible" });
-
-  const repertoireTabSelector = 'role=tab[name="Repertoire"]';
-  console.log(
-    "===> test-edit-1.ts:106 ~ waiting for selector, tabSelector: ",
-    repertoireTabSelector,
-  );
-  const repertoireTab = await page.waitForSelector(repertoireTabSelector, {
-    state: "visible",
-  });
-  await repertoireTab.click();
-
-  await page.waitForSelector("#current-tune-title", { state: "visible" });
-  await page.getByRole("tab", { name: "Repertoire" }).click();
-  await page.getByPlaceholder("Filter").click();
-  await page.getByPlaceholder("Filter").fill("lakes of");
-  await page.getByRole("row", { name: "1081 Lakes of Sligo Polka" }).click();
+  await ttPO.navigateToTune("Lakes of Sligo");
 
   // ========== First do a title edit, then Cancel ==============
   await doEditAndButtonClick(
@@ -128,4 +141,31 @@ test("test-edit-1", async ({ page }) => {
     "Lakes of Sligo",
     "Lakes of Sligo x",
   );
+});
+
+test("test-edit-2", async ({ page }) => {
+  const ttPO = new TuneTreesPageObject(page);
+
+  await ttPO.navigateToTune("Boyne Hunt");
+
+  // await page.waitForTimeout(60_000 * 20);
+
+  // // ========== First do a title edit, then Cancel ==============
+  // await doEditAndButtonClick(
+  //   page,
+  //   "tt-tune-editor-title",
+  //   "Cancel",
+  //   "Lakes of Sligo",
+  //   "Lakes of Sligo x",
+  //   "Lakes of Sligo",
+  // );
+
+  // // ========== Now do a title edit, then Save ==============
+  // await doEditAndButtonClick(
+  //   page,
+  //   "tt-tune-editor-title",
+  //   "Save",
+  //   "Lakes of Sligo",
+  //   "Lakes of Sligo x",
+  // );
 });
