@@ -479,7 +479,6 @@ export default function TuneEditor({
                             type="date"
                             {...field}
                             value={field.value || ""}
-                            readOnly
                           />
                         </FormControl>
                       </FormItem>
@@ -503,7 +502,6 @@ export default function TuneEditor({
                             value={
                               field.value ? field.value.replace(" ", "T") : ""
                             }
-                            readOnly
                           />
                         </FormControl>
                       </FormItem>
@@ -521,11 +519,7 @@ export default function TuneEditor({
                         </FormLabel>
 
                         <FormControl className="tune-form-control-style">
-                          <Input
-                            {...field}
-                            value={field.value || ""}
-                            readOnly
-                          />
+                          <Input {...field} value={field.value || ""} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -592,7 +586,6 @@ export default function TuneEditor({
                             onChange={(e) =>
                               field.onChange(e.target.valueAsNumber)
                             }
-                            readOnly
                           />
                         </FormControl>
                       </FormItem>
@@ -614,7 +607,6 @@ export default function TuneEditor({
                             type="number"
                             {...field}
                             value={field.value?.toString() || ""}
-                            readOnly
                             onChange={(e) =>
                               field.onChange(e.target.valueAsNumber)
                             }
@@ -639,7 +631,6 @@ export default function TuneEditor({
                             type="number"
                             {...field}
                             value={field.value?.toString() || ""}
-                            readOnly
                             onChange={(e) =>
                               field.onChange(e.target.valueAsNumber)
                             }
@@ -666,7 +657,6 @@ export default function TuneEditor({
                             value={
                               field.value ? field.value.replace(" ", "T") : ""
                             }
-                            readOnly
                           />
                         </FormControl>
                       </FormItem>
@@ -752,11 +742,7 @@ export default function TuneEditor({
                         </FormLabel>
 
                         <FormControl className="tune-form-control-style">
-                          <Input
-                            {...field}
-                            value={field.value || ""}
-                            readOnly
-                          />
+                          <Input {...field} value={field.value || ""} />
                         </FormControl>
 
                         <FormDescription>
