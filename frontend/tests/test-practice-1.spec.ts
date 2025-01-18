@@ -117,12 +117,11 @@ test.describe.serial("Practice Tests", () => {
     page.on("response", (data) => {
       console.log("===> test-practice-1.ts:108 ~ data", data);
     });
-    const tunesGrid = page.getByTestId("tunes-grid");
-    const tunesGridRows = tunesGrid.locator("tr");
-    const rowCount = await tunesGridRows.count();
+
+    const rowCount = await ttPO.tunesGridRows.count();
     console.log(`Number of rows: ${rowCount}`);
     // Make a very long timeout to allow for the server to respond.
-    await expect(tunesGridRows).toHaveCount(3, { timeout: 60000 });
+    await expect(ttPO.tunesGridRows).toHaveCount(3, { timeout: 60000 });
 
     await checkForCellId(page, 1820);
     await checkForCellId(page, 2451);

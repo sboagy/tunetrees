@@ -118,54 +118,66 @@ async function doEditAndButtonClick(
 //   });
 // }
 
-test("test-edit-1", async ({ page }) => {
-  const ttPO = new TuneTreesPageObject(page);
+test.describe.serial("Tune Edit Tests", () => {
+  test("test-edit-1", async ({ page }) => {
+    const ttPO = new TuneTreesPageObject(page);
 
-  await ttPO.navigateToTune("Lakes of Sligo");
+    await ttPO.navigateToTune("Lakes of Sligo");
 
-  // ========== First do a title edit, then Cancel ==============
-  await doEditAndButtonClick(
-    page,
-    "tt-tune-editor-title",
-    "Cancel",
-    "Lakes of Sligo",
-    "Lakes of Sligo x",
-    "Lakes of Sligo",
-  );
+    // ========== First do a title edit, then Cancel ==============
+    await doEditAndButtonClick(
+      page,
+      "tt-tune-editor-title",
+      "Cancel",
+      "Lakes of Sligo",
+      "Lakes of Sligo x",
+      "Lakes of Sligo",
+    );
 
-  // ========== Now do a title edit, then Save ==============
-  await doEditAndButtonClick(
-    page,
-    "tt-tune-editor-title",
-    "Save",
-    "Lakes of Sligo",
-    "Lakes of Sligo x",
-  );
-});
+    // ========== Now do a title edit, then Save ==============
+    await doEditAndButtonClick(
+      page,
+      "tt-tune-editor-title",
+      "Save",
+      "Lakes of Sligo",
+      "Lakes of Sligo x",
+    );
+    await ttPO.addToReviewButton.waitFor({ state: "visible" });
+    await ttPO.filterInput.fill("Lakes of Sligo x");
+    await expect(ttPO.tunesGridRows).toHaveCount(2); // 1 for the header, 1 for the tune
+    expect(page.getByRole("row", { name: "Lakes of Sligo x" }).isVisible());
+    // I get a 500 error here without the wait when it's doing a get on table state.  Not good.
+    // would a waitForResponse be better?
+    await page.waitForTimeout(100);
+    console.log("===> test-edit-1.ts:158 ~ exit test-edit-1");
+  });
 
-test("test-edit-2", async ({ page }) => {
-  const ttPO = new TuneTreesPageObject(page);
+  test("test-edit-2", async ({ page }) => {
+    const ttPO = new TuneTreesPageObject(page);
 
-  await ttPO.navigateToTune("Boyne Hunt");
+    await ttPO.navigateToTune("Boyne Hunt");
 
-  // await page.waitForTimeout(60_000 * 20);
+    // await page.waitForTimeout(60_000 * 20);
 
-  // // ========== First do a title edit, then Cancel ==============
-  // await doEditAndButtonClick(
-  //   page,
-  //   "tt-tune-editor-title",
-  //   "Cancel",
-  //   "Lakes of Sligo",
-  //   "Lakes of Sligo x",
-  //   "Lakes of Sligo",
-  // );
+    // // ========== First do a title edit, then Cancel ==============
+    // await doEditAndButtonClick(
+    //   page,
+    //   "tt-tune-editor-title",
+    //   "Cancel",
+    //   "Lakes of Sligo",
+    //   "Lakes of Sligo x",
+    //   "Lakes of Sligo",
+    // );
 
-  // // ========== Now do a title edit, then Save ==============
-  // await doEditAndButtonClick(
-  //   page,
-  //   "tt-tune-editor-title",
-  //   "Save",
-  //   "Lakes of Sligo",
-  //   "Lakes of Sligo x",
-  // );
+    // // ========== Now do a title edit, then Save ==============
+    // await doEditAndButtonClick(
+    //   page,
+    //   "tt-tune-editor-title",
+    //   "Save",
+    //   "Lakes of Sligo",
+    //   "Lakes of Sligo x",
+    // );
+    await page.waitForTimeout(100);
+    console.log("===> test-edit-1.spec.ts:182 ~ ");
+  });
 });

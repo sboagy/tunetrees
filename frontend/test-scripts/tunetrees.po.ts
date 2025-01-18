@@ -16,13 +16,12 @@ export class TuneTreesPageObject {
   readonly mainTabGroup;
   readonly practiceTabTrigger;
   readonly practiceTab;
+  readonly rowLocator;
+  readonly tunesGrid;
+  readonly tunesGridRows;
 
   constructor(page: Page) {
     this.page = page;
-    page.on("pageerror", (exception) => {
-      console.error(`Uncaught exception: "${exception}"`);
-      throw exception;
-    });
 
     // ==== initialize locators ====
     this.currentTuneTitle = page.getByTestId("current-tune-title");
@@ -53,7 +52,16 @@ export class TuneTreesPageObject {
       .filter({
         hasText: "Submit Practiced Tunes",
       });
+    this.rowLocator = page.getByRole("row");
+
+    this.tunesGrid = page.getByTestId("tunes-grid");
+    this.tunesGridRows = this.tunesGrid.locator("tr");
   }
+
+  onError = (exception: Error): void => {
+    console.error(`Uncaught exception: "${exception.message}"`);
+    throw exception;
+  };
 
   async gotoMainPage() {
     await checkHealth();
@@ -62,6 +70,7 @@ export class TuneTreesPageObject {
       timeout: initialPageLoadTimeout,
       waitUntil: "networkidle",
     });
+    this.page.on("pageerror", this.onError);
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForSelector("body");
   }
