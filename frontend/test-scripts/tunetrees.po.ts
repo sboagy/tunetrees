@@ -87,7 +87,9 @@ export class TuneTreesPageObject {
     await this.filterInput.click();
 
     await this.filterInput.fill(tuneTitle);
-    await this.page.getByRole("row", { name: tuneTitle }).click();
+    const tuneRow = this.page.getByRole("row").nth(1);
+    await tuneRow.click();
+    // await this.page.getByRole("row", { name: tuneTitle }).click();
   }
 
   async navigateToRepertoireTab() {
