@@ -1,11 +1,12 @@
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
-import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
-import { type Page, expect, test } from "@playwright/test";
+import { TuneEditorPageObject } from "@/test-scripts/tune-editor.po";
+import { expect, test } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
+  trace: "on",
 });
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -22,59 +23,27 @@ test.afterEach(async ({ page }) => {
 });
 
 async function doEditAndButtonClick(
-  page: Page,
+  ttPO: TuneEditorPageObject,
   formFieldTestId: string,
   buttonName: string,
   originalText: string,
   modifiedText: string,
   expectedText: string | null = null,
 ) {
-  const tuneEditLocatorButton = page.getByTestId("tt-sidebar-edit-tune");
-  await expect(tuneEditLocatorButton).toBeAttached();
-  await expect(tuneEditLocatorButton).toBeVisible();
-  await expect(tuneEditLocatorButton).toBeEnabled();
-
-  await tuneEditLocatorButton.click();
-
-  // const titleFormFieldLocator = page.getByTestId("tt-tune-editor-title");
-  // const titleFormFieldLocator = page.getByLabel("Title:");
-  const formFieldLocator = page
-    .getByTestId("tt-tune-editor-form")
-    .getByTestId(formFieldTestId);
-  await expect(formFieldLocator).toBeAttached({ timeout: 5000 });
-  await expect(formFieldLocator).toBeVisible({ timeout: 5000 });
-
-  const formFieldTextBox = formFieldLocator.getByRole("textbox");
-  await expect(formFieldTextBox).toBeVisible({ timeout: 5000 });
-  await expect(formFieldTextBox).toBeEnabled({ timeout: 5000 });
-
-  const formFieldText4 = await formFieldTextBox.inputValue();
-  console.log("===> test-edit-1.spec.ts:57 ~ formFieldText3", formFieldText4);
-
+  const formFieldTextBox = await ttPO.navigateToFormField(formFieldTestId);
   await expect(formFieldTextBox).toHaveValue(originalText, {
     timeout: 5000,
   });
-  await expect(formFieldTextBox).toBeEditable({ timeout: 5000 });
-  await formFieldTextBox.click();
   await formFieldTextBox.fill(modifiedText);
 
-  // Save
-  const responsePromise = page.waitForResponse(
-    (response) =>
-      response.url() === "https://localhost:3000/home" &&
-      response.status() === 200 &&
-      response.request().method() === "POST",
-  );
-  await page.getByRole("button", { name: buttonName }).click();
-  await responsePromise;
+  await ttPO.pressButton(buttonName);
 
   // Wait for the response to the POST request, which will hopefully
   // be the first response after the Save button is clicked?
-  const currentTuneTitleLocator = page.locator("#current-tune-title");
-  const tuneTitle2 = await currentTuneTitleLocator.textContent();
+  const tuneTitle2 = await ttPO.currentTuneTitle.textContent();
   console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
   const expectedText2 = expectedText ?? modifiedText;
-  await expect(currentTuneTitleLocator).toHaveText(expectedText2, {
+  await expect(ttPO.currentTuneTitle).toHaveText(expectedText2, {
     timeout: 5_000 * 100,
   });
 }
@@ -120,13 +89,13 @@ async function doEditAndButtonClick(
 
 test.describe.serial("Tune Edit Tests", () => {
   test("test-edit-1", async ({ page }) => {
-    const ttPO = new TuneTreesPageObject(page);
+    const ttPO = new TuneEditorPageObject(page);
 
     await ttPO.navigateToTune("Lakes of Sligo");
 
     // ========== First do a title edit, then Cancel ==============
     await doEditAndButtonClick(
-      page,
+      ttPO,
       "tt-tune-editor-title",
       "Cancel",
       "Lakes of Sligo",
@@ -136,7 +105,7 @@ test.describe.serial("Tune Edit Tests", () => {
 
     // ========== Now do a title edit, then Save ==============
     await doEditAndButtonClick(
-      page,
+      ttPO,
       "tt-tune-editor-title",
       "Save",
       "Lakes of Sligo",
@@ -153,7 +122,7 @@ test.describe.serial("Tune Edit Tests", () => {
   });
 
   test("test-edit-2", async ({ page }) => {
-    const ttPO = new TuneTreesPageObject(page);
+    const ttPO = new TuneEditorPageObject(page);
 
     await ttPO.navigateToTune("Boyne Hunt");
 
