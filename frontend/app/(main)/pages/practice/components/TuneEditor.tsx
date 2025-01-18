@@ -459,7 +459,7 @@ export default function TuneEditor({
                   <div className="items-center my-4 tune-form-item-style w-3/5">
                     <hr className="flex-grow border-t border-gray-300" />
                     <span className="px-4 text-gray-500">
-                      User Specific Data
+                      User/Repertoire Specific Data
                     </span>
                     <hr className="flex-grow border-t border-gray-300" />
                   </div>
