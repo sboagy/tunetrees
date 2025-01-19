@@ -94,6 +94,7 @@ test.describe.serial("Tune Edit Tests", () => {
     await ttPO.navigateToTune("Lakes of Sligo");
 
     // ========== First do a title edit, then Cancel ==============
+    await ttPO.openTuneEditorForCurrentTune();
     await doEditAndButtonClick(
       ttPO,
       "tt-tune-editor-title",
@@ -104,6 +105,7 @@ test.describe.serial("Tune Edit Tests", () => {
     );
 
     // ========== Now do a title edit, then Save ==============
+    await ttPO.openTuneEditorForCurrentTune();
     await doEditAndButtonClick(
       ttPO,
       "tt-tune-editor-title",
@@ -126,6 +128,10 @@ test.describe.serial("Tune Edit Tests", () => {
 
     await ttPO.navigateToTune("Boyne Hunt");
 
+    await ttPO.openTuneEditorForCurrentTune();
+
+    await page.pause();
+
     // await page.waitForTimeout(60_000 * 20);
 
     // // ========== First do a title edit, then Cancel ==============
@@ -146,6 +152,9 @@ test.describe.serial("Tune Edit Tests", () => {
     //   "Lakes of Sligo",
     //   "Lakes of Sligo x",
     // );
+
+    await ttPO.pressCancel();
+
     await page.waitForTimeout(100);
     console.log("===> test-edit-1.spec.ts:182 ~ ");
   });

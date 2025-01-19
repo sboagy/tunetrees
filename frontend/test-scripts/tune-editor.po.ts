@@ -4,22 +4,36 @@ import { TuneTreesPageObject } from "./tunetrees.po";
 export class TuneEditorPageObject extends TuneTreesPageObject {
   readonly tuneEditSidebarButton;
   readonly ttTuneEditorForm;
+  readonly tuneEditorIDTitle;
 
   constructor(page: Page) {
     super(page);
 
     this.tuneEditSidebarButton = page.getByTestId("tt-sidebar-edit-tune");
     this.ttTuneEditorForm = this.page.getByTestId("tt-tune-editor-form");
+    this.tuneEditorIDTitle = this.page.getByRole("heading", { name: "Tune #" });
+  }
+
+  async openTuneEditorForCurrentTune(): Promise<void> {
+    await this.tuneEditSidebarButton.waitFor({
+      state: "attached",
+      timeout: 60000,
+    });
+    await this.tuneEditSidebarButton.waitFor({
+      state: "visible",
+      timeout: 60000,
+    });
+    await this.tuneEditSidebarButton.isEnabled();
+
+    await this.tuneEditSidebarButton.click();
+    await this.ttTuneEditorForm.waitFor({ state: "visible" });
+    await this.tuneEditorIDTitle.waitFor({ state: "visible" });
+
+    console.log("===> tune-editor.po.ts:32 ~ ");
   }
 
   async navigateToFormField(formFieldTestId: string): Promise<Locator> {
     console.log("===> tune-editor.po.ts:17 ~ ");
-
-    await this.tuneEditSidebarButton.waitFor({ state: "attached" });
-    await this.tuneEditSidebarButton.waitFor({ state: "visible" });
-    await this.tuneEditSidebarButton.isEnabled();
-
-    await this.tuneEditSidebarButton.click();
 
     // const titleFormFieldLocator = page.getByTestId("tt-tune-editor-title");
     // const titleFormFieldLocator = page.getByLabel("Title:");
