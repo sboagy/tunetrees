@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
-  trace: "on",
+  // trace: "on",
 });
 
 test.beforeEach(async ({ page }, testInfo) => {
