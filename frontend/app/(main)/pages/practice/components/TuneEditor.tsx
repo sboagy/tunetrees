@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Save, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -71,10 +72,10 @@ export default function TuneEditor({
   if (!tuneId) {
     return <div>Missing tune ID</div>;
   }
-  const origBoundingClientRect = mainElement.getBoundingClientRect();
-  const headerFooterHeight = window.innerHeight - origBoundingClientRect.height;
+  // const origBoundingClientRect = mainElement.getBoundingClientRect();
+  // const headerFooterHeight = window.innerHeight - origBoundingClientRect.height;
   // const buttonsHeightSortOf = headerFooterHeight / 2;
-  const [height, setHeight] = useState(origBoundingClientRect.height);
+  // const [height, setHeight] = useState(origBoundingClientRect.height);
   const { triggerRefresh } = useTuneDataRefresh();
   const { setCurrentView } = useMainPaneView();
 
@@ -84,30 +85,30 @@ export default function TuneEditor({
     return repertoireTunes.some((tune) => tune.id === tuneId);
   };
 
-  useEffect(() => {
-    // const mainElement = document.querySelector("#main-content");
+  // useEffect(() => {
+  //   // const mainElement = document.querySelector("#main-content");
 
-    const handleResize = () => {
-      if (mainElement) {
-        setHeight(window.innerHeight - headerFooterHeight);
-        // setHeight(mainElement.clientHeight);
-        // const rect = mainElement.getBoundingClientRect();
-        // setHeight(rect.height);
-      }
-    };
+  //   const handleResize = () => {
+  //     if (mainElement) {
+  //       setHeight(window.innerHeight - headerFooterHeight);
+  //       // setHeight(mainElement.clientHeight);
+  //       // const rect = mainElement.getBoundingClientRect();
+  //       // setHeight(rect.height);
+  //     }
+  //   };
 
-    if (mainElement) {
-      setHeight(window.innerHeight - headerFooterHeight);
-      // setHeight(mainElement.clientHeight);
-      // const rect = mainElement.getBoundingClientRect();
-      // setHeight(rect.height);
-    }
+  //   if (mainElement) {
+  //     setHeight(window.innerHeight - headerFooterHeight);
+  //     // setHeight(mainElement.clientHeight);
+  //     // const rect = mainElement.getBoundingClientRect();
+  //     // setHeight(rect.height);
+  //   }
 
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [headerFooterHeight, mainElement]);
+  //   window.addEventListener("resize", handleResize);
+  //   return () => {
+  //     window.removeEventListener("resize", handleResize);
+  //   };
+  // }, [headerFooterHeight, mainElement]);
 
   const [tune, setTune] = useState<ITuneOverview | null>(null);
 
@@ -314,22 +315,52 @@ export default function TuneEditor({
           void form.handleSubmit(onSubmit)(e);
         }}
         className="flex flex-col w-full space-y-4"
-        style={{ height: `${height}px`, overflowY: "unset" }}
+        // style={{ height: `${height}px`, overflowY: "unset" }}
         data-testid="tt-tune-editor-form"
       >
-        <h1 className="text-2xl font-bold mb-4">Tune #{tune.id}</h1>
+        <div className="flex items-center justify-between space-x-2 w-3/5">
+          <h1 className="text-2xl font-bold ml-4 mb-0">Tune #{tune.id}</h1>
+          <div className="flex space-x-2">
+            <Button
+              type="submit"
+              variant="ghost"
+              size="icon"
+              aria-label="Save edits"
+              className="p-0 h-auto cursor-pointer"
+              title="Save edits"
+              data-testid="tt-tune-editor-submit-button"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                handleCancel()
+                  .then(() => console.log("Cancelled"))
+                  .catch((error) => console.error("Error cancelling:", error));
+              }}
+              aria-label="Cancel edits"
+              className="p-0 h-auto cursor-pointer"
+              title="Cancel edits"
+              data-testid="tt-tune-editor-cancel-button"
+            >
+              <XCircle className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
         <div
           className="flex flex-col flex-grow"
-          style={{
-            height: `${height - headerFooterHeight}px`,
-            overflowY: "unset",
-          }}
+          // style={{
+          //   height: `${height - headerFooterHeight}px`,
+          //   overflowY: "unset",
+          // }}
         >
           <div
             className="flex-grow w-full rounded-md border p-4 overflow-y-scroll"
             style={{
-              minHeight: "calc(100vh - 400px)",
-              maxHeight: "calc(100vh - 400px)",
+              minHeight: "calc(100vh - 80px)",
+              maxHeight: "calc(100vh - 80px)",
             }}
           >
             <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
@@ -702,33 +733,6 @@ export default function TuneEditor({
                 </>
               )}
             </div>
-          </div>
-
-          {/* <hr className="my-4" /> */}
-
-          <div className="flex justify-center space-x-4 p-4 tune-form-item-style w-3/5 ">
-            <Button
-              onClick={() => {
-                handleCancel()
-                  .then(() => console.log("Cancelled"))
-                  .catch((error) => console.error("Error cancelling:", error));
-              }}
-              variant="outline"
-              data-testid="tt-tune-editor-cancel-button"
-              className="bg-gray-600"
-            >
-              Cancel
-            </Button>
-            <span className="w-32" />
-
-            <Button
-              type="submit"
-              data-testid="tt-tune-editor-submit-button"
-              variant="outline"
-              className="bg-gray-600"
-            >
-              Save
-            </Button>
           </div>
         </div>
       </form>
