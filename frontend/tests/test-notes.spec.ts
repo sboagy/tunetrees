@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
   trace: "retain-on-failure",
-  actionTimeout: 10_000,
+  // actionTimeout: 10_000,
 });
 
 test.beforeEach(async ({ page }, testInfo) => {

@@ -8,7 +8,7 @@ test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
   trace: "retain-on-failure",
   // trace: "on",
-  actionTimeout: 10_000,
+  // actionTimeout: 10_000,
   viewport: { width: 1728 - 50, height: 1117 - 200 },
 });
 
