@@ -57,7 +57,7 @@ t_practice_list_joined = Table(
     Column("deleted", Boolean),
     Column("learned", Text),
     Column("practiced", Text),
-    Column("quality", Text),
+    Column("quality", Integer),
     Column("easiness", Float),
     Column("interval", Integer),
     Column("repetitions", Integer),
@@ -88,7 +88,7 @@ t_practice_list_staged = Table(
     Column("instrument", Text),
     Column("playlist_deleted", Boolean),
     Column("practiced", Text),
-    Column("quality", Text),
+    Column("quality", Integer),
     Column("easiness", Float),
     Column("interval", Integer),
     Column("repetitions", Integer),
@@ -341,7 +341,7 @@ class PracticeRecord(Base):
     playlist_ref = mapped_column(ForeignKey("playlist.playlist_id"))
     tune_ref = mapped_column(ForeignKey("tune.id"))
     practiced = mapped_column(Text)
-    quality = mapped_column(Text)
+    quality = mapped_column(Integer)
     easiness = mapped_column(Float)
     interval = mapped_column(Integer)
     repetitions = mapped_column(Integer)
