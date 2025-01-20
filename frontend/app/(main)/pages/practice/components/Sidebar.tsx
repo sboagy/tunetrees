@@ -55,6 +55,8 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
     setCurrentView("edit");
   };
 
+  const { currentView } = useMainPaneView();
+
   return currentTune && currentTune > 0 ? (
     <div className="flex flex-col h-full">
       <div className="sidebar flex-grow overflow-y-auto">
@@ -73,6 +75,7 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
             className="p-0 h-auto"
             title="Edit"
             data-testid="tt-sidebar-edit-tune"
+            disabled={currentView === "edit"}
             onClick={() => {
               console.log("Edit button clicked");
               handleTuneEditClick(currentTune);

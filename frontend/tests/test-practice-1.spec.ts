@@ -1,8 +1,8 @@
 import { restartBackend } from "@/test-scripts/global-setup";
-import { navigateToPracticeTab } from "@/test-scripts/navigate-tabs";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { screenShotDir } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { type Locator, type Page, expect, test } from "@playwright/test";
 import path from "node:path";
 
@@ -69,16 +69,9 @@ async function setReviewEval(page: Page, tuneId: number, evalType: string) {
 
 test.describe.serial("Practice Tests", () => {
   test("test-practice-1-1", async ({ page }) => {
-    /**
-     * Perform the following actions:
-     * - Checks the health of necessary servers.
-     * - Uses TT_REVIEW_SITDOWN_DATE env var as a reference date.
-     * - Navigates to the Practice tab within the application.
-     * - Validates specific cell IDs to ensure data integrity.
-     * - Verifies the number of rows in the tunes grid.
-     * - Logs significant steps and outcomes throughout the test execution.
-     **/
-    await navigateToPracticeTab(page);
+    const ttPO = new TuneTreesPageObject(page);
+
+    await ttPO.navigateToPracticeTab();
 
     await checkForCellId(page, 1081);
     await checkForCellId(page, 1820);
@@ -95,7 +88,9 @@ test.describe.serial("Practice Tests", () => {
   });
 
   test("test-practice-1-2", async ({ page }) => {
-    await navigateToPracticeTab(page);
+    const ttPO = new TuneTreesPageObject(page);
+
+    await ttPO.navigateToPracticeTab();
 
     console.log("===> test-practice-1.ts:77 ~ ");
     await setReviewEval(page, 1081, "struggled");
@@ -122,12 +117,11 @@ test.describe.serial("Practice Tests", () => {
     page.on("response", (data) => {
       console.log("===> test-practice-1.ts:108 ~ data", data);
     });
-    const tunesGrid = page.getByTestId("tunes-grid");
-    const tunesGridRows = tunesGrid.locator("tr");
-    const rowCount = await tunesGridRows.count();
+
+    const rowCount = await ttPO.tunesGridRows.count();
     console.log(`Number of rows: ${rowCount}`);
     // Make a very long timeout to allow for the server to respond.
-    await expect(tunesGridRows).toHaveCount(3, { timeout: 60000 });
+    await expect(ttPO.tunesGridRows).toHaveCount(3, { timeout: 60000 });
 
     await checkForCellId(page, 1820);
     await checkForCellId(page, 2451);
@@ -138,7 +132,9 @@ test.describe.serial("Practice Tests", () => {
      * This just repeats the first test to ensure that the server was restarted properly,
      * and that the test can run multiple times without issue.
      **/
-    await navigateToPracticeTab(page);
+    const ttPO = new TuneTreesPageObject(page);
+
+    await ttPO.navigateToPracticeTab();
 
     await checkForCellId(page, 1081);
     await checkForCellId(page, 1820);

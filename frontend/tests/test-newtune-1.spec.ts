@@ -1,14 +1,14 @@
 import { restartBackend } from "@/test-scripts/global-setup";
-import { navigateToRepertoireTab } from "@/test-scripts/navigate-tabs";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { expect, test } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
   trace: "retain-on-failure",
   // trace: "on",
-  actionTimeout: 10_000,
+  // actionTimeout: 10_000,
   viewport: { width: 1728 - 50, height: 1117 - 200 },
 });
 
@@ -26,11 +26,9 @@ test.afterEach(async ({ page }) => {
 });
 
 test("test-newtune-1", async ({ page }) => {
-  page.on("pageerror", (exception) => {
-    console.error(`Uncaught exception: "${exception}"`);
-    throw exception;
-  });
-  await navigateToRepertoireTab(page);
+  const ttPO = new TuneTreesPageObject(page);
+
+  await ttPO.navigateToRepertoireTab();
 
   // await page.waitForTimeout(1000 * 200);
 

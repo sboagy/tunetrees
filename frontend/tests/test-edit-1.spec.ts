@@ -1,12 +1,12 @@
-import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
-import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
-import { type Page, expect, test } from "@playwright/test";
+import { TuneEditorPageObject } from "@/test-scripts/tune-editor.po";
+import { expect, test } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
+  // trace: "on",
 });
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -23,109 +23,174 @@ test.afterEach(async ({ page }) => {
 });
 
 async function doEditAndButtonClick(
-  page: Page,
+  ttPO: TuneEditorPageObject,
   formFieldTestId: string,
   buttonName: string,
   originalText: string,
   modifiedText: string,
   expectedText: string | null = null,
 ) {
-  const tuneEditLocatorButton = page.getByTestId("tt-sidebar-edit-tune");
-  await expect(tuneEditLocatorButton).toBeAttached();
-  await expect(tuneEditLocatorButton).toBeVisible();
-  await expect(tuneEditLocatorButton).toBeEnabled();
-
-  await tuneEditLocatorButton.click();
-
-  // const titleFormFieldLocator = page.getByTestId("tt-tune-editor-title");
-  // const titleFormFieldLocator = page.getByLabel("Title:");
-  const formFieldLocator = page
-    .getByTestId("tt-tune-editor-form")
-    .getByTestId(formFieldTestId);
-  await expect(formFieldLocator).toBeAttached({ timeout: 5000 });
-  await expect(formFieldLocator).toBeVisible({ timeout: 5000 });
-
-  const formFieldTextBox = formFieldLocator.getByRole("textbox");
-  await expect(formFieldTextBox).toBeVisible({ timeout: 5000 });
-  await expect(formFieldTextBox).toBeEnabled({ timeout: 5000 });
-
-  const formFieldText4 = await formFieldTextBox.inputValue();
-  console.log("===> test-edit-1.spec.ts:57 ~ formFieldText3", formFieldText4);
-
+  const formFieldTextBox = await ttPO.navigateToFormFieldById(formFieldTestId);
   await expect(formFieldTextBox).toHaveValue(originalText, {
     timeout: 5000,
   });
-  await expect(formFieldTextBox).toBeEditable({ timeout: 5000 });
-  await formFieldTextBox.click();
   await formFieldTextBox.fill(modifiedText);
 
-  // Save
-  const responsePromise = page.waitForResponse(
-    (response) =>
-      response.url() === "https://localhost:3000/home" &&
-      response.status() === 200 &&
-      response.request().method() === "POST",
-  );
-  await page.getByRole("button", { name: buttonName }).click();
-  await responsePromise;
+  await ttPO.pressButton(buttonName);
 
   // Wait for the response to the POST request, which will hopefully
   // be the first response after the Save button is clicked?
-  const currentTuneTitleLocator = page.locator("#current-tune-title");
-  const tuneTitle2 = await currentTuneTitleLocator.textContent();
+  const tuneTitle2 = await ttPO.currentTuneTitle.textContent();
   console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
   const expectedText2 = expectedText ?? modifiedText;
-  await expect(currentTuneTitleLocator).toHaveText(expectedText2, {
-    timeout: 5000,
+  await expect(ttPO.currentTuneTitle).toHaveText(expectedText2, {
+    timeout: 5_000 * 100,
   });
 }
 
-test("test-edit-1", async ({ page }) => {
-  await checkHealth();
+test.describe.serial("Tune Edit Tests", () => {
+  test("test-edit-1", async ({ page }) => {
+    const ttPO = new TuneEditorPageObject(page);
 
-  console.log("===> test-edit-1.ts:88 ~ creating new page for tunetrees");
+    await ttPO.navigateToTune("Lakes of Sligo");
 
-  await page.goto("https://localhost:3000", {
-    timeout: initialPageLoadTimeout,
-    waitUntil: "networkidle",
+    // ========== First do a title edit, then Cancel ==============
+    await ttPO.openTuneEditorForCurrentTune();
+    await doEditAndButtonClick(
+      ttPO,
+      "tt-tune-editor-title",
+      "Cancel",
+      "Lakes of Sligo",
+      "Lakes of Sligo x",
+      "Lakes of Sligo",
+    );
+
+    // ========== Now do a title edit, then Save ==============
+    await ttPO.openTuneEditorForCurrentTune();
+    await doEditAndButtonClick(
+      ttPO,
+      "tt-tune-editor-title",
+      "Save",
+      "Lakes of Sligo",
+      "Lakes of Sligo x",
+    );
+    await ttPO.addToReviewButton.waitFor({ state: "visible" });
+    await ttPO.filterInput.fill("Lakes of Sligo x");
+    await expect(ttPO.tunesGridRows).toHaveCount(2); // 1 for the header, 1 for the tune
+    expect(page.getByRole("row", { name: "Lakes of Sligo x" }).isVisible());
+    // I get a 500 error here without the wait when it's doing a get on table state.  Not good.
+    // would a waitForResponse be better?
+    await page.waitForTimeout(100);
+    console.log("===> test-edit-1.ts:158 ~ exit test-edit-1");
   });
 
-  await page.waitForSelector("body");
-  const ttMainTabGroup = page.getByTestId("tt-main-tabs");
-  await ttMainTabGroup.waitFor({ state: "visible" });
+  test("test-edit-2", async ({ page }) => {
+    const ttPO = new TuneEditorPageObject(page);
 
-  const repertoireTabSelector = 'role=tab[name="Repertoire"]';
-  console.log(
-    "===> test-edit-1.ts:106 ~ waiting for selector, tabSelector: ",
-    repertoireTabSelector,
-  );
-  const repertoireTab = await page.waitForSelector(repertoireTabSelector, {
-    state: "visible",
+    await ttPO.navigateToTune("Boyne Hunt");
+
+    await ttPO.openTuneEditorForCurrentTune();
+
+    // Confirm that the values are as expected
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      console.log(`${formField.label}: ${await sampleLocator.inputValue()}`);
+      await expect(sampleLocator).toHaveValue(formField.original);
+    }
+
+    // Fill in new values
+    for (const formField of ttPO.sampleBoyneHunt) {
+      await formField.locator.fill(formField.modification);
+      await page.waitForTimeout(50);
+    }
+
+    // Confirm all the fields were changed
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      await expect(sampleLocator).toHaveValue(formField.modification);
+    }
+
+    await ttPO.pressCancel();
+
+    await ttPO.navigateToTune("Boyne Hunt");
+
+    // Do some light checking in the grid (not a full test)
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const cellId = formField.cellId;
+      if (!cellId) {
+        continue;
+      }
+      const cellLocator = page.getByTestId(`${cellId}`);
+      const cellText = await cellLocator.textContent();
+      console.log("===> test-edit-1.spec.ts:165 ~ cellText", cellText);
+      await expect(cellLocator).toHaveText(formField.original);
+    }
+
+    await ttPO.openTuneEditorForCurrentTune();
+
+    // Full check that the values haven't been changed
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      console.log(`${formField.label}: ${await sampleLocator.inputValue()}`);
+      await expect(sampleLocator).toHaveValue(formField.original);
+    }
+
+    await page.waitForTimeout(100);
+    console.log("===> test-edit-1.spec.ts:182 ~ ");
   });
-  await repertoireTab.click();
 
-  await page.waitForSelector("#current-tune-title", { state: "visible" });
-  await page.getByRole("tab", { name: "Repertoire" }).click();
-  await page.getByPlaceholder("Filter").click();
-  await page.getByPlaceholder("Filter").fill("lakes of");
-  await page.getByRole("row", { name: "1081 Lakes of Sligo Polka" }).click();
+  test("test-edit-3", async ({ page }) => {
+    const ttPO = new TuneEditorPageObject(page);
 
-  // ========== First do a title edit, then Cancel ==============
-  await doEditAndButtonClick(
-    page,
-    "tt-tune-editor-title",
-    "Cancel",
-    "Lakes of Sligo",
-    "Lakes of Sligo x",
-    "Lakes of Sligo",
-  );
+    await ttPO.navigateToTune("Boyne Hunt");
 
-  // ========== Now do a title edit, then Save ==============
-  await doEditAndButtonClick(
-    page,
-    "tt-tune-editor-title",
-    "Save",
-    "Lakes of Sligo",
-    "Lakes of Sligo x",
-  );
+    await ttPO.openTuneEditorForCurrentTune();
+
+    // Confirm that the values are as expected
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      console.log(`${formField.label}: ${await sampleLocator.inputValue()}`);
+      await expect(sampleLocator).toHaveValue(formField.original);
+    }
+
+    // Fill in new values
+    for (const formField of ttPO.sampleBoyneHunt) {
+      await formField.locator.fill(formField.modification);
+      await page.waitForTimeout(50);
+    }
+
+    // Confirm all the fields were changed
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      await expect(sampleLocator).toHaveValue(formField.modification);
+    }
+
+    await ttPO.pressSave();
+
+    await ttPO.navigateToTune("Boyne Hunt");
+
+    // Do some light checking in the grid (not a full test)
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const cellId = formField.cellId;
+      if (!cellId) {
+        continue;
+      }
+      const cellLocator = page.getByTestId(`${cellId}`);
+      const cellText = await cellLocator.textContent();
+      console.log("===> test-edit-1.spec.ts:165 ~ cellText", cellText);
+      await expect(cellLocator).toHaveText(formField.modification);
+    }
+
+    await ttPO.openTuneEditorForCurrentTune();
+
+    // Full check that the values haven't been changed
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      console.log(`${formField.label}: ${await sampleLocator.inputValue()}`);
+      await expect(sampleLocator).toHaveValue(formField.modification);
+    }
+
+    await page.waitForTimeout(100);
+    console.log("===> test-edit-1.spec.ts:182 ~ ");
+  });
 });

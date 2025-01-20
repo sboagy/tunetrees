@@ -117,6 +117,23 @@ export interface ITuneOverview extends ITune {
   playlist_deleted?: boolean | null;
 }
 
+export interface IPracticeRecord {
+  id: number;
+  playlist_ref?: number;
+  tune_ref?: number;
+  practiced?: string;
+  quality?: number;
+  easiness?: number;
+  interval?: number;
+  repetitions?: number;
+  review_date?: string;
+  backup_practiced?: string;
+  stability?: number;
+  elapsed_days?: number;
+  lapses?: number;
+  state?: number;
+}
+
 export interface ITuneOverviewScheduled extends ITuneOverview {
   recall_eval?: string | null;
 }

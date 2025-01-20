@@ -415,7 +415,7 @@ class PracticeRecordModel(BaseModel):
     playlist_ref: Optional[int]
     tune_ref: Optional[int]
     practiced: Optional[str]
-    quality: Optional[str]
+    quality: Optional[int]
     id: int
     easiness: Optional[float]
     interval: Optional[int]
@@ -436,7 +436,7 @@ class PracticeRecordModelPartial(BaseModel):
     playlist_ref: Optional[int] = None
     tune_ref: Optional[int] = None
     practiced: Optional[str] = None
-    quality: Optional[str] = None
+    quality: Optional[int] = None
     id: Optional[int] = None
     easiness: Optional[float] = None
     interval: Optional[int] = None
@@ -614,7 +614,7 @@ class PracticeListStagedModel(BaseModel):
     instrument: Optional[str] = None
     playlist_deleted: Optional[bool] = None
     practiced: Optional[str] = None
-    quality: Optional[str] = None
+    quality: Optional[int] = None
     easiness: Optional[float] = None
     interval: Optional[int] = None
     repetitions: Optional[int] = None

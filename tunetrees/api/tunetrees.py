@@ -40,6 +40,7 @@ from tunetrees.models.tunetrees import (
     Note,
     Playlist,
     PlaylistTune,
+    PracticeRecord,
     Reference,
     Tune,
     t_practice_list_joined,
@@ -62,6 +63,8 @@ from tunetrees.models.tunetrees_pydantic import (
     PlaylistTuneModel,
     PlaylistTuneModelPartial,
     PracticeListStagedModel,
+    PracticeRecordModel,
+    PracticeRecordModelPartial,
     ReferenceModel,
     ReferenceModelCreate,
     ReferenceModelPartial,
@@ -1349,3 +1352,122 @@ async def get_view_playlist_joined(
         raise HTTPException(
             status_code=500, detail=f"Unable to fetch view playlist joined: {e}"
         )
+
+
+@router.get(
+    "/practice_record/{playlist_ref}/{tune_ref}",
+    response_model=PracticeRecordModel,
+    summary="Get a single practice record",
+    description="Retrieve a single practice record by playlist_ref and tune_ref",
+    status_code=200,
+)
+def get_practice_record(playlist_ref: int, tune_ref: int):
+    try:
+        with SessionLocal() as db:
+            record = (
+                db.query(PracticeRecord)
+                .filter(
+                    PracticeRecord.playlist_ref == playlist_ref,
+                    PracticeRecord.tune_ref == tune_ref,
+                )
+                .first()
+            )
+            if not record:
+                raise HTTPException(status_code=404, detail="Practice record not found")
+            return PracticeRecordModel.model_dump(record)
+    except HTTPException as e:
+        logger.error("HTTPException in get_practice_record: %s", e)
+        raise e
+    except Exception as e:
+        logger.error(f"Unexpected error in get_practice_record: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+@router.post(
+    "/practice_record",
+    response_model=PracticeRecordModel,
+    summary="Create a practice record",
+    description="Create a new practice record (playlist_ref and tune_ref in the body)",
+    status_code=201,
+)
+def create_practice_record(record: PracticeRecordModelPartial):
+    try:
+        with SessionLocal() as db:
+            db_record = PracticeRecord(**record.model_dump(exclude_unset=True))
+            db.add(db_record)
+            db.commit()
+            db.refresh(db_record)
+            return PracticeRecordModel.model_dump(db_record)
+    except HTTPException as e:
+        logger.error("HTTPException in create_practice_record: %s", e)
+        raise e
+    except Exception as e:
+        logger.error("Unexpected error in create_practice_record: %s", e)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+@router.patch(
+    "/practice_record/{playlist_ref}/{tune_ref}",
+    response_model=PracticeRecordModel,
+    summary="Update a practice record",
+    description="Update an existing practice record by playlist_ref and tune_ref",
+    status_code=200,
+)
+def update_practice_record_patch(
+    playlist_ref: int, tune_ref: int, record: PracticeRecordModelPartial
+):
+    try:
+        with SessionLocal() as db:
+            db_record = (
+                db.query(PracticeRecord)
+                .filter(
+                    PracticeRecord.playlist_ref == playlist_ref,
+                    PracticeRecord.tune_ref == tune_ref,
+                )
+                .first()
+            )
+            if not db_record:
+                raise HTTPException(status_code=404, detail="Practice record not found")
+            update_data = record.model_dump(exclude_unset=True)
+            for key, value in update_data.items():
+                setattr(db_record, key, value)
+            db.commit()
+            db.refresh(db_record)
+            result = PracticeRecordModel.model_validate(db_record)
+            return result
+    except HTTPException as e:
+        logger.error("HTTPException in update_practice_record: %s", e)
+        raise e
+    except Exception as e:
+        logger.error("Unexpected error in update_practice_record: %s", e)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+@router.delete(
+    "/practice_record/{playlist_ref}/{tune_ref}",
+    summary="Delete a practice record",
+    description="Delete an existing practice record by playlist_ref and tune_ref",
+    status_code=204,
+)
+def delete_practice_record(playlist_ref: int, tune_ref: int):
+    try:
+        with SessionLocal() as db:
+            db_record = (
+                db.query(PracticeRecord)
+                .filter(
+                    PracticeRecord.playlist_ref == playlist_ref,
+                    PracticeRecord.tune_ref == tune_ref,
+                )
+                .first()
+            )
+            if not db_record:
+                raise HTTPException(status_code=404, detail="Practice record not found")
+            db.delete(db_record)
+            db.commit()
+            return {"message": "Practice record deleted"}
+    except HTTPException as e:
+        logger.error("HTTPException in delete_practice_record: %s", e)
+        raise e
+    except Exception as e:
+        logger.error("Unexpected error in delete_practice_record: %s", e)
+        raise HTTPException(status_code=500, detail="Internal Server Error")

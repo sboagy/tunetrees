@@ -67,7 +67,7 @@
     "html-react-parser": "^5.2.2",
     "install": "^0.13.0",
     "jodit-react": "^4.1.2",
-    "lucide-react": "^0.471.1",
+    "lucide-react": "^0.473.0",
     "next": "^15.1.4",
     "next-auth": "^5.0.0-beta.25",
     "next-auth-http-adapter": "^0.3.0",

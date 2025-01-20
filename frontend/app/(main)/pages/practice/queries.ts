@@ -10,6 +10,7 @@ import type {
   INote,
   IPlaylist,
   IPlaylistTune,
+  IPracticeRecord,
   IReferenceData,
   ITTResponseInfo,
   ITune,
@@ -1109,4 +1110,47 @@ export async function createPlaylistJoined(
     console.error("Error in createPlaylist: ", error);
     return { detail: `Unable to create playlist: ${(error as Error).message}` };
   }
+}
+
+export async function getPracticeRecords(
+  tuneRef: number,
+  playlistRef: number,
+): Promise<IPracticeRecord> {
+  const res = await client.get<IPracticeRecord>(
+    `/practice_record/${playlistRef}/${tuneRef}`,
+  );
+  return res.data;
+}
+
+export async function createPracticeRecord(
+  tuneRef: number,
+  playlistRef: number,
+  record: Partial<IPracticeRecord>,
+): Promise<IPracticeRecord> {
+  const payload = {
+    tune_ref: tuneRef,
+    playlist_ref: playlistRef,
+    ...record,
+  };
+  const res = await client.post<IPracticeRecord>("/practice_record", payload);
+  return res.data;
+}
+
+export async function updatePracticeRecord(
+  tuneRef: number,
+  playlistRef: number,
+  record: Partial<IPracticeRecord>,
+): Promise<IPracticeRecord> {
+  const res = await client.patch<IPracticeRecord>(
+    `/practice_record/${playlistRef}/${tuneRef}`,
+    record,
+  );
+  return res.data;
+}
+
+export async function deletePracticeRecord(
+  tuneRef: number,
+  playlistRef: number,
+): Promise<void> {
+  await client.delete(`/practice_record/${playlistRef}/${tuneRef}`);
 }

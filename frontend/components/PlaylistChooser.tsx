@@ -1,6 +1,7 @@
 "use client";
 
 import { usePlaylist } from "@/app/(main)/pages/practice/components/CurrentPlaylistProvider";
+import { useMainPaneView } from "@/app/(main)/pages/practice/components/MainPaneViewContext";
 import { useTuneDataRefresh } from "@/app/(main)/pages/practice/components/TuneDataRefreshContext";
 import { fetchViewPlaylistJoined } from "@/app/(main)/pages/practice/queries";
 import {
@@ -120,12 +121,15 @@ export default function PlaylistChooser() {
     triggerRefresh();
   };
 
+  const { currentView } = useMainPaneView();
+
   return (
     <div className="flex items-center space-x-2">
       <DropdownMenu>
         <DropdownMenuTrigger
           className={`${styles.headerMenuTrigger}`}
           title={currentPlaylistDescription}
+          disabled={currentView === "edit"}
           asChild
         >
           <Button
