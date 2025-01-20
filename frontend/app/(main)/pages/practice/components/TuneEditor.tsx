@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ScrollArea } from "@radix-ui/themes";
 import { Save, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -40,7 +41,7 @@ const formSchema = z.object({
   genre: z.string().nullable().optional(),
   learned: z.string().nullable().optional(), // playlist_tune.learned
   practiced: z.string().nullable().optional(), // practice_record.practiced
-  quality: z.number().nullable().optional(), // practice_record.quality
+  quality: z.number().int().nullable().optional(), // practice_record.quality
   easiness: z.number().nullable().optional(), // practice_record.easiness
   interval: z.number().nullable().optional(), // practice_record.interval
   repetitions: z.number().nullable().optional(), // practice_record.repetitions
@@ -199,7 +200,7 @@ export default function TuneEditor({
   ): Promise<boolean> {
     const practiceRecord: Partial<IPracticeRecord> = {
       practiced: data.practiced ?? "",
-      quality: `${data.quality ?? ""}`,
+      quality: data.quality ?? 0,
       easiness: data.easiness ?? 0,
       interval: data.interval ?? 0,
       repetitions: data.repetitions ?? 0,
@@ -220,7 +221,7 @@ export default function TuneEditor({
         tune_ref: tuneId,
         playlist_ref: playlistId,
         practiced: data.practiced ?? "",
-        quality: `${data.quality ?? ""}`,
+        quality: data.quality ?? 0,
         easiness: data.easiness ?? 0,
         interval: data.interval ?? 0,
         repetitions: data.repetitions ?? 0,
@@ -308,62 +309,65 @@ export default function TuneEditor({
   }
 
   return (
-    <Form {...form}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void form.handleSubmit(onSubmit)(e);
-        }}
-        className="flex flex-col w-full space-y-4"
-        // style={{ height: `${height}px`, overflowY: "unset" }}
-        data-testid="tt-tune-editor-form"
-      >
-        <div className="flex items-center justify-between space-x-2 w-3/5">
-          <h1 className="text-2xl font-bold ml-4 mb-0">Tune #{tune.id}</h1>
-          <div className="flex space-x-2">
-            <Button
-              type="submit"
-              variant="ghost"
-              size="icon"
-              aria-label="Save edits"
-              className="p-0 h-auto cursor-pointer"
-              title="Save edits"
-              data-testid="tt-tune-editor-submit-button"
-            >
-              <Save className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                handleCancel()
-                  .then(() => console.log("Cancelled"))
-                  .catch((error) => console.error("Error cancelling:", error));
-              }}
-              aria-label="Cancel edits"
-              className="p-0 h-auto cursor-pointer"
-              title="Cancel edits"
-              data-testid="tt-tune-editor-cancel-button"
-            >
-              <XCircle className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        <div
-          className="flex flex-col flex-grow"
-          // style={{
-          //   height: `${height - headerFooterHeight}px`,
-          //   overflowY: "unset",
-          // }}
-        >
-          <div
-            className="flex-grow w-full rounded-md border p-4 overflow-y-scroll"
-            style={{
-              minHeight: "calc(100vh - 80px)",
-              maxHeight: "calc(100vh - 80px)",
+    <div className="flex flex-col w-full h-full">
+      <div className="flex items-center justify-between space-x-2 w-3/5">
+        <h1 className="text-2xl font-bold ml-4 mb-0">Tune #{tune.id}</h1>
+        <div className="flex space-x-2">
+          <Button
+            type="submit"
+            variant="ghost"
+            size="icon"
+            aria-label="Save edits"
+            className="p-0 h-auto cursor-pointer"
+            title="Save edits"
+            onClick={() => {
+              const formElement = document.querySelector(
+                '[data-testid="tt-tune-editor-form"]',
+              ) as HTMLFormElement;
+              if (formElement) {
+                formElement.requestSubmit();
+              }
             }}
+            data-testid="tt-tune-editor-submit-button"
           >
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
+            <Save className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              handleCancel()
+                .then(() => console.log("Cancelled"))
+                .catch((error) => console.error("Error cancelling:", error));
+            }}
+            aria-label="Cancel edits"
+            className="p-0 h-auto cursor-pointer"
+            title="Cancel edits"
+            data-testid="tt-tune-editor-cancel-button"
+          >
+            <XCircle className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <ScrollArea
+        className="flex-grow w-full rounded-md border p-4"
+        // style={{
+        //   minHeight: "calc(100vh - 80px)",
+        //   maxHeight: "calc(100vh - 80px)",
+        // }}
+        aria-label="Tune Editor scrollable region"
+      >
+        <Form {...form}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void form.handleSubmit(onSubmit)(e);
+            }}
+            className="flex flex-col w-full space-y-4"
+            // style={{ height: `${height}px`, overflowY: "unset" }}
+            data-testid="tt-tune-editor-form"
+          >
+            <div className="flex flex-col gap-2">
               <div className="items-center my-0 tune-form-item-style w-3/5">
                 <hr className="flex-grow border-t border-gray-300" />
                 <span className="px-4 text-gray-500">Core Tune Data</span>
@@ -371,7 +375,7 @@ export default function TuneEditor({
               </div>
               <div className="items-center my-2 w-3/5 text-gray-500 italic">
                 At this time, edits to the core tune data will be shared with
-                all users, so please take care. It is intended that future
+                all users, so please take care. The intention is that future
                 versions of TuneTrees will allow for user-specific staging,
                 which could be maintained for just the user, or a admin request
                 for review and merge could be posted.
@@ -403,9 +407,11 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="type"
-                data-testid="tt-tune-editor-type"
                 render={({ field }) => (
-                  <FormItem className="tune-form-item-style">
+                  <FormItem
+                    className="tune-form-item-style"
+                    data-testid="tt-tune-editor-type"
+                  >
                     <FormLabel className="tune-form-label-style">
                       Type:{" "}
                     </FormLabel>
@@ -420,9 +426,11 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="structure"
-                data-testid="tt-tune-editor-structure"
                 render={({ field }) => (
-                  <FormItem className="tune-form-item-style">
+                  <FormItem
+                    className="tune-form-item-style"
+                    data-testid="tt-tune-editor-structure"
+                  >
                     <FormLabel className="tune-form-label-style">
                       Structure:{" "}
                     </FormLabel>
@@ -437,9 +445,11 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="mode"
-                data-testid="tt-tune-editor-mode"
                 render={({ field }) => (
-                  <FormItem className="tune-form-item-style">
+                  <FormItem
+                    className="tune-form-item-style"
+                    data-testid="tt-tune-editor-mode"
+                  >
                     <FormLabel className="tune-form-label-style">
                       Mode:{" "}
                     </FormLabel>
@@ -454,9 +464,11 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="incipit"
-                data-testid="tt-tune-editor-incipit"
                 render={({ field }) => (
-                  <FormItem className="tune-form-item-style">
+                  <FormItem
+                    className="tune-form-item-style"
+                    data-testid="tt-tune-editor-incipit"
+                  >
                     <FormLabel className="tune-form-label-style">
                       Incipit:{" "}
                     </FormLabel>
@@ -471,9 +483,11 @@ export default function TuneEditor({
               <FormField
                 control={form.control}
                 name="genre"
-                data-testid="tt-tune-editor-genre"
                 render={({ field }) => (
-                  <FormItem className="tune-form-item-style">
+                  <FormItem
+                    className="tune-form-item-style"
+                    data-testid="tt-tune-editor-genre"
+                  >
                     <FormLabel className="tune-form-label-style">
                       Genre:{" "}
                     </FormLabel>
@@ -498,9 +512,11 @@ export default function TuneEditor({
                   <FormField
                     control={form.control}
                     name="learned"
-                    data-testid="tt-tune-editor-learned"
                     render={({ field }) => (
-                      <FormItem className="tune-form-item-style">
+                      <FormItem
+                        className="tune-form-item-style"
+                        data-testid="tt-tune-editor-learned"
+                      >
                         <FormLabel className="tune-form-label-style">
                           <em>Learned Date:</em>{" "}
                         </FormLabel>
@@ -519,9 +535,11 @@ export default function TuneEditor({
                   <FormField
                     control={form.control}
                     name="practiced"
-                    data-testid="tt-tune-editor-practiced"
                     render={({ field }) => (
-                      <FormItem className="tune-form-item-style">
+                      <FormItem
+                        className="tune-form-item-style"
+                        data-testid="tt-tune-editor-practiced"
+                      >
                         <FormLabel className="tune-form-label-style">
                           <em>Practiced Date:</em>{" "}
                         </FormLabel>
@@ -542,69 +560,80 @@ export default function TuneEditor({
                   <FormField
                     control={form.control}
                     name="quality"
-                    data-testid="tt-tune-editor-quality"
                     render={({ field }) => (
-                      <FormItem className="tune-form-item-style">
+                      <FormItem
+                        className="tune-form-item-style"
+                        data-testid="tt-tune-editor-quality"
+                      >
                         <FormLabel className="tune-form-label-style">
                           <em>Quality:</em>{" "}
                         </FormLabel>
 
                         <FormControl className="tune-form-control-style">
-                          <Input {...field} value={field.value || ""} />
+                          <Input
+                            type="number"
+                            {...field}
+                            value={field.value?.toString() || ""}
+                            onChange={(e) =>
+                              field.onChange(e.target.valueAsNumber)
+                            }
+                          />
                         </FormControl>
                       </FormItem>
                     )}
                   />
                   {/* <FormField
-                    control={form.control}
-                    name="Quality"
-                    render={({ field }) => (
-                      <FormItem className="tune-form-item-style">
-                      <FormLabel className="tune-form-label-style">
-                        <em>Quality:</em>{" "}
-                      </FormLabel>
+                  control={form.control}
+                  name="Quality"
+                  render={({ field }) => (
+                    <FormItem className="tune-form-item-style" data-testid="tt-tune-editor-quality">
+                    <FormLabel className="tune-form-label-style">
+                    <em>Quality:</em>{" "}
+                    </FormLabel>
 
-                      <Select
-                        onValueChange={(value) =>
-                        field.onChange(Number.parseInt(value))
-                        }
-                        value={
-                        qualityList
-                          .find(
-                          (item) =>
-                            item.int_value.toString() === field.value ||
-                            item.value === field.value,
-                          )
-                          ?.int_value.toString() || ""
-                        }
+                    <Select
+                    onValueChange={(value) =>
+                    field.onChange(Number.parseInt(value))
+                    }
+                    value={
+                    qualityList
+                      .find(
+                      (item) =>
+                      item.int_value.toString() === field.value ||
+                      item.value === field.value,
+                      )
+                      ?.int_value.toString() || ""
+                    }
+                    >
+                    <FormControl className="tune-form-control-style">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select quality" />
+                    </SelectTrigger>
+                    </FormControl>
+
+                    <SelectContent>
+                    {qualityList.map((item) => (
+                      <SelectItem
+                      key={item.int_value}
+                      value={item.int_value.toString()}
                       >
-                        <FormControl className="tune-form-control-style">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select quality" />
-                        </SelectTrigger>
-                        </FormControl>
-
-                        <SelectContent>
-                        {qualityList.map((item) => (
-                          <SelectItem
-                          key={item.int_value}
-                          value={item.int_value.toString()}
-                          >
-                          {item.label}
-                          </SelectItem>
-                        ))}
-                        </SelectContent>
-                      </Select>
-                      </FormItem>
-                    )}
-                    /> */}
+                      {item.label}
+                      </SelectItem>
+                    ))}
+                    </SelectContent>
+                    </Select>
+                    </FormItem>
+                  )}
+                  /> */}
 
                   <FormField
                     control={form.control}
                     name="easiness"
-                    data-testid="tt-tune-editor-easiness"
                     render={({ field }) => (
-                      <FormItem className="tune-form-item-style">
+                      <FormItem
+                        className="tune-form-item-style"
+                        data-testid="tt-tune-editor-easiness"
+                      >
                         <FormLabel className="tune-form-label-style">
                           <em>Easiness:</em>{" "}
                         </FormLabel>
@@ -626,9 +655,11 @@ export default function TuneEditor({
                   <FormField
                     control={form.control}
                     name="interval"
-                    data-testid="tt-tune-editor-interval"
                     render={({ field }) => (
-                      <FormItem className="tune-form-item-style">
+                      <FormItem
+                        className="tune-form-item-style"
+                        data-testid="tt-tune-editor-interval"
+                      >
                         <FormLabel className="tune-form-label-style">
                           <em>Interval:</em>{" "}
                         </FormLabel>
@@ -650,9 +681,11 @@ export default function TuneEditor({
                   <FormField
                     control={form.control}
                     name="repetitions"
-                    data-testid="tt-tune-editor-repetitions"
                     render={({ field }) => (
-                      <FormItem className="tune-form-item-style">
+                      <FormItem
+                        className="tune-form-item-style"
+                        data-testid="tt-tune-editor-repetitions"
+                      >
                         <FormLabel className="tune-form-label-style">
                           <em>Repetitions:</em>{" "}
                         </FormLabel>
@@ -674,9 +707,11 @@ export default function TuneEditor({
                   <FormField
                     control={form.control}
                     name="review_date"
-                    data-testid="tt-tune-editor-review_date"
                     render={({ field }) => (
-                      <FormItem className="tune-form-item-style">
+                      <FormItem
+                        className="tune-form-item-style"
+                        data-testid="tt-tune-editor-review_date"
+                      >
                         <FormLabel className="tune-form-label-style">
                           <em>Scheduled:</em>{" "}
                         </FormLabel>
@@ -697,9 +732,11 @@ export default function TuneEditor({
                   <FormField
                     control={form.control}
                     name="tags"
-                    data-testid="tt-tune-editor-tags"
                     render={({ field }) => (
-                      <FormItem className="tune-form-item-style2">
+                      <FormItem
+                        className="tune-form-item-style2"
+                        data-testid="tt-tune-editor-tags"
+                      >
                         <FormLabel className="tune-form-label-style">
                           <em>Tags:</em>{" "}
                         </FormLabel>
@@ -716,26 +753,26 @@ export default function TuneEditor({
                   />
 
                   {/* <FormField
-                    control={form.control}
-                    name="RecallEval"
-                    render={({ field }) => (
-                    <FormItem className="tune-form-item-style2">
-                      <FormLabel className="tune-form-label-style">
-                      <em>Recall Evaluation:</em>{" "}
-                      </FormLabel>
+                  control={form.control}
+                  name="RecallEval"
+                  render={({ field }) => (
+                  <FormItem className="tune-form-item-style2" data-testid="tt-tune-editor-recall-eval">
+                    <FormLabel className="tune-form-label-style">
+                    <em>Recall Evaluation:</em>{" "}
+                    </FormLabel>
 
-                      <FormControl className="tune-form-control-style">
-                      <Input {...field} value={field.value || ""} />
-                      </FormControl>
-                    </FormItem>
-                    )}
+                    <FormControl className="tune-form-control-style">
+                    <Input {...field} value={field.value || ""} />
+                    </FormControl>
+                  </FormItem>
+                  )}
                   /> */}
                 </>
               )}
             </div>
-          </div>
-        </div>
-      </form>
-    </Form>
+          </form>
+        </Form>
+      </ScrollArea>
+    </div>
   );
 }

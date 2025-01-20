@@ -30,7 +30,7 @@ async function doEditAndButtonClick(
   modifiedText: string,
   expectedText: string | null = null,
 ) {
-  const formFieldTextBox = await ttPO.navigateToFormField(formFieldTestId);
+  const formFieldTextBox = await ttPO.navigateToFormFieldById(formFieldTestId);
   await expect(formFieldTextBox).toHaveValue(originalText, {
     timeout: 5000,
   });
@@ -47,45 +47,6 @@ async function doEditAndButtonClick(
     timeout: 5_000 * 100,
   });
 }
-
-// async function navigateToTune(page: Page, tuneTitle: string) {
-//   await checkHealth();
-
-//   console.log("===> test-edit-1.ts:88 ~ creating new page for tunetrees");
-
-//   await page.goto("https://localhost:3000", {
-//     timeout: initialPageLoadTimeout,
-//     waitUntil: "networkidle",
-//   });
-
-//   await page.waitForSelector("body");
-//   const ttMainTabGroup = page.getByTestId("tt-main-tabs");
-//   await ttMainTabGroup.waitFor({ state: "visible" });
-
-//   const repertoireTabSelector = 'role=tab[name="Repertoire"]';
-//   console.log(
-//     "===> test-edit-1.ts:106 ~ waiting for selector, tabSelector: ",
-//     repertoireTabSelector,
-//   );
-//   const repertoireTab = await page.waitForSelector(repertoireTabSelector, {
-//     state: "visible",
-//   });
-//   await repertoireTab.click();
-
-//   await page.waitForSelector("#current-tune-title", { state: "visible" });
-//   await page.getByRole("tab", { name: "Repertoire" }).click();
-//   await page.getByPlaceholder("Filter").click();
-
-//   await page.getByPlaceholder("Filter").fill(tuneTitle);
-//   await page.getByRole("row", { name: tuneTitle }).click();
-
-//   const currentTuneTitleLocator = page.locator("#current-tune-title");
-//   const tuneTitle2 = await currentTuneTitleLocator.textContent();
-//   console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
-//   await expect(currentTuneTitleLocator).toHaveText(tuneTitle, {
-//     timeout: 5000,
-//   });
-// }
 
 test.describe.serial("Tune Edit Tests", () => {
   test("test-edit-1", async ({ page }) => {
@@ -130,30 +91,104 @@ test.describe.serial("Tune Edit Tests", () => {
 
     await ttPO.openTuneEditorForCurrentTune();
 
-    await page.pause();
+    // Confirm that the values are as expected
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      console.log(`${formField.label}: ${await sampleLocator.inputValue()}`);
+      await expect(sampleLocator).toHaveValue(formField.original);
+    }
 
-    // await page.waitForTimeout(60_000 * 20);
+    // Fill in new values
+    for (const formField of ttPO.sampleBoyneHunt) {
+      await formField.locator.fill(formField.modification);
+      await page.waitForTimeout(50);
+    }
 
-    // // ========== First do a title edit, then Cancel ==============
-    // await doEditAndButtonClick(
-    //   page,
-    //   "tt-tune-editor-title",
-    //   "Cancel",
-    //   "Lakes of Sligo",
-    //   "Lakes of Sligo x",
-    //   "Lakes of Sligo",
-    // );
-
-    // // ========== Now do a title edit, then Save ==============
-    // await doEditAndButtonClick(
-    //   page,
-    //   "tt-tune-editor-title",
-    //   "Save",
-    //   "Lakes of Sligo",
-    //   "Lakes of Sligo x",
-    // );
+    // Confirm all the fields were changed
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      await expect(sampleLocator).toHaveValue(formField.modification);
+    }
 
     await ttPO.pressCancel();
+
+    await ttPO.navigateToTune("Boyne Hunt");
+
+    // Do some light checking in the grid (not a full test)
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const cellId = formField.cellId;
+      if (!cellId) {
+        continue;
+      }
+      const cellLocator = page.getByTestId(`${cellId}`);
+      const cellText = await cellLocator.textContent();
+      console.log("===> test-edit-1.spec.ts:165 ~ cellText", cellText);
+      await expect(cellLocator).toHaveText(formField.original);
+    }
+
+    await ttPO.openTuneEditorForCurrentTune();
+
+    // Full check that the values haven't been changed
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      console.log(`${formField.label}: ${await sampleLocator.inputValue()}`);
+      await expect(sampleLocator).toHaveValue(formField.original);
+    }
+
+    await page.waitForTimeout(100);
+    console.log("===> test-edit-1.spec.ts:182 ~ ");
+  });
+
+  test("test-edit-3", async ({ page }) => {
+    const ttPO = new TuneEditorPageObject(page);
+
+    await ttPO.navigateToTune("Boyne Hunt");
+
+    await ttPO.openTuneEditorForCurrentTune();
+
+    // Confirm that the values are as expected
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      console.log(`${formField.label}: ${await sampleLocator.inputValue()}`);
+      await expect(sampleLocator).toHaveValue(formField.original);
+    }
+
+    // Fill in new values
+    for (const formField of ttPO.sampleBoyneHunt) {
+      await formField.locator.fill(formField.modification);
+      await page.waitForTimeout(50);
+    }
+
+    // Confirm all the fields were changed
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      await expect(sampleLocator).toHaveValue(formField.modification);
+    }
+
+    await ttPO.pressSave();
+
+    await ttPO.navigateToTune("Boyne Hunt");
+
+    // Do some light checking in the grid (not a full test)
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const cellId = formField.cellId;
+      if (!cellId) {
+        continue;
+      }
+      const cellLocator = page.getByTestId(`${cellId}`);
+      const cellText = await cellLocator.textContent();
+      console.log("===> test-edit-1.spec.ts:165 ~ cellText", cellText);
+      await expect(cellLocator).toHaveText(formField.modification);
+    }
+
+    await ttPO.openTuneEditorForCurrentTune();
+
+    // Full check that the values haven't been changed
+    for (const formField of ttPO.sampleBoyneHunt) {
+      const sampleLocator = formField.locator;
+      console.log(`${formField.label}: ${await sampleLocator.inputValue()}`);
+      await expect(sampleLocator).toHaveValue(formField.modification);
+    }
 
     await page.waitForTimeout(100);
     console.log("===> test-edit-1.spec.ts:182 ~ ");

@@ -122,7 +122,7 @@ export interface IPracticeRecord {
   playlist_ref?: number;
   tune_ref?: number;
   practiced?: string;
-  quality?: string;
+  quality?: number;
   easiness?: number;
   interval?: number;
   repetitions?: number;

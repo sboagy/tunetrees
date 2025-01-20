@@ -266,6 +266,7 @@ const TunesGrid = ({
                       {row.getVisibleCells().map((cell) => (
                         <TableCell
                           key={cell.id}
+                          data-testid={`${cell.id}`}
                           style={{
                             position: "absolute",
                             top: "50%",
