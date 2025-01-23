@@ -1,6 +1,9 @@
 // import type { Awaitable } from "next-auth/types";
 
-import type { Adapter, AdapterAccount } from "next-auth/adapters";
+import type {
+  Adapter,
+  AdapterAccount
+} from "next-auth/adapters";
 
 import type {
   AdapterSession,
@@ -156,6 +159,7 @@ export async function getUserExtendedByEmail(
 export function ttHttpAdapter(): Adapter {
   return {
     async createUser(user) {
+      console.log("===> auth-tt-adapter.ts:164 ~ createUser");
       try {
         const res = await fetch(`${_baseURL}/auth/signup/`, {
           method: "POST",
@@ -174,6 +178,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async getUser(id) {
+      console.log("===> auth-tt-adapter.ts:183 ~ getUser");
       try {
         const res = await fetch(`${_baseURL}/auth/get-user/${id}/`, {
           method: "GET",
@@ -193,6 +198,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async getUserByEmail(email) {
+      console.log("===> auth-tt-adapter.ts:203 ~ email");
       try {
         const res = await fetch(`${_baseURL}/auth/get-user-by-email/${email}`, {
           method: "GET",
@@ -212,6 +218,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async getUserByAccount({ providerAccountId, provider }) {
+      console.log("===> auth-tt-adapter.ts:222 ~ getUserByAccount");
       try {
         const res = await fetch(
           `${_baseURL}/auth/get-user-by-account/${encodeURIComponent(
@@ -236,6 +243,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async updateUser(user) {
+      console.log("===> auth-tt-adapter.ts:247 ~ updateUser");
       try {
         const res = await fetch(`${_baseURL}/auth/update-user/`, {
           method: "PATCH",
@@ -254,6 +262,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async deleteUser(userId) {
+      console.log("===> auth-tt-adapter.ts:266 ~ deleteUser");
       try {
         const res = await fetch(`${_baseURL}/auth/delete-user/${userId}/`, {
           method: "DELETE",
@@ -272,6 +281,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async linkAccount(account) {
+      console.log("===> auth-tt-adapter.ts:285 ~ linkAccount");
       try {
         const res = await fetch(`${_baseURL}/auth/link-account/`, {
           method: "POST",
@@ -295,6 +305,7 @@ export function ttHttpAdapter(): Adapter {
     async unlinkAccount({
       providerAccountId,
     }: Pick<AdapterAccount, "providerAccountId" | "provider">) {
+      console.log("===> auth-tt-adapter.ts:309 ~ unlinkAccount");
       try {
         const res = await fetch(
           `${_baseURL}/auth/unlink-account/${providerAccountId}/`,
@@ -315,6 +326,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async createSession({ sessionToken, userId, expires }) {
+      console.log("===> auth-tt-adapter.ts:331 ~ createSession");
       try {
         const session = {
           sessionToken,
@@ -339,6 +351,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async getSessionAndUser(sessionToken) {
+      console.log("===> auth-tt-adapter.ts:355 ~ getSessionAndUser");
       try {
         const res = await fetch(
           `${_baseURL}/auth/get-session/${sessionToken}`,
@@ -361,6 +374,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async updateSession({ sessionToken, expires, userId }) {
+      console.log("===> auth-tt-adapter.ts:378 ~ updateSession");
       try {
         const session = {
           sessionToken,
@@ -384,6 +398,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async deleteSession(sessionToken) {
+      console.log("===> auth-tt-adapter.ts:402 ~ deleteSession");
       try {
         const res = await fetch(
           `${_baseURL}/auth/delete-session/${sessionToken}/`,
@@ -405,6 +420,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async createVerificationToken({ identifier, expires, token }) {
+      console.log("===> auth-tt-adapter.ts:424 ~ createVerificationToken");
       try {
         const verificationToken = {
           identifier,
@@ -429,6 +445,7 @@ export function ttHttpAdapter(): Adapter {
       }
     },
     async useVerificationToken({ identifier, token }) {
+      console.log("===> auth-tt-adapter.ts:449 ~ useVerificationToken");
       try {
         const verificationToken = {
           identifier,
@@ -452,42 +469,52 @@ export function ttHttpAdapter(): Adapter {
       }
     },
 
-    // =========================
-    // async getAccount(provider, providerAccountId) {
-    //   console.log(
-    //     "===> auth-tt-adapter2.ts:368 ~ ",
-    //     provider,
-    //     providerAccountId,
-    //   );
+    // ===== It's not clear if I need the following methods for
+    // strategy: "database", so they are commented out for now. =====
+    //   async getAccount(provider, providerAccountId) {
+    //     console.log("===> auth-tt-adapter.ts:475 ~ getAccount");
+    //     console.log(
+    //       "===> auth-tt-adapter2.ts:368 ~ ",
+    //       provider,
+    //       providerAccountId,
+    //     );
 
-    //   return await Promise.resolve(null);
-    // },
+    //     return await Promise.resolve(null);
+    //   },
 
-    // async getAuthenticator(id) {
-    //   console.log("===> auth-tt-adapter2.ts:379 ~ ", id);
-    //   return await Promise.resolve(null);
-    // },
+    //   async getAuthenticator(id) {
+    //     console.log("===> auth-tt-adapter.ts:486 ~ getAuthenticator");
+    //     console.log("===> auth-tt-adapter2.ts:379 ~ ", id);
+    //     return await Promise.resolve(null);
+    //   },
 
-    // async createAuthenticator(
-    //   authenticator: AdapterAuthenticator,
-    // ): Promise<AdapterAuthenticator> {
-    //   console.log("===> auth-tt-adapter2.ts:383 ~ ", authenticator);
-    //   return await Promise.resolve(authenticator);
-    // },
+    //   async createAuthenticator(
+    //     authenticator: AdapterAuthenticator,
+    //   ): Promise<AdapterAuthenticator> {
+    //     console.log(
+    //       "===> auth-tt-adapter2.ts:383 ~ createAuthenticator",
+    //       authenticator,
+    //     );
+    //     return await Promise.resolve(authenticator);
+    //   },
 
-    // async listAuthenticatorsByUserId(userId) {
-    //   console.log("===> auth-tt-adapter2.ts:395 ~ ", userId);
-    //   return await Promise.resolve([]);
-    // },
+    //   async listAuthenticatorsByUserId(userId) {
+    //     console.log(
+    //       "===> auth-tt-adapter2.ts:395 ~ listAuthenticatorsByUserId",
+    //       userId,
+    //     );
+    //     return await Promise.resolve([]);
+    //   },
 
-    // async updateAuthenticatorCounter(
-    //   credentialID: AdapterAuthenticator["credentialID"],
-    //   newCounter: AdapterAuthenticator["counter"],
-    // ): Promise<AdapterAuthenticator> {
-    //   return await Promise.resolve({
-    //     credentialID,
-    //     counter: newCounter,
-    //   } as AdapterAuthenticator);
-    // },
+    //   async updateAuthenticatorCounter(
+    //     credentialID: AdapterAuthenticator["credentialID"],
+    //     newCounter: AdapterAuthenticator["counter"],
+    //   ): Promise<AdapterAuthenticator> {
+    //     console.log("===> auth-tt-adapter.ts:491 ~ updateAuthenticatorCounter");
+    //     return await Promise.resolve({
+    //       credentialID,
+    //       counter: newCounter,
+    //     } as AdapterAuthenticator);
+    //   },
   };
 }
