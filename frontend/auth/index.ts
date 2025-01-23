@@ -274,7 +274,7 @@ export const providerMap: ProviderMap = providers.map((provider) => {
 
 const config = {
   // theme: { logo: "https://authjs.dev/img/logo-sm.png" },
-  adapter: ttHttpAdapter,
+  adapter: ttHttpAdapter(),
   session: {
     strategy: "database",
   },
@@ -468,17 +468,3 @@ export const {
 
 // export const handlers: NextAuthResult["handlers"] = nextAuth.handlers;
 export const auth: NextAuthResult["auth"] = nextAuth.auth;
-// export const signIn: NextAuthResult["signIn"] = nextAuth.signIn;
-// export const signOut: NextAuthResult["signOut"] = nextAuth.signOut;
-
-// declare module "next-auth" {
-//   interface Session {
-//     accessToken?: string;
-//   }
-// }
-//
-// declare module "next-auth/jwt" {
-//   interface JWT {
-//     accessToken?: string;
-//   }
-// }

@@ -1,12 +1,27 @@
+// import type { Awaitable } from "next-auth/types";
+
+import type { Adapter, AdapterAccount } from "next-auth/adapters";
+
 import type {
   AdapterSession,
   AdapterUser,
   VerificationToken,
 } from "next-auth/adapters";
-import { ofetch } from "ofetch";
 import { z } from "zod";
-import type { IAdapterProcedure } from "./adapter-procedure";
-import { httpAdapter } from "./http-adapter/http-adapter";
+import {
+  createSessionSchema,
+  createUserSchema,
+  createVerificationTokenSchema,
+  deleteSessionSchema,
+  deleteUserSchema,
+  getUserByEmailSchema,
+  getUserSchema,
+  linkAccountSchema,
+  unlinkAccountSchema,
+  updateSessionSchema,
+  updateUserSchema,
+  useVerificationRequestSchema,
+} from "./http-adapter/validation";
 export const adapterSessionSchema = z.object({
   expires: z.date(),
   sessionToken: z.string(),
@@ -122,171 +137,357 @@ const _baseURL = process.env.NEXT_BASE_URL;
 export async function getUserExtendedByEmail(
   email: string,
 ): Promise<IExtendedAdapterUser | null> {
-  const {
-    path,
-    select: serialize = userSerializer,
-    ...fetchOptions
-  } = {
-    path: `auth/get-user-by-email/${email}`,
+  const path = `${_baseURL}/auth/get-user-by-email/${email}`;
+  const res = await fetch(path, {
     method: "GET",
-    select: userSerializer,
-  };
-  const res: IExtendedAdapterUser = await ofetch(path, {
-    baseURL: _baseURL, // or any other base url
     headers: {
       // biome-ignore lint/style/noNonNullAssertion: Not actually sure about this assertion suppression
       Authorization: process.env.REMOTE_AUTH_RPC_TOKEN!,
+      Accept: "application/json",
     },
-    body: null,
-    ...fetchOptions,
   });
-  // return await getUserExtendedByEmailSchema.parseAsync(serialize(res));
-  return serialize(res);
+  const payload = await res.json();
+  const serialized = userSerializer(payload);
+
+  const parsed = getUserExtendedByEmailSchema.parse(serialized);
+  return parsed;
 }
 
-export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
-  baseURL: _baseURL, // or any other base url
-  headers: {
-    "x-auth-secret": process.env.NEXTAUTH_SECRET || "",
-    "Content-Type": "application/json",
-    // Authorization: process.env.REMOTE_AUTH_RPC_TOKEN!,
-    // or set any global headers to be able to authenticate your requests to your backend
-  },
-  // you can provide any other
-  adapterProcedures: {
-    createUser(user: Omit<AdapterUser, "id">): IAdapterProcedure {
-      return {
-        path: "auth/signup/",
-        method: "POST",
-        body: user,
-        select: userSerializer,
-      };
+export function ttHttpAdapter(): Adapter {
+  return {
+    async createUser(user) {
+      try {
+        const res = await fetch(`${_baseURL}/auth/signup/`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+          },
+          body: JSON.stringify(user),
+        });
+        const payload = await res.json();
+        const serialized = userSerializer(payload);
+        return createUserSchema.parse(serialized) as AdapterUser;
+      } catch (error) {
+        console.error("===> auth-tt-adapter.ts:173 ~ ", error);
+        throw new Error("User creation failed");
+      }
     },
-    getUserById(id: string): IAdapterProcedure {
-      return {
-        path: `auth/get-user/${id}/`,
-        method: "GET",
-        select: userSerializer,
-      };
+    async getUser(id) {
+      try {
+        const res = await fetch(`${_baseURL}/auth/get-user/${id}/`, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+        if (!res) {
+          return null;
+        }
+        const payload = await res.json();
+        const serialized = userSerializer(payload);
+        return getUserSchema.parse(serialized);
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
     },
-    getUserByEmail(email: string): IAdapterProcedure {
-      return {
-        path: `auth/get-user-by-email/${email}`,
-        method: "GET",
-        select: userSerializer,
-      };
+    async getUserByEmail(email) {
+      try {
+        const res = await fetch(`${_baseURL}/auth/get-user-by-email/${email}`, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+        if (!res) {
+          return null;
+        }
+        const payload = await res.json();
+        const serialized = userSerializer(payload);
+        return getUserByEmailSchema.parse(serialized);
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
     },
-    getUserByAccount(params: {
-      providerAccountId: string;
-      provider: string;
-    }): IAdapterProcedure {
-      const { providerAccountId, provider } = params;
-      return {
-        path: `auth/get-user-by-account/${encodeURIComponent(
-          provider,
-        )}/${encodeURIComponent(providerAccountId)}/`,
-        method: "GET",
-        select: userSerializer,
-      };
+    async getUserByAccount({ providerAccountId, provider }) {
+      try {
+        const res = await fetch(
+          `${_baseURL}/auth/get-user-by-account/${encodeURIComponent(
+            provider,
+          )}/${encodeURIComponent(providerAccountId)}/`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+            },
+          },
+        );
+        if (!res) {
+          return null;
+        }
+        const payload = await res.json();
+        const serialized = userSerializer(payload);
+        return getUserSchema.parse(serialized);
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
     },
-    updateUser(
-      user: Partial<AdapterUser> & Pick<AdapterUser, "id">,
-    ): IAdapterProcedure {
-      return {
-        path: "auth/update-user/",
-        method: "PATCH",
-        body: user,
-        select: userSerializer,
-      };
+    async updateUser(user) {
+      try {
+        const res = await fetch(`${_baseURL}/auth/update-user/`, {
+          method: "PATCH",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+          },
+          body: JSON.stringify(user),
+        });
+        const payload = await res.json();
+        const serialized = userSerializer(payload);
+        return updateUserSchema.parse(serialized) as AdapterUser;
+      } catch (error) {
+        console.error("===> auth-tt-adapter.ts:251 ~ ", error);
+        throw new Error("User creation failed");
+      }
     },
-    deleteUser(id: string): IAdapterProcedure {
-      return {
-        path: `auth/delete-user/${id}/`,
-        method: "DELETE",
-      };
+    async deleteUser(userId) {
+      try {
+        const res = await fetch(`${_baseURL}/auth/delete-user/${userId}/`, {
+          method: "DELETE",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+        if (!res) {
+          return null;
+        }
+        const payload = await res.json();
+        return deleteUserSchema.parse(payload);
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
     },
-    linkAccount(account: {
-      provider: string;
-      providerAccountId: string;
-      userId: string;
-    }): IAdapterProcedure {
-      return {
-        path: "auth/link-account/",
-        method: "POST",
-        body: account,
-      };
+    async linkAccount(account) {
+      try {
+        const res = await fetch(`${_baseURL}/auth/link-account/`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+          },
+          body: JSON.stringify(account),
+        });
+        const payload = await res.json();
+        const parsedRes = linkAccountSchema.parse(payload);
+        if (parsedRes && parsedRes.type === "credentials") {
+          parsedRes.type = "oauth"; // or any valid AdapterAccountType
+        }
+        return parsedRes as AdapterAccount | null | undefined;
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
     },
-    unlinkAccount(params: {
-      provider: string;
-      providerAccountId: string;
-    }): IAdapterProcedure {
-      const { provider, providerAccountId } = params;
-      return {
-        path: `auth/unlink-account/${encodeURIComponent(
-          provider,
-        )}/${encodeURIComponent(providerAccountId)}/`,
-        method: "DELETE",
-      };
+    async unlinkAccount({
+      providerAccountId,
+    }: Pick<AdapterAccount, "providerAccountId" | "provider">) {
+      try {
+        const res = await fetch(
+          `${_baseURL}/auth/unlink-account/${providerAccountId}/`,
+          {
+            method: "DELETE",
+            headers: {
+              Accept: "application/json",
+            },
+          },
+        );
+        const payload = await res.json();
+        const parsedRes = unlinkAccountSchema.parse(payload);
+        console.log("===> auth-tt-adapter2.ts:252 ~ ", parsedRes);
+        return;
+      } catch (error) {
+        console.log("===> auth-tt-adapter.ts:312 ~ ", error);
+        throw new Error("unlink account failed");
+      }
     },
-    createSession(session: AdapterSession): IAdapterProcedure {
-      console.log(
-        "===> auth-tt-adapter.ts: createSession called with session:",
-        session,
-      );
-      return {
-        path: "auth/create-session/",
-        method: "POST",
-        body: session,
-        select: sessionSerializer,
-      };
+    async createSession({ sessionToken, userId, expires }) {
+      try {
+        const session = {
+          sessionToken,
+          userId,
+          expires,
+        };
+        const res = await fetch(`${_baseURL}/auth/create-session/`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+          },
+          body: JSON.stringify(session),
+        });
+        const payload = await res.json();
+        const serialized = sessionSerializer(payload);
+        const parsedRes = createSessionSchema.parse(serialized);
+        return parsedRes;
+      } catch (error) {
+        console.log("===> auth-tt-adapter.ts:336 ~ ", error);
+        throw new Error("create session failed");
+      }
     },
-    getSessionAndUser(sessionToken: string): IAdapterProcedure {
-      console.log(
-        "===> auth-tt-adapter.ts: getSessionAndUser called with token:",
-        sessionToken,
-      );
-      return {
-        path: `auth/get-session/${sessionToken}`,
-        method: "GET",
-        select: userAndSessionSerializer,
-      };
+    async getSessionAndUser(sessionToken) {
+      try {
+        const res = await fetch(
+          `${_baseURL}/auth/get-session/${sessionToken}`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+            },
+          },
+        );
+        const payload = await res.json();
+        if (!payload) {
+          return null;
+        }
+        const serialized = userAndSessionSerializer(payload);
+        return getSessionAndUserSchema.parse(serialized);
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
     },
-    updateSession(
-      session: Partial<AdapterSession> & Pick<AdapterSession, "sessionToken">,
-    ): IAdapterProcedure {
-      return {
-        path: "auth/update-session/",
-        method: "PATCH",
-        body: session,
-        select: sessionSerializer,
-      };
+    async updateSession({ sessionToken, expires, userId }) {
+      try {
+        const session = {
+          sessionToken,
+          expires,
+          userId,
+        };
+        const res = await fetch(`${_baseURL}/auth/update-session/`, {
+          method: "PATCH",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+          },
+          body: JSON.stringify(session),
+        });
+        const payload = await res.json();
+        const serialized = sessionSerializer(payload);
+        return updateSessionSchema.parse(serialized);
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
     },
-    deleteSession(sessionToken: string): IAdapterProcedure {
-      return {
-        path: `auth/delete-session/${sessionToken}/`,
-        method: "DELETE",
-      };
+    async deleteSession(sessionToken) {
+      try {
+        const res = await fetch(
+          `${_baseURL}/auth/delete-session/${sessionToken}/`,
+          {
+            method: "DELETE",
+            headers: {
+              Accept: "application/json",
+            },
+          },
+        );
+        if (!res) {
+          return null;
+        }
+        const payload = await res.json();
+        return deleteSessionSchema.parse(payload);
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
     },
-    createVerificationToken(
-      verificationToken: VerificationToken,
-    ): IAdapterProcedure {
-      return {
-        path: "auth/create-verification-token/",
-        method: "POST",
-        body: verificationToken,
-      };
+    async createVerificationToken({ identifier, expires, token }) {
+      try {
+        const verificationToken = {
+          identifier,
+          expires,
+          token,
+        };
+        const res = await fetch(`${_baseURL}/auth/create-verification-token/`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+          },
+          body: JSON.stringify(verificationToken),
+        });
+        const payload = await res.json();
+        const serialized = verificationTokenSerializer(payload);
+        const parsedRes = createVerificationTokenSchema.parse(serialized);
+        return parsedRes;
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
     },
-    useVerificationToken(params: {
-      identifier: string;
-      token: string;
-    }): IAdapterProcedure {
-      const { identifier, token } = params;
-      return {
-        path: "auth/use-verification-token/",
-        method: "POST",
-        body: { identifier, token },
-        select: verificationTokenSerializer,
-      };
+    async useVerificationToken({ identifier, token }) {
+      try {
+        const verificationToken = {
+          identifier,
+          token,
+        };
+        const res = await fetch(`${_baseURL}/auth/use-verification-token/`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+          },
+          body: JSON.stringify(verificationToken),
+        });
+        const payload = await res.json();
+        const serialized = verificationTokenSerializer(payload);
+        const parsedRes = useVerificationRequestSchema.parse(serialized);
+        return parsedRes;
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
     },
-  },
-});
+
+    // =========================
+    // async getAccount(provider, providerAccountId) {
+    //   console.log(
+    //     "===> auth-tt-adapter2.ts:368 ~ ",
+    //     provider,
+    //     providerAccountId,
+    //   );
+
+    //   return await Promise.resolve(null);
+    // },
+
+    // async getAuthenticator(id) {
+    //   console.log("===> auth-tt-adapter2.ts:379 ~ ", id);
+    //   return await Promise.resolve(null);
+    // },
+
+    // async createAuthenticator(
+    //   authenticator: AdapterAuthenticator,
+    // ): Promise<AdapterAuthenticator> {
+    //   console.log("===> auth-tt-adapter2.ts:383 ~ ", authenticator);
+    //   return await Promise.resolve(authenticator);
+    // },
+
+    // async listAuthenticatorsByUserId(userId) {
+    //   console.log("===> auth-tt-adapter2.ts:395 ~ ", userId);
+    //   return await Promise.resolve([]);
+    // },
+
+    // async updateAuthenticatorCounter(
+    //   credentialID: AdapterAuthenticator["credentialID"],
+    //   newCounter: AdapterAuthenticator["counter"],
+    // ): Promise<AdapterAuthenticator> {
+    //   return await Promise.resolve({
+    //     credentialID,
+    //     counter: newCounter,
+    //   } as AdapterAuthenticator);
+    // },
+  };
+}
