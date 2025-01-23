@@ -1,4 +1,3 @@
-import { httpAdapter } from "next-auth-http-adapter";
 import type {
   AdapterSession,
   AdapterUser,
@@ -7,6 +6,7 @@ import type {
 import { ofetch } from "ofetch";
 import { z } from "zod";
 import type { IAdapterProcedure } from "./adapter-procedure";
+import { httpAdapter } from "./http-adapter/http-adapter";
 export const adapterSessionSchema = z.object({
   expires: z.date(),
   sessionToken: z.string(),
@@ -77,12 +77,14 @@ function sessionSerializer(res: AdapterSession | null | undefined) {
   };
 }
 
-async function userAndSessionSerializer(
-  res: Promise<{ session: AdapterSession; user: AdapterUser } | null>,
+function userAndSessionSerializer(
+  res: { session: AdapterSession; user: AdapterUser } | null,
 ) {
-  const userAndSessionObj = await res;
-  const user = userSerializer(userAndSessionObj?.user as IExtendedAdapterUser);
-  const session = sessionSerializer(userAndSessionObj?.session);
+  if (!res) {
+    return null;
+  }
+  const user = userSerializer(res?.user as IExtendedAdapterUser);
+  const session = sessionSerializer(res?.session);
   const seassionTweaked = { user, session };
   return seassionTweaked;
   // try{
@@ -227,6 +229,10 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
       };
     },
     createSession(session: AdapterSession): IAdapterProcedure {
+      console.log(
+        "===> auth-tt-adapter.ts: createSession called with session:",
+        session,
+      );
       return {
         path: "auth/create-session/",
         method: "POST",
@@ -235,6 +241,10 @@ export const ttHttpAdapter: ReturnType<typeof httpAdapter> = httpAdapter({
       };
     },
     getSessionAndUser(sessionToken: string): IAdapterProcedure {
+      console.log(
+        "===> auth-tt-adapter.ts: getSessionAndUser called with token:",
+        sessionToken,
+      );
       return {
         path: `auth/get-session/${sessionToken}`,
         method: "GET",

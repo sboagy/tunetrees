@@ -7,12 +7,12 @@ import UserButton from "./UserButton";
 
 export default function Header() {
   const { data: session, status } = useSession();
-  console.log("Header ===> Header.tsx:9 ~ status", status);
+  console.log("===> auth ===> Header.tsx:9 ~ status", status);
 
   const [key, setKey] = useState(0);
 
   useEffect(() => {
-    console.log("Header ===> Header.tsx:14 ~ user", session?.user);
+    console.log("===> auth ===> Header.tsx:14 ~ user", session?.user);
     setKey((prevKey) => prevKey + 1);
   }, [session?.user]);
 
