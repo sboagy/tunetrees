@@ -1,9 +1,6 @@
 // import type { Awaitable } from "next-auth/types";
 
-import type {
-  Adapter,
-  AdapterAccount
-} from "next-auth/adapters";
+import type { Adapter, AdapterAccount } from "next-auth/adapters";
 
 import type {
   AdapterSession,
