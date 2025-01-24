@@ -138,7 +138,7 @@ export async function getUserExtendedByEmail(
   email: string,
 ): Promise<IExtendedAdapterUser | null> {
   const path = `${_baseURL}/auth/get-user-by-email/${email}`;
-  const res = await fetch(path, {
+  const res = await fetchWithTimeout(path, {
     method: "GET",
     headers: {
       // biome-ignore lint/style/noNonNullAssertion: Not actually sure about this assertion suppression
@@ -153,12 +153,28 @@ export async function getUserExtendedByEmail(
   return parsed;
 }
 
-export function ttHttpAdapter(): Adapter {
+async function fetchWithTimeout(
+  resource: string,
+  options: RequestInit & { timeout?: number } = {},
+) {
+  const { timeout = 8000 } = options;
+
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  const response = await fetch(resource, {
+    ...options,
+    signal: controller.signal,
+  });
+  clearTimeout(id);
+  return response;
+}
+
+function createTuneTreesHttpAdapter(): Adapter {
   return {
     async createUser(user) {
       console.log("===> auth-tt-adapter.ts:164 ~ createUser");
       try {
-        const res = await fetch(`${_baseURL}/auth/signup/`, {
+        const res = await fetchWithTimeout(`${_baseURL}/auth/signup/`, {
           method: "POST",
           headers: {
             Accept: "application/json",
@@ -177,7 +193,7 @@ export function ttHttpAdapter(): Adapter {
     async getUser(id) {
       console.log("===> auth-tt-adapter.ts:183 ~ getUser");
       try {
-        const res = await fetch(`${_baseURL}/auth/get-user/${id}/`, {
+        const res = await fetchWithTimeout(`${_baseURL}/auth/get-user/${id}/`, {
           method: "GET",
           headers: {
             Accept: "application/json",
@@ -197,12 +213,15 @@ export function ttHttpAdapter(): Adapter {
     async getUserByEmail(email) {
       console.log("===> auth-tt-adapter.ts:203 ~ email");
       try {
-        const res = await fetch(`${_baseURL}/auth/get-user-by-email/${email}`, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
+        const res = await fetchWithTimeout(
+          `${_baseURL}/auth/get-user-by-email/${email}`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+            },
           },
-        });
+        );
         if (!res) {
           return null;
         }
@@ -217,7 +236,7 @@ export function ttHttpAdapter(): Adapter {
     async getUserByAccount({ providerAccountId, provider }) {
       console.log("===> auth-tt-adapter.ts:222 ~ getUserByAccount");
       try {
-        const res = await fetch(
+        const res = await fetchWithTimeout(
           `${_baseURL}/auth/get-user-by-account/${encodeURIComponent(
             provider,
           )}/${encodeURIComponent(providerAccountId)}/`,
@@ -242,7 +261,7 @@ export function ttHttpAdapter(): Adapter {
     async updateUser(user) {
       console.log("===> auth-tt-adapter.ts:247 ~ updateUser");
       try {
-        const res = await fetch(`${_baseURL}/auth/update-user/`, {
+        const res = await fetchWithTimeout(`${_baseURL}/auth/update-user/`, {
           method: "PATCH",
           headers: {
             Accept: "application/json",
@@ -261,12 +280,15 @@ export function ttHttpAdapter(): Adapter {
     async deleteUser(userId) {
       console.log("===> auth-tt-adapter.ts:266 ~ deleteUser");
       try {
-        const res = await fetch(`${_baseURL}/auth/delete-user/${userId}/`, {
-          method: "DELETE",
-          headers: {
-            Accept: "application/json",
+        const res = await fetchWithTimeout(
+          `${_baseURL}/auth/delete-user/${userId}/`,
+          {
+            method: "DELETE",
+            headers: {
+              Accept: "application/json",
+            },
           },
-        });
+        );
         if (!res) {
           return null;
         }
@@ -280,7 +302,7 @@ export function ttHttpAdapter(): Adapter {
     async linkAccount(account) {
       console.log("===> auth-tt-adapter.ts:285 ~ linkAccount");
       try {
-        const res = await fetch(`${_baseURL}/auth/link-account/`, {
+        const res = await fetchWithTimeout(`${_baseURL}/auth/link-account/`, {
           method: "POST",
           headers: {
             Accept: "application/json",
@@ -304,7 +326,7 @@ export function ttHttpAdapter(): Adapter {
     }: Pick<AdapterAccount, "providerAccountId" | "provider">) {
       console.log("===> auth-tt-adapter.ts:309 ~ unlinkAccount");
       try {
-        const res = await fetch(
+        const res = await fetchWithTimeout(
           `${_baseURL}/auth/unlink-account/${providerAccountId}/`,
           {
             method: "DELETE",
@@ -330,7 +352,7 @@ export function ttHttpAdapter(): Adapter {
           userId,
           expires,
         };
-        const res = await fetch(`${_baseURL}/auth/create-session/`, {
+        const res = await fetchWithTimeout(`${_baseURL}/auth/create-session/`, {
           method: "POST",
           headers: {
             Accept: "application/json",
@@ -350,15 +372,16 @@ export function ttHttpAdapter(): Adapter {
     async getSessionAndUser(sessionToken) {
       console.log("===> auth-tt-adapter.ts:355 ~ getSessionAndUser");
       try {
-        const res = await fetch(
-          `${_baseURL}/auth/get-session/${sessionToken}`,
-          {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-            },
+        const path = `${_baseURL}/auth/get-session/${sessionToken}`;
+        const controller = new AbortController();
+
+        const res = await fetchWithTimeout(path, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
           },
-        );
+          signal: controller.signal,
+        });
         const payload = await res.json();
         if (!payload) {
           return null;
@@ -378,7 +401,7 @@ export function ttHttpAdapter(): Adapter {
           expires,
           userId,
         };
-        const res = await fetch(`${_baseURL}/auth/update-session/`, {
+        const res = await fetchWithTimeout(`${_baseURL}/auth/update-session/`, {
           method: "PATCH",
           headers: {
             Accept: "application/json",
@@ -397,7 +420,7 @@ export function ttHttpAdapter(): Adapter {
     async deleteSession(sessionToken) {
       console.log("===> auth-tt-adapter.ts:402 ~ deleteSession");
       try {
-        const res = await fetch(
+        const res = await fetchWithTimeout(
           `${_baseURL}/auth/delete-session/${sessionToken}/`,
           {
             method: "DELETE",
@@ -424,14 +447,17 @@ export function ttHttpAdapter(): Adapter {
           expires,
           token,
         };
-        const res = await fetch(`${_baseURL}/auth/create-verification-token/`, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json; charset=utf-8",
+        const res = await fetchWithTimeout(
+          `${_baseURL}/auth/create-verification-token/`,
+          {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json; charset=utf-8",
+            },
+            body: JSON.stringify(verificationToken),
           },
-          body: JSON.stringify(verificationToken),
-        });
+        );
         const payload = await res.json();
         const serialized = verificationTokenSerializer(payload);
         const parsedRes = createVerificationTokenSchema.parse(serialized);
@@ -448,14 +474,17 @@ export function ttHttpAdapter(): Adapter {
           identifier,
           token,
         };
-        const res = await fetch(`${_baseURL}/auth/use-verification-token/`, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json; charset=utf-8",
+        const res = await fetchWithTimeout(
+          `${_baseURL}/auth/use-verification-token/`,
+          {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json; charset=utf-8",
+            },
+            body: JSON.stringify(verificationToken),
           },
-          body: JSON.stringify(verificationToken),
-        });
+        );
         const payload = await res.json();
         const serialized = verificationTokenSerializer(payload);
         const parsedRes = useVerificationRequestSchema.parse(serialized);
@@ -515,3 +544,5 @@ export function ttHttpAdapter(): Adapter {
     //   },
   };
 }
+
+export const ttHttpAdapter = createTuneTreesHttpAdapter();

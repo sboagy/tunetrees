@@ -274,7 +274,7 @@ export const providerMap: ProviderMap = providers.map((provider) => {
 
 const config = {
   // theme: { logo: "https://authjs.dev/img/logo-sm.png" },
-  adapter: ttHttpAdapter(),
+  adapter: ttHttpAdapter,
   session: {
     strategy: "database",
   },
