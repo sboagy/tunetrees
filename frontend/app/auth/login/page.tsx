@@ -29,8 +29,6 @@ import { type ControllerRenderProps, useForm } from "react-hook-form";
 import { emailSchema } from "../auth-types";
 import { type LoginFormValues, loginFormSchema } from "./login-form";
 
-// ...existing code...
-
 export default function LoginDialog(): JSX.Element {
   const searchParams = useSearchParams();
 
