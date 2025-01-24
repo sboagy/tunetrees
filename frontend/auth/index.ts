@@ -22,11 +22,6 @@
  * SOFTWARE.
  */
 
-// Note there is a lot of commented code in here right now.  This is because I'm still very much in the
-// process of figuring out how to do things.  I'm keeping the commented out code in here for now, because
-// it's easier for me to see at at a glance what I've tried and what I haven't tried yet, and what my
-// options are.  I'm not sure if I want to keep the commented out code in here or not for very long.
-
 import type { NextAuthConfig, NextAuthResult, Session, User } from "next-auth";
 import NextAuth, { AuthError } from "next-auth";
 import "next-auth/jwt";
@@ -99,31 +94,6 @@ export const providers: Provider[] = [
       }
 
       const user = await getUserExtendedByEmail(email as string);
-
-      // psuedo-logic:
-      // is there any password set?  (if not, then this is a new user, goto "no" below, but with
-      //                              a null initial callback.)
-      // is there a hash?
-      //    yes:  does the password match the hash?
-      //         yes:  return the user object
-      //         no:   Inform the user that the password does not match.
-      //               (AuthError("Password does not match.") does not seem to work)
-      //    no:  new user, send email verification
-      //         on verification, make them repeat the password,
-      //                        using double entry to avoid typos, with first edit box filled in,
-      //                        and then hash it and save it.  This allows them to change their
-      //                        password to something new, if they want to.)
-      //
-      // Alternatives:
-      // 1.  Have a separate "Sign up" entry, that just has the email.  But this gets confusing
-      //     with single email sign-in.  Also, probably would also need the custom login page
-      //     for this.
-      //
-      // Issues:
-      // 1. What should be the best explanitory message for the user in the sign-in
-      //      dialog box?
-      // 2. How to set that message?  Do we need to go back to trying to get a custom
-      //    signin page to work?
 
       const host = request.headers.get("host");
 
@@ -279,14 +249,11 @@ const config = {
     strategy: "database",
   },
   providers: providers,
-  // skipCSRFCheck: skipCSRFCheck, // nope
   pages: {
     verifyRequest: "/auth/verify-request",
-    // Right now I can't get custom pages to work because of the csrf token issue.
     signIn: "/auth/login",
     // signOut: "/auth/signout",
     // error: "/auth/error", // Error code passed in query string as ?error=
-    //   verifyRequest: "/auth/verify-request", // (used for check email message)
     // newUser: "/auth/newuser", // New users will be directed here on first sign in (leave the property out if not of interest)
   },
   theme: {
@@ -304,135 +271,7 @@ const config = {
   // and switching back.
   // basePath: BASE_PATH,
   secret: process.env.NEXTAUTH_SECRET,
-  events: {
-    // signIn(message: {
-    //   user: User;
-    //   account: Account | null;
-    //   profile?: Profile;
-    //   isNewUser?: boolean;
-    // }) {
-    //   console.log(
-    //     "===> auth/index.ts:310 ~ signIn: ",
-    //     logObject(message, false),
-    //   );
-    // },
-    // signOut(
-    //   message:
-    //     | ``
-    //     | { session: Awaited<ReturnType<Required<Adapter>["deleteSession"]>> }
-    //     | { token: Awaited<ReturnType<JWTOptions["decode"]>> },
-    // ) {
-    //   console.log(
-    //     "===> auth/index.ts:316 ~ event: signOut -- ",
-    //     logObject(message, false),
-    //   );
-    // },
-    // createUser(message: { user: User }) {
-    //   console.log(
-    //     "===> auth/index.ts:322 ~ event: createUser -- ",
-    //     logObject(message, false),
-    //   );
-    // },
-    // updateUser(message: { user: User }) {
-    //   console.log(
-    //     "===> auth/index.ts:328 ~ event: updateUser -- ",
-    //     logObject(message, false),
-    //   );
-    // },
-    // linkAccount(message: {
-    //   user: User | AdapterUser;
-    //   account: Account;
-    //   profile: User | AdapterUser;
-    // }) {
-    //   console.log(
-    //     "===> auth/index.ts:330 ~ event: linkAccount -- ",
-    //     logObject(message, false),
-    //   );
-    // },
-    // session(message: { session: Session }) {
-    //   console.log(
-    //     "===> auth/index.ts:336 ~ event: session -- ",
-    //     logObject(message, false),
-    //   );
-    // },
-  },
   callbacks: {
-    // signIn(params: {
-    //   user: User | AdapterUser;
-    //   account: Account | null;
-    //   /**
-    //    * If OAuth provider is used, it contains the full
-    //    * OAuth profile returned by your provider.
-    //    */
-    //   profile?: Profile;
-    //   /**
-    //    * If Email provider is used, on the first call, it contains a
-    //    * `verificationRequest: true` property to indicate it is being triggered in the verification request flow.
-    //    * When the callback is invoked after a user has clicked on a sign in link,
-    //    * this property will not be present. You can check for the `verificationRequest` property
-    //    * to avoid sending emails to addresses or domains on a blocklist or to only explicitly generate them
-    //    * for email address in an allow list.
-    //    */
-    //   email?: {
-    //     verificationRequest?: boolean;
-    //   };
-    //   /** If Credentials provider is used, it contains the user credentials */
-    //   credentials?: Record<string, CredentialInput>;
-    // }) {
-    //   // See https://next-auth.js.org/configuration/callbacks#sign-in-callback
-    //   // console.log("callback: signIn -- ", logObject(params, false));
-    //   console.log(
-    //     "===> auth/index.ts:376 ~ callback: signIn -- ",
-    //     typeof params,
-    //   );
-
-    //   // if (
-    //   //   req.url?.includes("callback") &&
-    //   //   req.url.includes("credentials") &&
-    //   //   req.method === "POST"
-    //   // ) {
-    //   //   const sessionToken = generateSessionToken();
-    //   //   const sessionExpiry = fromDate(
-    //   //     authOptions.session?.maxAge ?? 30 * 24 * 60 * 60
-    //   //   );
-
-    //   //   const createdSession = await dbAdapter?.createSession?.({
-    //   //     sessionToken: sessionToken,
-    //   //     userId: user.id,
-    //   //     expires: sessionExpiry,
-    //   //   });
-
-    //   //   if (!createdSession) return false;
-
-    //   //   const cks = cookies();
-    //   //   cks.set({
-    //   //     name: "next-auth.session-token",
-    //   //     value: sessionToken,
-    //   //     expires: sessionExpiry,
-    //   //   });
-    //   // }
-    //   return true;
-    //   // return "/home";
-    // },
-    /*
-     * Removed entire "jwt" callback for database session strategy.
-     * // async jwt(params) {
-     * //   ...code not needed for database sessions...
-     * // }
-     */
-    // signIn(params: {
-    //   user: User | AdapterUser;
-    //   account: Account | null;
-    //   profile?: Profile;
-    //   email?: { verificationRequest?: boolean };
-    //   credentials?: Record<string, CredentialInput>;
-    // }) {
-    //   console.log(
-    //     "===> auth/index.ts:376 ~ callback: signIn -- ",
-    //     logObject(params, false),
-    //   );
-    //   return true;
-    // },
     session(params: {
       session: Session & { userId?: string; view_settings?: string };
       user: User | AdapterUser;
