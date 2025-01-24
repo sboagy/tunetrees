@@ -39,6 +39,10 @@ export default function LoginDialog(): JSX.Element {
   // Fetch email from searchParams asynchronously
   useEffect(() => {
     const emailParam = searchParams.get("email") || "";
+    console.log(
+      "===> page.tsx:43 ~ LoginDialog useEffect emailParam: ",
+      emailParam,
+    );
     setUserEmail(emailParam);
     setUserEmailParam(emailParam);
     console.log("Extracted email from searchParams:", emailParam);
@@ -97,6 +101,10 @@ export default function LoginDialog(): JSX.Element {
 
   // Update the form's email field when userEmail state changes
   useEffect(() => {
+    console.log(
+      "===> page.tsx:105 ~ LoginDialog useEffect (2) userEmail: ",
+      userEmail,
+    );
     form.setValue("email", userEmail);
   }, [userEmail, form]);
 
@@ -199,7 +207,7 @@ export default function LoginDialog(): JSX.Element {
                           id="user_email"
                           name="user_email"
                           type="email"
-                          placeholder="person@example.com"
+                          placeholder="user@example.com"
                           value={userEmail}
                           onChange={(e) => void handleEmailChange(e, field)}
                           required
