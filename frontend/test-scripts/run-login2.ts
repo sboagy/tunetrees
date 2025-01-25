@@ -26,11 +26,11 @@ export async function runLogin(
   );
 
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.getByPlaceholder("person@example.com").fill(user || "");
-  await page.getByPlaceholder("person@example.com").press("Tab");
-  const passwordEntryBox = page.locator("#password");
+  const userEmailLocator = page.getByTestId("user_email");
+  await userEmailLocator.fill(user || "");
+  await userEmailLocator.press("Tab");
+  const passwordEntryBox = page.getByTestId("user_password");
   await passwordEntryBox.fill(pw || "");
-  // await page.waitForTimeout(500);
   const signInButton = page.getByRole("button", {
     name: "Sign In",
     exact: true,
