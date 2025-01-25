@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { XCircle } from "lucide-react";
 import { getCsrfToken, signIn } from "next-auth/react"; // Ensure getCsrfToken is imported
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -155,11 +156,34 @@ export default function LoginDialog(): JSX.Element {
     }
   };
 
+  const handleCancel = () => {
+    // tune.deleted = true indicates this is a new tune, so it's
+    // safe and proper to delete on cancel.
+    if (typeof window !== "undefined") {
+      window.location.href = "/";
+    }
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="w-full max-w-md p-4">
         <Card className="w-full">
-          <CardHeader className="space-y-1">
+          <div className="flex justify-end space-x-2 mt-2 mr-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                handleCancel();
+              }}
+              aria-label="Cancel edits"
+              className="p-0 h-auto cursor-pointer"
+              title="Cancel edits"
+              data-testid="tt-tune-editor-cancel-button"
+            >
+              <XCircle className="h-4 w-4" />
+            </Button>
+          </div>
+          <CardHeader className="space-y-1 pt-1">
             <div className="flex justify-center mb-4">
               <Image
                 src="/logo4.png"
