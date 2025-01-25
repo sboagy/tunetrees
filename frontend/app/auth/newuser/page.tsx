@@ -34,6 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { emailSchema } from "../auth-types";
 import { getUser } from "../login/validate-signin";
@@ -186,10 +187,33 @@ export default function SignInPage(): JSX.Element {
 
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
 
+  const handleCancel = () => {
+    // tune.deleted = true indicates this is a new tune, so it's
+    // safe and proper to delete on cancel.
+    if (typeof window !== "undefined") {
+      window.location.href = "/";
+    }
+  };
+
   return (
     <div className="flex items-center justify-center mb-0 mt-20">
       <Card className="w-[24em]">
-        <CardHeader>
+        <div className="flex justify-end space-x-2 mt-2 mr-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              handleCancel();
+            }}
+            aria-label="Cancel edits"
+            className="p-0 h-auto cursor-pointer"
+            title="Cancel edits"
+            data-testid="tt-tune-editor-cancel-button"
+          >
+            <XCircle className="h-4 w-4" />
+          </Button>
+        </div>
+        <CardHeader className="pt-1">
           <CardTitle className="flex justify-center">
             <Image
               src="/logo4.png"
@@ -200,6 +224,7 @@ export default function SignInPage(): JSX.Element {
               priority={true}
             />
           </CardTitle>
+          <CardTitle className="text-2xl text-center">Sign up</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
