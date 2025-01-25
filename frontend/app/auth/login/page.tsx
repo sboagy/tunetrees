@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
-import axios from "axios";
+import { getCsrfToken, signIn } from "next-auth/react"; // Ensure getCsrfToken is imported
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import type { JSX } from "react";
@@ -28,9 +28,6 @@ import { useCallback, useEffect, useState } from "react";
 import { type ControllerRenderProps, useForm } from "react-hook-form";
 import { emailSchema } from "../auth-types";
 import { type LoginFormValues, loginFormSchema } from "./login-form";
-import { authorizeWithPassword } from "./validate-signin";
-
-// ...existing code...
 
 export default function LoginDialog(): JSX.Element {
   const searchParams = useSearchParams();
@@ -42,6 +39,10 @@ export default function LoginDialog(): JSX.Element {
   // Fetch email from searchParams asynchronously
   useEffect(() => {
     const emailParam = searchParams.get("email") || "";
+    console.log(
+      "===> page.tsx:43 ~ LoginDialog useEffect emailParam: ",
+      emailParam,
+    );
     setUserEmail(emailParam);
     setUserEmailParam(emailParam);
     console.log("Extracted email from searchParams:", emailParam);
@@ -49,8 +50,28 @@ export default function LoginDialog(): JSX.Element {
 
   const [password, setPassword] = useState("");
 
-  const [_crsfToken, setCrsfToken] = useState("abcdef");
-  console.log("SignInPage(): setCrsfToken:", setCrsfToken);
+  const [csrfToken, setCsrfToken] = useState("");
+
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginFormSchema),
+    defaultValues: {
+      email: "", // Start with empty string
+      password: "",
+      csrfToken: "", // Initialize with empty string
+    },
+  });
+
+  // Runs once after initial render: The effect runs only once, after the component has rendered for the first time.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+  useEffect(() => {
+    void (async () => {
+      const token = await getCsrfToken();
+      if (token) {
+        setCsrfToken(token);
+        form.setValue("csrfToken", token); // Update form's csrfToken value
+      }
+    })();
+  }, []);
 
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -78,18 +99,12 @@ export default function LoginDialog(): JSX.Element {
     validateEmail(userEmail);
   }, [userEmail, validateEmail]);
 
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginFormSchema),
-    defaultValues: {
-      email: "", // Start with empty string
-      password: "",
-      csrfToken: _crsfToken || "", // Add initial value for csrfToken if needed
-      // csrfToken: "",
-    },
-  });
-
   // Update the form's email field when userEmail state changes
   useEffect(() => {
+    console.log(
+      "===> page.tsx:105 ~ LoginDialog useEffect (2) userEmail: ",
+      userEmail,
+    );
     form.setValue("email", userEmail);
   }, [userEmail, form]);
 
@@ -103,14 +118,6 @@ export default function LoginDialog(): JSX.Element {
     setUserEmail(newEmail); // Update userEmail state
     validateEmail(newEmail);
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    // if (newEmail) {
-    //   const user = await getUser(newEmail);
-    //   if (!user) {
-    //     setEmailError("User not found");
-    //   } else {
-    //     setEmailError(null);
-    //   }
-    // }
   };
 
   const onSubmit = async (data: LoginFormValues) => {
@@ -122,25 +129,18 @@ export default function LoginDialog(): JSX.Element {
         csrfToken: data.csrfToken,
       });
       try {
-        const user = await authorizeWithPassword(userEmail, data.password);
-        if (!user) {
-          setPasswordError("Sign in failed");
+        const result = await signIn("credentials", {
+          redirect: false,
+          email: userEmail,
+          password: data.password,
+          csrfToken: data.csrfToken,
+        });
+        if (result?.error) {
+          setPasswordError(result.error);
         } else {
           console.log("Sign in successful");
           if (typeof window !== "undefined") {
-            const response = await axios.get("/api/verify-user", {
-              params: {
-                email: userEmail,
-                password: data.password,
-              },
-            });
-            console.log("verify-user response:", response);
-            if (response.status === 200) {
-              window.location.href = "/";
-            } else {
-              setPasswordError(response.statusText);
-              console.log("Could not sign in user");
-            }
+            window.location.href = "/";
           } else {
             setPasswordError("Problem redirecting to home page");
             console.log("Sign in successful, but window is undefined");
@@ -182,7 +182,6 @@ export default function LoginDialog(): JSX.Element {
                 <FormField
                   control={form.control}
                   name="csrfToken"
-                  defaultValue={_crsfToken}
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
@@ -190,6 +189,7 @@ export default function LoginDialog(): JSX.Element {
                           placeholder="csrfToken"
                           type="hidden"
                           {...field}
+                          value={csrfToken} // Use the state variable here
                         />
                       </FormControl>
                       <FormMessage />
@@ -207,12 +207,13 @@ export default function LoginDialog(): JSX.Element {
                           id="user_email"
                           name="user_email"
                           type="email"
-                          placeholder="person@example.com"
+                          placeholder="user@example.com"
                           value={userEmail}
                           onChange={(e) => void handleEmailChange(e, field)}
                           required
                           className={emailError ? "border-red-500" : ""}
                           autoFocus={userEmailParam === ""}
+                          data-testid="user_email"
                         />
                       </FormControl>
                       <FormMessage />
@@ -243,6 +244,7 @@ export default function LoginDialog(): JSX.Element {
                           }}
                           autoFocus={userEmailParam !== ""}
                           required
+                          data-testid="user_password"
                         />
                       </FormControl>
                       <FormMessage />
@@ -258,6 +260,7 @@ export default function LoginDialog(): JSX.Element {
                   type="submit"
                   variant="secondary"
                   disabled={
+                    !csrfToken ||
                     !!emailError ||
                     !!passwordError ||
                     !password ||

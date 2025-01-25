@@ -22,11 +22,6 @@
  * SOFTWARE.
  */
 
-// Note there is a lot of commented code in here right now.  This is because I'm still very much in the
-// process of figuring out how to do things.  I'm keeping the commented out code in here for now, because
-// it's easier for me to see at at a glance what I've tried and what I haven't tried yet, and what my
-// options are.  I'm not sure if I want to keep the commented out code in here or not for very long.
-
 import type {
   Account,
   NextAuthConfig,
@@ -44,10 +39,10 @@ import GoogleProvider from "next-auth/providers/google";
 import SendgridProvider from "next-auth/providers/sendgrid";
 
 import { viewSettingsDefault } from "@/app/user-settings/view-settings-default";
-import type { Adapter, AdapterUser } from "next-auth/adapters";
-import type { JWT, JWTOptions } from "next-auth/jwt";
+import type { AdapterUser } from "next-auth/adapters";
+import type { JWT } from "next-auth/jwt";
 import type { CredentialInput, Provider } from "next-auth/providers";
-import type { NextRequest } from "next/server";
+// import { randomUUID } from "node:crypto";
 import {
   sendVerificationRequest,
   verification_mail_html,
@@ -72,6 +67,94 @@ function logObject(obj: unknown, expand: boolean) {
 
 export const BASE_PATH = "/auth";
 
+async function authorize(
+  credentials: Partial<Record<"email" | "password", unknown>>,
+  request: Request,
+) {
+  console.log("===> auth/index.ts:99 ~ authorize: ", logObject(request, false));
+  // Use credentials object directly instead of URL search params
+  const email: string | undefined | unknown = credentials?.email;
+
+  if (!email) {
+    throw new Error("Empty Email.");
+  }
+
+  const user = await getUserExtendedByEmail(email as string);
+
+  const host = request.headers.get("host");
+
+  if (!user) {
+    console.log(
+      "===> auth/index.ts:140 ~ authorize -- No user found, so this is their first attempt to login",
+    );
+
+    // No user found, so this is their first attempt to login
+    // meaning this is also the place we can do registration
+    // ...If you return null then an error will be displayed advising the user to check their details.
+
+    // Do a magic check to see if this is a test email address, and if so, send the email to me.
+    const toEmail = (email as string).includes("test658.com")
+      ? "sboagy@gmail.com"
+      : (email as string);
+
+    await sendGrid({
+      to: toEmail,
+      from: "admin@tunetrees.com",
+      subject: "Email Verification",
+      html: verification_mail_html({
+        url: `https://${host}/verify?email=${email as string}`,
+        host: `https://${host}`,
+        // theme: { colorScheme: "auto", logo: "/logo4.png" },
+        theme: { brandColor: "auto", buttonText: "Verify Email" },
+      }),
+      text: verification_mail_text({
+        url: `https://${host}/verify?email=${email as string}`,
+        host: `https://${host}:3000`,
+      }),
+      dynamicTemplateData: {
+        verificationLink: `https://${host}/verify?email=${credentials.email as string}`,
+      },
+    });
+  }
+
+  // const user = { id: "1", name: "J Smith", email: "jsmith@example.com" };
+  // debugger;
+  if (user) {
+    console.log("===> auth/index.ts:176 ~ authorize -- user found");
+    if (!credentials.password) {
+      throw new Error("Empty Password.");
+    }
+    const password = credentials.password as string;
+    if (user.hash === undefined || user.hash === null) {
+      throw new Error("No password hash found for user.");
+    }
+
+    if (user.emailVerified === null) {
+      throw new Error("User's email has not been verified.");
+    }
+
+    const match = await matchPasswordWithHash(password, user.hash);
+    if (match) {
+      // Any object returned will be saved in `user` property of the JWT
+      console.log("===> auth/index.ts:192 ~ authorize -- password matches");
+      return user;
+    }
+    // redirect("/auth/password-no-match");
+    // throw new Error("Password does not match");
+    console.log(
+      "===> auth/index.ts:197 ~ authorize -- password does not match.",
+    );
+    throw new AuthError("Password does not match.");
+  }
+  // No user found, so this is their first attempt to login
+  // meaning this is also the place you could do registration
+  // ...If you return null then an error will be displayed advising the user to check their details.
+  console.log(
+    "===> auth/index.ts:205 ~ authorize -- User not found, exiting function.",
+  );
+  throw new Error("User not found.");
+}
+
 export const providers: Provider[] = [
   CredentialsProvider({
     id: "credentials",
@@ -93,105 +176,7 @@ export const providers: Provider[] = [
         type: "password",
       },
     },
-    async authorize(
-      credentials: Partial<Record<"email" | "password", unknown>>,
-      request: Request,
-    ) {
-      // Use credentials object directly instead of URL search params
-      const email: string | undefined | unknown = credentials?.email;
-
-      if (!email) {
-        throw new Error("Empty Email.");
-      }
-
-      const user = await getUserExtendedByEmail(email as string);
-
-      // psuedo-logic:
-      // is there any password set?  (if not, then this is a new user, goto "no" below, but with
-      //                              a null initial callback.)
-      // is there a hash?
-      //    yes:  does the password match the hash?
-      //         yes:  return the user object
-      //         no:   Inform the user that the password does not match.
-      //               (AuthError("Password does not match.") does not seem to work)
-      //    no:  new user, send email verification
-      //         on verification, make them repeat the password,
-      //                        using double entry to avoid typos, with first edit box filled in,
-      //                        and then hash it and save it.  This allows them to change their
-      //                        password to something new, if they want to.)
-      //
-      // Alternatives:
-      // 1.  Have a separate "Sign up" entry, that just has the email.  But this gets confusing
-      //     with single email sign-in.  Also, probably would also need the custom login page
-      //     for this.
-      //
-      // Issues:
-      // 1. What should be the best explanitory message for the user in the sign-in
-      //      dialog box?
-      // 2. How to set that message?  Do we need to go back to trying to get a custom
-      //    signin page to work?
-
-      const host = request.headers.get("host");
-
-      if (!user) {
-        // No user found, so this is their first attempt to login
-        // meaning this is also the place we can do registration
-        // ...If you return null then an error will be displayed advising the user to check their details.
-
-        // Do a magic check to see if this is a test email address, and if so, send the email to me.
-        const toEmail = (email as string).includes("test658.com")
-          ? "sboagy@gmail.com"
-          : (email as string);
-
-        await sendGrid({
-          to: toEmail,
-          from: "admin@tunetrees.com",
-          subject: "Email Verification",
-          html: verification_mail_html({
-            url: `https://${host}/verify?email=${email as string}`,
-            host: `https://${host}`,
-            // theme: { colorScheme: "auto", logo: "/logo4.png" },
-            theme: { brandColor: "auto", buttonText: "Verify Email" },
-          }),
-          text: verification_mail_text({
-            url: `https://${host}/verify?email=${email as string}`,
-            host: `https://${host}:3000`,
-          }),
-          dynamicTemplateData: {
-            verificationLink: `https://${host}/verify?email=${credentials.email as string}`,
-          },
-        });
-      }
-
-      // const user = { id: "1", name: "J Smith", email: "jsmith@example.com" };
-      // debugger;
-      if (user) {
-        if (!credentials.password) {
-          throw new Error("Empty Password.");
-        }
-        const password = credentials.password as string;
-        if (user.hash === undefined || user.hash === null) {
-          throw new Error("No password hash found for user.");
-        }
-
-        if (user.emailVerified === null) {
-          throw new Error("User's email has not been verified.");
-        }
-
-        const match = await matchPasswordWithHash(password, user.hash);
-        if (match) {
-          // Any object returned will be saved in `user` property of the JWT
-          return user;
-        }
-        // redirect("/auth/password-no-match");
-        // throw new Error("Password does not match");
-        throw new AuthError("Password does not match.");
-      }
-      // No user found, so this is their first attempt to login
-      // meaning this is also the place you could do registration
-      // ...If you return null then an error will be displayed advising the user to check their details.
-      throw new Error("User not found.");
-    },
+    authorize: authorize,
   }),
 
   SendgridProvider({
@@ -270,18 +255,26 @@ const config = {
   // theme: { logo: "https://authjs.dev/img/logo-sm.png" },
   adapter: ttHttpAdapter,
   session: {
+    // Have not been to get database strategy to work yet.  From what I can tell,
+    // it simply doesn't work with the credentials provider.  I'm not sure if there's
+    // a way to make password authentication to work with the database strategy, without
+    // using a custom oauth provider, which I'm not sure I have the skills to do right now.
     strategy: "jwt",
-    // strategy: "database",
+
+    // Seconds - How long until an idle session expires and is no longer valid.
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+
+    // Seconds - Throttle how frequently to write to database to extend a session.
+    // Use it to limit write operations. Set to 0 to always update the database.
+    // Note: This option is ignored if using JSON Web Tokens
+    updateAge: 24 * 60 * 60, // 24 hours
   },
   providers: providers,
-  // skipCSRFCheck: skipCSRFCheck, // nope
   pages: {
     verifyRequest: "/auth/verify-request",
-    // Right now I can't get custom pages to work because of the csrf token issue.
     signIn: "/auth/login",
     // signOut: "/auth/signout",
     // error: "/auth/error", // Error code passed in query string as ?error=
-    //   verifyRequest: "/auth/verify-request", // (used for check email message)
     // newUser: "/auth/newuser", // New users will be directed here on first sign in (leave the property out if not of interest)
   },
   theme: {
@@ -299,39 +292,6 @@ const config = {
   // and switching back.
   // basePath: BASE_PATH,
   secret: process.env.NEXTAUTH_SECRET,
-  events: {
-    signIn(message: {
-      user: User;
-      account: Account | null;
-      profile?: Profile;
-      isNewUser?: boolean;
-    }) {
-      console.log("event: signIn -- ", logObject(message, false));
-    },
-    signOut(
-      message:
-        | { session: Awaited<ReturnType<Required<Adapter>["deleteSession"]>> }
-        | { token: Awaited<ReturnType<JWTOptions["decode"]>> },
-    ) {
-      console.log("event: signOut -- ", logObject(message, false));
-    },
-    createUser(message: { user: User }) {
-      console.log("event: createUser -- ", logObject(message, false));
-    },
-    updateUser(message: { user: User }) {
-      console.log("event: updateUser -- ", logObject(message, false));
-    },
-    linkAccount(message: {
-      user: User | AdapterUser;
-      account: Account;
-      profile: User | AdapterUser;
-    }) {
-      console.log("event: linkAccount -- ", logObject(message, false));
-    },
-    session(message: { session: Session; token: JWT }) {
-      console.log("event: session -- ", logObject(message, false));
-    },
-  },
   callbacks: {
     signIn(params: {
       user: User | AdapterUser;
@@ -356,51 +316,9 @@ const config = {
       credentials?: Record<string, CredentialInput>;
     }) {
       // See https://next-auth.js.org/configuration/callbacks#sign-in-callback
-      // console.log("callback: signIn -- ", logObject(params, false));
-      console.log("callback: signIn -- ", typeof params);
-
-      // if (
-      //   req.url?.includes("callback") &&
-      //   req.url.includes("credentials") &&
-      //   req.method === "POST"
-      // ) {
-      //   const sessionToken = generateSessionToken();
-      //   const sessionExpiry = fromDate(
-      //     authOptions.session?.maxAge ?? 30 * 24 * 60 * 60
-      //   );
-
-      //   const createdSession = await dbAdapter?.createSession?.({
-      //     sessionToken: sessionToken,
-      //     userId: user.id,
-      //     expires: sessionExpiry,
-      //   });
-
-      //   if (!createdSession) return false;
-
-      //   const cks = cookies();
-      //   cks.set({
-      //     name: "next-auth.session-token",
-      //     value: sessionToken,
-      //     expires: sessionExpiry,
-      //   });
-      // }
-      return true;
-      // return "/home";
-    },
-    authorized(params: {
-      /** The request to be authorized. */
-      request: NextRequest;
-      /** The authenticated user or token, if any. */
-      auth: Session | null;
-    }) {
-      // Is this a thing?  Who calls this?
-      console.log("callback: authorized -- ", logObject(params, false));
-
-      // const { pathname } = params.request.nextUrl;
-      // if (pathname === "/middleware-example") return !!auth;
+      console.log("===> index.ts:331 ~ signIn callback -- ", typeof params);
       return true;
     },
-
     async jwt(params: {
       token: JWT;
       user: User | AdapterUser;
@@ -410,7 +328,7 @@ const config = {
       isNewUser?: boolean;
       session?: Session | null;
     }) {
-      // console.log("callback: jwt -- ", logObject(params, false));
+      console.log("===> auth index.ts:343 ~ jwt callback");
       if (params.trigger === "update" && params.session?.user) {
         params.token.name = params.session.user.name;
       } else if (params.trigger === "update" && params.session) {
@@ -451,7 +369,7 @@ const config = {
       baseUrl: string;
     }) {
       // See https://next-auth.js.org/configuration/callbacks#redirect-callback
-      // console.log("redirect callback: -- ", logObject(params, true));
+      console.log("===> auth index.ts:384 ~ redirect callback");
       return params.baseUrl;
     },
     session(params: {
@@ -459,13 +377,7 @@ const config = {
       token: JWT & { user_id?: string; view_settings?: string };
       user: User | AdapterUser;
     }) {
-      // console.log(
-      //   "callback: session -- ",
-      //   logObject(params.session, false),
-      //   params.token,
-      //   params.user,
-      // );
-
+      console.log("===> auth index.ts:392 ~ session callback");
       params.session.userId = params.token.user_id as string;
       if (params.session.user) {
         params.session.user.id = params.token.user_id as string;
@@ -473,37 +385,8 @@ const config = {
       if (params.token.view_settings) {
         params.session.view_settings = params.token.view_settings;
       }
-
       return params.session;
     },
-    // async session(
-    //   params: ({
-    //     session: { user: AdapterUser } & AdapterSession;
-    //     /** Available when {@link AuthConfig.session} is set to `strategy: "database"`. */
-    //     user: AdapterUser;
-    //   } & {
-    //     session: Session;
-    //     /** Available when {@link AuthConfig.session} is set to `strategy: "jwt"` */
-    //     token: JWT;
-    //   }) & {
-    //     /**
-    //      * Available when using {@link AuthConfig.session} `strategy: "database"` and an update is triggered for the session.
-    //      *
-    //      * :::note
-    //      * You should validate this data before using it.
-    //      * :::
-    //      */
-    //     newSession: any;
-    //     trigger?: "update";
-    //   }
-    // ) {
-    //   console.log("callback: session -- ", logObject(params, false));
-    //   if (params.token?.accessToken) {
-    //     // params.session.sessionToken = params.token.accessToken;
-    //     // session.user.id = token.id;
-    //   }
-    //   return params.session;
-    // },
   },
   // experimental: {
   //   enableWebAuthn: true,
@@ -522,17 +405,3 @@ export const {
 
 // export const handlers: NextAuthResult["handlers"] = nextAuth.handlers;
 export const auth: NextAuthResult["auth"] = nextAuth.auth;
-// export const signIn: NextAuthResult["signIn"] = nextAuth.signIn;
-// export const signOut: NextAuthResult["signOut"] = nextAuth.signOut;
-
-// declare module "next-auth" {
-//   interface Session {
-//     accessToken?: string;
-//   }
-// }
-//
-// declare module "next-auth/jwt" {
-//   interface JWT {
-//     accessToken?: string;
-//   }
-// }

@@ -2,14 +2,9 @@ import { z } from "zod";
 
 export const accountFormSchema = z
   .object({
-    csrfToken: z
-      .string()
-      .min(2, {
-        message: "csrfToken must be at least 2 characters.",
-      })
-      .max(30, {
-        message: "csrfToken must not be longer than 30 characters.",
-      }),
+    csrfToken: z.string().max(128, {
+      message: "csrfToken must not be longer than 128 characters.",
+    }),
     // username: z
     //     .string()
     //     .min(2, {

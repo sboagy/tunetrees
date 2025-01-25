@@ -16,11 +16,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
-// import { useSession } from "next-auth/react";
+import { getCsrfToken } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { type ControllerRenderProps, useForm } from "react-hook-form";
 
-// import { cookies } from "next/headers";
 import {
   type AccountFormValues,
   accountFormSchema,
@@ -53,15 +52,11 @@ const languages = [
   { label: "Chinese", value: "zh" },
 ] as const;
 
-// const _crsfToken = client
-
 export default function SignInPage(): JSX.Element {
   const searchParams = useSearchParams();
   let email = searchParams.get("email") || "";
 
-  // Move the _crsfToken declaration here
-  const [_crsfToken, setCrsfToken] = useState("abcdef");
-  console.log("SignInPage(): setCrsfToken:", setCrsfToken);
+  const [_crsfToken, setCrsfToken] = useState("");
 
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
@@ -70,9 +65,21 @@ export default function SignInPage(): JSX.Element {
       password: "", // Add initial value for password
       password_confirmation: "", // Add initial value for password_confirmation
       name: "", // Add initial value for name
-      csrfToken: _crsfToken || "", // Add initial value for csrfToken if needed
+      csrfToken: "", // Initialize with empty string
     },
   });
+
+  // Runs once after initial render: The effect runs only once, after the component has rendered for the first time.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+  useEffect(() => {
+    void (async () => {
+      const token = await getCsrfToken();
+      if (token) {
+        setCrsfToken(token);
+        form.setValue("csrfToken", token); // Update form's csrfToken value
+      }
+    })();
+  }, []);
 
   if (email === "" && typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
@@ -87,12 +94,10 @@ export default function SignInPage(): JSX.Element {
 
   const validateEmail = useCallback((email: string): boolean => {
     if (email === "") {
-      // setEmailError("Email cannot be empty");
       setEmailError(null);
       return false;
     }
 
-    // TODO: implement token validation logic
     const result = emailSchema.safeParse(email);
     if (!result.success) {
       setEmailError(result.error.issues[0].message);
@@ -133,7 +138,6 @@ export default function SignInPage(): JSX.Element {
       setPasswordError(null);
       setPasswordConfirmationError(null);
     } else {
-      // setPasswordError("Password confirmation does not match");
       setPasswordConfirmationError("Passwords do not match");
     }
   }
@@ -168,10 +172,8 @@ export default function SignInPage(): JSX.Element {
     field.onChange(e); // Update the form state
   };
 
-  // Use useRouter directly
   const router = useRouter();
 
-  // Define onSubmit as a regular async function
   const onSubmit = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);
     const host = window.location.host;
@@ -182,22 +184,7 @@ export default function SignInPage(): JSX.Element {
     router.push("/auth/verify-request");
   };
 
-  // let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
-
-  // useEffect(() => {
-  //   const fetchCrsfToken = async () => {
-  //     try {
-  //       const response = await fetch("/api/get-csrf-token");
-  //       const data = await response.json();
-  //       setCrsfToken(data.csrfToken);
-  //     } catch (error) {
-  //       console.error("Failed to fetch CSRF token:", error);
-  //     }
-  //   };
-
-  //   fetchCrsfToken();
-  // }, []);
 
   return (
     <div className="flex items-center justify-center mb-0 mt-20">
@@ -209,14 +196,10 @@ export default function SignInPage(): JSX.Element {
               alt="Home"
               width={75}
               height={75}
-              // height={48}
               className="min-w-8"
               priority={true}
             />
           </CardTitle>
-
-          {/* <CardTitle>Sign Up for TuneTrees</CardTitle> */}
-          {/* <CardDescription>Register a new user with TuneTrees</CardDescription> */}
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -229,14 +212,16 @@ export default function SignInPage(): JSX.Element {
               <FormField
                 control={form.control}
                 name="csrfToken"
-                defaultValue={_crsfToken}
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Input placeholder="csrfToken" type="hidden" {...field} />
-                      {/* <CSRFInput /> */}
+                      <Input
+                        placeholder="csrfToken"
+                        type="hidden"
+                        {...field}
+                        value={_crsfToken} // Use the state variable here
+                      />
                     </FormControl>
-                    {/* <FormDescription>TuneTrees user name.</FormDescription> */}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -258,9 +243,6 @@ export default function SignInPage(): JSX.Element {
                         autoFocus
                       />
                     </FormControl>
-                    {/* <FormDescription>
-                      Must be a valid email address.
-                    </FormDescription> */}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -277,11 +259,6 @@ export default function SignInPage(): JSX.Element {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      {/* <Input
-                        placeholder="password"
-                        type="password"
-                        {...field}
-                      /> */}
                       <PasswordInput
                         id="password"
                         placeholder="password"
@@ -290,9 +267,6 @@ export default function SignInPage(): JSX.Element {
                         onChange={(e) => handlePasswordChange(e, field)}
                       />
                     </FormControl>
-                    {/* <FormDescription>
-                      Must be a valid email address.
-                    </FormDescription> */}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -309,11 +283,6 @@ export default function SignInPage(): JSX.Element {
                   <FormItem>
                     <FormLabel>Confirm Password</FormLabel>
                     <FormControl>
-                      {/* <Input
-                        placeholder="password"
-                        type="password"
-                        {...field}
-                      /> */}
                       <PasswordInput
                         id="password_confirmation"
                         placeholder="repeat password"
@@ -324,9 +293,6 @@ export default function SignInPage(): JSX.Element {
                         }
                       />
                     </FormControl>
-                    {/* <FormDescription>
-                      Repeat password, must match previous field.
-                    </FormDescription> */}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -349,10 +315,6 @@ export default function SignInPage(): JSX.Element {
                         onChange={(e) => handleUserNameChange(e, field)}
                       />
                     </FormControl>
-                    {/* <FormDescription>
-                      This is the name that will be displayed on your profile
-                      and in emails.
-                    </FormDescription> */}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -361,6 +323,7 @@ export default function SignInPage(): JSX.Element {
                 type="submit"
                 variant="secondary"
                 disabled={
+                  !_crsfToken ||
                   !!emailError ||
                   !!passwordError ||
                   !!passwordConfirmationError ||
