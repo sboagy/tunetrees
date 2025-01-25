@@ -323,6 +323,7 @@ export default function SignInPage(): JSX.Element {
                 type="submit"
                 variant="secondary"
                 disabled={
+                  !_crsfToken ||
                   !!emailError ||
                   !!passwordError ||
                   !!passwordConfirmationError ||

@@ -213,6 +213,7 @@ export default function LoginDialog(): JSX.Element {
                           required
                           className={emailError ? "border-red-500" : ""}
                           autoFocus={userEmailParam === ""}
+                          data-testid="user_email"
                         />
                       </FormControl>
                       <FormMessage />
@@ -243,6 +244,7 @@ export default function LoginDialog(): JSX.Element {
                           }}
                           autoFocus={userEmailParam !== ""}
                           required
+                          data-testid="user_password"
                         />
                       </FormControl>
                       <FormMessage />
@@ -258,6 +260,7 @@ export default function LoginDialog(): JSX.Element {
                   type="submit"
                   variant="secondary"
                   disabled={
+                    !csrfToken ||
                     !!emailError ||
                     !!passwordError ||
                     !password ||
