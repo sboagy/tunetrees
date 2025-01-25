@@ -14,7 +14,7 @@ import type {
 } from "@tanstack/react-table";
 import { BetweenHorizontalEnd } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
-import { getRepertoireTunesOverview } from "../queries";
+import { getRepertoireTunesOverview, getReviewSitdownDate } from "../queries";
 import {
   fetchFilterFromDB,
   getTableStateTable,
@@ -255,6 +255,54 @@ export default function TunesGridRepertoire({
     // const updates: { [key: string]: TuneUpdate } = {};
   };
 
+  const [reviewSitdownDate, setReviewSitdownDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    // We have to go clear to the server to get the review sitdown date.
+    // there might be a better way to do this, like in the session object.
+    getReviewSitdownDate()
+      .then((dateString: string) => {
+        const reviewSitdown = dateString ? new Date(dateString) : new Date();
+        setReviewSitdownDate(reviewSitdown);
+      })
+      .catch((error) => {
+        console.error(
+          "TunesGrid useEffect getReviewSitdownDate error: %s",
+          error,
+        );
+      });
+  }, []); // the effect runs only once, after the initial render of the component.
+
+  const getStyleForSchedulingState = (
+    scheduledDateString: string | null,
+  ): string => {
+    if (!scheduledDateString) {
+      return "underline"; // Return underline to signify new tune, has not been scheduled
+    }
+
+    const scheduledDate = new Date(scheduledDateString);
+    if (Number.isNaN(scheduledDate.getTime())) {
+      return "outline-red-500"; // Outline in red to show date is invalid (i.e. error state)
+    }
+
+    // reviewSitdownDateNoHours has to go to the server, thus is set by useEffect.
+    if (reviewSitdownDate) {
+      const lowerBoundReviewSitdownDate = new Date(reviewSitdownDate);
+      lowerBoundReviewSitdownDate.setDate(reviewSitdownDate.getDate() - 7);
+      if (scheduledDate < lowerBoundReviewSitdownDate) {
+        return "italic text-gray-300";
+      }
+      if (
+        scheduledDate > lowerBoundReviewSitdownDate &&
+        scheduledDate <= reviewSitdownDate
+      ) {
+        return "font-extrabold";
+      }
+      return "text-green-100";
+    }
+    return "";
+  };
+
   return (
     <div className="w-full h-full">
       {tableComponent}
@@ -342,6 +390,7 @@ export default function TunesGridRepertoire({
             userId={userId}
             playlistId={playlistId}
             tablePurpose={"repertoire"}
+            getStyleForSchedulingState={getStyleForSchedulingState}
           />
         </>
       )}

@@ -35,6 +35,24 @@ const client = axios.create({
   baseURL: process.env.NEXT_PUBLIC_TT_BASE_URL,
 });
 
+/**
+ * Fetches the review sitdown date from the server.
+ *
+ * This function retrieves the review sitdown date from an environment variable
+ * on the server side. This is necessary because the environment variable is not
+ * available to the client.
+ *
+ * @returns {Promise<string>} A promise that resolves to the review sitdown date
+ *                            as a string. If the environment variable is not set,
+ *                            an empty string is returned.
+ */
+export async function getReviewSitdownDate(): Promise<string> {
+  // Dummy await to satisfy the eslint rule
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  return process.env.TT_REVIEW_SITDOWN_DATE || "";
+}
+
 export async function getScheduledTunesOverview(
   userId: number,
   playlistId: number,
@@ -54,6 +72,7 @@ export async function getScheduledTunesOverview(
         params: {
           show_playlist_deleted: showDeleted,
           sitdown_date: reviewSitdownDate,
+          acceptable_delinquency_window: 7,
         },
       },
     );

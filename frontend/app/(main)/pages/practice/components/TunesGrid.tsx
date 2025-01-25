@@ -26,6 +26,9 @@ type Props = {
   playlistId: number;
   tablePurpose: TablePurpose;
   onRowClickCallback?: (newTune: number) => void;
+  getStyleForSchedulingState?: (
+    reviewDate: string | null,
+  ) => string | undefined;
 };
 
 const TunesGrid = ({
@@ -34,6 +37,7 @@ const TunesGrid = ({
   playlistId,
   tablePurpose,
   onRowClickCallback,
+  getStyleForSchedulingState,
 }: Props) => {
   const {
     currentTune,
@@ -254,11 +258,13 @@ const TunesGrid = ({
                       //     : ""
                       // } ${getColorForEvaluation(row.original.recall_eval || null)}`}
                       // className={`absolute h-16 cursor-pointer w-full ${getColorForEvaluation(row.original.recall_eval || null)}`}
-                      className={`absolute cursor-pointer w-full ${
-                        currentTune === row.original.id
-                          ? "outline outline-2 outline-blue-500"
-                          : ""
-                      } ${getColorForEvaluation(row.original.recall_eval || null, false)}`}
+                      className={`absolute cursor-pointer w-full 
+                        ${getStyleForSchedulingState ? getStyleForSchedulingState(row.original.review_date) : ""} 
+                        ${
+                          currentTune === row.original.id
+                            ? "outline outline-2 outline-blue-500"
+                            : ""
+                        } ${getColorForEvaluation(row.original.recall_eval || null, false)}`}
                       onClick={handleRowClick.bind(null, row)}
                       onDoubleClick={() => handleRowDoubleClick(row)}
                       data-state={row.getIsSelected() && "selected"}
