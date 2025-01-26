@@ -138,10 +138,10 @@ export class TuneTreesPageObject {
     await this.filterInput.waitFor({ state: "attached" });
     await this.filterInput.click();
 
-    await this.filterInput.fill(tuneTitle);
+    await this.filterInput.fill(tuneTitle, { timeout: 90_000 });
 
     // An exception to the rule that we should not use expect() in PageObjects.
-    await expect(this.tunesGridRows).toHaveCount(2, { timeout: 60000 });
+    await expect(this.tunesGridRows).toHaveCount(2, { timeout: 60_000 });
 
     const tuneRow = this.page.getByRole("row").nth(1);
     await tuneRow.click();
@@ -172,6 +172,7 @@ export class TuneTreesPageObject {
 
     // Make sure the "Add To Review" button is visible
     await this.addToReviewButton.waitFor({ state: "visible" });
+    await this.waitForTablePopulationToStart();
   }
 
   async navigateToPracticeTab() {
@@ -202,6 +203,8 @@ export class TuneTreesPageObject {
     await this.practiceTab.isEnabled();
 
     await this.submitPracticedTunesButton.isVisible({ timeout: 60000 });
+
+    await this.waitForTablePopulationToStart();
 
     // Hmmm, not sure what this is/was for.
     // const ttPracticeTab2 = page
