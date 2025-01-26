@@ -29,6 +29,10 @@ type Props = {
   getStyleForSchedulingState?: (
     reviewDate: string | null,
   ) => string | undefined;
+  lapsedCount?: number | null;
+  currentCount?: number | null;
+  futureCount?: number | null;
+  newCount?: number | null;
 };
 
 const TunesGrid = ({
@@ -38,6 +42,10 @@ const TunesGrid = ({
   tablePurpose,
   onRowClickCallback,
   getStyleForSchedulingState,
+  lapsedCount,
+  currentCount,
+  futureCount,
+  newCount,
 }: Props) => {
   const {
     currentTune,
@@ -305,6 +313,10 @@ const TunesGrid = ({
                 <div className="flex-1 text-sm text-muted-foreground">
                   {table.getFilteredSelectedRowModel().rows.length} of{" "}
                   {table.getFilteredRowModel().rows.length} row(s) selected.
+                  {lapsedCount !== undefined && `, lapsed: ${lapsedCount}`}
+                  {currentCount !== undefined && `, current: ${currentCount}`}
+                  {futureCount !== undefined && `, future: ${futureCount}`}
+                  {newCount !== undefined && `, new: ${newCount}`}
                 </div>
               </TableCell>
             </TableRow>

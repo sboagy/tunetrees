@@ -14,7 +14,7 @@ import type {
 } from "@tanstack/react-table";
 import { BetweenHorizontalEnd } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
-import { getRepertoireTunesOverview, getReviewSitdownDate } from "../queries";
+import { getRepertoireTunesOverview } from "../queries";
 import {
   fetchFilterFromDB,
   getTableStateTable,
@@ -24,6 +24,7 @@ import type { ITableStateTable, ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
 import NewTuneButton from "./NewTuneButton";
+import { useSitDownDate } from "./SitdownDateProvider";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
@@ -70,8 +71,16 @@ export default function TunesGridRepertoire({
   // which is specific to the repertoire grid, is used to track the last refresh
   // of the tunes. The refreshId, which is global to the app, is
   // used to compare to tunesRefreshId to trigger a refresh of the tunes when it changes.
-  const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =
-    useRepertoireTunes();
+  const {
+    tunes,
+    setTunes,
+    tunesRefreshId,
+    setTunesRefreshId,
+    lapsedCount,
+    currentCount,
+    futureCount,
+    newCount,
+  } = useRepertoireTunes();
 
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
 
@@ -255,23 +264,7 @@ export default function TunesGridRepertoire({
     // const updates: { [key: string]: TuneUpdate } = {};
   };
 
-  const [reviewSitdownDate, setReviewSitdownDate] = useState<Date | null>(null);
-
-  useEffect(() => {
-    // We have to go clear to the server to get the review sitdown date.
-    // there might be a better way to do this, like in the session object.
-    getReviewSitdownDate()
-      .then((dateString: string) => {
-        const reviewSitdown = dateString ? new Date(dateString) : new Date();
-        setReviewSitdownDate(reviewSitdown);
-      })
-      .catch((error) => {
-        console.error(
-          "TunesGrid useEffect getReviewSitdownDate error: %s",
-          error,
-        );
-      });
-  }, []); // the effect runs only once, after the initial render of the component.
+  const { sitDownDate } = useSitDownDate();
 
   const getStyleForSchedulingState = (
     scheduledDateString: string | null,
@@ -286,19 +279,19 @@ export default function TunesGridRepertoire({
     }
 
     // reviewSitdownDateNoHours has to go to the server, thus is set by useEffect.
-    if (reviewSitdownDate) {
-      const lowerBoundReviewSitdownDate = new Date(reviewSitdownDate);
-      lowerBoundReviewSitdownDate.setDate(reviewSitdownDate.getDate() - 7);
+    if (sitDownDate) {
+      const lowerBoundReviewSitdownDate = new Date(sitDownDate);
+      lowerBoundReviewSitdownDate.setDate(sitDownDate.getDate() - 7);
       if (scheduledDate < lowerBoundReviewSitdownDate) {
-        return "italic text-gray-300";
+        return "underline text-gray-300";
       }
       if (
         scheduledDate > lowerBoundReviewSitdownDate &&
-        scheduledDate <= reviewSitdownDate
+        scheduledDate <= sitDownDate
       ) {
         return "font-extrabold";
       }
-      return "text-green-100";
+      return "italic text-green-300";
     }
     return "";
   };
@@ -391,6 +384,10 @@ export default function TunesGridRepertoire({
             playlistId={playlistId}
             tablePurpose={"repertoire"}
             getStyleForSchedulingState={getStyleForSchedulingState}
+            lapsedCount={lapsedCount}
+            currentCount={currentCount}
+            futureCount={futureCount}
+            newCount={newCount}
           />
         </>
       )}

@@ -2,32 +2,32 @@ import type React from "react";
 import { type ReactNode, createContext, useContext, useState } from "react";
 import type { ITuneOverview } from "../types";
 
-interface IAllTunesContextType {
+interface ICatalogTunesContextType {
   tunes: ITuneOverview[];
   setTunes: React.Dispatch<React.SetStateAction<ITuneOverview[]>>;
   tunesRefreshId: number | null;
   setTunesRefreshId: (newRefreshId: number) => void;
 }
 
-const TunesContextAll = createContext<IAllTunesContextType | undefined>(
+const TunesContextCatalog = createContext<ICatalogTunesContextType | undefined>(
   undefined,
 );
 
-export const TunesProviderAll = ({ children }: { children: ReactNode }) => {
+export const TunesProviderCatalog = ({ children }: { children: ReactNode }) => {
   const [tunes, setTunes] = useState<ITuneOverview[]>([]);
   const [tunesRefreshId, setTunesRefreshId] = useState<number | null>(null);
 
   return (
-    <TunesContextAll.Provider
+    <TunesContextCatalog.Provider
       value={{ tunes, setTunes, tunesRefreshId, setTunesRefreshId }}
     >
       {children}
-    </TunesContextAll.Provider>
+    </TunesContextCatalog.Provider>
   );
 };
 
-export const useAllTunes = () => {
-  const context = useContext(TunesContextAll);
+export const useCatalogTunes = () => {
+  const context = useContext(TunesContextCatalog);
   if (!context) {
     throw new Error("useTunes must be used within a TunesProvider");
   }
