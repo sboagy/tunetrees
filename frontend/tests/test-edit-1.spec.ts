@@ -75,7 +75,8 @@ test.describe.serial("Tune Edit Tests", () => {
       "Lakes of Sligo x",
     );
     await ttPO.addToReviewButton.waitFor({ state: "visible" });
-    await ttPO.filterInput.fill("Lakes of Sligo x");
+    await ttPO.navigateToTune("Lakes of Sligo x");
+    // await ttPO.filterInput.fill("Lakes of Sligo x");
     await expect(ttPO.tunesGridRows).toHaveCount(2); // 1 for the header, 1 for the tune
     expect(page.getByRole("row", { name: "Lakes of Sligo x" }).isVisible());
     // I get a 500 error here without the wait when it's doing a get on table state.  Not good.
