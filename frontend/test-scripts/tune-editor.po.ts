@@ -32,6 +32,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
   readonly allFormFields: Locator[];
 
   readonly sampleBoyneHunt: FormFieldUpdate[];
+  readonly sampleSiBheagSiMhorShort: FormFieldUpdate[];
 
   constructor(page: Page) {
     super(page);
@@ -72,91 +73,191 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
       // this.ffTags,
     ];
 
-    this.sampleBoyneHunt = [
-      {
+    const tuneEditorFieldsBase: { [key: string]: FormFieldUpdate } = {
+      title: {
         label: "Title",
         locator: this.ffTitle.locator("input"),
-        modification: "Boyne Hunt x",
-        original: "Boyne Hunt",
+        modification: "",
+        original: "",
         cellId: "200_title",
       },
-      {
+      type: {
         label: "Type",
         locator: this.ffType.locator("input"),
-        modification: "Jig",
-        original: "Reel",
+        modification: "",
+        original: "",
         cellId: "200_type",
       },
-      {
+      structure: {
         label: "Structure",
         locator: this.ffStructure.locator("input"),
-        modification: "AABB",
-        original: "AB",
+        modification: "",
+        original: "",
         cellId: "200_structure",
       },
-      {
+      mode: {
         label: "Mode",
         locator: this.ffMode.locator("input"),
+        modification: "",
+        original: "",
+      },
+      incipit: {
+        label: "Incipit",
+        locator: this.ffIncipit.locator("input"),
+        modification: "",
+        original: "",
+      },
+      genre: {
+        label: "Genre",
+        locator: this.ffGenre.locator("input"),
+        modification: "",
+        original: "",
+      },
+      learned: {
+        label: "Learned Date",
+        locator: this.ffLearned.locator("input"),
+        modification: "",
+        original: "",
+      },
+      practiced: {
+        label: "Practiced Date",
+        locator: this.ffPracticed.locator("input"),
+        modification: "",
+        original: "",
+        // TODO: Have to factor out date formatting and maybe (?) time zone issues
+        // cellId: "200_practiced",
+      },
+      quality: {
+        label: "Quality",
+        locator: this.ffQuality.locator("input"),
+        modification: "",
+        original: "",
+      },
+      easiness: {
+        label: "Easiness",
+        locator: this.ffEasiness.locator("input"),
+        modification: "",
+        original: "",
+      },
+      interval: {
+        label: "Interval",
+        locator: this.ffInterval.locator("input"),
+        modification: "",
+        original: "",
+      },
+      repetitions: {
+        label: "Repetitions",
+        locator: this.ffRepetitions.locator("input"),
+        modification: "",
+        original: "",
+      },
+      scheduled: {
+        label: "Scheduled",
+        locator: this.ffReviewDate.locator("input"),
+        modification: "",
+        original: "",
+        // TODO: Have to factor out date formatting and maybe (?) time zone issues
+        // cellId: "200_review_date",
+      },
+    };
+
+    this.sampleBoyneHunt = [
+      {
+        ...tuneEditorFieldsBase.title,
+        modification: "Boyne Hunt x",
+        original: "Boyne Hunt",
+      },
+      {
+        ...tuneEditorFieldsBase.type,
+        modification: "Jig",
+        original: "Reel",
+      },
+      {
+        ...tuneEditorFieldsBase.structure,
+        modification: "AABB",
+        original: "AB",
+      },
+      {
+        ...tuneEditorFieldsBase.mode,
         modification: "G Major",
         original: "D Major",
       },
       {
-        label: "Incipit",
-        locator: this.ffIncipit.locator("input"),
+        ...tuneEditorFieldsBase.incipit,
         modification: "|ABC DEF|",
         original: "|A2FA DAFA|DAFA BEeB|",
       },
       {
-        label: "Genre",
-        locator: this.ffGenre.locator("input"),
+        ...tuneEditorFieldsBase.genre,
         modification: "FADO",
         original: "ITRAD",
       },
       {
-        label: "Learned Date",
-        locator: this.ffLearned.locator("input"),
+        ...tuneEditorFieldsBase.learned,
         modification: "2010-11-24",
         original: "2010-11-20",
       },
       {
-        label: "Practiced Date",
-        locator: this.ffPracticed.locator("input"),
+        ...tuneEditorFieldsBase.practiced,
         modification: "2023-06-06T10:25:16",
         original: "2023-06-06T22:25:16",
         // TODO: Have to factor out date formatting and maybe (?) time zone issues
         // cellId: "200_practiced",
       },
       {
-        label: "Quality",
-        locator: this.ffQuality.locator("input"),
+        ...tuneEditorFieldsBase.quality,
         modification: "2",
         original: "1",
       },
       {
-        label: "Easiness",
-        locator: this.ffEasiness.locator("input"),
+        ...tuneEditorFieldsBase.easiness,
         modification: "1.99",
         original: "1.96",
       },
       {
-        label: "Interval",
-        locator: this.ffInterval.locator("input"),
+        ...tuneEditorFieldsBase.interval,
         modification: "2",
         original: "1",
       },
       {
-        label: "Repetitions",
-        locator: this.ffRepetitions.locator("input"),
+        ...tuneEditorFieldsBase.repetitions,
         modification: "3",
         original: "0",
       },
       {
-        label: "Scheduled",
-        locator: this.ffReviewDate.locator("input"),
+        ...tuneEditorFieldsBase.scheduled,
         modification: "2023-06-07T10:25:16",
         original: "2023-06-07T22:25:16",
         // TODO: Have to factor out date formatting and maybe (?) time zone issues
         // cellId: "200_review_date",
+      },
+    ];
+
+    // For new tune creation
+    this.sampleSiBheagSiMhorShort = [
+      {
+        ...tuneEditorFieldsBase.title,
+        modification: "Sí Bheag, Sí Mhór",
+      },
+      {
+        ...tuneEditorFieldsBase.type,
+        modification: "waltz",
+      },
+      {
+        ...tuneEditorFieldsBase.structure,
+        modification: "AABB",
+      },
+      {
+        ...tuneEditorFieldsBase.mode,
+        modification: "D Major",
+      },
+      {
+        ...tuneEditorFieldsBase.incipit,
+        modification: "de|:f3e d2|d2 de d2|B4 A2|F4 A2|",
+      },
+      {
+        ...tuneEditorFieldsBase.genre,
+        modification: "ITRAD",
       },
     ];
   }

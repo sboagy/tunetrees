@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { type Page, expect } from "@playwright/test";
 import { checkHealth } from "./check-servers";
 import { initialPageLoadTimeout } from "./paths-for-tests";
 
@@ -19,6 +19,12 @@ export class TuneTreesPageObject {
   readonly rowLocator;
   readonly tunesGrid;
   readonly tunesGridRows;
+  readonly addToRepertoireButton;
+  readonly newTuneButton;
+  readonly tabsMenuButton;
+  readonly tabsMenuCatalogChoice;
+  readonly catalogTab;
+  readonly tableStatus;
 
   constructor(page: Page) {
     this.page = page;
@@ -56,6 +62,23 @@ export class TuneTreesPageObject {
 
     this.tunesGrid = page.getByTestId("tunes-grid");
     this.tunesGridRows = this.tunesGrid.locator("tr");
+
+    this.tabsMenuButton = page.getByRole("button", { name: "Tabs" });
+    this.tabsMenuCatalogChoice = page.getByRole("menuitemcheckbox", {
+      name: "Catalog",
+    });
+
+    this.catalogTab = page.getByRole("tab", { name: "Catalog" });
+
+    this.addToRepertoireButton = page
+      .locator("#tt-all-tunes-header div")
+      .filter({ hasText: "Add To Repertoire" });
+
+    this.newTuneButton = page
+      .getByTestId("tt-catalog-tab")
+      .getByLabel("Add new reference");
+
+    this.tableStatus = this.page.getByText(" row(s) selected.");
   }
 
   onError = (exception: Error): void => {
@@ -73,20 +96,53 @@ export class TuneTreesPageObject {
     this.page.on("pageerror", this.onError);
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForSelector("body");
+    await expect(this.tableStatus).toBeVisible();
+
+    // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
+    //   timeout: 60000,
+    // });
+    const tableStatusText = (await this.tableStatus.textContent()) as string;
+    console.log(
+      "===> tunetrees.po.ts:99 ~ done with gotoMainPage: ",
+      tableStatusText,
+    );
+    await this.waitForTablePopulationToStart();
+  }
+
+  async waitForTablePopulationToStart() {
+    await this.page.waitForSelector("body");
+    await expect(this.tableStatus).toBeVisible();
+    let rowCount = await this.tunesGridRows.count();
+    let iterations = 0;
+
+    while (rowCount < 2 && iterations < 12) {
+      await this.page.waitForTimeout(1000); // wait for 1 second before checking again
+      rowCount = await this.tunesGridRows.count();
+      iterations++;
+    }
+
+    if (iterations >= 12) {
+      console.warn("Table population check exceeded 12 iterations.");
+    }
   }
 
   async navigateToTune(tuneTitle: string) {
-    await this.gotoMainPage();
-
     await this.mainTabGroup.waitFor({ state: "visible" });
 
     await this.repertoireTabTrigger.waitFor({
       state: "visible",
     });
     await this.repertoireTabTrigger.click();
+
+    await this.filterInput.waitFor({ state: "visible" });
+    await this.filterInput.waitFor({ state: "attached" });
     await this.filterInput.click();
 
-    await this.filterInput.fill(tuneTitle);
+    await this.filterInput.fill(tuneTitle, { timeout: 90_000 });
+
+    // An exception to the rule that we should not use expect() in PageObjects.
+    await expect(this.tunesGridRows).toHaveCount(2, { timeout: 60_000 });
+
     const tuneRow = this.page.getByRole("row").nth(1);
     await tuneRow.click();
     // await this.page.getByRole("row", { name: tuneTitle }).click();
@@ -116,6 +172,7 @@ export class TuneTreesPageObject {
 
     // Make sure the "Add To Review" button is visible
     await this.addToReviewButton.waitFor({ state: "visible" });
+    await this.waitForTablePopulationToStart();
   }
 
   async navigateToPracticeTab() {
@@ -146,6 +203,8 @@ export class TuneTreesPageObject {
     await this.practiceTab.isEnabled();
 
     await this.submitPracticedTunesButton.isVisible({ timeout: 60000 });
+
+    await this.waitForTablePopulationToStart();
 
     // Hmmm, not sure what this is/was for.
     // const ttPracticeTab2 = page

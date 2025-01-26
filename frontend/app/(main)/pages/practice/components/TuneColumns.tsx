@@ -370,14 +370,7 @@ export function get_columns(
       cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
         const favoriteUrl = info.row.original.favorite_url;
         return favoriteUrl ? (
-          <a
-            href={favoriteUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-foreground underline hover:text-blue-700"
-            // className="underline hover:text-blue-700"
-            // className="text-blue-500 underline hover:text-blue-700"
-          >
+          <a href={favoriteUrl} target="_blank" rel="noopener noreferrer">
             {info.getValue()}
           </a>
         ) : (

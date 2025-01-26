@@ -1,7 +1,7 @@
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
-import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
+import { TuneEditorPageObject } from "@/test-scripts/tune-editor.po";
 import { expect, test } from "@playwright/test";
 
 test.use({
@@ -26,57 +26,44 @@ test.afterEach(async ({ page }) => {
 });
 
 test("test-newtune-1", async ({ page }) => {
-  const ttPO = new TuneTreesPageObject(page);
+  const ttPO = new TuneEditorPageObject(page);
+  await ttPO.gotoMainPage();
 
   await ttPO.navigateToRepertoireTab();
 
   // await page.waitForTimeout(1000 * 200);
 
-  await page.getByRole("button", { name: "Tabs" }).click();
-  await page.getByRole("menuitemcheckbox", { name: "Catalog" }).click();
-  const catalogTabLocator = page.getByRole("tab", { name: "Catalog" });
-  await expect(catalogTabLocator).toBeVisible();
-  await catalogTabLocator.click();
+  await ttPO.tabsMenuButton.click();
+  await ttPO.tabsMenuCatalogChoice.click();
+  await expect(ttPO.catalogTab).toBeVisible();
+  await ttPO.catalogTab.click();
 
   // await page.waitForTimeout(60_000 * 60);
 
-  const addToRepertoireButtonLocator = page
-    .locator("#tt-all-tunes-header div")
-    .filter({ hasText: "Add To Repertoire" });
+  await expect(ttPO.addToRepertoireButton).toBeVisible();
+  await ttPO.newTuneButton.click();
 
-  await expect(addToRepertoireButtonLocator).toBeVisible();
-  const addTuneLoacator = page
-    .getByTestId("tt-catalog-tab")
-    .getByLabel("Add new reference");
-  await addTuneLoacator.click();
+  // await page.getByTestId("tt-tune-editor-title-input").click();
 
-  await page.getByTestId("tt-tune-editor-title-input").click();
   // Note this is testing the accented characters in the title bug as well.
   // See https://github.com/axios/axios/issues/6761
-  await page
-    .getByTestId("tt-tune-editor-title-input")
-    .fill("Sí Bheag, Sí Mhór");
-  await page.getByLabel("Type:").click();
-  await page.getByLabel("Type:").fill("waltz");
-  await page.getByLabel("Type:").press("Tab");
-  await page.getByLabel("Structure:").fill("AABB");
-  await page.getByLabel("Structure:").press("Tab");
-  await page.getByLabel("Mode:").fill("D Major");
-  await page.getByLabel("Mode:").press("Tab");
-  await page.getByLabel("Incipit:").fill("de|:f3e d2|d2 de d2|B4 A2|F4 A2|");
-  await page.getByLabel("Genre:").click();
-  await page.getByLabel("Genre:").fill("ITRAD");
+  for (const formField of ttPO.sampleSiBheagSiMhorShort) {
+    await formField.locator.fill(formField.modification);
+    await page.waitForTimeout(50);
+  }
 
-  await page.getByTestId("tt-tune-editor-submit-button").click();
+  await ttPO.pressSave();
 
-  await page.getByPlaceholder("Filter").click();
-  await page.getByPlaceholder("Filter").fill("Sí Bheag");
-  await page.getByRole("cell", { name: "Sí Bheag, Sí Mhór" }).click();
+  await ttPO.waitForTablePopulationToStart();
+
+  const tuneTitle = ttPO.sampleSiBheagSiMhorShort[0].modification;
+
+  await ttPO.navigateToTune(tuneTitle);
 
   const currentTuneTitleLocator = page.locator("#current-tune-title");
   const tuneTitle2 = await currentTuneTitleLocator.textContent();
   console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
-  const expectedText2 = "Sí Bheag, Sí Mhór";
+  const expectedText2 = tuneTitle;
   await expect(currentTuneTitleLocator).toHaveText(expectedText2);
 
   // await page.waitForTimeout(60_000 * 60);

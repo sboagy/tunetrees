@@ -51,6 +51,7 @@ async function doEditAndButtonClick(
 test.describe.serial("Tune Edit Tests", () => {
   test("test-edit-1", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
+    await ttPO.gotoMainPage();
 
     await ttPO.navigateToTune("Lakes of Sligo");
 
@@ -75,7 +76,8 @@ test.describe.serial("Tune Edit Tests", () => {
       "Lakes of Sligo x",
     );
     await ttPO.addToReviewButton.waitFor({ state: "visible" });
-    await ttPO.filterInput.fill("Lakes of Sligo x");
+    await ttPO.navigateToTune("Lakes of Sligo x");
+    // await ttPO.filterInput.fill("Lakes of Sligo x");
     await expect(ttPO.tunesGridRows).toHaveCount(2); // 1 for the header, 1 for the tune
     expect(page.getByRole("row", { name: "Lakes of Sligo x" }).isVisible());
     // I get a 500 error here without the wait when it's doing a get on table state.  Not good.
@@ -86,6 +88,7 @@ test.describe.serial("Tune Edit Tests", () => {
 
   test("test-edit-2", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
+    await ttPO.gotoMainPage();
 
     await ttPO.navigateToTune("Boyne Hunt");
 
@@ -141,6 +144,7 @@ test.describe.serial("Tune Edit Tests", () => {
 
   test("test-edit-3", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
+    await ttPO.gotoMainPage();
 
     await ttPO.navigateToTune("Boyne Hunt");
 

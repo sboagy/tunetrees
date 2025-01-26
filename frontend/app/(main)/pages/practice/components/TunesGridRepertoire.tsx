@@ -24,6 +24,7 @@ import type { ITableStateTable, ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
 import NewTuneButton from "./NewTuneButton";
+import { useSitDownDate } from "./SitdownDateProvider";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
@@ -70,8 +71,16 @@ export default function TunesGridRepertoire({
   // which is specific to the repertoire grid, is used to track the last refresh
   // of the tunes. The refreshId, which is global to the app, is
   // used to compare to tunesRefreshId to trigger a refresh of the tunes when it changes.
-  const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =
-    useRepertoireTunes();
+  const {
+    tunes,
+    setTunes,
+    tunesRefreshId,
+    setTunesRefreshId,
+    lapsedCount,
+    currentCount,
+    futureCount,
+    newCount,
+  } = useRepertoireTunes();
 
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
 
@@ -255,6 +264,38 @@ export default function TunesGridRepertoire({
     // const updates: { [key: string]: TuneUpdate } = {};
   };
 
+  const { sitDownDate } = useSitDownDate();
+
+  const getStyleForSchedulingState = (
+    scheduledDateString: string | null,
+  ): string => {
+    if (!scheduledDateString) {
+      return "underline"; // Return underline to signify new tune, has not been scheduled
+    }
+
+    const scheduledDate = new Date(scheduledDateString);
+    if (Number.isNaN(scheduledDate.getTime())) {
+      return "outline-red-500"; // Outline in red to show date is invalid (i.e. error state)
+    }
+
+    // reviewSitdownDateNoHours has to go to the server, thus is set by useEffect.
+    if (sitDownDate) {
+      const lowerBoundReviewSitdownDate = new Date(sitDownDate);
+      lowerBoundReviewSitdownDate.setDate(sitDownDate.getDate() - 7);
+      if (scheduledDate < lowerBoundReviewSitdownDate) {
+        return "underline text-gray-300";
+      }
+      if (
+        scheduledDate > lowerBoundReviewSitdownDate &&
+        scheduledDate <= sitDownDate
+      ) {
+        return "font-extrabold";
+      }
+      return "italic text-green-300";
+    }
+    return "";
+  };
+
   return (
     <div className="w-full h-full">
       {tableComponent}
@@ -342,6 +383,11 @@ export default function TunesGridRepertoire({
             userId={userId}
             playlistId={playlistId}
             tablePurpose={"repertoire"}
+            getStyleForSchedulingState={getStyleForSchedulingState}
+            lapsedCount={lapsedCount}
+            currentCount={currentCount}
+            futureCount={futureCount}
+            newCount={newCount}
           />
         </>
       )}

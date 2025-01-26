@@ -24,7 +24,7 @@ import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
 import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
-import { useAllTunes } from "./TunesContextAll";
+import { useCatalogTunes } from "./TunesContextCatalog";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
 
@@ -67,7 +67,8 @@ export default function TunesGridCatalog({
   // which is specific to the All grid, is used to track the last refresh
   // of the tunes. The refreshId, which is global to the app, is
   // used to compare to tunesRefreshId to trigger a refresh of the tunes when it changes.
-  const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } = useAllTunes();
+  const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =
+    useCatalogTunes();
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
   // const { currentTune } = useTune();
 

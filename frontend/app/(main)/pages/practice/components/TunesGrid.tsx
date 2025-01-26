@@ -26,6 +26,13 @@ type Props = {
   playlistId: number;
   tablePurpose: TablePurpose;
   onRowClickCallback?: (newTune: number) => void;
+  getStyleForSchedulingState?: (
+    reviewDate: string | null,
+  ) => string | undefined;
+  lapsedCount?: number | null;
+  currentCount?: number | null;
+  futureCount?: number | null;
+  newCount?: number | null;
 };
 
 const TunesGrid = ({
@@ -34,6 +41,11 @@ const TunesGrid = ({
   playlistId,
   tablePurpose,
   onRowClickCallback,
+  getStyleForSchedulingState,
+  lapsedCount,
+  currentCount,
+  futureCount,
+  newCount,
 }: Props) => {
   const {
     currentTune,
@@ -254,11 +266,13 @@ const TunesGrid = ({
                       //     : ""
                       // } ${getColorForEvaluation(row.original.recall_eval || null)}`}
                       // className={`absolute h-16 cursor-pointer w-full ${getColorForEvaluation(row.original.recall_eval || null)}`}
-                      className={`absolute cursor-pointer w-full ${
-                        currentTune === row.original.id
-                          ? "outline outline-2 outline-blue-500"
-                          : ""
-                      } ${getColorForEvaluation(row.original.recall_eval || null, false)}`}
+                      className={`absolute cursor-pointer w-full 
+                        ${getStyleForSchedulingState ? getStyleForSchedulingState(row.original.review_date) : ""} 
+                        ${
+                          currentTune === row.original.id
+                            ? "outline outline-2 outline-blue-500"
+                            : ""
+                        } ${getColorForEvaluation(row.original.recall_eval || null, false)}`}
                       onClick={handleRowClick.bind(null, row)}
                       onDoubleClick={() => handleRowDoubleClick(row)}
                       data-state={row.getIsSelected() && "selected"}
@@ -299,6 +313,10 @@ const TunesGrid = ({
                 <div className="flex-1 text-sm text-muted-foreground">
                   {table.getFilteredSelectedRowModel().rows.length} of{" "}
                   {table.getFilteredRowModel().rows.length} row(s) selected.
+                  {lapsedCount !== undefined && `, lapsed: ${lapsedCount}`}
+                  {currentCount !== undefined && `, current: ${currentCount}`}
+                  {futureCount !== undefined && `, future: ${futureCount}`}
+                  {newCount !== undefined && `, new: ${newCount}`}
                 </div>
               </TableCell>
             </TableRow>
