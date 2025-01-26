@@ -20,9 +20,11 @@ const TabsMenu = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="ml-auto">
+        {/* I have to set the foreground color here because apparently the parent
+        is set to gray. */}
+        <Button variant="outline" className="ml-auto text-foreground">
           Tabs
-          <ChevronDown className="ml-2 h-4 w-4" />
+          <ChevronDown className="ml-2 h-4 w-4 text-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
