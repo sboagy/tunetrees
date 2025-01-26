@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { type Page, expect } from "@playwright/test";
 import { checkHealth } from "./check-servers";
 import { initialPageLoadTimeout } from "./paths-for-tests";
 
@@ -19,6 +19,11 @@ export class TuneTreesPageObject {
   readonly rowLocator;
   readonly tunesGrid;
   readonly tunesGridRows;
+  readonly addToRepertoireButton;
+  readonly newTuneButton;
+  readonly tabsMenuButton;
+  readonly tabsMenuCatalogChoice;
+  readonly catalogTab;
 
   constructor(page: Page) {
     this.page = page;
@@ -56,6 +61,21 @@ export class TuneTreesPageObject {
 
     this.tunesGrid = page.getByTestId("tunes-grid");
     this.tunesGridRows = this.tunesGrid.locator("tr");
+
+    this.tabsMenuButton = page.getByRole("button", { name: "Tabs" });
+    this.tabsMenuCatalogChoice = page.getByRole("menuitemcheckbox", {
+      name: "Catalog",
+    });
+
+    this.catalogTab = page.getByRole("tab", { name: "Catalog" });
+
+    this.addToRepertoireButton = page
+      .locator("#tt-all-tunes-header div")
+      .filter({ hasText: "Add To Repertoire" });
+
+    this.newTuneButton = page
+      .getByTestId("tt-catalog-tab")
+      .getByLabel("Add new reference");
   }
 
   onError = (exception: Error): void => {
@@ -84,9 +104,16 @@ export class TuneTreesPageObject {
       state: "visible",
     });
     await this.repertoireTabTrigger.click();
+
+    await this.filterInput.waitFor({ state: "visible" });
+    await this.filterInput.waitFor({ state: "attached" });
     await this.filterInput.click();
 
     await this.filterInput.fill(tuneTitle);
+
+    // An exception to the rule that we should not use expect() in PageObjects.
+    await expect(this.tunesGridRows).toHaveCount(2, { timeout: 60000 });
+
     const tuneRow = this.page.getByRole("row").nth(1);
     await tuneRow.click();
     // await this.page.getByRole("row", { name: tuneTitle }).click();
