@@ -27,6 +27,7 @@ test.afterEach(async ({ page }) => {
 
 test("test-newtune-1", async ({ page }) => {
   const ttPO = new TuneEditorPageObject(page);
+  await ttPO.gotoMainPage();
 
   await ttPO.navigateToRepertoireTab();
 
@@ -52,6 +53,8 @@ test("test-newtune-1", async ({ page }) => {
   }
 
   await ttPO.pressSave();
+
+  await ttPO.waitForTablePopulationToStart();
 
   const tuneTitle = ttPO.sampleSiBheagSiMhorShort[0].modification;
 

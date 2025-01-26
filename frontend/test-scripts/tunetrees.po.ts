@@ -97,16 +97,36 @@ export class TuneTreesPageObject {
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForSelector("body");
     await expect(this.tableStatus).toBeVisible();
-    const tableStatusText = await this.tableStatus.textContent();
+
+    // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
+    //   timeout: 60000,
+    // });
+    const tableStatusText = (await this.tableStatus.textContent()) as string;
     console.log(
       "===> tunetrees.po.ts:99 ~ done with gotoMainPage: ",
       tableStatusText,
     );
+    await this.waitForTablePopulationToStart();
+  }
+
+  async waitForTablePopulationToStart() {
+    await this.page.waitForSelector("body");
+    await expect(this.tableStatus).toBeVisible();
+    let rowCount = await this.tunesGridRows.count();
+    let iterations = 0;
+
+    while (rowCount < 2 && iterations < 12) {
+      await this.page.waitForTimeout(1000); // wait for 1 second before checking again
+      rowCount = await this.tunesGridRows.count();
+      iterations++;
+    }
+
+    if (iterations >= 12) {
+      console.warn("Table population check exceeded 12 iterations.");
+    }
   }
 
   async navigateToTune(tuneTitle: string) {
-    await this.gotoMainPage();
-
     await this.mainTabGroup.waitFor({ state: "visible" });
 
     await this.repertoireTabTrigger.waitFor({
