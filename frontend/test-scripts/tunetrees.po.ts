@@ -24,6 +24,7 @@ export class TuneTreesPageObject {
   readonly tabsMenuButton;
   readonly tabsMenuCatalogChoice;
   readonly catalogTab;
+  readonly tableStatus;
 
   constructor(page: Page) {
     this.page = page;
@@ -76,6 +77,8 @@ export class TuneTreesPageObject {
     this.newTuneButton = page
       .getByTestId("tt-catalog-tab")
       .getByLabel("Add new reference");
+
+    this.tableStatus = this.page.getByText(" row(s) selected.");
   }
 
   onError = (exception: Error): void => {
@@ -93,6 +96,12 @@ export class TuneTreesPageObject {
     this.page.on("pageerror", this.onError);
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForSelector("body");
+    await expect(this.tableStatus).toBeVisible();
+    const tableStatusText = await this.tableStatus.textContent();
+    console.log(
+      "===> tunetrees.po.ts:99 ~ done with gotoMainPage: ",
+      tableStatusText,
+    );
   }
 
   async navigateToTune(tuneTitle: string) {
