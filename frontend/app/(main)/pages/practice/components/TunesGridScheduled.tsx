@@ -18,7 +18,6 @@ import ColumnsMenu from "./ColumnsMenu";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
 import FlashcardPanel from "./FlashcardPanel";
-import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useScheduledTunes } from "./TunesContextScheduled";
 import TunesGrid from "./TunesGrid";
@@ -308,7 +307,7 @@ export default function TunesGridScheduled({
                   triggerRefresh={triggerRefresh}
                 />
               </div>
-              <NewTuneButton userId={userId} playlistId={playlistId} />
+              {/* <NewTuneButton userId={userId} playlistId={playlistId} /> */}
             </div>
           </div>
           {mode === "grid" ? (
