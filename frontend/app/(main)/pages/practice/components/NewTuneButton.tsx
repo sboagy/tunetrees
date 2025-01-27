@@ -62,10 +62,11 @@ export default function NewTuneButton({
   return (
     <Button
       variant="ghost"
-      size="icon"
+      // size="icon"
       aria-label="Add new reference"
       onClick={handleClick}
     >
+      New Tune
       <Plus className="h-4 w-4" />
     </Button>
   );
