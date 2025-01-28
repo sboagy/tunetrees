@@ -2,6 +2,7 @@
 
 import type { Adapter, AdapterAccount } from "next-auth/adapters";
 
+import { fetchWithTimeout } from "@/lib/fetch-utils";
 import type {
   AdapterSession,
   AdapterUser,
@@ -36,18 +37,6 @@ const userAdapterSchema = z.object({
   image: z.string().optional(),
 });
 
-export const getSessionAndUserSchema = z
-  .object({
-    session: adapterSessionSchema,
-    user: userAdapterSchema,
-  })
-  .nullable();
-
-export interface IExtendedAdapterUser extends AdapterUser {
-  hash?: string | null;
-  view_settings?: string;
-}
-
 const userExtendedAdapterSchema = z.object({
   id: z.string(),
   email: z.string().email(),
@@ -60,6 +49,18 @@ const userExtendedAdapterSchema = z.object({
 
 export const getUserExtendedByEmailSchema =
   userExtendedAdapterSchema.nullable();
+
+export const getSessionAndUserSchema = z
+  .object({
+    session: adapterSessionSchema,
+    user: userAdapterSchema,
+  })
+  .nullable();
+
+export interface IExtendedAdapterUser extends AdapterUser {
+  hash?: string | null;
+  view_settings?: string;
+}
 
 function userSerializer(res: IExtendedAdapterUser | null) {
   if (res === null) {
@@ -102,16 +103,6 @@ function userAndSessionSerializer(
   const session = sessionSerializer(res?.session);
   const seassionTweaked = { user, session };
   return seassionTweaked;
-  // try{
-  //   let parsed = await getSessionAndUserSchema.parseAsync(seassion_tweaked);
-  //   console.log("userAndSessionSerializer, parsed:");
-  //   console.log(parsed);
-  //   return parsed;
-  // }
-  // catch(e){
-  //   console.error(e);
-  //   throw e
-  // }
 }
 
 function verificationTokenSerializer(
@@ -151,22 +142,6 @@ export async function getUserExtendedByEmail(
 
   const parsed = getUserExtendedByEmailSchema.parse(serialized);
   return parsed;
-}
-
-async function fetchWithTimeout(
-  resource: string,
-  options: RequestInit & { timeout?: number } = {},
-) {
-  const { timeout = 16000 } = options;
-
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  const response = await fetch(resource, {
-    ...options,
-    signal: controller.signal,
-  });
-  clearTimeout(id);
-  return response;
 }
 
 function createTuneTreesHttpAdapter(): Adapter {
