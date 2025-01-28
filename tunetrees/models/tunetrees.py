@@ -62,7 +62,7 @@ t_practice_list_joined = Table(
     Column("interval", Integer),
     Column("repetitions", Integer),
     Column("review_date", Text),
-    Column("tags", Text),
+    Column("tags", NullType),
     Column("playlist_ref", Integer),
     Column("user_ref", Integer),
     Column("playlist_deleted", Boolean),
@@ -94,7 +94,7 @@ t_practice_list_staged = Table(
     Column("repetitions", Integer),
     Column("review_date", Text),
     Column("backup_practiced", Text),
-    Column("tags", Text),
+    Column("tags", NullType),
     Column("purpose", Text),
     Column("note_private", Text),
     Column("note_public", Text),
@@ -143,9 +143,6 @@ class User(Base):
         "TableTransientData", uselist=True, back_populates="user"
     )
     tag: Mapped[List["Tag"]] = relationship("Tag", uselist=True, back_populates="user")
-    user_annotation_set: Mapped[List["UserAnnotationSet"]] = relationship(
-        "UserAnnotationSet", uselist=True, back_populates="user"
-    )
 
 
 class VerificationToken(Base):
@@ -296,9 +293,6 @@ class Tune(Base):
         "TableTransientData", uselist=True, back_populates="tune"
     )
     tag: Mapped[List["Tag"]] = relationship("Tag", uselist=True, back_populates="tune")
-    user_annotation_set: Mapped[List["UserAnnotationSet"]] = relationship(
-        "UserAnnotationSet", uselist=True, back_populates="tune"
-    )
 
 
 class Note(Base):
@@ -442,21 +436,3 @@ class Tag(Base):
 
     tune: Mapped["Tune"] = relationship("Tune", back_populates="tag")
     user: Mapped["User"] = relationship("User", back_populates="tag")
-
-
-class UserAnnotationSet(Base):
-    __tablename__ = "user_annotation_set"
-
-    tune_ref = mapped_column(ForeignKey("tune.id"), primary_key=True)
-    note_private = mapped_column(Text)
-    note_public = mapped_column(Text)
-    tags = mapped_column(Text)
-    user_ref = mapped_column(ForeignKey("user.id"), primary_key=True)
-    deleted = mapped_column(Boolean, server_default=text("FALSE"))
-
-    tune: Mapped[Optional["Tune"]] = relationship(
-        "Tune", back_populates="user_annotation_set"
-    )
-    user: Mapped[Optional["User"]] = relationship(
-        "User", back_populates="user_annotation_set"
-    )

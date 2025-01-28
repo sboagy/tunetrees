@@ -15,7 +15,10 @@ SELECT
     practice_record.interval,
     practice_record.repetitions,
     practice_record.review_date,
-    user_annotation_set.tags,
+   (SELECT group_concat(tag.tag_text, ' ')
+    FROM tag
+    WHERE tag.tune_ref = tune.id
+      AND tag.user_ref = playlist.user_ref) AS tags,
     playlist_tune.playlist_ref,
     playlist.user_ref,
     playlist_tune.deleted as playlist_deleted,
@@ -38,4 +41,4 @@ LEFT JOIN
 LEFT JOIN
     practice_record ON practice_record.tune_ref = tune.id AND practice_record.playlist_ref = playlist_tune.playlist_ref
 LEFT JOIN
-    user_annotation_set ON user_annotation_set.tune_ref = tune.id;
+    tag ON tag.tune_ref = tune.id;

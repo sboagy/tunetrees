@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional, Literal
+from typing import Optional, Literal
 
 from pydantic import BaseModel, field_validator
 
@@ -107,46 +107,6 @@ class TuneModelCreate(BaseModel):
     incipit: str
     genre: str
     deleted: Optional[bool] = False
-
-
-class UserModel(BaseModel):
-    id: int
-    hash: str
-    name: str
-    email: str
-    email_verified: Optional[str]
-    image: Optional[str]
-    account: List["AccountModel"]
-    playlist: List["PlaylistModel"]
-    prefs_spaced_repetition: List["PrefsSpacedRepetitionModel"]
-    session: List["SessionModel"]
-    tab_group_main_state: List["TabGroupMainStateModel"]
-    table_state: List["TableStateModel"]
-    user_annotation_set: List["UserAnnotationSetModel"]
-    table_transient_data: List["TableTransientDataModel"]
-    deleted: Optional[bool]
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-
-class UserModelPartial(BaseModel):
-    id: Optional[int] = None
-    hash: Optional[str] = None
-    name: Optional[str] = None
-    email: Optional[str] = None
-    email_verified: Optional[str] = None
-    image: Optional[str] = None
-    account: Optional[List["AccountModel"]] = None
-    playlist: Optional[List["PlaylistModel"]] = None
-    prefs_spaced_repetition: Optional[List["PrefsSpacedRepetitionModel"]] = None
-    session: Optional[List["SessionModel"]] = None
-    tab_group_main_state: Optional[List["TabGroupMainStateModel"]] = None
-    table_state: Optional[List["TableStateModel"]] = None
-    user_annotation_set: Optional[List["UserAnnotationSetModel"]] = None
-    table_transient_data: Optional[List["TableTransientDataModel"]] = None
-    deleted: Optional[bool] = None
 
     class Config:
         orm_mode = True
