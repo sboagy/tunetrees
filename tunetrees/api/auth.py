@@ -122,7 +122,7 @@ async def create_user(user: UserModel) -> Optional[UserModel]:
             # id=user.name,  # The DB will need to set this
             name=user.name,
             email=user.email,
-            email_verified=user.emailVerified,
+            email_verified=user.email_verified,
             image=user.image,
             hash=user.hash,
         )
@@ -321,14 +321,14 @@ async def link_account(account: AccountModel) -> AccountModel:
     try:
         db = SessionLocal()
 
-        existing = db.query(orm.Account).filter_by(user_id=account.userId)
+        existing = db.query(orm.Account).filter_by(user_id=account.user_id)
         if existing.count() > 0:
             # Why on earth do I need to do and update with a dictionary?
             # and why is this so hard?  Isn't the orm supposed to make this easier?
             existing.update(
                 {
-                    "user_id": account.userId,
-                    "provider_account_id": account.providerAccountId,
+                    "user_id": account.user_id,
+                    "provider_account_id": account.provider_account_id,
                     "provider": account.provider,
                     "type": account.type,
                     "access_token": account.access_token,
@@ -344,8 +344,8 @@ async def link_account(account: AccountModel) -> AccountModel:
             db.flush()
         else:
             orm_account = orm.Account(
-                user_id=account.userId,
-                provider_account_id=account.providerAccountId,
+                user_id=account.user_id,
+                provider_account_id=account.provider_account_id,
                 provider=account.provider,
                 type=account.type,
                 access_token=account.access_token,
@@ -362,8 +362,8 @@ async def link_account(account: AccountModel) -> AccountModel:
             db.flush(orm_account)
 
         stmt = select(orm.Account).where(
-            orm.Account.user_id == account.userId,
-            orm.Account.provider_account_id == account.providerAccountId,
+            orm.Account.user_id == account.user_id,
+            orm.Account.provider_account_id == account.provider_account_id,
         )
 
         result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
@@ -378,8 +378,8 @@ async def link_account(account: AccountModel) -> AccountModel:
             )
 
             auth_account = AccountModel(
-                userId=str(found_orm_account.user_id),
-                providerAccountId=str(found_orm_account.provider_account_id),
+                user_id=str(found_orm_account.user_id),
+                provider_account_id=str(found_orm_account.provider_account_id),
                 provider=str(found_orm_account.provider),
                 type=AccountType(found_orm_account.type),
                 access_token=str(found_orm_account.access_token),
@@ -732,7 +732,7 @@ def query_user_to_auth_user(
                 id=str(user.id),
                 name=str(user.name),
                 email=str(user.email),
-                emailVerified=user.email_verified,  # for the moment
+                email_verified=user.email_verified,  # for the moment
                 hash=user.hash,
                 image=None,  # for the moment
             )

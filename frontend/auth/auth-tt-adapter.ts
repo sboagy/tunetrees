@@ -1,13 +1,19 @@
 // import type { Awaitable } from "next-auth/types";
 
-import type { Adapter, AdapterAccount } from "next-auth/adapters";
-
-import { fetchWithTimeout } from "@/lib/fetch-utils";
 import type {
+  Adapter,
+  AdapterAccount,
   AdapterSession,
-  AdapterUser,
   VerificationToken,
 } from "next-auth/adapters";
+
+import type {
+  ISession,
+  IUser,
+  IVerificationToken,
+} from "@/app/(main)/pages/practice/types";
+import { fetchWithTimeout } from "@/lib/fetch-utils";
+import type { AdapterUser } from "next-auth/adapters";
 import { z } from "zod";
 import {
   createSessionSchema,
@@ -60,20 +66,26 @@ export const getSessionAndUserSchema = z
 export interface IExtendedAdapterUser extends AdapterUser {
   hash?: string | null;
   view_settings?: string;
+  image?: string;
 }
 
-function userSerializer(res: IExtendedAdapterUser | null) {
+export interface IAdapterUserAndSession {
+  user: AdapterUser;
+  session: AdapterSession;
+}
+
+function userSerializer(res: IUser | null): IExtendedAdapterUser | null {
   if (res === null) {
     return null;
   }
   let emailVerified = null;
-  if (res?.emailVerified) {
-    emailVerified = new Date(res.emailVerified);
+  if (res?.email_verified) {
+    emailVerified = new Date(res.email_verified);
   }
   const serializedUser = {
-    id: res?.id,
-    name: res?.name,
-    email: res?.email,
+    id: res?.id ?? "",
+    name: res?.name ?? "",
+    email: res?.email ?? "",
     image: res?.image,
     emailVerified: emailVerified,
     hash: res?.hash, // ugh, "next-auth-http-adapter" will strip this
@@ -81,36 +93,49 @@ function userSerializer(res: IExtendedAdapterUser | null) {
   return serializedUser;
 }
 
-function sessionSerializer(res: AdapterSession | null | undefined) {
+function sessionSerializer(res: ISession | null | undefined): AdapterSession {
   let expires = null;
   if (res?.expires) {
     expires = new Date(res.expires);
   }
+  if (!expires || !res?.session_token || !res?.user_id) {
+    throw new Error("Invalid session data");
+  }
   return {
     expires: expires,
-    sessionToken: res?.sessionToken,
-    userId: res?.userId,
+    sessionToken: res?.session_token,
+    userId: res?.user_id.toString(),
   };
 }
 
 function userAndSessionSerializer(
-  res: { session: AdapterSession; user: AdapterUser } | null,
-) {
+  res: { session: ISession; user: IUser } | null,
+): IAdapterUserAndSession | null {
   if (!res) {
     return null;
   }
-  const user = userSerializer(res?.user as IExtendedAdapterUser);
+  const user = userSerializer(res?.user);
   const session = sessionSerializer(res?.session);
+  if (!user) {
+    console.log(
+      "===> auth-tt-adapter.ts:116 ~ userAndSessionSerializer, user not found, error?",
+    );
+    return null;
+  }
   const seassionTweaked = { user, session };
   return seassionTweaked;
 }
 
 function verificationTokenSerializer(
-  res: VerificationToken | null | undefined,
-) {
+  res: IVerificationToken | null | undefined,
+): VerificationToken | null {
   let expires = null;
   if (res?.expires) {
     expires = new Date(res.expires);
+  }
+
+  if (!expires || !res?.identifier || !res?.token) {
+    throw new Error("Invalid verification token data");
   }
 
   return {
@@ -159,6 +184,11 @@ function createTuneTreesHttpAdapter(): Adapter {
         });
         const payload = await res.json();
         const serialized = userSerializer(payload);
+
+        // In Zod, the parse method will validate the input object against
+        // the schema and remove any fields that are not explicitly defined
+        // in the schema. This means that the resulting object will only
+        // contain the fields specified in createUserSchema.
         return createUserSchema.parse(serialized) as AdapterUser;
       } catch (error) {
         console.error("===> auth-tt-adapter.ts:173 ~ ", error);

@@ -185,3 +185,43 @@ export interface IViewPlaylistJoined {
   genre_default?: string;
   instrument_deleted?: boolean;
 }
+
+export interface IAccount {
+  user_id: string;
+  provider_account_id: string;
+  provider: string;
+  type: string; // Assuming AccountType is a string, adjust if necessary
+  access_token?: string | null;
+  token_type?: string | null;
+  id_token?: string | null;
+  scope?: string | null;
+  expires_at?: number | null;
+  session_state?: string | null;
+  refresh_token?: string | null;
+}
+
+export interface ISession {
+  expires?: string;
+  session_token: string;
+  user_id?: number;
+}
+
+export interface IUser {
+  id?: string;
+  name?: string;
+  email?: string;
+  email_verified?: string | null; // Assuming datetime is converted to string
+  image?: string;
+  hash?: string;
+}
+
+export interface IVerificationTokenParams {
+  identifier: string;
+  token: string;
+}
+
+export interface IVerificationToken {
+  identifier: string;
+  token: string;
+  expires: string;
+}

@@ -142,8 +142,8 @@ class AccountType(str, Enum):
 
 
 class AccountModel(BaseModel):
-    userId: str
-    providerAccountId: str
+    user_id: str
+    provider_account_id: str
     provider: str
     type: AccountType
     access_token: Optional[str] = None
@@ -660,11 +660,15 @@ class UserModel(BaseModel):
         default=None,
     )
     email: Optional[str] = Field(default=None)
-    emailVerified: Optional[datetime.datetime] = Field(
-        default=None, alias="emailVerified"
+    email_verified: Optional[datetime.datetime] = Field(
+        default=None, alias="email_verified"
     )
     image: Optional[str] = Field(default=None, alias="image")
     hash: Optional[str] = Field(default=None, alias="hash")
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 # {
