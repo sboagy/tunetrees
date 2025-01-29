@@ -3,21 +3,27 @@
 # Note it has to transform from our SQLAlchemy ORM/Schema to the schema that nextauth
 # likes, which we define here via Pydantic.
 
-import datetime
 import logging
 import traceback
-from enum import Enum
 from typing import Any, Optional, Tuple
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from sqlalchemy import Result, Row, Select, select
 from sqlalchemy.orm.session import Session as SqlAlchemySession
 
 from tunetrees.app.database import SessionLocal
 from tunetrees.models import tunetrees as orm
+from tunetrees.models.tunetrees_pydantic import (
+    AccountModel,
+    AccountType,
+    SessionAndUserModel,
+    SessionModel,
+    UserModel,
+    VerificationTokenModel,
+    VerificationTokenParamsModel,
+)
 
 
 class StatusCode(object):
@@ -80,30 +86,6 @@ def register_exception(app: FastAPI):
         )
 
 
-class User(BaseModel):
-    id: Optional[str] = Field(
-        description="This will be assigned and will be ignored for create or update",
-        default=None,
-    )
-    name: Optional[str] = Field(
-        description="For now assume this is the user name.  It's exact meaning is a little ambigious at the moment",
-        default=None,
-    )
-    email: Optional[str] = Field(default=None)
-    emailVerified: Optional[datetime.datetime] = Field(
-        default=None, alias="emailVerified"
-    )
-    image: Optional[str] = Field(default=None, alias="image")
-    hash: Optional[str] = Field(default=None, alias="hash")
-
-
-class AccountType(str, Enum):
-    oauth = "oauth"
-    oidc = "oidc"
-    email = "email"
-    credentials = "credentials"
-
-
 # id
 # userId
 # type
@@ -128,59 +110,10 @@ class AccountType(str, Enum):
 # userId ='15'
 
 
-class Account(BaseModel):
-    userId: str
-    providerAccountId: str
-    provider: str
-    type: AccountType
-    access_token: Optional[str] = None
-    token_type: Optional[str] = None
-    id_token: Optional[str] = None
-    scope: Optional[str] = None
-    expires_at: Optional[int] = None
-    session_state: Optional[str]
-    refresh_token: Optional[str]
-
-
-class Session(BaseModel):
-    expires: datetime.datetime
-    sessionToken: str
-    userId: str
-
-
-# {
-#     "expires": "Tue Sep 03 2024 23:45:08 GMT-0400 (Eastern Daylight Time)",
-#     "sessionToken": "098af529-f6dd-42c8-b7ea-7d79f5bf582f",
-#     "userId": "19"
-# }
-
-
-class Token(BaseModel):
-    identifier: str
-    token: str
-    expires: datetime.date
-
-
-class SessionAndUser(BaseModel):
-    session: Session
-    user: User
-
-
-class VerificationToken(BaseModel):
-    identifier: str
-    token: str
-    expires: str
-
-
-class VerificationTokenParams(BaseModel):
-    identifier: str
-    token: str
-
-
 @router.post(
-    "/signup/", response_model=Optional[User], response_model_exclude_none=True
+    "/signup/", response_model=Optional[UserModel], response_model_exclude_none=True
 )
-async def create_user(user: User) -> Optional[User]:
+async def create_user(user: UserModel) -> Optional[UserModel]:
     db = None
     try:
         db = SessionLocal()
@@ -219,9 +152,11 @@ async def create_user(user: User) -> Optional[User]:
 
 
 @router.get(
-    "/get-user/{id}", response_model=Optional[User], response_model_exclude_none=True
+    "/get-user/{id}",
+    response_model=Optional[UserModel],
+    response_model_exclude_none=True,
 )
-async def get_user(id: str) -> Optional[User]:
+async def get_user(id: str) -> Optional[UserModel]:
     try:
         stmt = select(orm.User).where(orm.User.id == id)
         auth_user = query_user_to_auth_user(stmt)
@@ -242,10 +177,10 @@ async def get_user(id: str) -> Optional[User]:
 
 @router.get(
     "/get-user-by-email/{email}",
-    response_model=Optional[User],
+    response_model=Optional[UserModel],
     response_model_exclude_none=True,
 )
-async def get_user_by_email(email: str) -> Optional[User]:
+async def get_user_by_email(email: str) -> Optional[UserModel]:
     try:
         stmt = select(orm.User).where(orm.User.email == email)
         auth_user = query_user_to_auth_user(stmt)
@@ -268,10 +203,12 @@ async def get_user_by_email(email: str) -> Optional[User]:
 # auth/get-user-by-account/{provider}/{providerAccountId}/
 @router.get(
     "/get-user-by-account/{provider}/{providerAccountId}",
-    response_model=Optional[User],
+    response_model=Optional[UserModel],
     response_model_exclude_none=True,
 )
-async def get_user_by_account(provider: str, providerAccountId: str) -> Optional[User]:
+async def get_user_by_account(
+    provider: str, providerAccountId: str
+) -> Optional[UserModel]:
     try:
         with SessionLocal() as db:
             stmt = select(orm.Account).where(
@@ -308,10 +245,10 @@ async def get_user_by_account(provider: str, providerAccountId: str) -> Optional
 
 @router.patch(
     "/update-user/",
-    response_model=User,
+    response_model=UserModel,
     response_model_exclude_none=True,
 )
-async def update_user(user: User) -> User:
+async def update_user(user: UserModel) -> UserModel:
     db = None
     try:
         db = SessionLocal()
@@ -360,7 +297,7 @@ async def delete_user(id: str) -> None:
     try:
         db = SessionLocal()
 
-        orm_user = db.get(User, id)
+        orm_user = db.get(UserModel, id)
         if orm_user:
             db.delete(orm_user)
         else:
@@ -378,8 +315,8 @@ async def delete_user(id: str) -> None:
             db.close()
 
 
-@router.post("/link-account/", response_model=Account)
-async def link_account(account: Account) -> Account:
+@router.post("/link-account/", response_model=AccountModel)
+async def link_account(account: AccountModel) -> AccountModel:
     db = None
     try:
         db = SessionLocal()
@@ -440,7 +377,7 @@ async def link_account(account: Account) -> Account:
                 else None
             )
 
-            auth_account = Account(
+            auth_account = AccountModel(
                 userId=str(found_orm_account.user_id),
                 providerAccountId=str(found_orm_account.provider_account_id),
                 provider=str(found_orm_account.provider),
@@ -505,16 +442,16 @@ async def unlink_account(provider: str, providerAccountId: str) -> None:
             db.close()
 
 
-@router.post("/create-session/", response_model=Session)
-async def create_session(session: Session) -> Session:
+@router.post("/create-session/", response_model=SessionModel)
+async def create_session(session: SessionModel) -> SessionModel:
     db = None
     try:
         db = SessionLocal()
 
         orm_session = orm.Session(
             expires=session.expires,
-            session_token=session.sessionToken,
-            user_id=session.userId,
+            session_token=session.session_token,
+            user_id=session.user_id,
         )
 
         db.add(orm_session)
@@ -533,10 +470,10 @@ async def create_session(session: Session) -> Session:
         if which_row and len(which_row) > 0:
             orm_session_new: orm.Session = which_row[0]
 
-            updated_session = Session(
+            updated_session = SessionModel(
                 expires=orm_session_new.expires,
-                sessionToken=orm_session_new.session_token,
-                userId=orm_session_new.user_id,
+                session_token=orm_session_new.session_token,
+                user_id=orm_session_new.user_id,
             )
 
             return updated_session
@@ -558,10 +495,10 @@ async def create_session(session: Session) -> Session:
 
 @router.get(
     "/get-session/{sessionToken}",
-    response_model=Optional[SessionAndUser],
+    response_model=Optional[SessionAndUserModel],
     response_model_exclude_none=True,
 )
-async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUser]:
+async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUserModel]:
     db = None
     try:
         db = SessionLocal()
@@ -573,14 +510,16 @@ async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUser]:
             user_id = str(orm_session.user_id)
             stmt = select(orm.User).where(orm.User.id == user_id)
             auth_user = query_user_to_auth_user(stmt, db)
-            auth_session = Session(
+            auth_session = SessionModel(
                 expires=orm_session.expires,
-                sessionToken=orm_session.session_token,
-                userId=orm_session.user_id,
+                session_token=orm_session.session_token,
+                user_id=orm_session.user_id,
             )
 
             if auth_user is not None:
-                session_and_user = SessionAndUser(session=auth_session, user=auth_user)
+                session_and_user = SessionAndUserModel(
+                    session=auth_session, user=auth_user
+                )
                 return session_and_user
             else:
                 return None
@@ -602,8 +541,8 @@ async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUser]:
             db.close()
 
 
-@router.patch("/update-session/", response_model=Session)
-async def update_session(session: Session) -> Session:
+@router.patch("/update-session/", response_model=SessionModel)
+async def update_session(session: SessionModel) -> SessionModel:
     db = None
     try:
         db = SessionLocal()
@@ -611,10 +550,10 @@ async def update_session(session: Session) -> Session:
         update_dict = {}
 
         update_dict["expires"] = session.expires
-        update_dict["session_token"] = session.sessionToken
-        update_dict["user_id"] = session.userId
+        update_dict["session_token"] = session.session_token
+        update_dict["user_id"] = session.user_id
 
-        db.query(orm.Session).filter_by(session_token=session.sessionToken).update(
+        db.query(orm.Session).filter_by(session_token=session.session_token).update(
             update_dict
         )
 
@@ -622,20 +561,20 @@ async def update_session(session: Session) -> Session:
         # and just to make sure the update was applied.  Good chance
         # we'll want to not do this in the future.
         session_query = select(orm.User).where(
-            orm.Session.session_token == session.sessionToken
+            orm.Session.session_token == session.session_token
         )
         result: Result = db.execute(session_query)  # pyright: ignore[reportMissingTypeArgument]
         which_row: Optional[Row[orm.Session]] = result.fetchone()
         if which_row and len(which_row) > 0:
             orm_session: orm.Session = which_row[0]
-            updated_session = Session(
+            updated_session = SessionModel(
                 expires=orm_session.expires,
-                sessionToken=orm_session.session_token,
-                userId=orm_session.user_id,
+                session_token=orm_session.session_token,
+                user_id=orm_session.user_id,
             )
             return updated_session
         else:
-            logger.error(f"Could not find session for token: {session.sessionToken}")
+            logger.error(f"Could not find session for token: {session.session_token}")
             raise HTTPException(
                 status_code=404, detail="Session Not Found for for updated session"
             )
@@ -655,7 +594,7 @@ async def delete_session(session_token: str) -> None:
     try:
         db = SessionLocal()
 
-        orm_session = db.get(Session, session_token)
+        orm_session = db.get(SessionModel, session_token)
         if orm_session:
             db.delete(orm_session)
         else:
@@ -673,10 +612,10 @@ async def delete_session(session_token: str) -> None:
             db.close()
 
 
-@router.post("/create-verification-token/", response_model=VerificationToken)
+@router.post("/create-verification-token/", response_model=VerificationTokenModel)
 async def create_verification_token(
-    verification_token: VerificationToken,
-) -> VerificationToken:
+    verification_token: VerificationTokenModel,
+) -> VerificationTokenModel:
     db = None
     try:
         db = SessionLocal()
@@ -700,7 +639,7 @@ async def create_verification_token(
         if which_row and len(which_row) > 0:
             orm_verification_token_new: orm.VerificationToken = which_row[0]
 
-            updated_verification_toke = VerificationToken(
+            updated_verification_toke = VerificationTokenModel(
                 identifier=orm_verification_token_new.identifier,
                 token=orm_verification_token_new.token,
                 expires=orm_verification_token_new.expires,
@@ -723,8 +662,10 @@ async def create_verification_token(
             db.close()
 
 
-@router.post("/use-verification-token/", response_model=VerificationToken)
-async def use_verification_token(params: VerificationTokenParams) -> VerificationToken:
+@router.post("/use-verification-token/", response_model=VerificationTokenModel)
+async def use_verification_token(
+    params: VerificationTokenParamsModel,
+) -> VerificationTokenModel:
     db = None
     try:
         db = SessionLocal()
@@ -746,7 +687,7 @@ async def use_verification_token(params: VerificationTokenParams) -> Verificatio
                         status_code=404,  # Not sure if this is the right status code
                         detail="Verification token in storage does not match submitted token",
                     )
-                auth_verification_token = VerificationToken(
+                auth_verification_token = VerificationTokenModel(
                     identifier=orm_verification_token.identifier,
                     token=orm_verification_token.token,
                     expires=orm_verification_token.expires,
@@ -776,7 +717,7 @@ async def use_verification_token(params: VerificationTokenParams) -> Verificatio
 
 def query_user_to_auth_user(
     stmt: Select[Tuple[orm.User]], db: Optional[SqlAlchemySession] = None
-) -> Optional[User]:
+) -> Optional[UserModel]:
     local_session = db is None
     try:
         if local_session:
@@ -787,7 +728,7 @@ def query_user_to_auth_user(
         if which_row and len(which_row) > 0:
             user: orm.User = which_row[0]
 
-            auth_user = User(
+            auth_user = UserModel(
                 id=str(user.id),
                 name=str(user.name),
                 email=str(user.email),
