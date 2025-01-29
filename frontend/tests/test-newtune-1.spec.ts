@@ -22,7 +22,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 test.afterEach(async ({ page }) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(1_000);
 });
 
 test("test-newtune-1", async ({ page }) => {
