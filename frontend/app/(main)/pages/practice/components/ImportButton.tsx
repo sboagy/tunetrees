@@ -43,7 +43,7 @@ export default function ImportButton({
     importTune(importUrl)
       .then((scrapedTune) => {
         console.log("===> ImportButton.tsx:62 ~ scrapedTune", scrapedTune);
-        const importedTune: ITuneOverview = {
+        const importedTune: Partial<ITuneOverview> = {
           title: scrapedTune.title ?? "",
           type: scrapedTune.type ?? "",
           structure: scrapedTune.structure ?? "",

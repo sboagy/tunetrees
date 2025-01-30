@@ -78,6 +78,7 @@ class TuneModel(BaseModel):
     mode: Optional[str]
     incipit: Optional[str]
     genre: Optional[str]
+    private_for: Optional[int]
     deleted: Optional[bool]
 
     class Config:
@@ -93,6 +94,41 @@ class TuneModelPartial(BaseModel):
     mode: Optional[str] = None
     incipit: Optional[str] = None
     genre: Optional[str] = None
+    private_for: Optional[int] = None
+    deleted: Optional[bool] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class TuneOverrideModel(BaseModel):
+    id: int
+    tune_ref: int
+    user_ref: int
+    title: Optional[str]
+    type: Optional[str]
+    structure: Optional[str]
+    genre: Optional[str]
+    mode: Optional[str]
+    incipit: Optional[str]
+    deleted: Optional[bool] = Field(default=False)
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class TuneOverrideModelPartial(BaseModel):
+    id: Optional[int] = None
+    tune_ref: Optional[int] = None
+    user_ref: Optional[int] = None
+    title: Optional[str] = None
+    type: Optional[str] = None
+    structure: Optional[str] = None
+    genre: Optional[str] = None
+    mode: Optional[str] = None
+    incipit: Optional[str] = None
     deleted: Optional[bool] = None
 
     class Config:
@@ -107,6 +143,7 @@ class TuneModelCreate(BaseModel):
     mode: str
     incipit: str
     genre: str
+    private_for: Optional[int] = None
     deleted: Optional[bool] = False
 
     class Config:
@@ -548,6 +585,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     mode: Optional[str] = None
     incipit: Optional[str] = None
     genre: Optional[str] = None
+    private_for: Optional[int] = None
     deleted: Optional[bool] = None
     learned: Optional[str] = None
     practiced: Optional[str] = None
@@ -561,6 +599,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     notes: Optional[str] = None
     favorite_url: Optional[str] = None
     playlist_deleted: Optional[bool] = None
+    has_override: Optional[bool] = None
 
     class Config:
         orm_mode = True
@@ -575,6 +614,7 @@ class PracticeListStagedModel(BaseModel):
     mode: Optional[str] = None
     incipit: Optional[str] = None
     genre: Optional[str] = None
+    private_for: Optional[int] = None
     deleted: Optional[bool] = None
     learned: Optional[str] = None
     user_ref: Optional[int] = None
@@ -595,6 +635,7 @@ class PracticeListStagedModel(BaseModel):
     recall_eval: Optional[str] = None
     notes: Optional[str] = None
     favorite_url: Optional[str] = None
+    has_override: Optional[bool] = None
 
     class Config:
         orm_mode = True

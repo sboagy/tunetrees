@@ -215,7 +215,7 @@ export async function updateTuneInPlaylistFromTuneOverview(
       tune_id,
     );
     if ("detail" in dbTune) {
-      console.error("Error in updatePlaylistTune: ", dbTune.detail);
+      console.error("Error calling getPlaylistTuneOverview: ", dbTune.detail);
       throw new Error(dbTune.detail);
     }
     const tuneUpdateData: Partial<ITune> = {};
@@ -306,7 +306,7 @@ export async function getPlaylistTuneOverview(
     );
     return response.data;
   } catch (error) {
-    console.error("Error in getPlaylistTune: ", error);
+    console.error("Error calling playlist-tune-overview: ", error);
     return { detail: `Unable to fetch tune: ${(error as Error).message}` };
   }
 }
@@ -707,7 +707,7 @@ export async function updatePlaylistTunes(
  * @return {Promise<ITuneOverview | ITTResponseInfo>} A promise that resolves to the created tune or an object with success or detail messages.
  */
 export async function createEmptyTune(
-  tune: ITuneOverview,
+  tune: Partial<ITuneOverview>,
   playlistRef?: number,
 ): Promise<ITuneOverview | ITTResponseInfo> {
   try {
@@ -719,6 +719,7 @@ export async function createEmptyTune(
       incipit: tune.incipit ?? "",
       genre: tune.genre ?? "",
       deleted: tune.deleted ?? false,
+      private_for: tune.private_for ?? null,
     };
 
     type CreateTuneResponse = ITuneOverview | ITTResponseInfo;

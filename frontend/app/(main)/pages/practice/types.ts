@@ -92,9 +92,24 @@ export interface ITune {
   title?: string | null;
   type?: string | null;
   structure?: string | null;
+  private_for: number | null;
   mode?: string | null;
   incipit?: string | null;
   genre?: string | null;
+  deleted?: boolean | false;
+  private_for_user?: number | null;
+}
+
+export interface ITuneOverride {
+  id: number;
+  tune_ref: number;
+  user_ref: number;
+  title?: string | null;
+  type?: string | null;
+  structure?: string | null;
+  genre?: string | null;
+  mode?: string | null;
+  incipit?: string | null;
   deleted?: boolean | false;
 }
 

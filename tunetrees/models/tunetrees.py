@@ -7,6 +7,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Table,
@@ -32,6 +33,9 @@ class Genre(Base):
     tune: Mapped[List["Tune"]] = relationship(
         "Tune", uselist=True, back_populates="genre_"
     )
+    tune_override: Mapped[List["TuneOverride"]] = relationship(
+        "TuneOverride", uselist=True, back_populates="genre_"
+    )
 
 
 class PlaylistTune(Base):
@@ -47,14 +51,14 @@ class PlaylistTune(Base):
 t_practice_list_joined = Table(
     "practice_list_joined",
     metadata,
-    Column("id", Integer),
-    Column("title", Text),
-    Column("type", Text),
-    Column("structure", Text),
-    Column("mode", Text),
-    Column("incipit", Text),
-    Column("genre", Text),
-    Column("deleted", Boolean),
+    Column("id", NullType),
+    Column("title", NullType),
+    Column("type", NullType),
+    Column("structure", NullType),
+    Column("mode", NullType),
+    Column("incipit", NullType),
+    Column("genre", NullType),
+    Column("private_for", Integer),
     Column("learned", Text),
     Column("practiced", Text),
     Column("quality", Integer),
@@ -68,19 +72,21 @@ t_practice_list_joined = Table(
     Column("playlist_deleted", Boolean),
     Column("notes", NullType),
     Column("favorite_url", Text),
+    Column("has_override", NullType),
 )
 
 
 t_practice_list_staged = Table(
     "practice_list_staged",
     metadata,
-    Column("id", Integer),
-    Column("title", Text),
-    Column("type", Text),
-    Column("structure", Text),
-    Column("mode", Text),
-    Column("incipit", Text),
-    Column("genre", Text),
+    Column("id", NullType),
+    Column("title", NullType),
+    Column("type", NullType),
+    Column("structure", NullType),
+    Column("mode", NullType),
+    Column("incipit", NullType),
+    Column("genre", NullType),
+    Column("private_for", Integer),
     Column("deleted", Boolean),
     Column("learned", Text),
     Column("user_ref", Integer),
@@ -101,6 +107,7 @@ t_practice_list_staged = Table(
     Column("recall_eval", Text),
     Column("notes", NullType),
     Column("favorite_url", Text),
+    Column("has_override", NullType),
 )
 
 
@@ -133,6 +140,9 @@ class User(Base):
     tab_group_main_state: Mapped[List["TabGroupMainState"]] = relationship(
         "TabGroupMainState", uselist=True, back_populates="user"
     )
+    tune: Mapped[List["Tune"]] = relationship(
+        "Tune", uselist=True, back_populates="user"
+    )
     note: Mapped[List["Note"]] = relationship(
         "Note", uselist=True, back_populates="user"
     )
@@ -143,6 +153,9 @@ class User(Base):
         "TableTransientData", uselist=True, back_populates="user"
     )
     tag: Mapped[List["Tag"]] = relationship("Tag", uselist=True, back_populates="user")
+    tune_override: Mapped[List["TuneOverride"]] = relationship(
+        "TuneOverride", uselist=True, back_populates="user"
+    )
 
 
 class VerificationToken(Base):
@@ -269,6 +282,10 @@ class TabGroupMainState(Base):
 
 class Tune(Base):
     __tablename__ = "tune"
+    __table_args__ = (
+        ForeignKeyConstraint(["genre"], ["genre.id"], name="FK_tune_genre"),
+        ForeignKeyConstraint(["private_for"], ["user.id"], name="tune_user_FK"),
+    )
 
     id = mapped_column(Integer, primary_key=True)
     type = mapped_column(Text)
@@ -276,10 +293,12 @@ class Tune(Base):
     title = mapped_column(Text)
     mode = mapped_column(Text)
     incipit = mapped_column(Text)
-    genre = mapped_column(ForeignKey("genre.id"))
+    genre = mapped_column(Text)
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
+    private_for = mapped_column(Integer)
 
     genre_: Mapped[Optional["Genre"]] = relationship("Genre", back_populates="tune")
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="tune")
     note: Mapped[List["Note"]] = relationship(
         "Note", uselist=True, back_populates="tune"
     )
@@ -293,6 +312,9 @@ class Tune(Base):
         "TableTransientData", uselist=True, back_populates="tune"
     )
     tag: Mapped[List["Tag"]] = relationship("Tag", uselist=True, back_populates="tune")
+    tune_override: Mapped[List["TuneOverride"]] = relationship(
+        "TuneOverride", uselist=True, back_populates="tune"
+    )
 
 
 class Note(Base):
@@ -311,8 +333,8 @@ class Note(Base):
     )
 
     id = mapped_column(Integer, primary_key=True)
-    user_ref = mapped_column(ForeignKey("user.id"), nullable=False)
     tune_ref = mapped_column(ForeignKey("tune.id"), nullable=False)
+    user_ref = mapped_column(ForeignKey("user.id"))
     playlist_ref = mapped_column(ForeignKey("playlist.playlist_id"))
     created_date = mapped_column(Text)
     note_text = mapped_column(Text)
@@ -324,7 +346,7 @@ class Note(Base):
         "Playlist", back_populates="note"
     )
     tune: Mapped["Tune"] = relationship("Tune", back_populates="note")
-    user: Mapped["User"] = relationship("User", back_populates="note")
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="note")
 
 
 class PracticeRecord(Base):
@@ -436,3 +458,29 @@ class Tag(Base):
 
     tune: Mapped["Tune"] = relationship("Tune", back_populates="tag")
     user: Mapped["User"] = relationship("User", back_populates="tag")
+
+
+class TuneOverride(Base):
+    __tablename__ = "tune_override"
+    __table_args__ = (
+        ForeignKeyConstraint(["genre"], ["genre.id"], name="FK_tune_override_genre"),
+        ForeignKeyConstraint(["tune_ref"], ["tune.id"], name="tune_override_tune_FK"),
+        ForeignKeyConstraint(["user_ref"], ["user.id"], name="tune_override_user_FK"),
+    )
+
+    id = mapped_column(Integer, primary_key=True)
+    tune_ref = mapped_column(Integer, nullable=False)
+    user_ref = mapped_column(Integer, nullable=False)
+    title = mapped_column(Text)
+    type = mapped_column(Text)
+    structure = mapped_column(Text)
+    genre = mapped_column(Text)
+    mode = mapped_column(Text)
+    incipit = mapped_column(Text)
+    deleted = mapped_column(Boolean, server_default=text("FALSE"))
+
+    genre_: Mapped[Optional["Genre"]] = relationship(
+        "Genre", back_populates="tune_override"
+    )
+    tune: Mapped["Tune"] = relationship("Tune", back_populates="tune_override")
+    user: Mapped["User"] = relationship("User", back_populates="tune_override")

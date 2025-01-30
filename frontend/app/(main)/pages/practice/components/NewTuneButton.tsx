@@ -19,7 +19,7 @@ export default function NewTuneButton({
   const { setCurrentTune } = useTune();
 
   const handleClick = () => {
-    const newTune: ITuneOverview = {
+    const newTune: Partial<ITuneOverview> = {
       title: "",
       type: "",
       structure: null,
