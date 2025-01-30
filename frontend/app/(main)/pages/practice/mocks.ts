@@ -57,6 +57,7 @@ export function getMockTune(): ITuneOverview {
     tags: "tag1, tag2",
     recall_eval: "High",
     notes: "",
+    private_for: null,
   };
   return tuneData;
 }
@@ -122,6 +123,7 @@ export const ERROR_TUNE: ITuneOverview[] = [
     tags: "Error", // Optional property, should't need to be set
     recall_eval: "Error", // Optional property, should't need to be set
     notes: "",
+    private_for: null,
   },
 ];
 
@@ -145,4 +147,5 @@ export const ERROR_PLAYLIST_TUNE: ITuneOverview = {
   user_ref: 0,
   playlist_ref: 0,
   notes: "",
+  private_for: null,
 };
