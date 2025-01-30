@@ -1,5 +1,6 @@
 "use server";
 
+import { fetchWithTimeout } from "@/lib/fetch-utils";
 import { parseParamsWithArrays } from "@/lib/utils";
 import type { SortingState } from "@tanstack/react-table";
 import axios from "axios";
@@ -14,6 +15,7 @@ import type {
   IReferenceData,
   ITTResponseInfo,
   ITune,
+  ITuneOverride,
   ITuneOverview,
   ITuneOverviewScheduled,
   IViewPlaylistJoined,
@@ -1173,4 +1175,55 @@ export async function deletePracticeRecord(
   playlistRef: number,
 ): Promise<void> {
   await client.delete(`/practice_record/${playlistRef}/${tuneRef}`);
+}
+
+export async function fetchTuneOverride(
+  overrideId: number,
+): Promise<ITuneOverride> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch tune override: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneOverride;
+}
+
+export async function createTuneOverride(
+  data: Partial<ITuneOverride>,
+): Promise<ITuneOverride> {
+  const res = await fetchWithTimeout("/tunetrees/tune_override", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to create tune override: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneOverride;
+}
+
+export async function updateTuneOverride(
+  overrideId: number,
+  data: Partial<ITuneOverride>,
+): Promise<ITuneOverride> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update tune override: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneOverride;
+}
+
+export async function deleteTuneOverride(overrideId: number): Promise<void> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete tune override: ${res.statusText}`);
+  }
 }

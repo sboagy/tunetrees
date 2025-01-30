@@ -43,6 +43,7 @@ from tunetrees.models.tunetrees import (
     PracticeRecord,
     Reference,
     Tune,
+    TuneOverride,
     t_practice_list_joined,
     t_practice_list_staged,
     t_view_playlist_joined,
@@ -72,6 +73,8 @@ from tunetrees.models.tunetrees_pydantic import (
     TuneModel,
     TuneModelCreate,
     TuneModelPartial,
+    TuneOverrideModel,
+    TuneOverrideModelPartial,
     ViewPlaylistJoinedModel,
 )
 
@@ -1471,3 +1474,90 @@ def delete_practice_record(playlist_ref: int, tune_ref: int):
     except Exception as e:
         logger.error("Unexpected error in delete_practice_record: %s", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+# Tune Override API
+@router.get(
+    "/tune_override/{override_id}",
+    response_model=TuneOverrideModel,
+    summary="Get Tune Override",
+    description="Retrieve a tune override by its ID.",
+    status_code=200,
+)
+def get_tune_override(override_id: int) -> TuneOverrideModel:
+    try:
+        with SessionLocal() as db:
+            # Example usage:
+            tune_override = (
+                db.query(TuneOverride).filter(TuneOverride.id == override_id).first()
+            )
+            if not tune_override:
+                raise HTTPException(status_code=404, detail="Tune override not found")
+            return TuneOverrideModel.model_validate(tune_override)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/tune_override",
+    response_model=TuneOverrideModel,
+    summary="Create Tune Override",
+    description="Create a new tune override entry.",
+    status_code=201,
+)
+def create_tune_override(override: TuneOverrideModelPartial) -> TuneOverrideModel:
+    try:
+        with SessionLocal() as db:
+            new_override = TuneOverride(**override.model_dump(exclude_unset=True))
+            db.add(new_override)
+            db.commit()
+            db.refresh(new_override)
+            return TuneOverrideModel.model_validate(new_override)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch(
+    "/tune_override/{override_id}",
+    response_model=TuneOverrideModel,
+    summary="Update Tune Override",
+    description="Update an existing tune override by ID.",
+    status_code=200,
+)
+def update_tune_override(
+    override_id: int, override: TuneOverrideModelPartial
+) -> TuneOverrideModel:
+    try:
+        with SessionLocal() as db:
+            tune_override = (
+                db.query(TuneOverride).filter(TuneOverride.id == override_id).first()
+            )
+            if not tune_override:
+                raise HTTPException(status_code=404, detail="Tune override not found")
+            for key, value in override.model_dump(exclude_unset=True).items():
+                setattr(tune_override, key, value)
+            db.commit()
+            db.refresh(tune_override)
+            return TuneOverrideModel.model_validate(tune_override)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete(
+    "/tune_override/{override_id}",
+    summary="Delete Tune Override",
+    description="Delete an existing tune override by ID.",
+    status_code=204,
+)
+def delete_tune_override(override_id: int) -> None:
+    try:
+        with SessionLocal() as db:
+            tune_override = (
+                db.query(TuneOverride).filter(TuneOverride.id == override_id).first()
+            )
+            if not tune_override:
+                raise HTTPException(status_code=404, detail="Tune override not found")
+            db.delete(tune_override)
+            db.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
