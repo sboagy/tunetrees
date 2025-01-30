@@ -363,13 +363,6 @@ export default function TunesGridRepertoire({
               >
                 {">"}
               </Button> */}
-              <ColumnsMenu
-                user_id={userId}
-                tablePurpose="repertoire"
-                playlistId={playlistId}
-                table={table}
-                triggerRefresh={triggerRefresh}
-              />
               <NewTuneButton userId={userId} playlistId={playlistId} />
               <ImportButton userId={userId} playlistId={playlistId} />
               <DeleteTuneButton
@@ -377,6 +370,13 @@ export default function TunesGridRepertoire({
                 playlistId={playlistId}
                 disabled={!isRowsSelected}
                 table={table}
+              />
+              <ColumnsMenu
+                user_id={userId}
+                tablePurpose="repertoire"
+                playlistId={playlistId}
+                table={table}
+                triggerRefresh={triggerRefresh}
               />
             </div>
           </div>

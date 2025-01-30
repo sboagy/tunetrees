@@ -320,19 +320,19 @@ export default function TunesGridCatalog({
               >
                 {">"}
               </Button> */}
-              <ColumnsMenu
-                user_id={userId}
-                tablePurpose="catalog"
-                playlistId={playlistId}
-                table={table}
-                triggerRefresh={triggerRefresh}
-              />
               <NewTuneButton userId={userId} playlistId={playlistId} />
               <ImportButton userId={userId} playlistId={playlistId} />
               <DeleteTuneButton
                 userId={userId}
                 disabled={!isRowsSelected}
                 table={table}
+              />
+              <ColumnsMenu
+                user_id={userId}
+                tablePurpose="catalog"
+                playlistId={playlistId}
+                table={table}
+                triggerRefresh={triggerRefresh}
               />
             </div>
           </div>
