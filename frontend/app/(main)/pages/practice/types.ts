@@ -132,6 +132,10 @@ export interface ITuneOverview extends ITune {
   playlist_deleted?: boolean | null;
 }
 
+export interface ITuneOverviewImported extends ITuneOverview {
+  import_url: string | null;
+}
+
 export interface IPracticeRecord {
   id: number;
   playlist_ref?: number;
@@ -239,4 +243,17 @@ export interface IVerificationToken {
   identifier: string;
   token: string;
   expires: string;
+}
+
+export interface IGenreTuneType {
+  id: number;
+  genre_id: number;
+  tune_type_id: number;
+}
+
+export interface ITuneType {
+  id: string;
+  name: string;
+  rhythm: string;
+  description: string;
 }

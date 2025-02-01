@@ -7,6 +7,7 @@ import axios from "axios";
 import { ERROR_TUNE } from "./mocks";
 import type {
   IGenre,
+  IGenreTuneType,
   IInstrument,
   INote,
   IPlaylist,
@@ -18,6 +19,7 @@ import type {
   ITuneOverride,
   ITuneOverview,
   ITuneOverviewScheduled,
+  ITuneType,
   IViewPlaylistJoined,
 } from "./types";
 
@@ -1226,4 +1228,116 @@ export async function deleteTuneOverride(overrideId: number): Promise<void> {
   if (!res.ok) {
     throw new Error(`Failed to delete tune override: ${res.statusText}`);
   }
+}
+
+export async function getTuneType(tuneTypeId: string): Promise<ITuneType> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_type/${tuneTypeId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch tune type: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneType;
+}
+
+export async function createTuneType(
+  data: Partial<ITuneType>,
+): Promise<ITuneType> {
+  const res = await fetchWithTimeout("/tunetrees/tune_type", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to create tune type: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneType;
+}
+
+export async function updateTuneType(
+  tuneTypeId: string,
+  data: Partial<ITuneType>,
+): Promise<ITuneType> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_type/${tuneTypeId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update tune type: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneType;
+}
+
+export async function deleteTuneType(tuneTypeId: string): Promise<void> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_type/${tuneTypeId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete tune type: ${res.statusText}`);
+  }
+}
+
+export async function fetchGenreTuneType(
+  assocId: number,
+): Promise<IGenreTuneType> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const res = await fetch(`${baseUrl}/genre_tune_type/${assocId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch association: ${res.statusText}`);
+  }
+  return (await res.json()) as IGenreTuneType;
+}
+
+export async function createGenreTuneType(
+  data: Partial<IGenreTuneType>,
+): Promise<IGenreTuneType> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const res = await fetch(`${baseUrl}/genre_tune_type`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to create association: ${res.statusText}`);
+  }
+  return (await res.json()) as IGenreTuneType;
+}
+
+export async function updateGenreTuneType(
+  assocId: number,
+  data: Partial<IGenreTuneType>,
+): Promise<IGenreTuneType> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const res = await fetch(`${baseUrl}/genre_tune_type/${assocId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update association: ${res.statusText}`);
+  }
+  return (await res.json()) as IGenreTuneType;
+}
+
+export async function deleteGenreTuneType(assocId: number): Promise<void> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const res = await fetch(`${baseUrl}/genre_tune_type/${assocId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete association: ${res.statusText}`);
+  }
+}
+
+export async function getTuneTypesByGenre(
+  genreId: string,
+): Promise<ITuneType[]> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const res = await fetch(`${baseUrl}/tune_types/${genreId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch tune types: ${res.statusText}`);
+  }
+  return (await res.json()) as ITuneType[];
 }

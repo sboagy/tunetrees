@@ -26,6 +26,7 @@ export default function NewTuneButton({
       mode: null,
       incipit: null,
       genre: null,
+      private_for: userId, // This is a new tune, so it's private by default
       deleted: true, // This is a new tune, so it's deleted by default
       learned: null,
       practiced: null,

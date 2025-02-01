@@ -10,12 +10,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { Import } from "lucide-react";
-import { type JSX, useState } from "react";
+import type { JSX } from "react";
 import { importTune } from "../import-utils";
 import { createEmptyTune } from "../queries";
 import type { ITuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
+import { useImportUrl } from "./ImportContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 
 interface IImportButtonProps {
@@ -30,16 +32,30 @@ export default function ImportButton({
   const { setCurrentView } = useMainPaneView();
   const { setCurrentTune } = useTune();
 
-  const [importUrl, setImportUrl] = useState(
-    // "https://www.irishtune.info/tune/1081/",
-    "https://thesession.org/tunes/393",
-  );
+  const { toast } = useToast();
+
+  const handleError = (message: string) => {
+    toast({
+      title: "Error",
+      description: message,
+      // status: "error",
+    });
+  };
+
+  // const [importUrl, setImportUrl] = useState(
+  //   // "https://www.irishtune.info/tune/1081/",
+  //   "https://thesession.org/tunes/393",
+  // );
+  const { importUrl, setImportUrl } = useImportUrl();
 
   const handleUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setImportUrl(event.target.value);
   };
 
   const handleImport = () => {
+    if (!importUrl) {
+      return;
+    }
     importTune(importUrl)
       .then((scrapedTune) => {
         console.log("===> ImportButton.tsx:62 ~ scrapedTune", scrapedTune);
@@ -75,6 +91,7 @@ export default function ImportButton({
               return;
             }
             setCurrentTune(tune.id);
+            setImportUrl(importUrl);
             setCurrentView("edit");
             // void refreshData();
           })
@@ -83,7 +100,7 @@ export default function ImportButton({
           });
       })
       .catch((error) => {
-        alert(`Error extracting tune from URL: ${error.message}`);
+        handleError(`Error extracting tune from URL: ${error.message}`);
       });
   };
 
@@ -161,7 +178,7 @@ export default function ImportButton({
             </Label>
             <Input
               id="import-url"
-              value={importUrl}
+              value={importUrl ?? ""}
               className="col-span-3 w-full"
               onChange={handleUrlChange}
             />
