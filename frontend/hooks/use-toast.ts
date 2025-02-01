@@ -15,12 +15,13 @@ type ToasterToast = ToastProps & {
   action?: ToastActionElement;
 };
 
-type ActionType = {
-  ADD_TOAST: "ADD_TOAST";
-  UPDATE_TOAST: "UPDATE_TOAST";
-  DISMISS_TOAST: "DISMISS_TOAST";
-  REMOVE_TOAST: "REMOVE_TOAST";
-};
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const actionTypes = {
+  ADD_TOAST: "ADD_TOAST",
+  UPDATE_TOAST: "UPDATE_TOAST",
+  DISMISS_TOAST: "DISMISS_TOAST",
+  REMOVE_TOAST: "REMOVE_TOAST",
+} as const;
 
 let count = 0;
 
@@ -28,6 +29,8 @@ function genId() {
   count = (count + 1) % Number.MAX_SAFE_INTEGER;
   return count.toString();
 }
+
+type ActionType = typeof actionTypes;
 
 type Action =
   | {
@@ -169,7 +172,7 @@ function toast({ ...props }: Toast) {
 function useToast() {
   const [state, setState] = React.useState<IState>(memoryState);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Not sure how to fix this, or if it's a real issue
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   React.useEffect(() => {
     listeners.push(setState);
     return () => {
@@ -187,4 +190,4 @@ function useToast() {
   };
 }
 
-export { useToast, toast };
+export { toast, useToast };

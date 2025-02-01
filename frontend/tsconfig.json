@@ -54,6 +54,8 @@
     "test-scripts/**/*.mts",
     "components/**/*.ts",
     "components/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
     "auth/**/*.ts",
     "lib/**/*.ts",
     ".next/types/**/*.ts",
