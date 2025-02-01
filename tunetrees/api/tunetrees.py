@@ -15,7 +15,7 @@ from fastapi import (
     Path,
     Query,
 )
-from sqlalchemy import ColumnElement, Table, and_
+from sqlalchemy import ColumnElement, Table, and_, delete, insert
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.query import Query as QueryOrm
@@ -44,15 +44,19 @@ from tunetrees.models.tunetrees import (
     Reference,
     Tune,
     TuneOverride,
+    TuneType,
     t_practice_list_joined,
     t_practice_list_staged,
     t_view_playlist_joined,
+    t_genre_tune_type,
 )
 from tunetrees.models.tunetrees_pydantic import (
     ColumnSort,
     GenreModel,
     GenreModelCreate,
     GenreModelPartial,
+    GenreTuneTypeModel,
+    GenreTuneTypeModelPartial,
     InstrumentModel,
     InstrumentModelPartial,
     NoteModel,
@@ -75,6 +79,8 @@ from tunetrees.models.tunetrees_pydantic import (
     TuneModelPartial,
     TuneOverrideModel,
     TuneOverrideModelPartial,
+    TuneTypeModel,
+    TuneTypeModelPartial,
     ViewPlaylistJoinedModel,
 )
 
@@ -1561,3 +1567,183 @@ def delete_tune_override(override_id: int) -> None:
             db.commit()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/tune_type/{tune_type_id}",
+    response_model=TuneTypeModel,
+    summary="Get TuneType",
+    description="Retrieve a TuneType by its ID",
+    status_code=status.HTTP_200_OK,
+)
+async def get_tune_type(tune_type_id: str):
+    with SessionLocal() as db:
+        tune_type = db.query(TuneType).filter(TuneType.id == tune_type_id).first()
+        if not tune_type:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="TuneType not found"
+            )
+        return TuneTypeModel.model_validate(tune_type)
+
+
+@router.post(
+    "/tune_type",
+    response_model=TuneTypeModel,
+    summary="Create TuneType",
+    description="Create a new TuneType",
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_tune_type(tune_type: TuneTypeModel):
+    with SessionLocal() as db:
+        new_tune_type = TuneType(**tune_type.model_dump())
+        db.add(new_tune_type)
+        db.commit()
+        db.refresh(new_tune_type)
+        return TuneTypeModel.model_validate(new_tune_type)
+
+
+@router.patch(
+    "/tune_type/{tune_type_id}",
+    response_model=TuneTypeModel,
+    summary="Update TuneType",
+    description="Update an existing TuneType",
+    status_code=status.HTTP_200_OK,
+)
+async def update_tune_type(tune_type_id: str, tune_type: TuneTypeModelPartial):
+    with SessionLocal() as db:
+        existing_tune_type = (
+            db.query(TuneType).filter(TuneType.id == tune_type_id).first()
+        )
+        if not existing_tune_type:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="TuneType not found"
+            )
+        for key, value in tune_type.model_dump().items():
+            if value is not None:
+                setattr(existing_tune_type, key, value)
+        db.commit()
+        db.refresh(existing_tune_type)
+        return TuneTypeModel.model_validate(existing_tune_type)
+
+
+@router.delete(
+    "/tune_type/{tune_type_id}",
+    summary="Delete TuneType",
+    description="Delete a TuneType by its ID",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_tune_type(tune_type_id: str):
+    with SessionLocal() as db:
+        tune_type = db.query(TuneType).filter(TuneType.id == tune_type_id).first()
+        if not tune_type:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="TuneType not found"
+            )
+        db.delete(tune_type)
+        db.commit()
+        return {"detail": "TuneType deleted successfully"}
+
+
+@router.get(
+    "/genre_tune_type/{genre_id}/{tune_type_id}",
+    response_model=GenreTuneTypeModel,
+    summary="Get Genre-TuneType association",
+    description="Retrieve a Genre-TuneType association by its IDs.",
+    status_code=200,
+)
+async def get_genre_tune_type(genre_id: str, tune_type_id: str) -> GenreTuneTypeModel:
+    with SessionLocal() as db:
+        row = (
+            db.execute(
+                select(t_genre_tune_type).where(
+                    t_genre_tune_type.c.genre_id == genre_id,
+                    t_genre_tune_type.c.tune_type_id == tune_type_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Association not found",
+            )
+        return GenreTuneTypeModel.model_validate(row)
+
+
+@router.post(
+    "/genre_tune_type",
+    response_model=GenreTuneTypeModel,
+    summary="Create Genre-TuneType association",
+    description="Create a new association between Genre and TuneType.",
+    status_code=201,
+)
+async def create_genre_tune_type(data: GenreTuneTypeModelPartial) -> GenreTuneTypeModel:
+    with SessionLocal() as db:
+        insert_stmt = (
+            insert(t_genre_tune_type)
+            .values(**data.model_dump())
+            .returning(t_genre_tune_type)
+        )
+        row = db.execute(insert_stmt).mappings().first()
+        db.commit()
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Insert failed",
+            )
+        return GenreTuneTypeModel.model_validate(row)
+
+
+@router.delete(
+    "/genre_tune_type/{genre_id}/{tune_type_id}",
+    summary="Delete Genre-TuneType association",
+    status_code=204,
+)
+async def delete_genre_tune_type(genre_id: str, tune_type_id: str):
+    with SessionLocal() as db:
+        row_current = (
+            db.execute(
+                select(t_genre_tune_type).where(
+                    t_genre_tune_type.c.genre_id == genre_id,
+                    t_genre_tune_type.c.tune_type_id == tune_type_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if not row_current:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Association not found",
+            )
+        db.execute(
+            delete(t_genre_tune_type).where(
+                t_genre_tune_type.c.genre_id == genre_id,
+                t_genre_tune_type.c.tune_type_id == tune_type_id,
+            )
+        )
+        db.commit()
+
+
+@router.get(
+    "/tune_types/{genre_id}",
+    response_model=List[TuneTypeModel],
+    summary="Get TuneTypes by Genre",
+    description="Retrieve a list of TuneTypes associated with a specific Genre ID",
+    status_code=status.HTTP_200_OK,
+)
+async def get_tune_types_by_genre(genre_id: str):
+    with SessionLocal() as db:
+        tune_types = (
+            db.query(TuneType)
+            .join(t_genre_tune_type, TuneType.id == t_genre_tune_type.c.tune_type_id)
+            .filter(t_genre_tune_type.c.genre_id == genre_id)
+            .all()
+        )
+        if not tune_types:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No TuneTypes found for the given Genre ID",
+            )
+        return [TuneTypeModel.model_validate(tune_type) for tune_type in tune_types]

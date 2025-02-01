@@ -733,3 +733,43 @@ class SessionAndUserModel(BaseModel):
 class VerificationTokenParamsModel(BaseModel):
     identifier: str
     token: str
+
+
+class TuneTypeModel(BaseModel):
+    id: str
+    name: Optional[str] = None
+    rhythm: Optional[str] = None
+    description: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class TuneTypeModelPartial(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    rhythm: Optional[str] = None
+    description: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class GenreTuneTypeModel(BaseModel):
+    genre_id: int
+    tune_type_id: int
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class GenreTuneTypeModelPartial(BaseModel):
+    genre_id: Optional[int] = None
+    tune_type_id: Optional[int] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True

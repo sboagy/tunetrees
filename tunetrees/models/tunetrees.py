@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    PrimaryKeyConstraint,
     Table,
     Text,
     UniqueConstraint,
@@ -30,6 +31,9 @@ class Genre(Base):
     region = mapped_column(Text)
     description = mapped_column(Text)
 
+    tune_type: Mapped["TuneType"] = relationship(
+        "TuneType", secondary="genre_tune_type", back_populates="genre"
+    )
     tune: Mapped[List["Tune"]] = relationship(
         "Tune", uselist=True, back_populates="genre_"
     )
@@ -58,6 +62,7 @@ t_practice_list_joined = Table(
     Column("mode", NullType),
     Column("incipit", NullType),
     Column("genre", NullType),
+    Column("deleted", Boolean),
     Column("private_for", Integer),
     Column("learned", Text),
     Column("practiced", Text),
@@ -109,6 +114,20 @@ t_practice_list_staged = Table(
     Column("favorite_url", Text),
     Column("has_override", NullType),
 )
+
+
+class TuneType(Base):
+    __tablename__ = "tune_type"
+    __table_args__ = (PrimaryKeyConstraint("id", name="NewTable_PK"),)
+
+    id = mapped_column(Text)
+    name = mapped_column(Text)
+    rhythm = mapped_column(Text)
+    description = mapped_column(Text)
+
+    genre: Mapped["Genre"] = relationship(
+        "Genre", secondary="genre_tune_type", back_populates="tune_type"
+    )
 
 
 class User(Base):
@@ -197,6 +216,14 @@ class Account(Base):
     token_type = mapped_column(Text)
 
     user: Mapped["User"] = relationship("User", back_populates="account")
+
+
+t_genre_tune_type = Table(
+    "genre_tune_type",
+    metadata,
+    Column("genre_id", ForeignKey("genre.id"), primary_key=True),
+    Column("tune_type_id", ForeignKey("tune_type.id"), primary_key=True),
+)
 
 
 class Instrument(Base):
