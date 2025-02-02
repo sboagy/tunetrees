@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeKey } from "@/lib/abc-utils";
 import { fetchWithTimeout } from "@/lib/fetch-utils";
 import { parseParamsWithArrays } from "@/lib/utils";
 import type { SortingState } from "@tanstack/react-table";
@@ -212,6 +213,10 @@ export async function updateTuneInPlaylistFromTuneOverview(
     console.log("Title bytes:", [
       ...new TextEncoder().encode(tune_update.title || ""),
     ]);
+
+    if (tune_update.mode) {
+      tune_update.mode = normalizeKey(tune_update.mode);
+    }
 
     const dbTune = await getPlaylistTuneOverview(
       user_id,

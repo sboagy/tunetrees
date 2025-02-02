@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeKey } from "@/lib/abc-utils";
 import { fetchWithTimeout } from "@/lib/fetch-utils";
 import abcjs, { type VoiceItem, type VoiceItemBar } from "abcjs";
 import { type CheerioAPI, load } from "cheerio";
@@ -177,7 +178,18 @@ async function extractTheSessionTune(
       await fetchTuneFromTheSessionURL(url);
     extractedTune.title = tuneJson.name;
     extractedTune.type = tuneJson.type;
-    extractedTune.mode = tuneJson.settings[0].key;
+
+    // The basic structure of the key field is as follows:
+    // - Capital letter between A and G (key signature)
+    // - # or b to indicate sharp or flat respectively (optional)
+    // - Mode (if none is specified, major is assumed)
+    // Note that for modes, the capitalization is ignored and only the first
+    // three letters are parsed. For example, K:F#MIX is equivalent to K:F#
+    // mixolydian. The key field also supports a number of more advanced
+    // parameters allowing for the specification of accidentals, clef type,
+    // etc. It is possible to specify no key signature by using either an
+    // empty K field or K:none
+    extractedTune.mode = normalizeKey(tuneJson.settings[0].key);
     const barsPerSection = getBarsPerSection(tuneJson.type);
     const { incipit, structure } = extractIncipitFromTheSessionJson(
       tuneParsed,

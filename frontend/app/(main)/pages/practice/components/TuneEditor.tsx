@@ -43,12 +43,49 @@ import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import "./TuneEditor.css"; // Import the CSS file
 import { useRepertoireTunes } from "./TunesContextRepertoire";
 
+// Define the valid modes
+const validModes = new Set([
+  "maj",
+  "min",
+  "mix",
+  "dor",
+  "phr",
+  "lyd",
+  "loc",
+  "aeo",
+  "ion",
+  "none",
+]);
+
+// Custom validation function for the key field
+const keyValidation = z.string().refine(
+  (key) => {
+    // Regular expression to match the key signature and mode
+    const regex =
+      /^([A-Ga-g][#b]?)(\s*(maj|min|mix|dor|phr|lyd|loc|aeo|ion|none|major|minor|mixolydian|dorian|phrygian|lydian|locrian|aeolian|ionian)?)?$/i;
+    const match = key.match(regex);
+
+    if (!match) {
+      return false;
+    }
+
+    const mode = match[2]?.trim().toLowerCase().slice(0, 3) || "maj";
+
+    // Check if the mode is valid
+    return validModes.has(mode);
+  },
+  {
+    message:
+      "Invalid key format. Expected format: K:<key signature><optional sharp/flat><optional mode>",
+  },
+);
+
 const formSchema = z.object({
   id: z.number().optional(),
   title: z.string().optional(),
   type: z.string().nullable().optional(),
   structure: z.string().nullable().optional(),
-  mode: z.string().nullable().optional(),
+  mode: keyValidation.nullable().optional(),
   incipit: z.string().nullable().optional(),
   genre: z.string().nullable().optional(),
   learned: z.string().nullable().optional(), // playlist_tune.learned
@@ -145,6 +182,11 @@ export default function TuneEditor({
     resolver: zodResolver(formSchema),
     defaultValues: {},
   });
+  const {
+    // control,
+    // handleSubmit,
+    formState: { errors },
+  } = form;
 
   const [genres, setGenres] = useState<IGenre[]>([]);
   const [isGenresLoading, setIsGenresLoading] = useState(true);
@@ -654,6 +696,24 @@ export default function TuneEditor({
                 )}
               />
 
+              {/* <FormField
+                control={form.control}
+                name="mode"
+                render={({ field }) => (
+                  <FormItem
+                    className="tune-form-item-style"
+                    data-testid="tt-tune-editor-mode"
+                  >
+                    <FormLabel className="tune-form-label-style">
+                      Mode:{" "}
+                    </FormLabel>
+
+                    <FormControl className="tune-form-control-style">
+                      <Input {...field} value={field.value || ""} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              /> */}
               <FormField
                 control={form.control}
                 name="mode"
@@ -669,6 +729,9 @@ export default function TuneEditor({
                     <FormControl className="tune-form-control-style">
                       <Input {...field} value={field.value || ""} />
                     </FormControl>
+                    {errors.mode && (
+                      <p className="error-message">{errors.mode.message}</p>
+                    )}
                   </FormItem>
                 )}
               />
