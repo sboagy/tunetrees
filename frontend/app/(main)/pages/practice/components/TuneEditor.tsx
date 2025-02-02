@@ -446,6 +446,23 @@ export default function TuneEditor({
     return instructions;
   }
 
+  const onGenreChange = async (
+    e: React.ChangeEvent<HTMLSelectElement>,
+    field: { onChange: (value: string) => void },
+  ) => {
+    const genreId = e.target.value;
+    field.onChange(genreId);
+
+    try {
+      const types = await getTuneTypesByGenre(genreId);
+      setTuneTypeList(types);
+    } catch (error) {
+      const errorMessage = `Error fetching tune types for genre ${genreId}: ${String(error)}`;
+      console.log(errorMessage);
+      handleError(errorMessage);
+    }
+  };
+
   return (
     <div className="flex flex-col w-full h-full">
       <div className="flex items-center justify-between space-x-2 w-3/5">
@@ -549,7 +566,7 @@ export default function TuneEditor({
                       <select
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value)}
+                        onChange={(e) => void onGenreChange(e, field)}
                         className="tune-form-control-style px-2"
                       >
                         <option value="">Select genre</option>
