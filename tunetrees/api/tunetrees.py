@@ -17,6 +17,7 @@ from fastapi import (
 )
 from sqlalchemy import ColumnElement, Table, and_, delete, insert
 from sqlalchemy.future import select
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.query import Query as QueryOrm
 from starlette import status as status
@@ -583,6 +584,44 @@ def get_references(
         raise HTTPException(status_code=500, detail=f"Unable to fetch references: {e}")
 
 
+@router.get(
+    "/references_query",
+    response_model=List[ReferenceModel],
+    summary="Get References by column query",
+    description="Get all references that have a given value in a specified column.",
+    status_code=200,
+)
+def get_references_by_query(
+    url: Optional[str] = Query(None, description="URL to search for in references"),
+) -> List[ReferenceModel]:
+    try:
+        if url is None:
+            return []
+
+        logger.debug(f"Fetching references with URL ({url})")
+        with SessionLocal() as db:
+            stmt = select(Reference).where(Reference.url == url)
+            logger.debug(f"Generated SQL: {stmt}")
+            logger.debug(f"Parameters: url={url}")
+
+            result = db.execute(stmt)
+            references = result.scalars().all()
+            # Debugging: Print the fetched references
+            logger.debug(f"Fetched references: {references}")
+            for reference in references:
+                logger.debug(
+                    f"Reference type: {type(reference)}, Reference: {reference}"
+                )
+
+            result = [
+                ReferenceModel.model_validate(reference) for reference in references
+            ]
+            return result
+    except Exception as e:
+        logger.error(f"Unable to fetch references with URL ({url}): {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to fetch references: {e}")
+
+
 @router.post(
     "/references",
     response_model=ReferenceModel,
@@ -803,6 +842,38 @@ def get_tune(
 
 
 @router.get(
+    "/tunes/search",
+    response_model=List[TuneModel],
+    summary="Search Tunes by Title",
+    description="Search for tunes by title using Levenshtein Distance.",
+    status_code=200,
+)
+def search_tunes_by_title(
+    title: str = Query(..., description="Title to search for"),
+    limit: int = Query(10, description="Maximum number of results to return"),
+):
+    try:
+        with SessionLocal() as db:
+            stmt = (
+                select(Tune)
+                .order_by(func.levenshtein(Tune.title, title).desc())
+                .filter(func.levenshtein(Tune.title, title) > 70.0)
+                .limit(limit)
+            )
+            tunes = db.execute(stmt).scalars().all()
+            # if not tunes:
+            #     raise HTTPException(
+            #         status_code=404, detail=f"No tunes found matching title '{title}'"
+            #     )
+            return [TuneModel.model_validate(tune) for tune in tunes]
+    except Exception as e:
+        logger.error(f"Unable to search tunes by title '{title}': {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to search tunes by title '{title}': {e}"
+        )
+
+
+@router.get(
     "/tunes",
     response_model=List[TuneModel],
     summary="Get Tunes",
@@ -951,6 +1022,16 @@ def delete_tune(
             if not existing_tune:
                 raise HTTPException(status_code=404, detail="Tune not found")
 
+            # Delete related records in other tables
+            db.query(PlaylistTune).filter(PlaylistTune.tune_ref == tune_ref).delete()
+            db.query(TuneOverride).filter(TuneOverride.tune_ref == tune_ref).delete()
+            db.query(PracticeRecord).filter(
+                PracticeRecord.tune_ref == tune_ref
+            ).delete()
+            db.query(Note).filter(Note.tune_ref == tune_ref).delete()
+            db.query(Reference).filter(Reference.tune_ref == tune_ref).delete()
+
+            # Delete the tune
             db.delete(existing_tune)
             db.commit()
             return
