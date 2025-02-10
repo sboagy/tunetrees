@@ -1,13 +1,15 @@
 "use server";
 
-import { normalizeKey } from "@/lib/abc-utils";
+import { normalizeKey, normalizeTuneType } from "@/lib/abc-utils";
 import { fetchWithTimeout } from "@/lib/fetch-utils";
+import { levenshteinDistance } from "@/lib/utils";
 import abcjs, { type VoiceItem, type VoiceItemBar } from "abcjs";
 import { type CheerioAPI, load } from "cheerio";
 import type { ITheSessionTune } from "./import-the-session-schemas";
-import type { ITuneOverview } from "./types";
+import { getTune, queryReferences, searchTunesByTitle } from "./queries";
+import type { ITune, ITuneOverview } from "./types";
 
-export async function fetchTheSessionIncipitFromTitle(
+export async function fetchTheSessionURLFromTitle(
   title: string,
   tuneType: string,
 ): Promise<string> {
@@ -22,9 +24,26 @@ export async function fetchTheSessionIncipitFromTitle(
     });
     const results = await response.json();
     if (results.total > 0) {
-      const tuneUrlBase = results.tunes[0].url;
-      const incipit = await extractTuneMeasuresFromURL(tuneUrlBase);
-      return incipit;
+      let closestMatchIndex = 0;
+      let bestDistance = levenshteinDistance(
+        results.tunes[0].name.toLowerCase(),
+        title.toLowerCase(),
+      );
+
+      for (let index = 1; index < results.tunes.length; index++) {
+        const tune = results.tunes[index];
+        const currentDistance = levenshteinDistance(
+          tune.name.toLowerCase(),
+          title.toLowerCase(),
+        );
+
+        if (currentDistance < bestDistance) {
+          bestDistance = currentDistance;
+          closestMatchIndex = index;
+        }
+      }
+      const tuneUrlBase = results.tunes[closestMatchIndex].url;
+      return tuneUrlBase as string;
     }
   } catch (error) {
     console.error("Error fetching data:", error);
@@ -32,6 +51,18 @@ export async function fetchTheSessionIncipitFromTitle(
   }
 
   return "";
+}
+
+export async function fetchTheSessionIncipitFromTitle(
+  title: string,
+  tuneType: string,
+): Promise<[string, string]> {
+  const theSessionURL = await fetchTheSessionURLFromTitle(title, tuneType);
+  if (!theSessionURL) {
+    return ["", ""];
+  }
+  const incipit = await extractTuneMeasuresFromURL(theSessionURL);
+  return [incipit, theSessionURL];
 }
 
 async function extractTuneMeasuresFromURL(
@@ -170,25 +201,15 @@ async function fetchTuneFromTheSessionURL(tuneUrlBase: string): Promise<{
 
 async function extractTheSessionTune(
   url: string,
-): Promise<Partial<ITuneOverview>> {
+): Promise<[Partial<ITuneOverview>, ITune[], string]> {
   const extractedTune: Partial<ITuneOverview> = {};
 
   try {
     const { tuneParsed, abcString, tuneJson } =
       await fetchTuneFromTheSessionURL(url);
     extractedTune.title = tuneJson.name;
-    extractedTune.type = tuneJson.type;
+    extractedTune.type = normalizeTuneType(tuneJson.type);
 
-    // The basic structure of the key field is as follows:
-    // - Capital letter between A and G (key signature)
-    // - # or b to indicate sharp or flat respectively (optional)
-    // - Mode (if none is specified, major is assumed)
-    // Note that for modes, the capitalization is ignored and only the first
-    // three letters are parsed. For example, K:F#MIX is equivalent to K:F#
-    // mixolydian. The key field also supports a number of more advanced
-    // parameters allowing for the specification of accidentals, clef type,
-    // etc. It is possible to specify no key signature by using either an
-    // empty K field or K:none
     extractedTune.mode = normalizeKey(tuneJson.settings[0].key);
     const barsPerSection = getBarsPerSection(tuneJson.type);
     const { incipit, structure } = extractIncipitFromTheSessionJson(
@@ -200,21 +221,52 @@ async function extractTheSessionTune(
     extractedTune.incipit = incipit;
     extractedTune.structure = structure;
 
-    return extractedTune;
+    const existingMatches = await findExistingMatches(
+      url,
+      extractedTune.title ?? "",
+      extractedTune.type ?? "",
+    );
+
+    return [extractedTune, existingMatches, ""];
   } catch (error) {
-    console.error("Error scraping data:", error);
+    console.error("Error extracting data:", error);
     throw error;
   }
 }
 
+async function findExistingMatches(url: string, title: string, type: string) {
+  const existingMatches: ITune[] = [];
+
+  const refs = await queryReferences(url);
+  if (refs.length > 0) {
+    const tuneRef = refs[0].tune_ref;
+    if (tuneRef) {
+      const existingTune: ITuneOverview | { detail: string } =
+        await getTune(tuneRef);
+      if ("detail" in existingTune) {
+        throw new Error(`Existing tune not found: ${existingTune.detail}`);
+      }
+      if (existingTune) {
+        existingMatches.push(existingTune);
+        return existingMatches;
+      }
+    }
+  }
+
+  if (title) {
+    const matches = await searchTunesByTitle(title);
+    for (const match of matches) {
+      if (match.type === type) {
+        existingMatches.push(match);
+      }
+    }
+  }
+  return existingMatches;
+}
+
 async function scrapeIrishTuneInfoTune(
   url: string,
-): Promise<Partial<ITuneOverview>> {
-  /**
-   * Extracts the text content from a specific column in a table row.
-   * @param columnIndex - The index of the column to extract text from.
-   * @returns The text content of the specified column, or undefined if not found.
-   */
+): Promise<[Partial<ITuneOverview>, ITune[], string]> {
   function extractColumnText(
     $: CheerioAPI,
     columnIndex: number,
@@ -268,22 +320,32 @@ async function scrapeIrishTuneInfoTune(
     const mode = extractColumnText($, 4);
     scrapedTune.mode = mode;
 
+    let secondarySourceUrl = "";
     if (title) {
-      const incipit = await fetchTheSessionIncipitFromTitle(
+      const [incipit, incipitURL] = await fetchTheSessionIncipitFromTitle(
         title,
         rhythm ?? "",
       );
+      secondarySourceUrl = incipitURL;
       scrapedTune.incipit = incipit;
     }
 
-    return scrapedTune;
+    const existingMatches = await findExistingMatches(
+      url,
+      scrapedTune.title ?? "",
+      rhythm ?? "",
+    );
+
+    return [scrapedTune, existingMatches, secondarySourceUrl];
   } catch (error) {
     console.error("Error scraping data:", error);
     throw error;
   }
 }
 
-export async function importTune(url: string): Promise<Partial<ITuneOverview>> {
+export async function importTune(
+  url: string,
+): Promise<[Partial<ITuneOverview>, ITune[], string]> {
   try {
     if (url.includes("://www.irishtune.info")) {
       return await scrapeIrishTuneInfoTune(url);

@@ -356,6 +356,27 @@ export async function getReferences(
   }
 }
 
+/**
+ * Fetch references for a specific tune.
+ *
+ * @param url - URL value to search for.
+ * @returns A promise that resolves to a list of references.
+ */
+export async function queryReferences(url: string): Promise<IReferenceData[]> {
+  try {
+    console.log("===> queries.ts:368 ~ ", url);
+    const response = await client.get<IReferenceData[]>(
+      `/references_query?url=${url}`,
+      {},
+    );
+    console.log("references_query response: ", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error in queryReferences: ", error);
+    return [];
+  }
+}
+
 export async function getReferenceFavorite(
   tuneRef: number,
   userRef: number | null,
@@ -1345,4 +1366,23 @@ export async function getTuneTypesByGenre(
     throw new Error(`Failed to fetch tune types: ${res.statusText}`);
   }
   return (await res.json()) as ITuneType[];
+}
+
+export async function searchTunesByTitle(
+  title: string,
+  limit = 10,
+): Promise<ITune[]> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const url = new URL(
+    `${baseUrl}/tunes/search`,
+    process.env.NEXT_PUBLIC_TT_BASE_URL,
+  );
+  url.searchParams.append("title", title);
+  url.searchParams.append("limit", limit.toString());
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(`Error searching tunes: ${response.statusText}`);
+  }
+  return (await response.json()) as ITune[];
 }
