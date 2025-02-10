@@ -314,3 +314,5 @@ frontend/external_html_samples
 gist_prompt.txt
 frontend/saved_components.json
 frontend/gist_mermaid_ai.txt
+*.sqlite3-shm
+*.sqlite3-wal
