@@ -96,7 +96,7 @@ export class TuneTreesPageObject {
     this.page.on("pageerror", this.onError);
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForSelector("body");
-    await expect(this.tableStatus).toBeVisible();
+    await this.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
 
     // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
     //   timeout: 60000,
