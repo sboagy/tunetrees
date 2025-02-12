@@ -117,7 +117,7 @@ export async function updateTableStateInDb(
       );
       return response.status;
     } catch (error) {
-      console.error("<= createOrUpdateTableState: ", error);
+      console.error("<= updateTableStateInDb: ", error);
       return 500;
     }
   });
