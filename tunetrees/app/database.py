@@ -1,16 +1,15 @@
 import logging
 import os
+import sqlite3
 from pathlib import Path
-
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
 
 # import Levenshtein
 from rapidfuzz import fuzz
-
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Connection as SAConnection
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import ConnectionPoolEntry
 
 # SQLALCHEMY_DATABASE_URL = "sqlite:///./sql_app.db"
 # SQLALCHEMY_DATABASE_URL = "postgresql://user:password@postgresserver/db"
@@ -31,6 +30,15 @@ SQLALCHEMY_DATABASE_URL = f"sqlite:///{db_location_path.absolute()}"
 sqlalchemy_database_engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
+
+with sqlalchemy_database_engine.connect() as connection:
+    result = connection.execute(text("PRAGMA journal_mode;"))
+    journal_mode = result.scalar()
+    print(f"Current journal mode: {journal_mode}")
+    result = connection.execute(text("PRAGMA integrity_check;"))
+    integrity_check = result.scalar()
+    print(f"Integrity check result: {integrity_check}")
+
 SessionLocal = sessionmaker(
     autocommit=False, autoflush=False, bind=sqlalchemy_database_engine
 )
@@ -73,12 +81,26 @@ def levenshtein_distance(a: str, b: str) -> int:
 
 
 @event.listens_for(Engine, "connect")
-def register_levenshtein(dbapi_connection: SAConnection, connection_record) -> None:  # type: ignore
+def register_levenshtein(
+    dbapi_connection: SAConnection, connection_record: ConnectionPoolEntry
+) -> None:
     assert connection_record is not None
-    import sqlite3
 
     if isinstance(dbapi_connection, sqlite3.Connection):
         dbapi_connection.create_function("levenshtein", 2, levenshtein_distance)
+
+    logging.getLogger().info("Registered levenshtein function")
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(
+    dbapi_connection: SAConnection, connection_record: ConnectionPoolEntry
+):
+    assert connection_record is not None
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=DELETE")
+        cursor.close()
 
 
 # Base = declarative_base()
