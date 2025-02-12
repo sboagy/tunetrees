@@ -1,11 +1,11 @@
 import logging
-import time
+
 from threading import Lock
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Path
 from pydantic import BaseModel
-from sqlalchemy import text
+
 from starlette import status as status
 
 from tunetrees.app.database import SessionLocal
@@ -108,28 +108,7 @@ def update_table_state(
     try:
         with table_state_lock:
             with SessionLocal() as db:
-                # Purely expereimental code to see if the integrity error goes away
-                # if I wait a bit.
-                # But just implementing this makes the error go away.
-                # I'm going to leave it in place for now, but TODO.
-                loops = 6
-                for i in range(loops):
-                    try:
-                        result = db.execute(text("PRAGMA integrity_check;"))
-                        integrity_check = result.scalar()
-                        logger.info(
-                            f"Integrity check result (before table patch, iteration {i}): {integrity_check}"
-                        )
-                        break
-                    except Exception as e:
-                        logger.error(f"Integrity check error: {e}")
-                        if i == (loops - 1):
-                            logger.error(f"Unable to update table state: {e}")
-                            raise HTTPException(
-                                status_code=500, detail="Unable to update table state"
-                            )
-                        else:
-                            time.sleep(0.2)
+                # wait_for_integrity(db)
 
                 table_state = (
                     db.query(TableState)
@@ -139,6 +118,7 @@ def update_table_state(
                         purpose=purpose,
                         playlist_id=playlist_id,
                     )
+                    .with_for_update(read=True)  # Add pessimistic locking
                     .first()
                 )
                 if not table_state:
@@ -151,15 +131,9 @@ def update_table_state(
                 db.commit()
                 db.refresh(table_state)
 
-                # Check again after the update.  Again, this is eperimental and should be removed
-                # at some point.
-                result = db.execute(text("PRAGMA integrity_check;"))
-                integrity_check = result.scalar()
-                logger.info(
-                    f"Integrity check result (after table patch): {integrity_check}"
-                )
                 return table_state
     except HTTPException as e:
+        logger.error(f"Unable to update table state (HTTPException): {e}")
         raise e
     except Exception as e:
         logger.error(f"Unable to update table state: {e}")
@@ -496,6 +470,9 @@ def get_tab_group_main_state(
             raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
+tab_group_main_state_lock = Lock()
+
+
 @settings_router.post(
     "/tab_group_main_state",
     response_model=TabGroupMainStateModel,
@@ -506,28 +483,29 @@ def get_tab_group_main_state(
 def create_tab_group_main_state(
     tab_group_main_state: TabGroupMainStateModelPartial = Body(...),
 ):
-    with SessionLocal() as db:
-        try:
-            new_tab_group_main_state = TabGroupMainState(
-                user_id=tab_group_main_state.user_id,
-                which_tab=tab_group_main_state.which_tab,
-                playlist_id=tab_group_main_state.playlist_id,
-            )
-            if tab_group_main_state.tab_spec is not None:
-                new_tab_group_main_state.tab_spec = tab_group_main_state.tab_spec
-            db.add(new_tab_group_main_state)
-            db.commit()
-            db.refresh(new_tab_group_main_state)
-            tab_group_main_state_from_db = (
-                db.query(TabGroupMainState)
-                .filter_by(user_id=tab_group_main_state.user_id)
-                .first()
-            )
+    with tab_group_main_state_lock:
+        with SessionLocal() as db:
+            try:
+                new_tab_group_main_state = TabGroupMainState(
+                    user_id=tab_group_main_state.user_id,
+                    which_tab=tab_group_main_state.which_tab,
+                    playlist_id=tab_group_main_state.playlist_id,
+                )
+                if tab_group_main_state.tab_spec is not None:
+                    new_tab_group_main_state.tab_spec = tab_group_main_state.tab_spec
+                db.add(new_tab_group_main_state)
+                db.commit()
+                db.refresh(new_tab_group_main_state)
+                tab_group_main_state_from_db = (
+                    db.query(TabGroupMainState)
+                    .filter_by(user_id=tab_group_main_state.user_id)
+                    .first()
+                )
 
-            return tab_group_main_state_from_db
-        except Exception as e:
-            logging.getLogger().error("Unknown error: %s" % e)
-            raise HTTPException(status_code=500, detail="Unknown error occurred")
+                return tab_group_main_state_from_db
+            except Exception as e:
+                logging.getLogger().error("Unknown error: %s" % e)
+                raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
 @settings_router.patch(
@@ -546,26 +524,30 @@ def update_tab_group_main_state(
     ],
     tab_group_main_state: TabGroupMainStateModelPartial = Body(...),
 ):
-    with SessionLocal() as db:
-        try:
-            existing_tab_group_main_state = (
-                db.query(TabGroupMainState).filter_by(user_id=user_id).first()
-            )
-            if not existing_tab_group_main_state:
-                raise HTTPException(
-                    status_code=404, detail="Tab group main state not found"
+    with tab_group_main_state_lock:
+        with SessionLocal() as db:
+            try:
+                existing_tab_group_main_state = (
+                    db.query(TabGroupMainState)
+                    .filter_by(user_id=user_id)
+                    .with_for_update(read=True)
+                    .first()
                 )
+                if not existing_tab_group_main_state:
+                    raise HTTPException(
+                        status_code=404, detail="Tab group main state not found"
+                    )
 
-            update_data = tab_group_main_state.model_dump(exclude_unset=True)
-            for key, value in update_data.items():
-                setattr(existing_tab_group_main_state, key, value)
+                update_data = tab_group_main_state.model_dump(exclude_unset=True)
+                for key, value in update_data.items():
+                    setattr(existing_tab_group_main_state, key, value)
 
-            db.commit()
-            db.refresh(existing_tab_group_main_state)
-            return existing_tab_group_main_state
-        except Exception as e:
-            logging.getLogger().error("Unknown error: %s" % e)
-            raise HTTPException(status_code=500, detail="Unknown error occurred")
+                db.commit()
+                db.refresh(existing_tab_group_main_state)
+                return existing_tab_group_main_state
+            except Exception as e:
+                logging.getLogger().error("Unknown error: %s" % e)
+                raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
 @settings_router.delete(
@@ -582,19 +564,20 @@ def delete_tab_group_main_state(
         ),
     ],
 ) -> None:
-    with SessionLocal() as db:
-        try:
-            tab_group_main_state = (
-                db.query(TabGroupMainState).filter_by(user_id=user_id).first()
-            )
-            if not tab_group_main_state:
-                raise HTTPException(
-                    status_code=404, detail="Tab group main state not found"
+    with tab_group_main_state_lock:
+        with SessionLocal() as db:
+            try:
+                tab_group_main_state = (
+                    db.query(TabGroupMainState).filter_by(user_id=user_id).first()
                 )
+                if not tab_group_main_state:
+                    raise HTTPException(
+                        status_code=404, detail="Tab group main state not found"
+                    )
 
-            db.delete(tab_group_main_state)
-            db.commit()
-            # return {"status": "success", "code": 204}
-        except Exception as e:
-            logging.getLogger().error("Unknown error: %s" % e)
-            raise HTTPException(status_code=500, detail="Unknown error occurred")
+                db.delete(tab_group_main_state)
+                db.commit()
+                # return {"status": "success", "code": 204}
+            except Exception as e:
+                logging.getLogger().error("Unknown error: %s" % e)
+                raise HTTPException(status_code=500, detail="Unknown error occurred")

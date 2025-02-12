@@ -114,31 +114,29 @@ def register_exception(app: FastAPI):
     "/signup/", response_model=Optional[UserModel], response_model_exclude_none=True
 )
 async def create_user(user: UserModel) -> Optional[UserModel]:
-    db = None
     try:
-        db = SessionLocal()
+        with SessionLocal() as db:
+            orm_user = orm.User(
+                # id=user.name,  # The DB will need to set this
+                name=user.name,
+                email=user.email,
+                email_verified=user.email_verified,
+                image=user.image,
+                hash=user.hash,
+            )
 
-        orm_user = orm.User(
-            # id=user.name,  # The DB will need to set this
-            name=user.name,
-            email=user.email,
-            email_verified=user.email_verified,
-            image=user.image,
-            hash=user.hash,
-        )
+            db.add(orm_user)
 
-        db.add(orm_user)
+            # We won't have an ID until the DB does it's thing.
+            db.commit()
+            db.flush(orm_user)
 
-        # We won't have an ID until the DB does it's thing.
-        db.commit()
-        db.flush(orm_user)
+            # For right now, query the user again just to make sure the update was applied.
+            # We might want to not do this in the future.
+            user_query = select(orm.User).where(orm.User.email == orm_user.email)
+            updated_user = query_user_to_auth_user(user_query, db)
 
-        # For right now, query the user again just to make sure the update was applied.
-        # We might want to not do this in the future.
-        user_query = select(orm.User).where(orm.User.email == orm_user.email)
-        updated_user = query_user_to_auth_user(user_query, db)
-
-        return updated_user
+            return updated_user
 
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
@@ -146,9 +144,6 @@ async def create_user(user: UserModel) -> Optional[UserModel]:
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.get(
@@ -249,34 +244,34 @@ async def get_user_by_account(
     response_model_exclude_none=True,
 )
 async def update_user(user: UserModel) -> UserModel:
-    db = None
     try:
-        db = SessionLocal()
+        with SessionLocal() as db:
+            user_dict = user.model_dump(exclude_unset=True)
 
-        user_dict = user.model_dump(exclude_unset=True)
+            update_dict: dict[Any, Any] = {}
 
-        update_dict: dict[Any, Any] = {}
+            for k in user_dict:
+                if "emailVerified" == k:
+                    update_dict["email_verified"] = user_dict[k]
+                else:
+                    update_dict[k] = user_dict[k]
 
-        for k in user_dict:
-            if "emailVerified" == k:
-                update_dict["email_verified"] = user_dict[k]
-            else:
-                update_dict[k] = user_dict[k]
+            existing = db.query(orm.User).filter_by(id=user.id)
+            if existing.count() > 0:
+                existing.update(update_dict)
 
-        existing = db.query(orm.User).filter_by(id=user.id)
-        if existing.count() > 0:
-            existing.update(update_dict)
+            db.commit()
+            db.flush()
 
-        db.commit()
-        db.flush()
+            user_query = select(orm.User).where(orm.User.id == user.id)
+            updated_user = query_user_to_auth_user(user_query, db)
 
-        user_query = select(orm.User).where(orm.User.id == user.id)
-        updated_user = query_user_to_auth_user(user_query, db)
+            if updated_user is None:
+                raise HTTPException(
+                    status_code=404, detail="User Not Found after update"
+                )
 
-        if updated_user is None:
-            raise HTTPException(status_code=404, detail="User Not Found after update")
-
-        return updated_user
+            return updated_user
 
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
@@ -286,116 +281,105 @@ async def update_user(user: UserModel) -> UserModel:
         logger.error("Unexpected Exception: %s" % e)
         raise
 
-    finally:
-        if db is not None:
-            db.close()
-
 
 @router.delete("/delete-user/{id}", response_model=None)
 async def delete_user(id: str) -> None:
-    db = None
     try:
-        db = SessionLocal()
+        with SessionLocal() as db:
+            orm_user = db.get(UserModel, id)
+            if orm_user:
+                db.delete(orm_user)
+            else:
+                raise HTTPException(status_code=404, detail="User Not Found")
 
-        orm_user = db.get(UserModel, id)
-        if orm_user:
-            db.delete(orm_user)
-        else:
-            raise HTTPException(status_code=404, detail="User Not Found")
-
-        return None
+            return None
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
         raise
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.post("/link-account/", response_model=AccountModel)
 async def link_account(account: AccountModel) -> AccountModel:
-    db = None
     try:
-        db = SessionLocal()
+        with SessionLocal() as db:
+            existing = db.query(orm.Account).filter_by(user_id=account.user_id)
+            if existing.count() > 0:
+                # Why on earth do I need to do and update with a dictionary?
+                # and why is this so hard?  Isn't the orm supposed to make this easier?
+                existing.update(
+                    {
+                        "user_id": account.user_id,
+                        "provider_account_id": account.provider_account_id,
+                        "provider": account.provider,
+                        "type": account.type,
+                        "access_token": account.access_token,
+                        "token_type": account.token_type,
+                        "id_token": account.id_token,
+                        "scope": account.scope,
+                        "expires_at": account.expires_at,
+                        "refresh_token": account.refresh_token,
+                        "session_state": account.session_state,
+                    }
+                )
+                db.commit()
+                db.flush()
+            else:
+                orm_account = orm.Account(
+                    user_id=account.user_id,
+                    provider_account_id=account.provider_account_id,
+                    provider=account.provider,
+                    type=account.type,
+                    access_token=account.access_token,
+                    token_type=account.token_type,
+                    id_token=account.id_token,
+                    scope=account.scope,
+                    expires_at=account.expires_at,
+                    refresh_token=account.refresh_token,
+                    session_state=account.session_state,
+                )
+                db.add(orm_account)
+                # We won't have an ID until the DB does it's thing.
+                db.commit()
+                db.flush(orm_account)
 
-        existing = db.query(orm.Account).filter_by(user_id=account.user_id)
-        if existing.count() > 0:
-            # Why on earth do I need to do and update with a dictionary?
-            # and why is this so hard?  Isn't the orm supposed to make this easier?
-            existing.update(
-                {
-                    "user_id": account.user_id,
-                    "provider_account_id": account.provider_account_id,
-                    "provider": account.provider,
-                    "type": account.type,
-                    "access_token": account.access_token,
-                    "token_type": account.token_type,
-                    "id_token": account.id_token,
-                    "scope": account.scope,
-                    "expires_at": account.expires_at,
-                    "refresh_token": account.refresh_token,
-                    "session_state": account.session_state,
-                }
-            )
-            db.commit()
-            db.flush()
-        else:
-            orm_account = orm.Account(
-                user_id=account.user_id,
-                provider_account_id=account.provider_account_id,
-                provider=account.provider,
-                type=account.type,
-                access_token=account.access_token,
-                token_type=account.token_type,
-                id_token=account.id_token,
-                scope=account.scope,
-                expires_at=account.expires_at,
-                refresh_token=account.refresh_token,
-                session_state=account.session_state,
-            )
-            db.add(orm_account)
-            # We won't have an ID until the DB does it's thing.
-            db.commit()
-            db.flush(orm_account)
-
-        stmt = select(orm.Account).where(
-            orm.Account.user_id == account.user_id,
-            orm.Account.provider_account_id == account.provider_account_id,
-        )
-
-        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
-        which_row: Optional[Row[orm.Account]] = result.fetchone()
-        if which_row and len(which_row) > 0:
-            found_orm_account: orm.Account = which_row[0]
-
-            expires_at = (
-                int(str(found_orm_account.expires_at))
-                if found_orm_account.expires_at is not None
-                else None
+            stmt = select(orm.Account).where(
+                orm.Account.user_id == account.user_id,
+                orm.Account.provider_account_id == account.provider_account_id,
             )
 
-            auth_account = AccountModel(
-                user_id=str(found_orm_account.user_id),
-                provider_account_id=str(found_orm_account.provider_account_id),
-                provider=str(found_orm_account.provider),
-                type=AccountType(found_orm_account.type),
-                access_token=str(found_orm_account.access_token),
-                token_type=str(found_orm_account.token_type),
-                id_token=str(found_orm_account.id_token),
-                refresh_token=str(found_orm_account.refresh_token),
-                scope=str(found_orm_account.scope),
-                expires_at=expires_at,
-                session_state=str(found_orm_account.session_state),
-            )
+            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            which_row: Optional[Row[orm.Account]] = result.fetchone()
+            if which_row and len(which_row) > 0:
+                found_orm_account: orm.Account = which_row[0]
 
-            return auth_account
-        else:
-            raise HTTPException(
-                status_code=404, detail="Account Not Found after insert"
-            )
+                expires_at = (
+                    int(str(found_orm_account.expires_at))
+                    if found_orm_account.expires_at is not None
+                    else None
+                )
+
+                auth_account = AccountModel(
+                    user_id=str(found_orm_account.user_id),
+                    provider_account_id=str(found_orm_account.provider_account_id),
+                    provider=str(found_orm_account.provider),
+                    type=AccountType(found_orm_account.type),
+                    access_token=str(found_orm_account.access_token),
+                    token_type=str(found_orm_account.token_type),
+                    id_token=str(found_orm_account.id_token),
+                    refresh_token=str(found_orm_account.refresh_token),
+                    scope=str(found_orm_account.scope),
+                    expires_at=expires_at,
+                    session_state=str(found_orm_account.session_state),
+                )
+
+                return auth_account
+            else:
+                raise HTTPException(
+                    status_code=404, detail="Account Not Found after insert"
+                )
 
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
@@ -403,32 +387,27 @@ async def link_account(account: AccountModel) -> AccountModel:
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.delete("/unlink-account/{provider}/{providerAccountId}", response_model=None)
 async def unlink_account(provider: str, providerAccountId: str) -> None:
-    db = None
     try:
-        db = SessionLocal()
+        with SessionLocal() as db:
+            stmt = select(orm.Account).where(
+                orm.Account.provider == provider,
+                orm.Account.provider_account_id == providerAccountId,
+            )
 
-        stmt = select(orm.Account).where(
-            orm.Account.provider == provider,
-            orm.Account.provider_account_id == providerAccountId,
-        )
+            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            which_row: Optional[Row[orm.Account]] = result.fetchone()
+            if which_row and len(which_row) > 0:
+                orm_account: orm.Account = which_row[0]
 
-        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
-        which_row: Optional[Row[orm.Account]] = result.fetchone()
-        if which_row and len(which_row) > 0:
-            orm_account: orm.Account = which_row[0]
+                db.delete(orm_account)
 
-            db.delete(orm_account)
-
-            return None
-        else:
-            raise HTTPException(status_code=404, detail="Account Not Found")
+                return None
+            else:
+                raise HTTPException(status_code=404, detail="Account Not Found")
 
         return None
     except HTTPException as e:
@@ -437,50 +416,45 @@ async def unlink_account(provider: str, providerAccountId: str) -> None:
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.post("/create-session/", response_model=SessionModel)
 async def create_session(session: SessionModel) -> SessionModel:
-    db = None
     try:
-        db = SessionLocal()
-
-        orm_session = orm.Session(
-            expires=session.expires,
-            session_token=session.session_token,
-            user_id=session.user_id,
-        )
-
-        db.add(orm_session)
-
-        # We won't have an ID until the DB does it's thing.
-        db.commit()
-        db.flush(orm_session)
-
-        # For right now, query the user again just to make sure the update was applied.
-        # We might want to not do this in the future.
-        stmt = select(orm.Session).where(
-            orm.Session.session_token == orm_session.session_token
-        )
-        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
-        which_row: Optional[Row[orm.Session]] = result.fetchone()
-        if which_row and len(which_row) > 0:
-            orm_session_new: orm.Session = which_row[0]
-
-            updated_session = SessionModel(
-                expires=orm_session_new.expires,
-                session_token=orm_session_new.session_token,
-                user_id=orm_session_new.user_id,
+        with SessionLocal() as db:
+            orm_session = orm.Session(
+                expires=session.expires,
+                session_token=session.session_token,
+                user_id=session.user_id,
             )
 
-            return updated_session
-        else:
-            raise HTTPException(
-                status_code=404, detail="Session Not Found after insert"
+            db.add(orm_session)
+
+            # We won't have an ID until the DB does it's thing.
+            db.commit()
+            db.flush(orm_session)
+
+            # For right now, query the user again just to make sure the update was applied.
+            # We might want to not do this in the future.
+            stmt = select(orm.Session).where(
+                orm.Session.session_token == orm_session.session_token
             )
+            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            which_row: Optional[Row[orm.Session]] = result.fetchone()
+            if which_row and len(which_row) > 0:
+                orm_session_new: orm.Session = which_row[0]
+
+                updated_session = SessionModel(
+                    expires=orm_session_new.expires,
+                    session_token=orm_session_new.session_token,
+                    user_id=orm_session_new.user_id,
+                )
+
+                return updated_session
+            else:
+                raise HTTPException(
+                    status_code=404, detail="Session Not Found after insert"
+                )
 
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
@@ -488,9 +462,6 @@ async def create_session(session: SessionModel) -> SessionModel:
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.get(
@@ -499,157 +470,142 @@ async def create_session(session: SessionModel) -> SessionModel:
     response_model_exclude_none=True,
 )
 async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUserModel]:
-    db = None
     try:
-        db = SessionLocal()
-        stmt = select(orm.Session).where(orm.Session.session_token == sessionToken)
-        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
-        which_row: Optional[Row[orm.User]] = result.fetchone()
-        if which_row and len(which_row) > 0:
-            orm_session: orm.Session = which_row[0]
-            user_id = str(orm_session.user_id)
-            stmt = select(orm.User).where(orm.User.id == user_id)
-            auth_user = query_user_to_auth_user(stmt, db)
-            auth_session = SessionModel(
-                expires=orm_session.expires,
-                session_token=orm_session.session_token,
-                user_id=orm_session.user_id,
-            )
-
-            if auth_user is not None:
-                session_and_user = SessionAndUserModel(
-                    session=auth_session, user=auth_user
+        with SessionLocal() as db:
+            stmt = select(orm.Session).where(orm.Session.session_token == sessionToken)
+            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            which_row: Optional[Row[orm.User]] = result.fetchone()
+            if which_row and len(which_row) > 0:
+                orm_session: orm.Session = which_row[0]
+                user_id = str(orm_session.user_id)
+                stmt = select(orm.User).where(orm.User.id == user_id)
+                auth_user = query_user_to_auth_user(stmt, db)
+                auth_session = SessionModel(
+                    expires=orm_session.expires,
+                    session_token=orm_session.session_token,
+                    user_id=orm_session.user_id,
                 )
-                return session_and_user
-            else:
-                return None
 
-        else:
-            logger.error(f"Could not find session for token: {sessionToken}")
-            return None
-            # raise HTTPException(
-            #     status_code=404, detail="Session Not Found for session_token"
-            # )
+                if auth_user is not None:
+                    session_and_user = SessionAndUserModel(
+                        session=auth_session, user=auth_user
+                    )
+                    return session_and_user
+                else:
+                    return None
+
+            else:
+                logger.error(f"Could not find session for token: {sessionToken}")
+                return None
+                # raise HTTPException(
+                #     status_code=404, detail="Session Not Found for session_token"
+                # )
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
         raise
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.patch("/update-session/", response_model=SessionModel)
 async def update_session(session: SessionModel) -> SessionModel:
-    db = None
     try:
-        db = SessionLocal()
+        with SessionLocal() as db:
+            update_dict = {}
 
-        update_dict = {}
+            update_dict["expires"] = session.expires
+            update_dict["session_token"] = session.session_token
+            update_dict["user_id"] = session.user_id
 
-        update_dict["expires"] = session.expires
-        update_dict["session_token"] = session.session_token
-        update_dict["user_id"] = session.user_id
-
-        db.query(orm.Session).filter_by(session_token=session.session_token).update(
-            update_dict
-        )
-
-        # For right now, query the user again to flush the update,
-        # and just to make sure the update was applied.  Good chance
-        # we'll want to not do this in the future.
-        session_query = select(orm.User).where(
-            orm.Session.session_token == session.session_token
-        )
-        result: Result = db.execute(session_query)  # pyright: ignore[reportMissingTypeArgument]
-        which_row: Optional[Row[orm.Session]] = result.fetchone()
-        if which_row and len(which_row) > 0:
-            orm_session: orm.Session = which_row[0]
-            updated_session = SessionModel(
-                expires=orm_session.expires,
-                session_token=orm_session.session_token,
-                user_id=orm_session.user_id,
+            db.query(orm.Session).filter_by(session_token=session.session_token).update(
+                update_dict
             )
-            return updated_session
-        else:
-            logger.error(f"Could not find session for token: {session.session_token}")
-            raise HTTPException(
-                status_code=404, detail="Session Not Found for for updated session"
+
+            # For right now, query the user again to flush the update,
+            # and just to make sure the update was applied.  Good chance
+            # we'll want to not do this in the future.
+            session_query = select(orm.User).where(
+                orm.Session.session_token == session.session_token
             )
+            result: Result = db.execute(session_query)  # pyright: ignore[reportMissingTypeArgument]
+            which_row: Optional[Row[orm.Session]] = result.fetchone()
+            if which_row and len(which_row) > 0:
+                orm_session: orm.Session = which_row[0]
+                updated_session = SessionModel(
+                    expires=orm_session.expires,
+                    session_token=orm_session.session_token,
+                    user_id=orm_session.user_id,
+                )
+                return updated_session
+            else:
+                logger.error(
+                    f"Could not find session for token: {session.session_token}"
+                )
+                raise HTTPException(
+                    status_code=404, detail="Session Not Found for for updated session"
+                )
 
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
         raise
 
-    finally:
-        if db is not None:
-            db.close()
-
 
 @router.delete("/delete-session/{sessionToken}", response_model=None)
 async def delete_session(session_token: str) -> None:
-    db = None
     try:
-        db = SessionLocal()
+        with SessionLocal() as db:
+            orm_session = db.get(SessionModel, session_token)
+            if orm_session:
+                db.delete(orm_session)
+            else:
+                raise HTTPException(status_code=404, detail="Session Not Found")
 
-        orm_session = db.get(SessionModel, session_token)
-        if orm_session:
-            db.delete(orm_session)
-        else:
-            raise HTTPException(status_code=404, detail="Session Not Found")
-
-        return None
+            return None
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
         raise
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.post("/create-verification-token/", response_model=VerificationTokenModel)
 async def create_verification_token(
     verification_token: VerificationTokenModel,
 ) -> VerificationTokenModel:
-    db = None
     try:
-        db = SessionLocal()
-
-        orm_verification_token = orm.VerificationToken(
-            identifier=verification_token.identifier,
-            token=verification_token.token,
-            expires=verification_token.expires,
-        )
-
-        db.add(orm_verification_token)
-
-        db.commit()
-        db.flush(orm_verification_token)
-
-        stmt = select(orm.VerificationToken).where(
-            orm.VerificationToken.identifier == verification_token.identifier
-        )
-        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
-        which_row: Optional[Row[orm.Session]] = result.fetchone()
-        if which_row and len(which_row) > 0:
-            orm_verification_token_new: orm.VerificationToken = which_row[0]
-
-            updated_verification_toke = VerificationTokenModel(
-                identifier=orm_verification_token_new.identifier,
-                token=orm_verification_token_new.token,
-                expires=orm_verification_token_new.expires,
+        with SessionLocal() as db:
+            orm_verification_token = orm.VerificationToken(
+                identifier=verification_token.identifier,
+                token=verification_token.token,
+                expires=verification_token.expires,
             )
 
-            return updated_verification_toke
-        else:
-            raise HTTPException(
-                status_code=404, detail="Session Not Found after insert"
+            db.add(orm_verification_token)
+
+            db.commit()
+            db.flush(orm_verification_token)
+
+            stmt = select(orm.VerificationToken).where(
+                orm.VerificationToken.identifier == verification_token.identifier
             )
+            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            which_row: Optional[Row[orm.Session]] = result.fetchone()
+            if which_row and len(which_row) > 0:
+                orm_verification_token_new: orm.VerificationToken = which_row[0]
+
+                updated_verification_toke = VerificationTokenModel(
+                    identifier=orm_verification_token_new.identifier,
+                    token=orm_verification_token_new.token,
+                    expires=orm_verification_token_new.expires,
+                )
+
+                return updated_verification_toke
+            else:
+                raise HTTPException(
+                    status_code=404, detail="Session Not Found after insert"
+                )
 
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
@@ -657,91 +613,81 @@ async def create_verification_token(
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
 
 
 @router.post("/use-verification-token/", response_model=VerificationTokenModel)
 async def use_verification_token(
     params: VerificationTokenParamsModel,
 ) -> VerificationTokenModel:
-    db = None
     try:
-        db = SessionLocal()
-        if params.identifier:
-            stmt = select(orm.VerificationToken).where(
-                orm.VerificationToken.identifier == params.identifier
-            )
-        else:
-            raise HTTPException(status_code=422, detail="params must have identifier")
-
-        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
-        which_row: Optional[Row[orm.VerificationToken]] = result.fetchone()
-        if which_row and len(which_row) > 0:
-            orm_verification_token: orm.VerificationToken = which_row[0]
-            try:
-                if orm_verification_token.token != params.token:
-                    # I assume this is the right thing to do if the tokens don't match?
-                    raise HTTPException(
-                        status_code=404,  # Not sure if this is the right status code
-                        detail="Verification token in storage does not match submitted token",
-                    )
-                auth_verification_token = VerificationTokenModel(
-                    identifier=orm_verification_token.identifier,
-                    token=orm_verification_token.token,
-                    expires=orm_verification_token.expires,
+        with SessionLocal() as db:
+            if params.identifier:
+                stmt = select(orm.VerificationToken).where(
+                    orm.VerificationToken.identifier == params.identifier
+                )
+            else:
+                raise HTTPException(
+                    status_code=422, detail="params must have identifier"
                 )
 
-                return auth_verification_token
-            finally:
-                db.delete(orm_verification_token)
-                db.commit()
-                db.flush(orm_verification_token)
+            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            which_row: Optional[Row[orm.VerificationToken]] = result.fetchone()
+            if which_row and len(which_row) > 0:
+                orm_verification_token: orm.VerificationToken = which_row[0]
+                try:
+                    if orm_verification_token.token != params.token:
+                        # I assume this is the right thing to do if the tokens don't match?
+                        raise HTTPException(
+                            status_code=404,  # Not sure if this is the right status code
+                            detail="Verification token in storage does not match submitted token",
+                        )
+                    auth_verification_token = VerificationTokenModel(
+                        identifier=orm_verification_token.identifier,
+                        token=orm_verification_token.token,
+                        expires=orm_verification_token.expires,
+                    )
 
-        else:
-            logger.error(f"Could not find session for params: {params}")
-            raise HTTPException(
-                status_code=404, detail="Verification token Not Found for session_token"
-            )
+                    return auth_verification_token
+                finally:
+                    db.delete(orm_verification_token)
+                    db.commit()
+                    db.flush(orm_verification_token)
+
+            else:
+                logger.error(f"Could not find session for params: {params}")
+                raise HTTPException(
+                    status_code=404,
+                    detail="Verification token Not Found for session_token",
+                )
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
         raise
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if db is not None:
-            db.close()
 
 
 def query_user_to_auth_user(
     stmt: Select[Tuple[orm.User]], db: Optional[SqlAlchemySession] = None
 ) -> Optional[UserModel]:
-    local_session = db is None
     try:
-        if local_session:
-            db = SessionLocal()
+        with SessionLocal() as db:
+            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            which_row: Optional[Row[orm.User]] = result.fetchone()
+            if which_row and len(which_row) > 0:
+                user: orm.User = which_row[0]
 
-        result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
-        which_row: Optional[Row[orm.User]] = result.fetchone()
-        if which_row and len(which_row) > 0:
-            user: orm.User = which_row[0]
-
-            auth_user = UserModel(
-                id=str(user.id),
-                name=str(user.name),
-                email=str(user.email),
-                email_verified=user.email_verified,  # for the moment
-                hash=user.hash,
-                image=None,  # for the moment
-            )
-            return auth_user
-        else:
-            return None
+                auth_user = UserModel(
+                    id=str(user.id),
+                    name=str(user.name),
+                    email=str(user.email),
+                    email_verified=user.email_verified,  # for the moment
+                    hash=user.hash,
+                    image=None,  # for the moment
+                )
+                return auth_user
+            else:
+                return None
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
-    finally:
-        if local_session and db is not None:
-            db.close()
