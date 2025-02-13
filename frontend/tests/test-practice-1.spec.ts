@@ -114,9 +114,9 @@ test.describe.serial("Practice Tests", () => {
     await page.screenshot({
       path: path.join(screenShotDir, "practice_just_after_submitted.png"),
     });
-    page.on("response", (data) => {
-      console.log("===> test-practice-1.ts:108 ~ data", data);
-    });
+    // page.on("response", (data) => {
+    //   console.log("===> test-practice-1.ts:108 ~ data", data);
+    // });
 
     const rowCount = await ttPO.tunesGridRows.count();
     console.log(`Number of rows: ${rowCount}`);
