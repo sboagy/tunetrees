@@ -318,3 +318,4 @@ frontend/gist_mermaid_ai.txt
 *.sqlite3-wal
 current_requirements.txt
 compiled_requirements.txt
+frontend/test-scripts/storageStateSboagyLogin.b64
