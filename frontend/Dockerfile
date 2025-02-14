@@ -106,6 +106,7 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 # Copy the main application directories.
 COPY app app
 COPY auth auth
+COPY hooks hooks
 COPY components components
 COPY public public
 COPY lib lib
