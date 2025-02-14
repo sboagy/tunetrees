@@ -12,4 +12,4 @@ SELECT
 	i.deleted AS instrument_deleted
 FROM
 	playlist p
-	JOIN main.instrument i ON p.instrument_ref = i.id;
+	JOIN instrument i ON p.instrument_ref = i.id;
