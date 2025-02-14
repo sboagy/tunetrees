@@ -19,13 +19,14 @@ export default function NewTuneButton({
   const { setCurrentTune } = useTune();
 
   const handleClick = () => {
-    const newTune: ITuneOverview = {
+    const newTune: Partial<ITuneOverview> = {
       title: "",
       type: "",
       structure: null,
       mode: null,
       incipit: null,
       genre: null,
+      private_for: userId, // This is a new tune, so it's private by default
       deleted: true, // This is a new tune, so it's deleted by default
       learned: null,
       practiced: null,
@@ -62,10 +63,11 @@ export default function NewTuneButton({
   return (
     <Button
       variant="ghost"
-      size="icon"
+      // size="icon"
       aria-label="Add new reference"
       onClick={handleClick}
     >
+      New Tune
       <Plus className="h-4 w-4" />
     </Button>
   );

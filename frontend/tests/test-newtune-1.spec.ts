@@ -22,7 +22,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 test.afterEach(async ({ page }) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(1_000);
 });
 
 test("test-newtune-1", async ({ page }) => {
@@ -48,7 +48,8 @@ test("test-newtune-1", async ({ page }) => {
   // Note this is testing the accented characters in the title bug as well.
   // See https://github.com/axios/axios/issues/6761
   for (const formField of ttPO.sampleSiBheagSiMhorShort) {
-    await formField.locator.fill(formField.modification);
+    await ttPO.doFormFieldValueMod(formField);
+    // await formField.locator.fill(formField.modification);
     await page.waitForTimeout(50);
   }
 
@@ -56,7 +57,7 @@ test("test-newtune-1", async ({ page }) => {
 
   await ttPO.waitForTablePopulationToStart();
 
-  const tuneTitle = ttPO.sampleSiBheagSiMhorShort[0].modification;
+  const tuneTitle = ttPO.sampleSiBheagSiMhorShort[ttPO.iffTitle].modification;
 
   await ttPO.navigateToTune(tuneTitle);
 

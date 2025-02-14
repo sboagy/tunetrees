@@ -1,8 +1,11 @@
 import logging
+
+from threading import Lock
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Path
 from pydantic import BaseModel
+
 from starlette import status as status
 
 from tunetrees.app.database import SessionLocal
@@ -22,6 +25,8 @@ from tunetrees.models.tunetrees_pydantic import (
 logger = logging.getLogger(__name__)
 
 settings_router = APIRouter(prefix="/settings", tags=["settings"])
+
+table_state_lock = Lock()
 
 
 @settings_router.get(
@@ -66,20 +71,21 @@ def get_table_state(
 )
 def create_table_state(table_state: TableStateModel) -> TableStateModel:
     try:
-        TableStateModel.model_validate(table_state)
-        with SessionLocal() as db:
-            new_table_state = TableState(
-                user_id=table_state.user_id,
-                screen_size=table_state.screen_size,
-                purpose=table_state.purpose,
-                settings=table_state.settings,
-                current_tune=table_state.current_tune,
-                playlist_id=table_state.playlist_id,
-            )
-            db.add(new_table_state)
-            db.commit()
-            db.refresh(new_table_state)
-            return new_table_state
+        with table_state_lock:
+            TableStateModel.model_validate(table_state)
+            with SessionLocal() as db:
+                new_table_state = TableState(
+                    user_id=table_state.user_id,
+                    screen_size=table_state.screen_size,
+                    purpose=table_state.purpose,
+                    settings=table_state.settings,
+                    current_tune=table_state.current_tune,
+                    playlist_id=table_state.playlist_id,
+                )
+                db.add(new_table_state)
+                db.commit()
+                db.refresh(new_table_state)
+                return new_table_state
     except Exception as e:
         logger.error(f"Unable to create table state: {e}")
         raise HTTPException(status_code=500, detail="Unable to create table state")
@@ -100,28 +106,34 @@ def update_table_state(
     table_state_update: TableStateModelPartial = Body(...),
 ) -> TableStateModel:
     try:
-        with SessionLocal() as db:
-            table_state = (
-                db.query(TableState)
-                .filter_by(
-                    user_id=user_id,
-                    screen_size=screen_size,
-                    purpose=purpose,
-                    playlist_id=playlist_id,
+        with table_state_lock:
+            with SessionLocal() as db:
+                # wait_for_integrity(db)
+
+                table_state = (
+                    db.query(TableState)
+                    .filter_by(
+                        user_id=user_id,
+                        screen_size=screen_size,
+                        purpose=purpose,
+                        playlist_id=playlist_id,
+                    )
+                    .with_for_update(read=True)  # Add pessimistic locking
+                    .first()
                 )
-                .first()
-            )
-            if not table_state:
-                raise HTTPException(status_code=404, detail="Table state not found")
+                if not table_state:
+                    raise HTTPException(status_code=404, detail="Table state not found")
 
-            update_data = table_state_update.model_dump(exclude_unset=True)
-            for key, value in update_data.items():
-                setattr(table_state, key, value)
+                update_data = table_state_update.model_dump(exclude_unset=True)
+                for key, value in update_data.items():
+                    setattr(table_state, key, value)
 
-            db.commit()
-            db.refresh(table_state)
-            return table_state
+                db.commit()
+                db.refresh(table_state)
+
+                return table_state
     except HTTPException as e:
+        logger.error(f"Unable to update table state (HTTPException): {e}")
         raise e
     except Exception as e:
         logger.error(f"Unable to update table state: {e}")
@@ -141,23 +153,24 @@ def delete_table_state(
     purpose: PurposeEnum = Path(..., description="Purpose"),
 ) -> None:
     try:
-        with SessionLocal() as db:
-            table_state = (
-                db.query(TableState)
-                .filter_by(
-                    user_id=user_id,
-                    screen_size=screen_size,
-                    purpose=purpose,
-                    playlist_id=playlist_id,
+        with table_state_lock:
+            with SessionLocal() as db:
+                table_state = (
+                    db.query(TableState)
+                    .filter_by(
+                        user_id=user_id,
+                        screen_size=screen_size,
+                        purpose=purpose,
+                        playlist_id=playlist_id,
+                    )
+                    .first()
                 )
-                .first()
-            )
-            if not table_state:
-                raise HTTPException(status_code=404, detail="Table state not found")
+                if not table_state:
+                    raise HTTPException(status_code=404, detail="Table state not found")
 
-        db.delete(table_state)
-        db.commit()
-        return
+            db.delete(table_state)
+            db.commit()
+            return
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -255,7 +268,7 @@ def stage_table_transient_data(
     purpose: Annotated[
         str,
         Path(
-            enum_values=["practice", "repertoire", "all," "analysis"],
+            enum_values=["practice", "repertoire", "all", "analysis"],
             description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'analysis'",
         ),
     ],
@@ -332,7 +345,7 @@ def get_table_transient_data(
     purpose: Annotated[
         str,
         Path(
-            enum_values=["practice", "repertoire", "catalog" "anylysis"],
+            enum_values=["practice", "repertoire", "catalog", "anylysis"],
             description="Associated purpose, one of 'practice', 'repertoire', 'all', or 'anylysis'",
         ),
     ],
@@ -457,6 +470,9 @@ def get_tab_group_main_state(
             raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
+tab_group_main_state_lock = Lock()
+
+
 @settings_router.post(
     "/tab_group_main_state",
     response_model=TabGroupMainStateModel,
@@ -467,28 +483,29 @@ def get_tab_group_main_state(
 def create_tab_group_main_state(
     tab_group_main_state: TabGroupMainStateModelPartial = Body(...),
 ):
-    with SessionLocal() as db:
-        try:
-            new_tab_group_main_state = TabGroupMainState(
-                user_id=tab_group_main_state.user_id,
-                which_tab=tab_group_main_state.which_tab,
-                playlist_id=tab_group_main_state.playlist_id,
-            )
-            if tab_group_main_state.tab_spec is not None:
-                new_tab_group_main_state.tab_spec = tab_group_main_state.tab_spec
-            db.add(new_tab_group_main_state)
-            db.commit()
-            db.refresh(new_tab_group_main_state)
-            tab_group_main_state_from_db = (
-                db.query(TabGroupMainState)
-                .filter_by(user_id=tab_group_main_state.user_id)
-                .first()
-            )
+    with tab_group_main_state_lock:
+        with SessionLocal() as db:
+            try:
+                new_tab_group_main_state = TabGroupMainState(
+                    user_id=tab_group_main_state.user_id,
+                    which_tab=tab_group_main_state.which_tab,
+                    playlist_id=tab_group_main_state.playlist_id,
+                )
+                if tab_group_main_state.tab_spec is not None:
+                    new_tab_group_main_state.tab_spec = tab_group_main_state.tab_spec
+                db.add(new_tab_group_main_state)
+                db.commit()
+                db.refresh(new_tab_group_main_state)
+                tab_group_main_state_from_db = (
+                    db.query(TabGroupMainState)
+                    .filter_by(user_id=tab_group_main_state.user_id)
+                    .first()
+                )
 
-            return tab_group_main_state_from_db
-        except Exception as e:
-            logging.getLogger().error("Unknown error: %s" % e)
-            raise HTTPException(status_code=500, detail="Unknown error occurred")
+                return tab_group_main_state_from_db
+            except Exception as e:
+                logging.getLogger().error("Unknown error: %s" % e)
+                raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
 @settings_router.patch(
@@ -507,26 +524,30 @@ def update_tab_group_main_state(
     ],
     tab_group_main_state: TabGroupMainStateModelPartial = Body(...),
 ):
-    with SessionLocal() as db:
-        try:
-            existing_tab_group_main_state = (
-                db.query(TabGroupMainState).filter_by(user_id=user_id).first()
-            )
-            if not existing_tab_group_main_state:
-                raise HTTPException(
-                    status_code=404, detail="Tab group main state not found"
+    with tab_group_main_state_lock:
+        with SessionLocal() as db:
+            try:
+                existing_tab_group_main_state = (
+                    db.query(TabGroupMainState)
+                    .filter_by(user_id=user_id)
+                    .with_for_update(read=True)
+                    .first()
                 )
+                if not existing_tab_group_main_state:
+                    raise HTTPException(
+                        status_code=404, detail="Tab group main state not found"
+                    )
 
-            update_data = tab_group_main_state.model_dump(exclude_unset=True)
-            for key, value in update_data.items():
-                setattr(existing_tab_group_main_state, key, value)
+                update_data = tab_group_main_state.model_dump(exclude_unset=True)
+                for key, value in update_data.items():
+                    setattr(existing_tab_group_main_state, key, value)
 
-            db.commit()
-            db.refresh(existing_tab_group_main_state)
-            return existing_tab_group_main_state
-        except Exception as e:
-            logging.getLogger().error("Unknown error: %s" % e)
-            raise HTTPException(status_code=500, detail="Unknown error occurred")
+                db.commit()
+                db.refresh(existing_tab_group_main_state)
+                return existing_tab_group_main_state
+            except Exception as e:
+                logging.getLogger().error("Unknown error: %s" % e)
+                raise HTTPException(status_code=500, detail="Unknown error occurred")
 
 
 @settings_router.delete(
@@ -543,19 +564,20 @@ def delete_tab_group_main_state(
         ),
     ],
 ) -> None:
-    with SessionLocal() as db:
-        try:
-            tab_group_main_state = (
-                db.query(TabGroupMainState).filter_by(user_id=user_id).first()
-            )
-            if not tab_group_main_state:
-                raise HTTPException(
-                    status_code=404, detail="Tab group main state not found"
+    with tab_group_main_state_lock:
+        with SessionLocal() as db:
+            try:
+                tab_group_main_state = (
+                    db.query(TabGroupMainState).filter_by(user_id=user_id).first()
                 )
+                if not tab_group_main_state:
+                    raise HTTPException(
+                        status_code=404, detail="Tab group main state not found"
+                    )
 
-            db.delete(tab_group_main_state)
-            db.commit()
-            # return {"status": "success", "code": 204}
-        except Exception as e:
-            logging.getLogger().error("Unknown error: %s" % e)
-            raise HTTPException(status_code=500, detail="Unknown error occurred")
+                db.delete(tab_group_main_state)
+                db.commit()
+                # return {"status": "success", "code": 204}
+            except Exception as e:
+                logging.getLogger().error("Unknown error: %s" % e)
+                raise HTTPException(status_code=500, detail="Unknown error occurred")

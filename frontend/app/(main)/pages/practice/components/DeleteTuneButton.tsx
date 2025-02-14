@@ -108,11 +108,12 @@ export default function DeleteTuneButton({
   return (
     <Button
       variant="ghost"
-      size="icon"
+      // size="icon"
       aria-label="Delete Selected Tunes"
       onClick={handleClick}
       disabled={disabled}
     >
+      Delete Tunes
       <TrashIcon className="h-4 w-4" />
     </Button>
   );

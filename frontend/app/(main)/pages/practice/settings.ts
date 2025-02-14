@@ -111,13 +111,14 @@ export async function updateTableStateInDb(
       const response = await client.patch<Partial<ITableStateTable>>(
         `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
         tableStateTable,
+        { timeout: 10_000 }, // Increase timeout to 10 seconds
       );
       console.log(
         `=> updateTableStateInDb: response.status=${response.status} purpose=${purpose}, playlistId=${playlistId})}`,
       );
       return response.status;
     } catch (error) {
-      console.error("<= createOrUpdateTableState: ", error);
+      console.error("<= updateTableStateInDb: ", error);
       return 500;
     }
   });
@@ -544,6 +545,7 @@ export async function updateTabGroupMainState(
       const response = await client.patch(
         `/tab_group_main_state/${userId}`,
         tabGroupMainState,
+        { timeout: 10_000 }, // Increase timeout to 10 seconds
       );
       console.log("updateTabGroupMainState response status: ", response.status);
       return response.status;

@@ -94,6 +94,11 @@ test.describe.serial("Tune Edit Tests", () => {
 
     await ttPO.openTuneEditorForCurrentTune();
 
+    const typeValue = await ttPO.ffType.textContent();
+    console.log("===> test-edit-1.spec.ts:99 ~ ", typeValue);
+    const inputValue = await ttPO.ffType.locator("select").inputValue();
+    console.log("===> test-edit-1.spec.ts:101 ~ ", inputValue);
+
     // Confirm that the values are as expected
     for (const formField of ttPO.sampleBoyneHunt) {
       const sampleLocator = formField.locator;
@@ -103,7 +108,9 @@ test.describe.serial("Tune Edit Tests", () => {
 
     // Fill in new values
     for (const formField of ttPO.sampleBoyneHunt) {
-      await formField.locator.fill(formField.modification);
+      await ttPO.doFormFieldValueMod(formField);
+
+      // await formField.locator.fill(formField.modification);
       await page.waitForTimeout(50);
     }
 
@@ -159,7 +166,8 @@ test.describe.serial("Tune Edit Tests", () => {
 
     // Fill in new values
     for (const formField of ttPO.sampleBoyneHunt) {
-      await formField.locator.fill(formField.modification);
+      // await formField.locator.fill(formField.modification);
+      await ttPO.doFormFieldValueMod(formField);
       await page.waitForTimeout(50);
     }
 

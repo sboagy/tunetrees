@@ -103,7 +103,7 @@ async function globalSetup() {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   let serverUp = false;
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 30; i++) {
     serverUp = await checkServer();
     if (serverUp) break;
     await new Promise((resolve) => setTimeout(resolve, 2000));

@@ -7,8 +7,8 @@ flowchart TB
         B(Email/Password Login) --> C(Email Validation)
         C --> D(Password Verification)
         D --> E(Session Creation)
-        D --> F(Verification Token (Optional))
-        B --> G(Social Login (Google, GitHub))
+        D --> F(Verification Token)
+        B --> G(Social Login)
         G --> H(Redirect)
         H --> I(Callback)
         I --> J(Token Exchange)
@@ -16,7 +16,7 @@ flowchart TB
         K --> L(Create/Update User)
         L --> M(Session Creation)
     end
-    subgraph Verification (Optional)
+    subgraph Verification
         F --> N(Email Verification)
         N --> O(Verification Success)
         N --> P(Verification Failure)

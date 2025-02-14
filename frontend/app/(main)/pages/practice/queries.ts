@@ -1,11 +1,14 @@
 "use server";
 
+import { normalizeKey } from "@/lib/abc-utils";
+import { fetchWithTimeout } from "@/lib/fetch-utils";
 import { parseParamsWithArrays } from "@/lib/utils";
 import type { SortingState } from "@tanstack/react-table";
 import axios from "axios";
 import { ERROR_TUNE } from "./mocks";
 import type {
   IGenre,
+  IGenreTuneType,
   IInstrument,
   INote,
   IPlaylist,
@@ -14,8 +17,10 @@ import type {
   IReferenceData,
   ITTResponseInfo,
   ITune,
+  ITuneOverride,
   ITuneOverview,
   ITuneOverviewScheduled,
+  ITuneType,
   IViewPlaylistJoined,
 } from "./types";
 
@@ -209,13 +214,17 @@ export async function updateTuneInPlaylistFromTuneOverview(
       ...new TextEncoder().encode(tune_update.title || ""),
     ]);
 
+    if (tune_update.mode) {
+      tune_update.mode = normalizeKey(tune_update.mode);
+    }
+
     const dbTune = await getPlaylistTuneOverview(
       user_id,
       playlist_ref,
       tune_id,
     );
     if ("detail" in dbTune) {
-      console.error("Error in updatePlaylistTune: ", dbTune.detail);
+      console.error("Error calling getPlaylistTuneOverview: ", dbTune.detail);
       throw new Error(dbTune.detail);
     }
     const tuneUpdateData: Partial<ITune> = {};
@@ -306,7 +315,7 @@ export async function getPlaylistTuneOverview(
     );
     return response.data;
   } catch (error) {
-    console.error("Error in getPlaylistTune: ", error);
+    console.error("Error calling playlist-tune-overview: ", error);
     return { detail: `Unable to fetch tune: ${(error as Error).message}` };
   }
 }
@@ -343,6 +352,27 @@ export async function getReferences(
     return response.data;
   } catch (error) {
     console.error("Error in getReferences: ", error);
+    return [];
+  }
+}
+
+/**
+ * Fetch references for a specific tune.
+ *
+ * @param url - URL value to search for.
+ * @returns A promise that resolves to a list of references.
+ */
+export async function queryReferences(url: string): Promise<IReferenceData[]> {
+  try {
+    console.log("===> queries.ts:368 ~ ", url);
+    const response = await client.get<IReferenceData[]>(
+      `/references_query?url=${url}`,
+      {},
+    );
+    console.log("references_query response: ", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error in queryReferences: ", error);
     return [];
   }
 }
@@ -707,7 +737,7 @@ export async function updatePlaylistTunes(
  * @return {Promise<ITuneOverview | ITTResponseInfo>} A promise that resolves to the created tune or an object with success or detail messages.
  */
 export async function createEmptyTune(
-  tune: ITuneOverview,
+  tune: Partial<ITuneOverview>,
   playlistRef?: number,
 ): Promise<ITuneOverview | ITTResponseInfo> {
   try {
@@ -719,6 +749,7 @@ export async function createEmptyTune(
       incipit: tune.incipit ?? "",
       genre: tune.genre ?? "",
       deleted: tune.deleted ?? false,
+      private_for: tune.private_for ?? null,
     };
 
     type CreateTuneResponse = ITuneOverview | ITTResponseInfo;
@@ -1172,4 +1203,186 @@ export async function deletePracticeRecord(
   playlistRef: number,
 ): Promise<void> {
   await client.delete(`/practice_record/${playlistRef}/${tuneRef}`);
+}
+
+export async function fetchTuneOverride(
+  overrideId: number,
+): Promise<ITuneOverride> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch tune override: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneOverride;
+}
+
+export async function createTuneOverride(
+  data: Partial<ITuneOverride>,
+): Promise<ITuneOverride> {
+  const res = await fetchWithTimeout("/tunetrees/tune_override", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to create tune override: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneOverride;
+}
+
+export async function updateTuneOverride(
+  overrideId: number,
+  data: Partial<ITuneOverride>,
+): Promise<ITuneOverride> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update tune override: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneOverride;
+}
+
+export async function deleteTuneOverride(overrideId: number): Promise<void> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete tune override: ${res.statusText}`);
+  }
+}
+
+export async function getTuneType(tuneTypeId: string): Promise<ITuneType> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_type/${tuneTypeId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch tune type: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneType;
+}
+
+export async function createTuneType(
+  data: Partial<ITuneType>,
+): Promise<ITuneType> {
+  const res = await fetchWithTimeout("/tunetrees/tune_type", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to create tune type: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneType;
+}
+
+export async function updateTuneType(
+  tuneTypeId: string,
+  data: Partial<ITuneType>,
+): Promise<ITuneType> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_type/${tuneTypeId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update tune type: ${res.statusText}`);
+  }
+  const result = await res.json();
+  return result as ITuneType;
+}
+
+export async function deleteTuneType(tuneTypeId: string): Promise<void> {
+  const res = await fetchWithTimeout(`/tunetrees/tune_type/${tuneTypeId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete tune type: ${res.statusText}`);
+  }
+}
+
+export async function fetchGenreTuneType(
+  assocId: number,
+): Promise<IGenreTuneType> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const res = await fetch(`${baseUrl}/genre_tune_type/${assocId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch association: ${res.statusText}`);
+  }
+  return (await res.json()) as IGenreTuneType;
+}
+
+export async function createGenreTuneType(
+  data: Partial<IGenreTuneType>,
+): Promise<IGenreTuneType> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const res = await fetch(`${baseUrl}/genre_tune_type`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to create association: ${res.statusText}`);
+  }
+  return (await res.json()) as IGenreTuneType;
+}
+
+export async function updateGenreTuneType(
+  assocId: number,
+  data: Partial<IGenreTuneType>,
+): Promise<IGenreTuneType> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const res = await fetch(`${baseUrl}/genre_tune_type/${assocId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update association: ${res.statusText}`);
+  }
+  return (await res.json()) as IGenreTuneType;
+}
+
+export async function deleteGenreTuneType(assocId: number): Promise<void> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const res = await fetch(`${baseUrl}/genre_tune_type/${assocId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete association: ${res.statusText}`);
+  }
+}
+
+export async function getTuneTypesByGenre(
+  genreId: string,
+): Promise<ITuneType[]> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const res = await fetch(`${baseUrl}/tune_types/${genreId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch tune types: ${res.statusText}`);
+  }
+  return (await res.json()) as ITuneType[];
+}
+
+export async function searchTunesByTitle(
+  title: string,
+  limit = 10,
+): Promise<ITune[]> {
+  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
+  const url = new URL(
+    `${baseUrl}/tunes/search`,
+    process.env.NEXT_PUBLIC_TT_BASE_URL,
+  );
+  url.searchParams.append("title", title);
+  url.searchParams.append("limit", limit.toString());
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(`Error searching tunes: ${response.statusText}`);
+  }
+  return (await response.json()) as ITune[];
 }

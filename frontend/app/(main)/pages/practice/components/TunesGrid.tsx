@@ -270,7 +270,7 @@ const TunesGrid = ({
                         ${getStyleForSchedulingState ? getStyleForSchedulingState(row.original.review_date) : ""} 
                         ${
                           currentTune === row.original.id
-                            ? "outline outline-2 outline-blue-500"
+                            ? "outline outline-blue-500"
                             : ""
                         } ${getColorForEvaluation(row.original.recall_eval || null, false)}`}
                       onClick={handleRowClick.bind(null, row)}
