@@ -71,6 +71,7 @@ if not db_location_path.exists():
 stop_words = ["a", "an", "the", "of", "in", "on", "at", "to", "for", "with", "by"]
 
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{db_location_path.absolute()}"
+logger.info(f"Using database at {SQLALCHEMY_DATABASE_URL}")
 
 sqlalchemy_database_engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
