@@ -77,16 +77,6 @@ sqlalchemy_database_engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
 
-with sqlalchemy_database_engine.connect() as connection:
-    result = connection.execute(text("PRAGMA journal_mode;"))
-    journal_mode = result.scalar()
-    logger.info(f"Current journal mode: {journal_mode}")
-    if journal_mode != "delete":
-        logger.warning("The journal mode is not set to DELETE, issues may occur")
-    result = connection.execute(text("PRAGMA integrity_check;"))
-    integrity_check = result.scalar()
-    logger.info(f"Integrity check result: {integrity_check}")
-
 SessionLocalInternal = sessionmaker(
     autocommit=False, autoflush=False, bind=sqlalchemy_database_engine
 )
@@ -171,3 +161,13 @@ def register_levenshtein(
 
 
 # Base = declarative_base()
+
+with sqlalchemy_database_engine.connect() as connection:
+    result = connection.execute(text("PRAGMA journal_mode;"))
+    journal_mode = result.scalar()
+    logger.info(f"Current journal mode: {journal_mode}")
+    if journal_mode != "delete":
+        logger.warning("The journal mode is not set to DELETE, issues may occur")
+    result = connection.execute(text("PRAGMA integrity_check;"))
+    integrity_check = result.scalar()
+    logger.info(f"Integrity check result: {integrity_check}")
