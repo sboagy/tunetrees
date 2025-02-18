@@ -507,7 +507,7 @@ export default function AddTuneButtonAndDialog({
             return;
           }
 
-          createTuneAndUseIt(importedData, importUrl, secondaryURL);
+          createTuneAndUseIt(importedData, url, secondaryURL);
         })
         .catch((error) => {
           handleError(`Error extracting tune from URL: ${error.message}`);
@@ -635,55 +635,62 @@ export default function AddTuneButtonAndDialog({
           style={{ resize: "horizontal", overflow: "auto" }}
         >
           <DialogHeader>
-            <DialogTitle>Import</DialogTitle>
-            <DialogDescription>
-              Import a tune or a list of tunes from external web site.
-              <br />
-              At this time, only tunes from the following sites can be imported:
-            </DialogDescription>
-            <table className="text-sm text-muted-foreground">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Site</th>
-                  <th>URL</th>
-                  <th>Type</th>
-                  <th>Genre</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>1</td>
-                  <td>irishtune.info</td>
-                  <td>
-                    <a
-                      href="https://www.irishtune.info/"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      https://www.irishtune.info/
-                    </a>
-                  </td>
-                  <td>Individual Tune Only</td>
-                  <td>ITRAD</td>
-                </tr>
-                <tr>
-                  <td>2</td>
-                  <td>The Session</td>
-                  <td>
-                    <a
-                      href="https://thesession.org/"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      https://thesession.org/
-                    </a>
-                  </td>
-                  <td>Individual Tune Only</td>
-                  <td>ITRAD</td>
-                </tr>
-              </tbody>
-            </table>
+            <DialogTitle>Add Tune</DialogTitle>
+            <DialogDescription>Add or Import a tune.</DialogDescription>
+            {currentGenre === "ITRAD" ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  You can import a tune from a URL or search for a tune by
+                  title. At this time, only tunes from the following sites can
+                  be imported:
+                </p>
+                <table className="text-sm text-muted-foreground">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Site</th>
+                      <th>URL</th>
+                      <th>Type</th>
+                      <th>Genre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>1</td>
+                      <td>irishtune.info</td>
+                      <td>
+                        <a
+                          href="https://www.irishtune.info/"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          https://www.irishtune.info/
+                        </a>
+                      </td>
+                      <td>Individual Tune Only</td>
+                      <td>ITRAD</td>
+                    </tr>
+                    <tr>
+                      <td>2</td>
+                      <td>The Session</td>
+                      <td>
+                        <a
+                          href="https://thesession.org/"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          https://thesession.org/
+                        </a>
+                      </td>
+                      <td>Individual Tune Only</td>
+                      <td>ITRAD</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </>
+            ) : (
+              <p>No import sites implemented for this Genre.</p>
+            )}
           </DialogHeader>
           <div className="grid gap-4 py-4 pb-0 mb-0">
             <div className="grid grid-cols-4 items-center gap-4">
@@ -720,7 +727,7 @@ export default function AddTuneButtonAndDialog({
               variant="outline"
               type="submit"
               onClick={handleImport}
-              disabled={importUrl === ""}
+              disabled={importUrl === "" || currentGenre !== "ITRAD"}
             >
               {importUrl?.startsWith("https://") ? "Import" : "Search"}
             </Button>
@@ -755,7 +762,7 @@ export default function AddTuneButtonAndDialog({
           </ul>
           <DialogFooter>
             <Button variant="outline" onClick={handleProceedWithImport}>
-              Import New Tune Anyway
+              Import as New Tune Instead
             </Button>
           </DialogFooter>
         </DialogContent>
