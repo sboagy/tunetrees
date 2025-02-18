@@ -257,3 +257,14 @@ export interface ITuneType {
   rhythm: string;
   description: string;
 }
+
+export interface IExtractedTuneInfo {
+  incipit: string;
+  structure: string;
+}
+
+export interface ITheSessionTuneSummary {
+  name: string;
+  url: string;
+  type: string;
+}

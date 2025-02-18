@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import type { JSX } from "react";
 import { createEmptyTune } from "../queries";
 import type { ITuneOverview } from "../types";
@@ -67,8 +66,8 @@ export default function NewTuneButton({
       aria-label="Add new reference"
       onClick={handleClick}
     >
-      New Tune
-      <Plus className="h-4 w-4" />
+      New
+      {/* <Plus className="h-4 w-4" /> */}
     </Button>
   );
 }

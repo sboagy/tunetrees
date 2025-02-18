@@ -23,7 +23,6 @@ import type { IPlaylistTune, ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
 import ImportButton from "./ImportButton";
-import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useCatalogTunes } from "./TunesContextCatalog";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
@@ -320,7 +319,7 @@ export default function TunesGridCatalog({
               >
                 {">"}
               </Button> */}
-              <NewTuneButton userId={userId} playlistId={playlistId} />
+              {/* <NewTuneButton userId={userId} playlistId={playlistId} /> */}
               <ImportButton userId={userId} playlistId={playlistId} />
               <DeleteTuneButton
                 userId={userId}

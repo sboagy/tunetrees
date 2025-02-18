@@ -40,3 +40,22 @@ export interface ITheSessionTune {
   settings: ITheSessionSetting[];
   comments: ITheSessionComment[];
 }
+
+export interface ITheSessionQueryResults {
+  format: string;
+  type: string;
+  mode: string;
+  q: string;
+  pages: number;
+  page: number;
+  total: number;
+  tunes: {
+    id: number;
+    name: string;
+    alias?: string;
+    url: string;
+    member: ITheSessionMember;
+    date: string;
+    type: string;
+  }[];
+}

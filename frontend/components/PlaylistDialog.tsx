@@ -2,14 +2,12 @@ import {
   createInstrument,
   createPlaylist,
   deletePlaylist,
-  getAllGenres,
   getInstruments,
   getPlaylists,
   updateInstrument,
   updatePlaylist,
 } from "@/app/(main)/pages/practice/queries";
 import type {
-  IGenre,
   IInstrument,
   IPlaylist,
   IViewPlaylistJoined,
@@ -24,7 +22,6 @@ import {
   DialogTitle,
 } from "@radix-ui/react-dialog";
 import {
-  ChevronDownIcon,
   ListChecksIcon,
   PenOffIcon,
   PlusIcon,
@@ -42,16 +39,12 @@ import {
   useRef,
   useState,
 } from "react";
+import { useGenresList } from "./GenreContext";
+import { GenreSelector } from "./GenreSelector";
 import styles from "./PlaylistChooser.module.css";
 import SaveChangesOrNotDialog from "./SaveChangesOrNotDialog";
 import { Button } from "./ui/button";
 import { DialogFooter, DialogHeader } from "./ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
 import { Input } from "./ui/input";
 import {
   Table,
@@ -489,27 +482,7 @@ export default function PlaylistDialog({
     };
   }, [checkAndClose]);
 
-  const [genres, setGenres] = useState<IGenre[]>([]);
-  const [isGenresLoading, setIsGenresLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchGenres = async () => {
-      try {
-        const genresData = await getAllGenres();
-        if (Array.isArray(genresData)) {
-          setGenres(genresData);
-        } else {
-          console.error("Error fetching genres:", genresData);
-        }
-      } catch (error) {
-        console.error("Error fetching genres:", error);
-      } finally {
-        setIsGenresLoading(false);
-      }
-    };
-
-    void fetchGenres();
-  }, []);
+  const { genres, isGenresLoading } = useGenresList();
 
   if (isGenresLoading) {
     return <div>Loading...</div>;
@@ -650,41 +623,20 @@ export default function PlaylistDialog({
                           />
                         </TableCell>
                         <TableCell className={styles.column_genre_default}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              className={`${styles.column_genre_default} flex items-center justify-between ${editedInstrumentRow.private_to_user === 0 ? "cursor-not-allowed opacity-50" : ""}`}
-                              disabled={
-                                editedInstrumentRow.private_to_user === 0
-                              }
-                            >
-                              {editedInstrumentRow.genre_default || "(not set)"}
-                              {editedInstrumentRow.private_to_user !== 0 && (
-                                <ChevronDownIcon className="w-5 h-5" />
-                              )}
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="max-h-60 overflow-y-auto">
-                              {genres.map((genre) => (
-                                <DropdownMenuItem
-                                  key={genre.id}
-                                  onSelect={() => {
-                                    handleEditInstrument(
-                                      editedInstrumentRow.id,
-                                      "genre_default",
-                                      genre.id,
-                                    );
-                                  }}
-                                  className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                                >
-                                  <div className="text-xs">
-                                    <div>{genre.id}</div>
-                                    <div>Name: {genre.name}</div>
-                                    <div>Region: {genre.region}</div>
-                                    <div>Description: {genre.description}</div>
-                                  </div>
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <GenreSelector
+                            genre_default={editedInstrumentRow.genre_default}
+                            private_to_user={
+                              editedInstrumentRow.private_to_user
+                            }
+                            genres={genres}
+                            onSelect={(genreId) => {
+                              handleEditInstrument(
+                                editedInstrumentRow.id,
+                                "genre_default",
+                                genreId,
+                              );
+                            }}
+                          />
                         </TableCell>
                         <TableCell className={styles.column_description}>
                           <Input
