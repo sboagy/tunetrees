@@ -21,6 +21,7 @@ export class TuneTreesPageObject {
   readonly tunesGridRows;
   readonly addToRepertoireButton;
   readonly newTuneButton;
+  readonly addTuneButton;
   readonly tabsMenuButton;
   readonly tabsMenuCatalogChoice;
   readonly catalogTab;
@@ -74,9 +75,11 @@ export class TuneTreesPageObject {
       .locator("#tt-all-tunes-header div")
       .filter({ hasText: "Add To Repertoire" });
 
-    this.newTuneButton = page
+    this.newTuneButton = page.getByTestId("tt-new-tune-button");
+
+    this.addTuneButton = page
       .getByTestId("tt-catalog-tab")
-      .getByLabel("Add new reference");
+      .getByTestId("tt-import-button");
 
     this.tableStatus = this.page.getByText(" row(s) selected.");
   }

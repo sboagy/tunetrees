@@ -65,6 +65,7 @@ export default function NewTuneButton({
       // size="icon"
       aria-label="Add new reference"
       onClick={handleClick}
+      data-testid="tt-new-tune-button"
     >
       New
       {/* <Plus className="h-4 w-4" /> */}

@@ -41,6 +41,11 @@ test("test-newtune-1", async ({ page }) => {
   // await page.waitForTimeout(60_000 * 60);
 
   await expect(ttPO.addToRepertoireButton).toBeVisible();
+
+  await ttPO.addTuneButton.click();
+
+  // await ttPO.newTuneButton.waitFor({ state: "visible" });
+  await ttPO.newTuneButton.isEnabled();
   await ttPO.newTuneButton.click();
 
   // await page.getByTestId("tt-tune-editor-title-input").click();
