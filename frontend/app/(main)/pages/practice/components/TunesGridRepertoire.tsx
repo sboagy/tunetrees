@@ -21,9 +21,9 @@ import {
   updateTableStateInDb,
 } from "../settings";
 import type { ITableStateTable, ITuneOverview } from "../types";
+import AddTuneButtonAndDialog from "./AddTuneButtonAndDialog";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
-import ImportButton from "./ImportButton";
 import { useSitDownDate } from "./SitdownDateProvider";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
@@ -363,7 +363,7 @@ export default function TunesGridRepertoire({
                 {">"}
               </Button> */}
               {/* <NewTuneButton userId={userId} playlistId={playlistId} /> */}
-              <ImportButton userId={userId} playlistId={playlistId} />
+              <AddTuneButtonAndDialog userId={userId} playlistId={playlistId} />
               <DeleteTuneButton
                 userId={userId}
                 playlistId={playlistId}

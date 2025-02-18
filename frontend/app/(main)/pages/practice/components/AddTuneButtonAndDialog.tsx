@@ -52,7 +52,7 @@ interface IImportButtonProps {
   playlistId: number;
 }
 
-export default function ImportButton({
+export default function AddTuneButtonAndDialog({
   userId,
   playlistId,
 }: IImportButtonProps): JSX.Element {
