@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass
 from http.client import HTTPResponse
+from os import environ
 from pathlib import Path
 from time import sleep
 from typing import List, TypedDict
@@ -66,7 +67,15 @@ def fetch_irishtune_info_playlist(data_dir: Path) -> str:
             http_response: HTTPResponse = urlopen(req)
             status = http_response.status
             print(f"{status}")
-            web_byte = http_response.read()
+            while True:
+                msg = http_response.readline()
+                print(f"{msg}")
+                if msg.startswith(b'{"status":') or msg == b"":
+                    break
+            if msg == b"":
+                print("Can't discover JSON response")
+                exit(-1)
+            web_byte = msg
             break
         except URLError as e:
             print(f"URLError = {str(e.reason)}", flush=True)
@@ -75,6 +84,14 @@ def fetch_irishtune_info_playlist(data_dir: Path) -> str:
         print("Could not get page bytes")
         exit(-1)
     page = web_byte.decode("utf-8")
+    # page = page[page.find("{") :]
+    try:
+        check_loading = json.loads(page)
+        assert check_loading["status"] == "OK"
+    except json.JSONDecodeError as e:
+        print(f"JSONDecodeError: {e}")
+        exit(-1)
+
     login_output_file = data_dir.joinpath("output_playlist.json")
     with open(login_output_file, "w") as f:
         f.write(page)
@@ -142,12 +159,24 @@ class IrishTuneInfoPlaylistDict(TypedDict):
 
 def main():
     page_url = "https://www.irishtune.info/my/login2.php"
-    data_dir = Path(__file__).parent.parent.joinpath("data")
+    data_dir = Path(__file__).parent.parent.parent.joinpath("iti_import_output")
+    if not data_dir.exists():
+        data_dir.mkdir()
 
     print(page_url)
 
+    irishtuneinfo_username = environ.get("IRISHTUNEINFO_USERNAME_TT")
+    irishtuneinfo_password = environ.get("IRISHTUNEINFO_PASSWORD_TT")
+
+    if not irishtuneinfo_username or not irishtuneinfo_password:
+        print("Please set IRISHTUNEINFO_USERNAME_ME and IRISHTUNEINFO_PASSWORD_ME")
+        exit(-1)
+
     page = login_irishtune_info(
-        data_dir, page_url, username="sboag", password="caitlin"
+        data_dir,
+        page_url,
+        username=irishtuneinfo_username,
+        password=irishtuneinfo_password,
     )
 
     assert page
@@ -156,42 +185,48 @@ def main():
     dump_obj: IrishTuneInfoPlaylistDict = json.loads(page)
     tunes_dict = dump_obj["data"]
     tunes_columns = [
-        "id",
-        "type",
-        "structure",
-        "title",
-        "mode",
-        "incipit",
+        "ID",
+        "Type",
+        "Structure",
+        "Title",
+        "Mode",
+        "Incipit",
+        "Current",
+        "Learned",
+        "Practiced",
+        "NotePrivate",
+        "NotePublic",
+        "Tags",
     ]
-    tunes_user_notes_columns = [
-        "id",  # TUNE_REF
-        # Add also user id column
-        "note_private",
-        "note_public",
-        "tags",
-    ]
-    tunes_practice_record_columns = [
-        "playlist_ref",  #
-        "id",  # TUNE_REF (redundant, but will keep for now)
-        # Add also user id column
-        "practiced",
-        "feedback",
-    ]
-    playlist_tunes_columns = [
-        "playlist_ref",  # Joins
-        "id",  # TUNE_REF
-        "current",
-        "learned",
-    ]
+    # tunes_user_notes_columns = [
+    #     "id",  # TUNE_REF
+    #     # Add also user id column
+    #     "note_private",
+    #     "note_public",
+    #     "tags",
+    # ]
+    # tunes_practice_record_columns = [
+    #     "playlist_ref",  #
+    #     "id",  # TUNE_REF (redundant, but will keep for now)
+    #     # Add also user id column
+    #     "practiced",
+    #     "feedback",
+    # ]
+    # playlist_tunes_columns = [
+    #     "playlist_ref",  # Joins
+    #     "id",  # TUNE_REF
+    #     "current",
+    #     "learned",
+    # ]
     tunes_dump_cvs = data_dir.joinpath("dump_tunes.cvs")
-    tune_user_notes_dump_cvs = data_dir.joinpath("dump_tune_user_notes.cvs")
-    practice_record_dump_cvs = data_dir.joinpath("dump_practice_records.cvs")
-    playlist_tunes_columns_cvs = data_dir.joinpath("dump_playlist_tunes.cvs")
+    # tune_user_notes_dump_cvs = data_dir.joinpath("dump_tune_user_notes.cvs")
+    # practice_record_dump_cvs = data_dir.joinpath("dump_practice_records.cvs")
+    # playlist_tunes_columns_cvs = data_dir.joinpath("dump_playlist_tunes.cvs")
     tables = {
         tunes_dump_cvs: tunes_columns,
-        tune_user_notes_dump_cvs: tunes_user_notes_columns,
-        practice_record_dump_cvs: tunes_practice_record_columns,
-        playlist_tunes_columns_cvs: playlist_tunes_columns,
+        # tune_user_notes_dump_cvs: tunes_user_notes_columns,
+        # practice_record_dump_cvs: tunes_practice_record_columns,
+        # playlist_tunes_columns_cvs: playlist_tunes_columns,
     }
     for table_dump_cvs_path, columns in tables.items():
         with open(table_dump_cvs_path, "w") as f:
@@ -205,7 +240,9 @@ def main():
         for table_dump_cvs_path, columns in tables.items():
             with open(table_dump_cvs_path, "a") as f:
                 utd = tune_dict  # untyped tune dict
-                row_data = [(utd.get(k) or "").translate(trans) for k in columns]
+                row_data: List[str] = [
+                    (utd.get(k) or "").translate(trans) for k in columns
+                ]
                 f.write(", ".join(row_data))
                 f.write("\n")
 
