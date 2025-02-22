@@ -44,26 +44,68 @@ export async function fetchTuneInfoFromTheSessionURL(
   return tuneJson;
 }
 
+function getItiHeaders() {
+  return {
+    "User-Agent": "Mozilla/5.0",
+    // "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/113.0",
+    Accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    // "Accept": "text/html",
+    // "Accept-Language": "en-US,en;q=0.5",
+    // "Accept-Encoding": "gzip, deflate, br",
+    // "Content-Type": "application/x-www-form-urlencoded",
+    // "Content-Length": "73",
+    // "Origin": "https://www.irishtune.info",
+    // "Referer": "https://www.irishtune.info/my/login.php",
+    Cookie: "MyIrishTuneInfo=b2dcbda34d41f29b2967f917e89fd77b",
+    // "Upgrade-Insecure-Requests": "1",
+    // "Sec-Fetch-Dest": "document",
+    // "Sec-Fetch-Mode": "navigate",
+    // "Sec-Fetch-Site": "same-origin",
+    // "Sec-Fetch-User": "?1",
+  };
+}
+
 export async function scrapeIrishTuneInfoTune(
   url: string,
 ): Promise<Partial<ITuneOverview>> {
-  function extractColumnText(
-    $: CheerioAPI,
-    columnIndex: number,
-  ): string | undefined {
-    try {
-      const selector = `body > div.twoCol > div.leftCol > table > tbody > tr > td:nth-child(${columnIndex})`;
-      const elements = $(selector);
+  async function itiLogin() {
+    const loginPageUrl = "https://www.irishtune.info/my/login2.php";
 
-      if (elements.length > 0) {
-        return elements.first().text().trim();
-      }
+    const irishtuneinfoUsername = process.env.IRISHTUNEINFO_USERNAME_TT;
+    const irishtuneinfoPassword = process.env.IRISHTUNEINFO_PASSWORD_TT;
 
-      return undefined;
-    } catch {
-      throw Error("Error extracting column text");
+    if (!irishtuneinfoUsername || !irishtuneinfoPassword) {
+      throw new Error("Missing IrishTuneInfo credentials");
     }
+
+    const formDataLogin = new URLSearchParams({
+      username: irishtuneinfoUsername,
+      password: irishtuneinfoPassword,
+      B1: "Submit",
+      jtest: "t",
+      IE8: "false",
+      from: "/my/",
+    }).toString();
+
+    const response2 = await fetchWithTimeout(loginPageUrl, {
+      timeout: 200_000,
+      method: "POST",
+      body: formDataLogin,
+      headers: {
+        ...getItiHeaders(),
+        Connection: "keep-alive",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+    if (!response2.ok) {
+      throw new Error("Failed to fetch login page");
+    }
+    return response2;
   }
+
+  const loginResponse = await itiLogin();
+  console.log("loginResponse.status", loginResponse.status);
 
   const scrapedTune: Partial<ITuneOverview> = {};
 
@@ -72,33 +114,144 @@ export async function scrapeIrishTuneInfoTune(
     const response = await fetchWithTimeout(url, {
       timeout: 20_0000,
       headers: {
+        ...getItiHeaders(),
         Accept: "text/html",
       },
     });
     const html = await response.text();
     const $: CheerioAPI = load(html); // Load HTML into Cheerio
 
-    const titleSection = $("body > div.twoCol > div.leftCol > h1")
-      .map((i, el) => $(el))
-      .get();
+    const addOrDeleteButtonElement = $(
+      "body > div.twoCol > div.rightCol form.addbutton input",
+    );
+    const addOrDeleteButtonValue = addOrDeleteButtonElement.attr("value");
+    // This should either be "addlist" or "dellist" according to if it's already in the playlist
+    console.log("Button value:", addOrDeleteButtonValue);
 
-    const titleNode: Text = titleSection[0][0].children[3] as unknown as Text;
-    let title = titleNode.nodeValue?.trim();
-    if (title?.startsWith("(") && title?.endsWith(")")) {
-      title = title.slice(1, -1).trim();
+    if (addOrDeleteButtonValue === "addlist") {
+      console.log(`Adding ${url} to iti tt playlist`);
+      // const formActionUrl = "https://www.irishtune.info/my/ctrlPlaylist.php";
+      const formActionUrl = url;
+      const formData = new URLSearchParams({
+        formname: "addlist",
+      });
+
+      const submitResponse = await fetchWithTimeout(formActionUrl, {
+        timeout: 400_000,
+        method: "POST",
+        body: formData.toString(),
+        headers: {
+          ...getItiHeaders(),
+          "Accept-Encoding": "gzip, deflate, br, zstd",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "max-age=0",
+          "Content-Type": "application/x-www-form-urlencoded",
+          Origin: "https://www.irishtune.info",
+          Referer: url,
+        },
+      });
+
+      if (!submitResponse.ok) {
+        throw new Error("Failed to submit form (addlist)");
+      }
+
+      console.log(
+        `Form submitted successfully to add ${url} to iti tt playlist`,
+      );
     }
-    scrapedTune.title = title;
 
-    // Example: Extract all the text from <p> tags
-    const rhythm = extractColumnText($, 1);
-    scrapedTune.type = rhythm;
-    // const bars = extractColumnText(3);
+    const formData = new URLSearchParams({
+      action: "listall",
+      // _: "1686614383963",
+    });
 
-    const phraseStructure = extractColumnText($, 3);
-    scrapedTune.structure = phraseStructure;
+    const pageUrl = `https://www.irishtune.info/my/ctrlPlaylist.php?${formData.toString()}`;
 
-    const mode = extractColumnText($, 4);
-    scrapedTune.mode = mode;
+    const response3 = await fetchWithTimeout(pageUrl, {
+      timeout: 200_000,
+      headers: {
+        ...getItiHeaders(),
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "max-age=0",
+        Origin: "https://www.irishtune.info",
+        Referer: "https://www.irishtune.info/my/playlist.php",
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response3.ok) {
+      throw new Error("Failed to fetch form data page");
+    }
+    const tunesDataText = await response3.text();
+
+    // ==============
+    // hackity hack time, for some reason we're getting some
+    // html before the json data, so we need to find the
+    // start of the json data. Hopefully I'll find a fix,
+    // may need to ask Allan Ng when I'm ready.
+    const jsonStartIndex = tunesDataText.indexOf("{");
+    if (jsonStartIndex === -1) {
+      throw new Error("JSON data not found in response");
+    }
+    const jsonString = tunesDataText.slice(jsonStartIndex);
+    // ==============
+
+    const jsonData = JSON.parse(jsonString);
+    const tunesData = jsonData.data;
+    const urlParts = url.split("/");
+    const tuneId = urlParts.at(-2);
+    console.log("Tune ID:", tuneId);
+
+    const matchingTune = tunesData.find(
+      (tune: { ID: string }) => tune.ID === tuneId,
+    );
+    if (!matchingTune) {
+      throw new Error(`Tune with ID ${tuneId} not found`);
+    }
+
+    scrapedTune.title = matchingTune.Title;
+    scrapedTune.type = matchingTune.Type;
+    scrapedTune.structure = matchingTune.Structure;
+    scrapedTune.mode = matchingTune.Mode;
+    scrapedTune.incipit = matchingTune.Incipit;
+    scrapedTune.genre = "ITRAD";
+
+    console.log("tunesData", tunesData);
+
+    // If we added it, then clean up after ourselves.  Could consider to
+    // do this unconditionaly, but it's a bit more polite to only do it
+    // if we added it.
+    if (addOrDeleteButtonValue === "addlist") {
+      console.log(`Deleting ${url} from iti tt playlist`);
+      // const formActionUrl = "https://www.irishtune.info/my/ctrlPlaylist.php";
+      const formActionUrl = url;
+      const formData = new URLSearchParams({
+        formname: "dellist",
+      });
+
+      const submitResponse = await fetchWithTimeout(formActionUrl, {
+        timeout: 400_000,
+        method: "POST",
+        body: formData.toString(),
+        headers: {
+          ...getItiHeaders(),
+          "Accept-Encoding": "gzip, deflate, br, zstd",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "max-age=0",
+          "Content-Type": "application/x-www-form-urlencoded",
+          Origin: "https://www.irishtune.info",
+          Referer: url,
+        },
+      });
+
+      if (!submitResponse.ok) {
+        throw new Error("Failed to submit form (dellist)");
+      }
+
+      console.log(
+        `Form submitted successfully to delete tune ${url} from iti tt playlist`,
+      );
+    }
 
     return scrapedTune;
   } catch (error) {

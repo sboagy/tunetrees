@@ -459,12 +459,16 @@ export default function AddTuneButtonAndDialog({
       if (url.startsWith("https://")) {
         if (url.includes("://www.irishtune.info")) {
           const scrapedTune = await scrapeIrishTuneInfoTune(url);
-          const secondarySourceUrl = await extractIncipit(scrapedTune);
-          const existingMatches = await findExistingMatches(
-            url,
-            scrapedTune.title ?? "",
-            scrapedTune.type ?? "",
-          );
+          if (!scrapedTune) {
+            return [null, [], ""];
+          }
+          let secondarySourceUrl = "";
+          if (!scrapedTune.incipit) {
+            // Questionalble if we should do this at all, but it's here for now
+            secondarySourceUrl = await extractIncipit(scrapedTune);
+          }
+          // I don't think we want to have findExistingMatches search by title here.
+          const existingMatches = await findExistingMatches(url, "", "");
           return [scrapedTune, existingMatches, secondarySourceUrl];
         }
         if (url.includes("://thesession.org")) {
