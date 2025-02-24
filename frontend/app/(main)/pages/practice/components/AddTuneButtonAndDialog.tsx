@@ -45,11 +45,50 @@ import { useTune } from "./CurrentTuneContext";
 import { useImportUrl } from "./ImportContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import NewTuneButton from "./NewTuneButton";
+import { SelectSettingDialog } from "./SelectSettingDialog"; // Import the new component
 import { SelectTuneDialog } from "./SelectTuneDialog";
 
 interface IImportButtonProps {
   userId: number;
   playlistId: number;
+}
+
+// interface IPromptForSettingResult {
+//   settingIndex: number;
+// }
+
+function usePromptForSetting() {
+  const [isOpenPromptForSetting, setIsOpenPromptForSetting] = useState(false);
+  const [resolvePromise, setResolvePromise] =
+    useState<(value: number) => void>();
+  const [settingsData, setSettingsData] = useState<
+    { abc: string; id: number }[]
+  >([]);
+
+  const promptUserForSetting = (
+    settings: { abc: string; id: number }[],
+  ): Promise<number> => {
+    setIsOpenPromptForSetting(true);
+    setSettingsData(settings);
+    return new Promise<number>((resolve) => {
+      setResolvePromise(() => resolve);
+    });
+  };
+
+  const handlePromptUserForSetting = (input: number) => {
+    if (resolvePromise) {
+      resolvePromise(input);
+      setIsOpenPromptForSetting(false);
+      setSettingsData([]);
+    }
+  };
+
+  return {
+    isOpenPromptForSetting,
+    promptUserForSetting,
+    handlePromptUserForSetting,
+    settingsData,
+  };
 }
 
 export default function AddTuneButtonAndDialog({
@@ -60,6 +99,13 @@ export default function AddTuneButtonAndDialog({
   const { setCurrentTune } = useTune();
 
   const { toast } = useToast();
+
+  const {
+    isOpenPromptForSetting,
+    promptUserForSetting,
+    handlePromptUserForSetting,
+    settingsData,
+  } = usePromptForSetting();
 
   const handleError = (message: string) => {
     toast({
@@ -320,7 +366,19 @@ export default function AddTuneButtonAndDialog({
   }> {
     const tuneJson = await fetchTuneInfoFromTheSessionURL(tuneUrlBase);
     // TODO: Fetch multiple settings here
-    const setting = tuneJson.settings[0];
+    if (tuneJson.settings.length === 0) {
+      throw new Error("No settings found for tune");
+    }
+    let whichSetting = 0;
+    if (tuneJson.settings.length > 1) {
+      const settings = tuneJson.settings.map((setting) => ({
+        abc: setting.abc,
+        id: setting.id,
+      }));
+      whichSetting = await promptUserForSetting(settings);
+    }
+
+    const setting = tuneJson.settings[whichSetting];
     const abcString = setting.abc;
     const tuneParsed = abcjs.parseOnly(abcString);
     return { tuneParsed, abcString, tuneJson };
@@ -744,6 +802,13 @@ export default function AddTuneButtonAndDialog({
         onOpenChange={setShowSettingsSelectDialog}
         tunes={tuneSettingsList}
         onTuneSelect={handleTuneSelect}
+      />
+      {/* --------------------- */}
+      <SelectSettingDialog
+        open={isOpenPromptForSetting}
+        onOpenChange={() => handlePromptUserForSetting(-1)}
+        settings={settingsData}
+        onSettingSelect={handlePromptUserForSetting}
       />
       {/* --------------------- */}
       <Dialog open={showMatchesDialog} onOpenChange={setShowMatchesDialog}>
