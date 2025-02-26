@@ -243,6 +243,7 @@ async def submit_feedback(
     return status.HTTP_302_FOUND
 
 
+# DEADCODE: Dead code?
 @router.post("/practice/submit_schedules/{playlist_id}")
 async def submit_schedules(
     playlist_id: str,
@@ -259,10 +260,15 @@ async def submit_schedules(
 async def submit_feedbacks(
     playlist_id: str,
     tune_updates: Dict[str, TuneFeedbackUpdate],
+    sitdown_date: Optional[datetime] = Query(None),
 ):
     logger.debug(f"{tune_updates=}")
 
-    update_practice_feedbacks(tune_updates, playlist_id)
+    update_practice_feedbacks(
+        tune_updates,
+        playlist_id,
+        review_sitdown_date=sitdown_date,
+    )
 
     return status.HTTP_302_FOUND
 
