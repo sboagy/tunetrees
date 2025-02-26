@@ -2,7 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import ColumnsMenu from "./ColumnsMenu";
-import { globalFlagManualSorting, useTunesTable } from "./TunesTable"; // Add this import
+import {
+  globalFlagManualSorting,
+  saveTableState,
+  useTunesTable,
+} from "./TunesTable"; // Add this import
 
 import { Input } from "@/components/ui/input";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
@@ -255,6 +259,11 @@ export default function TunesGridRepertoire({
           table.resetRowSelection();
         }
         triggerRefresh();
+
+        const tableState: TableState = table.getState();
+        tableState.rowSelection = {};
+        table.setState(tableState);
+        void saveTableState(table, userId, "repertoire", playlistId);
       })
       .catch((error) => {
         console.error("Error submit_practice_feedbacks_result:", error);
