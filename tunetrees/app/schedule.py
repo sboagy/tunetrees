@@ -274,28 +274,49 @@ def update_practice_feedbacks(  # noqa: C901
             user_ref = fetch_user_ref_from_playlist_ref(db, playlist_ref)
             alg_type: AlgorithmType = fetch_algorithm_type(db, user_ref)
 
-            stmt = select(PracticeRecord).where(
-                and_(
-                    PracticeRecord.tune_ref.in_(
-                        [int(tune_id) for tune_id in user_tune_updates]
-                    ),
-                    PracticeRecord.playlist_ref == playlist_ref,
-                )
-            )
-            row_results = db.execute(stmt).all()
+            # stmt = select(PracticeRecord).where(
+            #     and_(
+            #         PracticeRecord.tune_ref.in_(
+            #             [int(tune_id) for tune_id in user_tune_updates]
+            #         ),
+            #         PracticeRecord.playlist_ref == playlist_ref,
+            #     )
+            # )
+            # row_results = db.execute(stmt).all()
 
-            data_to_update = []
-            for row_result_tuple in row_results:
+            for tune_id, tune_update in user_tune_updates.items():
+                stmt = select(PracticeRecord).where(
+                    and_(
+                        PracticeRecord.tune_ref == tune_id,
+                        PracticeRecord.playlist_ref == playlist_ref,
+                    )
+                )
+                row_result_tuple = db.execute(stmt).one_or_none()
+
                 # row_result_tuple is of type `Tuple[PracticeRecord]`.  I'm not sure
                 # yet why that tuple layer is there.
-                row_result = row_result_tuple[0]
-                tune_id = row_result.tune_ref
-                easiness = row_result.easiness
-                interval = row_result.interval
-                repetitions = row_result.repetitions
-                tune_update = user_tune_updates.get(tune_id)
-                if tune_update is None:
-                    tune_update = user_tune_updates.get(str(tune_id))
+                practice_record: PracticeRecord
+                if row_result_tuple is not None:
+                    practice_record = row_result_tuple[0]
+                    easiness = practice_record.easiness
+                    interval = practice_record.interval
+                    repetitions = practice_record.repetitions
+                else:
+                    practice_record = PracticeRecord(
+                        tune_ref=tune_id,
+                        playlist_ref=playlist_ref,
+                        easiness=0.0,
+                        interval=0,
+                        repetitions=0,
+                        review_date="",
+                        quality=0,
+                        practiced="",
+                    )
+                    db.add(practice_record)
+                    easiness = 0.0
+                    interval = 0
+                    repetitions = 0
+
                 if tune_update is None:
                     raise ValueError(f"No update found for tune_id: {tune_id}")
                 quality = tune_update.get("feedback")
@@ -310,27 +331,19 @@ def update_practice_feedbacks(  # noqa: C901
                     continue
 
                 if quality == NEW or quality == RESCHEDULED:
-                    stmt = select(PracticeRecord.practiced).where(
-                        and_(
-                            PracticeRecord.tune_ref == tune_id,
-                            PracticeRecord.playlist_ref == playlist_ref,
-                        )
-                    )
-                    practiced_result = db.execute(stmt).one_or_none()
-
-                    if practiced_result:
+                    if practice_record:
                         # This is the case where the user just wants the tune to be scheduled for review
                         # immediately, presumably so they can practice it, but we don't want to change
                         # any of the other metrics.
-                        quality_int = row_result.quality
-                        practiced_str = row_result.practiced
+                        quality_int = practice_record.quality
+                        practiced_str = practice_record.practiced
                         review_date_str = datetime.strftime(
                             sitdown_date, TT_DATE_FORMAT
                         )
                         review = ReviewResult(
-                            easiness=row_result.easiness,
-                            interval=row_result.interval,
-                            repetitions=row_result.repetitions,
+                            easiness=practice_record.easiness,
+                            interval=practice_record.interval,
+                            repetitions=practice_record.repetitions,
                             review_datetime=review_date_str,
                         )
 
@@ -390,50 +403,14 @@ def update_practice_feedbacks(  # noqa: C901
                         f"Unexpected review_date type: {type(review_date)}: {review_date}"
                     )
 
-                data_to_update.append(
-                    {
-                        "tune_ref": tune_id,
-                        "playlist_ref": playlist_ref,
-                        "interval": review["interval"],
-                        "easiness": review["easiness"],
-                        "repetitions": review["repetitions"],
-                        "review_date": review_date_str,
-                        "quality": quality_int,
-                        "practiced": practiced_str,
-                    }
-                )
+                practice_record.interval = review.get("interval")
+                practice_record.easiness = review.get("easiness")
+                practice_record.repetitions = review.get("repetitions")
+                practice_record.review_date = review_date_str
+                practice_record.quality = quality_int
+                practice_record.practiced = practiced_str
 
-            for data in data_to_update:
-                tune_id_int = int(data["tune_ref"])
-                stmt = select(PracticeRecord).where(
-                    PracticeRecord.tune_ref == tune_id_int,
-                    PracticeRecord.playlist_ref == playlist_ref,
-                )
-                record = db.execute(stmt).scalars().first()
-                if record:
-                    for key, value in data.items():
-                        if key not in {"tune_ref", "playlist_ref"}:
-                            setattr(record, key, value)
-                else:
-                    log.error(f"No record found for tune_ref: {data['tune_ref']}")
-
-            db.commit()
-
-            for data in data_to_update:
-                updated_record = (
-                    db.query(PracticeRecord)
-                    .filter(
-                        PracticeRecord.tune_ref == data["tune_ref"],
-                        PracticeRecord.playlist_ref == int(playlist_ref),
-                    )
-                    .first()
-                )
-                if updated_record:
-                    print("After update:", updated_record.review_date)
-                else:
-                    print(
-                        "No record found after update for tune_ref:", data["tune_ref"]
-                    )
+                db.commit()
 
         except Exception as e:
             db.rollback()
