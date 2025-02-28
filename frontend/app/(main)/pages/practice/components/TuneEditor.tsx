@@ -353,15 +353,33 @@ export default function TuneEditor({
     return false;
   }
 
+  // BOOKMARK: onSubmit for tune editor
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     console.log(data);
-
+    // TODO: tune override logic here, or flag to backend?  Might be a tad tricky here.
+    //       Get the base public tune.  Compare each field.  If it differs,
+    //       then add to override object.
+    // Is it always an override if not new?  No, I think we need to know if
+    // the tune is public.  If it isn't the `private_for` field will be set to
+    // the current user's ID.
+    //
+    // So, given I'm a little squishy on the logic here to figure out
+    // when to save as an override, I broke it into
+    // some atomic variables.  Hopefully this will make it easier to
+    // read the intention?
+    const isTuneUserPrivateForUser =
+      isTuneUserPrivate() && tune?.private_for === userId;
+    const isNewTuneImported = isNewTune() && isTuneImported();
+    const saveInMainTuneTable = isTuneUserPrivateForUser || isNewTuneImported;
+    const saveAsOverride = !saveInMainTuneTable;
     const result = await updateTuneInPlaylistFromTuneOverview(
       userId,
       playlistId,
       tuneId,
+      saveAsOverride,
       { ...data, deleted: false } as ITuneOverview,
     );
+
     if ("detail" in result) {
       console.error("Failed to update tune:", result.detail);
       handleError(

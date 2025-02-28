@@ -1569,6 +1569,35 @@ def delete_practice_record(playlist_ref: int, tune_ref: int):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
+# BOOKMARK: tune_override_query
+@router.get(
+    "/query_tune_override",
+    response_model=TuneOverrideModel,
+    summary="Get Tune Override",
+    description="Retrieve a tune override by its ID.",
+    status_code=200,
+)
+def query_tune_override(
+    user_ref: int = Query(description="User reference ID"),
+    tune_ref: int = Query(description="Tune reference ID"),
+) -> TuneOverrideModel:
+    try:
+        with SessionLocal() as db:
+            # Example usage:
+            tune_override = (
+                db.query(TuneOverride)
+                .filter(
+                    TuneOverride.tune_ref == tune_ref, TuneOverride.user_ref == user_ref
+                )
+                .first()
+            )
+            if not tune_override:
+                raise HTTPException(status_code=404, detail="Tune override not found")
+            return TuneOverrideModel.model_validate(tune_override)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Tune Override API
 @router.get(
     "/tune_override/{override_id}",

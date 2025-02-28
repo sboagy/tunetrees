@@ -191,6 +191,156 @@ export async function getTunesOnlyIntoOverview(
   }
 }
 
+async function createNewOverrideRecord(
+  user_id: number,
+  tune_id: number,
+  tuneOverrideData: Partial<ITuneOverride>, // change request
+  dbTune: ITuneOverview, // public tune data
+) {
+  const responseCreate = await fetch(
+    `${process.env.NEXT_PUBLIC_TT_BASE_URL}/tune_override?user_ref=${user_id}&tune_ref=${tune_id}`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify(tuneOverrideData),
+    },
+  );
+
+  if (!responseCreate.ok) {
+    throw new Error(`Request failed with status code ${responseCreate.status}`);
+  }
+
+  const responseTuneOverride: ITuneOverride = await responseCreate.json();
+  const responseData: ITune = {
+    ...dbTune,
+    ...responseTuneOverride,
+  };
+  return responseData;
+}
+
+async function updateOverrideRecord(
+  existingOverrideResponse: Response, // override data from db
+  tuneOverrideData: Partial<ITuneOverride>, // change request
+  dbTune: ITuneOverview, // public tune data
+) {
+  const tuneOverrideDataFromDB = await existingOverrideResponse.json();
+  const overrideId = tuneOverrideDataFromDB.id;
+  const responseCreate = await fetch(
+    `${process.env.NEXT_PUBLIC_TT_BASE_URL}/tune_override/${overrideId}`,
+    {
+      method: "PATCH",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify(tuneOverrideData),
+    },
+  );
+
+  if (!responseCreate.ok) {
+    throw new Error(`Request failed with status code ${responseCreate.status}`);
+  }
+
+  const responseTuneOverride: ITuneOverride = await responseCreate.json();
+  const responseData: ITune = {
+    ...dbTune,
+    ...responseTuneOverride,
+  };
+  return responseData;
+}
+
+async function updatePublicTuneRecord(
+  dbTune: ITuneOverview,
+  tune_update: Partial<ITuneOverview>,
+  tune_id: number,
+) {
+  const tuneUpdateData: Partial<ITune> = {};
+  if (dbTune) {
+    if (tune_update.title !== dbTune.title)
+      tuneUpdateData.title = tune_update.title;
+    if (tune_update.type !== dbTune.type)
+      tuneUpdateData.type = tune_update.type;
+    if (tune_update.structure !== dbTune.structure)
+      tuneUpdateData.structure = tune_update.structure;
+    if (tune_update.mode !== dbTune.mode)
+      tuneUpdateData.mode = tune_update.mode;
+    if (tune_update.incipit !== dbTune.incipit)
+      tuneUpdateData.incipit = tune_update.incipit;
+    if (tune_update.genre !== dbTune.genre)
+      tuneUpdateData.genre = tune_update.genre;
+    if (tune_update.deleted !== dbTune.deleted)
+      tuneUpdateData.deleted = tune_update.deleted;
+  }
+
+  console.log(
+    "tuneUpdateDataStringified:",
+    JSON.stringify(tuneUpdateData, null, 2),
+  );
+
+  const urlString = `${process.env.NEXT_PUBLIC_TT_BASE_URL}/tune/${tune_id}`;
+
+  console.log("===> queries.ts:215 ~ urlString", urlString);
+
+  // The axios library is throwing an error with the string "Sí Bheag, Sí Mhór",
+  // or just "í", so using fetch instead.
+  // See issue filed: https://github.com/axios/axios/issues/6761
+  // Contemplating using the fetch API for everything.
+  //
+  // const response = await axios.patch<ITune>(urlString, tuneUpdateData, {
+  //   headers: {
+  //     // accept: "application/json",
+  //     "Content-Type": "application/json; charset=utf-8",
+  //   },
+  //   timeout: 10_000,
+  // });
+  // if (!response.status || response.status < 200 || response.status >= 300) {
+  //   throw new Error(`Request failed with status code ${response.status}`);
+  // }
+  // const responseData = response.data;
+  const response = await fetch(urlString, {
+    method: "PATCH",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json; charset=utf-8",
+    },
+    body: JSON.stringify(tuneUpdateData),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request failed with status code ${response.status}`);
+  }
+
+  const responseData: ITune = await response.json();
+  return responseData;
+}
+
+function createTuneOverrideChangeRecordFromDifferences(
+  tune_update: Partial<ITuneOverview>,
+  dbTune: ITuneOverview,
+): Partial<ITuneOverride> {
+  const tuneOverrideData: Partial<ITuneOverride> = {};
+  if (dbTune) {
+    if (tune_update.title !== dbTune.title)
+      tuneOverrideData.title = tune_update.title;
+    if (tune_update.type !== dbTune.type)
+      tuneOverrideData.type = tune_update.type;
+    if (tune_update.structure !== dbTune.structure)
+      tuneOverrideData.structure = tune_update.structure;
+    if (tune_update.mode !== dbTune.mode)
+      tuneOverrideData.mode = tune_update.mode;
+    if (tune_update.incipit !== dbTune.incipit)
+      tuneOverrideData.incipit = tune_update.incipit;
+    if (tune_update.genre !== dbTune.genre)
+      tuneOverrideData.genre = tune_update.genre;
+    if (tune_update.deleted !== dbTune.deleted)
+      tuneOverrideData.deleted = tune_update.deleted;
+  }
+  return tuneOverrideData;
+}
+
 /**
  * Update a specific tune in a user's playlist.
  *
@@ -206,8 +356,10 @@ export async function updateTuneInPlaylistFromTuneOverview(
   user_id: number,
   playlist_ref: number,
   tune_id: number,
+  saveAsOverride: boolean,
   tune_update: Partial<ITuneOverview>,
 ): Promise<ITune> {
+  // BOOKMARK: updateTuneInPlaylistFromTuneOverview
   try {
     console.log("Input title:", tune_update.title);
     console.log("Title bytes:", [
@@ -227,65 +379,14 @@ export async function updateTuneInPlaylistFromTuneOverview(
       console.error("Error calling getPlaylistTuneOverview: ", dbTune.detail);
       throw new Error(dbTune.detail);
     }
-    const tuneUpdateData: Partial<ITune> = {};
 
-    if (dbTune) {
-      if (tune_update.title !== dbTune.title)
-        tuneUpdateData.title = tune_update.title;
-      if (tune_update.type !== dbTune.type)
-        tuneUpdateData.type = tune_update.type;
-      if (tune_update.structure !== dbTune.structure)
-        tuneUpdateData.structure = tune_update.structure;
-      if (tune_update.mode !== dbTune.mode)
-        tuneUpdateData.mode = tune_update.mode;
-      if (tune_update.incipit !== dbTune.incipit)
-        tuneUpdateData.incipit = tune_update.incipit;
-      if (tune_update.genre !== dbTune.genre)
-        tuneUpdateData.genre = tune_update.genre;
-      if (tune_update.deleted !== dbTune.deleted)
-        tuneUpdateData.deleted = tune_update.deleted;
-    }
-
-    console.log(
-      "tuneUpdateDataStringified:",
-      JSON.stringify(tuneUpdateData, null, 2),
-    );
-
-    const urlString = `${process.env.NEXT_PUBLIC_TT_BASE_URL}/tune/${tune_id}`;
-
-    console.log("===> queries.ts:215 ~ urlString", urlString);
-
-    // The axios library is throwing an error with the string "Sí Bheag, Sí Mhór",
-    // or just "í", so using fetch instead.
-    // See issue filed: https://github.com/axios/axios/issues/6761
-    // Contemplating using the fetch API for everything.
-    //
-    // const response = await axios.patch<ITune>(urlString, tuneUpdateData, {
-    //   headers: {
-    //     // accept: "application/json",
-    //     "Content-Type": "application/json; charset=utf-8",
-    //   },
-    //   timeout: 10_000,
-    // });
-    // if (!response.status || response.status < 200 || response.status >= 300) {
-    //   throw new Error(`Request failed with status code ${response.status}`);
-    // }
-    // const responseData = response.data;
-
-    const response = await fetch(urlString, {
-      method: "PATCH",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json; charset=utf-8",
-      },
-      body: JSON.stringify(tuneUpdateData),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Request failed with status code ${response.status}`);
-    }
-
-    const responseData: ITune = await response.json();
+    // This goes into some fairly nasty logic to save the user data as an override
+    // vs. updating the public tune record. One could make the argument that this
+    // logic should be implemented in the backend, to avoid so many round trips.
+    // Keep this in mind for optimization or simplication in the future.
+    const responseData = await (saveAsOverride
+      ? saveTuneAsOverride(tune_update, dbTune, user_id, tune_id)
+      : updatePublicTuneRecord(dbTune, tune_update, tune_id));
 
     console.log("Received response:", responseData);
 
@@ -294,6 +395,54 @@ export async function updateTuneInPlaylistFromTuneOverview(
     console.error("Error in updatePlaylistTune: ", error);
     throw error;
   }
+}
+
+async function saveTuneAsOverride(
+  tune_update: Partial<ITuneOverview>,
+  dbTune: ITuneOverview,
+  user_id: number,
+  tune_id: number,
+): Promise<ITune> {
+  const tuneOverrideData: Partial<ITuneOverride> =
+    createTuneOverrideChangeRecordFromDifferences(tune_update, dbTune);
+
+  console.log(
+    "tuneUpdateDataStringified:",
+    JSON.stringify(tuneOverrideData, null, 2),
+  );
+
+  const existingOverrideResponse = await fetch(
+    `${process.env.NEXT_PUBLIC_TT_BASE_URL}/query_tune_override?user_ref=${user_id}&tune_ref=${tune_id}`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json; charset=utf-8",
+      },
+    },
+  );
+
+  let responseData: ITune;
+
+  if (existingOverrideResponse.status === 404) {
+    responseData = await createNewOverrideRecord(
+      user_id,
+      tune_id,
+      tuneOverrideData,
+      dbTune,
+    );
+  } else if (existingOverrideResponse.ok) {
+    responseData = await updateOverrideRecord(
+      existingOverrideResponse,
+      tuneOverrideData,
+      dbTune,
+    );
+  } else {
+    throw new Error(
+      `Request failed with status code ${existingOverrideResponse.status}`,
+    );
+  }
+  return responseData;
 }
 
 /**
@@ -1205,6 +1354,7 @@ export async function deletePracticeRecord(
   await client.delete(`/practice_record/${playlistRef}/${tuneRef}`);
 }
 
+// BOOKMARK: fetchTuneOverride
 export async function fetchTuneOverride(
   overrideId: number,
 ): Promise<ITuneOverride> {
@@ -1216,6 +1366,7 @@ export async function fetchTuneOverride(
   return result as ITuneOverride;
 }
 
+// BOOKMARK: createTuneOverride
 export async function createTuneOverride(
   data: Partial<ITuneOverride>,
 ): Promise<ITuneOverride> {
@@ -1231,6 +1382,7 @@ export async function createTuneOverride(
   return result as ITuneOverride;
 }
 
+// BOOKMARK: updateTuneOverride
 export async function updateTuneOverride(
   overrideId: number,
   data: Partial<ITuneOverride>,
@@ -1247,6 +1399,7 @@ export async function updateTuneOverride(
   return result as ITuneOverride;
 }
 
+// BOOKMARK: deleteTuneOverride
 export async function deleteTuneOverride(overrideId: number): Promise<void> {
   const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`, {
     method: "DELETE",
