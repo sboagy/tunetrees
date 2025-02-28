@@ -1,7 +1,7 @@
 CREATE VIEW
 	practice_list_joined AS
 SELECT
-	COALESCE(tune_override.id, tune.id) AS id,
+	tune.id AS id,
 	COALESCE(tune_override.title, tune.title) AS title,
 	COALESCE(tune_override.type, tune.type) AS type,
 	COALESCE(tune_override.structure, tune.structure) AS structure,
@@ -56,9 +56,9 @@ SELECT
 	END AS has_override
 FROM
 	tune
-	LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
-	LEFT JOIN playlist_tune ON playlist_tune.tune_ref = COALESCE(tune_override.id, tune.id)
+	LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
 	LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+	LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
 	LEFT JOIN practice_record ON practice_record.tune_ref = COALESCE(tune_override.id, tune.id)
 	AND practice_record.playlist_ref = playlist_tune.playlist_ref
 	LEFT JOIN tag ON tag.tune_ref = COALESCE(tune_override.id, tune.id)
