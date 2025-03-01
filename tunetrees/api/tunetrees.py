@@ -1596,7 +1596,7 @@ def query_tune_override(
             if not tune_override:
                 raise HTTPException(status_code=404, detail="Tune override not found")
             return TuneOverrideModel.model_validate(tune_override)
-    except HTTPException as e:
+    except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
