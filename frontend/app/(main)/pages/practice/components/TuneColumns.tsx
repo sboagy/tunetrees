@@ -467,7 +467,8 @@ export function get_columns(
         header: ({ column }) =>
           sortableHeader(column, "Practiced", setTunesRefreshId),
         cell: (info) => {
-          return new Date(info.getValue() as string).toLocaleString(undefined, {
+          const utcDate = new Date(`${info.getValue() as string}Z`); // Ensure the date is interpreted as UTC
+          return utcDate.toLocaleString(undefined, {
             year: "numeric",
             month: "2-digit",
             day: "2-digit",
@@ -528,7 +529,8 @@ export function get_columns(
         header: ({ column }) =>
           sortableHeader(column, "Scheduled", setTunesRefreshId),
         cell: (info) => {
-          return new Date(info.getValue() as string).toLocaleString(undefined, {
+          const utcDate = new Date(`${info.getValue() as string}Z`); // Ensure the date is interpreted as UTC
+          return utcDate.toLocaleString(undefined, {
             year: "numeric",
             month: "2-digit",
             day: "2-digit",

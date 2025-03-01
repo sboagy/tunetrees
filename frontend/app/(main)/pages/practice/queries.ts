@@ -47,6 +47,8 @@ const client = axios.create({
  * on the server side. This is necessary because the environment variable is not
  * available to the client.
  *
+ * The review sitdown date must be specified in Coordinated Universal Time (UTC).
+ *
  * @returns {Promise<string>} A promise that resolves to the review sitdown date
  *                            as a string. If the environment variable is not set,
  *                            an empty string is returned.
@@ -55,6 +57,7 @@ export async function getReviewSitdownDate(): Promise<string> {
   // Dummy await to satisfy the eslint rule
   await new Promise((resolve) => setTimeout(resolve, 0));
 
+  // Note the TT_REVIEW_SITDOWN_DATE env variable, if set, must be in UTC!
   return process.env.TT_REVIEW_SITDOWN_DATE || "";
 }
 

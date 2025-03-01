@@ -77,6 +77,7 @@ export const submitPracticeFeedbacks = async ({
   );
 
   try {
+    // Note the TT_REVIEW_SITDOWN_DATE env variable, if set, must be in UTC!
     const reviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
     const response = await axios({
       method: "post",

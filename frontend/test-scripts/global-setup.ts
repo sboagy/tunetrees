@@ -84,6 +84,7 @@ async function globalSetup() {
           `${tunetreesBackendDeployBaseDir}`,
         LOGLEVEL: "DEBUG",
         TT_REVIEW_SITDOWN_DATE:
+          // The TT_REVIEW_SITDOWN_DATE must be specified in Coordinated Universal Time (UTC).
           process.env.TT_REVIEW_SITDOWN_DATE || "2024-07-08 12:27:08",
       },
       stdio: ["ignore", fastAPIFd, fastAPIFd],
