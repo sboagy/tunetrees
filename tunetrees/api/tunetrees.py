@@ -847,6 +847,8 @@ def get_tune(
             )
 
 
+# TODO: This will need to accept user_ref and playlist_ref, in order to search titles
+#       that are in tune_override table.
 @router.get(
     "/tunes/search",
     response_model=List[TuneModel],
@@ -1594,6 +1596,8 @@ def query_tune_override(
             if not tune_override:
                 raise HTTPException(status_code=404, detail="Tune override not found")
             return TuneOverrideModel.model_validate(tune_override)
+    except HTTPException as e:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
