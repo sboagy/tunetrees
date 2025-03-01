@@ -467,7 +467,16 @@ export function get_columns(
         header: ({ column }) =>
           sortableHeader(column, "Practiced", setTunesRefreshId),
         cell: (info) => {
-          return info.getValue();
+          return new Date(info.getValue() as string).toLocaleString(undefined, {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
+            timeZoneName: "short",
+          });
         },
         enableSorting: true,
         enableHiding: true,
@@ -519,7 +528,16 @@ export function get_columns(
         header: ({ column }) =>
           sortableHeader(column, "Scheduled", setTunesRefreshId),
         cell: (info) => {
-          return new Date(info.getValue() as string).toLocaleDateString();
+          return new Date(info.getValue() as string).toLocaleString(undefined, {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
+            timeZoneName: "short",
+          });
         },
         enableSorting: true,
         enableHiding: true,
