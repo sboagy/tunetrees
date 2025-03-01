@@ -17,6 +17,7 @@ import { normalizeKey, normalizeTuneType } from "@/lib/abc-utils";
 import type { VoiceItem, VoiceItemBar } from "abcjs";
 import abcjs from "abcjs";
 import { Import } from "lucide-react";
+import { useSession } from "next-auth/react";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import type { ITheSessionTune } from "../import-the-session-schemas";
@@ -30,7 +31,7 @@ import {
   createReference,
   getInstrumentById,
   getPlaylistById,
-  getTune,
+  getPlaylistTuneOverview,
   queryReferences,
   searchTunesByTitle,
 } from "../queries";
@@ -41,6 +42,7 @@ import type {
   ITune,
   ITuneOverview,
 } from "../types";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
 import { useImportUrl } from "./ImportContext";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -430,11 +432,22 @@ export default function AddTuneButtonAndDialog({
     const existingMatches: ITune[] = [];
 
     const refs = await queryReferences(url);
+
+    // In order to getPlaylistTuneOverview, we need the playlist and user ID.
+    // For the moment, we'll just use the current playlist and user from the
+    // context and session, rather than drilling it in.
+    const { currentPlaylist } = usePlaylist();
+    const { data: session } = useSession();
+    const userId = session?.user?.id ? Number.parseInt(session?.user?.id) : -1;
+
     if (refs.length > 0) {
       const tuneRef = refs[0].tune_ref;
       if (tuneRef) {
+        // REVIEW: calling getPlaylistTuneOverview() instead of getTune()
+        //         This will ensure we get tune override data, which may or may
+        //         not be what we want.
         const existingTune: ITuneOverview | { detail: string } =
-          await getTune(tuneRef);
+          await getPlaylistTuneOverview(userId, currentPlaylist, tuneRef);
         if ("detail" in existingTune) {
           throw new Error(`Existing tune not found: ${existingTune.detail}`);
         }

@@ -197,15 +197,20 @@ async function createNewOverrideRecord(
   tuneOverrideData: Partial<ITuneOverride>, // change request
   dbTune: ITuneOverview, // public tune data
 ) {
+  const tuneOverrideDataWithTuneRef: Partial<ITuneOverride> = {
+    ...tuneOverrideData,
+    tune_ref: tune_id,
+    user_ref: user_id,
+  };
   const responseCreate = await fetch(
-    `${process.env.NEXT_PUBLIC_TT_BASE_URL}/tune_override?user_ref=${user_id}&tune_ref=${tune_id}`,
+    `${process.env.NEXT_PUBLIC_TT_BASE_URL}/tune_override`,
     {
       method: "POST",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json; charset=utf-8",
       },
-      body: JSON.stringify(tuneOverrideData),
+      body: JSON.stringify(tuneOverrideDataWithTuneRef),
     },
   );
 
@@ -461,6 +466,7 @@ export async function getPlaylistTuneOverview(
   try {
     const response = await client.get<ITuneOverview | { detail: string }>(
       `/playlist-tune-overview/${user_id}/${playlist_ref}/${tune_id}`,
+      { timeout: 10000 }, // 10 seconds timeout
     );
     return response.data;
   } catch (error) {
@@ -1533,6 +1539,8 @@ export async function searchTunesByTitle(
   url.searchParams.append("title", title);
   url.searchParams.append("limit", limit.toString());
 
+  // TODO: This will need to pass in userID and playlistID in order
+  //       to search for titles with override.
   const response = await fetch(url.toString());
   if (!response.ok) {
     throw new Error(`Error searching tunes: ${response.statusText}`);
