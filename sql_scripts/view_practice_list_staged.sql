@@ -28,7 +28,7 @@ SELECT
 		FROM
 			tag
 		WHERE
-			tag.tune_ref = COALESCE(tune_override.id, tune.id)
+			tag.tune_ref = tune.id
 			AND tag.user_ref = playlist.user_ref
 	) AS tags,
 	td.purpose AS purpose,
@@ -41,7 +41,7 @@ SELECT
 		FROM
 			note
 		WHERE
-			note.tune_ref = COALESCE(tune_override.id, tune.id)
+			note.tune_ref = tune.id
 			AND note.user_ref = playlist.user_ref
 	) AS notes,
 	(
@@ -50,7 +50,7 @@ SELECT
 		FROM
 			reference ref
 		WHERE
-			ref.tune_ref = COALESCE(tune_override.id, tune.id)
+			ref.tune_ref = tune.id
 			AND ref.user_ref = playlist.user_ref
 			AND ref.favorite = 1
 		LIMIT
@@ -66,10 +66,10 @@ FROM
 	LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
 	LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
 	LEFT JOIN instrument ON instrument.id = playlist.instrument_ref
-	LEFT JOIN practice_record ON practice_record.tune_ref = COALESCE(tune_override.id, tune.id)
+	LEFT JOIN practice_record ON practice_record.tune_ref = tune.id
 	AND practice_record.playlist_ref = playlist_tune.playlist_ref
-	LEFT JOIN tag ON tag.tune_ref = COALESCE(tune_override.id, tune.id)
-	LEFT JOIN table_transient_data td ON td.tune_id = COALESCE(tune_override.id, tune.id)
+	LEFT JOIN tag ON tag.tune_ref = tune.id
+	LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 	AND td.playlist_id = playlist_tune.playlist_ref
 WHERE
 	(
