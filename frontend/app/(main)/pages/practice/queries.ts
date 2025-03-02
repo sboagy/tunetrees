@@ -352,7 +352,7 @@ function createTuneOverrideChangeRecordFromDifferences(
 /**
  * Update a specific tune in a user's playlist.
  *
- * Note: Good chance this function will be removed in future releases.
+ * Dates in tune_update must be in UTC and look like "2023-01-11 22:56:26".
  *
  * @param user_id - The ID of the user.
  * @param playlist_ref - The ID of the playlist.

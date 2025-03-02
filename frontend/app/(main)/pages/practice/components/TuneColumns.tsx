@@ -3,6 +3,7 @@
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { transformToDatetimeLocalForDisplay } from "@/lib/date-utils";
 import type { CheckedState } from "@radix-ui/react-checkbox";
 import type {
   CellContext,
@@ -467,17 +468,7 @@ export function get_columns(
         header: ({ column }) =>
           sortableHeader(column, "Practiced", setTunesRefreshId),
         cell: (info) => {
-          const utcDate = new Date(`${info.getValue() as string}Z`); // Ensure the date is interpreted as UTC
-          return utcDate.toLocaleString(undefined, {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: true,
-            timeZoneName: "short",
-          });
+          return transformToDatetimeLocalForDisplay(info.getValue() as string);
         },
         enableSorting: true,
         enableHiding: true,
@@ -529,17 +520,7 @@ export function get_columns(
         header: ({ column }) =>
           sortableHeader(column, "Scheduled", setTunesRefreshId),
         cell: (info) => {
-          const utcDate = new Date(`${info.getValue() as string}Z`); // Ensure the date is interpreted as UTC
-          return utcDate.toLocaleString(undefined, {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: true,
-            timeZoneName: "short",
-          });
+          return transformToDatetimeLocalForDisplay(info.getValue() as string);
         },
         enableSorting: true,
         enableHiding: true,

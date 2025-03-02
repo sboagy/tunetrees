@@ -11,6 +11,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import {
+  transformToDatetimeLocalForInput,
+  transformToDatetimeUtcForDB,
+} from "@/lib/date-utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ScrollArea } from "@radix-ui/themes";
 import { Save, XCircle } from "lucide-react";
@@ -230,10 +234,18 @@ export default function TuneEditor({
                   handleError(errorMessage);
                 });
             }
+            // BOOKMARK: set form values
             form.reset({
               ...tuneOverview,
               title: tuneOverview.title ?? undefined,
               type: tuneOverview.type,
+              practiced: transformToDatetimeLocalForInput(
+                tuneOverview.practiced as string,
+              ),
+              review_date: transformToDatetimeLocalForInput(
+                tuneOverview.review_date as string,
+              ),
+              // learned: transformToDatetimeLocal(tuneOverview.learned as string),
             });
           } else {
             console.error(
@@ -356,8 +368,7 @@ export default function TuneEditor({
   // BOOKMARK: onSubmit for tune editor
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     console.log(data);
-    // TODO: tune override logic here, or flag to backend?  Might be a tad tricky here.
-    //       Get the base public tune.  Compare each field.  If it differs,
+    // Get the base public tune.  Compare each field.  If it differs,
     //       then add to override object.
     // Is it always an override if not new?  No, I think we need to know if
     // the tune is public.  If it isn't the `private_for` field will be set to
@@ -372,12 +383,25 @@ export default function TuneEditor({
     const isNewTuneImported = isNewTune() && isTuneImported();
     const saveInMainTuneTable = isTuneUserPrivateForUser || isNewTuneImported;
     const saveAsOverride = !saveInMainTuneTable;
+    const practicedUtc = transformToDatetimeUtcForDB(data.practiced ?? "");
+    const reviewDateUtc = transformToDatetimeUtcForDB(data.review_date ?? "");
+
+    const dataLocal = {
+      ...data,
+      deleted: false,
+      practiced: practicedUtc,
+      review_date: reviewDateUtc,
+    };
+
+    // BOOKMARK: tune editor save logic
+    //           Need to tweak `practiced` and `review_date` to UTC
+    //           before saving.
     const result = await updateTuneInPlaylistFromTuneOverview(
       userId,
       playlistId,
       tuneId,
       saveAsOverride,
-      { ...data, deleted: false } as ITuneOverview,
+      dataLocal,
     );
 
     if ("detail" in result) {
@@ -393,13 +417,13 @@ export default function TuneEditor({
     if (isTuneInRepertoire(tuneId) === true) {
       console.log("Saving user specfic data");
 
-      const errorOccured = await savePlaylistPart(data);
+      const errorOccured = await savePlaylistPart(dataLocal);
       if (errorOccured) {
         // Don't close the editor on error
         return;
       }
 
-      const errorOccured2 = await savePracticeRecordPart(data);
+      const errorOccured2 = await savePracticeRecordPart(dataLocal);
       if (errorOccured2) {
         // Don't close the editor on error
         return;
@@ -892,9 +916,7 @@ export default function TuneEditor({
                           <Input
                             type="datetime-local"
                             {...field}
-                            value={
-                              field.value ? field.value.replace(" ", "T") : ""
-                            }
+                            value={field.value || ""}
                           />
                         </FormControl>
                       </FormItem>
@@ -1064,9 +1086,7 @@ export default function TuneEditor({
                           <Input
                             type="datetime-local"
                             {...field}
-                            value={
-                              field.value ? field.value.replace(" ", "T") : ""
-                            }
+                            value={field.value as string}
                           />
                         </FormControl>
                       </FormItem>
