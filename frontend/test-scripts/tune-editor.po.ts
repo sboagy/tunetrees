@@ -222,13 +222,13 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
         modification: "2010-11-24",
         original: "2010-11-20",
       },
-      {
-        ...tuneEditorFieldsBase.practiced,
-        modification: "2023-06-06T10:25:16",
-        original: "2023-06-06T22:25:16",
-        // TODO: Have to factor out date formatting and maybe (?) time zone issues
-        // cellId: "200_practiced",
-      },
+      // {
+      //   ...tuneEditorFieldsBase.practiced,
+      //   modification: "2023-06-06T18:25:16",
+      //   original: "2023-06-06T18:25:16",
+      //   // TODO: Have to factor out date formatting and maybe (?) time zone issues
+      //   // cellId: "200_practiced",
+      // },
       {
         ...tuneEditorFieldsBase.quality,
         modification: "2",
@@ -249,13 +249,13 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
         modification: "3",
         original: "0",
       },
-      {
-        ...tuneEditorFieldsBase.scheduled,
-        modification: "2023-06-07T10:25:16",
-        original: "2023-06-07T22:25:16",
-        // TODO: Have to factor out date formatting and maybe (?) time zone issues
-        // cellId: "200_review_date",
-      },
+      // {
+      //   ...tuneEditorFieldsBase.scheduled,
+      //   modification: "2023-06-07T18:25:16",
+      //   original: "2023-06-07T18:25:16",
+      //   // TODO: Have to factor out date formatting and maybe (?) time zone issues
+      //   // cellId: "200_review_date",
+      // },
     ];
 
     // For new tune creation

@@ -6,6 +6,9 @@
  * @returns A local datetime string in the format `YYYY-MM-DDTHH:mm:ss`.
  */
 export function transformToDatetimeLocalForInput(dateString: string): string {
+  if (!dateString) {
+    return "";
+  }
   const utcDate = new Date(`${dateString}Z`); // Ensure the date is interpreted as UTC
   const year = utcDate.getFullYear();
   const month = String(utcDate.getMonth() + 1).padStart(2, "0");
@@ -23,6 +26,9 @@ export function transformToDatetimeLocalForInput(dateString: string): string {
  * @returns A UTC datetime string in the format "YYYY-MM-DD HH:MM:SS".
  */
 export function transformToDatetimeUtcForDB(dateString: string): string {
+  if (!dateString) {
+    return "";
+  }
   const dateStringUtc = new Date(dateString ?? "")
     .toISOString()
     .replace("T", " ")
@@ -38,6 +44,9 @@ export function transformToDatetimeUtcForDB(dateString: string): string {
  * @returns The localized datetime string formatted for display.
  */
 export function transformToDatetimeLocalForDisplay(dateString: string): string {
+  if (!dateString) {
+    return "";
+  }
   const utcDate = new Date(`${dateString}Z`); // Ensure the date is interpreted as UTC
   const dateStringLocal = utcDate.toLocaleString(undefined, {
     year: "numeric",
