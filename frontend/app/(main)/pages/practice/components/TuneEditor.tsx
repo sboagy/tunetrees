@@ -597,10 +597,10 @@ export default function TuneEditor({
       </div>
       <ScrollArea
         className="flex-grow w-full rounded-md border p-4"
-        // style={{
-        //   minHeight: "calc(100vh - 80px)",
-        //   maxHeight: "calc(100vh - 80px)",
-        // }}
+        style={{
+          height: "calc(100vh - 120px)", // Set a specific height
+          overflow: "hidden", // Ensure the container doesn't scroll
+        }}
         aria-label="Tune Editor scrollable region"
       >
         <Form {...form}>
