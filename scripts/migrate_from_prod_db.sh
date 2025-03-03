@@ -17,8 +17,13 @@ fi
 # Putting this prompt here to remind me to remind me about this, and just to give an 
 # option to not copy the test database to the main database.
 read -p "copy tunetrees_test_clean.sqlite3 tunetrees.sqlite3? (y/n): " choice
-if [[ "$choice" != "y" && "$choice" != "Y" ]]; then
+echo choice: $choice
+if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+    echo "Copying tunetrees_test_clean.sqlite3 to tunetrees.sqlite3"
     cp tunetrees_test_clean.sqlite3 tunetrees.sqlite3
+else
+    echo "Not copying tunetrees_test_clean.sqlite3 to tunetrees.sqlite3 and exiting"
+    exit 1
 fi
 
 #######################
