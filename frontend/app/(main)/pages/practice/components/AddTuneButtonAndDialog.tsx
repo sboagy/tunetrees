@@ -428,16 +428,17 @@ export default function AddTuneButtonAndDialog({
     }
   }
 
+  // In order to getPlaylistTuneOverview, we need the playlist and user ID.
+  // For the moment, we'll just use the current playlist and user from the
+  // context and session, rather than drilling it in.
+  const { currentPlaylist } = usePlaylist();
+  const { data: session } = useSession();
+
   async function findExistingMatches(url: string, title: string, type: string) {
     const existingMatches: ITune[] = [];
 
     const refs = await queryReferences(url);
 
-    // In order to getPlaylistTuneOverview, we need the playlist and user ID.
-    // For the moment, we'll just use the current playlist and user from the
-    // context and session, rather than drilling it in.
-    const { currentPlaylist } = usePlaylist();
-    const { data: session } = useSession();
     const userId = session?.user?.id ? Number.parseInt(session?.user?.id) : -1;
 
     if (refs.length > 0) {
