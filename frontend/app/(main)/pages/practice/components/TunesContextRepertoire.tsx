@@ -1,29 +1,36 @@
-import type React from "react";
+import type { TableState } from "@tanstack/react-table";
+import { useSession } from "next-auth/react";
 import {
   type Dispatch,
   type ReactNode,
   type SetStateAction,
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
 } from "react";
+import { getRepertoireTunesOverview } from "../queries";
+import { getTableStateTable } from "../settings";
 import type { ITuneOverview } from "../types";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useSitDownDate } from "./SitdownDateProvider";
+import { globalFlagManualSorting } from "./TunesTable";
 
 interface IRepertoireTunesContextType {
   tunes: ITuneOverview[];
-  setTunes: React.Dispatch<React.SetStateAction<ITuneOverview[]>>;
+  setTunes: Dispatch<SetStateAction<ITuneOverview[]>>;
   tunesRefreshId: number | null;
-  setTunesRefreshId: React.Dispatch<React.SetStateAction<number | null>>;
+  setTunesRefreshId: Dispatch<SetStateAction<number | null>>;
   lapsedCount: number | null;
-  setLapsedCount: React.Dispatch<React.SetStateAction<number>>;
+  setLapsedCount: Dispatch<SetStateAction<number>>;
   currentCount: number | null;
-  setCurrentCount: React.Dispatch<React.SetStateAction<number>>;
+  setCurrentCount: Dispatch<SetStateAction<number>>;
   futureCount: number | null;
-  setFutureCount: React.Dispatch<React.SetStateAction<number>>;
+  setFutureCount: Dispatch<SetStateAction<number>>;
   newCount: number | null;
-  setNewCount: React.Dispatch<React.SetStateAction<number>>;
+  setNewCount: Dispatch<SetStateAction<number>>;
+  refreshTunes: () => Promise<void>;
 }
 
 const TunesContextRepertoire = createContext<
@@ -45,8 +52,47 @@ export const TunesProviderRepertoire = ({
 
   const { sitDownDate, acceptableDelinquencyDays } = useSitDownDate();
 
-  // BOOKMARK: This is a useEffect that will run whenever the sitDownDate changes.
-  //
+  const { data: session } = useSession();
+  const userId = session?.user?.id ? Number.parseInt(session?.user?.id) : -1;
+
+  const { currentPlaylist: playlistId } = usePlaylist();
+
+  const showDeleted = false; // Should become a state variable at some point
+
+  const refreshTunes = useCallback(async () => {
+    try {
+      let sortingState: TableState["sorting"] | null = null;
+      if (globalFlagManualSorting) {
+        const tableStateTable = await getTableStateTable(
+          userId,
+          "full",
+          "repertoire",
+          playlistId,
+        );
+        sortingState =
+          (tableStateTable?.settings as TableState)?.sorting ?? null;
+      }
+      const result = await getRepertoireTunesOverview(
+        userId,
+        playlistId,
+        showDeleted,
+        sortingState,
+      );
+      setTunes(result);
+      console.log(
+        `TunesProviderRepertoire setTunes with ${result.length} tunes`,
+      );
+    } catch (error) {
+      console.error("Error refreshing tunes:", error);
+    }
+  }, [userId, playlistId]);
+
+  useEffect(() => {
+    if (userId > 0 && playlistId > 0) {
+      void refreshTunes();
+    }
+  }, [refreshTunes, userId, playlistId]);
+
   // since setTunes calls setCounts, we don't want to include tunes in the
   // dependency array, otherwise we'll be doing double counting, so we
   // bypass the lint rule.
@@ -59,7 +105,6 @@ export const TunesProviderRepertoire = ({
       // trigger.
       return;
     }
-
     setCounts(tunes);
   }, [sitDownDate]); // Don't include tunes in the dependency array
 
@@ -129,6 +174,7 @@ export const TunesProviderRepertoire = ({
         setFutureCount,
         newCount,
         setNewCount,
+        refreshTunes,
       }}
     >
       {children}
@@ -136,7 +182,7 @@ export const TunesProviderRepertoire = ({
   );
 };
 
-export const useRepertoireTunes = () => {
+export const useRepertoireTunes = (): IRepertoireTunesContextType => {
   const context = useContext(TunesContextRepertoire);
   if (!context) {
     throw new Error("useTunes must be used within a TunesProvider");

@@ -95,7 +95,11 @@ export default function TunesGridRepertoire({
   // persist across renders without causing re-renders.
   const isRefreshing = useRef(false);
 
-  // BOOKMARK: refreshTunes in TunesGridRepertoire.tsx
+  // REVIEW: refreshTunes in TunesGridRepertoire.tsx
+  // I tried to use refreshTunes from
+  // app/[main]/pages/practice/components/TunesContextRepertoire.tsx
+  // but things don't work right then.  It's possible that I may be doing
+  // some double refreshes, but I'm not sure.
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
