@@ -5,6 +5,74 @@ ATTACH DATABASE 'tunetrees_do.sqlite3' AS source_db;
 
 PRAGMA foreign_keys = OFF;
 
+-- Tune Type Table Migration
+INSERT
+OR REPLACE INTO main.tune_type (id, name, rhythm, description)
+SELECT
+    id,
+    name,
+    rhythm,
+    description
+FROM
+    source_db.tune_type;
+
+-- Genre Tune Type Table Migration
+INSERT
+OR REPLACE INTO main.genre_tune_type (genre_id, tune_type_id)
+SELECT
+    genre_id,
+    tune_type_id
+FROM
+    source_db.genre_tune_type;
+
+-- Instrument Table Migration
+INSERT
+OR REPLACE INTO main.instrument (
+    id,
+    private_to_user,
+    instrument,
+    description,
+    genre_default,
+    deleted
+)
+SELECT
+    id,
+    private_to_user,
+    instrument,
+    description,
+    genre_default,
+    deleted
+FROM
+    source_db.instrument;
+
+-- Tune Override Table Migration
+INSERT
+OR REPLACE INTO main.tune_override (
+    id,
+    tune_ref,
+    title,
+    type,
+    structure,
+    genre,
+    mode,
+    incipit,
+    deleted,
+    user_ref
+)
+SELECT
+    id,
+    tune_ref,
+    title,
+    type,
+    structure,
+    genre,
+    mode,
+    incipit,
+    deleted,
+    user_ref
+FROM
+    source_db.tune_override;
+
 -- Tune Table Migration
 INSERT
 OR REPLACE INTO main.tune (id, type, structure, title, mode, incipit, genre)
