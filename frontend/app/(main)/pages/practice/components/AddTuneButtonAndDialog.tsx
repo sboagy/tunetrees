@@ -367,17 +367,25 @@ export default function AddTuneButtonAndDialog({
     tuneJson: ITheSessionTune;
   }> {
     const tuneJson = await fetchTuneInfoFromTheSessionURL(tuneUrlBase);
-    // TODO: Fetch multiple settings here
     if (tuneJson.settings.length === 0) {
       throw new Error("No settings found for tune");
     }
-    let whichSetting = 0;
+    let whichSetting = -1;
     if (tuneJson.settings.length > 1) {
       const settings = tuneJson.settings.map((setting) => ({
         abc: setting.abc,
         id: setting.id,
       }));
-      whichSetting = await promptUserForSetting(settings);
+      const url = new URL(tuneUrlBase);
+      if (url.hash?.startsWith("#setting")) {
+        const settingId = Number.parseInt(url.hash.slice(8));
+        whichSetting = settings.findIndex(
+          (setting) => setting.id === settingId,
+        );
+      }
+      if (whichSetting === -1) {
+        whichSetting = await promptUserForSetting(settings);
+      }
     }
 
     const setting = tuneJson.settings[whichSetting];

@@ -33,7 +33,9 @@ export async function fetchTheSessionURLsFromTitle(
 export async function fetchTuneInfoFromTheSessionURL(
   tuneUrlBase: string,
 ): Promise<ITheSessionTune> {
-  const tuneUrl = `${tuneUrlBase}?format=json`;
+  const url = new URL(tuneUrlBase);
+  const primaryUrl = url.origin + url.pathname;
+  const tuneUrl = `${primaryUrl}?format=json`;
   const responseTune = await fetchWithTimeout(tuneUrl, {
     timeout: 30_000,
     headers: {
