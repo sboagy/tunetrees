@@ -45,6 +45,8 @@ export const TunesProviderRepertoire = ({
 
   const { sitDownDate, acceptableDelinquencyDays } = useSitDownDate();
 
+  // BOOKMARK: This is a useEffect that will run whenever the sitDownDate changes.
+  //
   // since setTunes calls setCounts, we don't want to include tunes in the
   // dependency array, otherwise we'll be doing double counting, so we
   // bypass the lint rule.
