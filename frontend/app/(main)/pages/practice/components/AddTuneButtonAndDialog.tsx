@@ -35,6 +35,7 @@ import {
   queryReferences,
   searchTunesByTitle,
 } from "../queries";
+import { updateCurrentTuneInDb } from "../settings";
 import type {
   IExtractedTuneInfo,
   IReferenceData,
@@ -49,6 +50,7 @@ import { useMainPaneView } from "./MainPaneViewContext";
 import NewTuneButton from "./NewTuneButton";
 import { SelectSettingDialog } from "./SelectSettingDialog"; // Import the new component
 import { SelectTuneDialog } from "./SelectTuneDialog";
+import { tabIdToPurpose, useTabsState } from "./TabsStateContext";
 
 interface IImportButtonProps {
   userId: number;
@@ -189,6 +191,15 @@ export default function AddTuneButtonAndDialog({
         console.log(
           `Tune created successfully /pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tune.id}`,
         );
+        const purpose = tabIdToPurpose(activeTab);
+        void updateCurrentTuneInDb(
+          userId,
+          "full",
+          purpose,
+          playlistId,
+          tune.id,
+        );
+
         if (importURL) {
           createReferenceFromURL(importURL, tune.id, data.user_ref ?? userId);
         }
@@ -386,11 +397,17 @@ export default function AddTuneButtonAndDialog({
       if (whichSetting === -1) {
         whichSetting = await promptUserForSetting(settings);
       }
+    } else if (tuneJson.settings.length === 1) {
+      whichSetting = 0;
     }
 
-    const setting = tuneJson.settings[whichSetting];
-    const abcString = setting.abc;
-    const tuneParsed = abcjs.parseOnly(abcString);
+    let abcString = "";
+    let tuneParsed: abcjs.TuneObject[] = [];
+    if (whichSetting >= 0) {
+      const setting = tuneJson.settings[whichSetting];
+      abcString = setting.abc;
+      tuneParsed = abcjs.parseOnly(abcString);
+    }
     return { tuneParsed, abcString, tuneJson };
   }
 
@@ -629,9 +646,19 @@ export default function AddTuneButtonAndDialog({
         createTuneAndUseIt(importedData, importUrl, secondaryURL);
       })
       .catch((error) => {
-        handleError(`Error extracting tune from URL: ${error.message}`);
+        if (error.message === "No tune found") {
+          toast({
+            title: "Info",
+            description: `${error.message}: ${importUrl}`,
+            // status: "error",
+          });
+        } else {
+          handleError(`Error extracting tune from URL: ${error.message}`);
+        }
       });
   };
+
+  const { activeTab } = useTabsState();
 
   function handleUseExisting(match: ITune): void {
     if (!match.id) {
@@ -639,6 +666,10 @@ export default function AddTuneButtonAndDialog({
       return;
     }
     setCurrentTune(match.id);
+
+    const purpose = tabIdToPurpose(activeTab);
+    void updateCurrentTuneInDb(userId, "full", purpose, playlistId, match.id);
+
     setCurrentView("edit");
   }
 
