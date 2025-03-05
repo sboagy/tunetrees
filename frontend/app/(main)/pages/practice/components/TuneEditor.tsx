@@ -9,6 +9,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -148,6 +149,7 @@ export default function TuneEditor({
   const { triggerRefresh } = useTuneDataRefresh();
   const { setCurrentView } = useMainPaneView();
   const { importUrl, setImportUrl } = useImportUrl();
+  const [publicMode, setPublicMode] = useState<boolean>(false);
 
   const { tunes: repertoireTunes } = useRepertoireTunes();
 
@@ -234,7 +236,6 @@ export default function TuneEditor({
                   handleError(errorMessage);
                 });
             }
-            // BOOKMARK: set form values
             form.reset({
               ...tuneOverview,
               title: tuneOverview.title ?? undefined,
@@ -365,7 +366,6 @@ export default function TuneEditor({
     return false;
   }
 
-  // BOOKMARK: onSubmit for tune editor
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     console.log(data);
     // Get the base public tune.  Compare each field.  If it differs,
@@ -393,9 +393,6 @@ export default function TuneEditor({
       review_date: reviewDateUtc,
     };
 
-    // BOOKMARK: tune editor save logic
-    //           Need to tweak `practiced` and `review_date` to UTC
-    //           before saving.
     const result = await updateTuneInPlaylistFromTuneOverview(
       userId,
       playlistId,
@@ -467,7 +464,6 @@ export default function TuneEditor({
     return tune?.deleted === true;
   }
 
-  // BOOKMARK: isTuneInRepertoire
   function isTuneInUsersRepertoire(): boolean {
     return isTuneInRepertoire(tune?.id ?? -987) === true;
   }
@@ -483,6 +479,10 @@ export default function TuneEditor({
   function isTuneImported(): boolean {
     return importUrl !== null;
   }
+
+  const handlePublicModeChange = (checked: boolean) => {
+    setPublicMode(checked);
+  };
 
   function isTuneOverride(): boolean {
     return !isNewTune() && !isTuneUserPrivate();
@@ -500,14 +500,16 @@ export default function TuneEditor({
     `;
     }
     const privateByDefaultText = "This tune will be user-private by default.";
+    const publicTuneText = `
+      Imported tunes are public to reduce duplication, and all edits here 
+      will be for the public record.
+    `;
 
     if (isNewTune()) {
       instructions = isTuneImported()
         ? `
-          Please check the values imported from ${importUrl} for correctness.  Note that 
-          some values may be pulled from other sites.
-          ${privateByDefaultText}
-          ${baseNewTuneInstructions("tune")}
+          Please check the values imported from ${importUrl} for correctness.
+          ${publicTuneText}
         `
         : `
           You are editing a new tune from scratch.
@@ -552,6 +554,19 @@ export default function TuneEditor({
     <div className="flex flex-col w-full h-full">
       <div className="flex items-center justify-between space-x-2 w-3/5">
         <h1 className="text-2xl font-bold ml-4 mb-0">Tune #{tune.id}</h1>
+        <div className="flex items-center space-x-4">
+          <Label
+            aria-disabled={!isTuneOverride()}
+            className={!isTuneOverride() ? "text-gray-600" : ""}
+          >
+            Show Public
+          </Label>
+          <Switch
+            checked={publicMode}
+            onCheckedChange={handlePublicModeChange}
+            disabled={!isTuneOverride()}
+          />
+        </div>
         <div className="flex space-x-12">
           <Button
             type="submit"
@@ -842,31 +857,6 @@ export default function TuneEditor({
                   )}
                 />
               )} */}
-
-              {isTuneOverride() && (
-                <FormField
-                  control={form.control}
-                  name="display_public_fields"
-                  render={({ field }) => (
-                    <FormItem
-                      className="tune-form-item-style pt-2"
-                      data-testid="tt-tune-editor-display-public-fields"
-                    >
-                      <FormLabel className="tune-form-label-style">
-                        Display Public Fields:
-                      </FormLabel>
-                      <FormControl
-                      // className="tune-form-control-style"
-                      >
-                        <Switch
-                          checked={field.value || false}
-                          onCheckedChange={(checked) => field.onChange(checked)}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              )}
 
               {isTuneInUsersRepertoire() && (
                 <>
