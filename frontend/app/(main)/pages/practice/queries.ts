@@ -367,7 +367,6 @@ export async function updateTuneInPlaylistFromTuneOverview(
   saveAsOverride: boolean,
   tune_update: Partial<ITuneOverview>,
 ): Promise<ITune> {
-  // BOOKMARK: updateTuneInPlaylistFromTuneOverview
   try {
     console.log("Input title:", tune_update.title);
     console.log("Title bytes:", [
@@ -1363,7 +1362,6 @@ export async function deletePracticeRecord(
   await client.delete(`/practice_record/${playlistRef}/${tuneRef}`);
 }
 
-// BOOKMARK: fetchTuneOverride
 export async function fetchTuneOverride(
   overrideId: number,
 ): Promise<ITuneOverride> {
@@ -1375,7 +1373,6 @@ export async function fetchTuneOverride(
   return result as ITuneOverride;
 }
 
-// BOOKMARK: createTuneOverride
 export async function createTuneOverride(
   data: Partial<ITuneOverride>,
 ): Promise<ITuneOverride> {
@@ -1391,7 +1388,6 @@ export async function createTuneOverride(
   return result as ITuneOverride;
 }
 
-// BOOKMARK: updateTuneOverride
 export async function updateTuneOverride(
   overrideId: number,
   data: Partial<ITuneOverride>,
@@ -1408,7 +1404,6 @@ export async function updateTuneOverride(
   return result as ITuneOverride;
 }
 
-// BOOKMARK: deleteTuneOverride
 export async function deleteTuneOverride(overrideId: number): Promise<void> {
   const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`, {
     method: "DELETE",
