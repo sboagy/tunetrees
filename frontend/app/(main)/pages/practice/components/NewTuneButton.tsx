@@ -8,23 +8,29 @@ import { useMainPaneView } from "./MainPaneViewContext";
 interface INewTuneButtonProps {
   userId: number;
   playlistId: number;
+  disabled?: boolean;
+  tuneTitle?: string;
+  genreId?: string | null;
 }
 
 export default function NewTuneButton({
   userId,
   playlistId,
+  disabled = false,
+  tuneTitle = "",
+  genreId = null,
 }: INewTuneButtonProps): JSX.Element {
   const { setCurrentView } = useMainPaneView();
   const { setCurrentTune } = useTune();
 
   const handleClick = () => {
     const newTune: Partial<ITuneOverview> = {
-      title: "",
+      title: tuneTitle,
       type: "",
       structure: null,
       mode: null,
       incipit: null,
-      genre: null,
+      genre: genreId,
       private_for: userId, // This is a new tune, so it's private by default
       deleted: true, // This is a new tune, so it's deleted by default
       learned: null,
@@ -66,6 +72,7 @@ export default function NewTuneButton({
       aria-label="Add new reference"
       onClick={handleClick}
       data-testid="tt-new-tune-button"
+      disabled={disabled}
     >
       New
       {/* <Plus className="h-4 w-4" /> */}

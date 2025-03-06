@@ -57,7 +57,6 @@ export async function getReviewSitdownDate(): Promise<string> {
   // Dummy await to satisfy the eslint rule
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  // Note the TT_REVIEW_SITDOWN_DATE env variable, if set, must be in UTC!
   return process.env.TT_REVIEW_SITDOWN_DATE || "";
 }
 
@@ -308,6 +307,7 @@ async function updatePublicTuneRecord(
   //   throw new Error(`Request failed with status code ${response.status}`);
   // }
   // const responseData = response.data;
+
   const response = await fetch(urlString, {
     method: "PATCH",
     headers: {
@@ -1355,6 +1355,18 @@ export async function updatePracticeRecord(
   return res.data;
 }
 
+export async function upsertPracticeRecord(
+  tuneRef: number,
+  playlistRef: number,
+  record: Partial<IPracticeRecord>,
+): Promise<IPracticeRecord> {
+  const res = await client.put<IPracticeRecord>(
+    `/practice_record/${playlistRef}/${tuneRef}`,
+    record,
+  );
+  return res.data;
+}
+
 export async function deletePracticeRecord(
   tuneRef: number,
   playlistRef: number,
@@ -1537,8 +1549,6 @@ export async function searchTunesByTitle(
   url.searchParams.append("title", title);
   url.searchParams.append("limit", limit.toString());
 
-  // TODO: This will need to pass in userID and playlistID in order
-  //       to search for titles with override.
   const response = await fetch(url.toString());
   if (!response.ok) {
     throw new Error(`Error searching tunes: ${response.statusText}`);

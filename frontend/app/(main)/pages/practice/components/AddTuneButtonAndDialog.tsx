@@ -837,12 +837,22 @@ export default function AddTuneButtonAndDialog({
             </div>
           </div>
           <DialogFooter>
-            <NewTuneButton userId={userId} playlistId={playlistId} />
+            <NewTuneButton
+              userId={userId}
+              playlistId={playlistId}
+              tuneTitle={
+                importUrl?.startsWith("https://") ||
+                importUrl?.startsWith("http://")
+                  ? ""
+                  : (importUrl ?? "")
+              }
+              genreId={currentGenre ?? "ITRAD"}
+            />
             <Button
               variant="outline"
               type="submit"
               onClick={handleImport}
-              disabled={importUrl === "" || currentGenre !== "ITRAD"}
+              disabled={!importUrl || currentGenre !== "ITRAD"}
             >
               {importUrl?.startsWith("https://") ? "Import" : "Search"}
             </Button>

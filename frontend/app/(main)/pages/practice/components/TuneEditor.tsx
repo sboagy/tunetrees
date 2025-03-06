@@ -31,9 +31,10 @@ import {
   getPlaylistTuneOverview,
   getTuneTypesByGenre,
   updatePlaylistTunes,
-  updatePracticeRecord,
   updateTuneInPlaylistFromTuneOverview,
+  upsertPracticeRecord,
 } from "../queries";
+import { updateCurrentTuneInDb } from "../settings";
 import type {
   IGenre,
   IPlaylistTune,
@@ -44,6 +45,7 @@ import type {
 import { useTune } from "./CurrentTuneContext";
 import { useImportUrl } from "./ImportContext";
 import { useMainPaneView } from "./MainPaneViewContext";
+import { tabIdToPurpose, useTabsState } from "./TabsStateContext";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import "./TuneEditor.css"; // Import the CSS file
 import { useRepertoireTunes } from "./TunesContextRepertoire";
@@ -197,6 +199,9 @@ export default function TuneEditor({
   const [genres, setGenres] = useState<IGenre[]>([]);
   const [isGenresLoading, setIsGenresLoading] = useState(true);
 
+  const { activeTab } = useTabsState();
+  const { setCurrentTune } = useTune();
+
   useEffect(() => {
     const fetchGenres = async () => {
       try {
@@ -326,7 +331,7 @@ export default function TuneEditor({
       review_date: data.review_date ?? "",
       // tags: z.string().nullable().optional(),
     };
-    const responsePracticeRecordUpdate = await updatePracticeRecord(
+    const responsePracticeRecordUpdate = await upsertPracticeRecord(
       tuneId,
       playlistId,
       practiceRecord,
@@ -429,6 +434,11 @@ export default function TuneEditor({
       // TODO: Save tags
       // tags: z.string().nullable().optional(),
     }
+    setCurrentTune(tuneId);
+
+    const purpose = tabIdToPurpose(activeTab);
+    void updateCurrentTuneInDb(userId, "full", purpose, playlistId, tuneId);
+
     triggerRefresh();
     setImportUrl(null);
     setCurrentView("tabs");
@@ -638,7 +648,7 @@ export default function TuneEditor({
               {/* Is the tune private? */}
               {/* Is the tune new? */}
               {/* is the tune in the user's repertoire? */}
-              <div className="items-center my-2 w-3/5 text-gray-500 italic">
+              <div className="items-center my-2 w-3/5 text-gray-400 italic">
                 {getEditorInstructions()}
               </div>
 

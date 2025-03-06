@@ -1459,20 +1459,19 @@ async def get_view_playlist_joined(
     description="Retrieve a single practice record by playlist_ref and tune_ref",
     status_code=200,
 )
-def get_practice_record(playlist_ref: int, tune_ref: int):
+def get_practice_record(playlist_ref: int, tune_ref: int) -> PracticeRecordModel:
     try:
         with SessionLocal() as db:
-            record = (
-                db.query(PracticeRecord)
-                .filter(
-                    PracticeRecord.playlist_ref == playlist_ref,
-                    PracticeRecord.tune_ref == tune_ref,
-                )
-                .first()
+            stmt = select(PracticeRecord).where(
+                PracticeRecord.playlist_ref == playlist_ref,
+                PracticeRecord.tune_ref == tune_ref,
             )
+            record = db.execute(stmt).scalar_one_or_none()
+
             if not record:
                 raise HTTPException(status_code=404, detail="Practice record not found")
-            return PracticeRecordModel.model_dump(record)
+
+            return PracticeRecordModel.model_validate(record)
     except HTTPException as e:
         logger.error("HTTPException in get_practice_record: %s", e)
         raise e
@@ -1488,14 +1487,17 @@ def get_practice_record(playlist_ref: int, tune_ref: int):
     description="Create a new practice record (playlist_ref and tune_ref in the body)",
     status_code=201,
 )
-def create_practice_record(record: PracticeRecordModelPartial):
+def create_practice_record(record: PracticeRecordModelPartial) -> PracticeRecordModel:
     try:
         with SessionLocal() as db:
             db_record = PracticeRecord(**record.model_dump(exclude_unset=True))
             db.add(db_record)
             db.commit()
             db.refresh(db_record)
-            return PracticeRecordModel.model_dump(db_record)
+            result = PracticeRecordModel.model_validate(
+                db_record
+            )  # Using model_validate
+            return result
     except HTTPException as e:
         logger.error("HTTPException in create_practice_record: %s", e)
         raise e
@@ -1513,22 +1515,22 @@ def create_practice_record(record: PracticeRecordModelPartial):
 )
 def update_practice_record_patch(
     playlist_ref: int, tune_ref: int, record: PracticeRecordModelPartial
-):
+) -> PracticeRecordModel:
     try:
         with SessionLocal() as db:
-            db_record = (
-                db.query(PracticeRecord)
-                .filter(
-                    PracticeRecord.playlist_ref == playlist_ref,
-                    PracticeRecord.tune_ref == tune_ref,
-                )
-                .first()
+            stmt = select(PracticeRecord).where(
+                PracticeRecord.playlist_ref == playlist_ref,
+                PracticeRecord.tune_ref == tune_ref,
             )
+            db_record = db.execute(stmt).scalar_one_or_none()
+
             if not db_record:
                 raise HTTPException(status_code=404, detail="Practice record not found")
+
             update_data = record.model_dump(exclude_unset=True)
             for key, value in update_data.items():
                 setattr(db_record, key, value)
+
             db.commit()
             db.refresh(db_record)
             result = PracticeRecordModel.model_validate(db_record)
@@ -1541,28 +1543,73 @@ def update_practice_record_patch(
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
+@router.put(
+    "/practice_record/{playlist_ref}/{tune_ref}",
+    response_model=PracticeRecordModel,
+    summary="Create or update a practice record",
+    description="Create a new practice record if it doesn't exist, or update an existing one",
+    status_code=200,
+)
+def upsert_practice_record(
+    playlist_ref: int, tune_ref: int, record: PracticeRecordModelPartial
+) -> PracticeRecordModel:
+    try:
+        with SessionLocal() as db:
+            stmt = select(PracticeRecord).where(
+                PracticeRecord.playlist_ref == playlist_ref,
+                PracticeRecord.tune_ref == tune_ref,
+            )
+            db_record = db.execute(stmt).scalar_one_or_none()
+
+            update_data = record.model_dump(exclude_unset=True)
+
+            if not db_record:
+                # Create new record if not found
+                db_record = PracticeRecord(
+                    playlist_ref=playlist_ref, tune_ref=tune_ref, **update_data
+                )
+                db.add(db_record)
+                logger.debug(
+                    f"Creating new practice record for playlist_ref={playlist_ref}, tune_ref={tune_ref}"
+                )
+            else:
+                # Update existing record
+                for key, value in update_data.items():
+                    setattr(db_record, key, value)
+                logger.debug(
+                    f"Updating practice record for playlist_ref={playlist_ref}, tune_ref={tune_ref}"
+                )
+
+            db.commit()
+            db.refresh(db_record)
+            result = PracticeRecordModel.model_validate(db_record)
+            return result
+    except HTTPException as e:
+        logger.error("HTTPException in upsert_practice_record: %s", e)
+        raise e
+    except Exception as e:
+        logger.error("Unexpected error in upsert_practice_record: %s", e)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
 @router.delete(
     "/practice_record/{playlist_ref}/{tune_ref}",
     summary="Delete a practice record",
     description="Delete an existing practice record by playlist_ref and tune_ref",
     status_code=204,
 )
-def delete_practice_record(playlist_ref: int, tune_ref: int):
+def delete_practice_record(playlist_ref: int, tune_ref: int) -> None:
     try:
         with SessionLocal() as db:
-            db_record = (
-                db.query(PracticeRecord)
-                .filter(
-                    PracticeRecord.playlist_ref == playlist_ref,
-                    PracticeRecord.tune_ref == tune_ref,
-                )
-                .first()
+            stmt = select(PracticeRecord).where(
+                PracticeRecord.playlist_ref == playlist_ref,
+                PracticeRecord.tune_ref == tune_ref,
             )
+            db_record = db.execute(stmt).scalar_one_or_none()
             if not db_record:
                 raise HTTPException(status_code=404, detail="Practice record not found")
             db.delete(db_record)
             db.commit()
-            return {"message": "Practice record deleted"}
     except HTTPException as e:
         logger.error("HTTPException in delete_practice_record: %s", e)
         raise e
