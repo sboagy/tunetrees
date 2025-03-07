@@ -22,6 +22,15 @@ export class TuneTreesPageObject {
   readonly addToRepertoireButton;
   readonly newTuneButton;
   readonly addTuneButton;
+  readonly addtuneUrlOrTitleInput;
+  readonly addtuneButtonNew;
+  readonly addtuneButtonImport;
+
+  readonly selectSettingButton;
+
+  readonly tuneEditorSubmitButton;
+  readonly tuneEditorCancelButton;
+
   readonly tabsMenuButton;
   readonly tabsMenuCatalogChoice;
   readonly catalogTab;
@@ -78,8 +87,24 @@ export class TuneTreesPageObject {
     this.newTuneButton = page.getByTestId("tt-new-tune-button");
 
     this.addTuneButton = page
-      .getByTestId("tt-catalog-tab")
+      // .getByTestId("tt-catalog-tab")
       .getByTestId("tt-import-button");
+
+    this.addtuneUrlOrTitleInput = page.getByTestId(
+      "addtune-url-or-title-input",
+    );
+
+    this.addtuneButtonNew = page.getByTestId("addtune-button-new");
+    this.addtuneButtonImport = page.getByTestId("addtune-button-import");
+
+    this.selectSettingButton = page.getByTestId("tt-select-setting");
+
+    this.tuneEditorSubmitButton = page.getByTestId(
+      "tt-tune-editor-submit-button",
+    );
+    this.tuneEditorCancelButton = page.getByTestId(
+      "tt-tune-editor-cancel-button",
+    );
 
     this.tableStatus = this.page.getByText(" row(s) selected.");
   }

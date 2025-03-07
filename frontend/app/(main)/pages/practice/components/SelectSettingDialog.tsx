@@ -139,6 +139,7 @@ export function SelectSettingDialog({
             variant="ghost"
             onClick={handleSettingSelect}
             disabled={selectedValue === null}
+            data-testid="tt-select-setting"
           >
             Select Setting
           </Button>

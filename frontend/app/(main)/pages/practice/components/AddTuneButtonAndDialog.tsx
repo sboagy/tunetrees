@@ -830,6 +830,7 @@ export default function AddTuneButtonAndDialog({
               </Label>
               <Input
                 id="import-url"
+                data-testid="addtune-url-or-title-input"
                 value={importUrl ?? ""}
                 className="col-span-3 w-full"
                 onChange={handleUrlChange}
@@ -847,12 +848,14 @@ export default function AddTuneButtonAndDialog({
                   : (importUrl ?? "")
               }
               genreId={currentGenre ?? "ITRAD"}
+              data-testid="addtune-button-new"
             />
             <Button
               variant="outline"
               type="submit"
               onClick={handleImport}
               disabled={!importUrl || currentGenre !== "ITRAD"}
+              data-testid="addtune-button-import"
             >
               {importUrl?.startsWith("https://") ? "Import" : "Search"}
             </Button>
