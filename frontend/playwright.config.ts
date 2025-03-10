@@ -121,6 +121,8 @@ export default defineConfig({
     env: {
       NEXT_BASE_URL: process.env.NEXT_BASE_URL || "",
       NEXT_PUBLIC_TT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
+      NEXT_PUBLIC_MOCK_EXTERNAL_APIS:
+        process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS || "true",
       TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
       AUTH_SECRET: process.env.AUTH_SECRET || "",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",

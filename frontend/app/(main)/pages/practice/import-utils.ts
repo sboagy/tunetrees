@@ -2,6 +2,8 @@
 
 import { fetchWithTimeout } from "@/lib/fetch-utils";
 import { type CheerioAPI, load } from "cheerio";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import type {
   ITheSessionQueryResults,
   ITheSessionTune,
@@ -30,9 +32,50 @@ export async function fetchTheSessionURLsFromTitle(
   }
 }
 
+// export async function fetchTuneInfoFromTheSessionURL(
+//   tuneUrlBase: string,
+// ): Promise<ITheSessionTune> {
+//   const url = new URL(tuneUrlBase);
+//   const primaryUrl = url.origin + url.pathname;
+//   const tuneUrl = `${primaryUrl}?format=json`;
+//   const responseTune = await fetchWithTimeout(tuneUrl, {
+//     timeout: 30_000,
+//     headers: {
+//       Accept: "text/json",
+//     },
+//   });
+//   const tuneJson: ITheSessionTune = await responseTune.json();
+//   return tuneJson;
+// }
+
 export async function fetchTuneInfoFromTheSessionURL(
   tuneUrlBase: string,
 ): Promise<ITheSessionTune> {
+  // Check for test environment
+  if (process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS === "true") {
+    // Extract tune ID for mock data
+    const url = new URL(tuneUrlBase);
+    const pathParts = url.pathname.split("/");
+    const tuneId = pathParts.at(-1);
+
+    try {
+      // Use the correct path for playwright test fixtures
+      const mockPath = path.join(
+        process.cwd(),
+        `tests/fixtures/thesession/tunes/${tuneId}.json`,
+      );
+
+      console.log(`[MOCK] Loading from ${mockPath}`);
+      const fileContent = await readFile(mockPath, "utf8");
+      const mockData = JSON.parse(fileContent) as ITheSessionTune;
+      return mockData;
+    } catch (error) {
+      console.error("[MOCK] Error loading mock data:", error);
+      throw error;
+    }
+  }
+
+  // Normal production code continues here
   const url = new URL(tuneUrlBase);
   const primaryUrl = url.origin + url.pathname;
   const tuneUrl = `${primaryUrl}?format=json`;

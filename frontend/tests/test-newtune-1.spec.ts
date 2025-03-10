@@ -14,6 +14,17 @@ test.use({
 
 test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+
+  // Add this at the start to see ALL requests
+  // await page.route("**", async (route) => {
+  //   const url = route.request().url();
+  //   console.log("===> route.request().url() <=== url: ", url);
+  //   if (url.includes("thesession.org")) {
+  //     console.log("DETECTED thesession.org URL:", url);
+  //   }
+  //   await route.continue();
+  // });
+
   // doConsolelogs(page, testInfo);
   // await page.waitForTimeout(1);
   await applyNetworkThrottle(page);
