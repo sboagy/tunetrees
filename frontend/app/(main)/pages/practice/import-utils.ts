@@ -15,11 +15,13 @@ export async function fetchTheSessionURLsFromTitle(
   tuneType: string | null,
 ): Promise<ITheSessionQueryResults> {
   try {
+    // This should eventually have a mock, but wait for a specific test.
     const encodedTitle = encodeURIComponent(title);
     const typeQuery = tuneType ? `type=${tuneType}&` : "";
     const theSessionUrl = `https://thesession.org/tunes/search?${typeQuery}mode=&q=${encodedTitle}&format=json`;
 
-    const response = await fetch(theSessionUrl, {
+    const response = await fetchWithTimeout(theSessionUrl, {
+      timeout: 30_000,
       headers: {
         Accept: "text/json",
       },
@@ -31,22 +33,6 @@ export async function fetchTheSessionURLsFromTitle(
     throw error;
   }
 }
-
-// export async function fetchTuneInfoFromTheSessionURL(
-//   tuneUrlBase: string,
-// ): Promise<ITheSessionTune> {
-//   const url = new URL(tuneUrlBase);
-//   const primaryUrl = url.origin + url.pathname;
-//   const tuneUrl = `${primaryUrl}?format=json`;
-//   const responseTune = await fetchWithTimeout(tuneUrl, {
-//     timeout: 30_000,
-//     headers: {
-//       Accept: "text/json",
-//     },
-//   });
-//   const tuneJson: ITheSessionTune = await responseTune.json();
-//   return tuneJson;
-// }
 
 export async function fetchTuneInfoFromTheSessionURL(
   tuneUrlBase: string,
@@ -60,6 +46,9 @@ export async function fetchTuneInfoFromTheSessionURL(
 
     try {
       // Use the correct path for playwright test fixtures
+      // Consider obtaining the path from the test environment,
+      // but for now, just hardcode a relative path, for the sake
+      // of simplicity.
       const mockPath = path.join(
         process.cwd(),
         `tests/fixtures/thesession/tunes/${tuneId}.json`,
