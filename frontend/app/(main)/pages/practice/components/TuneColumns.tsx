@@ -484,16 +484,19 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        size: 12 * 8, // Approximate width for 11 characters
       },
       {
         accessorKey: "easiness",
         header: ({ column }) =>
           sortableHeader(column, "Easiness", setTunesRefreshId),
         cell: (info) => {
-          return info.getValue();
+          const value = info.getValue() as number;
+          return value.toFixed(2);
         },
         enableSorting: true,
         enableHiding: true,
+        size: 14 * 8, // Approximate width for 11 characters
       },
       {
         accessorKey: "interval",
@@ -504,6 +507,7 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        size: 13 * 8, // Approximate width for 11 characters
       },
       {
         accessorKey: "repetitions",
@@ -514,6 +518,7 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        size: 16 * 8, // Approximate width for 11 characters
       },
       {
         accessorKey: "review_date",
