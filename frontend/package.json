@@ -68,6 +68,7 @@
     "gts": "^6.0.2",
     "html-react-parser": "^5.2.2",
     "install": "^0.13.0",
+    "jodit": "^4.5.17",
     "jodit-react": "^5.2.15",
     "lucide-react": "^0.479.0",
     "next": "^15.2.2",

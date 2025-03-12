@@ -1,157 +1,150 @@
 "use client";
 
 import parse from "html-react-parser";
+// import type { Jodit } from "jodit";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./AutoResizingRichTextarea.css";
-// import JoditEditor from "jodit-react";
+// type JoditConfig = Partial<Jodit["options"]>;
 
 // Dynamically import JoditEditor to ensure it only loads on the client side
-// eslint-disable-next-line @typescript-eslint/naming-convention
 const JoditEditor = dynamic(
-  () => import("jodit-react").then((mod) => mod.default),
-  {
-    ssr: false,
-  },
+	() => import("jodit-react").then((mod) => mod.default),
+	{ ssr: false },
 );
+// import JoditEditor from "jodit-react";
 
 interface IAutoResizingRichTextareaProps {
-  id: string;
-  value: string;
-  onChange: (content: string) => void;
-  placeholder?: string;
-  className?: string;
-  style?: React.CSSProperties;
-  readOnly?: boolean;
+	id: string;
+	value: string;
+	onChange: (content: string) => void;
+	placeholder?: string;
+	className?: string;
+	style?: React.CSSProperties;
+	readOnly?: boolean;
 }
 
 const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
-  id,
-  value,
-  onChange,
-  className,
-  style,
-  readOnly,
+	id,
+	value,
+	onChange,
+	className,
+	style,
+	readOnly = false,
 }) => {
-  console.log(
-    `render ===> AutoResizingRichTextarea.tsx:39 ~ id=${id}, value=${value}, className=${className}, readOnly=${readOnly}`,
-  );
-  const [editorValue, setEditorValue] = useState(value);
+	const [editorValue, setEditorValue] = useState(value);
+	const editorRef = useRef(null);
 
-  useEffect(() => {
-    // Convert plain text to HTML if necessary
-    if (!/<[a-z][\S\s]*>/i.test(value)) {
-      setEditorValue(`<p>${value}</p>`);
-    } else {
-      setEditorValue(value);
-    }
-  }, [value]);
+	useEffect(() => {
+		// Convert plain text to HTML if necessary
+		if (!/<[a-z][\S\s]*>/i.test(value)) {
+			setEditorValue(`<p>${value}</p>`);
+		} else {
+			setEditorValue(value);
+		}
+	}, [value]);
 
-  const handleChange = (content: string) => {
-    setEditorValue(content);
-    onChange(content);
-  };
+	const handleChange = (content: string) => {
+		setEditorValue(content);
+		onChange(content);
+	};
 
-  const { theme, resolvedTheme } = useTheme();
+	const { theme, resolvedTheme } = useTheme();
+	const isDarkMode = theme === "dark" || resolvedTheme === "dark";
 
-  // Determine if the theme is dark
-  const isDarkMode = theme === "dark" || resolvedTheme === "dark";
-
-  const config = useMemo(
+	// Simplified configuration that works with Jodit 5.x
+	const config = useMemo(
     () => ({
-      ic: id,
+      id,
       readonly: false,
       theme: isDarkMode ? "dark" : "default",
-      style: {
-        background: "var(--jd-color-background-default)",
-        border: "1px solid var(--jd-color-border)",
-        panel: "var(--jd-color-panel)",
-        icon: "var(--jd-color-icon)",
-      },
-      toolbar: false, // Initially hide the toolbar
-      // placeholder: placeholder,
+
+      // Set fixed dimensions to prevent layout issues
+      width: "100%",
+      height: 250,
+      minHeight: 150,
+
+      // Simplified toolbar setup
+      toolbar: true,
       toolbarSticky: false,
-      toolbarAdaptive: false,
-      spellcheck: true,
+
+      // Focus points need to be explicitly set for Jodit 5.x
+      defaultMode: 1, // 1 = WYSIWYG mode
+      enter: "p" as const, // Explicitly set the type to "p"
+
+      // Completely disable all UI elements you don't need
+      statusbar: false,
       showCharsCounter: false,
       showWordsCounter: false,
       showXPathInStatusbar: false,
+
+      // Use a limited set of buttons
       buttons: [
         "bold",
         "italic",
         "underline",
-        "strikethrough",
+        // "strikethrough",
         "|",
         "ul",
         "ol",
         "|",
-        "font",
-        "fontsize",
-        "brush",
-        "|",
-        "link",
-        "image",
-        "|",
-        "align",
+        // "font",
+        // "fontsize",
+        // "brush",
+        // "|",
+        // "link",
+        // "image",
+        // "|",
+        // "align",
         "undo",
         "redo",
-        "|",
-        "hr",
-        "eraser",
-        "fullsize",
+        // "|",
+        // "hr",
+        // "eraser",
+        // "fullsize",
       ],
-      buttonsXS: [
-        "bold",
-        "italic",
-        "underline",
-        "strikethrough",
-        "|",
-        "ul",
-        "ol",
-        "|",
-        "font",
-        "fontsize",
-        "brush",
-        "|",
-        "link",
-        "image",
-        "|",
-        "align",
-        "undo",
-        "redo",
-        "|",
-        "hr",
-        "eraser",
-        "fullsize",
-      ],
-      i18n: {
-        en: {
-          "Type something": "Type something",
-          // Add other necessary localization strings here
-        },
-      },
+
+      // Disable plugins that may cause issues
+      disablePlugins: ["mobile", "speech-recognize", "stat"],
+
+      // Set these to prevent focus issues
+      askBeforePasteHTML: false,
+      askBeforePasteFromWord: false,
+
+      // Other essential settings
+      spellcheck: true,
     }),
     [id, isDarkMode],
   );
 
-  return (
+	return (
     <div
-      className="read-only-rich"
-      style={{ ...style, overflow: "hidden", resize: "vertical" }}
+      className={`jodit-wrapper ${readOnly ? "read-only" : ""}`}
+      style={{
+        ...style,
+        overflow: "scroll",
+        resize: "vertical",
+        border: readOnly ? "none" : "1px solid #ccc",
+        borderRadius: "4px",
+      }}
     >
       {readOnly ? (
         <div className={className}>{parse(editorValue)}</div>
       ) : (
-        <JoditEditor
-          value={editorValue}
-          config={config}
-          onBlur={handleChange}
-          onChange={(newContent) => {
-            handleChange(newContent);
-          }}
-        />
+        <>
+          {!JoditEditor && <div>Loading editor...</div>}
+          <JoditEditor
+            ref={editorRef}
+            key={`jodit-${id}-${isDarkMode ? "dark" : "light"}`}
+            value={editorValue}
+            config={config}
+            onBlur={handleChange}
+            onChange={handleChange} // Use the same handler for both events
+            tabIndex={0} // Changed from 1 to 0 to follow accessibility best practices
+          />
+        </>
       )}
     </div>
   );

@@ -22,6 +22,12 @@ export default async function RootLayout({
   const session: Session | null = await auth();
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/jodit@5.2.15/esm/jodit.min.css"
+        />
+      </head>
       <body className={`${inter.className} h-full`}>
         <ThemeProvider
           attribute="class"
