@@ -124,7 +124,7 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
       className={`jodit-wrapper ${readOnly ? "read-only" : ""}`}
       style={{
         ...style,
-        overflow: "scroll",
+        overflow: "auto",
         resize: "vertical",
         border: readOnly ? "none" : "1px solid #ccc",
         borderRadius: "4px",
