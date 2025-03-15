@@ -60,3 +60,11 @@ export function transformToDatetimeLocalForDisplay(dateString: string): string {
   });
   return dateStringLocal;
 }
+
+export function formatDateForEmailVerification(dateObject: Date): string {
+  const dateString = dateObject.toISOString()
+    .replace("T", " ")
+    .replace("Z", "+00:00");
+
+  return dateString;
+}

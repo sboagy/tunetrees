@@ -246,19 +246,12 @@ async def get_user_by_account(
 async def update_user(user: UserModel) -> UserModel:
     try:
         with SessionLocal() as db:
-            user_dict = user.model_dump(exclude_unset=True)
-
-            update_dict: dict[Any, Any] = {}
-
-            for k in user_dict:
-                if "emailVerified" == k:
-                    update_dict["email_verified"] = user_dict[k]
-                else:
-                    update_dict[k] = user_dict[k]
+            user_dict: dict[str, Any] = user.model_dump(exclude_unset=True)
+            update_dict = {key: value for key, value in user_dict.items()}
 
             existing = db.query(orm.User).filter_by(id=user.id)
             if existing.count() > 0:
-                existing.update(update_dict)
+                existing.update(update_dict)  # type: ignore[dict-item]
 
             db.commit()
             db.flush()
