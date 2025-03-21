@@ -1,15 +1,12 @@
 "use server";
 
+import type { IUser } from "@/app/(main)/pages/practice/types";
 import type { AccountFormValues } from "@/app/auth/newuser/account-form";
 import {
   verification_mail_html,
   verification_mail_text,
 } from "@/auth/auth-send-request";
-import {
-  type IExtendedAdapterUser,
-  getUserExtendedByEmail,
-  ttHttpAdapter,
-} from "@/auth/auth-tt-adapter";
+import { getUserExtendedByEmail, ttHttpAdapter } from "@/auth/auth-tt-adapter";
 
 import { sendGrid } from "@/auth/helpers";
 import axios from "axios";
@@ -50,11 +47,9 @@ export const newUser = async (data: AccountFormValues, host: string) => {
   // We'll go ahead and create the user in the database, with the hashed password,
   //  but we'll leave the emailVerified field null, until the user verifies their email.
   // And we won't allow logging in until the email is verified.
-  const user: IExtendedAdapterUser = {
-    id: "",
+  const user: IUser = {
     name: data.name,
     email: email,
-    emailVerified: null,
 
     hash: bcrypt.hashSync(data.password, bcrypt.genSaltSync()),
   };
@@ -95,7 +90,23 @@ export const newUser = async (data: AccountFormValues, host: string) => {
 
   const emailTo = email;
 
-  const linkBackURL = `https://${host}/api/verify-user?email=${email}&password=${data.password}`;
+  const token: string = btoa(
+    `${email}:${Math.random().toString(36).substring(2, 15)}`,
+  );
+  const expires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours from now
+  if (!ttHttpAdapter.createVerificationToken) {
+    throw new Error("ttHttpAdapter.createVerificationToken is not defined.");
+  }
+  const verificationToken = await ttHttpAdapter.createVerificationToken({
+    identifier: email,
+    expires,
+    token,
+  });
+  if (!verificationToken) {
+    throw new Error("Failed to create verification token.");
+  }
+
+  const linkBackURL = `https://${host}/api/verify-user?email=${email}&token=${verificationToken.token}`;
   // const linkBackURL = `https://${host}/auth/login?email=${email}`;
 
   const sendGridResponse = await sendGrid({

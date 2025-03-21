@@ -226,7 +226,7 @@ export interface ISession {
 }
 
 export interface IUser {
-  id?: string;
+  id?: number;
   name?: string;
   email?: string;
   email_verified?: string | null; // Assuming datetime is converted to string

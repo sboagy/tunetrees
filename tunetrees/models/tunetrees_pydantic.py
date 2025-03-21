@@ -692,7 +692,28 @@ class ViewPlaylistJoinedModel(BaseModel):
 
 
 class UserModel(BaseModel):
-    id: Optional[str] = Field(
+    id: Optional[int] = Field(
+        description="This will be assigned and will be ignored for create or update",
+        default=None,
+    )
+    name: Optional[str] = Field(
+        description="For now assume this is the user name.  It's exact meaning is a little ambigious at the moment",
+        default=None,
+    )
+    email: Optional[str]
+    email_verified: Optional[datetime.datetime] = Field(
+        default=None, alias="email_verified"
+    )
+    image: Optional[str] = Field(default=None, alias="image")
+    hash: Optional[str] = Field(default=None, alias="hash")
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class UserModelPartial(BaseModel):
+    id: Optional[int] = Field(
         description="This will be assigned and will be ignored for create or update",
         default=None,
     )

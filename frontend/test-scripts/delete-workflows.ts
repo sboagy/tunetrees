@@ -41,5 +41,4 @@ async function deleteAllWorkflowRuns(): Promise<void> {
   }
 }
 
-// eslint-disable-next-line unicorn/prefer-top-level-await
 deleteAllWorkflowRuns().catch(console.error);

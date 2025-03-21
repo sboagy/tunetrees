@@ -30,7 +30,7 @@ import type {
   Session,
   User,
 } from "next-auth";
-import NextAuth, { AuthError } from "next-auth";
+import NextAuth from "next-auth";
 import "next-auth/jwt";
 
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -49,6 +49,17 @@ import {
   verification_mail_text,
 } from "./auth-send-request";
 import { getUserExtendedByEmail, ttHttpAdapter } from "./auth-tt-adapter";
+import {
+  EmailNotVerifiedError,
+  EmptyEmailError,
+  EmptyPasswordError,
+  NoPasswordHashError,
+  PasswordMismatchError,
+  UseVerificationTokenError,
+  UserNotFoundError,
+  VerificationTokenExpiredError,
+  VerificationTokenNotFoundError,
+} from "./credential-errors";
 import { sendGrid } from "./helpers";
 import { matchPasswordWithHash } from "./password-match";
 
@@ -76,7 +87,7 @@ async function authorize(
   const email: string | undefined | unknown = credentials?.email;
 
   if (!email) {
-    throw new Error("Empty Email.");
+    throw new EmptyEmailError();
   }
 
   const user = await getUserExtendedByEmail(email as string);
@@ -122,15 +133,15 @@ async function authorize(
   if (user) {
     console.log("===> auth/index.ts:176 ~ authorize -- user found");
     if (!credentials.password) {
-      throw new Error("Empty Password.");
+      throw new EmptyPasswordError();
     }
     const password = credentials.password as string;
     if (user.hash === undefined || user.hash === null) {
-      throw new Error("No password hash found for user.");
+      throw new NoPasswordHashError();
     }
 
     if (user.emailVerified === null) {
-      throw new Error("User's email has not been verified.");
+      throw new EmailNotVerifiedError();
     }
 
     const match = await matchPasswordWithHash(password, user.hash);
@@ -144,7 +155,7 @@ async function authorize(
     console.log(
       "===> auth/index.ts:197 ~ authorize -- password does not match.",
     );
-    throw new AuthError("Password does not match.");
+    throw new PasswordMismatchError();
   }
   // No user found, so this is their first attempt to login
   // meaning this is also the place you could do registration
@@ -152,7 +163,58 @@ async function authorize(
   console.log(
     "===> auth/index.ts:205 ~ authorize -- User not found, exiting function.",
   );
-  throw new Error("User not found.");
+  throw new UserNotFoundError();
+}
+
+async function authorizeWithToken(
+  credentials: Partial<Record<"email" | "token", unknown>>,
+) {
+  // Implement your own logic to find the user
+  if (!ttHttpAdapter.getUserByEmail) {
+    throw new Error("getUserByEmail is not defined in ttHttpAdapter.");
+  }
+  const user = await ttHttpAdapter.getUserByEmail(credentials.email as string);
+  if (user) {
+    if (!ttHttpAdapter.useVerificationToken) {
+      console.log(
+        "===> index.ts:331 ~ signIn callback -- useVerificationToken is not defined",
+      );
+      throw new UseVerificationTokenError();
+    }
+    const verificationToken = await ttHttpAdapter.useVerificationToken({
+      identifier: credentials.email as string,
+      token: credentials.token as string,
+    });
+
+    if (!verificationToken) {
+      console.log(
+        "===> index.ts:331 ~ signIn callback -- verificationToken is not defined",
+      );
+      throw new VerificationTokenNotFoundError();
+    }
+
+    if (verificationToken.expires < new Date()) {
+      console.log(
+        "===> index.ts:331 ~ signIn callback -- verificationToken is expired",
+      );
+      throw new VerificationTokenExpiredError();
+    }
+
+    if (!ttHttpAdapter.updateUser) {
+      throw new Error("updateUser is not defined in ttHttpAdapter.");
+    }
+    user.emailVerified = new Date();
+    const updatedUser = await ttHttpAdapter.updateUser({
+      id: user.id,
+      emailVerified: user.emailVerified,
+    });
+    if (!updatedUser) {
+      throw new Error("Failed to update user with email verification date.");
+    }
+
+    return user;
+  }
+  return null;
 }
 
 export const providers: Provider[] = [
@@ -178,7 +240,16 @@ export const providers: Provider[] = [
     },
     authorize: authorize,
   }),
-
+  {
+    id: "token-credential",
+    name: "Token Credential",
+    type: "credentials",
+    credentials: {
+      email: { label: "Email", type: "email" },
+      token: { label: "Token", type: "token" },
+    },
+    authorize: authorizeWithToken,
+  },
   SendgridProvider({
     id: "sendgrid",
     // If your environment variable is named differently than default

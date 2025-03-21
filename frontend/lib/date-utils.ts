@@ -62,7 +62,8 @@ export function transformToDatetimeLocalForDisplay(dateString: string): string {
 }
 
 export function formatDateForEmailVerification(dateObject: Date): string {
-  const dateString = dateObject.toISOString()
+  const dateString = dateObject
+    .toISOString()
     .replace("T", " ")
     .replace("Z", "+00:00");
 

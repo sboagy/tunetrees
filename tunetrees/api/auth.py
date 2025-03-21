@@ -7,7 +7,7 @@ import logging
 import traceback
 from typing import Any, Optional, Tuple
 
-from fastapi import APIRouter, FastAPI, HTTPException, Request, status
+from fastapi import APIRouter, Body, FastAPI, HTTPException, Path, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import Result, Row, Select, select
@@ -21,6 +21,7 @@ from tunetrees.models.tunetrees_pydantic import (
     SessionAndUserModel,
     SessionModel,
     UserModel,
+    UserModelPartial,
     VerificationTokenModel,
     VerificationTokenParamsModel,
 )
@@ -239,40 +240,44 @@ async def get_user_by_account(
 
 
 @router.patch(
-    "/update-user/",
+    "/update-user/{id}",
     response_model=UserModel,
     response_model_exclude_none=True,
 )
-async def update_user(user: UserModel) -> UserModel:
+async def update_user(
+    id: int = Path(..., description="Reference ID"), user: UserModelPartial = Body(...)
+) -> UserModel:
     try:
         with SessionLocal() as db:
-            user_dict: dict[str, Any] = user.model_dump(exclude_unset=True)
+            # Extract fields to update
+            user_dict: dict[str, Optional[Any]] = user.model_dump(exclude_unset=True)
             update_dict = {key: value for key, value in user_dict.items()}
 
-            existing = db.query(orm.User).filter_by(id=user.id)
-            if existing.count() > 0:
-                existing.update(update_dict)  # type: ignore[dict-item]
+            # Query the existing user
+            stmt = select(orm.User).where(orm.User.id == id)
+            existing_user = db.execute(stmt).scalar_one_or_none()
 
+            if not existing_user:
+                raise HTTPException(status_code=404, detail="User Not Found")
+
+            # Update the fields dynamically
+            for key, value in update_dict.items():
+                setattr(existing_user, key, value)
+
+            # Commit the changes
             db.commit()
-            db.flush()
+            db.refresh(existing_user)
 
-            user_query = select(orm.User).where(orm.User.id == user.id)
-            updated_user = query_user_to_auth_user(user_query, db)
-
-            if updated_user is None:
-                raise HTTPException(
-                    status_code=404, detail="User Not Found after update"
-                )
-
-            return updated_user
+            # Return the updated user
+            return UserModel.model_validate(existing_user)
 
     except HTTPException as e:
-        logger.error("HTTPException (secondary catch): %s" % e)
+        logger.error(f"HTTPException (secondary catch): {e}")
         raise
 
     except Exception as e:
-        logger.error("Unexpected Exception: %s" % e)
-        raise
+        logger.error(f"Unexpected Exception: {e}")
+        raise HTTPException(status_code=500, detail="Unexpected error occurred")
 
 
 @router.delete("/delete-user/{id}", response_model=None)
@@ -671,7 +676,7 @@ def query_user_to_auth_user(
                 user: orm.User = which_row[0]
 
                 auth_user = UserModel(
-                    id=str(user.id),
+                    id=user.id,
                     name=str(user.name),
                     email=str(user.email),
                     email_verified=user.email_verified,  # for the moment

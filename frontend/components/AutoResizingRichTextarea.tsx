@@ -10,52 +10,53 @@ import "./AutoResizingRichTextarea.css";
 // type JoditConfig = Partial<Jodit["options"]>;
 
 // Dynamically import JoditEditor to ensure it only loads on the client side
+// eslint-disable-next-line @typescript-eslint/naming-convention
 const JoditEditor = dynamic(
-	() => import("jodit-react").then((mod) => mod.default),
-	{ ssr: false },
+  () => import("jodit-react").then((mod) => mod.default),
+  { ssr: false },
 );
 // import JoditEditor from "jodit-react";
 
 interface IAutoResizingRichTextareaProps {
-	id: string;
-	value: string;
-	onChange: (content: string) => void;
-	placeholder?: string;
-	className?: string;
-	style?: React.CSSProperties;
-	readOnly?: boolean;
+  id: string;
+  value: string;
+  onChange: (content: string) => void;
+  placeholder?: string;
+  className?: string;
+  style?: React.CSSProperties;
+  readOnly?: boolean;
 }
 
 const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
-	id,
-	value,
-	onChange,
-	className,
-	style,
-	readOnly = false,
+  id,
+  value,
+  onChange,
+  className,
+  style,
+  readOnly = false,
 }) => {
-	const [editorValue, setEditorValue] = useState(value);
-	const editorRef = useRef(null);
+  const [editorValue, setEditorValue] = useState(value);
+  const editorRef = useRef(null);
 
-	useEffect(() => {
-		// Convert plain text to HTML if necessary
-		if (!/<[a-z][\S\s]*>/i.test(value)) {
-			setEditorValue(`<p>${value}</p>`);
-		} else {
-			setEditorValue(value);
-		}
-	}, [value]);
+  useEffect(() => {
+    // Convert plain text to HTML if necessary
+    if (!/<[a-z][\S\s]*>/i.test(value)) {
+      setEditorValue(`<p>${value}</p>`);
+    } else {
+      setEditorValue(value);
+    }
+  }, [value]);
 
-	const handleChange = (content: string) => {
-		setEditorValue(content);
-		onChange(content);
-	};
+  const handleChange = (content: string) => {
+    setEditorValue(content);
+    onChange(content);
+  };
 
-	const { theme, resolvedTheme } = useTheme();
-	const isDarkMode = theme === "dark" || resolvedTheme === "dark";
+  const { theme, resolvedTheme } = useTheme();
+  const isDarkMode = theme === "dark" || resolvedTheme === "dark";
 
-	// Simplified configuration that works with Jodit 5.x
-	const config = useMemo(
+  // Simplified configuration that works with Jodit 5.x
+  const config = useMemo(
     () => ({
       id,
       readonly: false,
@@ -119,7 +120,7 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
     [id, isDarkMode],
   );
 
-	return (
+  return (
     <div
       className={`jodit-wrapper ${readOnly ? "read-only" : ""}`}
       style={{

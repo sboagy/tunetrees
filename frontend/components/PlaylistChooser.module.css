@@ -14,7 +14,6 @@
   border: 2px solid #cbd5e0;
   border: 2px solid var(--border-gray-600);
   outline: none;
-  ring: 0;
 }
 
 .dialog_content .dialog_table {

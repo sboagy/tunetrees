@@ -9,8 +9,8 @@
     "start": "next start",
     "lint": "gts lint",
     "glint": "gts lint",
-    "eslint": "eslint .",
-    "eslint:fix": "eslint --fix .",
+    "eslint": "ESLINT_USE_FLAT_CONFIG=true eslint .",
+    "eslint:fix": "ESLINT_USE_FLAT_CONFIG=true eslint --fix .",
     "clean": "gts clean",
     "compile": "tsc",
     "fix": "gts fix",
@@ -18,7 +18,10 @@
     "pretest": "npm run compile",
     "posttest": "npm run lint",
     "biome_lint": "npx @biomejs/biome lint --fix app lib components auth *.ts *.json",
-    "biome_lint:fix": "npx @biomejs/biome check --organize-imports-enabled=true --fix app lib components auth *.ts *.json && npx prettier --write app lib components auth *.ts *.json"
+    "biome_lint:fix": "npx @biomejs/biome check --organize-imports-enabled=true --fix app lib components auth *.ts *.json && npx prettier --write app lib components auth *.ts *.json",
+    "typecheck": "tsc --noEmit",
+    "build:theme-script": "tsc -p tsconfig.theme-script.json",
+    "prebuild": "npm run build:theme-script"
   },
   "engines": {
     "node": ">=v22.9.0"
