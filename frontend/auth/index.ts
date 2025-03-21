@@ -49,17 +49,7 @@ import {
   verification_mail_text,
 } from "./auth-send-request";
 import { getUserExtendedByEmail, ttHttpAdapter } from "./auth-tt-adapter";
-import {
-  EmailNotVerifiedError,
-  EmptyEmailError,
-  EmptyPasswordError,
-  NoPasswordHashError,
-  PasswordMismatchError,
-  UseVerificationTokenError,
-  UserNotFoundError,
-  VerificationTokenExpiredError,
-  VerificationTokenNotFoundError,
-} from "./credential-errors";
+
 import { sendGrid } from "./helpers";
 import { matchPasswordWithHash } from "./password-match";
 
@@ -87,7 +77,7 @@ async function authorize(
   const email: string | undefined | unknown = credentials?.email;
 
   if (!email) {
-    throw new EmptyEmailError();
+    throw new Error("Empty Email");
   }
 
   const user = await getUserExtendedByEmail(email as string);
@@ -133,15 +123,15 @@ async function authorize(
   if (user) {
     console.log("===> auth/index.ts:176 ~ authorize -- user found");
     if (!credentials.password) {
-      throw new EmptyPasswordError();
+      throw new Error("Empty Password");
     }
     const password = credentials.password as string;
     if (user.hash === undefined || user.hash === null) {
-      throw new NoPasswordHashError();
+      throw new Error("No password hash found for user");
     }
 
     if (user.emailVerified === null) {
-      throw new EmailNotVerifiedError();
+      throw new Error("User's email has not been verified");
     }
 
     const match = await matchPasswordWithHash(password, user.hash);
@@ -155,15 +145,15 @@ async function authorize(
     console.log(
       "===> auth/index.ts:197 ~ authorize -- password does not match.",
     );
-    throw new PasswordMismatchError();
+    throw new Error("Password does not match");
   }
   // No user found, so this is their first attempt to login
   // meaning this is also the place you could do registration
   // ...If you return null then an error will be displayed advising the user to check their details.
   console.log(
-    "===> auth/index.ts:205 ~ authorize -- User not found, exiting function.",
+    "===> auth/index.ts:205 ~ authorize -- User not found, exiting function",
   );
-  throw new UserNotFoundError();
+  throw new Error("User not found");
 }
 
 async function authorizeWithToken(
@@ -171,7 +161,7 @@ async function authorizeWithToken(
 ) {
   // Implement your own logic to find the user
   if (!ttHttpAdapter.getUserByEmail) {
-    throw new Error("getUserByEmail is not defined in ttHttpAdapter.");
+    throw new Error("getUserByEmail is not defined in ttHttpAdapter");
   }
   const user = await ttHttpAdapter.getUserByEmail(credentials.email as string);
   if (user) {
@@ -179,7 +169,7 @@ async function authorizeWithToken(
       console.log(
         "===> index.ts:331 ~ signIn callback -- useVerificationToken is not defined",
       );
-      throw new UseVerificationTokenError();
+      throw new Error("useVerificationToken is not defined in ttHttpAdapter");
     }
     const verificationToken = await ttHttpAdapter.useVerificationToken({
       identifier: credentials.email as string,
@@ -190,18 +180,18 @@ async function authorizeWithToken(
       console.log(
         "===> index.ts:331 ~ signIn callback -- verificationToken is not defined",
       );
-      throw new VerificationTokenNotFoundError();
+      throw new Error("verificationToken is not defined");
     }
 
     if (verificationToken.expires < new Date()) {
       console.log(
         "===> index.ts:331 ~ signIn callback -- verificationToken is expired",
       );
-      throw new VerificationTokenExpiredError();
+      throw new Error("verificationToken is expired");
     }
 
     if (!ttHttpAdapter.updateUser) {
-      throw new Error("updateUser is not defined in ttHttpAdapter.");
+      throw new Error("updateUser is not defined in ttHttpAdapter");
     }
     user.emailVerified = new Date();
     const updatedUser = await ttHttpAdapter.updateUser({
@@ -440,7 +430,7 @@ const config = {
       baseUrl: string;
     }) {
       // See https://next-auth.js.org/configuration/callbacks#redirect-callback
-      console.log("===> auth index.ts:384 ~ redirect callback");
+      console.log("===> auth index.ts:384 ~ redirect callback", params.url);
       return params.baseUrl;
     },
     session(params: {
