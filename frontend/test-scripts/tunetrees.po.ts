@@ -244,4 +244,51 @@ export class TuneTreesPageObject {
     //   .nth(2);
     // await expect(ttPracticeTab2).toBeVisible({ timeout: 60000 });
   }
+
+  async runLogin(
+    user: string | undefined,
+    pw: string | undefined,
+  ): Promise<void> {
+    if (
+      !process.env.TEST1_LOGIN_USER_EMAIL ||
+      !process.env.TEST1_LOGIN_USER_PASSWORD
+    ) {
+      console.log("===> run-login2.ts:20 ~ ", "No login credentials found");
+      throw new Error("No login credentials found");
+    }
+
+    await this.page.getByRole("button", { name: "Sign in" }).click();
+    const userEmailLocator = this.page.getByTestId("user_email");
+    await userEmailLocator.fill(user || "");
+    await userEmailLocator.press("Tab");
+    const passwordEntryBox = this.page.getByTestId("user_password");
+    await passwordEntryBox.fill(pw || "");
+    const signInButton = this.page.getByRole("button", {
+      name: "Sign In",
+      exact: true,
+    });
+    await passwordEntryBox.press("Tab");
+
+    await this.page.waitForFunction(
+      (button) => {
+        const btn = button as HTMLButtonElement;
+        return !btn.disabled;
+      },
+      await signInButton.elementHandle(),
+      { timeout: 2000 },
+    );
+
+    await signInButton.click();
+
+    // Not sure why the following doesn't work.
+    // await this.addToRepertoireButton.waitFor({
+    //   state: "visible",
+    //   timeout: 30_000,
+    // });
+    //
+    // instead, we'll wait for the tableStatus to be visible.
+    await this.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
+
+    console.log("===> run-login2.ts:50 ~ ", "Login completed");
+  }
 }

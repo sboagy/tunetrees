@@ -1,6 +1,8 @@
-import type { Page } from "@playwright/test";
 import path from "node:path";
+
 import { fileURLToPath } from "node:url";
+
+import type { Page } from "@playwright/test";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const __filename = fileURLToPath(import.meta.url);
@@ -47,6 +49,6 @@ export async function runLogin(
   );
 
   await signInButton.click();
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(4000);
   await page.context().storageState({ path: storageStatePath });
 }
