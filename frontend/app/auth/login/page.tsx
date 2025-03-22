@@ -137,14 +137,16 @@ export default function LoginDialog(): JSX.Element {
           csrfToken: data.csrfToken,
         });
         if (result?.error) {
-          setPasswordError(result.error);
+          // Given limitations of next-auth, such that we can't get the error instance
+          // or error message, this is the best we can do for now.
+          setPasswordError(`User login failed, error class: ${result.error}`);
         } else {
           console.log("Sign in successful");
           if (typeof window !== "undefined") {
             window.location.href = "/";
           } else {
             setPasswordError("Problem redirecting to home page");
-            console.log("Sign in successful, but window is undefined");
+            console.log("Login successful, but window is undefined");
           }
         }
       } catch (error) {
