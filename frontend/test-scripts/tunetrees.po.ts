@@ -166,6 +166,7 @@ export class TuneTreesPageObject {
     await this.filterInput.waitFor({ state: "attached" });
     await this.filterInput.click();
 
+    await this.page.waitForTimeout(1000);
     await this.filterInput.fill(tuneTitle, { timeout: 90_000 });
 
     // An exception to the rule that we should not use expect() in PageObjects.
