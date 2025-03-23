@@ -15,8 +15,18 @@
             "problemMatcher": []
         },
         {
+            "label": "start_server",
+            "type": "shell",
+            "command": "uvicorn tunetrees.api.main:app --reload",
+            "problemMatcher": []
+        },
+        {
             "label": "clean_and_stop",
-            "dependsOn": ["clean_test_db", "stop_server"]
+            "dependsOn": ["stop_server", "clean_test_db"]
+        },
+        {
+            "label": "stop_clean_start_server",
+            "dependsOn": ["stop_server", "clean_test_db", "start_server"]
         }
     ]
 }
