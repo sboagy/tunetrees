@@ -1,10 +1,5 @@
 import { AuthError, CredentialsSignin } from "next-auth";
-import {
-  verification_mail_html,
-  verification_mail_text,
-} from "./auth-send-request";
 import { getUserExtendedByEmail, ttHttpAdapter } from "./auth-tt-adapter";
-import { sendGrid } from "./helpers";
 import { matchPasswordWithHash } from "./password-match";
 
 function logObject(obj: unknown, expand: boolean) {
@@ -38,6 +33,35 @@ class MissingAdapterMethods extends AuthError {
 }
 
 export const BASE_PATH = "/auth";
+
+/**
+ * Authorizes a user based on provided credentials and request information.
+ *
+ * @param credentials - A partial record containing the user's email and password.
+ *   - `email`: The email address of the user attempting to log in.
+ *   - `password`: The password of the user attempting to log in.
+ * @param request - The HTTP request object associated with the authorization attempt.
+ *
+ * @returns The user object if authorization is successful.
+ *
+ * @throws {InvalidLoginError} If:
+ *   - The email is empty or undefined.
+ *   - The password is empty or undefined.
+ *   - No password hash is found for the user.
+ *   - The user's email has not been verified.
+ *   - The provided password does not match the stored hash.
+ *   - The user is not found in the system.
+ *
+ * @remarks
+ * This function performs the following steps:
+ * 1. Validates the presence of the email in the credentials.
+ * 2. Retrieves the user by their email.
+ * 3. Validates the presence of the password and checks it against the stored hash.
+ * 4. Ensures the user's email is verified.
+ * 5. Returns the user object if all checks pass.
+ *
+ * If any of the above checks fail, an `InvalidLoginError` is thrown with an appropriate message.
+ */
 export async function authorize(
   credentials: Partial<Record<"email" | "password", unknown>>,
   request: Request,
@@ -51,41 +75,6 @@ export async function authorize(
   }
 
   const user = await getUserExtendedByEmail(email as string);
-
-  const host = request.headers.get("host");
-
-  if (!user) {
-    console.log(
-      "===> auth/index.ts:140 ~ authorize -- No user found, so this is their first attempt to login",
-    );
-
-    // No user found, so this is their first attempt to login
-    // meaning this is also the place we can do registration
-    // ...If you return null then an error will be displayed advising the user to check their details.
-    // Do a magic check to see if this is a test email address, and if so, send the email to me.
-    const toEmail = (email as string).includes("test658.com")
-      ? "sboagy@gmail.com"
-      : (email as string);
-
-    await sendGrid({
-      to: toEmail,
-      from: "admin@tunetrees.com",
-      subject: "Email Verification",
-      html: verification_mail_html({
-        url: `https://${host}/verify?email=${email as string}`,
-        host: `https://${host}`,
-        // theme: { colorScheme: "auto", logo: "/logo4.png" },
-        theme: { brandColor: "auto", buttonText: "Verify Email" },
-      }),
-      text: verification_mail_text({
-        url: `https://${host}/verify?email=${email as string}`,
-        host: `https://${host}:3000`,
-      }),
-      dynamicTemplateData: {
-        verificationLink: `https://${host}/verify?email=${credentials.email as string}`,
-      },
-    });
-  }
 
   // const user = { id: "1", name: "J Smith", email: "jsmith@example.com" };
   // debugger;
@@ -124,6 +113,22 @@ export async function authorize(
   );
   throw new InvalidLoginError("User not found");
 }
+
+/**
+ * Authorizes a user using their email and token credentials.
+ *
+ * This function verifies the user's email and token, checks the validity of the
+ * verification token, and updates the user's email verification status if successful.
+ *
+ * @param credentials - An object containing the user's email and token. Both fields are optional.
+ *   - `email`: The email address of the user.
+ *   - `token`: The verification token associated with the user.
+ *
+ * @returns The user object if authorization is successful, or `null` if the user is not found.
+ *
+ * @throws {MissingAdapterMethods} If required adapter methods (`getUserByEmail`, `useVerificationToken`, or `updateUser`) are not defined.
+ * @throws {InvalidLoginError} If the verification token is invalid, expired, or if updating the user fails.
+ */
 export async function authorizeWithToken(
   credentials: Partial<Record<"email" | "token", unknown>>,
 ) {

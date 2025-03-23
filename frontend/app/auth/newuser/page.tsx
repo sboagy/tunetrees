@@ -180,7 +180,19 @@ export default function SignInPage(): JSX.Element {
     const host = window.location.host;
 
     const result = await newUser(data, host);
-    console.log(result);
+    console.log(`newUser status result ${result.status}`);
+
+    if (process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS === "true") {
+      const linkBackURL = result.linkBackURL;
+      // Store the linkBackURL in local storage for testing purposes
+      if (typeof window !== "undefined") {
+        localStorage.setItem("linkBackURL", linkBackURL);
+      } else {
+        console.log(
+          "onSubmit(): window is undefined, cannot store linkBackURL for playwright tests",
+        );
+      }
+    }
 
     router.push("/auth/verify-request");
   };

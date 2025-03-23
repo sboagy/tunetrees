@@ -1,20 +1,27 @@
 "use server";
 
-import type { IUser } from "@/app/(main)/pages/practice/types";
 import type { AccountFormValues } from "@/app/auth/newuser/account-form";
 import {
   verification_mail_html,
   verification_mail_text,
 } from "@/auth/auth-send-request";
-import { getUserExtendedByEmail, ttHttpAdapter } from "@/auth/auth-tt-adapter";
+import {
+  type IExtendedAdapterUser,
+  getUserExtendedByEmail,
+  ttHttpAdapter,
+} from "@/auth/auth-tt-adapter";
 
 import { sendGrid } from "@/auth/helpers";
-import axios from "axios";
+import type { AdapterUser } from "next-auth/adapters";
 // import { redirect } from "next/navigation";
 
-const _baseURL = process.env.NEXT_BASE_URL;
-
-export const newUser = async (data: AccountFormValues, host: string) => {
+export const newUser = async (
+  data: AccountFormValues,
+  host: string,
+): Promise<{
+  status: string;
+  linkBackURL: string;
+}> => {
   const email = data.email;
   console.log("newUser data: ", data);
 
@@ -47,46 +54,16 @@ export const newUser = async (data: AccountFormValues, host: string) => {
   // We'll go ahead and create the user in the database, with the hashed password,
   //  but we'll leave the emailVerified field null, until the user verifies their email.
   // And we won't allow logging in until the email is verified.
-  const user: IUser = {
+  const user: Partial<IExtendedAdapterUser> = {
     name: data.name,
     email: email,
 
     hash: bcrypt.hashSync(data.password, bcrypt.genSaltSync()),
   };
 
-  const stringifiedUser = JSON.stringify(user);
+  // const stringifiedUser = JSON.stringify(user);
 
-  try {
-    // Calling fetch or the ttHttpAdapter.createUser method will
-    // fail here with an 'write EPIPE' error.  Are we really running
-    // on the server here?
-    //
-    // const create_user_response = await fetch("/auth/signup/", {
-    //   method: "POST",
-    //   headers: {
-    //     accept: "application/json",
-    //     "Content-Type": "application/json",
-    //   },
-    //   body: stringifiedUser,
-    // });
-    // const data = await create_user_response.json();
-    // console.log(data);
-    // const create_user_response = await ttHttpAdapter.createUser(user);
-
-    const createUserResponse = await axios.post(
-      `${_baseURL}/auth/signup/`,
-      stringifiedUser,
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
-    );
-    console.log("createUserResponse: ", createUserResponse);
-  } catch (error) {
-    console.error(error);
-    throw error;
-  }
+  const fullUser = await ttHttpAdapter.createUser(user as AdapterUser);
 
   const emailTo = email;
 
@@ -103,6 +80,20 @@ export const newUser = async (data: AccountFormValues, host: string) => {
     token,
   });
   if (!verificationToken) {
+    // I think delete user here, which we know was created in this function
+    // if we got this far, if we can't create the verification token.
+    if (!ttHttpAdapter.deleteUser) {
+      throw new Error("ttHttpAdapter.deleteUser is not defined.");
+    }
+    try {
+      await ttHttpAdapter.deleteUser(fullUser.id);
+    } catch (error) {
+      console.error(
+        `Failed to delete user after failed verification token creation: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      );
+    }
     throw new Error("Failed to create verification token.");
   }
 
@@ -131,6 +122,7 @@ export const newUser = async (data: AccountFormValues, host: string) => {
 
   return {
     status: `User created successfully.  Verification email sent to ${email}.`,
+    linkBackURL: linkBackURL,
   };
 
   // Redirect to verify-request page

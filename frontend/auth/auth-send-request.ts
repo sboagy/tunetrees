@@ -53,9 +53,7 @@ export function verification_mail_html(params: {
   host: string;
   theme: { brandColor?: string; buttonText?: string };
 }) {
-  const { url, host, theme } = params;
-
-  const escapedHost = host.replaceAll(".", "&#8203;.");
+  const { url, theme } = params;
 
   const brandColor = theme.brandColor || "#346df1";
   const color = {
@@ -71,12 +69,6 @@ export function verification_mail_html(params: {
 <body style="background: ${color.background};">
   <table width="100%" border="0" cellspacing="20" cellpadding="0"
     style="background: ${color.mainBackground}; max-width: 600px; margin: auto; border-radius: 10px;">
-    // <tr>
-    //   <td align="center"
-    //     style="padding: 10px 0px; font-size: 22px; font-family: Helvetica, Arial, sans-serif; color: ${color.text};">
-    //     Sign in to <strong>${escapedHost}</strong>
-    //   </td>
-    // </tr>
     <tr>
       <td align="center" style="padding: 20px 0;">
         <table border="0" cellspacing="0" cellpadding="0">
