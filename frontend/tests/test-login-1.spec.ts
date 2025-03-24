@@ -13,7 +13,7 @@ import { test } from "@playwright/test";
 
 import { checkHealth } from "../test-scripts/check-servers";
 
-import { TuneEditorPageObject } from "@/test-scripts/tune-editor.po";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 
 test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
@@ -29,7 +29,7 @@ test.afterEach(async ({ page }) => {
 
 test("test-login-1", async ({ page }) => {
   console.log("===> test-login-1:21 ~ ", "Basic login test");
-  const ttPO = new TuneEditorPageObject(page);
+  const ttPO = new TuneTreesPageObject(page);
 
   await checkHealth();
 
