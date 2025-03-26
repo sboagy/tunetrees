@@ -156,6 +156,8 @@ test("test-signup-1", async ({ page }) => {
     .getByRole("row", { name: "5 5-String Banjo BGRA 5-" })
     .getByRole("button")
     .first();
+  await fiveStringBanjoCheckBox.isVisible();
+  await fiveStringBanjoCheckBox.isEnabled();
   await fiveStringBanjoCheckBox.click();
 
   const submitButton = page.getByTestId("submit-button");
