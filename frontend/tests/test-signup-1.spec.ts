@@ -65,14 +65,7 @@ test("test-signup-1", async ({ page }) => {
   });
   await passwordEntryBox.press("Tab");
 
-  await ttPO.page.waitForFunction(
-    (button) => {
-      const btn = button as HTMLButtonElement;
-      return !btn.disabled;
-    },
-    await dialogSignInButton.elementHandle(),
-    { timeout: 4_000 },
-  );
+  await dialogSignInButton.isEnabled();
 
   await dialogSignInButton.click();
 
