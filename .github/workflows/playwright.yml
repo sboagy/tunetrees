@@ -71,7 +71,7 @@ jobs:
 
           TEST2_LOGIN_USER_EMAIL: ${{ secrets.TEST2_LOGIN_USER_EMAIL }}
           TEST2_LOGIN_USER_PASSWORD: ${{ secrets.TEST2_LOGIN_USER_PASSWORD }}
-          TEST1_LOGIN_USTEST2_LOGIN_USER_NAMEER_EMAIL: ${{ secrets.TEST2_LOGIN_USER_NAME }}
+          TEST2_LOGIN_USER_NAME: ${{ secrets.TEST2_LOGIN_USER_NAME }}
           TEST2_LOGIN_GMAIL_PW: ${{ secrets.TEST2_LOGIN_GMAIL_PW }}
 
           # TT_REVIEW_SITDOWN_DATE must be specified in Coordinated Universal Time (UTC).
