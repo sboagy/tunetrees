@@ -182,7 +182,7 @@ export default function SignInPage(): JSX.Element {
     const result = await newUser(data, host);
     console.log(`newUser status result ${result.status}`);
 
-    if (process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS === "true") {
+    if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
       const linkBackURL = result.linkBackURL;
       // Store the linkBackURL in local storage for testing purposes
       if (typeof window !== "undefined") {
@@ -278,6 +278,7 @@ export default function SignInPage(): JSX.Element {
                         required
                         className={emailError ? "border-red-500" : ""}
                         autoFocus
+                        data-testid="user_email"
                       />
                     </FormControl>
                     <FormMessage />
@@ -302,6 +303,7 @@ export default function SignInPage(): JSX.Element {
                         autoComplete="new-password"
                         {...field}
                         onChange={(e) => handlePasswordChange(e, field)}
+                        data-testid="user_password"
                       />
                     </FormControl>
                     <FormMessage />
@@ -328,6 +330,7 @@ export default function SignInPage(): JSX.Element {
                         onChange={(e) =>
                           handlePasswordConfirmationChange(e, field)
                         }
+                        data-testid="user_password_verification"
                       />
                     </FormControl>
                     <FormMessage />
@@ -350,6 +353,7 @@ export default function SignInPage(): JSX.Element {
                         placeholder="Your name"
                         {...field}
                         onChange={(e) => handleUserNameChange(e, field)}
+                        data-testid="user_name"
                       />
                     </FormControl>
                     <FormMessage />

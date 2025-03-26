@@ -49,7 +49,7 @@ export async function sendGrid(options: {
     dynamicTemplateData: options?.dynamicTemplateData,
   };
 
-  if (process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS === "true") {
+  if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
     console.log(
       "===> send-grid.ts:48 ~ sendGrid -- Skipping email send since using mock external APIs",
     );

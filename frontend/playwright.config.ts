@@ -1,3 +1,7 @@
+// Playwright configuration file. See https://playwright.dev/docs/test-configuration
+//
+// This file is used to configure the Playwright test runner. It is used to define the
+// test environment, the browsers to run the tests in, and the test files to run.
 import { defineConfig, devices } from "@playwright/test";
 import * as dotenv from "dotenv";
 import path from "node:path";
@@ -123,6 +127,8 @@ export default defineConfig({
       NEXT_PUBLIC_TT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
       NEXT_PUBLIC_MOCK_EXTERNAL_APIS:
         process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS || "true",
+      NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION:
+        process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "false",
       TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
       AUTH_SECRET: process.env.AUTH_SECRET || "",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",

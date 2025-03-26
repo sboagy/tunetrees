@@ -688,6 +688,7 @@ export default function PlaylistDialog({
                 onClick={() => void handleSubmit()}
                 disabled={hasNoChanges()}
                 className="w-full mt-6 border border-gray-300"
+                data-testid="submit-button"
               >
                 Update
               </Button>

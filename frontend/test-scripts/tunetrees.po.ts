@@ -258,13 +258,14 @@ export class TuneTreesPageObject {
       throw new Error("No login credentials found");
     }
 
-    await this.page.getByRole("button", { name: "Sign in" }).click();
+    const topSignInButton = this.page.getByRole("button", { name: "Sign in" });
+    await topSignInButton.click();
     const userEmailLocator = this.page.getByTestId("user_email");
     await userEmailLocator.fill(user || "");
     await userEmailLocator.press("Tab");
     const passwordEntryBox = this.page.getByTestId("user_password");
     await passwordEntryBox.fill(pw || "");
-    const signInButton = this.page.getByRole("button", {
+    const dialogSignInButton = this.page.getByRole("button", {
       name: "Sign In",
       exact: true,
     });
@@ -275,11 +276,11 @@ export class TuneTreesPageObject {
         const btn = button as HTMLButtonElement;
         return !btn.disabled;
       },
-      await signInButton.elementHandle(),
+      await dialogSignInButton.elementHandle(),
       { timeout: 2000 },
     );
 
-    await signInButton.click();
+    await dialogSignInButton.click();
 
     // Not sure why the following doesn't work.
     // await this.addToRepertoireButton.waitFor({
