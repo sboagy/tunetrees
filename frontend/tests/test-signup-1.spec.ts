@@ -152,6 +152,8 @@ test("test-signup-1", async ({ page }) => {
     });
   }
 
+  await page.waitForTimeout(4_000);
+
   const fiveStringBanjoCheckBox = page
     .getByRole("row", { name: "5 5-String Banjo BGRA 5-" })
     .getByRole("button")
