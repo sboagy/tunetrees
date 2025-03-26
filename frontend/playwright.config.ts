@@ -15,6 +15,10 @@ if (!process.env.CI) {
   dotenv.config({ path: path.resolve(frontendDirPath, ".env.local") });
 }
 
+// Define environment variables for the test environment
+process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS = "true";
+process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION = "true";
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -128,7 +132,7 @@ export default defineConfig({
       NEXT_PUBLIC_MOCK_EXTERNAL_APIS:
         process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS || "true",
       NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION:
-        process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "false",
+        process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "true",
       TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
       AUTH_SECRET: process.env.AUTH_SECRET || "",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",

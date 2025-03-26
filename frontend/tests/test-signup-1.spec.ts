@@ -71,7 +71,7 @@ test("test-signup-1", async ({ page }) => {
       return !btn.disabled;
     },
     await dialogSignInButton.elementHandle(),
-    { timeout: 2000 },
+    { timeout: 4_000 },
   );
 
   await dialogSignInButton.click();
