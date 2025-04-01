@@ -223,7 +223,7 @@ export async function createVerificationTokenInDatabase(verificationToken: {
 export async function useVerificationTokenFromDatabase(verificationToken: {
   identifier: string;
   token: string;
-}): Promise<IVerificationToken> {
+}): Promise<IVerificationToken | null> {
   const res = await fetch(`${_baseURL}/auth/use-verification-token/`, {
     method: "POST",
     headers: {

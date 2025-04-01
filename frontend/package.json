@@ -70,6 +70,7 @@
     "formik": "^2.4.6",
     "gts": "^6.0.2",
     "html-react-parser": "^5.2.2",
+    "input-otp": "^1.4.2",
     "install": "^0.13.0",
     "jodit": "^4.5.17",
     "jodit-react": "^5.2.15",

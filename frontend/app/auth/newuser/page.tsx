@@ -194,7 +194,7 @@ export default function SignInPage(): JSX.Element {
       }
     }
 
-    router.push("/auth/verify-request");
+    router.push(`/auth/verify-request?email=${data.email}`);
   };
 
   console.log("SignInPage(): csrfToken: %s", _crsfToken);

@@ -55,6 +55,9 @@ export function verification_mail_html(params: {
 }) {
   const { url, theme } = params;
 
+  const { searchParams } = new URL(url);
+  const token = searchParams.get("token");
+
   const brandColor = theme.brandColor || "#346df1";
   const color = {
     background: "#f9f9f9",
@@ -70,21 +73,34 @@ export function verification_mail_html(params: {
   <table width="100%" border="0" cellspacing="20" cellpadding="0"
     style="background: ${color.mainBackground}; max-width: 600px; margin: auto; border-radius: 10px;">
     <tr>
+      <td align="center"
+        style="padding: 10px; font-size: 22px; font-weight: bold; line-height: 25px; font-family: Helvetica, Arial, sans-serif; color: ${color.text}; border-bottom: 1px solid #eee;">
+        TuneTrees Signup Verification
+      </td>
+    </tr>
+
+    <tr>
       <td align="center" style="padding: 20px 0;">
         <table border="0" cellspacing="0" cellpadding="0">
           <tr>
-            <td align="center" style="border-radius: 5px;" bgcolor="${color.buttonBackground}"><a href="${url}"
-                target="_self"
-                style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${color.buttonText}; text-decoration: none; border-radius: 5px; padding: 10px 20px; border: 1px solid ${color.buttonBorder}; display: inline-block; font-weight: bold;">Sign
-                in</a></td>
+            <td align="center" style="font-size: 18px; font-family: Helvetica, Arial, sans-serif">
+                You may invoke this sign-in link to verify your email address:
+                <a href="${url}" target="_self">${url}</a></td>
           </tr>
+          <tr>
+            <td align="center">
+              <p style="font-size: 18px; font-family: Helvetica, Arial, sans-serif">
+              Or copy and paste (or type) this code into the verify-request page: ${token}</p>
+            </td>
+          </tr>
+
         </table>
       </td>
     </tr>
     <tr>
       <td align="center"
         style="padding: 0px 0px 10px 0px; font-size: 16px; line-height: 22px; font-family: Helvetica, Arial, sans-serif; color: ${color.text};">
-        If you did not request this email you can safely ignore it.
+        If you did not request this email by signing up for TuneTrees, you may safely ignore it.
       </td>
     </tr>
   </table>
@@ -100,5 +116,7 @@ export function verification_mail_text({
   url: string;
   host: string;
 }) {
-  return `Sign in to ${host}\n${url}\n\n`;
+  const { searchParams } = new URL(url);
+  const token = searchParams.get("token");
+  return `Paste this link into your browser to ${host}\n${url}, or use this code as a one-time password: ${token}\n\n`;
 }

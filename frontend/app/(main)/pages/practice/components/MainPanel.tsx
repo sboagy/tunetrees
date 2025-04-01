@@ -4,8 +4,8 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { useSession } from "next-auth/react";
-import { useEffect, useRef } from "react";
+import { useSession, getSession } from "next-auth/react";
+import { useEffect, useRef, useState } from "react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
@@ -38,17 +38,41 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
     }
   };
 
+  const { status } = useSession();
+  console.log("MainPanel ===> MainPanel.tsx:53 ~ status", status);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   useEffect(() => {
+    const refreshSession = async () => {
+      if (status === "unauthenticated") {
+        console.log("MainPanel ===> Forcing session refresh...");
+        setIsRefreshing(true); // Indicate that the session is being refreshed
+        try {
+          const newSession = await getSession();
+          if (newSession) {
+            console.log("MainPanel ===> Session refreshed:", newSession);
+          } else {
+            console.error("MainPanel ===> Failed to refresh session.");
+          }
+        } catch (error) {
+          console.error("MainPanel ===> Error refreshing session:", error);
+        } finally {
+          setIsRefreshing(false); // Refreshing is complete
+        }
+      }
+    };
+
+    void refreshSession(); // Call the async function
     // Collapse the sidebar if on a small device
     if (window !== undefined && sidebarRef.current && window.innerWidth < 768) {
       sidebarRef.current.collapse();
     }
-  }, []);
+  }, [status]);
 
-  const { status } = useSession();
-  console.log("MainPanel ===> MainPanel.tsx:53 ~ status", status);
+  // const { status } = useSession();
+  // console.log("MainPanel ===> MainPanel.tsx:53 ~ status", status);
 
-  if (status === "loading") {
+  if (status === "loading" || isRefreshing) {
     // I'm not sure if this will occur, but it's here just in case.
     return <div>Loading...</div>;
   }

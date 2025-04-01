@@ -67,9 +67,12 @@ export const newUser = async (
 
   const emailTo = email;
 
-  const token: string = btoa(
-    `${email}:${Math.random().toString(36).substring(2, 15)}`,
-  );
+  // const token: string = btoa(
+  //   `${email}:${Math.random().toString(36).substring(2, 15)}`,
+  // );
+
+  // Generate a 6-digit one-time password for verification
+  const token = Math.floor(100000 + Math.random() * 900000).toString();
   const expires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours from now
   if (!ttHttpAdapter.createVerificationToken) {
     throw new Error("ttHttpAdapter.createVerificationToken is not defined.");
