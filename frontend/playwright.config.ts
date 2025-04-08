@@ -16,8 +16,13 @@ if (!process.env.CI) {
 }
 
 // Define environment variables for the test environment
-process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS = "true";
-process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION = "true";
+// Set environment variables for tests if they aren't already defined
+if (!process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS) {
+  process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS = "true";
+}
+if (!process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION) {
+  process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION = "true";
+}
 
 /**
  * See https://playwright.dev/docs/test-configuration.
