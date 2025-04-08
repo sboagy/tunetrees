@@ -69,12 +69,12 @@ export function verification_mail_html(params: {
   };
 
   return `
-<body style="background: ${color.background};">
+<body style="background: ${color.background};" data-testid="email-body">
   <table width="100%" border="0" cellspacing="20" cellpadding="0"
-    style="background: ${color.mainBackground}; max-width: 600px; margin: auto; border-radius: 10px;">
+    style="background: ${color.mainBackground}; max-width: 600px; margin: auto; border-radius: 10px;" data-testid="email-container">
     <tr>
       <td align="center"
-        style="padding: 10px; font-size: 22px; font-weight: bold; line-height: 25px; font-family: Helvetica, Arial, sans-serif; color: ${color.text}; border-bottom: 1px solid #eee;">
+        style="padding: 10px; font-size: 22px; font-weight: bold; line-height: 25px; font-family: Helvetica, Arial, sans-serif; color: ${color.text}; border-bottom: 1px solid #eee;" data-testid="email-header">
         TuneTrees Signup Verification
       </td>
     </tr>
@@ -83,14 +83,14 @@ export function verification_mail_html(params: {
       <td align="center" style="padding: 20px 0;">
         <table border="0" cellspacing="0" cellpadding="0">
           <tr>
-            <td align="center" style="font-size: 18px; font-family: Helvetica, Arial, sans-serif">
+            <td align="center" style="font-size: 18px; font-family: Helvetica, Arial, sans-serif" data-testid="email-link-description">
                 You may invoke this sign-in link to verify your email address:
                 <a href="${url}" target="_self">${url}</a></td>
           </tr>
           <tr>
             <td align="center">
-              <p style="font-size: 18px; font-family: Helvetica, Arial, sans-serif">
-              Or copy and paste (or type) this code into the verify-request page: ${token}</p>
+              <p style="font-size: 18px; font-family: Helvetica, Arial, sans-serif" data-testid="verification-code-container">
+              Or copy and paste (or type) this code into the verify-request page: <span>${token}</span></p>
             </td>
           </tr>
 
@@ -99,7 +99,7 @@ export function verification_mail_html(params: {
     </tr>
     <tr>
       <td align="center"
-        style="padding: 0px 0px 10px 0px; font-size: 16px; line-height: 22px; font-family: Helvetica, Arial, sans-serif; color: ${color.text};">
+        style="padding: 0px 0px 10px 0px; font-size: 16px; line-height: 22px; font-family: Helvetica, Arial, sans-serif; color: ${color.text};" data-testid="email-footer">
         If you did not request this email by signing up for TuneTrees, you may safely ignore it.
       </td>
     </tr>
