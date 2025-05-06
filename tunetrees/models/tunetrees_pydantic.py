@@ -27,6 +27,9 @@ class AlgTypeEnum(str, Enum):
     FSRS = "FSRS"
 
 
+AlgorithmType = AlgTypeEnum
+
+
 class WhichTabEnum(str, Enum):
     scheduled = "scheduled"
     repertoire = "repertoire"
@@ -241,6 +244,7 @@ class PlaylistModel(BaseModel):
     user_ref: Optional[int]
     instrument_ref: Optional[int]
     deleted: Optional[bool]
+    sr_alg_type: Optional[str] = Field(default=None)
 
     class Config:
         orm_mode = True
@@ -252,6 +256,7 @@ class PlaylistModelPartial(BaseModel):
     user_ref: Optional[int] = None
     instrument_ref: Optional[int] = None
     deleted: Optional[bool] = None
+    sr_alg_type: Optional[str] = Field(default=None)
 
     class Config:
         orm_mode = True
@@ -706,6 +711,7 @@ class UserModel(BaseModel):
     )
     image: Optional[str] = Field(default=None, alias="image")
     hash: Optional[str] = Field(default=None, alias="hash")
+    sr_alg_type: Optional[str] = Field(default="FSRS")
 
     class Config:
         orm_mode = True
@@ -727,6 +733,7 @@ class UserModelPartial(BaseModel):
     )
     image: Optional[str] = Field(default=None, alias="image")
     hash: Optional[str] = Field(default=None, alias="hash")
+    sr_alg_type: Optional[str] = Field(default="FSRS")
 
     class Config:
         orm_mode = True

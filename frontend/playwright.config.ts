@@ -23,6 +23,7 @@ if (!process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS) {
 if (!process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION) {
   process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION = "true";
 }
+// process.env.SAVE_COOKIES = "true"; // Save cookies for login tests
 
 /**
  * See https://playwright.dev/docs/test-configuration.

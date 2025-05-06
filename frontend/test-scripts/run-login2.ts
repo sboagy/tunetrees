@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const __dirname = path.dirname(__filename);
 
-export async function runLogin(
+export async function runLoginWithCookieSave(
   page: Page,
   user: string | undefined,
   pw: string | undefined,

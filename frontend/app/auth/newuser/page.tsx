@@ -175,7 +175,7 @@ export default function SignInPage(): JSX.Element {
 
   const router = useRouter();
 
-  const onSubmit = async (data: AccountFormValues) => {
+  const onSubmitHandler = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);
     const host = window.location.host;
 
@@ -242,7 +242,17 @@ export default function SignInPage(): JSX.Element {
           <Form {...form}>
             <form
               onSubmit={(e) => {
-                void form.handleSubmit(onSubmit)(e);
+                e.preventDefault(); // Prevent default form submission behavior
+                console.log("Form submitted"); // Debugging log
+                console.log("Before calling form.handleSubmit"); // Debugging log
+                void form.handleSubmit((data) => {
+                  console.log(
+                    "Inside form.handleSubmit callback with data:",
+                    data,
+                  );
+                  void onSubmitHandler(data);
+                })(e);
+                console.log("After calling form.handleSubmit"); // Debugging log
               }}
               className="space-y-6"
             >

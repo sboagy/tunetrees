@@ -55,7 +55,7 @@ class PlaylistTune(Base):
 t_practice_list_joined = Table(
     "practice_list_joined",
     metadata,
-    Column("id", NullType),
+    Column("id", Integer),
     Column("title", NullType),
     Column("type", NullType),
     Column("structure", NullType),
@@ -84,7 +84,7 @@ t_practice_list_joined = Table(
 t_practice_list_staged = Table(
     "practice_list_staged",
     metadata,
-    Column("id", NullType),
+    Column("id", Integer),
     Column("title", NullType),
     Column("type", NullType),
     Column("structure", NullType),
@@ -140,6 +140,7 @@ class User(Base):
     email_verified = mapped_column(Text, server_default=text("NULL"))
     image = mapped_column(Text)
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
+    sr_alg_type = mapped_column(Text)
 
     account: Mapped[List["Account"]] = relationship(
         "Account", uselist=True, back_populates="user"
@@ -252,6 +253,7 @@ class Playlist(Base):
     user_ref = mapped_column(ForeignKey("user.id"))
     instrument_ref = mapped_column(Integer)
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
+    sr_alg_type = mapped_column(Text)
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="playlist")
     note: Mapped[List["Note"]] = relationship(

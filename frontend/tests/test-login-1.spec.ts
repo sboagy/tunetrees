@@ -14,6 +14,7 @@ import { test } from "@playwright/test";
 import { checkHealth } from "../test-scripts/check-servers";
 
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
+import { runLoginWithCookieSave } from "@/test-scripts/run-login2";
 
 test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
@@ -29,19 +30,28 @@ test.afterEach(async ({ page }) => {
 
 test("test-login-1", async ({ page }) => {
   console.log("===> test-login-1:21 ~ ", "Basic login test");
-  const ttPO = new TuneTreesPageObject(page);
 
   await checkHealth();
+
+  const isCookieSave = process.env.SAVE_COOKIES === "true";
 
   await page.goto("https://localhost:3000", {
     timeout: initialPageLoadTimeout,
     waitUntil: "networkidle",
   });
-
-  await ttPO.runLogin(
-    process.env.TEST1_LOGIN_USER_EMAIL,
-    process.env.TEST1_LOGIN_USER_PASSWORD,
-  );
+  if (isCookieSave) {
+    await runLoginWithCookieSave(
+      page,
+      process.env.TEST1_LOGIN_USER_EMAIL,
+      process.env.TEST1_LOGIN_USER_PASSWORD,
+    );
+  } else {
+    const ttPO = new TuneTreesPageObject(page);
+    await ttPO.runLogin(
+      process.env.TEST1_LOGIN_USER_EMAIL,
+      process.env.TEST1_LOGIN_USER_PASSWORD,
+    );
+  }
 
   // await page.waitForTimeout(1000 * 3);
 

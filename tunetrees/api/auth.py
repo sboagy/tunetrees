@@ -682,6 +682,7 @@ def query_user_to_auth_user(
                     email_verified=user.email_verified,  # for the moment
                     hash=user.hash,
                     image=None,  # for the moment
+                    sr_alg_type=user.sr_alg_type,  # for the moment
                 )
                 return auth_user
             else:

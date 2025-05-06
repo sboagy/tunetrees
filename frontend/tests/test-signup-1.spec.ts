@@ -319,7 +319,9 @@ async function initialSignIn(page: Page) {
   });
   await passwordEntryBox.press("Tab");
 
-  await dialogSignInButton.isEnabled();
+  await dialogSignInButton.isEnabled({ timeout: 60_000 });
+
+  // await page.waitForTimeout(20_000_000);
 
   await dialogSignInButton.click();
 

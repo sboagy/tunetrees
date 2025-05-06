@@ -9,7 +9,6 @@ from supermemo2 import sm_two
 from tabulate import tabulate
 from dateutil.parser import parse
 
-from tunetrees.api.preferences import AlgorithmType
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
     get_practice_record_table,
@@ -17,6 +16,7 @@ from tunetrees.app.queries import (
 )
 from tunetrees.models.quality import NEW, NOT_SET, RESCHEDULED, quality_lookup
 from tunetrees.models.tunetrees import Playlist, PracticeRecord, PrefsSpacedRepetition
+from tunetrees.models.tunetrees_pydantic import AlgorithmType
 
 log = logging.getLogger(__name__)
 
@@ -317,7 +317,7 @@ def update_practice_feedbacks(  # noqa: C901
                     interval = 0
                     repetitions = 0
 
-                if tune_update is None:
+                if tune_update is None:  # type: ignore
                     raise ValueError(f"No update found for tune_id: {tune_id}")
                 quality = tune_update.get("feedback")
                 if not quality:

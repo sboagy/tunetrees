@@ -170,6 +170,7 @@ export interface IPlaylist {
   user_ref: number;
   instrument_ref: number;
   deleted?: boolean | null;
+  sr_alg_type?: string;
 }
 
 export interface IInstrument {
@@ -232,6 +233,7 @@ export interface IUser {
   email_verified?: string | null; // Assuming datetime is converted to string
   image?: string;
   hash?: string;
+  sr_alg_type?: string;
 }
 
 export interface IVerificationTokenParams {
@@ -268,3 +270,36 @@ export interface ITheSessionTuneSummary {
   url: string;
   type: string;
 }
+
+// Moved types from preferences.ts
+
+/**
+ * Enum for algorithm types
+ */
+export enum AlgorithmType {
+  SM2 = "SM2",
+  FSRS = "FSRS",
+}
+
+/**
+ * Interface for spaced repetition preferences
+ */
+export interface IPrefsSpacedRepetitionBase {
+  user_id: number;
+  algorithm: AlgorithmType;
+  fsrs_weights?: string;
+  request_retention?: number;
+  maximum_interval?: number;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface IPrefsSpacedRepetitionCreate
+  extends IPrefsSpacedRepetitionBase {
+  // Inherits all fields from IPrefsSpacedRepetitionBase
+}
+
+export interface IPrefsSpacedRepetitionUpdate {
+  algorithm?: AlgorithmType;
+}
+
+export type IPrefsSpacedRepetitionResponse = IPrefsSpacedRepetitionBase;
