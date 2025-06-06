@@ -197,7 +197,7 @@ const config = {
   callbacks: {
     signIn(params: {
       user: User | AdapterUser;
-      account: Account | null;
+      account?: Account | null;
       /**
        * If OAuth provider is used, it contains the full
        * OAuth profile returned by your provider.
@@ -224,7 +224,7 @@ const config = {
     async jwt(params: {
       token: JWT;
       user: User | AdapterUser;
-      account: Account | null;
+      account?: Account | null;
       profile?: Profile;
       trigger?: "signIn" | "signUp" | "update";
       isNewUser?: boolean;

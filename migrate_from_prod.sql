@@ -5,6 +5,9 @@ ATTACH DATABASE 'tunetrees_do.sqlite3' AS source_db;
 
 PRAGMA foreign_keys = OFF;
 
+--- for this table, the following should be much more robust than naming the fields?
+-- User Table Migration (copy all columns)
+-- INSERT OR REPLACE INTO main.user SELECT * FROM source_db.user;
 -- Tune Type Table Migration
 INSERT
 OR REPLACE INTO main.tune_type (id, name, rhythm, description)
@@ -96,7 +99,9 @@ SELECT
     name,
     email,
     email_verified,
-    image
+    image,
+    deleted BOOLEAN DEFAULT FALSE,
+    sr_alg_type TEXT
 FROM
     source_db.user;
 
