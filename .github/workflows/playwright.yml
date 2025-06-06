@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12.2"
+          python-version: "3.13.1"
       - name: Create virtual environment
         run: python -m venv .venv
 
@@ -30,7 +30,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Install typescript
-        run: npm install -g typescript@5.7.2
+        run: npm install -g typescript@5.8.2
         working-directory: frontend
 
       - name: Install node types
@@ -68,7 +68,16 @@ jobs:
           STORAGE_STATE_TEST1: ${{ secrets.STORAGE_STATE_TEST1 }}
           TEST1_LOGIN_USER_EMAIL: ${{ secrets.TEST1_LOGIN_USER_EMAIL }}
           TEST1_LOGIN_USER_PASSWORD: ${{ secrets.TEST1_LOGIN_USER_PASSWORD }}
+
+          TEST2_LOGIN_USER_EMAIL: ${{ secrets.TEST2_LOGIN_USER_EMAIL }}
+          TEST2_LOGIN_USER_PASSWORD: ${{ secrets.TEST2_LOGIN_USER_PASSWORD }}
+          TEST2_LOGIN_USER_NAME: ${{ secrets.TEST2_LOGIN_USER_NAME }}
+          TEST2_LOGIN_GMAIL_PW: ${{ secrets.TEST2_LOGIN_GMAIL_PW }}
+
+          # TT_REVIEW_SITDOWN_DATE must be specified in Coordinated Universal Time (UTC).
           TT_REVIEW_SITDOWN_DATE: 2024-12-31 16:47:57.671465+00:00
+          THROTTLE_MAX: 0
+          AUTH_TRUST_HOST: true
           # ...add other test-specific environment variables as needed
 
       - uses: actions/upload-artifact@v4

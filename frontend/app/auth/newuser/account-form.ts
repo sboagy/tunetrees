@@ -13,6 +13,7 @@ export const accountFormSchema = z
     //     .max(30, {
     //         message: "User Name must not be longer than 30 characters.",
     //     }),
+    user_id: z.string().optional(),
     password: z
       .string()
       .min(2, {

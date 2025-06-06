@@ -2,7 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import ColumnsMenu from "./ColumnsMenu";
-import { globalFlagManualSorting, useTunesTable } from "./TunesTable"; // Add this import
+import {
+  globalFlagManualSorting,
+  saveTableState,
+  useTunesTable,
+} from "./TunesTable"; // Add this import
 
 import { Input } from "@/components/ui/input";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
@@ -21,9 +25,9 @@ import {
   updateTableStateInDb,
 } from "../settings";
 import type { ITableStateTable, ITuneOverview } from "../types";
+import AddTuneButtonAndDialog from "./AddTuneButtonAndDialog";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
-import NewTuneButton from "./NewTuneButton";
 import { useSitDownDate } from "./SitdownDateProvider";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
@@ -91,6 +95,11 @@ export default function TunesGridRepertoire({
   // persist across renders without causing re-renders.
   const isRefreshing = useRef(false);
 
+  // REVIEW: refreshTunes in TunesGridRepertoire.tsx
+  // I tried to use refreshTunes from
+  // app/[main]/pages/practice/components/TunesContextRepertoire.tsx
+  // but things don't work right then.  It's possible that I may be doing
+  // some double refreshes, but I'm not sure.
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
@@ -255,6 +264,11 @@ export default function TunesGridRepertoire({
           table.resetRowSelection();
         }
         triggerRefresh();
+
+        const tableState: TableState = table.getState();
+        tableState.rowSelection = {};
+        table.setState(tableState);
+        void saveTableState(table, userId, "repertoire", playlistId);
       })
       .catch((error) => {
         console.error("Error submit_practice_feedbacks_result:", error);
@@ -362,19 +376,20 @@ export default function TunesGridRepertoire({
               >
                 {">"}
               </Button> */}
+              {/* <NewTuneButton userId={userId} playlistId={playlistId} /> */}
+              <AddTuneButtonAndDialog userId={userId} playlistId={playlistId} />
+              <DeleteTuneButton
+                userId={userId}
+                playlistId={playlistId}
+                disabled={!isRowsSelected}
+                table={table}
+              />
               <ColumnsMenu
                 user_id={userId}
                 tablePurpose="repertoire"
                 playlistId={playlistId}
                 table={table}
                 triggerRefresh={triggerRefresh}
-              />
-              <NewTuneButton userId={userId} playlistId={playlistId} />
-              <DeleteTuneButton
-                userId={userId}
-                playlistId={playlistId}
-                disabled={!isRowsSelected}
-                table={table}
               />
             </div>
           </div>

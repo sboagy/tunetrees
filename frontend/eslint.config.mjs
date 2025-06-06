@@ -17,6 +17,23 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 });
 
+// Explicitly disable all node rules upfront to avoid compatibility issues
+const disabledNodeRules = {
+  // Disable all Node.js plugin rules that are causing issues
+  "n/no-deprecated-api": "off",
+  "n/no-extraneous-require": "off",
+  "n/no-unpublished-require": "off",
+  "n/no-unsupported-features/es-builtins": "off",
+  "n/no-unsupported-features/node-builtins": "off",
+  "n/no-exports-assign": "off",
+  "n/no-missing-require": "off",
+  "n/no-unsupported-features/es-syntax": "off",
+  "node/no-deprecated-api": "off", // Also disable legacy naming
+  "node/no-missing-require": "off",
+  "node/no-extraneous-require": "off",
+  "node/no-unpublished-require": "off",
+};
+
 export default [
   {
     ignores: [
@@ -38,6 +55,15 @@ export default [
       ".prettierrc.js",
     ],
   },
+  // Global rules that apply to all files - disable problematic node rules
+  {
+    rules: {
+      ...disabledNodeRules,
+    },
+  },
+  // Include basic JS recommended configs
+  js.configs.recommended,
+  // compat.extends with modified configurations
   ...compat.extends(
     "./node_modules/gts/",
     "eslint:recommended",
@@ -45,57 +71,52 @@ export default [
     "plugin:@typescript-eslint/recommended",
     "plugin:react/jsx-runtime",
     "plugin:@typescript-eslint/recommended-requiring-type-checking",
-    "plugin:unicorn/recommended",
   ),
+  // Define plugins and rules in a single config object
   {
     plugins: {
       "@typescript-eslint": typescriptEslint,
       react,
-      unicorn,
     },
-
     languageOptions: {
       parser: tsParser,
       ecmaVersion: "latest",
       sourceType: "module",
-
       parserOptions: {
         ecmaFeatures: {
           jsx: true,
         },
-
         project: "./tsconfig.json",
       },
     },
-
     settings: {
       react: {
         version: "detect",
       },
     },
-
     rules: {
+      ...disabledNodeRules, // Also apply here to ensure they're disabled
+    },
+  },
+  // Include unicorn plugin configuration separately
+  {
+    plugins: {
+      unicorn,
+    },
+    rules: {
+      // Include specific unicorn rules here
+      ...disabledNodeRules, // Also apply node rule disabling here
       "unicorn/consistent-existence-index-check": "off",
       "unicorn/prefer-global-this": "off",
-      "n/no-deprecated-api": "off",
-      "n/no-extraneous-require": "off",
-      "n/no-unpublished-require": "off",
-      "n/no-unsupported-features/es-builtins": "off",
-      "n/no-unsupported-features/node-builtins": "off",
-      "n/no-exports-assign": "off",
-      "n/no-missing-require": "off",
-      "n/no-unsupported-features/es-syntax": "off",
       "unicorn/filename-case": [
         "error",
         {
           cases: {
             kebabCase: true,
           },
-
           ignore: ["layout.tsx", "page.tsx"],
         },
       ],
-
       "unicorn/no-empty-file": "off",
       "unicorn/prefer-module": "off",
       "unicorn/no-null": "off",
@@ -131,12 +152,17 @@ export default [
       "unicorn/prefer-type-error": "error",
       "unicorn/prevent-abbreviations": "off",
       "unicorn/throw-new-error": "off",
+    },
+  },
+  // Common rules for all TypeScript files
+  {
+    rules: {
+      ...disabledNodeRules, // Apply again to ensure coverage
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-redundant-type-constituents": "off",
       "@typescript-eslint/no-unsafe-argument": "off",
-
       "@typescript-eslint/naming-convention": [
         "warn",
         {
@@ -148,7 +174,6 @@ export default [
           selector: "variable",
           types: ["function"],
           format: ["camelCase", "PascalCase"],
-
           filter: {
             regex: "^[A-Z]",
             match: true,
@@ -184,16 +209,15 @@ export default [
           },
         },
       ],
-
       quotes: "off",
     },
   },
+  // Special rules for component files
   {
     files: [
       "components/*.tsx",
       "app/(main)/pages/practice/components/**/*.tsx",
     ],
-
     rules: {
       "unicorn/filename-case": [
         "error",
@@ -201,7 +225,6 @@ export default [
           cases: {
             pascalCase: true,
           },
-
           ignore: ["Sidebar.tsx"],
         },
       ],

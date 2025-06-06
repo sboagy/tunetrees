@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import type { JSX } from "react";
 import { createEmptyTune } from "../queries";
 import type { ITuneOverview } from "../types";
@@ -9,23 +8,30 @@ import { useMainPaneView } from "./MainPaneViewContext";
 interface INewTuneButtonProps {
   userId: number;
   playlistId: number;
+  disabled?: boolean;
+  tuneTitle?: string;
+  genreId?: string | null;
 }
 
 export default function NewTuneButton({
   userId,
   playlistId,
+  disabled = false,
+  tuneTitle = "",
+  genreId = null,
 }: INewTuneButtonProps): JSX.Element {
   const { setCurrentView } = useMainPaneView();
   const { setCurrentTune } = useTune();
 
   const handleClick = () => {
-    const newTune: ITuneOverview = {
-      title: "",
+    const newTune: Partial<ITuneOverview> = {
+      title: tuneTitle,
       type: "",
       structure: null,
       mode: null,
       incipit: null,
-      genre: null,
+      genre: genreId,
+      private_for: userId, // This is a new tune, so it's private by default
       deleted: true, // This is a new tune, so it's deleted by default
       learned: null,
       practiced: null,
@@ -62,11 +68,14 @@ export default function NewTuneButton({
   return (
     <Button
       variant="ghost"
-      size="icon"
+      // size="icon"
       aria-label="Add new reference"
       onClick={handleClick}
+      data-testid="tt-new-tune-button"
+      disabled={disabled}
     >
-      <Plus className="h-4 w-4" />
+      New
+      {/* <Plus className="h-4 w-4" /> */}
     </Button>
   );
 }

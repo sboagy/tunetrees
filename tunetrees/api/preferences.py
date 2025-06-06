@@ -1,68 +1,51 @@
-from fastapi import APIRouter, HTTPException, status
-from typing import List, Optional
-from pydantic import BaseModel
-from enum import Enum
+from fastapi import APIRouter, HTTPException, Query, status
 
-from tunetrees.models.tunetrees import PrefsSpacedRepetition
 from tunetrees.app.database import (
     SessionLocal,
+)
+from tunetrees.models.tunetrees import PrefsSpacedRepetition
+from tunetrees.models.tunetrees_pydantic import (
+    PrefsSpacedRepetitionModel,
+    PrefsSpacedRepetitionModelPartial,
 )  # Import SessionLocal from your database module
 
 # Existing preferences_router
 preferences_router = APIRouter(prefix="/preferences", tags=["preferences"])
 
 
-# Enum for algorithm types (modify as per your actual algorithms)
-class AlgorithmType(str, Enum):
-    SM2 = "SM2"
-    FSRS = "FSRS"
-    # Add other algorithms if applicable
-
-
-# Pydantic models matching ORM definitions
-class PrefsSpacedRepetitionBase(BaseModel):
-    user_id: int
-    algorithm: AlgorithmType
-    # Add other fields from your ORM definition if needed
-
-
-class PrefsSpacedRepetitionCreate(PrefsSpacedRepetitionBase):
-    pass  # Inherit all fields from PrefsSpacedRepetitionBase
-
-
-class PrefsSpacedRepetitionUpdate(BaseModel):
-    algorithm: Optional[AlgorithmType] = None
-    # Add other optional fields for updating if needed
-
-
-class PrefsSpacedRepetitionResponse(PrefsSpacedRepetitionBase):
-    id: int  # Include the ID in the response
-
-    class Config:
-        orm_mode = True  # Enable ORM mode for automatic data conversion
-
-
 @preferences_router.get(
     "/prefs_spaced_repetition",
-    response_model=List[PrefsSpacedRepetitionResponse],
-    summary="Get all spaced repetition preferences",
-    description="Retrieve all spaced repetition preferences from the database.",
+    response_model=PrefsSpacedRepetitionModel,
+    summary="Get a spaced repetition preference",
+    description="Retrieve a specific spaced repetition preference using alg_type and user_id.",
     status_code=status.HTTP_200_OK,
 )
-def get_prefs_spaced_repetition():
+def get_prefs_spaced_repetition(
+    alg_type: str = Query(..., description="The algorithm type (e.g., SM2, FSRS)"),
+    user_id: int = Query(..., description="The user ID"),
+):
     with SessionLocal() as db:
-        preferences = db.query(PrefsSpacedRepetition).all()
-        return preferences
+        preference = (
+            db.query(PrefsSpacedRepetition)
+            .filter(
+                PrefsSpacedRepetition.alg_type == alg_type,
+                PrefsSpacedRepetition.user_id == user_id,
+            )
+            .first()
+        )
+        if not preference:
+            raise HTTPException(status_code=404, detail="Preference not found")
+        return preference
 
 
 @preferences_router.post(
     "/prefs_spaced_repetition",
-    response_model=PrefsSpacedRepetitionResponse,
+    response_model=PrefsSpacedRepetitionModel,
     summary="Create a new spaced repetition preference",
     description="Create a new spaced repetition preference in the database.",
     status_code=status.HTTP_201_CREATED,
 )
-def create_prefs_spaced_repetition(prefs: PrefsSpacedRepetitionCreate):
+def create_prefs_spaced_repetition(prefs: PrefsSpacedRepetitionModelPartial):
     with SessionLocal() as db:
         db_prefs = PrefsSpacedRepetition(**prefs.model_dump())
         db.add(db_prefs)
@@ -72,17 +55,24 @@ def create_prefs_spaced_repetition(prefs: PrefsSpacedRepetitionCreate):
 
 
 @preferences_router.put(
-    "/prefs_spaced_repetition/{prefs_id}",
-    response_model=PrefsSpacedRepetitionResponse,
+    "/prefs_spaced_repetition",
+    response_model=PrefsSpacedRepetitionModel,
     summary="Update a spaced repetition preference",
-    description="Update an existing spaced repetition preference in the database.",
+    description="Update an existing spaced repetition preference using alg_type and user_id.",
     status_code=status.HTTP_200_OK,
 )
-def update_prefs_spaced_repetition(prefs_id: int, prefs: PrefsSpacedRepetitionUpdate):
+def update_prefs_spaced_repetition(
+    alg_type: str = Query(..., description="The algorithm type (e.g., SM2, FSRS)"),
+    user_id: int = Query(..., description="The user ID"),
+    prefs: PrefsSpacedRepetitionModelPartial = Query(...),
+):
     with SessionLocal() as db:
         db_prefs = (
             db.query(PrefsSpacedRepetition)
-            .filter(PrefsSpacedRepetition.id == prefs_id)
+            .filter(
+                PrefsSpacedRepetition.alg_type == alg_type,
+                PrefsSpacedRepetition.user_id == user_id,
+            )
             .first()
         )
         if not db_prefs:
@@ -95,16 +85,22 @@ def update_prefs_spaced_repetition(prefs_id: int, prefs: PrefsSpacedRepetitionUp
 
 
 @preferences_router.delete(
-    "/prefs_spaced_repetition/{prefs_id}",
+    "/prefs_spaced_repetition",
     summary="Delete a spaced repetition preference",
-    description="Delete an existing spaced repetition preference from the database.",
+    description="Delete an existing spaced repetition preference using alg_type and user_id.",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_prefs_spaced_repetition(prefs_id: int):
+def delete_prefs_spaced_repetition(
+    alg_type: str = Query(..., description="The algorithm type (e.g., SM2, FSRS)"),
+    user_id: int = Query(..., description="The user ID"),
+):
     with SessionLocal() as db:
         db_prefs = (
             db.query(PrefsSpacedRepetition)
-            .filter(PrefsSpacedRepetition.id == prefs_id)
+            .filter(
+                PrefsSpacedRepetition.alg_type == alg_type,
+                PrefsSpacedRepetition.user_id == user_id,
+            )
             .first()
         )
         if not db_prefs:

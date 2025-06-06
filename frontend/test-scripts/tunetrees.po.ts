@@ -21,6 +21,16 @@ export class TuneTreesPageObject {
   readonly tunesGridRows;
   readonly addToRepertoireButton;
   readonly newTuneButton;
+  readonly addTuneButton;
+  readonly addtuneUrlOrTitleInput;
+  readonly addtuneButtonNew;
+  readonly addtuneButtonImport;
+
+  readonly selectSettingButton;
+
+  readonly tuneEditorSubmitButton;
+  readonly tuneEditorCancelButton;
+
   readonly tabsMenuButton;
   readonly tabsMenuCatalogChoice;
   readonly catalogTab;
@@ -74,9 +84,27 @@ export class TuneTreesPageObject {
       .locator("#tt-all-tunes-header div")
       .filter({ hasText: "Add To Repertoire" });
 
-    this.newTuneButton = page
-      .getByTestId("tt-catalog-tab")
-      .getByLabel("Add new reference");
+    this.newTuneButton = page.getByTestId("tt-new-tune-button");
+
+    this.addTuneButton = page
+      // .getByTestId("tt-catalog-tab")
+      .getByTestId("tt-import-button");
+
+    this.addtuneUrlOrTitleInput = page.getByTestId(
+      "addtune-url-or-title-input",
+    );
+
+    this.addtuneButtonNew = page.getByTestId("addtune-button-new");
+    this.addtuneButtonImport = page.getByTestId("addtune-button-import");
+
+    this.selectSettingButton = page.getByTestId("tt-select-setting");
+
+    this.tuneEditorSubmitButton = page.getByTestId(
+      "tt-tune-editor-submit-button",
+    );
+    this.tuneEditorCancelButton = page.getByTestId(
+      "tt-tune-editor-cancel-button",
+    );
 
     this.tableStatus = this.page.getByText(" row(s) selected.");
   }
@@ -96,7 +124,7 @@ export class TuneTreesPageObject {
     this.page.on("pageerror", this.onError);
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForSelector("body");
-    await expect(this.tableStatus).toBeVisible();
+    await this.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
 
     // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
     //   timeout: 60000,
@@ -138,6 +166,7 @@ export class TuneTreesPageObject {
     await this.filterInput.waitFor({ state: "attached" });
     await this.filterInput.click();
 
+    await this.page.waitForTimeout(1000);
     await this.filterInput.fill(tuneTitle, { timeout: 90_000 });
 
     // An exception to the rule that we should not use expect() in PageObjects.
@@ -215,5 +244,53 @@ export class TuneTreesPageObject {
     //   })
     //   .nth(2);
     // await expect(ttPracticeTab2).toBeVisible({ timeout: 60000 });
+  }
+
+  async runLogin(
+    user: string | undefined,
+    pw: string | undefined,
+  ): Promise<void> {
+    if (
+      !process.env.TEST1_LOGIN_USER_EMAIL ||
+      !process.env.TEST1_LOGIN_USER_PASSWORD
+    ) {
+      console.log("===> run-login2.ts:20 ~ ", "No login credentials found");
+      throw new Error("No login credentials found");
+    }
+
+    const topSignInButton = this.page.getByRole("button", { name: "Sign in" });
+    await topSignInButton.click();
+    const userEmailLocator = this.page.getByTestId("user_email");
+    await userEmailLocator.fill(user || "");
+    await userEmailLocator.press("Tab");
+    const passwordEntryBox = this.page.getByTestId("user_password");
+    await passwordEntryBox.fill(pw || "");
+    const dialogSignInButton = this.page.getByRole("button", {
+      name: "Sign In",
+      exact: true,
+    });
+    await passwordEntryBox.press("Tab");
+
+    await this.page.waitForFunction(
+      (button) => {
+        const btn = button as HTMLButtonElement;
+        return !btn.disabled;
+      },
+      await dialogSignInButton.elementHandle(),
+      { timeout: 2000 },
+    );
+
+    await dialogSignInButton.click();
+
+    // Not sure why the following doesn't work.
+    // await this.addToRepertoireButton.waitFor({
+    //   state: "visible",
+    //   timeout: 30_000,
+    // });
+    //
+    // instead, we'll wait for the tableStatus to be visible.
+    await this.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
+
+    console.log("===> run-login2.ts:50 ~ ", "Login completed");
   }
 }

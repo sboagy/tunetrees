@@ -21,7 +21,8 @@
     "source.fixAll.biome": "explicit",
     "source.fixAll.eslint": "explicit",
     "source.removeUnusedImports": "explicit",
-    "source.organizeImports": "explicit",
+    // organizeImports seems to have a bug where it will do all sorts of strange things.
+    "source.organizeImports": "never",
     "source.format": "explicit"
   }
 }

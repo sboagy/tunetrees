@@ -1,6 +1,6 @@
 "use server";
-import sgMail from "@sendgrid/mail";
 import type { MailDataRequired } from "@sendgrid/mail";
+import sgMail from "@sendgrid/mail";
 
 import { signIn as naSignIn, signOut as naSignOut } from ".";
 
@@ -49,11 +49,17 @@ export async function sendGrid(options: {
     dynamicTemplateData: options?.dynamicTemplateData,
   };
 
-  try {
-    const response = await sgMail.send(mailData);
-    console.log("Email sent:", response);
-  } catch (error) {
-    console.error("Error sending email:", error);
-    throw error;
+  if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+    console.log(
+      "===> send-grid.ts:48 ~ sendGrid -- Skipping email send since using mock external APIs",
+    );
+  } else {
+    try {
+      const response = await sgMail.send(mailData);
+      console.log("Email sent:", response);
+    } catch (error) {
+      console.error("Error sending email:", error);
+      throw error;
+    }
   }
 }

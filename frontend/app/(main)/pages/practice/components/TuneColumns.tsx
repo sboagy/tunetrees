@@ -3,6 +3,7 @@
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { transformToDatetimeLocalForDisplay } from "@/lib/date-utils";
 import type { CheckedState } from "@radix-ui/react-checkbox";
 import type {
   CellContext,
@@ -467,7 +468,7 @@ export function get_columns(
         header: ({ column }) =>
           sortableHeader(column, "Practiced", setTunesRefreshId),
         cell: (info) => {
-          return info.getValue();
+          return transformToDatetimeLocalForDisplay(info.getValue() as string);
         },
         enableSorting: true,
         enableHiding: true,
@@ -483,16 +484,19 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        size: 12 * 8, // Approximate width for 11 characters
       },
       {
         accessorKey: "easiness",
         header: ({ column }) =>
           sortableHeader(column, "Easiness", setTunesRefreshId),
         cell: (info) => {
-          return info.getValue();
+          const value = info.getValue() as number;
+          return value.toFixed(2);
         },
         enableSorting: true,
         enableHiding: true,
+        size: 14 * 8, // Approximate width for 11 characters
       },
       {
         accessorKey: "interval",
@@ -503,6 +507,7 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        size: 13 * 8, // Approximate width for 11 characters
       },
       {
         accessorKey: "repetitions",
@@ -513,13 +518,14 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        size: 16 * 8, // Approximate width for 11 characters
       },
       {
         accessorKey: "review_date",
         header: ({ column }) =>
           sortableHeader(column, "Scheduled", setTunesRefreshId),
         cell: (info) => {
-          return new Date(info.getValue() as string).toLocaleDateString();
+          return transformToDatetimeLocalForDisplay(info.getValue() as string);
         },
         enableSorting: true,
         enableHiding: true,

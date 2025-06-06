@@ -92,9 +92,24 @@ export interface ITune {
   title?: string | null;
   type?: string | null;
   structure?: string | null;
+  private_for: number | null;
   mode?: string | null;
   incipit?: string | null;
   genre?: string | null;
+  deleted?: boolean | false;
+  private_for_user?: number | null;
+}
+
+export interface ITuneOverride {
+  id: number;
+  tune_ref: number;
+  user_ref: number;
+  title?: string | null;
+  type?: string | null;
+  structure?: string | null;
+  genre?: string | null;
+  mode?: string | null;
+  incipit?: string | null;
   deleted?: boolean | false;
 }
 
@@ -115,6 +130,10 @@ export interface ITuneOverview extends ITune {
   notes?: string | null;
   favorite_url?: string | null;
   playlist_deleted?: boolean | null;
+}
+
+export interface ITuneOverviewImported extends ITuneOverview {
+  import_url: string | null;
 }
 
 export interface IPracticeRecord {
@@ -151,6 +170,7 @@ export interface IPlaylist {
   user_ref: number;
   instrument_ref: number;
   deleted?: boolean | null;
+  sr_alg_type?: string;
 }
 
 export interface IInstrument {
@@ -185,3 +205,101 @@ export interface IViewPlaylistJoined {
   genre_default?: string;
   instrument_deleted?: boolean;
 }
+
+export interface IAccount {
+  user_id: string;
+  provider_account_id: string;
+  provider: string;
+  type: string; // Assuming AccountType is a string, adjust if necessary
+  access_token?: string | null;
+  token_type?: string | null;
+  id_token?: string | null;
+  scope?: string | null;
+  expires_at?: number | null;
+  session_state?: string | null;
+  refresh_token?: string | null;
+}
+
+export interface ISession {
+  expires?: string;
+  session_token: string;
+  user_id?: number;
+}
+
+export interface IUser {
+  id?: number;
+  name?: string;
+  email?: string;
+  email_verified?: string | null; // Assuming datetime is converted to string
+  image?: string;
+  hash?: string;
+  sr_alg_type?: string;
+}
+
+export interface IVerificationTokenParams {
+  identifier: string;
+  token: string;
+}
+
+export interface IVerificationToken {
+  identifier: string;
+  token: string;
+  expires: string;
+}
+
+export interface IGenreTuneType {
+  id: number;
+  genre_id: number;
+  tune_type_id: number;
+}
+
+export interface ITuneType {
+  id: string;
+  name: string;
+  rhythm: string;
+  description: string;
+}
+
+export interface IExtractedTuneInfo {
+  incipit: string;
+  structure: string;
+}
+
+export interface ITheSessionTuneSummary {
+  name: string;
+  url: string;
+  type: string;
+}
+
+// Moved types from preferences.ts
+
+/**
+ * Enum for algorithm types
+ */
+export enum AlgorithmType {
+  SM2 = "SM2",
+  FSRS = "FSRS",
+}
+
+/**
+ * Interface for spaced repetition preferences
+ */
+export interface IPrefsSpacedRepetitionBase {
+  user_id: number;
+  algorithm: AlgorithmType;
+  fsrs_weights?: string;
+  request_retention?: number;
+  maximum_interval?: number;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface IPrefsSpacedRepetitionCreate
+  extends IPrefsSpacedRepetitionBase {
+  // Inherits all fields from IPrefsSpacedRepetitionBase
+}
+
+export interface IPrefsSpacedRepetitionUpdate {
+  algorithm?: AlgorithmType;
+}
+
+export type IPrefsSpacedRepetitionResponse = IPrefsSpacedRepetitionBase;

@@ -15,8 +15,9 @@ from fastapi import (
     Path,
     Query,
 )
-from sqlalchemy import ColumnElement, Table, and_
+from sqlalchemy import ColumnElement, Table, and_, delete, insert
 from sqlalchemy.future import select
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.query import Query as QueryOrm
 from starlette import status as status
@@ -43,15 +44,20 @@ from tunetrees.models.tunetrees import (
     PracticeRecord,
     Reference,
     Tune,
+    TuneOverride,
+    TuneType,
     t_practice_list_joined,
     t_practice_list_staged,
     t_view_playlist_joined,
+    t_genre_tune_type,
 )
 from tunetrees.models.tunetrees_pydantic import (
     ColumnSort,
     GenreModel,
     GenreModelCreate,
     GenreModelPartial,
+    GenreTuneTypeModel,
+    GenreTuneTypeModelPartial,
     InstrumentModel,
     InstrumentModelPartial,
     NoteModel,
@@ -72,6 +78,10 @@ from tunetrees.models.tunetrees_pydantic import (
     TuneModel,
     TuneModelCreate,
     TuneModelPartial,
+    TuneOverrideModel,
+    TuneOverrideModelPartial,
+    TuneTypeModel,
+    TuneTypeModelPartial,
     ViewPlaylistJoinedModel,
 )
 
@@ -233,6 +243,7 @@ async def submit_feedback(
     return status.HTTP_302_FOUND
 
 
+# DEADCODE: Dead code?
 @router.post("/practice/submit_schedules/{playlist_id}")
 async def submit_schedules(
     playlist_id: str,
@@ -249,10 +260,15 @@ async def submit_schedules(
 async def submit_feedbacks(
     playlist_id: str,
     tune_updates: Dict[str, TuneFeedbackUpdate],
+    sitdown_date: Optional[datetime] = Query(None),
 ):
     logger.debug(f"{tune_updates=}")
 
-    update_practice_feedbacks(tune_updates, playlist_id)
+    update_practice_feedbacks(
+        tune_updates,
+        playlist_id,
+        review_sitdown_date=sitdown_date,
+    )
 
     return status.HTTP_302_FOUND
 
@@ -574,6 +590,44 @@ def get_references(
         raise HTTPException(status_code=500, detail=f"Unable to fetch references: {e}")
 
 
+@router.get(
+    "/references_query",
+    response_model=List[ReferenceModel],
+    summary="Get References by column query",
+    description="Get all references that have a given value in a specified column.",
+    status_code=200,
+)
+def get_references_by_query(
+    url: Optional[str] = Query(None, description="URL to search for in references"),
+) -> List[ReferenceModel]:
+    try:
+        if url is None:
+            return []
+
+        logger.debug(f"Fetching references with URL ({url})")
+        with SessionLocal() as db:
+            stmt = select(Reference).where(Reference.url == url)
+            logger.debug(f"Generated SQL: {stmt}")
+            logger.debug(f"Parameters: url={url}")
+
+            result = db.execute(stmt)
+            references = result.scalars().all()
+            # Debugging: Print the fetched references
+            logger.debug(f"Fetched references: {references}")
+            for reference in references:
+                logger.debug(
+                    f"Reference type: {type(reference)}, Reference: {reference}"
+                )
+
+            result = [
+                ReferenceModel.model_validate(reference) for reference in references
+            ]
+            return result
+    except Exception as e:
+        logger.error(f"Unable to fetch references with URL ({url}): {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to fetch references: {e}")
+
+
 @router.post(
     "/references",
     response_model=ReferenceModel,
@@ -793,6 +847,40 @@ def get_tune(
             )
 
 
+# TODO: This will need to accept user_ref and playlist_ref, in order to search titles
+#       that are in tune_override table.
+@router.get(
+    "/tunes/search",
+    response_model=List[TuneModel],
+    summary="Search Tunes by Title",
+    description="Search for tunes by title using Levenshtein Distance.",
+    status_code=200,
+)
+def search_tunes_by_title(
+    title: str = Query(..., description="Title to search for"),
+    limit: int = Query(10, description="Maximum number of results to return"),
+):
+    try:
+        with SessionLocal() as db:
+            stmt = (
+                select(Tune)
+                .order_by(func.levenshtein(Tune.title, title).desc())
+                .filter(func.levenshtein(Tune.title, title) > 70.0)
+                .limit(limit)
+            )
+            tunes = db.execute(stmt).scalars().all()
+            # if not tunes:
+            #     raise HTTPException(
+            #         status_code=404, detail=f"No tunes found matching title '{title}'"
+            #     )
+            return [TuneModel.model_validate(tune) for tune in tunes]
+    except Exception as e:
+        logger.error(f"Unable to search tunes by title '{title}': {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to search tunes by title '{title}': {e}"
+        )
+
+
 @router.get(
     "/tunes",
     response_model=List[TuneModel],
@@ -942,6 +1030,16 @@ def delete_tune(
             if not existing_tune:
                 raise HTTPException(status_code=404, detail="Tune not found")
 
+            # Delete related records in other tables
+            db.query(PlaylistTune).filter(PlaylistTune.tune_ref == tune_ref).delete()
+            db.query(TuneOverride).filter(TuneOverride.tune_ref == tune_ref).delete()
+            db.query(PracticeRecord).filter(
+                PracticeRecord.tune_ref == tune_ref
+            ).delete()
+            db.query(Note).filter(Note.tune_ref == tune_ref).delete()
+            db.query(Reference).filter(Reference.tune_ref == tune_ref).delete()
+
+            # Delete the tune
             db.delete(existing_tune)
             db.commit()
             return
@@ -1361,20 +1459,19 @@ async def get_view_playlist_joined(
     description="Retrieve a single practice record by playlist_ref and tune_ref",
     status_code=200,
 )
-def get_practice_record(playlist_ref: int, tune_ref: int):
+def get_practice_record(playlist_ref: int, tune_ref: int) -> PracticeRecordModel:
     try:
         with SessionLocal() as db:
-            record = (
-                db.query(PracticeRecord)
-                .filter(
-                    PracticeRecord.playlist_ref == playlist_ref,
-                    PracticeRecord.tune_ref == tune_ref,
-                )
-                .first()
+            stmt = select(PracticeRecord).where(
+                PracticeRecord.playlist_ref == playlist_ref,
+                PracticeRecord.tune_ref == tune_ref,
             )
+            record = db.execute(stmt).scalar_one_or_none()
+
             if not record:
                 raise HTTPException(status_code=404, detail="Practice record not found")
-            return PracticeRecordModel.model_dump(record)
+
+            return PracticeRecordModel.model_validate(record)
     except HTTPException as e:
         logger.error("HTTPException in get_practice_record: %s", e)
         raise e
@@ -1390,14 +1487,17 @@ def get_practice_record(playlist_ref: int, tune_ref: int):
     description="Create a new practice record (playlist_ref and tune_ref in the body)",
     status_code=201,
 )
-def create_practice_record(record: PracticeRecordModelPartial):
+def create_practice_record(record: PracticeRecordModelPartial) -> PracticeRecordModel:
     try:
         with SessionLocal() as db:
             db_record = PracticeRecord(**record.model_dump(exclude_unset=True))
             db.add(db_record)
             db.commit()
             db.refresh(db_record)
-            return PracticeRecordModel.model_dump(db_record)
+            result = PracticeRecordModel.model_validate(
+                db_record
+            )  # Using model_validate
+            return result
     except HTTPException as e:
         logger.error("HTTPException in create_practice_record: %s", e)
         raise e
@@ -1415,22 +1515,22 @@ def create_practice_record(record: PracticeRecordModelPartial):
 )
 def update_practice_record_patch(
     playlist_ref: int, tune_ref: int, record: PracticeRecordModelPartial
-):
+) -> PracticeRecordModel:
     try:
         with SessionLocal() as db:
-            db_record = (
-                db.query(PracticeRecord)
-                .filter(
-                    PracticeRecord.playlist_ref == playlist_ref,
-                    PracticeRecord.tune_ref == tune_ref,
-                )
-                .first()
+            stmt = select(PracticeRecord).where(
+                PracticeRecord.playlist_ref == playlist_ref,
+                PracticeRecord.tune_ref == tune_ref,
             )
+            db_record = db.execute(stmt).scalar_one_or_none()
+
             if not db_record:
                 raise HTTPException(status_code=404, detail="Practice record not found")
+
             update_data = record.model_dump(exclude_unset=True)
             for key, value in update_data.items():
                 setattr(db_record, key, value)
+
             db.commit()
             db.refresh(db_record)
             result = PracticeRecordModel.model_validate(db_record)
@@ -1443,31 +1543,374 @@ def update_practice_record_patch(
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
+@router.put(
+    "/practice_record/{playlist_ref}/{tune_ref}",
+    response_model=PracticeRecordModel,
+    summary="Create or update a practice record",
+    description="Create a new practice record if it doesn't exist, or update an existing one",
+    status_code=200,
+)
+def upsert_practice_record(
+    playlist_ref: int, tune_ref: int, record: PracticeRecordModelPartial
+) -> PracticeRecordModel:
+    try:
+        with SessionLocal() as db:
+            stmt = select(PracticeRecord).where(
+                PracticeRecord.playlist_ref == playlist_ref,
+                PracticeRecord.tune_ref == tune_ref,
+            )
+            db_record = db.execute(stmt).scalar_one_or_none()
+
+            update_data = record.model_dump(exclude_unset=True)
+
+            if not db_record:
+                # Create new record if not found
+                db_record = PracticeRecord(
+                    playlist_ref=playlist_ref, tune_ref=tune_ref, **update_data
+                )
+                db.add(db_record)
+                logger.debug(
+                    f"Creating new practice record for playlist_ref={playlist_ref}, tune_ref={tune_ref}"
+                )
+            else:
+                # Update existing record
+                for key, value in update_data.items():
+                    setattr(db_record, key, value)
+                logger.debug(
+                    f"Updating practice record for playlist_ref={playlist_ref}, tune_ref={tune_ref}"
+                )
+
+            db.commit()
+            db.refresh(db_record)
+            result = PracticeRecordModel.model_validate(db_record)
+            return result
+    except HTTPException as e:
+        logger.error("HTTPException in upsert_practice_record: %s", e)
+        raise e
+    except Exception as e:
+        logger.error("Unexpected error in upsert_practice_record: %s", e)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
 @router.delete(
     "/practice_record/{playlist_ref}/{tune_ref}",
     summary="Delete a practice record",
     description="Delete an existing practice record by playlist_ref and tune_ref",
     status_code=204,
 )
-def delete_practice_record(playlist_ref: int, tune_ref: int):
+def delete_practice_record(playlist_ref: int, tune_ref: int) -> None:
     try:
         with SessionLocal() as db:
-            db_record = (
-                db.query(PracticeRecord)
-                .filter(
-                    PracticeRecord.playlist_ref == playlist_ref,
-                    PracticeRecord.tune_ref == tune_ref,
-                )
-                .first()
+            stmt = select(PracticeRecord).where(
+                PracticeRecord.playlist_ref == playlist_ref,
+                PracticeRecord.tune_ref == tune_ref,
             )
+            db_record = db.execute(stmt).scalar_one_or_none()
             if not db_record:
                 raise HTTPException(status_code=404, detail="Practice record not found")
             db.delete(db_record)
             db.commit()
-            return {"message": "Practice record deleted"}
     except HTTPException as e:
         logger.error("HTTPException in delete_practice_record: %s", e)
         raise e
     except Exception as e:
         logger.error("Unexpected error in delete_practice_record: %s", e)
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+# BOOKMARK: tune_override_query
+@router.get(
+    "/query_tune_override",
+    response_model=TuneOverrideModel,
+    summary="Get Tune Override",
+    description="Retrieve a tune override by its ID.",
+    status_code=200,
+)
+def query_tune_override(
+    user_ref: int = Query(description="User reference ID"),
+    tune_ref: int = Query(description="Tune reference ID"),
+) -> TuneOverrideModel:
+    try:
+        with SessionLocal() as db:
+            # Example usage:
+            tune_override = (
+                db.query(TuneOverride)
+                .filter(
+                    TuneOverride.tune_ref == tune_ref, TuneOverride.user_ref == user_ref
+                )
+                .first()
+            )
+            if not tune_override:
+                raise HTTPException(status_code=404, detail="Tune override not found")
+            return TuneOverrideModel.model_validate(tune_override)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Tune Override API
+@router.get(
+    "/tune_override/{override_id}",
+    response_model=TuneOverrideModel,
+    summary="Get Tune Override",
+    description="Retrieve a tune override by its ID.",
+    status_code=200,
+)
+def get_tune_override(override_id: int) -> TuneOverrideModel:
+    try:
+        with SessionLocal() as db:
+            # Example usage:
+            tune_override = (
+                db.query(TuneOverride).filter(TuneOverride.id == override_id).first()
+            )
+            if not tune_override:
+                raise HTTPException(status_code=404, detail="Tune override not found")
+            return TuneOverrideModel.model_validate(tune_override)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/tune_override",
+    response_model=TuneOverrideModel,
+    summary="Create Tune Override",
+    description="Create a new tune override entry.",
+    status_code=201,
+)
+def create_tune_override(override: TuneOverrideModelPartial) -> TuneOverrideModel:
+    try:
+        with SessionLocal() as db:
+            new_override = TuneOverride(**override.model_dump(exclude_unset=True))
+            db.add(new_override)
+            db.commit()
+            db.refresh(new_override)
+            return TuneOverrideModel.model_validate(new_override)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch(
+    "/tune_override/{override_id}",
+    response_model=TuneOverrideModel,
+    summary="Update Tune Override",
+    description="Update an existing tune override by ID.",
+    status_code=200,
+)
+def update_tune_override(
+    override_id: int, override: TuneOverrideModelPartial
+) -> TuneOverrideModel:
+    try:
+        with SessionLocal() as db:
+            tune_override = (
+                db.query(TuneOverride).filter(TuneOverride.id == override_id).first()
+            )
+            if not tune_override:
+                raise HTTPException(status_code=404, detail="Tune override not found")
+            for key, value in override.model_dump(exclude_unset=True).items():
+                setattr(tune_override, key, value)
+            db.commit()
+            db.refresh(tune_override)
+            return TuneOverrideModel.model_validate(tune_override)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete(
+    "/tune_override/{override_id}",
+    summary="Delete Tune Override",
+    description="Delete an existing tune override by ID.",
+    status_code=204,
+)
+def delete_tune_override(override_id: int) -> None:
+    try:
+        with SessionLocal() as db:
+            tune_override = (
+                db.query(TuneOverride).filter(TuneOverride.id == override_id).first()
+            )
+            if not tune_override:
+                raise HTTPException(status_code=404, detail="Tune override not found")
+            db.delete(tune_override)
+            db.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/tune_type/{tune_type_id}",
+    response_model=TuneTypeModel,
+    summary="Get TuneType",
+    description="Retrieve a TuneType by its ID",
+    status_code=status.HTTP_200_OK,
+)
+async def get_tune_type(tune_type_id: str):
+    with SessionLocal() as db:
+        tune_type = db.query(TuneType).filter(TuneType.id == tune_type_id).first()
+        if not tune_type:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="TuneType not found"
+            )
+        return TuneTypeModel.model_validate(tune_type)
+
+
+@router.post(
+    "/tune_type",
+    response_model=TuneTypeModel,
+    summary="Create TuneType",
+    description="Create a new TuneType",
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_tune_type(tune_type: TuneTypeModel):
+    with SessionLocal() as db:
+        new_tune_type = TuneType(**tune_type.model_dump())
+        db.add(new_tune_type)
+        db.commit()
+        db.refresh(new_tune_type)
+        return TuneTypeModel.model_validate(new_tune_type)
+
+
+@router.patch(
+    "/tune_type/{tune_type_id}",
+    response_model=TuneTypeModel,
+    summary="Update TuneType",
+    description="Update an existing TuneType",
+    status_code=status.HTTP_200_OK,
+)
+async def update_tune_type(tune_type_id: str, tune_type: TuneTypeModelPartial):
+    with SessionLocal() as db:
+        existing_tune_type = (
+            db.query(TuneType).filter(TuneType.id == tune_type_id).first()
+        )
+        if not existing_tune_type:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="TuneType not found"
+            )
+        for key, value in tune_type.model_dump().items():
+            if value is not None:
+                setattr(existing_tune_type, key, value)
+        db.commit()
+        db.refresh(existing_tune_type)
+        return TuneTypeModel.model_validate(existing_tune_type)
+
+
+@router.delete(
+    "/tune_type/{tune_type_id}",
+    summary="Delete TuneType",
+    description="Delete a TuneType by its ID",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_tune_type(tune_type_id: str):
+    with SessionLocal() as db:
+        tune_type = db.query(TuneType).filter(TuneType.id == tune_type_id).first()
+        if not tune_type:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="TuneType not found"
+            )
+        db.delete(tune_type)
+        db.commit()
+        return {"detail": "TuneType deleted successfully"}
+
+
+@router.get(
+    "/genre_tune_type/{genre_id}/{tune_type_id}",
+    response_model=GenreTuneTypeModel,
+    summary="Get Genre-TuneType association",
+    description="Retrieve a Genre-TuneType association by its IDs.",
+    status_code=200,
+)
+async def get_genre_tune_type(genre_id: str, tune_type_id: str) -> GenreTuneTypeModel:
+    with SessionLocal() as db:
+        row = (
+            db.execute(
+                select(t_genre_tune_type).where(
+                    t_genre_tune_type.c.genre_id == genre_id,
+                    t_genre_tune_type.c.tune_type_id == tune_type_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Association not found",
+            )
+        return GenreTuneTypeModel.model_validate(row)
+
+
+@router.post(
+    "/genre_tune_type",
+    response_model=GenreTuneTypeModel,
+    summary="Create Genre-TuneType association",
+    description="Create a new association between Genre and TuneType.",
+    status_code=201,
+)
+async def create_genre_tune_type(data: GenreTuneTypeModelPartial) -> GenreTuneTypeModel:
+    with SessionLocal() as db:
+        insert_stmt = (
+            insert(t_genre_tune_type)
+            .values(**data.model_dump())
+            .returning(t_genre_tune_type)
+        )
+        row = db.execute(insert_stmt).mappings().first()
+        db.commit()
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Insert failed",
+            )
+        return GenreTuneTypeModel.model_validate(row)
+
+
+@router.delete(
+    "/genre_tune_type/{genre_id}/{tune_type_id}",
+    summary="Delete Genre-TuneType association",
+    status_code=204,
+)
+async def delete_genre_tune_type(genre_id: str, tune_type_id: str):
+    with SessionLocal() as db:
+        row_current = (
+            db.execute(
+                select(t_genre_tune_type).where(
+                    t_genre_tune_type.c.genre_id == genre_id,
+                    t_genre_tune_type.c.tune_type_id == tune_type_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if not row_current:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Association not found",
+            )
+        db.execute(
+            delete(t_genre_tune_type).where(
+                t_genre_tune_type.c.genre_id == genre_id,
+                t_genre_tune_type.c.tune_type_id == tune_type_id,
+            )
+        )
+        db.commit()
+
+
+@router.get(
+    "/tune_types/{genre_id}",
+    response_model=List[TuneTypeModel],
+    summary="Get TuneTypes by Genre",
+    description="Retrieve a list of TuneTypes associated with a specific Genre ID",
+    status_code=status.HTTP_200_OK,
+)
+async def get_tune_types_by_genre(genre_id: str):
+    with SessionLocal() as db:
+        tune_types = (
+            db.query(TuneType)
+            .join(t_genre_tune_type, TuneType.id == t_genre_tune_type.c.tune_type_id)
+            .filter(t_genre_tune_type.c.genre_id == genre_id)
+            .all()
+        )
+        if not tune_types:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No TuneTypes found for the given Genre ID",
+            )
+        return [TuneTypeModel.model_validate(tune_type) for tune_type in tune_types]

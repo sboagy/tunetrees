@@ -1,20 +1,27 @@
 "use server";
 
+import type { IUser } from "@/app/(main)/pages/practice/types";
 import {
   type IExtendedAdapterUser,
   getUserExtendedByEmail,
 } from "@/auth/auth-tt-adapter";
 import { matchPasswordWithHash } from "@/auth/password-match";
+import { formatDateForEmailVerification } from "@/lib/date-utils";
 import axios from "axios";
 
 const _baseURL = process.env.NEXT_BASE_URL;
 
 export async function updateUserEmailVerification(user: IExtendedAdapterUser) {
   user.emailVerified = new Date();
-  const stringifyUser = JSON.stringify(user);
+
+  const userPatch: IUser = {
+    id: Number(user.id),
+    email_verified: formatDateForEmailVerification(user.emailVerified),
+  };
+  const stringifyUser = JSON.stringify(userPatch);
 
   const updateUserResponse = await axios.patch(
-    `${_baseURL}/auth/update-user/`,
+    `${_baseURL}/auth/update-user/${user.id}`,
     stringifyUser,
     {
       headers: {

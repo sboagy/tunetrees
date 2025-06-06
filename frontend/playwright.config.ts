@@ -1,3 +1,7 @@
+// Playwright configuration file. See https://playwright.dev/docs/test-configuration
+//
+// This file is used to configure the Playwright test runner. It is used to define the
+// test environment, the browsers to run the tests in, and the test files to run.
 import { defineConfig, devices } from "@playwright/test";
 import * as dotenv from "dotenv";
 import path from "node:path";
@@ -10,6 +14,16 @@ import {
 if (!process.env.CI) {
   dotenv.config({ path: path.resolve(frontendDirPath, ".env.local") });
 }
+
+// Define environment variables for the test environment
+// Set environment variables for tests if they aren't already defined
+if (!process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS) {
+  process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS = "true";
+}
+if (!process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION) {
+  process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION = "true";
+}
+// process.env.SAVE_COOKIES = "true"; // Save cookies for login tests
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -121,6 +135,10 @@ export default defineConfig({
     env: {
       NEXT_BASE_URL: process.env.NEXT_BASE_URL || "",
       NEXT_PUBLIC_TT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
+      NEXT_PUBLIC_MOCK_EXTERNAL_APIS:
+        process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS || "true",
+      NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION:
+        process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "true",
       TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
       AUTH_SECRET: process.env.AUTH_SECRET || "",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",

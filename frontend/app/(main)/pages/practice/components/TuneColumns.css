@@ -1,8 +1,13 @@
 .column-icon-style {
-  @apply ml-2 h-4 w-4;
+  margin-left: 0.5rem; /* 8px */
+  height: 1rem; /* 16px */
+  width: 1rem; /* 16px */
 }
 
 .column-menu-icon-style {
-  @apply ml-2 mr-2 h-4 w-4;
+  margin-left: 0.5rem; /* 8px */
+  margin-right: 0.5rem; /* 8px */
+  height: 1rem; /* 16px */
+  width: 1rem; /* 16px */
 }
 

@@ -12,12 +12,16 @@ import {
 } from "@/auth/auth-tt-adapter";
 
 import { sendGrid } from "@/auth/helpers";
-import axios from "axios";
+import type { AdapterUser } from "next-auth/adapters";
 // import { redirect } from "next/navigation";
 
-const _baseURL = process.env.NEXT_BASE_URL;
-
-export const newUser = async (data: AccountFormValues, host: string) => {
+export const newUser = async (
+  data: AccountFormValues,
+  host: string,
+): Promise<{
+  status: string;
+  linkBackURL: string;
+}> => {
   const email = data.email;
   console.log("newUser data: ", data);
 
@@ -50,54 +54,54 @@ export const newUser = async (data: AccountFormValues, host: string) => {
   // We'll go ahead and create the user in the database, with the hashed password,
   //  but we'll leave the emailVerified field null, until the user verifies their email.
   // And we won't allow logging in until the email is verified.
-  const user: IExtendedAdapterUser = {
-    id: "",
+  const user: Partial<IExtendedAdapterUser> = {
     name: data.name,
     email: email,
-    emailVerified: null,
 
     hash: bcrypt.hashSync(data.password, bcrypt.genSaltSync()),
   };
 
-  const stringifiedUser = JSON.stringify(user);
+  // const stringifiedUser = JSON.stringify(user);
 
-  try {
-    // Calling fetch or the ttHttpAdapter.createUser method will
-    // fail here with an 'write EPIPE' error.  Are we really running
-    // on the server here?
-    //
-    // const create_user_response = await fetch("/auth/signup/", {
-    //   method: "POST",
-    //   headers: {
-    //     accept: "application/json",
-    //     "Content-Type": "application/json",
-    //   },
-    //   body: stringifiedUser,
-    // });
-    // const data = await create_user_response.json();
-    // console.log(data);
-    // const create_user_response = await ttHttpAdapter.createUser(user);
+  const fullUser = await ttHttpAdapter.createUser(user as AdapterUser);
 
-    const createUserResponse = await axios.post(
-      `${_baseURL}/auth/signup/`,
-      stringifiedUser,
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
-    );
-    console.log("createUserResponse: ", createUserResponse);
-  } catch (error) {
-    console.error(error);
-    throw error;
+  const emailTo = email;
+
+  // const token: string = btoa(
+  //   `${email}:${Math.random().toString(36).substring(2, 15)}`,
+  // );
+
+  // Generate a 6-digit one-time password for verification
+  const token = Math.floor(100000 + Math.random() * 900000).toString();
+  const expires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours from now
+  if (!ttHttpAdapter.createVerificationToken) {
+    throw new Error("ttHttpAdapter.createVerificationToken is not defined.");
+  }
+  const verificationToken = await ttHttpAdapter.createVerificationToken({
+    identifier: email,
+    expires,
+    token,
+  });
+  if (!verificationToken) {
+    // I think delete user here, which we know was created in this function
+    // if we got this far, if we can't create the verification token.
+    if (!ttHttpAdapter.deleteUser) {
+      throw new Error("ttHttpAdapter.deleteUser is not defined.");
+    }
+    try {
+      await ttHttpAdapter.deleteUser(fullUser.id);
+    } catch (error) {
+      console.error(
+        `Failed to delete user after failed verification token creation: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      );
+    }
+    throw new Error("Failed to create verification token.");
   }
 
-  // const email_to = email;
-  const emailTo = "sboagy@gmail.com";
-
-  // const linkBackURL = `https://${host}/api/verify-user?email=${email}&password=${data.password}`;
-  const linkBackURL = `https://${host}/auth/login?email=${email}`;
+  const linkBackURL = `https://${host}/api/verify-user?email=${email}&token=${verificationToken.token}`;
+  // const linkBackURL = `https://${host}/auth/login?email=${email}`;
 
   const sendGridResponse = await sendGrid({
     to: emailTo,
@@ -121,6 +125,7 @@ export const newUser = async (data: AccountFormValues, host: string) => {
 
   return {
     status: `User created successfully.  Verification email sent to ${email}.`,
+    linkBackURL: linkBackURL,
   };
 
   // Redirect to verify-request page

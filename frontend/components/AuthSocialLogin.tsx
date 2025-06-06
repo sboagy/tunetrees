@@ -15,7 +15,9 @@ export function SocialLoginButtons(providerMap: ProviderMap) {
       {Object.values(providerMap)
         .filter(
           (provider) =>
-            provider.id !== "credentials" && provider.id !== "sendgrid",
+            provider.id !== "credentials" &&
+            provider.id !== "sendgrid" &&
+            provider.id !== "token-credential",
         )
         .map((provider) => (
           <form key={provider.id} action={() => void doSocialLogin2(provider)}>

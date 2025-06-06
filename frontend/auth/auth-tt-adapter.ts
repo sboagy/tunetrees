@@ -1,23 +1,45 @@
 // import type { Awaitable } from "next-auth/types";
 
-import type { Adapter, AdapterAccount } from "next-auth/adapters";
-
 import type {
+  Adapter,
+  AdapterAccount,
   AdapterSession,
-  AdapterUser,
   VerificationToken,
 } from "next-auth/adapters";
+
+import type {
+  IAccount,
+  ISession,
+  IUser,
+  IVerificationToken,
+} from "@/app/(main)/pages/practice/types";
+import type { AdapterUser } from "next-auth/adapters";
 import { z } from "zod";
+import {
+  createSessionInDatabase,
+  createUserInDatabase,
+  createVerificationTokenInDatabase,
+  deleteSessionFromDatabase,
+  deleteUserFromDatabase,
+  getSessionAndUserFromDatabase,
+  getUserByAccountFromDatabase,
+  getUserByEmailFromDatabase,
+  getUserExtendedByEmailFromDb,
+  getUserFromDatabase,
+  linkAccountInDatabase,
+  unlinkAccountFromDatabase,
+  updateSessionInDatabase,
+  updateUserInDatabase,
+  useVerificationTokenFromDatabase,
+} from "./auth-fetch";
 import {
   createSessionSchema,
   createUserSchema,
   createVerificationTokenSchema,
-  deleteSessionSchema,
   deleteUserSchema,
   getUserByEmailSchema,
   getUserSchema,
   linkAccountSchema,
-  unlinkAccountSchema,
   updateSessionSchema,
   updateUserSchema,
   useVerificationRequestSchema,
@@ -36,18 +58,6 @@ const userAdapterSchema = z.object({
   image: z.string().optional(),
 });
 
-export const getSessionAndUserSchema = z
-  .object({
-    session: adapterSessionSchema,
-    user: userAdapterSchema,
-  })
-  .nullable();
-
-export interface IExtendedAdapterUser extends AdapterUser {
-  hash?: string | null;
-  view_settings?: string;
-}
-
 const userExtendedAdapterSchema = z.object({
   id: z.string(),
   email: z.string().email(),
@@ -61,18 +71,36 @@ const userExtendedAdapterSchema = z.object({
 export const getUserExtendedByEmailSchema =
   userExtendedAdapterSchema.nullable();
 
-function userSerializer(res: IExtendedAdapterUser | null) {
+export const getSessionAndUserSchema = z
+  .object({
+    session: adapterSessionSchema,
+    user: userAdapterSchema,
+  })
+  .nullable();
+
+export interface IExtendedAdapterUser extends AdapterUser {
+  hash?: string | null;
+  view_settings?: string;
+  image?: string;
+}
+
+export interface IAdapterUserAndSession {
+  user: AdapterUser;
+  session: AdapterSession;
+}
+
+function userSerializer(res: IUser | null): IExtendedAdapterUser | null {
   if (res === null) {
     return null;
   }
   let emailVerified = null;
-  if (res?.emailVerified) {
-    emailVerified = new Date(res.emailVerified);
+  if (res?.email_verified) {
+    emailVerified = new Date(res.email_verified);
   }
   const serializedUser = {
-    id: res?.id,
-    name: res?.name,
-    email: res?.email,
+    id: res?.id?.toString() ?? "",
+    name: res?.name ?? "",
+    email: res?.email ?? "",
     image: res?.image,
     emailVerified: emailVerified,
     hash: res?.hash, // ugh, "next-auth-http-adapter" will strip this
@@ -80,46 +108,49 @@ function userSerializer(res: IExtendedAdapterUser | null) {
   return serializedUser;
 }
 
-function sessionSerializer(res: AdapterSession | null | undefined) {
+function sessionSerializer(res: ISession | null | undefined): AdapterSession {
   let expires = null;
   if (res?.expires) {
     expires = new Date(res.expires);
   }
+  if (!expires || !res?.session_token || !res?.user_id) {
+    throw new Error("Invalid session data");
+  }
   return {
     expires: expires,
-    sessionToken: res?.sessionToken,
-    userId: res?.userId,
+    sessionToken: res?.session_token,
+    userId: res?.user_id.toString(),
   };
 }
 
 function userAndSessionSerializer(
-  res: { session: AdapterSession; user: AdapterUser } | null,
-) {
+  res: { session: ISession; user: IUser } | null,
+): IAdapterUserAndSession | null {
   if (!res) {
     return null;
   }
-  const user = userSerializer(res?.user as IExtendedAdapterUser);
+  const user = userSerializer(res?.user);
   const session = sessionSerializer(res?.session);
+  if (!user) {
+    console.log(
+      "===> auth-tt-adapter.ts:116 ~ userAndSessionSerializer, user not found, error?",
+    );
+    return null;
+  }
   const seassionTweaked = { user, session };
   return seassionTweaked;
-  // try{
-  //   let parsed = await getSessionAndUserSchema.parseAsync(seassion_tweaked);
-  //   console.log("userAndSessionSerializer, parsed:");
-  //   console.log(parsed);
-  //   return parsed;
-  // }
-  // catch(e){
-  //   console.error(e);
-  //   throw e
-  // }
 }
 
 function verificationTokenSerializer(
-  res: VerificationToken | null | undefined,
-) {
+  res: IVerificationToken | null | undefined,
+): VerificationToken | null {
   let expires = null;
   if (res?.expires) {
     expires = new Date(res.expires);
+  }
+
+  if (!expires || !res?.identifier || !res?.token) {
+    throw new Error("Invalid verification token data");
   }
 
   return {
@@ -129,7 +160,7 @@ function verificationTokenSerializer(
   };
 }
 
-const _baseURL = process.env.NEXT_BASE_URL;
+export const _baseURL = process.env.NEXT_BASE_URL;
 
 // The createUser method of ttHttpAdapter will strip the hash off,
 // unfortunately, which we need for authentication.  So use this
@@ -137,36 +168,11 @@ const _baseURL = process.env.NEXT_BASE_URL;
 export async function getUserExtendedByEmail(
   email: string,
 ): Promise<IExtendedAdapterUser | null> {
-  const path = `${_baseURL}/auth/get-user-by-email/${email}`;
-  const res = await fetchWithTimeout(path, {
-    method: "GET",
-    headers: {
-      // biome-ignore lint/style/noNonNullAssertion: Not actually sure about this assertion suppression
-      Authorization: process.env.REMOTE_AUTH_RPC_TOKEN!,
-      Accept: "application/json",
-    },
-  });
-  const payload = await res.json();
+  const payload = await getUserExtendedByEmailFromDb(email);
   const serialized = userSerializer(payload);
 
   const parsed = getUserExtendedByEmailSchema.parse(serialized);
   return parsed;
-}
-
-async function fetchWithTimeout(
-  resource: string,
-  options: RequestInit & { timeout?: number } = {},
-) {
-  const { timeout = 16000 } = options;
-
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  const response = await fetch(resource, {
-    ...options,
-    signal: controller.signal,
-  });
-  clearTimeout(id);
-  return response;
 }
 
 function createTuneTreesHttpAdapter(): Adapter {
@@ -174,16 +180,26 @@ function createTuneTreesHttpAdapter(): Adapter {
     async createUser(user) {
       console.log("===> auth-tt-adapter.ts:164 ~ createUser");
       try {
-        const res = await fetchWithTimeout(`${_baseURL}/auth/signup/`, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json; charset=utf-8",
-          },
-          body: JSON.stringify(user),
-        });
-        const payload = await res.json();
+        const user4db: IUser = {
+          email: user.email,
+          name: user.name ?? "",
+          image: user.image ?? "",
+          email_verified: user.emailVerified?.toISOString(),
+        };
+        if ("hash" in user) {
+          user4db.hash = user.hash as string;
+        }
+        if ("image" in user) {
+          user4db.image = user.image as string;
+        }
+
+        const payload = await createUserInDatabase(user4db);
         const serialized = userSerializer(payload);
+
+        // In Zod, the parse method will validate the input object against
+        // the schema and remove any fields that are not explicitly defined
+        // in the schema. This means that the resulting object will only
+        // contain the fields specified in createUserSchema.
         return createUserSchema.parse(serialized) as AdapterUser;
       } catch (error) {
         console.error("===> auth-tt-adapter.ts:173 ~ ", error);
@@ -193,16 +209,10 @@ function createTuneTreesHttpAdapter(): Adapter {
     async getUser(id) {
       console.log("===> auth-tt-adapter.ts:183 ~ getUser");
       try {
-        const res = await fetchWithTimeout(`${_baseURL}/auth/get-user/${id}/`, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        });
-        if (!res) {
+        const payload = await getUserFromDatabase(id);
+        if (!payload) {
           return null;
         }
-        const payload = await res.json();
         const serialized = userSerializer(payload);
         return getUserSchema.parse(serialized);
       } catch (error) {
@@ -213,19 +223,10 @@ function createTuneTreesHttpAdapter(): Adapter {
     async getUserByEmail(email) {
       console.log("===> auth-tt-adapter.ts:203 ~ email");
       try {
-        const res = await fetchWithTimeout(
-          `${_baseURL}/auth/get-user-by-email/${email}`,
-          {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-            },
-          },
-        );
-        if (!res) {
+        const payload = await getUserByEmailFromDatabase(email);
+        if (!payload) {
           return null;
         }
-        const payload = await res.json();
         const serialized = userSerializer(payload);
         return getUserByEmailSchema.parse(serialized);
       } catch (error) {
@@ -236,21 +237,13 @@ function createTuneTreesHttpAdapter(): Adapter {
     async getUserByAccount({ providerAccountId, provider }) {
       console.log("===> auth-tt-adapter.ts:222 ~ getUserByAccount");
       try {
-        const res = await fetchWithTimeout(
-          `${_baseURL}/auth/get-user-by-account/${encodeURIComponent(
-            provider,
-          )}/${encodeURIComponent(providerAccountId)}/`,
-          {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-            },
-          },
+        const payload = await getUserByAccountFromDatabase(
+          provider,
+          providerAccountId,
         );
-        if (!res) {
+        if (!payload) {
           return null;
         }
-        const payload = await res.json();
         const serialized = userSerializer(payload);
         return getUserSchema.parse(serialized);
       } catch (error) {
@@ -260,16 +253,28 @@ function createTuneTreesHttpAdapter(): Adapter {
     },
     async updateUser(user) {
       console.log("===> auth-tt-adapter.ts:247 ~ updateUser");
+
       try {
-        const res = await fetchWithTimeout(`${_baseURL}/auth/update-user/`, {
-          method: "PATCH",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json; charset=utf-8",
-          },
-          body: JSON.stringify(user),
-        });
-        const payload = await res.json();
+        const user4db: IUser = {};
+        if (user.emailVerified) {
+          user4db.email_verified = user.emailVerified?.toISOString();
+        }
+        if (user.email) {
+          user4db.email = user.email;
+        }
+        if (user.name) {
+          user4db.name = user.name;
+        }
+        if (user.image) {
+          user4db.image = user.image;
+        }
+        const userExt = user as IExtendedAdapterUser;
+        if (userExt.hash) {
+          user4db.hash = userExt.hash;
+        }
+        const isServer = typeof window === "undefined";
+        console.log("===> auth-tt-adapter.ts:268 ~ isServer", isServer);
+        const payload = await updateUserInDatabase(Number(user.id), user4db);
         const serialized = userSerializer(payload);
         return updateUserSchema.parse(serialized) as AdapterUser;
       } catch (error) {
@@ -280,19 +285,10 @@ function createTuneTreesHttpAdapter(): Adapter {
     async deleteUser(userId) {
       console.log("===> auth-tt-adapter.ts:266 ~ deleteUser");
       try {
-        const res = await fetchWithTimeout(
-          `${_baseURL}/auth/delete-user/${userId}/`,
-          {
-            method: "DELETE",
-            headers: {
-              Accept: "application/json",
-            },
-          },
-        );
-        if (!res) {
+        const payload = await deleteUserFromDatabase(userId);
+        if (!payload) {
           return null;
         }
-        const payload = await res.json();
         return deleteUserSchema.parse(payload);
       } catch (error) {
         console.error(error);
@@ -302,15 +298,26 @@ function createTuneTreesHttpAdapter(): Adapter {
     async linkAccount(account) {
       console.log("===> auth-tt-adapter.ts:285 ~ linkAccount");
       try {
-        const res = await fetchWithTimeout(`${_baseURL}/auth/link-account/`, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json; charset=utf-8",
-          },
-          body: JSON.stringify(account),
-        });
-        const payload = await res.json();
+        const account4DB: IAccount = {
+          provider_account_id: account.providerAccountId,
+          provider: account.provider,
+          user_id: String(account.userId),
+          type: account.type as string,
+          ...(account.scope && { scope: account.scope }),
+          ...(account.accessToken && {
+            access_token: account.accessToken as string,
+          }),
+          ...(account.tokenType && { token_type: account.tokenType as string }),
+          ...(account.idToken && { id_token: account.idToken as string }),
+          ...(account.expires && { expires_at: Number(account.expires) }),
+          ...(account.sessionState && {
+            session_state: account.sessionState as string, // need to serialize object to string?
+          }),
+          ...(account.refreshToken && {
+            refresh_token: account.refreshToken as string, // need to serialize object to string?
+          }),
+        };
+        const payload = await linkAccountInDatabase(account4DB);
         const parsedRes = linkAccountSchema.parse(payload);
         if (parsedRes && parsedRes.type === "credentials") {
           parsedRes.type = "oauth"; // or any valid AdapterAccountType
@@ -326,18 +333,9 @@ function createTuneTreesHttpAdapter(): Adapter {
     }: Pick<AdapterAccount, "providerAccountId" | "provider">) {
       console.log("===> auth-tt-adapter.ts:309 ~ unlinkAccount");
       try {
-        const res = await fetchWithTimeout(
-          `${_baseURL}/auth/unlink-account/${providerAccountId}/`,
-          {
-            method: "DELETE",
-            headers: {
-              Accept: "application/json",
-            },
-          },
-        );
-        const payload = await res.json();
-        const parsedRes = unlinkAccountSchema.parse(payload);
-        console.log("===> auth-tt-adapter2.ts:252 ~ ", parsedRes);
+        const payload = await unlinkAccountFromDatabase(providerAccountId);
+        // const parsedRes = unlinkAccountSchema.parse(payload);
+        console.log("===> auth-tt-adapter2.ts:252 ~ ", payload);
         return;
       } catch (error) {
         console.log("===> auth-tt-adapter.ts:312 ~ ", error);
@@ -352,15 +350,7 @@ function createTuneTreesHttpAdapter(): Adapter {
           userId,
           expires,
         };
-        const res = await fetchWithTimeout(`${_baseURL}/auth/create-session/`, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json; charset=utf-8",
-          },
-          body: JSON.stringify(session),
-        });
-        const payload = await res.json();
+        const payload = await createSessionInDatabase(session);
         const serialized = sessionSerializer(payload);
         const parsedRes = createSessionSchema.parse(serialized);
         return parsedRes;
@@ -372,17 +362,7 @@ function createTuneTreesHttpAdapter(): Adapter {
     async getSessionAndUser(sessionToken) {
       console.log("===> auth-tt-adapter.ts:355 ~ getSessionAndUser");
       try {
-        const path = `${_baseURL}/auth/get-session/${sessionToken}`;
-        const controller = new AbortController();
-
-        const res = await fetchWithTimeout(path, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-          signal: controller.signal,
-        });
-        const payload = await res.json();
+        const payload = await getSessionAndUserFromDatabase(sessionToken);
         if (!payload) {
           return null;
         }
@@ -393,23 +373,15 @@ function createTuneTreesHttpAdapter(): Adapter {
         return null;
       }
     },
-    async updateSession({ sessionToken, expires, userId }) {
+    async updateSession({ sessionToken, userId, expires }: AdapterSession) {
       console.log("===> auth-tt-adapter.ts:378 ~ updateSession");
       try {
-        const session = {
-          sessionToken,
-          expires,
-          userId,
+        const session: ISession = {
+          session_token: sessionToken,
+          expires: expires.toISOString(),
+          user_id: Number(userId),
         };
-        const res = await fetchWithTimeout(`${_baseURL}/auth/update-session/`, {
-          method: "PATCH",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json; charset=utf-8",
-          },
-          body: JSON.stringify(session),
-        });
-        const payload = await res.json();
+        const payload = await updateSessionInDatabase(session);
         const serialized = sessionSerializer(payload);
         return updateSessionSchema.parse(serialized);
       } catch (error) {
@@ -420,20 +392,12 @@ function createTuneTreesHttpAdapter(): Adapter {
     async deleteSession(sessionToken) {
       console.log("===> auth-tt-adapter.ts:402 ~ deleteSession");
       try {
-        const res = await fetchWithTimeout(
-          `${_baseURL}/auth/delete-session/${sessionToken}/`,
-          {
-            method: "DELETE",
-            headers: {
-              Accept: "application/json",
-            },
-          },
-        );
-        if (!res) {
+        const payload = await deleteSessionFromDatabase(sessionToken);
+        if (!payload) {
           return null;
         }
-        const payload = await res.json();
-        return deleteSessionSchema.parse(payload);
+        return null;
+        // return deleteSessionSchema.parse(payload);
       } catch (error) {
         console.error(error);
         return null;
@@ -447,18 +411,8 @@ function createTuneTreesHttpAdapter(): Adapter {
           expires,
           token,
         };
-        const res = await fetchWithTimeout(
-          `${_baseURL}/auth/create-verification-token/`,
-          {
-            method: "POST",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json; charset=utf-8",
-            },
-            body: JSON.stringify(verificationToken),
-          },
-        );
-        const payload = await res.json();
+        const payload =
+          await createVerificationTokenInDatabase(verificationToken);
         const serialized = verificationTokenSerializer(payload);
         const parsedRes = createVerificationTokenSchema.parse(serialized);
         return parsedRes;
@@ -474,18 +428,8 @@ function createTuneTreesHttpAdapter(): Adapter {
           identifier,
           token,
         };
-        const res = await fetchWithTimeout(
-          `${_baseURL}/auth/use-verification-token/`,
-          {
-            method: "POST",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json; charset=utf-8",
-            },
-            body: JSON.stringify(verificationToken),
-          },
-        );
-        const payload = await res.json();
+        const payload =
+          await useVerificationTokenFromDatabase(verificationToken);
         const serialized = verificationTokenSerializer(payload);
         const parsedRes = useVerificationRequestSchema.parse(serialized);
         return parsedRes;
@@ -538,7 +482,7 @@ function createTuneTreesHttpAdapter(): Adapter {
     //   ): Promise<AdapterAuthenticator> {
     //     console.log("===> auth-tt-adapter.ts:491 ~ updateAuthenticatorCounter");
     //     return await Promise.resolve({
-    //       credentialID,
+    //       credentialID,Í
     //       counter: newCounter,
     //     } as AdapterAuthenticator);
     //   },

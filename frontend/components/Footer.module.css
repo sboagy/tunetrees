@@ -14,11 +14,10 @@
 }
 
 .collapsible-content {
-  /* display: flex; */
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  max-width: 100%; /* Ensure the content does not exceed the container's width */
+  max-width: 100%;
 }
 
 .collapsible-content a {

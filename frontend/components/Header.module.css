@@ -11,7 +11,7 @@
   top: 0;
   opacity: 1;
   overflow: hidden;
-  border-radius: 0 0 0.6rem 0.6rem;
+  border-radius: 0.6rem;
   padding: 0.6rem 1rem;
   margin: 0;
   background-color: rgba(0, 0, 0, 0.05);
@@ -92,28 +92,20 @@
 }
 
 .headerMenuTrigger {
-  @apply 
-    px-4 
-    py-2 
-    /* border 
-    rounded  */
-    /* bg-background  */
-    /* hover:bg-gray-500  */
-    /* focus:outline-none 
-    focus:ring-2  */
-    transition 
-    duration-150 
-    ease-in-out 
-    flex 
-    items-center 
-    space-x-2;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .dropDownMenuChevronDown {
-  @apply 
-    w-4 
-    h-4 
-    text-foreground;
+  width: 1rem;
+  height: 1rem;
+  /* @apply w-4 h-4 text-foreground; */
 }
 
 .dropDownMenuTriggerInnerButton {

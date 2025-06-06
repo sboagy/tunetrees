@@ -1,7 +1,8 @@
 import ClientContextsWrapper from "@/components/ClientContextsWrapper";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemeScript, ThemeScriptNoFlash } from "@/components/ThemeScript";
 import "@radix-ui/themes/styles.css";
-import { auth } from "auth"; // Import your auth function
+import { auth } from "auth";
 import type { Metadata } from "next";
 import type { Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
@@ -22,7 +23,15 @@ export default async function RootLayout({
   const session: Session | null = await auth();
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/jodit@5.2.15/esm/jodit.min.css"
+        />
+        <ThemeScriptNoFlash />
+      </head>
       <body className={`${inter.className} h-full`}>
+        <ThemeScript />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

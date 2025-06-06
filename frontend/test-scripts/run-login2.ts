@@ -1,13 +1,15 @@
-import type { Page } from "@playwright/test";
 import path from "node:path";
+
 import { fileURLToPath } from "node:url";
+
+import type { Page } from "@playwright/test";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const __filename = fileURLToPath(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const __dirname = path.dirname(__filename);
 
-export async function runLogin(
+export async function runLoginWithCookieSave(
   page: Page,
   user: string | undefined,
   pw: string | undefined,
@@ -47,6 +49,6 @@ export async function runLogin(
   );
 
   await signInButton.click();
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(4000);
   await page.context().storageState({ path: storageStatePath });
 }

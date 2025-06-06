@@ -1,96 +1,327 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarIcon, CheckIcon } from "@radix-ui/react-icons";
-import { format } from "date-fns";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+
+import { getCsrfToken, useSession } from "next-auth/react";
+import { useCallback, useEffect, useState } from "react";
+import type { ControllerRenderProps } from "react-hook-form";
+
+// import {
+//   type AccountFormValues,
+//   accountFormSchema,
+// } from "@/app/auth/newuser/account-form";
+import { PasswordInput } from "@/components/PasswordInput";
+import { useRouter } from "next/navigation";
+import { emailSchema } from "@/app/auth/auth-types";
+import { getUser } from "@/app/auth/login/validate-signin";
+import { newUser } from "@/app/auth/newuser/newuser-actions";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { toast } from "@/components/ui/use-toast";
-import { cn } from "@/lib/utils";
-
-const languages = [
-  { label: "English", value: "en" },
-  { label: "French", value: "fr" },
-  { label: "German", value: "de" },
-  { label: "Spanish", value: "es" },
-  { label: "Portuguese", value: "pt" },
-  { label: "Russian", value: "ru" },
-  { label: "Japanese", value: "ja" },
-  { label: "Korean", value: "ko" },
-  { label: "Chinese", value: "zh" },
-] as const;
-
-const accountFormSchema = z.object({
-  name: z
-    .string()
-    .min(2, {
-      message: "Name must be at least 2 characters.",
-    })
-    .max(30, {
-      message: "Name must not be longer than 30 characters.",
-    }),
-  dob: z.date({
-    required_error: "A date of birth is required.",
-  }),
-  language: z.string({
-    required_error: "Please select a language.",
-  }),
-});
-
-type AccountFormValues = z.infer<typeof accountFormSchema>;
+  accountFormSchema,
+  type AccountFormValues,
+} from "@/app/auth/newuser/account-form";
 
 // This can come from your database or API.
-const defaultValues: Partial<AccountFormValues> = {
-  // name: "Your name",
-  // dob: new Date("2023-01-23"),
-};
+// const defaultValues: Partial<AccountFormValues> = {
+//   // name: "Your name",
+//   // dob: new Date("2023-01-23"),
+// };
 
 export function AccountForm() {
+  const { data: session } = useSession();
+  let email = session?.user?.email;
+
+  // const searchParams = useSearchParams();
+  // let email = searchParams.get("email") || "";
+
+  const [_crsfToken, setCrsfToken] = useState("");
+
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
-    defaultValues,
+    defaultValues: {
+      user_id: session?.user?.id || "", // Ensure id has an initial value
+      email: email || "", // Ensure email has an initial value
+      password: "", // Add initial value for password
+      password_confirmation: "", // Add initial value for password_confirmation
+      name: session?.user?.name || "", // Add initial value for name, empty string if null
+      csrfToken: "", // Initialize with empty string
+    },
   });
 
-  function onSubmit(data: AccountFormValues) {
-    toast({
-      title: "You submitted the following values:",
-      description: (
-        <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-          <code className="text-white">{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
+  // Runs once after initial render: The effect runs only once, after the component has rendered for the first time.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+  useEffect(() => {
+    void (async () => {
+      const token = await getCsrfToken();
+      if (token) {
+        setCrsfToken(token);
+        form.setValue("csrfToken", token); // Update form's csrfToken value
+      }
+    })();
+  }, []);
+
+  if (email === "" && typeof window !== "undefined") {
+    const searchParams = new URLSearchParams(window.location.search);
+    email = searchParams.get("email") || email;
   }
+
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordConfirmationError, setPasswordConfirmationError] = useState<
+    string | null
+  >(null);
+
+  const validateEmail = useCallback((email: string): boolean => {
+    if (email === "") {
+      setEmailError(null);
+      return false;
+    }
+
+    const result = emailSchema.safeParse(email);
+    if (!result.success) {
+      setEmailError(result.error.issues[0].message);
+      return false;
+    }
+    setEmailError(null);
+    return true;
+  }, []);
+
+  useEffect(() => {
+    validateEmail(form.getValues("email"));
+  }, [form, validateEmail]);
+
+  const handleEmailChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "email">,
+  ) => {
+    const newEmail = e.target.value;
+    console.log("handleEmailChange: email:", newEmail);
+    field.onChange(e); // Update the form state
+    validateEmail(newEmail);
+
+    if (newEmail) {
+      const user = await getUser(newEmail);
+      if (user) {
+        setEmailError("Email already in use");
+      }
+    }
+  };
+
+  function check_password() {
+    const pw = form.getValues("password");
+    const pwc = form.getValues("password_confirmation");
+    if (!pw || !pwc) {
+      setPasswordError(null);
+      setPasswordConfirmationError(null);
+    } else if (pw === pwc) {
+      setPasswordError(null);
+      setPasswordConfirmationError(null);
+    } else {
+      setPasswordConfirmationError("Passwords do not match");
+    }
+  }
+
+  const handlePasswordChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "password">,
+  ) => {
+    console.log("handlePasswordChange: password:", e.target.value);
+    field.onChange(e); // Update the form state
+    check_password();
+    void form.trigger("password");
+  };
+
+  const handlePasswordConfirmationChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "password_confirmation">,
+  ) => {
+    console.log(
+      "handlePasswordConfirmationChange: password_confirmation:",
+      e.target.value,
+    );
+    field.onChange(e); // Update the form state
+    check_password();
+  };
+
+  const handleUserNameChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "name">,
+  ) => {
+    console.log("handleUserNameChange: name:", e.target.value);
+    field.onChange(e); // Update the form state
+  };
+
+  const router = useRouter();
+
+  const onSubmit = async (data: AccountFormValues) => {
+    console.log("onSubmit called with data:", data);
+    const host = window.location.host;
+
+    const result = await newUser(data, host);
+    console.log(`newUser status result ${result.status}`);
+
+    if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+      const linkBackURL = result.linkBackURL;
+      // Store the linkBackURL in local storage for testing purposes
+      if (typeof window !== "undefined") {
+        localStorage.setItem("linkBackURL", linkBackURL);
+      } else {
+        console.log(
+          "onSubmit(): window is undefined, cannot store linkBackURL for playwright tests",
+        );
+      }
+    }
+
+    router.push(`/auth/verify-request?email=${data.email}`);
+  };
+
+  console.log("SignInPage(): csrfToken: %s", _crsfToken);
+
+  // const handleCancel = () => {
+  //   // tune.deleted = true indicates this is a new tune, so it's
+  //   // safe and proper to delete on cancel.
+  //   if (typeof window !== "undefined") {
+  //     window.location.href = "/";
+  //   }
+  // };
 
   return (
     <Form {...form}>
-      <form onSubmit={void form.handleSubmit(onSubmit)} className="space-y-8">
+      <form
+        onSubmit={(e) => {
+          void form.handleSubmit(onSubmit)(e);
+        }}
+        className="space-y-6"
+      >
+        <FormField
+          control={form.control}
+          name="csrfToken"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <Input
+                  placeholder="csrfToken"
+                  type="hidden"
+                  {...field}
+                  value={_crsfToken} // Use the state variable here
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {/* <FormField
+          control={form.control}
+          name="user_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-muted-foreground">
+                User ID (for reference)
+              </FormLabel>
+              <FormControl>
+                <Input
+                  type="string"
+                  placeholder="user_id"
+                  {...field}
+                  disabled
+                  readOnly
+                  className="opacity-75 cursor-text select-text"
+                  onClick={(e) => e.currentTarget.select()}
+                  data-testid="user_id"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        /> */}
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>EMail</FormLabel>
+              <FormControl>
+                <Input
+                  type="email"
+                  placeholder="person@example.com"
+                  {...field}
+                  onChange={(e) => void handleEmailChange(e, field)}
+                  required
+                  className={emailError ? "border-red-500" : ""}
+                  autoFocus
+                  data-testid="user_email"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {emailError && (
+          <p className="text-red-500 text-sm" role="alert">
+            {emailError}
+          </p>
+        )}
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Password</FormLabel>
+              <FormControl>
+                <PasswordInput
+                  id="password"
+                  placeholder="password"
+                  autoComplete="new-password"
+                  {...field}
+                  onChange={(e) => handlePasswordChange(e, field)}
+                  data-testid="user_password"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {passwordError && (
+          <p className="text-red-500 text-sm" role="alert">
+            {passwordError}
+          </p>
+        )}
+        <FormField
+          control={form.control}
+          name="password_confirmation"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Confirm Password</FormLabel>
+              <FormControl>
+                <PasswordInput
+                  id="password_confirmation"
+                  placeholder="repeat password"
+                  autoComplete="new-password"
+                  {...field}
+                  onChange={(e) => handlePasswordConfirmationChange(e, field)}
+                  data-testid="user_password_verification"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {passwordConfirmationError && (
+          <p className="text-red-500 text-sm" role="alert">
+            {passwordConfirmationError}
+          </p>
+        )}
         <FormField
           control={form.control}
           name="name"
@@ -98,129 +329,42 @@ export function AccountForm() {
             <FormItem>
               <FormLabel>Name</FormLabel>
               <FormControl>
-                <Input placeholder="Your name" {...field} />
+                <Input
+                  placeholder="Your name"
+                  {...field}
+                  onChange={(e) => handleUserNameChange(e, field)}
+                  data-testid="user_name"
+                />
               </FormControl>
-              <FormDescription>
-                This is the name that will be displayed on your profile and in
-                emails.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="dob"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Date of birth</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-[240px] pl-3 text-left font-normal",
-                        !field.value && "text-muted-foreground",
-                      )}
-                    >
-                      {field.value ? (
-                        format(field.value, "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    disabled={(date) =>
-                      date > new Date() || date < new Date("1900-01-01")
-                    }
-                    // initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <FormDescription>
-                Your date of birth is used to calculate your age.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="language"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Language</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <select
-                      className={cn(
-                        "w-[200px] justify-between border border-gray-300 rounded-md p-2",
-                        !field.value && "text-muted-foreground",
-                      )}
-                      value={field.value}
-                      onChange={(e) =>
-                        form.setValue("language", e.target.value)
-                      }
-                    >
-                      <option value="" disabled>
-                        Select language
-                      </option>
-                      {languages.map((language) => (
-                        <option key={language.value} value={language.value}>
-                          {language.label}
-                        </option>
-                      ))}
-                    </select>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-[200px] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search language..." />
-                    <CommandEmpty>No language found.</CommandEmpty>
-                    <CommandList>
-                      <CommandGroup>
-                        {languages.map((language) => (
-                          <CommandItem
-                            value={language.label}
-                            key={language.value}
-                            onSelect={() => {
-                              form.setValue("language", language.value);
-                            }}
-                          >
-                            <CheckIcon
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                language.value === field.value
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            {language.label}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              <FormDescription>
-                This is the language that will be used in the dashboard.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit">Update account</Button>
+        <Button
+          type="submit"
+          variant="secondary"
+          disabled={
+            !_crsfToken ||
+            !!emailError ||
+            !!passwordError ||
+            !!passwordConfirmationError ||
+            !form.getValues("password") ||
+            !form.getValues("password_confirmation") ||
+            !form.getValues("email") ||
+            !form.getValues("name")
+          }
+          className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
+        >
+          Update account
+        </Button>
       </form>
+      {/* <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
+        <div className="flex-1 bg-neutral-300 h-[1px]" />
+        <span className="text-xs leading-4 uppercase text-neutral-500">
+          or sign up with
+        </span>
+        <div className="flex-1 bg-neutral-300 h-[1px]" />
+      </div> */}
     </Form>
   );
 }

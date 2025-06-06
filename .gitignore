@@ -309,3 +309,14 @@ scratch/request_from_swagger.txt
 frontend/scratch/shark_request_from_client.txt
 frontend/scratch/shark_request_from_swagger.txt
 frontend/gists_misc.txt
+frontend/external_html_samples
+.dbeaver
+gist_prompt.txt
+frontend/saved_components.json
+frontend/gist_mermaid_ai.txt
+*.sqlite3-shm
+*.sqlite3-wal
+current_requirements.txt
+compiled_requirements.txt
+frontend/test-scripts/storageStateSboagyLogin.b64
+iti_import_output

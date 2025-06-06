@@ -6,12 +6,14 @@ type FormFieldUpdate = {
   label: string;
   locator: Locator;
   modification: string;
+  select_modification?: string;
   original: string;
   cellId?: string;
 };
 
 export class TuneEditorPageObject extends TuneTreesPageObject {
   readonly sidebarButton: Locator;
+  readonly ffGenre: Locator;
   readonly form: Locator;
   readonly IdTitle: Locator;
   readonly ffTitle: Locator;
@@ -19,7 +21,6 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
   readonly ffStructure: Locator;
   readonly ffMode: Locator;
   readonly ffIncipit: Locator;
-  readonly ffGenre: Locator;
   readonly ffLearned: Locator;
   readonly ffPracticed: Locator;
   readonly ffQuality: Locator;
@@ -30,6 +31,21 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
   readonly ffTags: Locator;
 
   readonly allFormFields: Locator[];
+
+  readonly iffGenre!: number;
+  readonly iffTitle!: number;
+  readonly iffType!: number;
+  readonly iffStructure!: number;
+  readonly iffMode!: number;
+  readonly iffIncipit!: number;
+  readonly iffLearned!: number;
+  readonly iffPracticed!: number;
+  readonly iffQuality!: number;
+  readonly iffEasiness!: number;
+  readonly iffInterval!: number;
+  readonly iffRepetitions!: number;
+  readonly iffReviewDate!: number;
+  readonly iffTags!: number;
 
   readonly sampleBoyneHunt: FormFieldUpdate[];
   readonly sampleSiBheagSiMhorShort: FormFieldUpdate[];
@@ -74,6 +90,12 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
     ];
 
     const tuneEditorFieldsBase: { [key: string]: FormFieldUpdate } = {
+      genre: {
+        label: "Genre",
+        locator: this.ffGenre.locator("select"),
+        modification: "",
+        original: "",
+      },
       title: {
         label: "Title",
         locator: this.ffTitle.locator("input"),
@@ -83,7 +105,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
       },
       type: {
         label: "Type",
-        locator: this.ffType.locator("input"),
+        locator: this.ffType.locator("select"),
         modification: "",
         original: "",
         cellId: "200_type",
@@ -104,12 +126,6 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
       incipit: {
         label: "Incipit",
         locator: this.ffIncipit.locator("input"),
-        modification: "",
-        original: "",
-      },
-      genre: {
-        label: "Genre",
-        locator: this.ffGenre.locator("input"),
         modification: "",
         original: "",
       },
@@ -161,7 +177,19 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
       },
     };
 
+    const fieldKeys = Object.keys(tuneEditorFieldsBase);
+    for (const [index, key] of fieldKeys.entries()) {
+      (this as unknown as Record<string, number>)[
+        `iff${key.charAt(0).toUpperCase() + key.slice(1)}`
+      ] = index;
+    }
+
     this.sampleBoyneHunt = [
+      {
+        ...tuneEditorFieldsBase.genre,
+        modification: "FADO",
+        original: "ITRAD",
+      },
       {
         ...tuneEditorFieldsBase.title,
         modification: "Boyne Hunt x",
@@ -169,7 +197,8 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
       },
       {
         ...tuneEditorFieldsBase.type,
-        modification: "Jig",
+        modification: "FadoCorrido",
+        select_modification: "Fado (Corrido)",
         original: "Reel",
       },
       {
@@ -187,23 +216,19 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
         modification: "|ABC DEF|",
         original: "|A2FA DAFA|DAFA BEeB|",
       },
-      {
-        ...tuneEditorFieldsBase.genre,
-        modification: "FADO",
-        original: "ITRAD",
-      },
+
       {
         ...tuneEditorFieldsBase.learned,
         modification: "2010-11-24",
         original: "2010-11-20",
       },
-      {
-        ...tuneEditorFieldsBase.practiced,
-        modification: "2023-06-06T10:25:16",
-        original: "2023-06-06T22:25:16",
-        // TODO: Have to factor out date formatting and maybe (?) time zone issues
-        // cellId: "200_practiced",
-      },
+      // {
+      //   ...tuneEditorFieldsBase.practiced,
+      //   modification: "2023-06-06T18:25:16",
+      //   original: "2023-06-06T18:25:16",
+      //   // TODO: Have to factor out date formatting and maybe (?) time zone issues
+      //   // cellId: "200_practiced",
+      // },
       {
         ...tuneEditorFieldsBase.quality,
         modification: "2",
@@ -224,17 +249,21 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
         modification: "3",
         original: "0",
       },
-      {
-        ...tuneEditorFieldsBase.scheduled,
-        modification: "2023-06-07T10:25:16",
-        original: "2023-06-07T22:25:16",
-        // TODO: Have to factor out date formatting and maybe (?) time zone issues
-        // cellId: "200_review_date",
-      },
+      // {
+      //   ...tuneEditorFieldsBase.scheduled,
+      //   modification: "2023-06-07T18:25:16",
+      //   original: "2023-06-07T18:25:16",
+      //   // TODO: Have to factor out date formatting and maybe (?) time zone issues
+      //   // cellId: "200_review_date",
+      // },
     ];
 
     // For new tune creation
     this.sampleSiBheagSiMhorShort = [
+      {
+        ...tuneEditorFieldsBase.genre,
+        modification: "ITRAD",
+      },
       {
         ...tuneEditorFieldsBase.title,
         modification: "Sí Bheag, Sí Mhór",
@@ -242,6 +271,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
       {
         ...tuneEditorFieldsBase.type,
         modification: "waltz",
+        select_modification: "Waltz (3/4)",
       },
       {
         ...tuneEditorFieldsBase.structure,
@@ -255,11 +285,24 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
         ...tuneEditorFieldsBase.incipit,
         modification: "de|:f3e d2|d2 de d2|B4 A2|F4 A2|",
       },
-      {
-        ...tuneEditorFieldsBase.genre,
-        modification: "ITRAD",
-      },
     ];
+  }
+
+  async doFormFieldValueMod(formField: FormFieldUpdate): Promise<void> {
+    const tagName = await formField.locator.evaluate((node) =>
+      node.tagName.toLowerCase(),
+    );
+    if (tagName === "input") {
+      await formField.locator.fill(formField.modification);
+    } else if (tagName === "select") {
+      const selectedOption =
+        formField.select_modification !== undefined
+          ? formField.select_modification
+          : formField.modification;
+      await formField.locator.selectOption(selectedOption);
+    } else {
+      throw new Error(`Unsupported form field type: ${tagName}`);
+    }
   }
 
   findUpdateByLabel(

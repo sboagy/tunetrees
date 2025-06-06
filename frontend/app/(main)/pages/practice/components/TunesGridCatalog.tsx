@@ -20,9 +20,9 @@ import {
 } from "../queries";
 import { fetchFilterFromDB, updateTableStateInDb } from "../settings";
 import type { IPlaylistTune, ITuneOverview } from "../types";
+import AddTuneButtonAndDialog from "./AddTuneButtonAndDialog";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
-import NewTuneButton from "./NewTuneButton";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useCatalogTunes } from "./TunesContextCatalog";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
@@ -319,18 +319,19 @@ export default function TunesGridCatalog({
               >
                 {">"}
               </Button> */}
+              {/* <NewTuneButton userId={userId} playlistId={playlistId} /> */}
+              <AddTuneButtonAndDialog userId={userId} playlistId={playlistId} />
+              <DeleteTuneButton
+                userId={userId}
+                disabled={!isRowsSelected}
+                table={table}
+              />
               <ColumnsMenu
                 user_id={userId}
                 tablePurpose="catalog"
                 playlistId={playlistId}
                 table={table}
                 triggerRefresh={triggerRefresh}
-              />
-              <NewTuneButton userId={userId} playlistId={playlistId} />
-              <DeleteTuneButton
-                userId={userId}
-                disabled={!isRowsSelected}
-                table={table}
               />
             </div>
           </div>

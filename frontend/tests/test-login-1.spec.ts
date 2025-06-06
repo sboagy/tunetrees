@@ -1,13 +1,20 @@
+import path from "node:path";
+
 import { restartBackend } from "@/test-scripts/global-setup";
+
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+
 import {
   initialPageLoadTimeout,
   screenShotDir,
 } from "@/test-scripts/paths-for-tests";
+
 import { test } from "@playwright/test";
-import path from "node:path";
+
 import { checkHealth } from "../test-scripts/check-servers";
-import { runLogin } from "../test-scripts/run-login2";
+
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
+import { runLoginWithCookieSave } from "@/test-scripts/run-login2";
 
 test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
@@ -23,20 +30,30 @@ test.afterEach(async ({ page }) => {
 
 test("test-login-1", async ({ page }) => {
   console.log("===> test-login-1:21 ~ ", "Basic login test");
+
   await checkHealth();
+
+  const isCookieSave = process.env.SAVE_COOKIES === "true";
 
   await page.goto("https://localhost:3000", {
     timeout: initialPageLoadTimeout,
     waitUntil: "networkidle",
   });
+  if (isCookieSave) {
+    await runLoginWithCookieSave(
+      page,
+      process.env.TEST1_LOGIN_USER_EMAIL,
+      process.env.TEST1_LOGIN_USER_PASSWORD,
+    );
+  } else {
+    const ttPO = new TuneTreesPageObject(page);
+    await ttPO.runLogin(
+      process.env.TEST1_LOGIN_USER_EMAIL,
+      process.env.TEST1_LOGIN_USER_PASSWORD,
+    );
+  }
 
-  await runLogin(
-    page,
-    process.env.TEST1_LOGIN_USER_EMAIL,
-    process.env.TEST1_LOGIN_USER_PASSWORD,
-  );
-
-  await page.waitForTimeout(1000 * 3);
+  // await page.waitForTimeout(1000 * 3);
 
   await page.screenshot({
     path: path.join(screenShotDir, "page_just_loaded.png"),

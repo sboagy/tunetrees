@@ -175,14 +175,26 @@ export default function SignInPage(): JSX.Element {
 
   const router = useRouter();
 
-  const onSubmit = async (data: AccountFormValues) => {
+  const onSubmitHandler = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);
     const host = window.location.host;
 
     const result = await newUser(data, host);
-    console.log(result);
+    console.log(`newUser status result ${result.status}`);
 
-    router.push("/auth/verify-request");
+    if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+      const linkBackURL = result.linkBackURL;
+      // Store the linkBackURL in local storage for testing purposes
+      if (typeof window !== "undefined") {
+        localStorage.setItem("linkBackURL", linkBackURL);
+      } else {
+        console.log(
+          "onSubmit(): window is undefined, cannot store linkBackURL for playwright tests",
+        );
+      }
+    }
+
+    router.push(`/auth/verify-request?email=${data.email}`);
   };
 
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
@@ -230,7 +242,17 @@ export default function SignInPage(): JSX.Element {
           <Form {...form}>
             <form
               onSubmit={(e) => {
-                void form.handleSubmit(onSubmit)(e);
+                e.preventDefault(); // Prevent default form submission behavior
+                console.log("Form submitted"); // Debugging log
+                console.log("Before calling form.handleSubmit"); // Debugging log
+                void form.handleSubmit((data) => {
+                  console.log(
+                    "Inside form.handleSubmit callback with data:",
+                    data,
+                  );
+                  void onSubmitHandler(data);
+                })(e);
+                console.log("After calling form.handleSubmit"); // Debugging log
               }}
               className="space-y-6"
             >
@@ -266,6 +288,7 @@ export default function SignInPage(): JSX.Element {
                         required
                         className={emailError ? "border-red-500" : ""}
                         autoFocus
+                        data-testid="user_email"
                       />
                     </FormControl>
                     <FormMessage />
@@ -290,6 +313,7 @@ export default function SignInPage(): JSX.Element {
                         autoComplete="new-password"
                         {...field}
                         onChange={(e) => handlePasswordChange(e, field)}
+                        data-testid="user_password"
                       />
                     </FormControl>
                     <FormMessage />
@@ -316,6 +340,7 @@ export default function SignInPage(): JSX.Element {
                         onChange={(e) =>
                           handlePasswordConfirmationChange(e, field)
                         }
+                        data-testid="user_password_verification"
                       />
                     </FormControl>
                     <FormMessage />
@@ -338,6 +363,7 @@ export default function SignInPage(): JSX.Element {
                         placeholder="Your name"
                         {...field}
                         onChange={(e) => handleUserNameChange(e, field)}
+                        data-testid="user_name"
                       />
                     </FormControl>
                     <FormMessage />

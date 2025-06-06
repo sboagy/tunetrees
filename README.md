@@ -8,31 +8,38 @@ to get some insight into the vision of the project.
 **Table of Contents**
 
 <!-- TOC -->
-- [1. Design and Intent](#1-design-and-intent)
-    - [1.1. User-centric Functional Overview](#11-user-centric-functional-overview)
-    - [1.2. System Structure](#12-system-structure)
-    - [1.3. Technology Usage](#13-technology-usage)
-        - [1.3.1. Frontend:](#131-frontend)
-        - [1.3.2. Backend:](#132-backend)
-    - [1.4. Schema:](#14-schema)
-    - [1.5. Alternatives or Potential Technology Evolution](#15-alternatives-or-potential-technology-evolution)
-- [2. Development Processes](#2-development-processes)
-    - [2.1. Generation of ORM code](#21-generation-of-orm-code)
-        - [2.1.1. VSCode Processes  (🚧 This Section a Work in Progress 🚧)](#211-vscode-processes---this-section-a-work-in-progress-)
-        - [2.1.2. Run and Debug in VSCode  (🚧 This Section a Work in Progress 🚧)](#212-run-and-debug-in-vscode---this-section-a-work-in-progress-)
-- [3. Build and Deploy (🚧 This Section a Work in Progress 🚧)](#3-build-and-deploy--this-section-a-work-in-progress-)
-    - [3.1. Basics](#31-basics)
-    - [3.2. Build](#32-build)
-    - [3.3. Deploy](#33-deploy)
-        - [3.3.1. Deploy to Local Docker](#331-deploy-to-local-docker)
-            - [3.3.1.1. ***3.3.1.1. Make local certificates***](#3311-3311-make-local-certificates)
-            - [3.3.1.2. ***3.3.1.2. Use Docker Compose to deploy using webserver_local***](#3312-3312-use-docker-compose-to-deploy-using-webserver_local)
-        - [3.3.2. Deploy to Digital Ocean Droplet](#332-deploy-to-digital-ocean-droplet)
-- [4. Authentication and User Management (🚧 This Section a Work in Progress 🚧)](#4-authentication-and-user-management--this-section-a-work-in-progress-)
-    - [4.1. Mail verification mechanism](#41-mail-verification-mechanism)
-- [5. Credits](#5-credits)
-<!-- /TOC -->
 
+- [1. Design and Intent](#1-design-and-intent)
+  - [1.1. User-centric Functional Overview](#11-user-centric-functional-overview)
+  - [1.2. System Structure](#12-system-structure)
+  - [1.3. Technology Usage](#13-technology-usage)
+    - [1.3.1. Frontend:](#131-frontend)
+    - [1.3.2. Backend:](#132-backend)
+  - [1.4. Schema:](#14-schema)
+  - [1.5. Alternatives or Potential Technology Evolution](#15-alternatives-or-potential-technology-evolution)
+- [2. Development Processes](#2-development-processes)
+  - [2.1. Generation of ORM code](#21-generation-of-orm-code)
+    - [2.1.1. VSCode Processes (🚧 This Section a Work in Progress 🚧)](#211-vscode-processes--this-section-a-work-in-progress-)
+    - [2.1.2. Run and Debug in VSCode (🚧 This Section a Work in Progress 🚧)](#212-run-and-debug-in-vscode--this-section-a-work-in-progress-)
+- [3. Build and Deploy (🚧 This Section a Work in Progress 🚧)](#3-build-and-deploy--this-section-a-work-in-progress-)
+  - [3.1. Basics](#31-basics)
+  - [3.2. Build](#32-build)
+  - [3.3. Deploy](#33-deploy)
+    - [3.3.1. Deploy to Local Docker](#331-deploy-to-local-docker)
+      - [3.3.1.1. **_3.3.1.1. Make local certificates_**](#3311-_3311-make-local-certificates_)
+      - [3.3.1.2. **_3.3.1.2. Use Docker Compose to deploy using webserver_local_**](#3312-_3312-use-docker-compose-to-deploy-using-webserver_local_)
+    - [3.3.2. Deploy to Digital Ocean Droplet](#332-deploy-to-digital-ocean-droplet)
+- [4. Testing](#4-testing)
+  - [4.1. Continuous Integration (CI)](#41-continuous-integration-ci)
+  - [4.2. Test Data Management](#42-test-data-management)
+  - [4.3. React/Next Frontend Testing](#43-reactnext-frontend-testing)
+    - [4.3.1. End-to-End (E2E)](#431-end-to-end-e2e)
+  - [4.4. Python Backend Testing](#44-python-backend-testing)
+    - [4.4.1. Integration Testing](#441-integration-testing)
+- [5. Authentication and User Management (🚧 This Section a Work in Progress 🚧)](#5-authentication-and-user-management--this-section-a-work-in-progress-)
+  - [5.1. Mail verification mechanism](#51-mail-verification-mechanism)
+- [6. Credits](#6-credits)
+<!-- /TOC -->
 
 ## 1. Design and Intent
 
@@ -40,7 +47,7 @@ TuneTrees is a web application with a backend server that manages user data and 
 
 ### 1.1. User-centric Functional Overview
 
-The following sketch illustrates a high-level and abstract _user view_ functional (or feature) overview.  In this rough diagram, boxes are the main intent, and the arrows just imply major relations, with the direction implying general data flow.  The blue boxes illustrate intent and are not yet implemented.
+The following sketch illustrates a high-level and abstract _user view_ functional (or feature) overview. In this rough diagram, boxes are the main intent, and the arrows just imply major relations, with the direction implying general data flow. The blue boxes illustrate intent and are not yet implemented.
 
 ![TuneTrees User-centric Functional Overview](design/tunetrees_functional_overview.drawio.svg)
 
@@ -109,6 +116,7 @@ graph LR
 #### 1.3.1. Frontend:
 
 Handles user interactions, including login, account management, and tune practice.
+
 - HTTP API: Communicates with the backend to access and update user data.
 - User Management: Handles user registration, login, and account settings.
 - Tune Practice: Provides tools for practicing tunes and tracking progress.
@@ -117,6 +125,7 @@ Handles user interactions, including login, account management, and tune practic
 #### 1.3.2. Backend:
 
 Handles user data management, review scheduling, and API requests.
+
 - Database: Stores user data, including tunes, practice history, and review schedules.
 - Review Scheduler: Determines when tunes should be reviewed based on the user's progress.
 
@@ -225,8 +234,8 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
 
 ### 2.1. Generation of ORM code
 
-The SQLAlchemy ORM code is contained in the `tunetrees/models` package in the `tunetrees.py` 
-module.  It should always be generated with the following procedure:
+The SQLAlchemy ORM code is contained in the `tunetrees/models` package in the `tunetrees.py`
+module. It should always be generated with the following procedure:
 
 First, make sure you have [sqlacodegen-v2](https://pypi.org/project/sqlacodegen-v2/) installed:
 
@@ -245,67 +254,71 @@ Then remove the extra `from sqlalchemy.orm.base import Mapped` line from the gen
 Finally, make sure the new code is properly formatted for the project.
 
 > [!NOTE]
-> For the moment, both `black` and `ruff` are being invoked, which is just the author 
+> For the moment, both `black` and `ruff` are being invoked, which is just the author
 > trying to hedge his bets.
 
 ```bash
-black tunetrees/models/tunetrees.py &&  ruff check --fix --select I tunetrees/models/tunetrees.py && ruff check --fix tunetrees 
+black tunetrees/models/tunetrees.py &&  ruff check --fix --select I tunetrees/models/tunetrees.py && ruff check --fix tunetrees
 ```
 
-#### 2.1.1. VSCode Processes  (🚧 This Section a Work in Progress 🚧)
+#### 2.1.1. VSCode Processes (🚧 This Section a Work in Progress 🚧)
 
 To install and set up Visual Studio Code (VSCode) for this project, follow these steps:
 
 1. Download and install VSCode from the official website: [https://code.visualstudio.com/](https://code.visualstudio.com/)
 
 2. Open VSCode and install the following extensions:
-    - Python: This extension provides support for Python development. You can install it by searching for "Python" in the Extensions view and clicking on the "Install" button.
-    - Docker: This extension allows you to work with Docker containers directly from VSCode. Search for "Docker" in the Extensions view and install it.
-    - Remote - Containers: This extension enables you to develop inside a Docker container using VSCode. Install it by searching for "Remote - Containers" in the Extensions view.
+
+   - Python: This extension provides support for Python development. You can install it by searching for "Python" in the Extensions view and clicking on the "Install" button.
+   - Docker: This extension allows you to work with Docker containers directly from VSCode. Search for "Docker" in the Extensions view and install it.
+   - Remote - Containers: This extension enables you to develop inside a Docker container using VSCode. Install it by searching for "Remote - Containers" in the Extensions view.
 
 3. Clone the TuneTrees project repository to your local machine:
-    ```bash
-    git clone https://github.com/your-username/tunetrees.git
-    ```
+
+   ```bash
+   git clone https://github.com/your-username/tunetrees.git
+   ```
 
 4. Open the project folder in VSCode:
-    - Click on "File" in the menu bar.
-    - Select "Open Folder" and navigate to the location where you cloned the TuneTrees repository.
-    - Click "Open" to open the project in VSCode.
+
+   - Click on "File" in the menu bar.
+   - Select "Open Folder" and navigate to the location where you cloned the TuneTrees repository.
+   - Click "Open" to open the project in VSCode.
 
 5. Set up the development environment:
-    - Open the integrated terminal in VSCode by clicking on "View" in the menu bar and selecting "Terminal" from the dropdown menu.
-    - Run the following command to create a virtual environment for the project:
-      ```bash
-      python3 -m venv venv
-      ```
-    - Activate the virtual environment:
-      - On macOS/Linux:
-         ```bash
-         source venv/bin/activate
-         ```
-      - On Windows:
-         ```bash
-         venv\Scripts\activate
-         ```
+
+   - Open the integrated terminal in VSCode by clicking on "View" in the menu bar and selecting "Terminal" from the dropdown menu.
+   - Run the following command to create a virtual environment for the project:
+     ```bash
+     python3 -m venv venv
+     ```
+   - Activate the virtual environment:
+     - On macOS/Linux:
+       ```bash
+       source venv/bin/activate
+       ```
+     - On Windows:
+       ```bash
+       venv\Scripts\activate
+       ```
 
 6. Install the project dependencies:
-    - Run the following command to install the required Python packages:
-      ```bash
-      pip install -r requirements.txt
-      ```
+
+   - Run the following command to install the required Python packages:
+     ```bash
+     pip install -r requirements.txt
+     ```
 
 7. Start the development server:
-    - Run the following command to start the backend server:
-      ```bash
-      uvicorn tunetrees.main:app --reload
-      ```
-    - Open a web browser and navigate to [http://localhost:8000](http://localhost:8000) to access the TuneTrees application.
+   - Run the following command to start the backend server:
+     ```bash
+     uvicorn tunetrees.main:app --reload
+     ```
+   - Open a web browser and navigate to [http://localhost:8000](http://localhost:8000) to access the TuneTrees application.
 
 Now you have VSCode installed and set up for the TuneTrees project. You can start coding and contributing to the project using the powerful features of VSCode.
 
-
-#### 2.1.2. Run and Debug in VSCode  (🚧 This Section a Work in Progress 🚧)
+#### 2.1.2. Run and Debug in VSCode (🚧 This Section a Work in Progress 🚧)
 
 To run and debug your project using `.vscode/launch.json`, follow these steps:
 
@@ -330,7 +343,6 @@ To run and debug your project using `.vscode/launch.json`, follow these steps:
 10. Use the debugging controls in the VSCode toolbar to navigate through your code and control the debugging session. These controls include stepping into functions, stepping over lines, stepping out of functions, and stopping the debugging session.
 
 By following these steps and configuring the `launch.json` file, you can easily run and debug your project in Visual Studio Code.
-
 
 ## 3. Build and Deploy (🚧 This Section a Work in Progress 🚧)
 
@@ -359,15 +371,15 @@ If you are not already familiar with Docker and Docker Compose, we recommend fam
 
 #### 3.3.1. Deploy to Local Docker
 
-For local deployment to Docker containers, these instructions have been tested with [Docker Desktop](https://www.docker.com/products/docker-desktop) on a MacBook Pro with an M3 chip and 48 gigibytes of memory.  
+For local deployment to Docker containers, these instructions have been tested with [Docker Desktop](https://www.docker.com/products/docker-desktop) on a MacBook Pro with an M3 chip and 48 gigibytes of memory.
 
 > [!NOTE]
-> The author has chosen not to use [Rancher Desktop](https://rancherdesktop.io/) at the moment because he believes it may have limitations when it comes to cross-compiling to platform-specific containers. However, it is quite possible that there is a way to configure Rancher Desktop for cross-compilation. Other desktop container options such as [Podman](https://podman.io/) may also be feasible. 
+> The author has chosen not to use [Rancher Desktop](https://rancherdesktop.io/) at the moment because he believes it may have limitations when it comes to cross-compiling to platform-specific containers. However, it is quite possible that there is a way to configure Rancher Desktop for cross-compilation. Other desktop container options such as [Podman](https://podman.io/) may also be feasible.
 
-##### 3.3.1.1. ***3.3.1.1. Make local certificates***
+##### 3.3.1.1. **_3.3.1.1. Make local certificates_**
 
-We recommend using `mkcert` to generate self-signed certificates into a local 
-`dhparam` directory.  To install `mkcert` follow these steps:
+We recommend using `mkcert` to generate self-signed certificates into a local
+`dhparam` directory. To install `mkcert` follow these steps:
 
 **For macOS:**
 
@@ -412,7 +424,7 @@ mkcert localhost
 
 This will generate the `localhost.pem` and `localhost-key.pem` files in the `dhparam` directory.
 
-##### 3.3.1.2. ***3.3.1.2. Use Docker Compose to deploy using webserver_local***
+##### 3.3.1.2. **_3.3.1.2. Use Docker Compose to deploy using webserver_local_**
 
 To deploy the application locally using Docker Compose with a local https ngnx proxy, follow these steps:
 
@@ -420,14 +432,14 @@ To deploy the application locally using Docker Compose with a local https ngnx p
 
 2. Open a terminal or command prompt and navigate to the root directory of the project.
 
-3. Create a `.env.local` file in the `frontend` directory based on the [frontend/template.env.local](https://github.com/sboagy/tunetrees/tree/main/frontend/template.env.local) template.  Replace 
-the IDs and secrets, specifid by the angle-bracketed values, with the correct secrets.  You can supply
-your own secrets, or, if working as part of the project, you can obtain these secrets from the 
-1Password vault assigned to the project, or get them directly from this project's administrator.
+3. Create a `.env.local` file in the `frontend` directory based on the [frontend/template.env.local](https://github.com/sboagy/tunetrees/tree/main/frontend/template.env.local) template. Replace
+   the IDs and secrets, specifid by the angle-bracketed values, with the correct secrets. You can supply
+   your own secrets, or, if working as part of the project, you can obtain these secrets from the
+   1Password vault assigned to the project, or get them directly from this project's administrator.
 
 Obviously ensure that no secrets are ever checked into the github repository.
 
-Before the next step, you should declare `TUNETREES_DB` and `TUNETREES_DEPLOY_BASE_DIR` in 
+Before the next step, you should declare `TUNETREES_DB` and `TUNETREES_DEPLOY_BASE_DIR` in
 your terminal environment (not sure if there's a reasonable way to make this more automatic):
 
 ```shell
@@ -437,40 +449,39 @@ export TUNETREES_DEPLOY_BASE_DIR="/home/sboag/tunetrees"
 
 4. Build the Docker images by running the following command:
 
-    ```bash
-    docker compose build
-    ```
+   ```bash
+   docker compose build
+   ```
 
 5. Start the Docker containers in detached mode by running the following command:
 
-    ```bash
-    docker compose up server frontend webserver_local -d
-    ```
+   ```bash
+   docker compose up server frontend webserver_local -d
+   ```
 
-    This command will start the `server`, `frontend` and `webserver_local` services defined in the `compose.yaml` file.
+   This command will start the `server`, `frontend` and `webserver_local` services defined in the `compose.yaml` file.
 
 6. Wait for the containers to start up. You can check the logs by running the following command:
 
-    ```bash
-    docker-compose logs -f
-    ```
+   ```bash
+   docker-compose logs -f
+   ```
 
-    This will display the logs from both the `server` and `webserver_local` containers.
+   This will display the logs from both the `server` and `webserver_local` containers.
 
 7. Once the containers are up and running, you can access the TuneTrees application by opening a web browser and navigating to [http://localhost:8000](http://localhost:8000).
 
-    Note: The `webserver_local` service acts as a reverse proxy and forwards requests to the `server` service running on port 8000.
+   Note: The `webserver_local` service acts as a reverse proxy and forwards requests to the `server` service running on port 8000.
 
 8. To stop the containers, run the following command:
 
-    ```bash
-    docker-compose down
-    ```
+   ```bash
+   docker-compose down
+   ```
 
-    This will stop and remove the containers, but preserve the data in the SQLite database.
+   This will stop and remove the containers, but preserve the data in the SQLite database.
 
 By following these steps, you will be able to deploy the TuneTrees application locally using Docker Compose with the `webserver_local` service.
-
 
 #### 3.3.2. Deploy to Digital Ocean Droplet
 
@@ -478,7 +489,60 @@ By following these steps, you will be able to deploy the TuneTrees application l
 - local.
 - remote DigitalOcean droplet.
 
-## 4. Authentication and User Management (🚧 This Section a Work in Progress 🚧)
+## 4. Testing
+
+Testing is thin right now, primarily consisting of Playwright End-to-End testing.  
+(No apologies for this thinness, as I prefer to let the design settle down before
+spending excessive time with detailed testing.)
+
+> [!NOTE]
+> Ed: this Testing section a work in progress.
+
+### 4.1. Continuous Integration (CI)
+
+The CI tests only run Playwright at this time, the configuration for which can be
+found in `.github/workflows/playwright.yml`.
+
+### 4.2. Test Data Management
+
+`tunetrees_test_clean.sqlite3` (checked in) is the base test database, and is copied into
+`tunetrees_test.sqlite3` (transient, git ignored) for every test.
+
+Stability of using this test database relies on setting the environment variable
+`TT_REVIEW_SITDOWN_DATE` on the frontend, which must be specified in Coordinated Universal Time (UTC).  
+This value should be set to `2024-12-31 16:47:57.671465+00:00`.
+
+### 4.3. React/Next Frontend Testing
+
+Unit Testing, Integration Testing, Visual Regression Testing, and Accessibility Testing
+is not implemented at this time.
+
+#### 4.3.1. End-to-End (E2E)
+
+Playwright is used for End-to-End testing, the main configuration for which is found
+in `playwright.config.ts`, in the `frontend` directory. Also in the `frontend` directory
+are the `tests` as well as `test-scripts` which hold shared utility scripts for the tests.
+Of particular note is `test-scripts/tunetrees.po.ts` which contains the main Playwright
+Page Object object model for TuneTrees, abstracting many of the components for use by the
+tests.
+
+Stability of Playwright testing relies on setting the environment variable for the frontend to
+`TT_REVIEW_SITDOWN_DATE`, which must be specified in Coordinated Universal Time (UTC).  
+This value should be set to `2024-12-31 16:47:57.671465+00:00`.
+
+### 4.4. Python Backend Testing
+
+Unit Testing is not really implemented at this time. Nor is
+API Testing, Performance Testing, or Security Testing implemented.
+
+For the moment I'm mainly relying on the frontend End-to-End testing to
+test the backend.
+
+#### 4.4.1. Integration Testing
+
+There are a few pytest tests, but these aren't run by CI at this time.
+
+## 5. Authentication and User Management (🚧 This Section a Work in Progress 🚧)
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
@@ -531,11 +595,11 @@ flowchart LR
     end
 ```
 
-### 4.1. Mail verification mechanism
+### 5.1. Mail verification mechanism
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
-## 5. Credits
+## 6. Credits
 
 TuneTrees is a collaborative project developed by a team of dedicated musicians and software engineers. The following individuals have made contributions to the project:
 

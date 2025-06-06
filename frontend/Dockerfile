@@ -13,6 +13,7 @@ COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.mjs next.config.mj
 
 # Copy necessary configuration files
 COPY tsconfig.json  ./tsconfig.json
+COPY tsconfig.theme-script.json  ./tsconfig.theme-script.json
 
 # Install necessary dependencies
 RUN npm install --save-dev @next/eslint-plugin-next
@@ -32,6 +33,7 @@ COPY eslint.config.mjs .prettierrc .prettierrc.js next.config.mjs next.config.mj
 
 # Copy necessary configuration files
 COPY tsconfig.json  ./tsconfig.json
+COPY tsconfig.theme-script.json  ./tsconfig.theme-script.json
 
 # Install TypeScript globally
 RUN npm install -g typescript@5.7.2
@@ -85,9 +87,9 @@ COPY package.json package-lock.json ./
 # Leverage bind mounts to package.json and package-lock.json to avoid having to copy them
 # into this layer.
 RUN --mount=type=bind,source=package.json,target=package.json \
-    --mount=type=bind,source=package-lock.json,target=package-lock.json \
-    --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev
+  --mount=type=bind,source=package-lock.json,target=package-lock.json \
+  --mount=type=cache,target=/root/.npm \
+  npm ci --omit=dev
 
 ################################################################################
 # Create a stage for building the application.
@@ -99,21 +101,25 @@ WORKDIR /usr/src/app
 # Download additional development dependencies before building, as some projects require
 # "devDependencies" to be installed to build. If you don't need this, remove this step.
 RUN --mount=type=bind,source=package.json,target=package.json \
-    --mount=type=bind,source=package-lock.json,target=package-lock.json \
-    --mount=type=cache,target=/root/.npm \
-    npm ci
+  --mount=type=bind,source=package-lock.json,target=package-lock.json \
+  --mount=type=cache,target=/root/.npm \
+  npm ci
 
 # Copy the main application directories.
 COPY app app
 COPY auth auth
+COPY hooks hooks
 COPY components components
 COPY public public
 COPY lib lib
+COPY src src
 
 COPY middleware.ts ./
 COPY components.json next.config.mjs next.config.mjs postcss.config.mjs ./
 COPY tailwind.config.mjs ./
 COPY tsconfig.json ./
+COPY tsconfig.theme-script.json  ./
+
 COPY eslint.config.mjs .prettierrc .prettierrc.js ./
 
 # Run the build script.
@@ -144,6 +150,7 @@ COPY package.json .
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/.next ./.next
 COPY --from=build /usr/src/app/public ./public
+COPY --from=build /usr/src/app/src ./src
 
 # Expose the port that the application listens on.
 EXPOSE 3000

@@ -1,26 +1,53 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@config '../tailwind.config.mjs';
+
+/* Simplified theme handling - just one approach */
+html:not([data-theme-initialized]) {
+  visibility: hidden;
+}
+
+html[data-theme-initialized] {
+  visibility: visible;
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
 
 @layer base {
   :root {
-    --background: 210 20% 95%; /* Changed from 0 0% 100% to a slightly darker hue */
-    --foreground: 222.2 84% 20%; /* Lightened foreground for better readability */
+    --background: 0 0% 100%; /* Changed from 0 0% 100% to a slightly darker hue */
+    --foreground: 222.2 84% 4.9%; /* Lightened foreground for better readability */
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
     --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 30% 90%; /* Adjusted secondary background */
-    --secondary-foreground: 222.2 47.4% 20%; /* Darkened secondary foreground */
-    --muted: 210 30% 90%; /* Adjusted muted background */
-    --muted-foreground: 215.4 16.3% 30%; /* Darkened muted foreground */
+    --secondary: 210 40% 96.1%; /* Adjusted secondary background */
+    --secondary-foreground: 222.2 47.4% 11.2%; /* Darkened secondary foreground */
+    --muted: 210 40% 96.1%; /* Adjusted muted background */
+    --muted-foreground: 215.4 16.3% 46.9%; /* Darkened muted foreground */
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 20%;
+    --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;

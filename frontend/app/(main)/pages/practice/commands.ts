@@ -11,6 +11,7 @@ interface IPracticeFeedbackProps {
   playlist_id: string;
 }
 
+// DEADCODE: Dead code?
 export const submitPracticeFeedback = async ({
   id,
   feedback,
@@ -76,10 +77,15 @@ export const submitPracticeFeedbacks = async ({
   );
 
   try {
+    // Note the TT_REVIEW_SITDOWN_DATE env variable, if set, must be in UTC!
+    const reviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
     const response = await axios({
       method: "post",
       url: `${baseURL}/practice/submit_feedbacks/${playlistId}`,
       data: updates,
+      params: {
+        sitdown_date: reviewSitdownDate,
+      },
       headers: {
         key: "Access-Control-Allow-Origin",
         Accept: "application/json",
@@ -111,6 +117,7 @@ interface IPracticeSchedulesProps {
   updates: { [key: string]: ITuneScheduleUpdate };
 }
 
+// DEADCODE: Dead code?
 export const submitPracticeSchedules = async ({
   playlist_id,
   updates,

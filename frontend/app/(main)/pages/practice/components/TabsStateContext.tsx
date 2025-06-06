@@ -11,6 +11,7 @@ import {
   getTabGroupMainState,
   updateTabGroupMainState,
 } from "../settings";
+import type { TablePurpose } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 
 // For this context, I'm going to use a bit of a different approach to the one
@@ -173,3 +174,33 @@ export const useTabsState = () => {
   }
   return context;
 };
+
+/**
+ * Converts a tab identifier to its corresponding table purpose.
+ * This is really a work-around for the fact that the tab identifiers
+ * to not match the table purposes.
+ *
+ * @param {string} tabId - The identifier of the tab.
+ * @returns {TablePurpose} The purpose associated with the given tab identifier.
+ *
+ * @remarks
+ * The function maps specific tab identifiers to their respective purposes:
+ * - "scheduled" maps to "practice"
+ * - "repertoire" maps to "repertoire"
+ * - "catalog" maps to "catalog"
+ *
+ * If the tab identifier does not match any of the predefined cases, the
+ * function defaults to returning "practice".
+ */
+export function tabIdToPurpose(tabId: string): TablePurpose {
+  switch (tabId) {
+    case "scheduled":
+      return "practice";
+    case "repertoire":
+      return "repertoire";
+    case "catalog":
+      return "catalog";
+    default:
+      return "practice";
+  }
+}
