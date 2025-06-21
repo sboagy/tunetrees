@@ -139,7 +139,7 @@ async def get_scheduled_tunes_overview(
     response_model=List[PracticeListStagedModel],
     description="Retrieve an overview of repertoire tunes for a user and playlist with optional filters and pagination.",
 )
-async def get_tunes_staged(
+async def get_repertoire_tunes_overview(
     user_id: int,
     playlist_ref: int,
     show_deleted: bool = Query(False),
@@ -273,6 +273,7 @@ async def submit_feedbacks(
     return status.HTTP_302_FOUND
 
 
+# DEADCODE: Dead code?
 @router.post("/practice/feedback")
 async def feedback(
     selected_tune: Annotated[int, Form()],
