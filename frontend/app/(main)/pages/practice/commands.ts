@@ -81,7 +81,7 @@ export const submitPracticeFeedbacks = async ({
     const reviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
     const response = await axios({
       method: "post",
-      url: `${baseURL}/practice/submit_feedbacks/${playlistId}`,
+      url: `${url}/${playlistId}`,
       data: updates,
       params: {
         sitdown_date: reviewSitdownDate,
