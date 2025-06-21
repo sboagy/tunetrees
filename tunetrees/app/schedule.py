@@ -1,9 +1,9 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, TypedDict, cast
+from typing import Dict, List, Optional, Tuple, TypedDict, cast
 
 from fsrs import Card, Rating
-from sqlalchemy import and_, select, update
+from sqlalchemy import Row, and_, select, update
 from sqlalchemy.orm.session import Session
 from supermemo2 import sm_two
 from tabulate import tabulate
@@ -260,162 +260,199 @@ class ReviewResult(TypedDict):
     review_datetime: str
 
 
-def update_practice_feedbacks(  # noqa: C901
+def update_practice_feedbacks(
     user_tune_updates: dict[str, TuneFeedbackUpdate],
     playlist_ref: str | int,
     review_sitdown_date: Optional[datetime] = None,
-):
-    playlist_ref = int(playlist_ref)
-    sitdown_date = review_sitdown_date or datetime.now(timezone.utc)
+) -> None:
+    playlist_ref_int: int = int(playlist_ref)
+    sitdown_date: datetime = review_sitdown_date or datetime.now(timezone.utc)
     with SessionLocal() as db:
         try:
-            # TODO: This needs to handle the case where the user_tune_updates entry
-            #       is not found.  The simplest solution is to query one tune at a time.
-            user_ref = fetch_user_ref_from_playlist_ref(db, playlist_ref)
+            user_ref: str = fetch_user_ref_from_playlist_ref(db, playlist_ref_int)
             alg_type: AlgorithmType = fetch_algorithm_type(db, user_ref)
 
-            # stmt = select(PracticeRecord).where(
-            #     and_(
-            #         PracticeRecord.tune_ref.in_(
-            #             [int(tune_id) for tune_id in user_tune_updates]
-            #         ),
-            #         PracticeRecord.playlist_ref == playlist_ref,
-            #     )
-            # )
-            # row_results = db.execute(stmt).all()
-
             for tune_id, tune_update in user_tune_updates.items():
-                stmt = select(PracticeRecord).where(
-                    and_(
-                        PracticeRecord.tune_ref == tune_id,
-                        PracticeRecord.playlist_ref == playlist_ref,
-                    )
+                _process_single_tune_feedback(
+                    db=db,
+                    tune_id=tune_id,
+                    tune_update=tune_update,
+                    playlist_ref=playlist_ref_int,
+                    sitdown_date=sitdown_date,
+                    alg_type=alg_type,
                 )
-                row_result_tuple = db.execute(stmt).one_or_none()
-
-                # row_result_tuple is of type `Tuple[PracticeRecord]`.  I'm not sure
-                # yet why that tuple layer is there.
-                practice_record: PracticeRecord
-                if row_result_tuple is not None:
-                    practice_record = row_result_tuple[0]
-                    easiness = practice_record.easiness
-                    interval = practice_record.interval
-                    repetitions = practice_record.repetitions
-                else:
-                    practice_record = PracticeRecord(
-                        tune_ref=tune_id,
-                        playlist_ref=playlist_ref,
-                        easiness=0.0,
-                        interval=0,
-                        repetitions=0,
-                        review_date="",
-                        quality=0,
-                        practiced="",
-                    )
-                    db.add(practice_record)
-                    easiness = 0.0
-                    interval = 0
-                    repetitions = 0
-
-                if tune_update is None:  # type: ignore
-                    raise ValueError(f"No update found for tune_id: {tune_id}")
-                quality = tune_update.get("feedback")
-                if not quality:
-                    raise ValueError(
-                        f"Quality is is not specified for tune_id: {tune_id}"
-                    )
-                quality_int = quality_lookup.get(quality, -2)
-                if quality_int == -2:
-                    raise ValueError(f"Unexpected quality value: {quality_int}")
-                if quality == NOT_SET:
-                    continue
-
-                if quality == NEW or quality == RESCHEDULED:
-                    if practice_record:
-                        # This is the case where the user just wants the tune to be scheduled for review
-                        # immediately, presumably so they can practice it, but we don't want to change
-                        # any of the other metrics.
-                        quality_int = practice_record.quality
-                        practiced_str = practice_record.practiced
-                        review_date_str = datetime.strftime(
-                            sitdown_date, TT_DATE_FORMAT
-                        )
-                        review = ReviewResult(
-                            easiness=practice_record.easiness,
-                            interval=practice_record.interval,
-                            repetitions=practice_record.repetitions,
-                            review_datetime=review_date_str,
-                        )
-
-                    elif alg_type == AlgorithmType.SM2:
-                        # This is the case where the user hasn't ever practiced the tune.
-                        practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
-                        practiced_faux = sitdown_date - timedelta(days=1)
-
-                        review = cast(
-                            ReviewResult,
-                            sm_two.first_review(quality_int, practiced_faux),
-                        )
-                    else:
-                        practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
-                        card = Card()
-                        due_str = datetime.strftime(card.due, TT_DATE_FORMAT)
-                        review = ReviewResult(
-                            easiness=card.difficulty
-                            if card.difficulty is not None
-                            else 0.0,
-                            interval=0,
-                            repetitions=0,
-                            review_datetime=due_str,
-                        )
-                        raise ValueError(f"Unexpected algorithm type: {alg_type}")
-                else:
-                    practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
-                    practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
-
-                    if alg_type == AlgorithmType.SM2:
-                        review = cast(
-                            ReviewResult,
-                            sm_two.review(
-                                quality_int,
-                                easiness,
-                                interval,
-                                repetitions,
-                                practiced,
-                            ),
-                        )
-                    else:
-                        raise ValueError(f"Unexpected algorithm type: {alg_type}")
-
-                review_date = review.get("review_datetime")
-                if isinstance(review_date, datetime):
-                    review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
-                elif isinstance(review_date, str):  # type: ignore
-                    try:
-                        review_date_dt = parse(review_date)
-                    except ValueError:
-                        log.error(f"Unable to parse date: {review_date}")
-                        raise
-                    review_date_dt = review_date_dt.replace(second=0, microsecond=0)
-                    review_date_str = review_date_dt.strftime(TT_DATE_FORMAT)
-                else:
-                    raise ValueError(
-                        f"Unexpected review_date type: {type(review_date)}: {review_date}"
-                    )
-
-                practice_record.interval = review.get("interval")
-                practice_record.easiness = review.get("easiness")
-                practice_record.repetitions = review.get("repetitions")
-                practice_record.review_date = review_date_str
-                practice_record.quality = quality_int
-                practice_record.practiced = practiced_str
-
-                db.commit()
-
+            db.commit()
         except Exception as e:
             db.rollback()
             log.error(f"An error occurred during the update: {e}")
             raise
+
+
+def get_or_create_practice_record(
+    db: Session,
+    tune_id: str,
+    playlist_ref: int,
+) -> tuple[PracticeRecord, float, int, int, Optional[Row[Tuple[PracticeRecord]]]]:
+    stmt = select(PracticeRecord).where(
+        and_(
+            PracticeRecord.tune_ref == tune_id,
+            PracticeRecord.playlist_ref == playlist_ref,
+        )
+    )
+    row_result_tuple: Row[Tuple[PracticeRecord]] | None = db.execute(stmt).one_or_none()
+    if row_result_tuple is not None:
+        practice_record: PracticeRecord = row_result_tuple[0]
+        return (
+            practice_record,
+            practice_record.easiness,
+            practice_record.interval,
+            practice_record.repetitions,
+            row_result_tuple,
+        )
+    else:
+        practice_record = PracticeRecord(
+            tune_ref=tune_id,
+            playlist_ref=playlist_ref,
+            easiness=0.0,
+            interval=0,
+            repetitions=0,
+            review_date="",
+            quality=0,
+            practiced="",
+        )
+        db.add(practice_record)
+        return practice_record, 0.0, 0, 0, None
+
+
+def parse_review_date(review_date: datetime | str) -> str:
+    if isinstance(review_date, datetime):
+        return datetime.strftime(review_date, TT_DATE_FORMAT)
+    elif isinstance(review_date, str):  # type: ignore
+        try:
+            review_date_dt = parse(review_date)
+        except ValueError:
+            log.error(f"Unable to parse date: {review_date}")
+            raise
+        review_date_dt = review_date_dt.replace(second=0, microsecond=0)
+        return review_date_dt.strftime(TT_DATE_FORMAT)
+    else:
+        raise ValueError(
+            f"Unexpected review_date type: {type(review_date)}: {review_date}"
+        )
+
+
+def handle_new_or_rescheduled(
+    practice_record: PracticeRecord,
+    row_result_tuple: Optional[Row[Tuple[PracticeRecord]]],
+    quality_int: int,
+    sitdown_date: datetime,
+    alg_type: AlgorithmType,
+) -> tuple[str, ReviewResult]:
+    if row_result_tuple is not None:
+        review_date_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
+        review = ReviewResult(
+            easiness=practice_record.easiness,
+            interval=practice_record.interval,
+            repetitions=practice_record.repetitions,
+            review_datetime=review_date_str,
+        )
+        return practice_record.practiced, review
+    elif alg_type == AlgorithmType.SM2:
+        practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
+        practiced_faux = sitdown_date - timedelta(days=1)
+        review = cast(
+            ReviewResult,
+            sm_two.first_review(quality_int, practiced_faux),
+        )
+        return practiced_str, review
+    else:
+        practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
+        card = Card()
+        due_str = datetime.strftime(card.due, TT_DATE_FORMAT)
+        review = ReviewResult(
+            easiness=card.difficulty if card.difficulty is not None else 0.0,
+            interval=0,
+            repetitions=0,
+            review_datetime=due_str,
+        )
+        raise ValueError(f"Unexpected algorithm type: {alg_type}")
+
+
+def handle_regular_feedback(
+    quality_int: int,
+    easiness: float,
+    interval: int,
+    repetitions: int,
+    sitdown_date: datetime,
+    alg_type: AlgorithmType,
+) -> tuple[str, ReviewResult]:
+    practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
+    practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
+    if alg_type == AlgorithmType.SM2:
+        review = cast(
+            ReviewResult,
+            sm_two.review(
+                quality_int,
+                easiness,
+                interval,
+                repetitions,
+                practiced,
+            ),
+        )
+        return practiced_str, review
+    else:
+        raise ValueError(f"Unexpected algorithm type: {alg_type}")
+
+
+def validate_and_get_quality(
+    tune_update: TuneFeedbackUpdate, tune_id: str
+) -> int | None:
+    if tune_update is None:  # type: ignore
+        raise ValueError(f"No update found for tune_id: {tune_id}")
+    quality = tune_update.get("feedback")
+    if not quality:
+        raise ValueError(f"Quality is is not specified for tune_id: {tune_id}")
+    quality_int = quality_lookup.get(quality, -2)
+    if quality_int == -2:
+        raise ValueError(f"Unexpected quality value: {quality_int}")
+    if quality == NOT_SET:
+        return None  # type: ignore
+    return quality_int
+
+
+def _process_single_tune_feedback(
+    db: Session,
+    tune_id: str,
+    tune_update: TuneFeedbackUpdate,
+    playlist_ref: int,
+    sitdown_date: datetime,
+    alg_type: AlgorithmType,
+) -> None:
+    practice_record, easiness, interval, repetitions, row_result_tuple = (
+        get_or_create_practice_record(db, tune_id, playlist_ref)
+    )
+    quality_int = validate_and_get_quality(tune_update, tune_id)
+    if quality_int is None:
+        return
+    quality = tune_update.get("feedback")
+
+    if quality == NEW or quality == RESCHEDULED:
+        practiced_str, review = handle_new_or_rescheduled(
+            practice_record, row_result_tuple, quality_int, sitdown_date, alg_type
+        )
+    else:
+        practiced_str, review = handle_regular_feedback(
+            quality_int, easiness, interval, repetitions, sitdown_date, alg_type
+        )
+
+    review_date_str = parse_review_date(review.get("review_datetime"))
+
+    practice_record.interval = review.get("interval")
+    practice_record.easiness = review.get("easiness")
+    practice_record.repetitions = review.get("repetitions")
+    practice_record.review_date = review_date_str
+    practice_record.quality = quality_int
+    practice_record.practiced = practiced_str
 
 
 class TuneScheduleUpdate(TypedDict):
