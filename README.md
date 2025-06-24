@@ -137,90 +137,209 @@ The complete entity relationship diagram is illustrated by the following diagram
 
 ```mermaid
 erDiagram
+    GENRE {
+        TEXT id PK
+        TEXT name
+        TEXT region
+        TEXT description
+    }
+    TUNE_TYPE {
+        TEXT id PK
+        TEXT name
+        TEXT rhythm
+        TEXT description
+    }
+    GENRE_TUNE_TYPE {
+        TEXT genre_id FK
+        TEXT tune_type_id FK
+    }
+    USER {
+        INTEGER id PK
+        TEXT hash
+        TEXT name
+        TEXT email
+        TEXT email_verified
+        TEXT image
+        BOOLEAN deleted
+        TEXT sr_alg_type
+    }
     ACCOUNT {
-        TEXT user_id
-        TEXT provider_account_id
+        TEXT user_id FK
+        TEXT provider_account_id PK
         TEXT provider
         TEXT type
         TEXT access_token
         TEXT id_token
         TEXT refresh_token
         TEXT scope
-        integer expires_at
+        INTEGER expires_at
         TEXT session_state
         TEXT token_type
     }
-
-    EXTERNAL_REF {
-        integer id
+    INSTRUMENT {
+        INTEGER id PK
+        INTEGER private_to_user FK
+        TEXT instrument
+        TEXT description
+        TEXT genre_default
+        BOOLEAN deleted
+    }
+    PLAYLIST {
+        INTEGER playlist_id PK
+        INTEGER user_ref FK
+        INTEGER instrument_ref
+        BOOLEAN deleted
+        TEXT sr_alg_type
+    }
+    PLAYLIST_TUNE {
+        INTEGER playlist_ref PK, FK
+        INTEGER tune_ref PK, FK
+        TEXT current
+        TEXT learned
+        BOOLEAN deleted
+    }
+    PREFS_SPACED_REPETITION {
+        TEXT alg_type PK
+        INTEGER user_id PK, FK
+        TEXT fsrs_weights
+        REAL request_retention
+        INTEGER maximum_interval
+    }
+    SESSION {
+        TEXT session_token PK
+        TEXT expires
+        TEXT user_id FK
+    }
+    TAB_GROUP_MAIN_STATE {
+        INTEGER id PK
+        INTEGER user_id FK
+        TEXT which_tab
+        INTEGER playlist_id
+        TEXT tab_spec
+    }
+    TABLE_STATE {
+        INTEGER user_id PK, FK
+        TEXT screen_size PK
+        TEXT purpose PK
+        INTEGER playlist_id PK, FK
+        TEXT settings
+        INTEGER current_tune
+    }
+    TUNE {
+        INTEGER id PK
+        TEXT type
+        TEXT structure
+        TEXT title
+        TEXT mode
+        TEXT incipit
+        TEXT genre FK
+        BOOLEAN deleted
+        INTEGER private_for FK
+    }
+    NOTE {
+        INTEGER id PK
+        INTEGER user_ref FK
+        INTEGER tune_ref FK
+        INTEGER playlist_ref FK
+        TEXT created_date
+        TEXT note_text
+        INTEGER public
+        INTEGER favorite
+        BOOLEAN deleted
+    }
+    PRACTICE_RECORD {
+        INTEGER id PK
+        INTEGER playlist_ref FK
+        INTEGER tune_ref FK
+        TEXT practiced
+        INTEGER quality
+        REAL easiness
+        INTEGER interval
+        INTEGER repetitions
+        TEXT review_date
+        TEXT backup_practiced
+        REAL stability
+        INTEGER elapsed_days
+        INTEGER lapses
+        INTEGER state
+        REAL difficulty
+        INTEGER step
+    }
+    REFERENCE {
+        INTEGER id PK
         TEXT url
         TEXT ref_type
-        integer tune_ref
+        INTEGER tune_ref FK
+        INTEGER public
+        INTEGER favorite
+        INTEGER user_ref FK
+        TEXT comment
+        TEXT title
+        BOOLEAN deleted
     }
-
-    PLAYLIST {
-        integer PLAYLIST_ID
-        integer USER_REF
-        TEXT instrument
+    TABLE_TRANSIENT_DATA {
+        INTEGER user_id PK, FK
+        INTEGER tune_id PK, FK
+        INTEGER playlist_id PK, FK
+        TEXT purpose
+        TEXT note_private
+        TEXT note_public
+        TEXT recall_eval
     }
-
-    PRACTICE_RECORD {
-        integer PLAYLIST_REF
-        TEXT TUNE_REF
-        TEXT Practiced
-        TEXT Quality
-        integer ID
-        REAL Easiness
-        integer Interval
-        integer Repetitions
-        integer ReviewDate
-        TEXT BackupPracticed
+    TAG {
+        INTEGER tag_id PK
+        INTEGER user_ref FK
+        INTEGER tune_ref FK
+        TEXT tag_text
     }
-
-    SESSION {
-        TEXT expires
-        TEXT session_token
-        TEXT user_id
+    TUNE_OVERRIDE {
+        INTEGER id PK
+        INTEGER tune_ref FK
+        TEXT title
+        TEXT type
+        TEXT structure
+        TEXT genre FK
+        TEXT mode
+        TEXT incipit
+        BOOLEAN deleted
+        INTEGER user_ref FK
     }
-
-    TUNE {
-        integer ID
-        TEXT Type
-        TEXT Structure
-        TEXT Title
-        TEXT Mode
-        TEXT Incipit
-    }
-
-    USER {
-        integer ID
-        TEXT Name
-        TEXT Email
-        TEXT Password
-    }
-
-    USER_ANNOTATION_SET {
-        integer id
-        integer user_id
-        TEXT Content
-    }
-
     VERIFICATION_TOKEN {
-        integer id
-        integer user_id
+        TEXT identifier PK
         TEXT token
-        integer expires_at
+        TEXT expires
     }
 
     %% Relationships
-    ACCOUNT }|--|| USER : "references"
-    USER_ANNOTATION_SET }|--|| USER : "belongs to"
-    VERIFICATION_TOKEN }|--|| USER : "belongs to"
-    SESSION }|--|| USER : "references"
-    EXTERNAL_REF }|--|| TUNE : "references"
-    PRACTICE_RECORD }|--|| PLAYLIST : "belongs to"
-    PRACTICE_RECORD }|--|| TUNE : "references"
-    PLAYLIST }|--|| USER : "belongs to"
+    GENRE_TUNE_TYPE }|--|| GENRE : "genre_id"
+    GENRE_TUNE_TYPE }|--|| TUNE_TYPE : "tune_type_id"
+    INSTRUMENT }|--|| USER : "private_to_user"
+    PLAYLIST }|--|| USER : "user_ref"
+    PLAYLIST_TUNE }|--|| PLAYLIST : "playlist_ref"
+    PLAYLIST_TUNE }|--|| TUNE : "tune_ref"
+    PREFS_SPACED_REPETITION }|--|| USER : "user_id"
+    SESSION }|--|| USER : "user_id"
+    TAB_GROUP_MAIN_STATE }|--|| USER : "user_id"
+    TABLE_STATE }|--|| USER : "user_id"
+    TABLE_STATE }|--|| PLAYLIST : "playlist_id"
+    TUNE }|--|| GENRE : "genre"
+    TUNE }|--|| USER : "private_for"
+    NOTE }|--|| USER : "user_ref"
+    NOTE }|--|| TUNE : "tune_ref"
+    NOTE }|--|| PLAYLIST : "playlist_ref"
+    PRACTICE_RECORD }|--|| PLAYLIST : "playlist_ref"
+    PRACTICE_RECORD }|--|| TUNE : "tune_ref"
+    REFERENCE }|--|| TUNE : "tune_ref"
+    REFERENCE }|--|| USER : "user_ref"
+    TABLE_TRANSIENT_DATA }|--|| USER : "user_id"
+    TABLE_TRANSIENT_DATA }|--|| TUNE : "tune_id"
+    TABLE_TRANSIENT_DATA }|--|| PLAYLIST : "playlist_id"
+    TAG }|--|| USER : "user_ref"
+    TAG }|--|| TUNE : "tune_ref"
+    TUNE_OVERRIDE }|--|| TUNE : "tune_ref"
+    TUNE_OVERRIDE }|--|| GENRE : "genre"
+    TUNE_OVERRIDE }|--|| USER : "user_ref"
+    ACCOUNT }|--|| USER : "user_id"
 ```
 
 ### 1.5. Alternatives or Potential Technology Evolution
