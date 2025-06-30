@@ -120,7 +120,9 @@ export interface ITuneOverview extends ITune {
   practiced: string | null;
   quality: number | null;
   easiness: number | null;
+  difficulty: number | null;
   interval: number | null;
+  step: number | null;
   repetitions: number | null;
   review_date: string | null;
   backup_practiced?: string | null;
@@ -143,7 +145,9 @@ export interface IPracticeRecord {
   practiced?: string;
   quality?: number;
   easiness?: number;
+  difficulty: number;
   interval?: number;
+  step: number;
   repetitions?: number;
   review_date?: string;
   backup_practiced?: string;

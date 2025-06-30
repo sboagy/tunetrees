@@ -2,7 +2,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, TypedDict, cast
 
-from fsrs import Card, Rating
+from fsrs import Card, Rating, State, Scheduler, ReviewLog
+from fsrs.optimizer import Optimizer
 from sqlalchemy import Row, and_, select, update
 from sqlalchemy.orm.session import Session
 from supermemo2 import sm_two
@@ -17,6 +18,7 @@ from tunetrees.app.queries import (
 from tunetrees.models.quality import NEW, NOT_SET, RESCHEDULED, quality_lookup
 from tunetrees.models.tunetrees import Playlist, PracticeRecord, PrefsSpacedRepetition
 from tunetrees.models.tunetrees_pydantic import AlgorithmType
+import json
 
 log = logging.getLogger(__name__)
 
@@ -89,7 +91,7 @@ class BadTuneID(Exception):
 
 def update_practice_record(
     tune_id: str,
-    quality: str,
+    quality_str: str,
     playlist_ref: str,
 ):
     with SessionLocal() as db:
@@ -104,11 +106,11 @@ def update_practice_record(
 
             if row_result:
                 practice_record: PracticeRecord = row_result[0]
-                quality_int = quality_lookup.get(quality, -1)
+                quality_int = quality_lookup.get(quality_str, -1)
                 if quality_int == -1:
-                    raise ValueError(f"Unexpected quality value: {quality}")
+                    raise ValueError(f"Unexpected quality value: {quality_str}")
 
-                if quality == NEW or quality == RESCHEDULED:
+                if quality_str == NEW or quality_str == RESCHEDULED:
                     stmt = select(PracticeRecord.practiced).where(
                         and_(
                             PracticeRecord.tune_ref == tune_id,
@@ -170,7 +172,7 @@ def update_practice_record(
                         interval=review.get("interval"),
                         repetitions=review.get("repetitions"),
                         review_date=review_date_str,
-                        quality=quality,
+                        quality=quality_str,
                         practiced=practiced_str,
                     ),
                     execution_options={"synchronize_session": False},
@@ -201,7 +203,7 @@ def fetch_algorithm_type(db: Session, user_ref: str) -> AlgorithmType:
         return alg_type
     else:
         log.debug(f"No alg_type found for user_ref: {user_ref}")
-        return AlgorithmType.SM2
+        return AlgorithmType.FSRS
 
 
 def fetch_user_ref_from_playlist_ref(db: Session, playlist_ref: int) -> str:
@@ -229,17 +231,17 @@ def difficulty_to_e_factor(d: float) -> float:
     return e_factor
 
 
-def quality_to_fsrs_rating(quality: int) -> Rating:
-    if quality in (0, 1):
+def quality_to_fsrs_rating(quality_int: int) -> Rating:
+    if quality_int in (0, 1):
         return Rating.Again
-    elif quality == 2:
+    elif quality_int == 2:
         return Rating.Hard
-    elif quality == 3:
+    elif quality_int == 3:
         return Rating.Good
-    elif quality in (4, 5):
+    elif quality_int in (4, 5):
         return Rating.Easy
     else:
-        raise ValueError(f"Unexpected quality value: {quality}")
+        raise ValueError(f"Unexpected quality value: {quality_int}")
 
 
 def fsrs_rating_to_quality(rating: Rating):
@@ -254,10 +256,15 @@ def fsrs_rating_to_quality(rating: Rating):
 
 
 class ReviewResult(TypedDict):
-    easiness: float
+    id: int
+    quality: int | None
+    easiness: float | None
+    difficulty: float | None
     interval: int
+    step: int | None
     repetitions: int
-    review_datetime: str
+    review_datetime: datetime
+    review_duration: int | None
 
 
 def update_practice_feedbacks(
@@ -277,6 +284,7 @@ def update_practice_feedbacks(
                     db=db,
                     tune_id=tune_id,
                     tune_update=tune_update,
+                    user_ref=user_ref,
                     playlist_ref=playlist_ref_int,
                     sitdown_date=sitdown_date,
                     alg_type=alg_type,
@@ -288,40 +296,41 @@ def update_practice_feedbacks(
             raise
 
 
-def get_or_create_practice_record(
+def get_latest_practice_record(
     db: Session,
     tune_id: str,
     playlist_ref: int,
-) -> tuple[PracticeRecord, float, int, int, Optional[Row[Tuple[PracticeRecord]]]]:
-    stmt = select(PracticeRecord).where(
-        and_(
-            PracticeRecord.tune_ref == tune_id,
-            PracticeRecord.playlist_ref == playlist_ref,
+) -> PracticeRecord:
+    stmt = (
+        select(PracticeRecord)
+        .where(
+            and_(
+                PracticeRecord.tune_ref == tune_id,
+                PracticeRecord.playlist_ref == playlist_ref,
+            )
         )
+        .order_by(PracticeRecord.id.desc())
     )
     row_result_tuple: Row[Tuple[PracticeRecord]] | None = db.execute(stmt).one_or_none()
     if row_result_tuple is not None:
         practice_record: PracticeRecord = row_result_tuple[0]
-        return (
-            practice_record,
-            practice_record.easiness,
-            practice_record.interval,
-            practice_record.repetitions,
-            row_result_tuple,
-        )
+        return practice_record
     else:
         practice_record = PracticeRecord(
+            id=None,
             tune_ref=tune_id,
             playlist_ref=playlist_ref,
             easiness=0.0,
+            difficulty=None,
             interval=0,
+            step=None,
             repetitions=0,
             review_date="",
             quality=0,
             practiced="",
         )
-        db.add(practice_record)
-        return practice_record, 0.0, 0, 0, None
+        # db.add(practice_record)
+        return practice_record
 
 
 def parse_review_date(review_date: datetime | str) -> str:
@@ -342,22 +351,30 @@ def parse_review_date(review_date: datetime | str) -> str:
 
 
 def handle_new_or_rescheduled(
-    practice_record: PracticeRecord,
-    row_result_tuple: Optional[Row[Tuple[PracticeRecord]]],
+    db: Session,
+    user_ref: str,
+    previous_practice_record: PracticeRecord,
+    quality_text: str,
     quality_int: int,
     sitdown_date: datetime,
     alg_type: AlgorithmType,
 ) -> tuple[str, ReviewResult]:
-    if row_result_tuple is not None:
-        review_date_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
-        review = ReviewResult(
-            easiness=practice_record.easiness,
-            interval=practice_record.interval,
-            repetitions=practice_record.repetitions,
-            review_datetime=review_date_str,
-        )
-        return practice_record.practiced, review
-    elif alg_type == AlgorithmType.SM2:
+    # Not totally certain what this was doing
+    # if row_result_tuple is not None:
+    #     review_date_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
+    #     review = ReviewResult(
+    #         easiness=practice_record.easiness,
+    #         difficulty=practice_record.difficulty
+    #         if practice_record.difficulty
+    #         else 0.0,
+    #         interval=practice_record.interval,
+    #         step=practice_record.step if practice_record.step else 0,
+    #         repetitions=practice_record.repetitions,
+    #         review_datetime=review_date_str,
+    #     )
+    #     return practice_record.practiced, review
+    # elif
+    if alg_type == AlgorithmType.SM2:
         practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
         practiced_faux = sitdown_date - timedelta(days=1)
         review = cast(
@@ -365,27 +382,79 @@ def handle_new_or_rescheduled(
             sm_two.first_review(quality_int, practiced_faux),
         )
         return practiced_str, review
-    else:
+    elif alg_type == AlgorithmType.FSRS:
         practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
-        card = Card()
-        due_str = datetime.strftime(card.due, TT_DATE_FORMAT)
-        review = ReviewResult(
-            easiness=card.difficulty if card.difficulty is not None else 0.0,
-            interval=0,
-            repetitions=0,
-            review_datetime=due_str,
+        if quality_text == NEW:
+            state = State.Learning
+        elif quality_text == RESCHEDULED:
+            state = State.Relearning
+        else:
+            # This shouldn't happen, but just in case
+            state = State.Review
+        card = Card(state=state)
+        prefs_spaced_repetition: PrefsSpacedRepetition = get_prefs_spaced_repetition(
+            db, user_ref, alg_type
         )
+        scheduler = Scheduler(
+            parameters=prefs_spaced_repetition.fsrs_weights,
+            desired_retention=prefs_spaced_repetition.request_retention,
+            learning_steps=json.loads(prefs_spaced_repetition.learning_steps),
+            relearning_steps=json.loads(prefs_spaced_repetition.relearning_steps),
+            maximum_interval=prefs_spaced_repetition.maximum_interval,
+            enable_fuzzing=prefs_spaced_repetition.enable_fuzzing,
+        )
+
+        card_reviewed, review_log = scheduler.review_card(
+            card, quality_to_fsrs_rating(quality_int)
+        )
+
+        """
+        ReviewLog: Represents the log entry of a Card object that has been reviewed.
+
+        Attributes:
+            card_id: The id of the card being reviewed.
+            rating: The rating given to the card during the review.
+            review_datetime: The date and time of the review.
+            review_duration: The number of miliseconds it took to review the card or None if unspecified.
+        """
+
+        # due_str = datetime.strftime(card.due, TT_DATE_FORMAT)
+        e_factor = (
+            card_reviewed.difficulty if card_reviewed.difficulty is not None else None
+        )
+        review = ReviewResult(
+            id=review_log.card_id,
+            quality=review_log.rating,
+            easiness=e_factor,
+            difficulty=card_reviewed.difficulty if card_reviewed.difficulty else None,
+            interval=0,
+            step=0,
+            repetitions=0,
+            review_datetime=card.due,
+            review_duration=review_log.review_duration if review_log else None,
+        )
+        return practiced_str, review
+    else:
         raise ValueError(f"Unexpected algorithm type: {alg_type}")
 
 
 def handle_regular_feedback(
+    db: Session,
+    user_ref: str,
     quality_int: int,
     easiness: float,
+    stability: float | None,
+    difficulty: float | None,
     interval: int,
+    step: int | None,
     repetitions: int,
     sitdown_date: datetime,
+    last_review: datetime | None,
     alg_type: AlgorithmType,
 ) -> tuple[str, ReviewResult]:
+    prefs_spaced_repetition: PrefsSpacedRepetition = get_prefs_spaced_repetition(
+        db, user_ref, alg_type
+    )
     practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
     practiced = datetime.strptime(practiced_str, TT_DATE_FORMAT)
     if alg_type == AlgorithmType.SM2:
@@ -400,6 +469,121 @@ def handle_regular_feedback(
             ),
         )
         return practiced_str, review
+    elif alg_type == AlgorithmType.FSRS:
+        # Attributes:
+        #   card_id: The id of the card. Defaults to the epoch milliseconds of when the card was created.
+        #   state: The card's current learning state.
+        #   step: The card's current learning or relearning step or None if the card is in the Review state.
+        #   stability: Core mathematical parameter used for future scheduling.
+        #   difficulty: Core mathematical parameter used for future scheduling.
+        #   due: The date and time when the card is due next.
+        #   last_review: The date and time of the card's last review.
+        card = Card(
+            # card_id - just use the default,
+            state=State.Review,
+            step=step,
+            stability=stability,
+            difficulty=difficulty,
+            due=sitdown_date,
+            last_review=last_review,
+        )
+
+        # Attributes:
+        #     parameters: The model weights of the FSRS scheduler.
+        #     desired_retention: The desired retention rate of cards scheduled with the scheduler.
+        #     learning_steps: Small time intervals that schedule cards in the Learning state.
+        #     relearning_steps: Small time intervals that schedule cards in the Relearning state.
+        #     maximum_interval: The maximum number of days a Review-state card can be scheduled into the future.
+        #     enable_fuzzing: Whether to apply a small amount of random 'fuzz' to calculated intervals.
+        scheduler = Scheduler(
+            parameters=prefs_spaced_repetition.fsrs_weights,
+            desired_retention=prefs_spaced_repetition.request_retention,
+            learning_steps=json.loads(prefs_spaced_repetition.learning_steps),
+            relearning_steps=json.loads(prefs_spaced_repetition.relearning_steps),
+            maximum_interval=prefs_spaced_repetition.maximum_interval,
+            enable_fuzzing=prefs_spaced_repetition.enable_fuzzing,
+        )
+
+        card_reviewed, review_log = scheduler.review_card(
+            card, quality_to_fsrs_rating(quality_int)
+        )
+        log.debug(f"FSRS review_log: {review_log}")
+        e_factor = (
+            card_reviewed.difficulty if card_reviewed.difficulty is not None else None
+        )
+        review = ReviewResult(
+            id=review_log.card_id,
+            quality=review_log.rating,
+            easiness=e_factor,
+            difficulty=card_reviewed.difficulty if card_reviewed.difficulty else None,
+            interval=0,
+            step=0,
+            repetitions=0,
+            review_datetime=card.due,
+            review_duration=review_log.review_duration if review_log else None,
+        )
+
+        # Optimize parameters periodically (e.g., every 50 reviews)
+        if repetitions > 0 and repetitions % 50 == 0:
+            log.info("Running FSRS parameter optimization")
+            optimized_weights, optimal_retention = optimize_fsrs_parameters(
+                db, user_ref, review_log
+            )
+
+            # Create new scheduler with optimized parameters
+            optimized_scheduler = Scheduler(
+                parameters=optimized_weights,
+                desired_retention=optimal_retention,
+                learning_steps=scheduler.learning_steps,
+                relearning_steps=scheduler.relearning_steps,
+                maximum_interval=scheduler.maximum_interval,
+                enable_fuzzing=scheduler.enable_fuzzing,
+            )
+
+            # Save optimized preferences
+            save_prefs_spaced_repetition(
+                db,
+                PrefsSpacedRepetition(
+                    user_id=user_ref,
+                    alg_type=alg_type,
+                    fsrs_weights=optimized_weights,
+                    request_retention=optimized_scheduler.desired_retention,
+                    maximum_interval=optimized_scheduler.maximum_interval,
+                    learning_steps=json.dumps(
+                        [
+                            td.total_seconds()
+                            for td in optimized_scheduler.learning_steps
+                        ]
+                    ),
+                    relearning_steps=json.dumps(
+                        [
+                            td.total_seconds()
+                            for td in optimized_scheduler.relearning_steps
+                        ]
+                    ),
+                    enable_fuzzing=optimized_scheduler.enable_fuzzing,
+                ),
+            )
+        else:
+            # Regular save without optimization
+            save_prefs_spaced_repetition(
+                db,
+                PrefsSpacedRepetition(
+                    user_id=user_ref,
+                    alg_type=alg_type,
+                    fsrs_weights=scheduler.parameters,
+                    request_retention=scheduler.desired_retention,
+                    maximum_interval=scheduler.maximum_interval,
+                    learning_steps=json.dumps(
+                        [td.total_seconds() for td in scheduler.learning_steps]
+                    ),
+                    relearning_steps=json.dumps(
+                        [td.total_seconds() for td in scheduler.relearning_steps]
+                    ),
+                    enable_fuzzing=scheduler.enable_fuzzing,
+                ),
+            )
+        return practiced_str, review
     else:
         raise ValueError(f"Unexpected algorithm type: {alg_type}")
 
@@ -409,46 +593,152 @@ def validate_and_get_quality(
 ) -> int | None:
     if tune_update is None:  # type: ignore
         raise ValueError(f"No update found for tune_id: {tune_id}")
-    quality = tune_update.get("feedback")
-    if not quality:
+    quality_str = tune_update.get("feedback")
+    if not quality_str:
         raise ValueError(f"Quality is is not specified for tune_id: {tune_id}")
-    quality_int = quality_lookup.get(quality, -2)
+    quality_int = quality_lookup.get(quality_str, -2)
     if quality_int == -2:
         raise ValueError(f"Unexpected quality value: {quality_int}")
-    if quality == NOT_SET:
+    if quality_str == NOT_SET:
         return None  # type: ignore
     return quality_int
+
+
+def save_prefs_spaced_repetition(db: Session, prefs: PrefsSpacedRepetition) -> None:
+    """
+    Save or update the given PrefsSpacedRepetition object in the database.
+
+    Args:
+        db (Session): SQLAlchemy session.
+        prefs (PrefsSpacedRepetition): The preferences object to save.
+    """
+    stmt = select(PrefsSpacedRepetition).where(
+        and_(
+            PrefsSpacedRepetition.user_id == prefs.user_id,
+            PrefsSpacedRepetition.alg_type == prefs.alg_type,
+        )
+    )
+    existing_row: Row[Tuple[PrefsSpacedRepetition]] | None = db.execute(
+        stmt
+    ).one_or_none()
+    if existing_row is not None:
+        db.execute(
+            update(PrefsSpacedRepetition)
+            .where(
+                and_(
+                    PrefsSpacedRepetition.user_id == prefs.user_id,
+                    PrefsSpacedRepetition.alg_type == prefs.alg_type,
+                )
+            )
+            .values(
+                fsrs_weights=prefs.fsrs_weights,
+                request_retention=prefs.request_retention,
+                maximum_interval=prefs.maximum_interval,
+                learning_steps=prefs.learning_steps,
+                relearning_steps=prefs.relearning_steps,
+                enable_fuzzing=prefs.enable_fuzzing,
+            ),
+            execution_options={"synchronize_session": False},
+        )
+    else:
+        db.add(prefs)
+    db.flush()
+
+
+def get_prefs_spaced_repetition(
+    db: Session, user_ref: str, alg_type: AlgorithmType
+) -> PrefsSpacedRepetition:
+    # Convert learning_steps (tuple[timedelta, ...]) to a JSON string for storage
+    def timedelta_tuple_to_json(td_tuple: tuple[timedelta, ...]) -> str:
+        # Convert each timedelta to total seconds for JSON serialization
+        return json.dumps([td.total_seconds() for td in td_tuple])
+
+    stmt = select(PrefsSpacedRepetition).where(
+        and_(
+            PrefsSpacedRepetition.user_id == user_ref,
+            PrefsSpacedRepetition.alg_type == alg_type,  # or "SM2"
+        )
+    )
+    prefs_spaced_repetition_row: Row[Tuple[PrefsSpacedRepetition]] | None = db.execute(
+        stmt
+    ).one_or_none()
+    if prefs_spaced_repetition_row is not None:
+        prefs_spaced_repitition: PrefsSpacedRepetition = prefs_spaced_repetition_row[0]
+    else:
+        # Use default values from FSRS scheduler for now, for both SM2 and FSRS
+        scheduler = Scheduler()
+
+        prefs_spaced_repitition = PrefsSpacedRepetition(
+            user_id=user_ref,
+            alg_type=alg_type,
+            fsrs_weights=scheduler.parameters,
+            request_retention=scheduler.desired_retention,
+            maximum_interval=scheduler.maximum_interval,
+            learning_steps=timedelta_tuple_to_json(scheduler.learning_steps),
+            relearning_steps=timedelta_tuple_to_json(scheduler.relearning_steps),
+            enable_fuzzing=scheduler.enable_fuzzing,
+        )
+        db.add(prefs_spaced_repitition)
+        db.flush()
+    return prefs_spaced_repitition
 
 
 def _process_single_tune_feedback(
     db: Session,
     tune_id: str,
     tune_update: TuneFeedbackUpdate,
+    user_ref: str,
     playlist_ref: int,
     sitdown_date: datetime,
     alg_type: AlgorithmType,
 ) -> None:
-    practice_record, easiness, interval, repetitions, row_result_tuple = (
-        get_or_create_practice_record(db, tune_id, playlist_ref)
-    )
+    practice_record = get_latest_practice_record(db, tune_id, playlist_ref)
     quality_int = validate_and_get_quality(tune_update, tune_id)
     if quality_int is None:
         return
-    quality = tune_update.get("feedback")
+    quality_str = tune_update.get("feedback")
 
-    if quality == NEW or quality == RESCHEDULED:
+    if quality_str == NEW or quality_str == RESCHEDULED:
         practiced_str, review = handle_new_or_rescheduled(
-            practice_record, row_result_tuple, quality_int, sitdown_date, alg_type
+            db,
+            user_ref,
+            practice_record,
+            quality_str,
+            quality_int,
+            sitdown_date,
+            alg_type,
         )
     else:
+        last_review_date: datetime | None = None
+        if practice_record.review_date:
+            try:
+                last_review_date = datetime.strptime(
+                    practice_record.review_date, TT_DATE_FORMAT
+                )
+            except Exception:
+                last_review_date = None
+
         practiced_str, review = handle_regular_feedback(
-            quality_int, easiness, interval, repetitions, sitdown_date, alg_type
+            db=db,
+            user_ref=user_ref,
+            quality_int=quality_int,
+            easiness=practice_record.easiness,
+            stability=practice_record.stability,
+            interval=practice_record.interval,
+            difficulty=practice_record.difficulty,
+            step=practice_record.step,
+            repetitions=practice_record.repetitions,
+            sitdown_date=sitdown_date,
+            last_review=last_review_date,
+            alg_type=alg_type,
         )
 
     review_date_str = parse_review_date(review.get("review_datetime"))
 
-    practice_record.interval = review.get("interval")
     practice_record.easiness = review.get("easiness")
+    practice_record.difficulty = review.get("difficulty")
+    practice_record.interval = review.get("interval")
+    practice_record.step = review.get("step")
     practice_record.repetitions = review.get("repetitions")
     practice_record.review_date = review_date_str
     practice_record.quality = quality_int
@@ -538,6 +828,95 @@ def query_and_print_tune_by_id(tune_id: int, print_table=True):
             )
             print("\n----------")
             print(tabulate(rows_list, headers="keys"))
+
+
+def get_user_review_history(
+    db: Session, user_ref: str, limit: int = 1000
+) -> List[ReviewLog]:
+    """Fetch user's review history and convert to FSRS ReviewLog format."""
+    stmt = (
+        select(PracticeRecord)
+        .join(Playlist)
+        .where(Playlist.user_ref == user_ref)
+        .order_by(PracticeRecord.practiced.desc())
+        .limit(limit)
+    )
+
+    practice_records = db.execute(stmt).scalars().all()
+    review_logs = []
+
+    for record in practice_records:
+        if not record.practiced or not record.quality:
+            continue
+
+        try:
+            practiced_dt = datetime.strptime(record.practiced, TT_DATE_FORMAT)
+            review_dt = (
+                datetime.strptime(record.review_date, TT_DATE_FORMAT)
+                if record.review_date
+                else practiced_dt
+            )
+
+            # Convert quality to FSRS rating
+            rating = quality_to_fsrs_rating(record.quality)
+
+            """
+            Represents the log entry of a Card object that has been reviewed.
+
+            Attributes:
+                card_id: The id of the card being reviewed.
+                rating: The rating given to the card during the review.
+                review_datetime: The date and time of the review.
+                review_duration: The number of miliseconds it took to review the card or None if unspecified.
+            """
+
+            # Create ReviewLog entry
+            review_log = ReviewLog(
+                card_id=record.id,
+                rating=rating,
+                review_datetime=review_dt,
+                review_duration=None,
+            )
+            review_logs.append(review_log)
+
+        except (ValueError, TypeError) as e:
+            log.warning(f"Skipping invalid review record: {e}")
+            continue
+
+    return review_logs
+
+
+def optimize_fsrs_parameters(
+    db: Session, user_ref: str, current_review_log: ReviewLog
+) -> tuple[list[float], float]:
+    """Optimize FSRS parameters based on user's review history."""
+    review_logs = get_user_review_history(db, user_ref)
+
+    # Add the current review log to the history
+    review_logs.append(current_review_log)
+
+    if len(review_logs) < 50:  # Need sufficient data for optimization
+        log.info(
+            f"Insufficient review history ({len(review_logs)} records) for optimization, using defaults"
+        )
+        return list(Scheduler().parameters), 0.9
+
+    try:
+        optimizer = Optimizer(review_logs)  # Pass all review logs, not just one
+        optimized_params = optimizer.compute_optimal_parameters()
+
+        # I think the typing for compute_optimal_retention and it returns a single float
+        optimal_retention = optimizer.compute_optimal_retention(optimized_params)
+        log.info(f"FSRS parameters optimized with {len(review_logs)} review records")
+
+        # Ensure we return the correct types
+        if isinstance(optimal_retention, (list, tuple)):  # type: ignore
+            optimal_retention = optimal_retention[0] if optimal_retention else 0.9
+
+        return list(optimized_params), optimal_retention
+    except Exception as e:
+        log.error(f"FSRS optimization failed: {e}, using default parameters")
+        return list(Scheduler().parameters), 0.9
 
 
 if __name__ == "__main__":

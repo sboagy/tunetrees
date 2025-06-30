@@ -436,6 +436,8 @@ class PracticeRecordModel(BaseModel):
     elapsed_days: Optional[int]
     lapses: Optional[int]
     state: Optional[int]
+    difficulty: Optional[float]
+    step: Optional[int]
 
     class Config:
         orm_mode = True
@@ -457,6 +459,10 @@ class PracticeRecordModelPartial(BaseModel):
     elapsed_days: Optional[int] = None
     lapses: Optional[int] = None
     state: Optional[int] = None
+    difficulty: Optional[float]
+    step: Optional[int]
+    difficulty: Optional[float]
+    step: Optional[int]
 
     class Config:
         orm_mode = True
@@ -596,7 +602,9 @@ class PlaylistTuneJoinedModel(BaseModel):
     practiced: Optional[str] = None
     quality: Optional[int] = None
     easiness: Optional[float] = None
+    difficulty: Optional[float] = None
     interval: Optional[int] = None
+    step: Optional[int] = None
     repetitions: Optional[int] = None
     review_date: Optional[str] = None
     tags: Optional[str] = None
@@ -629,7 +637,9 @@ class PracticeListStagedModel(BaseModel):
     practiced: Optional[str] = None
     quality: Optional[int] = None
     easiness: Optional[float] = None
+    difficulty: Optional[float] = None
     interval: Optional[int] = None
+    step: Optional[int] = None
     repetitions: Optional[int] = None
     review_date: Optional[str] = None
     backup_practiced: Optional[str] = None
