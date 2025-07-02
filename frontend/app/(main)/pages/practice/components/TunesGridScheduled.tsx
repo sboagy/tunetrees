@@ -22,6 +22,7 @@ import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useScheduledTunes } from "./TunesContextScheduled";
 import TunesGrid from "./TunesGrid";
 import { useTunesTable } from "./TunesTable";
+import { useToast } from "@/hooks/use-toast";
 
 type ReviewMode = "grid" | "flashcard";
 
@@ -32,6 +33,18 @@ type ScheduledTunesGridProps = {
 export default function TunesGridScheduled({
   userId,
 }: ScheduledTunesGridProps): JSX.Element {
+  const { toast } = useToast();
+
+  const handleError = useCallback(
+    (message: string) => {
+      toast({
+        title: "Error",
+        description: message,
+      });
+    },
+    [toast],
+  );
+
   const {
     tunes,
     setTunes,
@@ -194,6 +207,9 @@ export default function TunesGridScheduled({
         console.log("submitPracticeFeedbacks result:", result);
       })
       .catch((error) => {
+        handleError(
+          "Error submit_practice_feedbacks_result. Please try again.",
+        );
         console.error("Error submit_practice_feedbacks_result:", error);
         throw error;
       });
@@ -209,11 +225,17 @@ export default function TunesGridScheduled({
         console.log("deleteTableTransientData successful:", result);
       })
       .catch((error) => {
+        handleError("Error deleting table transient data. Please try again.");
         console.error("Error submitting feedbacks:", error);
         throw error;
       });
 
     triggerRefresh();
+
+    toast({
+      title: "Success",
+      description: "Practice successfully submitted",
+    });
 
     // refreshData()
     //   .then((result) => {
