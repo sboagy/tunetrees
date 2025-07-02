@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple, TypedDict, Any
+from typing import Dict, List, Optional, Tuple, TypedDict
 
 from fsrs import Rating, Scheduler, ReviewLog
 from sqlalchemy import Row, and_, select, update
@@ -247,58 +247,6 @@ def parse_review_date(review_date: datetime | str) -> str:
         raise ValueError(
             f"Unexpected review_date type: {type(review_date)}: {review_date}"
         )
-
-
-def handle_new_or_rescheduled(
-    db: Session,
-    user_ref: str,
-    previous_practice_record: PracticeRecord,
-    quality_text: str,
-    quality_int: int,
-    sitdown_date: datetime,
-    alg_type: AlgorithmType,
-) -> tuple[str, Dict[str, Any]]:
-    # Not totally certain what this was doing
-    # if row_result_tuple is not None:
-    #     review_date_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
-    #     review = ReviewResult(
-    #         easiness=practice_record.easiness,
-    #         difficulty=practice_record.difficulty
-    #         if practice_record.difficulty
-    #         else 0.0,
-    #         interval=practice_record.interval,
-    #         step=practice_record.step if practice_record.step else 0,
-    #         repetitions=practice_record.repetitions,
-    #         review_datetime=review_date_str,
-    #     )
-    #     return practice_record.practiced, review
-    # elif
-    from tunetrees.app.schedulers import SM2Scheduler, FSRScheduler
-
-    practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
-    if alg_type == AlgorithmType.SM2:
-        scheduler = SM2Scheduler()
-        practiced_faux = sitdown_date - timedelta(days=1)
-        review = scheduler.first_review(quality_int, practiced_faux)
-        return practiced_str, review
-    elif alg_type == AlgorithmType.FSRS:
-        prefs_spaced_repetition: PrefsSpacedRepetition = get_prefs_spaced_repetition(
-            db, user_ref, alg_type
-        )
-        scheduler = FSRScheduler(
-            fsrs_weights=prefs_spaced_repetition.fsrs_weights,
-            request_retention=prefs_spaced_repetition.request_retention,
-            maximum_interval=prefs_spaced_repetition.maximum_interval,
-            learning_steps=prefs_spaced_repetition.learning_steps,
-            relearning_steps=prefs_spaced_repetition.relearning_steps,
-            enable_fuzzing=prefs_spaced_repetition.enable_fuzzing,
-        )
-        review = scheduler.first_review(
-            quality_int, sitdown_date, quality_text=quality_text
-        )
-        return practiced_str, review
-    else:
-        raise ValueError(f"Unexpected algorithm type: {alg_type}")
 
 
 def validate_and_get_quality(
