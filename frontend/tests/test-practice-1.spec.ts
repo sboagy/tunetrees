@@ -92,6 +92,9 @@ test.describe.serial("Practice Tests", () => {
 
     await ttPO.navigateToPracticeTab();
 
+    const rowCountBefore = await ttPO.tunesGridRows.count();
+    console.log(`Number of rows before submit: ${rowCountBefore}`);
+
     console.log("===> test-practice-1.ts:77 ~ ");
     await setReviewEval(page, 1081, "struggled");
 
