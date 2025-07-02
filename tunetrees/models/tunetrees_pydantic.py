@@ -464,8 +464,6 @@ class PracticeRecordModelPartial(BaseModel):
     state: Optional[int] = None
     difficulty: Optional[float]
     step: Optional[int]
-    difficulty: Optional[float]
-    step: Optional[int]
 
     class Config:
         orm_mode = True
