@@ -68,7 +68,9 @@ t_practice_list_joined = Table(
     Column("practiced", Text),
     Column("quality", Integer),
     Column("easiness", Float),
+    Column("difficulty", Float),
     Column("interval", Integer),
+    Column("step", Integer),
     Column("repetitions", Integer),
     Column("review_date", Text),
     Column("tags", NullType),
@@ -101,7 +103,9 @@ t_practice_list_staged = Table(
     Column("practiced", Text),
     Column("quality", Integer),
     Column("easiness", Float),
+    Column("difficulty", Float),
     Column("interval", Integer),
+    Column("step", Integer),
     Column("repetitions", Integer),
     Column("review_date", Text),
     Column("backup_practiced", Text),
@@ -278,6 +282,9 @@ class PrefsSpacedRepetition(Base):
     fsrs_weights = mapped_column(Text)
     request_retention = mapped_column(Float)
     maximum_interval = mapped_column(Integer)
+    learning_steps = mapped_column(Text)
+    relearning_steps = mapped_column(Text)
+    enable_fuzzing = mapped_column(Integer)
 
     user: Mapped[Optional["User"]] = relationship(
         "User", back_populates="prefs_spaced_repetition"
@@ -380,7 +387,10 @@ class Note(Base):
 
 class PracticeRecord(Base):
     __tablename__ = "practice_record"
-    __table_args__ = (UniqueConstraint("tune_ref", "playlist_ref"),)
+    __table_args__ = (
+        UniqueConstraint("tune_ref", "playlist_ref"),
+        Index("practice_record_id_index", "id"),
+    )
 
     id = mapped_column(Integer, primary_key=True)
     playlist_ref = mapped_column(ForeignKey("playlist.playlist_id"))
@@ -396,6 +406,8 @@ class PracticeRecord(Base):
     elapsed_days = mapped_column(Integer)
     lapses = mapped_column(Integer)
     state = mapped_column(Integer)
+    difficulty = mapped_column(Float)
+    step = mapped_column(Integer)
 
     playlist: Mapped[Optional["Playlist"]] = relationship(
         "Playlist", back_populates="practice_record"

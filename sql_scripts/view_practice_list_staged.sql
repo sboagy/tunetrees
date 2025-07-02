@@ -1,5 +1,4 @@
-CREATE VIEW
-	practice_list_staged AS
+CREATE VIEW practice_list_staged as
 SELECT
 	tune.id AS id,
 	COALESCE(tune_override.title, tune.title) AS title,
@@ -18,7 +17,9 @@ SELECT
 	practice_record.practiced,
 	practice_record.quality,
 	practice_record.easiness,
+	practice_record.difficulty,
 	practice_record.interval,
+	practice_record.step,
 	practice_record.repetitions,
 	practice_record.review_date,
 	practice_record.backup_practiced,
@@ -75,4 +76,5 @@ WHERE
 	(
 		tune_override.user_ref IS NULL
 		OR tune_override.user_ref = playlist.user_ref
-	)
+	);
+

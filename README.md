@@ -342,6 +342,33 @@ erDiagram
     ACCOUNT }|--|| USER : "user_id"
 ```
 
+#### 1.4.1. Notable Table/Field Descriptions
+
+Since SQLite can't directly have descriptions for the fields, this is arguably the best place to track these.
+
+##### practice_record
+
+This associates a the current state of practice, unique to tune/playlist/user.
+
+| Type    | Name             | Description                                                                                             |
+| ------- | ---------------- | ------------------------------------------------------------------------------------------------------- |
+| INTEGER | playlist_ref     | References the playlist (`playlist.playlist_id`)                                                        |
+| INTEGER | tune_ref         | References the tune (`tune.id`)                                                                         |
+| TEXT    | practiced        | Date/time or string indicating when the practice occurred                                               |
+| INTEGER | quality          | Quality rating of the practice session                                                                  |
+| INTEGER | id               | Primary key, autoincrement                                                                              |
+| REAL    | easiness         | Easiness factor for spaced repetition, when using SM2                                                   |
+| INTEGER | interval         | Interval (days) until next review                                                                       |
+| INTEGER | repetitions      | Number of times this tune has been reviewed                                                             |
+| TEXT    | review_date      | Scheduled date for next review (maybe should be call Due)                                               |
+| TEXT    | backup_practiced | Backup of practice date/time or notes (deprecated, not need given `practice_history` table)             |
+| REAL    | stability        | Stability metric for spaced repetition                                                                  |
+| INTEGER | elapsed_days     | Days elapsed since last review                                                                          |
+| INTEGER | lapses           | Number of times the tune was forgotten                                                                  |
+| INTEGER | state            | Enum representing the learning state (one of Learning = 1, Review = 2, Relearning = 3, or null/0 = NEW) |
+| REAL    | difficulty       | Difficulty metric for the tune, when using FSRS                                                         |
+| INTEGER | step             | Current learning or relearning step or None if the tune is in the Review state                          |
+
 ### 1.5. Alternatives or Potential Technology Evolution
 
 1. Down the line, I can switch to MySQL or PostgreSQL if needed.
@@ -648,6 +675,24 @@ tests.
 Stability of Playwright testing relies on setting the environment variable for the frontend to
 `TT_REVIEW_SITDOWN_DATE`, which must be specified in Coordinated Universal Time (UTC).  
 This value should be set to `2024-12-31 16:47:57.671465+00:00`.
+
+##### 4.3.1.2. Test Cookies
+
+\[ This section should be considered as not stable. And, certainly the refresh of the storage state needs to
+be automated. See https://github.com/sboagy/tunetrees/issues/189 . \]
+
+In order to not have every test log in, the TuneTrees playwright tests save login information into
+`test-scripts/storageStateSboagyLogin.json`. If you run the tests, and you don't get a logged in state,
+i.e. it just sits there, it's likely because `storageStateSboagyLogin.json` is stale, and needs to be rebuilt.
+
+In order for the `storageStateSboagyLogin.json` to be rebuild, one should set the environment variable `SAVE_COOKIES` to
+`true`, or uncomment the `process.env.SAVE_COOKIES = "true"` in `frontend/playwright.config.ts`, and then run the "test-login-1" playwright test.
+
+On the server, this information is stored in a secret and needs to be base64 encoded before setting the secret:
+
+```
+base64 -i test-scripts/storageStateSboagyLogin.json -o test-scripts/storageStateSboagyLogin.b64
+```
 
 ### 4.4. Python Backend Testing
 
