@@ -58,6 +58,8 @@ export function getMockTune(): ITuneOverview {
     recall_eval: "High",
     notes: "",
     private_for: null,
+    difficulty: 1,
+    step: 1,
   };
   return tuneData;
 }
@@ -124,6 +126,8 @@ export const ERROR_TUNE: ITuneOverview[] = [
     recall_eval: "Error", // Optional property, should't need to be set
     notes: "",
     private_for: null,
+    difficulty: 0,
+    step: 0,
   },
 ];
 
@@ -148,4 +152,6 @@ export const ERROR_PLAYLIST_TUNE: ITuneOverview = {
   playlist_ref: 0,
   notes: "",
   private_for: null,
+  difficulty: 0,
+  step: 0,
 };
