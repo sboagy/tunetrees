@@ -1,4 +1,4 @@
-import { type Page, expect } from "@playwright/test";
+import { type Locator, type Page, expect } from "@playwright/test";
 import { checkHealth } from "./check-servers";
 import { initialPageLoadTimeout } from "./paths-for-tests";
 
@@ -35,6 +35,7 @@ export class TuneTreesPageObject {
   readonly tabsMenuCatalogChoice;
   readonly catalogTab;
   readonly tableStatus;
+  readonly toast;
 
   constructor(page: Page) {
     this.page = page;
@@ -107,6 +108,7 @@ export class TuneTreesPageObject {
     );
 
     this.tableStatus = this.page.getByText(" row(s) selected.");
+    this.toast = this.page.getByTestId("shadcn-toast");
   }
 
   onError = (exception: Error): void => {
@@ -244,6 +246,37 @@ export class TuneTreesPageObject {
     //   })
     //   .nth(2);
     // await expect(ttPracticeTab2).toBeVisible({ timeout: 60000 });
+  }
+
+  async clickWithTimeAfter(locator: Locator, timeout = 9000) {
+    await locator.waitFor({ state: "attached", timeout: timeout });
+    await locator.waitFor({ state: "visible", timeout: timeout });
+    await expect(locator).toBeAttached({ timeout: timeout });
+    await expect(locator).toBeVisible({ timeout: timeout });
+    await expect(locator).toBeEnabled({ timeout: timeout });
+    // await locator.click({ trial: true });
+    await locator.click({ timeout: timeout });
+  }
+
+  async setReviewEval(tuneId: number, evalType: string) {
+    const qualityButton = this.page
+      .getByRole("row", { name: `${tuneId} ` })
+      .getByTestId("tt-recal-eval-popover-trigger");
+    await expect(qualityButton).toBeVisible({ timeout: 60000 });
+    await expect(qualityButton).toBeEnabled({ timeout: 60000 });
+    await this.clickWithTimeAfter(qualityButton);
+    await this.page
+      .getByTestId("tt-recal-eval-group-menu")
+      .waitFor({ state: "visible", timeout: 60000 });
+    const responseRecalledButton = this.page.getByTestId(
+      `tt-recal-eval-${evalType}`,
+    );
+    await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
+    await expect(responseRecalledButton).toBeEnabled({ timeout: 60000 });
+    await this.clickWithTimeAfter(responseRecalledButton);
+    await this.page
+      .getByTestId("tt-recal-eval-popover-content")
+      .waitFor({ state: "detached", timeout: 60000 });
   }
 
   async runLogin(
