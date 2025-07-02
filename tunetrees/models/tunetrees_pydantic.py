@@ -295,6 +295,9 @@ class PrefsSpacedRepetitionModel(BaseModel):
     fsrs_weights: Optional[str]
     request_retention: Optional[float]
     maximum_interval: Optional[int]
+    learning_steps: Optional[str]
+    relearning_steps: Optional[str]
+    enable_fuzzing: Optional[bool] = None
 
     class Config:
         orm_mode = True
