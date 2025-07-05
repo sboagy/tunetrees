@@ -1,3 +1,4 @@
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
@@ -14,6 +15,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
   // await page.waitForTimeout(1);
+  await setTestDefaults(page);
   await applyNetworkThrottle(page);
 });
 

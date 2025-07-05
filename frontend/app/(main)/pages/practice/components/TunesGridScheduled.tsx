@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { RowSelectionState } from "@tanstack/react-table";
 import { Upload } from "lucide-react";
-import { type JSX, useCallback, useEffect, useRef, useState } from "react";
+import { type JSX, useCallback, useEffect, useState } from "react";
 import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
 import { getScheduledTunesOverview } from "../queries";
 import {
@@ -23,6 +23,7 @@ import { useScheduledTunes } from "./TunesContextScheduled";
 import TunesGrid from "./TunesGrid";
 import { useTunesTable } from "./TunesTable";
 import { useToast } from "@/hooks/use-toast";
+import { convertToIsoUTCString } from "@/lib/date-utils";
 
 type ReviewMode = "grid" | "flashcard";
 
@@ -30,9 +31,38 @@ type ScheduledTunesGridProps = {
   userId: number;
 };
 
+// Returns a Date object for the sitdown date using browser globals, localStorage, or current date
+function getSitdownDateFromBrowser(): Date {
+  if (typeof window !== "undefined") {
+    const w = window as typeof window & {
+      __TT_REVIEW_SITDOWN_DATE__?: string;
+    };
+    const dateString =
+      w.__TT_REVIEW_SITDOWN_DATE__ ||
+      window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE") ||
+      new Date().toISOString();
+    const sitdownDate = new Date(convertToIsoUTCString(dateString));
+    if (
+      !sitdownDate ||
+      !(sitdownDate instanceof Date) ||
+      Number.isNaN(sitdownDate.getTime())
+    ) {
+      throw new Error(
+        "No valid sitdown date found in browser globals, localStorage, or current date. This is required.",
+      );
+    }
+    return sitdownDate;
+  }
+  throw new Error(
+    "getSitdownDateFromBrowser must be called in a browser context",
+  );
+}
+
 export default function TunesGridScheduled({
   userId,
 }: ScheduledTunesGridProps): JSX.Element {
+  // Local refreshId for client-side refresh logic
+  const [refreshId, setRefreshId] = useState(0);
   const { toast } = useToast();
 
   const handleError = useCallback(
@@ -45,13 +75,8 @@ export default function TunesGridScheduled({
     [toast],
   );
 
-  const {
-    tunes,
-    setTunes,
-    tunesRefreshId: scheduledTunesRefreshId,
-    setTunesRefreshId,
-  } = useScheduledTunes();
-  const { refreshId, triggerRefresh } = useTuneDataRefresh();
+  const { tunes, setTunes } = useScheduledTunes();
+  const { triggerRefresh } = useTuneDataRefresh();
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
   const { currentPlaylist: playlistId } = usePlaylist();
   const showDeleted = false; // Should become a state variable at some point
@@ -75,6 +100,40 @@ export default function TunesGridScheduled({
     // setIsLoading(false);
   }, [tunes]);
 
+  // Only fetch scheduled tunes on the client after mount or refresh
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchTunes() {
+      setIsLoading(true);
+      try {
+        const sitdownDate = getSitdownDateFromBrowser();
+
+        const result = await getScheduledTunesOverview(
+          userId,
+          playlistId,
+          sitdownDate,
+          showDeleted,
+        );
+        if (!cancelled) {
+          setTunes(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setTunes([]); // or handle error
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+    void fetchTunes();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, playlistId, refreshId, setTunes]);
+
   const handleRecallEvalChange = useCallback(
     (tuneId: number, newValue: string): void => {
       setTunes((prevTunes: ITuneOverview[]) =>
@@ -90,70 +149,40 @@ export default function TunesGridScheduled({
   const [isLoading, setIsLoading] = useState(true);
 
   // See comment for isRefreshing in RepertoireTunesGrid.tsx.
-  const isRefreshing = useRef(false);
+  // (not used in this component)
 
-  const refreshTunes = useCallback(
-    async (
-      userId: number,
-      playlistId: number,
-      refreshId: number,
-      isSoftRefresh = false,
-    ) => {
+  // Only fetch scheduled tunes on the client after mount or refresh
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchTunes() {
+      setIsLoading(true);
       try {
-        if (isSoftRefresh) {
-          console.log("============> TunesGridScheduled.tsx:85 ~ SOFT REFRESH");
-          setTunesRefreshId(refreshId);
-          return tunes;
-        }
-        console.log(
-          "============> TunesGridScheduled.tsx:90 ~ awaiting getScheduledTunesOverview",
-        );
-        const result: ITuneOverview[] = await getScheduledTunesOverview(
+        const sitdownDate = getSitdownDateFromBrowser();
+
+        const result = await getScheduledTunesOverview(
           userId,
           playlistId,
+          sitdownDate,
           showDeleted,
         );
-        setTunes(result);
-        setTunesRefreshId(refreshId);
-        return result;
-      } catch (error) {
-        console.error("LF1 ScheduledTunesGrid Error refreshing tunes:", error);
-        throw error;
-      }
-    },
-    [setTunes, setTunesRefreshId, tunes],
-  );
-
-  useEffect(() => {
-    if (scheduledTunesRefreshId !== refreshId && !isRefreshing.current) {
-      console.log(
-        `useEffect ===> TunesGridScheduled.tsx:94 ~ call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${scheduledTunesRefreshId} isRefreshing: ${isRefreshing.current}`,
-      );
-      isRefreshing.current = true;
-      const isSoftRefresh = scheduledTunesRefreshId === -1;
-      refreshTunes(userId, playlistId, refreshId, isSoftRefresh)
-        .then((result: ITuneOverview[]) => {
-          console.log(`LF1 ScheduledTunesGrid number tunes: ${result.length}`);
-          console.log(
-            `LF1 ScheduledTunesGrid back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${scheduledTunesRefreshId} isRefreshing: ${isRefreshing.current}`,
-          );
-        })
-        .catch((error) => {
-          console.error(
-            "LF1 ScheduledTunesGrid Error invoking refreshTunes:",
-            error,
-          );
-        })
-        .finally(() => {
-          isRefreshing.current = false;
+        if (!cancelled) {
+          setTunes(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setTunes([]); // or handle error
+        }
+      } finally {
+        if (!cancelled) {
           setIsLoading(false);
-        });
-    } else {
-      console.log(
-        `useEffect ===> TunesGridScheduled.tsx:118 ~  SKIPPING refreshId: ${refreshId} tunesRefreshId: ${scheduledTunesRefreshId} isRefreshing: ${isRefreshing.current}`,
-      );
+        }
+      }
     }
-  }, [refreshId, scheduledTunesRefreshId, userId, playlistId, refreshTunes]);
+    void fetchTunes();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, playlistId, setTunes]);
 
   // Move table creation after tunes are loaded
   const [tableComponent, table] = useTunesTable({
@@ -162,7 +191,6 @@ export default function TunesGridScheduled({
     tablePurpose: "practice",
     globalFilter: "",
     onRecallEvalChange: handleRecallEvalChange,
-    setTunesRefreshId,
     setIsLoading,
   });
 
@@ -198,9 +226,11 @@ export default function TunesGridScheduled({
       }
     }
 
+    const sitdownDate = getSitdownDateFromBrowser();
     const promiseResult = submitPracticeFeedbacks({
       playlistId,
       updates,
+      sitdownDate,
     });
     promiseResult
       .then((result) => {
@@ -230,7 +260,8 @@ export default function TunesGridScheduled({
         throw error;
       });
 
-    triggerRefresh();
+    // Increment local refreshId to trigger reload
+    setRefreshId((id) => id + 1);
 
     toast({
       title: "Success",

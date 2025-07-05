@@ -14,11 +14,13 @@ import { test } from "@playwright/test";
 import { checkHealth } from "../test-scripts/check-servers";
 
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { runLoginWithCookieSave } from "@/test-scripts/run-login2";
 
 test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
+  await setTestDefaults(page);
   await applyNetworkThrottle(page);
 });
 

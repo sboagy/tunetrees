@@ -14,7 +14,7 @@ import type {
 
 const client = axios.create({
   baseURL: `${process.env.NEXT_BASE_URL}/settings`,
-  timeout: 2000, // Increase timeout to 2 seconds
+  timeout: 6000, // Increase timeout to 2 seconds
 });
 
 const tableStateMutex = new Mutex();
@@ -422,9 +422,8 @@ export async function deleteTableTransientData(
   purpose: TablePurpose,
 ): Promise<number> {
   try {
-    const response = await client.delete(
-      `/table_transient_data/${userId}/${tuneId}/${playlistId}/${purpose}`,
-    );
+    const url = `/table_transient_data/${userId}/${tuneId}/${playlistId}/${purpose}`;
+    const response = await client.delete(url);
     // Handle successful response
     console.log("deleteTableTransientData: ", response?.status);
     return response.status;

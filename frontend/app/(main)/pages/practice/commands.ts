@@ -1,5 +1,6 @@
 "use server";
 
+import { convertToPythonUTCString } from "@/lib/date-utils";
 import axios from "axios";
 
 const baseURL = process.env.TT_API_BASE_URL;
@@ -61,12 +62,14 @@ export interface ITuneUpdate {
 interface IPracticeFeedbacksProps {
   playlistId: number;
   updates: { [key: string]: ITuneUpdate };
+
+  sitdownDate: Date;
 }
 
-export const submitPracticeFeedbacks = async ({
-  playlistId,
-  updates,
-}: IPracticeFeedbacksProps): Promise<string> => {
+export const submitPracticeFeedbacks = async (
+  props: IPracticeFeedbacksProps,
+): Promise<string> => {
+  const { playlistId, updates, sitdownDate } = props;
   if (!baseURL) {
     console.error("Base URL is not defined");
     return "Error: Base URL is not defined";
@@ -77,14 +80,21 @@ export const submitPracticeFeedbacks = async ({
   );
 
   try {
-    // Note the TT_REVIEW_SITDOWN_DATE env variable, if set, must be in UTC!
-    const reviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
+    if (
+      !sitdownDate ||
+      !(sitdownDate instanceof Date) ||
+      Number.isNaN(sitdownDate.getTime())
+    ) {
+      throw new Error(
+        "A valid sitdownDate (Date object) must be provided to submitPracticeFeedbacks.",
+      );
+    }
     const response = await axios({
       method: "post",
       url: `${url}/${playlistId}`,
       data: updates,
       params: {
-        sitdown_date: reviewSitdownDate,
+        sitdown_date: convertToPythonUTCString(sitdownDate.toISOString()),
       },
       headers: {
         key: "Access-Control-Allow-Origin",

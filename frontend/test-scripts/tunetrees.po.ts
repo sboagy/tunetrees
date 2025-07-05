@@ -145,14 +145,19 @@ export class TuneTreesPageObject {
     let rowCount = await this.tunesGridRows.count();
     let iterations = 0;
 
-    while (rowCount < 2 && iterations < 12) {
+    const maxIterations = 12; // 12 seconds max wait time
+    while (rowCount < 2 && iterations < maxIterations) {
       await this.page.waitForTimeout(1000); // wait for 1 second before checking again
       rowCount = await this.tunesGridRows.count();
       iterations++;
     }
 
-    if (iterations >= 12) {
-      console.warn("Table population check exceeded 12 iterations.");
+    if (iterations >= maxIterations) {
+      console.warn(`
+    waitForTablePopulationToStart(): Table population check exceeded ${maxIterations} iterations.
+    Actual iterations: ${iterations}
+    Row count: ${rowCount}.
+    `);
     }
   }
 
@@ -325,5 +330,12 @@ export class TuneTreesPageObject {
     await this.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
 
     console.log("===> run-login2.ts:50 ~ ", "Login completed");
+  }
+
+  async waitForSuccessfullySubmitted(): Promise<void> {
+    await expect(this.toast.last()).toContainText(
+      "Practice successfully submitted",
+      { timeout: 60000 },
+    );
   }
 }

@@ -14,9 +14,12 @@ test.use({
 
 // testInfo.project.name,
 
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
+
 test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
+  await setTestDefaults(page);
   await applyNetworkThrottle(page, 0);
 });
 
@@ -88,6 +91,7 @@ test.describe.serial("Practice Tests", () => {
     await page.screenshot({
       path: path.join(screenShotDir, "practice_just_after_submitted.png"),
     });
+    await ttPO.waitForSuccessfullySubmitted();
     // page.on("response", (data) => {
     //   console.log("===> test-practice-1.ts:108 ~ data", data);
     // });

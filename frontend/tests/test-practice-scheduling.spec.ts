@@ -1,7 +1,19 @@
 import { test, expect } from "@playwright/test";
+import {
+  setTestDateTime,
+  setTestDefaults,
+} from "../test-scripts/set-test-defaults";
 import { TuneTreesPageObject } from "../test-scripts/tunetrees.po";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { getStorageState } from "@/test-scripts/storage-state";
+
+// Extend the Window interface to include __TT_REVIEW_SITDOWN_DATE__
+declare global {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  interface Window {
+    __TT_REVIEW_SITDOWN_DATE__?: string;
+  }
+}
 
 // Parameterize timezones for future expansion
 const timezones = ["Asia/Karachi", "America/New_York"]; // UTC+5, EST (Eastern Time), add more as needed
@@ -16,6 +28,7 @@ for (const timezoneId of timezones) {
     let pageObject: TuneTreesPageObject;
 
     test.beforeEach(async ({ page }) => {
+      await setTestDefaults(page);
       pageObject = new TuneTreesPageObject(page);
       await pageObject.gotoMainPage();
     });
@@ -54,11 +67,7 @@ for (const timezoneId of timezones) {
       });
       await pageObject.clickWithTimeAfter(submitButton, 1000);
 
-      // Make a very long timeout to allow for the server to respond.
-      await expect(pageObject.toast.last()).toContainText(
-        "Practice successfully submitted",
-        { timeout: 60000 },
-      );
+      await pageObject.waitForSuccessfullySubmitted();
 
       const rowCount = await pageObject.tunesGridRows.count();
       console.log(`Number of rows: ${rowCount}`);
@@ -69,74 +78,63 @@ for (const timezoneId of timezones) {
       page,
     }) => {
       // Simulate advancing to the next day
-      // Use environment variable if set, otherwise use current date
-      const envDate = process.env.TT_REVIEW_SITDOWN_DATE;
-      const baseSitdownDate = envDate ? new Date(envDate) : new Date();
+      const baseSitdownDate = new Date();
       const tomorrow = new Date(baseSitdownDate.getTime());
       tomorrow.setDate(tomorrow.getDate() + 1);
-      // Set TT_REVIEW_SITDOWN_DATE to tomorrow's date in YYYY-MM-DDTHH:mm:ss format
-      try {
-        setSitdownDate(tomorrow, timezoneId);
-        await page.addInitScript(`{
-          Date = class extends Date {
-            constructor(...args) {
-              if (args.length === 0) return super(${tomorrow.getTime()});
-              return super(...args);
-            }
-          }
-        }`);
-        pageObject = new TuneTreesPageObject(page);
-        await pageObject.gotoMainPage();
-        await pageObject.navigateToPracticeTab();
-        // Check that only tunes scheduled for the new day are shown
-        const rowCount = await pageObject.tunesGridRows.count();
-        expect(rowCount).toBeGreaterThan(1);
-      } finally {
-        setSitdownDate(baseSitdownDate, "America/New_York");
-      }
+
+      // Format as ISO string for injection
+      const isoTomorrow = tomorrow.toISOString();
+      await setTestDateTime(page, isoTomorrow);
+
+      pageObject = new TuneTreesPageObject(page);
+      await pageObject.gotoMainPage();
+      await pageObject.navigateToPracticeTab();
+      // Check that only tunes scheduled for the new day are shown
+      const rowCount = await pageObject.tunesGridRows.count();
+      expect(rowCount).toBeGreaterThan(1);
     });
   });
 }
 
-function setSitdownDate(tomorrow: Date, timezoneId: string) {
-  const yyyy = tomorrow.getFullYear();
-  const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
-  const dd = String(tomorrow.getDate()).padStart(2, "0");
-  const hh = String(tomorrow.getHours()).padStart(2, "0");
-  const min = String(tomorrow.getMinutes()).padStart(2, "0");
-  const ss = String(tomorrow.getSeconds()).padStart(2, "0");
+// Deprecated: function setSitdownDate(tomorrow: Date, timezoneId: string) {
+//   const yyyy = tomorrow.getFullYear();
+//   const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
+//   const dd = String(tomorrow.getDate()).padStart(2, "0");
+//   const hh = String(tomorrow.getHours()).padStart(2, "0");
+//   const min = String(tomorrow.getMinutes()).padStart(2, "0");
+//   const ss = String(tomorrow.getSeconds()).padStart(2, "0");
 
-  // Get the IANA timezone offset at the target date
-  const tz = timezoneId;
-  // Use Intl.DateTimeFormat to get the offset in ±HH:MM format
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-  const parts = dtf.formatToParts(tomorrow);
-  const getPart = (type: string) => {
-    const part = parts.find((p) => p.type === type);
-    if (!part) throw new Error(`Missing date part: ${type}`);
-    return part.value;
-  };
-  const dateInTz = new Date(
-    `${getPart("year")}-${getPart("month")}-${getPart("day")}T${getPart("hour")}:${getPart("minute")}:${getPart("second")}`,
-  );
-  // Calculate offset in minutes
-  const offsetMinutes = Math.round(
-    (dateInTz.getTime() - tomorrow.getTime()) / 60000,
-  );
-  const offsetSign = offsetMinutes <= 0 ? "+" : "-";
-  const absOffset = Math.abs(offsetMinutes);
-  const offsetHH = String(Math.floor(absOffset / 60)).padStart(2, "0");
-  const offsetMM = String(absOffset % 60).padStart(2, "0");
-  const tzOffset = `${offsetSign}${offsetHH}:${offsetMM}`;
+//   // Get the IANA timezone offset at the target date
+//   const tz = timezoneId;
+//   // Use Intl.DateTimeFormat to get the offset in ±HH:MM format
+//   const dtf = new Intl.DateTimeFormat("en-US", {
+//     timeZone: tz,
+//     hour12: false,
+//     year: "numeric",
+//     month: "2-digit",
+//     day: "2-digit",
+//     hour: "2-digit",
+//     minute: "2-digit",
+//     second: "2-digit",
+//   });
+//   const parts = dtf.formatToParts(tomorrow);
+//   const getPart = (type: string) => {
+//     const part = parts.find((p) => p.type === type);
+//     if (!part) throw new Error(`Missing date part: ${type}`);
+//     return part.value;
+//   };
+//   const dateInTz = new Date(
+//     `${getPart("year")}-${getPart("month")}-${getPart("day")}T${getPart("hour")}:${getPart("minute")}:${getPart("second")}`,
+//   );
+//   // Calculate offset in minutes
+//   const offsetMinutes = Math.round(
+//     (dateInTz.getTime() - tomorrow.getTime()) / 60000,
+//   );
+//   const offsetSign = offsetMinutes <= 0 ? "+" : "-";
+//   const absOffset = Math.abs(offsetMinutes);
+//   const offsetHH = String(Math.floor(absOffset / 60)).padStart(2, "0");
+//   const offsetMM = String(absOffset % 60).padStart(2, "0");
+//   const tzOffset = `${offsetSign}${offsetHH}:${offsetMM}`;
 
-  process.env.TT_REVIEW_SITDOWN_DATE = `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}${tzOffset}`;
-}
+//   process.env.TT_REVIEW_SITDOWN_DATE = `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}${tzOffset}`;
+// }

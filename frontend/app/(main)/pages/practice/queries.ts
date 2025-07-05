@@ -23,6 +23,7 @@ import type {
   ITuneType,
   IViewPlaylistJoined,
 } from "./types";
+import { formatTypeScriptDateToPythonUTCString } from "@/lib/date-utils";
 
 // function isValidUTF8(str: string): boolean {
 //   try {
@@ -40,31 +41,25 @@ const client = axios.create({
   baseURL: process.env.NEXT_PUBLIC_TT_BASE_URL,
 });
 
-/**
- * Fetches the review sitdown date from the server.
- *
- * This function retrieves the review sitdown date from an environment variable
- * on the server side. This is necessary because the environment variable is not
- * available to the client.
- *
- * The review sitdown date must be specified in Coordinated Universal Time (UTC).
- *
- * @returns {Promise<string>} A promise that resolves to the review sitdown date
- *                            as a string. If the environment variable is not set,
- *                            an empty string is returned.
- */
-export async function getReviewSitdownDate(): Promise<string> {
-  // Dummy await to satisfy the eslint rule
-  await new Promise((resolve) => setTimeout(resolve, 0));
-
-  return process.env.TT_REVIEW_SITDOWN_DATE || "";
-}
+// The sitdown date must always be passed from the client/browser.
+// There is no default for SSR; if missing, throw an error.
+// For tests, use NEXT_PUBLIC_TT_SITDOWN_DATE_DEFAULT as the default.
 
 export async function getScheduledTunesOverview(
   userId: number,
   playlistId: number,
+  sitdownDate: Date,
   showDeleted = false,
 ): Promise<ITuneOverviewScheduled[]> {
+  if (
+    !sitdownDate ||
+    !(sitdownDate instanceof Date) ||
+    Number.isNaN(sitdownDate.getTime())
+  ) {
+    throw new Error(
+      "sitdownDate (Date) must be provided by the client/browser. SSR is not supported for this function.",
+    );
+  }
   try {
     // console.log("Environment Variables:", process.env);
     console.log(
@@ -72,13 +67,14 @@ export async function getScheduledTunesOverview(
       client.getUri(),
     );
     console.log("user_id: %s, playlist_id: %s", userId, playlistId);
-    const reviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
+    const sitdownDateUtcString =
+      formatTypeScriptDateToPythonUTCString(sitdownDate);
     const response = await client.get<ITuneOverviewScheduled[]>(
       `/scheduled_tunes_overview/${userId}/${playlistId}`,
       {
         params: {
           show_playlist_deleted: showDeleted,
-          sitdown_date: reviewSitdownDate,
+          sitdown_date: sitdownDateUtcString,
           acceptable_delinquency_window: 7,
         },
       },
