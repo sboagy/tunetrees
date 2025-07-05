@@ -1,7 +1,37 @@
+"use client";
+
 // SitDownDateContext.tsx
+import { convertToIsoUTCString } from "@/lib/date-utils";
 import type { ReactNode } from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 // import { getReviewSitdownDate } from "../queries";
+
+// Returns a Date object for the sitdown date using browser globals, localStorage, or current date
+export function getSitdownDateFromBrowser(): Date {
+  if (typeof window !== "undefined") {
+    const w = window as typeof window & {
+      __TT_REVIEW_SITDOWN_DATE__?: string;
+    };
+    const dateString =
+      w.__TT_REVIEW_SITDOWN_DATE__ ||
+      window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE") ||
+      new Date().toISOString();
+    const sitdownDate = new Date(convertToIsoUTCString(dateString));
+    if (
+      !sitdownDate ||
+      !(sitdownDate instanceof Date) ||
+      Number.isNaN(sitdownDate.getTime())
+    ) {
+      throw new Error(
+        "No valid sitdown date found in browser globals, localStorage, or current date. This is required.",
+      );
+    }
+    return sitdownDate;
+  }
+  throw new Error(
+    "getSitdownDateFromBrowser must be called in a browser context",
+  );
+}
 
 interface ISitDownDateContextType {
   sitDownDate: Date | null;

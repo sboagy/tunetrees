@@ -23,40 +23,13 @@ import { useScheduledTunes } from "./TunesContextScheduled";
 import TunesGrid from "./TunesGrid";
 import { useTunesTable } from "./TunesTable";
 import { useToast } from "@/hooks/use-toast";
-import { convertToIsoUTCString } from "@/lib/date-utils";
+import { getSitdownDateFromBrowser } from "./SitdownDateProvider";
 
 type ReviewMode = "grid" | "flashcard";
 
 type ScheduledTunesGridProps = {
   userId: number;
 };
-
-// Returns a Date object for the sitdown date using browser globals, localStorage, or current date
-function getSitdownDateFromBrowser(): Date {
-  if (typeof window !== "undefined") {
-    const w = window as typeof window & {
-      __TT_REVIEW_SITDOWN_DATE__?: string;
-    };
-    const dateString =
-      w.__TT_REVIEW_SITDOWN_DATE__ ||
-      window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE") ||
-      new Date().toISOString();
-    const sitdownDate = new Date(convertToIsoUTCString(dateString));
-    if (
-      !sitdownDate ||
-      !(sitdownDate instanceof Date) ||
-      Number.isNaN(sitdownDate.getTime())
-    ) {
-      throw new Error(
-        "No valid sitdown date found in browser globals, localStorage, or current date. This is required.",
-      );
-    }
-    return sitdownDate;
-  }
-  throw new Error(
-    "getSitdownDateFromBrowser must be called in a browser context",
-  );
-}
 
 export default function TunesGridScheduled({
   userId,
