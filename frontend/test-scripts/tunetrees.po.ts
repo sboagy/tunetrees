@@ -126,6 +126,11 @@ export class TuneTreesPageObject {
     this.page.on("pageerror", this.onError);
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForSelector("body");
+
+    await this.page.screenshot({ path: "gotoMainPage_after_goto.png" });
+    const pageContent = await this.page.content();
+    console.log("Page content after goto:", pageContent.slice(0, 500)); // Log first 500 chars for inspection
+
     await this.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
 
     // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
