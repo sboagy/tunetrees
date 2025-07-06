@@ -694,6 +694,8 @@ On the server, this information is stored in a secret and needs to be base64 enc
 base64 -i test-scripts/storageStateSboagyLogin.json -o test-scripts/storageStateSboagyLogin.b64
 ```
 
+Once you've got the `storageStateSboagyLogin.b64` file, copy and paste that into the STORAGE_STATE_TEST1 [environment secret found in the TuneTrees git repository](https://github.com/sboagy/tunetrees/settings/environments).
+
 ### 4.4. Python Backend Testing
 
 Unit Testing is not really implemented at this time. Nor is
