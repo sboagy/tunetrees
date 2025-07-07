@@ -1,11 +1,8 @@
-
 import { restartBackend } from "@/test-scripts/global-setup";
 
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 
-import {
-  initialPageLoadTimeout
-} from "@/test-scripts/paths-for-tests";
+import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
 
 import { test } from "@playwright/test";
 

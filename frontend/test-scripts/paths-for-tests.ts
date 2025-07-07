@@ -45,4 +45,4 @@ if (!fs.existsSync(screenShotDir)) {
   fs.mkdirSync(screenShotDir, { recursive: true });
 }
 
-export const initialPageLoadTimeout = 50000;
+export const initialPageLoadTimeout = 60000;

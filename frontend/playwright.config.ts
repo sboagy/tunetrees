@@ -156,7 +156,7 @@ export default defineConfig({
     url: "https://localhost:3000/api/health",
     // Playwright seems to trip up due to SSL errors (because the self-signed certificate
     // via "next dev --experimental-https" won't be trusted), so we ignore them.
-    ignoreHTTPSErrors: true,
+    // ignoreHTTPSErrors is not a valid property for webServer; it is set globally in the `use` block above.
     reuseExistingServer: !process.env.CI,
 
     // timeout: 2 * 1000,
