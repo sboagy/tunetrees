@@ -1,12 +1,10 @@
-import path from "node:path";
 
 import { restartBackend } from "@/test-scripts/global-setup";
 
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 
 import {
-  initialPageLoadTimeout,
-  screenShotDir,
+  initialPageLoadTimeout
 } from "@/test-scripts/paths-for-tests";
 
 import { test } from "@playwright/test";
@@ -57,16 +55,9 @@ test("test-login-1", async ({ page }) => {
 
   // await page.waitForTimeout(1000 * 3);
 
-  await page.screenshot({
-    path: path.join(screenShotDir, "page_just_loaded.png"),
-  });
-
   console.log("===> test-login-1:106 ~ waiting for selector");
   await page.waitForSelector('role=tab[name="Repertoire"]', {
     state: "visible",
-  });
-  await page.screenshot({
-    path: path.join(screenShotDir, "page_just_after_repertoire_select.png"),
   });
 
   console.log("===> test-login-1:100 ~ ", "test-1 completed");

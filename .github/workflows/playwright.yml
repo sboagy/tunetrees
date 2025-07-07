@@ -17,6 +17,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
+
+      - name: Print Node version
+        run: node --version
+        working-directory: frontend
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -38,11 +43,15 @@ jobs:
         working-directory: frontend
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
         working-directory: frontend
 
       - name: Install Playwright Chromium Browser
         run: npx playwright install chromium --with-deps
+        working-directory: frontend
+
+      - name: Print playwright version
+        run: npm list playwright --depth=0
         working-directory: frontend
 
       - name: Run Frontend Playwright tests
