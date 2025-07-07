@@ -157,8 +157,8 @@ export default defineConfig({
     // Playwright seems to trip up due to SSL errors (because the self-signed certificate
     // via "next dev --experimental-https" won't be trusted), so we ignore them.
     // ignoreHTTPSErrors is not a valid property for webServer; it is set globally in the `use` block above.
-    // Always reuse the server if started externally (e.g., by CI workflow)
-    reuseExistingServer: true,
+
+    reuseExistingServer: !process.env.CI,
 
     // timeout: 2 * 1000,
   },

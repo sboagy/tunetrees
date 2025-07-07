@@ -54,17 +54,18 @@ jobs:
         run: npm list playwright --depth=0
         working-directory: frontend
 
-      - name: Install wait-on
-        run: npm install -g wait-on
-        working-directory: frontend
+      # I think the way these tests are set up, we don't want to start the Next.js server manually.
+      # - name: Install wait-on
+      #   run: npm install -g wait-on
+      #   working-directory: frontend
 
-      - name: Start Next.js server
-        run: npm run dev &
-        working-directory: frontend
+      # - name: Start Next.js server
+      #   run: npm run dev &
+      #   working-directory: frontend
 
-      - name: Wait for Next.js server to be ready
-        run: wait-on https://localhost:3000
-        working-directory: frontend
+      # - name: Wait for Next.js server to be ready
+      #   run: wait-on https://localhost:3000
+      #   working-directory: frontend
 
       - name: Run Frontend Playwright tests
         # run: npx playwright test --project=chromium --grep "test-practice-1-2"
