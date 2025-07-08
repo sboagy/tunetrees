@@ -51,7 +51,7 @@ class PurposeEnum(str, Enum):
 
 class PlaylistTuneModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
+    
     playlist_ref: int
     tune_ref: int  # Changed from str to int
     current: str
@@ -61,7 +61,7 @@ class PlaylistTuneModel(BaseModel):
 
 class PlaylistTuneModelPartial(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
+    
     playlist_ref: Optional[int] = None
     tune_ref: Optional[int] = None
     current: Optional[str] = None
@@ -80,7 +80,9 @@ class TuneModel(BaseModel):
     private_for: Optional[int]
     deleted: Optional[bool]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TuneModelPartial(BaseModel):
@@ -94,7 +96,9 @@ class TuneModelPartial(BaseModel):
     private_for: Optional[int] = None
     deleted: Optional[bool] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TuneOverrideModel(BaseModel):
@@ -109,7 +113,9 @@ class TuneOverrideModel(BaseModel):
     incipit: Optional[str]
     deleted: Optional[bool] = Field(default=False)
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TuneOverrideModelPartial(BaseModel):
@@ -124,7 +130,9 @@ class TuneOverrideModelPartial(BaseModel):
     incipit: Optional[str] = None
     deleted: Optional[bool] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TuneModelCreate(BaseModel):
@@ -137,7 +145,9 @@ class TuneModelCreate(BaseModel):
     private_for: Optional[int] = None
     deleted: Optional[bool] = False
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class VerificationTokenModel(BaseModel):
@@ -145,7 +155,9 @@ class VerificationTokenModel(BaseModel):
     token: str
     expires: str
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class VerificationTokenModelPartial(BaseModel):
@@ -153,7 +165,9 @@ class VerificationTokenModelPartial(BaseModel):
     token: Optional[str] = None
     expires: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class AccountType(str, Enum):
@@ -176,7 +190,9 @@ class AccountModel(BaseModel):
     session_state: Optional[str]
     refresh_token: Optional[str]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class AccountModelPartial(BaseModel):
@@ -192,7 +208,9 @@ class AccountModelPartial(BaseModel):
     session_state: Optional[str] = None
     token_type: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class ExternalRefModel(BaseModel):
@@ -201,7 +219,9 @@ class ExternalRefModel(BaseModel):
     tune_ref: int
     ref_type: Optional[str]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class ExternalRefModelPartial(BaseModel):
@@ -210,7 +230,9 @@ class ExternalRefModelPartial(BaseModel):
     tune_ref: Optional[int] = None
     ref_type: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class PlaylistModel(BaseModel):
@@ -220,7 +242,9 @@ class PlaylistModel(BaseModel):
     deleted: Optional[bool]
     sr_alg_type: Optional[str] = Field(default=None)
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class PlaylistModelPartial(BaseModel):
@@ -230,7 +254,9 @@ class PlaylistModelPartial(BaseModel):
     deleted: Optional[bool] = None
     sr_alg_type: Optional[str] = Field(default=None)
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class InstrumentModel(BaseModel):
@@ -241,7 +267,9 @@ class InstrumentModel(BaseModel):
     genre_default: Optional[str]
     deleted: Optional[bool]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class InstrumentModelPartial(BaseModel):
@@ -252,7 +280,9 @@ class InstrumentModelPartial(BaseModel):
     genre_default: Optional[str] = None
     deleted: Optional[bool] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class PrefsSpacedRepetitionModel(BaseModel):
@@ -265,7 +295,9 @@ class PrefsSpacedRepetitionModel(BaseModel):
     relearning_steps: Optional[str]
     enable_fuzzing: Optional[bool] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class PrefsSpacedRepetitionModelPartial(BaseModel):
@@ -275,7 +307,9 @@ class PrefsSpacedRepetitionModelPartial(BaseModel):
     request_retention: Optional[float] = None
     maximum_interval: Optional[int] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class SessionModel(BaseModel):
@@ -283,7 +317,9 @@ class SessionModel(BaseModel):
     session_token: str
     user_id: Optional[int]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class SessionModelPartial(BaseModel):
@@ -291,7 +327,9 @@ class SessionModelPartial(BaseModel):
     session_token: Optional[str] = None
     user_id: Optional[int] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TabGroupMainStateModel(BaseModel):
@@ -301,7 +339,9 @@ class TabGroupMainStateModel(BaseModel):
     playlist_id: int
     tab_spec: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TabGroupMainStateModelPartial(BaseModel):
@@ -311,7 +351,9 @@ class TabGroupMainStateModelPartial(BaseModel):
     playlist_id: Optional[int] = None
     tab_spec: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TableStateModel(BaseModel):
@@ -334,7 +376,9 @@ class TableStateModel(BaseModel):
             raise ValueError("playlist_id must be greater than zero")
         return value
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TableStateModelPartial(BaseModel):
@@ -345,7 +389,9 @@ class TableStateModelPartial(BaseModel):
     current_tune: Optional[int] = None
     playlist_id: Optional[int] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class UserAnnotationSetModel(BaseModel):
@@ -356,7 +402,9 @@ class UserAnnotationSetModel(BaseModel):
     user_ref: int
     deleted: Optional[bool]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class UserAnnotationSetModelPartial(BaseModel):
@@ -367,7 +415,9 @@ class UserAnnotationSetModelPartial(BaseModel):
     user_ref: Optional[int] = None
     deleted: Optional[bool] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class PracticeRecordModel(BaseModel):
@@ -388,7 +438,9 @@ class PracticeRecordModel(BaseModel):
     difficulty: Optional[float]
     step: Optional[int]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class PracticeRecordModelPartial(BaseModel):
@@ -409,7 +461,9 @@ class PracticeRecordModelPartial(BaseModel):
     difficulty: Optional[float]
     step: Optional[int]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TableTransientDataModel(BaseModel):
@@ -421,7 +475,9 @@ class TableTransientDataModel(BaseModel):
     note_public: Optional[str]
     recall_eval: Optional[str]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TableTransientDataModelPartial(BaseModel):
@@ -433,7 +489,9 @@ class TableTransientDataModelPartial(BaseModel):
     note_public: Optional[str] = None
     recall_eval: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class NoteModel(BaseModel):
@@ -446,7 +504,9 @@ class NoteModel(BaseModel):
     public: Optional[bool]
     favorite: Optional[int]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class NoteModelPartial(BaseModel):
@@ -459,7 +519,9 @@ class NoteModelPartial(BaseModel):
     public: Optional[bool] = None
     favorite: Optional[int] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class NoteModelCreate(BaseModel):
@@ -471,7 +533,9 @@ class NoteModelCreate(BaseModel):
     public: Optional[bool] = False
     favorite: Optional[int] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class ReferenceModel(BaseModel):
@@ -486,7 +550,9 @@ class ReferenceModel(BaseModel):
     title: str | None
     deleted: Optional[bool]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class ReferenceModelPartial(BaseModel):
@@ -501,7 +567,9 @@ class ReferenceModelPartial(BaseModel):
     title: Optional[str] = None
     deleted: Optional[bool] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class ReferenceModelCreate(BaseModel):
@@ -543,7 +611,9 @@ class PlaylistTuneJoinedModel(BaseModel):
     playlist_deleted: Optional[bool] = None
     has_override: Optional[bool] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class PracticeListStagedModel(BaseModel):
@@ -579,7 +649,9 @@ class PracticeListStagedModel(BaseModel):
     favorite_url: Optional[str] = None
     has_override: Optional[bool] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class ResponseStatusModel(BaseModel):
@@ -598,7 +670,9 @@ class GenreModel(BaseModel):
     description: str | None = None
     region: str | None = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class GenreModelCreate(BaseModel):
@@ -624,7 +698,9 @@ class ViewPlaylistJoinedModel(BaseModel):
     genre_default: Optional[str]
     instrument_deleted: bool
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class UserModel(BaseModel):
@@ -644,7 +720,9 @@ class UserModel(BaseModel):
     hash: Optional[str] = Field(default=None, alias="hash")
     sr_alg_type: Optional[str] = Field(default="FSRS")
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class UserModelPartial(BaseModel):
@@ -664,7 +742,9 @@ class UserModelPartial(BaseModel):
     hash: Optional[str] = Field(default=None, alias="hash")
     sr_alg_type: Optional[str] = Field(default="FSRS")
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 # {
@@ -696,7 +776,9 @@ class TuneTypeModel(BaseModel):
     rhythm: Optional[str] = None
     description: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class TuneTypeModelPartial(BaseModel):
@@ -705,18 +787,24 @@ class TuneTypeModelPartial(BaseModel):
     rhythm: Optional[str] = None
     description: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class GenreTuneTypeModel(BaseModel):
     genre_id: int
     tune_type_id: int
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class GenreTuneTypeModelPartial(BaseModel):
     genre_id: Optional[int] = None
     tune_type_id: Optional[int] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        orm_mode = True
+        from_attributes = True
