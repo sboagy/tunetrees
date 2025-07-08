@@ -148,15 +148,19 @@ export default defineConfig({
       AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET || "",
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
       GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
-      GITHUB_CLIENT_ID: process.env.GGITHUB_CLIENT_ID || "",
-      GITHUB_CLIENT_SECRET: process.env.GGITHUB_CLIENT_SECRET || "",
+      GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || "",
+      GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || "",
       TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
-      CI: process.env.TT_AUTH_SENDGRID_API_KEY || "",
+      CI: process.env.CI || "",
     },
     url: "https://localhost:3000/api/health",
     // Playwright seems to trip up due to SSL errors (because the self-signed certificate
     // via "next dev --experimental-https" won't be trusted), so we ignore them.
-    // ignoreHTTPSErrors is not a valid property for webServer; it is set globally in the `use` block above.
+
+    // CoPilot absolutely lied to me about this: ignoreHTTPSErrors is not a valid property
+    // for webServer; it is set globally in the `use` block above.
+    // This property is absolutely necessary to make the tests work!
+    ignoreHTTPSErrors: true, // Accept self-signed certificates
 
     reuseExistingServer: !process.env.CI,
     // reuseExistingServer: true, // try to reuse the existing server if it is already running
