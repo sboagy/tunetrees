@@ -82,9 +82,8 @@ else:
     db_location_path = default_db_location
 
 assert db_location_path
-if not db_location_path.exists():
-    logging.getLogger().error(f"Database file not found: {db_location_path}")
-    raise FileNotFoundError(f"Database file not found: {db_location_path}")
+# Note: Don't check file existence at import time to allow tests to set up the database
+# The file existence will be checked when the database is actually accessed
 
 stop_words = ["a", "an", "the", "of", "in", "on", "at", "to", "for", "with", "by"]
 
@@ -102,6 +101,11 @@ SessionLocalInternal = sessionmaker(
 
 @contextmanager
 def SessionLocal() -> Iterator[Session]:
+    # Check database file existence when actually accessing it
+    if not db_location_path.exists():
+        logger.error(f"Database file not found: {db_location_path}")
+        raise FileNotFoundError(f"Database file not found: {db_location_path}")
+
     db = SessionLocalInternal()
     try:
         check_integrity(db, "before")
