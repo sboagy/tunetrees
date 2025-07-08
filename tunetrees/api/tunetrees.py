@@ -299,6 +299,9 @@ async def get_playlist_tune_overview(user_id: int, playlist_ref: int, tune_id: i
                     status_code=404, detail=f"Tune not found: ({tune_id})"
                 )
             return PlaylistTuneJoinedModel.model_validate(result)
+    except HTTPException as e:
+        logger.error(f"Unable to fetch tune ({tune_id}): {e}")
+        raise
     except Exception as e:
         logger.error(f"Unable to fetch tune ({tune_id}): {e}")
         raise HTTPException(

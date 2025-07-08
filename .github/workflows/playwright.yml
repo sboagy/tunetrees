@@ -60,7 +60,7 @@ jobs:
       #   working-directory: frontend
 
       # - name: Start Next.js server
-      #   run: npm run dev &
+      #   run: next dev --experimental-https &
       #   working-directory: frontend
 
       # - name: Wait for Next.js server to be ready

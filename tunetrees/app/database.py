@@ -58,11 +58,17 @@ def wait_for_integrity(db: Session):
 
 # SQLALCHEMY_DATABASE_URL = "sqlite:///./sql_app.db"
 # SQLALCHEMY_DATABASE_URL = "postgresql://user:password@postgresserver/db"
-default_db_location = Path(__file__).parent.parent.parent.joinpath("tunetrees.sqlite3")
-db_location_str = os.environ.get("TUNETREES_DB")
+default_db_location: Path = Path(__file__).parent.parent.parent.joinpath(
+    "tunetrees.sqlite3"
+)
+db_location_str = os.environ.get("TUNETREES_DB", os.environ.get("DATABASE_URL"))
 if db_location_str is not None:
     db_location_str = db_location_str.strip()
+    # If it's a SQLAlchemy URL, extract the path
+    if db_location_str.startswith("sqlite:///"):
+        db_location_str = db_location_str.replace("sqlite:///", "")
 db_location_path = Path(db_location_str) if db_location_str else default_db_location
+
 assert db_location_path
 if not db_location_path.exists():
     logging.getLogger().error(f"Database file not found: {db_location_path}")

@@ -321,3 +321,6 @@ compiled_requirements.txt
 frontend/test-scripts/storageStateSboagyLogin.b64
 iti_import_output
 frontend/public/test-browser.properties
+xtest_stashed_folder
+**/__pycache__
+**/__pycache__/**/*.*

@@ -159,6 +159,7 @@ export default defineConfig({
     // ignoreHTTPSErrors is not a valid property for webServer; it is set globally in the `use` block above.
 
     reuseExistingServer: !process.env.CI,
+    // reuseExistingServer: true, // try to reuse the existing server if it is already running
 
     // timeout: 2 * 1000,
   },
