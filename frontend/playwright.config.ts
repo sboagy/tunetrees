@@ -61,7 +61,9 @@ export default defineConfig({
 
     /* Base URL to use in actions like `await page.goto('/')`. */
     // baseURL: 'http://127.0.0.1:3000',
-    baseURL: "https://localhost:3000",
+    baseURL: process.env.CI
+      ? "http://localhost:8000"
+      : "https://localhost:3000",
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "retain-on-failure",
@@ -153,7 +155,9 @@ export default defineConfig({
       TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
       CI: process.env.TT_AUTH_SENDGRID_API_KEY || "",
     },
-    url: "https://localhost:3000/api/health",
+    url: process.env.CI
+      ? "http://localhost:8000/api/health"
+      : "https://localhost:3000/api/health",
     // Playwright seems to trip up due to SSL errors (because the self-signed certificate
     // via "next dev --experimental-https" won't be trusted), so we ignore them.
 
