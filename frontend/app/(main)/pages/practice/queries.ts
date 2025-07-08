@@ -1392,7 +1392,9 @@ export async function deletePracticeRecord(
 export async function fetchTuneOverride(
   overrideId: number,
 ): Promise<ITuneOverride> {
-  const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`);
+  const res = await fetchWithTimeout(
+    `${TT_API_BASE_URL}/tunetrees/tune_override/${overrideId}`,
+  );
   if (!res.ok) {
     throw new Error(`Failed to fetch tune override: ${res.statusText}`);
   }
@@ -1403,11 +1405,14 @@ export async function fetchTuneOverride(
 export async function createTuneOverride(
   data: Partial<ITuneOverride>,
 ): Promise<ITuneOverride> {
-  const res = await fetchWithTimeout("/tunetrees/tune_override", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  const res = await fetchWithTimeout(
+    `${TT_API_BASE_URL}/tunetrees/tune_override`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
   if (!res.ok) {
     throw new Error(`Failed to create tune override: ${res.statusText}`);
   }
@@ -1419,11 +1424,14 @@ export async function updateTuneOverride(
   overrideId: number,
   data: Partial<ITuneOverride>,
 ): Promise<ITuneOverride> {
-  const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  const res = await fetchWithTimeout(
+    `${TT_API_BASE_URL}/tunetrees/tune_override/${overrideId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
   if (!res.ok) {
     throw new Error(`Failed to update tune override: ${res.statusText}`);
   }
@@ -1432,16 +1440,21 @@ export async function updateTuneOverride(
 }
 
 export async function deleteTuneOverride(overrideId: number): Promise<void> {
-  const res = await fetchWithTimeout(`/tunetrees/tune_override/${overrideId}`, {
-    method: "DELETE",
-  });
+  const res = await fetchWithTimeout(
+    `${TT_API_BASE_URL}/tunetrees/tune_override/${overrideId}`,
+    {
+      method: "DELETE",
+    },
+  );
   if (!res.ok) {
     throw new Error(`Failed to delete tune override: ${res.statusText}`);
   }
 }
 
 export async function getTuneType(tuneTypeId: string): Promise<ITuneType> {
-  const res = await fetchWithTimeout(`/tunetrees/tune_type/${tuneTypeId}`);
+  const res = await fetchWithTimeout(
+    `${TT_API_BASE_URL}/tunetrees/tune_type/${tuneTypeId}`,
+  );
   if (!res.ok) {
     throw new Error(`Failed to fetch tune type: ${res.statusText}`);
   }
@@ -1452,7 +1465,7 @@ export async function getTuneType(tuneTypeId: string): Promise<ITuneType> {
 export async function createTuneType(
   data: Partial<ITuneType>,
 ): Promise<ITuneType> {
-  const res = await fetchWithTimeout("/tunetrees/tune_type", {
+  const res = await fetchWithTimeout(`${TT_API_BASE_URL}/tunetrees/tune_type`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -1468,11 +1481,14 @@ export async function updateTuneType(
   tuneTypeId: string,
   data: Partial<ITuneType>,
 ): Promise<ITuneType> {
-  const res = await fetchWithTimeout(`/tunetrees/tune_type/${tuneTypeId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  const res = await fetchWithTimeout(
+    `${TT_API_BASE_URL}/tunetrees/tune_type/${tuneTypeId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
   if (!res.ok) {
     throw new Error(`Failed to update tune type: ${res.statusText}`);
   }
@@ -1481,9 +1497,12 @@ export async function updateTuneType(
 }
 
 export async function deleteTuneType(tuneTypeId: string): Promise<void> {
-  const res = await fetchWithTimeout(`/tunetrees/tune_type/${tuneTypeId}`, {
-    method: "DELETE",
-  });
+  const res = await fetchWithTimeout(
+    `${TT_API_BASE_URL}/tunetrees/tune_type/${tuneTypeId}`,
+    {
+      method: "DELETE",
+    },
+  );
   if (!res.ok) {
     throw new Error(`Failed to delete tune type: ${res.statusText}`);
   }
