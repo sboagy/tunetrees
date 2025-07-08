@@ -148,10 +148,10 @@ export default defineConfig({
       AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET || "",
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
       GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
-      GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID || "",
-      GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET || "",
+      GITHUB_CLIENT_ID: process.env.GGITHUB_CLIENT_ID || "",
+      GITHUB_CLIENT_SECRET: process.env.GGITHUB_CLIENT_SECRET || "",
       TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
-      CI: process.env.CI || "",
+      CI: process.env.TT_AUTH_SENDGRID_API_KEY || "",
     },
     url: "https://localhost:3000/api/health",
     // Playwright seems to trip up due to SSL errors (because the self-signed certificate
