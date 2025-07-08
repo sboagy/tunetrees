@@ -53,16 +53,32 @@ def test_practice_list_joined():
         except Exception as e:
             print(f"Could not determine SQLAlchemy DB path: {e}")
 
+        review_sitdown_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
         tunes: List[Row[Any]] = query_practice_list_scheduled(
             db,
             limit=1000,
             print_table=True,
-            review_sitdown_date=datetime.fromisoformat("2024-07-08 12:27:08"),
+            review_sitdown_date=review_sitdown_date,
         )
-        filtered = list(filter(lambda tune: tune.id == 924, tunes))
+        filtered = list(filter(lambda tune: tune.id == 1081, tunes))
         assert filtered
         r1714 = filtered[0]
-        assert str(r1714.title) == "Jenny Picking Cockles"
+        assert str(r1714.title) == "Lakes of Sligo"
+
+        filtered = list(filter(lambda tune: tune.id == 1820, tunes))
+        assert filtered
+        r1714 = filtered[0]
+        assert str(r1714.title) == "St. Mary's"
+
+        filtered = list(filter(lambda tune: tune.id == 2451, tunes))
+        assert filtered
+        r1714 = filtered[0]
+        assert str(r1714.title) == "Church Street Polka"
+
+        filtered = list(filter(lambda tune: tune.id == 1684, tunes))
+        assert filtered
+        r1714 = filtered[0]
+        assert str(r1714.title) == "Road to Lisdoonvarna"
 
 
 def test_direct_sql_on_practice_list_staged():
