@@ -5,6 +5,15 @@ import axios from "axios";
 
 const baseURL = process.env.TT_API_BASE_URL;
 
+if (!baseURL) {
+  console.error(
+    "TT_API_BASE_URL environment variable is not set in commands.ts!",
+  );
+  throw new Error("TT_API_BASE_URL environment variable is not set");
+}
+
+console.log("Commands API baseURL:", baseURL);
+
 interface IPracticeFeedbackProps {
   id: number;
   feedback: string;
@@ -32,7 +41,7 @@ export const submitPracticeFeedback = async ({
   try {
     const response = await axios({
       method: "post",
-      url: `${baseURL}/practice/submit_feedback`,
+      url: `${baseURL}/tunetrees/practice/submit_feedback`,
       data: {
         selected_tune: id,
         vote_type: feedback,
@@ -74,7 +83,7 @@ export const submitPracticeFeedbacks = async (
     console.error("Base URL is not defined");
     return "Error: Base URL is not defined";
   }
-  const url = `${baseURL}/practice/submit_feedbacks`;
+  const url = `${baseURL}/tunetrees/practice/submit_feedbacks`;
   console.log(
     `Submitting feedbacks for user_id: ${playlistId}, updates: ${JSON.stringify(updates)} url: ${url}`,
   );
@@ -136,7 +145,7 @@ export const submitPracticeSchedules = async ({
     console.error("Base URL is not defined");
     return "Error: Base URL is not defined";
   }
-  const url = `${baseURL}/practice/submit_schedules`;
+  const url = `${baseURL}/tunetrees/practice/submit_schedules`;
   console.log(
     `Submitting feedbacks for user_id: ${playlist_id}, updates: ${JSON.stringify(updates)} url: ${url}`,
   );
@@ -144,7 +153,7 @@ export const submitPracticeSchedules = async ({
   try {
     const response = await axios({
       method: "post",
-      url: `${baseURL}/practice/submit_schedules/${playlist_id}`,
+      url: `${baseURL}/tunetrees/practice/submit_schedules/${playlist_id}`,
       data: updates,
       headers: {
         key: "Access-Control-Allow-Origin",

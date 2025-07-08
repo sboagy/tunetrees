@@ -37,9 +37,26 @@ import { formatTypeScriptDateToPythonUTCString } from "@/lib/date-utils";
 //   }
 // }
 
+const TT_API_BASE_URL = process.env.TT_API_BASE_URL;
+
+if (!TT_API_BASE_URL) {
+  console.error(
+    "TT_API_BASE_URL environment variable is not set in queries.ts!",
+  );
+  throw new Error("TT_API_BASE_URL environment variable is not set");
+}
+
+// Most queries APIs are under /tunetrees/ path
 const client = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_TT_BASE_URL,
+  baseURL: `${TT_API_BASE_URL}/tunetrees`,
 });
+
+console.log(
+  "Queries API baseURL:",
+  `${TT_API_BASE_URL}/tunetrees`,
+  "client baseURL:",
+  client.defaults.baseURL,
+);
 
 // The sitdown date must always be passed from the client/browser.
 // There is no default for SSR; if missing, throw an error.
@@ -203,7 +220,7 @@ async function createNewOverrideRecord(
     user_ref: user_id,
   };
   const responseCreate = await fetch(
-    `${process.env.NEXT_PUBLIC_TT_BASE_URL}/tune_override`,
+    `${TT_API_BASE_URL}/tunetrees/tune_override`,
     {
       method: "POST",
       headers: {
@@ -234,7 +251,7 @@ async function updateOverrideRecord(
   const tuneOverrideDataFromDB = await existingOverrideResponse.json();
   const overrideId = tuneOverrideDataFromDB.id;
   const responseCreate = await fetch(
-    `${process.env.NEXT_PUBLIC_TT_BASE_URL}/tune_override/${overrideId}`,
+    `${TT_API_BASE_URL}/tunetrees/tune_override/${overrideId}`,
     {
       method: "PATCH",
       headers: {
@@ -285,7 +302,7 @@ async function updatePublicTuneRecord(
     JSON.stringify(tuneUpdateData, null, 2),
   );
 
-  const urlString = `${process.env.NEXT_PUBLIC_TT_BASE_URL}/tune/${tune_id}`;
+  const urlString = `${TT_API_BASE_URL}/tunetrees/tune/${tune_id}`;
 
   console.log("===> queries.ts:215 ~ urlString", urlString);
 
@@ -417,7 +434,7 @@ async function saveTuneAsOverride(
   );
 
   const existingOverrideResponse = await fetch(
-    `${process.env.NEXT_PUBLIC_TT_BASE_URL}/query_tune_override?user_ref=${user_id}&tune_ref=${tune_id}`,
+    `${TT_API_BASE_URL}/tunetrees/query_tune_override?user_ref=${user_id}&tune_ref=${tune_id}`,
     {
       method: "GET",
       headers: {
@@ -1475,8 +1492,9 @@ export async function deleteTuneType(tuneTypeId: string): Promise<void> {
 export async function fetchGenreTuneType(
   assocId: number,
 ): Promise<IGenreTuneType> {
-  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
-  const res = await fetch(`${baseUrl}/genre_tune_type/${assocId}`);
+  const res = await fetch(
+    `${TT_API_BASE_URL}/tunetrees/genre_tune_type/${assocId}`,
+  );
   if (!res.ok) {
     throw new Error(`Failed to fetch association: ${res.statusText}`);
   }
@@ -1486,8 +1504,7 @@ export async function fetchGenreTuneType(
 export async function createGenreTuneType(
   data: Partial<IGenreTuneType>,
 ): Promise<IGenreTuneType> {
-  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
-  const res = await fetch(`${baseUrl}/genre_tune_type`, {
+  const res = await fetch(`${TT_API_BASE_URL}/tunetrees/genre_tune_type`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -1502,12 +1519,14 @@ export async function updateGenreTuneType(
   assocId: number,
   data: Partial<IGenreTuneType>,
 ): Promise<IGenreTuneType> {
-  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
-  const res = await fetch(`${baseUrl}/genre_tune_type/${assocId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  const res = await fetch(
+    `${TT_API_BASE_URL}/tunetrees/genre_tune_type/${assocId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
   if (!res.ok) {
     throw new Error(`Failed to update association: ${res.statusText}`);
   }
@@ -1515,10 +1534,12 @@ export async function updateGenreTuneType(
 }
 
 export async function deleteGenreTuneType(assocId: number): Promise<void> {
-  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
-  const res = await fetch(`${baseUrl}/genre_tune_type/${assocId}`, {
-    method: "DELETE",
-  });
+  const res = await fetch(
+    `${TT_API_BASE_URL}/tunetrees/genre_tune_type/${assocId}`,
+    {
+      method: "DELETE",
+    },
+  );
   if (!res.ok) {
     throw new Error(`Failed to delete association: ${res.statusText}`);
   }
@@ -1527,8 +1548,7 @@ export async function deleteGenreTuneType(assocId: number): Promise<void> {
 export async function getTuneTypesByGenre(
   genreId: string,
 ): Promise<ITuneType[]> {
-  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
-  const res = await fetch(`${baseUrl}/tune_types/${genreId}`);
+  const res = await fetch(`${TT_API_BASE_URL}/tunetrees/tune_types/${genreId}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch tune types: ${res.statusText}`);
   }
@@ -1539,11 +1559,7 @@ export async function searchTunesByTitle(
   title: string,
   limit = 10,
 ): Promise<ITune[]> {
-  const baseUrl = process.env.NEXT_PUBLIC_TT_BASE_URL ?? "";
-  const url = new URL(
-    `${baseUrl}/tunes/search`,
-    process.env.NEXT_PUBLIC_TT_BASE_URL,
-  );
+  const url = new URL(`${TT_API_BASE_URL}/tunetrees/tunes/search`);
   url.searchParams.append("title", title);
   url.searchParams.append("limit", limit.toString());
 

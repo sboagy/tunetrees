@@ -12,8 +12,21 @@ import type {
   TablePurpose,
 } from "./types";
 
+const TT_API_BASE_URL = process.env.TT_API_BASE_URL;
+console.log("TT_API_BASE_URL env var:", TT_API_BASE_URL);
+console.log("Using TT_API_BASE_URL:", TT_API_BASE_URL);
+
+if (!TT_API_BASE_URL) {
+  console.error("TT_API_BASE_URL environment variable is not set!");
+  throw new Error("TT_API_BASE_URL environment variable is not set");
+}
+
+// Settings API is at /settings/ from the base URL
+const baseURL = `${TT_API_BASE_URL}/settings`;
+console.log("Settings API baseURL:", baseURL);
+
 const client = axios.create({
-  baseURL: `${process.env.NEXT_BASE_URL}/settings`,
+  baseURL: baseURL,
   timeout: 6000, // Increase timeout to 2 seconds
 });
 
