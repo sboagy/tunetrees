@@ -1,4 +1,5 @@
 import shutil
+import sqlite3
 import pytest
 from pathlib import Path
 from fastapi import FastAPI
@@ -12,8 +13,36 @@ def reset_test_db():
     repo_root = Path(__file__).parent.parent
     src_path = repo_root / "tunetrees_test_clean.sqlite3"
     dst_path = repo_root / "tunetrees_test.sqlite3"
+
+    # Debug: Check if source file exists and has the difficulty column
+    if src_path.exists():
+        print(f"Source DB exists: {src_path}")
+        # Quick check for difficulty column in source
+        with sqlite3.connect(src_path) as conn:
+            cursor = conn.execute("PRAGMA table_info(practice_record)")
+            cols = [row[1] for row in cursor.fetchall()]
+            if "difficulty" in cols:
+                print("✓ Source DB has difficulty column in practice_record")
+            else:
+                print("✗ Source DB missing difficulty column in practice_record")
+    else:
+        print(f"✗ Source DB not found: {src_path}")
+
     print(f"Copying test DB from {src_path} to {dst_path}")
     shutil.copyfile(src_path, dst_path)
+
+    # Debug: Verify the copy worked
+    if dst_path.exists():
+        print(f"✓ Destination DB exists after copy: {dst_path}")
+        with sqlite3.connect(dst_path) as conn:
+            cursor = conn.execute("PRAGMA table_info(practice_record)")
+            cols = [row[1] for row in cursor.fetchall()]
+            if "difficulty" in cols:
+                print("✓ Destination DB has difficulty column in practice_record")
+            else:
+                print("✗ Destination DB missing difficulty column in practice_record")
+    else:
+        print(f"✗ Destination DB not found after copy: {dst_path}")
 
 
 @pytest.fixture(scope="session")

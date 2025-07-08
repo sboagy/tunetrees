@@ -27,9 +27,19 @@ def test_check_practice_list_staged_columns():
     db_url = os.environ.get("DATABASE_URL")
     print(f"DATABASE_URL={db_url}")
     if db_url and db_url.startswith("sqlite:///"):
-        repo_root: str = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        db_path: str = os.path.join(repo_root, db_url.replace("sqlite:///", ""))
+        # Extract the path from the URL
+        db_path = db_url.replace("sqlite:///", "")
+
+        # If it's not an absolute path, make it relative to repo root
+        if not os.path.isabs(db_path):
+            repo_root: str = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..")
+            )
+            db_path = os.path.join(repo_root, db_path)
+
         print(f"ABSOLUTE DB PATH: {os.path.abspath(db_path)}")
+        print(f"DB PATH EXISTS: {os.path.exists(db_path)}")
+
         with sqlite3.connect(db_path) as conn:
             cursor = conn.execute("PRAGMA table_info('practice_list_staged')")
             columns = [row[1] for row in cursor.fetchall()]
@@ -84,8 +94,16 @@ def test_practice_list_joined():
 def test_direct_sql_on_practice_list_staged():
     db_url = os.environ.get("DATABASE_URL")
     if db_url and db_url.startswith("sqlite:///"):
-        repo_root: str = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        db_path: str = os.path.join(repo_root, db_url.replace("sqlite:///", ""))
+        # Extract the path from the URL
+        db_path = db_url.replace("sqlite:///", "")
+
+        # If it's not an absolute path, make it relative to repo root
+        if not os.path.isabs(db_path):
+            repo_root: str = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..")
+            )
+            db_path = os.path.join(repo_root, db_path)
+
         with sqlite3.connect(db_path) as conn:
             try:
                 cursor = conn.execute(
