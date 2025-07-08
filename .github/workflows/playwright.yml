@@ -73,8 +73,7 @@ jobs:
         working-directory: frontend
         env:
           NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
-          NEXT_PUBLIC_TT_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
-          TT_API_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
+          TT_API_BASE_URL: ${{ vars.TT_API_BASE_URL }}
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}
