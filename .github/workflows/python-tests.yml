@@ -25,5 +25,6 @@ jobs:
       - name: Run pytest
         env:
           PYTHONPATH: .
+          DATABASE_URL: sqlite:///tunetrees_test.sqlite3
         run: |
           pytest
