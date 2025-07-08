@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple, TypedDict
+from typing import Dict, List, Optional, Tuple
+from typing_extensions import TypedDict
 
 from fsrs import Rating, Scheduler, ReviewLog
 from sqlalchemy import Row, and_, select, update
