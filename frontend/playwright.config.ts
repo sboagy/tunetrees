@@ -150,7 +150,6 @@ export default defineConfig({
       GITHUB_CLIENT_ID: process.env.GGITHUB_CLIENT_ID || "",
       GITHUB_CLIENT_SECRET: process.env.GGITHUB_CLIENT_SECRET || "",
       TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
-      CI: process.env.CI || "",
     },
     url: "https://localhost:3000/api/health",
 

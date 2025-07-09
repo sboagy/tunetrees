@@ -54,6 +54,13 @@ jobs:
         run: npm list playwright --depth=0
         working-directory: frontend
 
+      - name: Debug environment
+        run: |
+          echo "CI=$CI"
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+        working-directory: frontend
+
       # I think the way these tests are set up, we don't want to start the Next.js server manually.
       # - name: Install wait-on
       #   run: npm install -g wait-on
@@ -69,7 +76,7 @@ jobs:
 
       - name: Run Frontend Playwright tests
         # run: npx playwright test --project=chromium --grep "test-practice-1-2"
-        run: npx playwright test --project=chromium
+        run: npx playwright test --project=chromium --reporter=list
         working-directory: frontend
         env:
           NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
