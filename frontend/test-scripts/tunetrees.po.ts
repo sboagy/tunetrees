@@ -301,8 +301,12 @@ export class TuneTreesPageObject {
     }
 
     const topSignInButton = this.page.getByRole("button", { name: "Sign in" });
+    await topSignInButton.waitFor({ state: "visible" });
     await topSignInButton.click();
+    
+    // Wait for the login dialog to appear
     const userEmailLocator = this.page.getByTestId("user_email");
+    await userEmailLocator.waitFor({ state: "visible", timeout: 10000 });
     await userEmailLocator.fill(user || "");
     await userEmailLocator.press("Tab");
     const passwordEntryBox = this.page.getByTestId("user_password");

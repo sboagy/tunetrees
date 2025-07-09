@@ -308,8 +308,13 @@ async function initialSignIn(page: Page) {
   const topSignInButton = ttPO.page.getByRole("button", {
     name: "New user",
   });
+  await topSignInButton.waitFor({ state: "visible" });
   await topSignInButton.click();
+  
+  // Wait for the signup dialog to appear
   const userEmailLocator = ttPO.page.getByTestId("user_email");
+  await userEmailLocator.waitFor({ state: "visible", timeout: 10000 });
+  
   const user = process.env.TEST2_LOGIN_USER_EMAIL;
   const pw = process.env.TEST2_LOGIN_USER_PASSWORD;
   const userName = process.env.TEST2_LOGIN_USER_NAME;
