@@ -121,7 +121,7 @@ export class TuneTreesPageObject {
 
     await this.page.goto(this.pageLocation, {
       timeout: initialPageLoadTimeout,
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded", // More reliable than networkidle in CI
     });
     this.page.on("pageerror", this.onError);
     await this.page.waitForLoadState("domcontentloaded");

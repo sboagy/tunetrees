@@ -54,11 +54,11 @@ test.describe.serial("Signup Tests", () => {
 
       await page.goto(linkBackURL, {
         timeout: initialPageLoadTimeout,
-        waitUntil: "networkidle",
+        waitUntil: "domcontentloaded", // More reliable than networkidle in CI
       });
     } else {
       const gmailLoginURL = "https://mail.google.com/";
-      await page.goto(gmailLoginURL, { waitUntil: "networkidle" });
+      await page.goto(gmailLoginURL, { waitUntil: "domcontentloaded" });
 
       const emailInput = page.getByRole("textbox", {
         name: "Email or phone",
@@ -118,7 +118,7 @@ test.describe.serial("Signup Tests", () => {
 
       await page.goto(verificationLink, {
         timeout: initialPageLoadTimeout,
-        waitUntil: "networkidle",
+        waitUntil: "domcontentloaded", // More reliable than networkidle in CI
       });
     }
 
@@ -175,7 +175,7 @@ test.describe.serial("Signup Tests", () => {
       // Open Gmail in a new tab
       const gmailPage = await page.context().newPage();
       const gmailLoginURL = "https://mail.google.com/";
-      await gmailPage.goto(gmailLoginURL, { waitUntil: "networkidle" });
+      await gmailPage.goto(gmailLoginURL, { waitUntil: "domcontentloaded" });
 
       const emailInput = gmailPage.getByRole("textbox", {
         name: "Email or phone",
@@ -294,7 +294,7 @@ async function initialSignIn(page: Page) {
 
   await page.goto("https://localhost:3000", {
     timeout: initialPageLoadTimeout,
-    waitUntil: "networkidle",
+    waitUntil: "domcontentloaded", // More reliable than networkidle in CI
   });
 
   if (
