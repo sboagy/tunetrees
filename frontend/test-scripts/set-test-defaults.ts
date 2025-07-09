@@ -19,6 +19,9 @@ export async function setTestDefaults(page: Page) {
         }
       }
     }`);
+    // Get the current date from the browser and log it to Node stdout
+    const browserDate = await page.evaluate(() => new Date().toISOString());
+    console.log("Browser Date (default):", browserDate);
   }
 }
 
@@ -36,5 +39,8 @@ export async function setTestDateTime(page: Page, sitdownDate: string) {
         }
       }
     }`);
+    // Get the current date from the browser and log it to Node stdout
+    const browserDate = await page.evaluate(() => new Date().toISOString());
+    console.log("Browser Date:", browserDate);
   }
 }
