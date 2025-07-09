@@ -1,10 +1,23 @@
 import shutil
 import sqlite3
 import pytest
+import gc
+import threading
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from tunetrees.api.tunetrees import router
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Clean up resources after all tests are done."""
+    # Force garbage collection to clean up any remaining objects
+    gc.collect()
+
+    # Give threads a moment to clean up
+    threading_active = threading.active_count()
+    if threading_active > 1:  # Main thread + any others
+        print(f"Active threads at session end: {threading_active}")
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -50,7 +63,11 @@ def api_client():
     """Create a FastAPI TestClient for API testing."""
     app = FastAPI()
     app.include_router(router, prefix="")
-    return TestClient(app)
+    client = TestClient(app)
+    yield client
+    # Explicit cleanup to help with threading issues
+    if hasattr(client, "close"):
+        client.close()
 
 
 # Optional: Fixtures for testing against a live server

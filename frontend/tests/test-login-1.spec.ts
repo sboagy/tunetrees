@@ -11,24 +11,36 @@ import { checkHealth } from "../test-scripts/check-servers";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { runLoginWithCookieSave } from "@/test-scripts/run-login2";
+import {
+  logTestStart,
+  logTestEnd,
+  logServerHealth,
+  logBrowserContextStart,
+  logBrowserContextEnd,
+} from "../test-scripts/test-logging";
 
 test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
 });
 
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
   await page.waitForTimeout(100);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
 });
 
 test("test-login-1", async ({ page }) => {
   console.log("===> test-login-1:21 ~ ", "Basic login test");
 
   await checkHealth();
+  await logServerHealth("https://localhost:3000");
 
   const isCookieSave = process.env.SAVE_COOKIES === "true";
 

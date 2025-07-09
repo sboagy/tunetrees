@@ -11,18 +11,29 @@ import type { Page } from "@playwright/test";
 import { checkHealth } from "../test-scripts/check-servers";
 
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
+import {
+  logTestStart,
+  logTestEnd,
+  logServerHealth,
+  logBrowserContextStart,
+  logBrowserContextEnd,
+} from "../test-scripts/test-logging";
 
 test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
 });
 
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
   await page.waitForTimeout(100);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
 });
 
 test.describe.serial("Signup Tests", () => {
@@ -281,6 +292,7 @@ async function initialSignIn(page: Page) {
   const ttPO = new TuneTreesPageObject(page);
 
   await checkHealth();
+  await logServerHealth("https://localhost:3000");
 
   await page.goto("https://localhost:3000", {
     timeout: initialPageLoadTimeout,

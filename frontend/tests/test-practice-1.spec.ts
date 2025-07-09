@@ -5,6 +5,13 @@ import { getStorageState } from "@/test-scripts/storage-state";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { type Page, expect, test } from "@playwright/test";
 import path from "node:path";
+import {
+  logTestStart,
+  logTestEnd,
+  logServerHealth,
+  logBrowserContextStart,
+  logBrowserContextEnd,
+} from "../test-scripts/test-logging";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -17,6 +24,8 @@ test.use({
 import { setTestDefaults } from "../test-scripts/set-test-defaults";
 
 test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
   await setTestDefaults(page);
@@ -24,9 +33,11 @@ test.beforeEach(async ({ page }, testInfo) => {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
 });
 
 async function checkForCellId(page: Page, cellId: number) {
@@ -41,6 +52,7 @@ test.describe.serial("Practice Tests", () => {
   test("Test for the predicted number of rows in the Practice tab", async ({
     page,
   }) => {
+    await logServerHealth("https://localhost:3000");
     const ttPO = new TuneTreesPageObject(page);
 
     await ttPO.navigateToPracticeTab();

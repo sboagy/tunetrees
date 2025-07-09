@@ -127,10 +127,8 @@ export default defineConfig({
 
   /* Run the local dev server before starting the tests */
   webServer: {
-    // When in the github actions CI, the server will be started by
-    // the playwright test runner, controlled by
-    // tunetrees/.github/workflows/playwright.yml,
-    // so this shouldn't have any effect in that environment.
+    // Playwright will start the server using this webServer config in both local and CI environments.
+    // Setting reuseExistingServer: true avoids server startup/shutdown race conditions.
     command: "npm run dev 2>&1 | tee test-results/frontend.log", // Combine the command and arguments
     env: {
       NEXT_BASE_URL: process.env.NEXT_BASE_URL || "",
@@ -140,7 +138,7 @@ export default defineConfig({
         process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "true",
       TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
       AUTH_SECRET: process.env.AUTH_SECRET || "",
-      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",
+      NEXTAUTH_SECRET: process.env.AUTH_SECRET || "",
       AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
       AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET || "",
       AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || "",
@@ -161,8 +159,10 @@ export default defineConfig({
     // This property is absolutely necessary to make the tests work!
     ignoreHTTPSErrors: true, // Accept self-signed certificates
 
-    reuseExistingServer: !process.env.CI,
-    // reuseExistingServer: true, // try to reuse the existing server if it is already running
+    // reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true, // try to reuse the existing server if it is already running
+
+    timeout: 30_000, // Give more time for server startup
 
     // timeout: 2 * 1000,
   },
