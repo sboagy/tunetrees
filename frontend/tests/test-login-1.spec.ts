@@ -14,7 +14,6 @@ import { runLoginWithCookieSave } from "@/test-scripts/run-login2";
 import {
   logTestStart,
   logTestEnd,
-  logServerHealth,
   logBrowserContextStart,
   logBrowserContextEnd,
 } from "../test-scripts/test-logging";
@@ -40,7 +39,6 @@ test("test-login-1", async ({ page }) => {
   console.log("===> test-login-1:21 ~ ", "Basic login test");
 
   await checkHealth();
-  await logServerHealth("https://localhost:3000");
 
   const isCookieSave = process.env.SAVE_COOKIES === "true";
 

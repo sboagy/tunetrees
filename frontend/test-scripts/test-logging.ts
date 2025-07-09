@@ -32,26 +32,6 @@ export function logTestEnd(testInfo: TestInfo) {
 }
 
 /**
- * Logs server health check
- */
-export async function logServerHealth(baseURL: string) {
-  const timestamp = new Date().toISOString();
-  try {
-    const response = await fetch(`${baseURL}/api/health`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    });
-    console.log(
-      `🏥 [${timestamp}] Server health check: ${response.status} ${response.statusText}`,
-    );
-    return response.ok;
-  } catch (error) {
-    console.log(`🏥 [${timestamp}] Server health check failed:`, error);
-    return false;
-  }
-}
-
-/**
  * Logs browser context creation
  */
 export function logBrowserContextStart() {

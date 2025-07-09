@@ -7,7 +7,6 @@ import { expect, test } from "@playwright/test";
 import {
   logTestStart,
   logTestEnd,
-  logServerHealth,
   logBrowserContextStart,
   logBrowserContextEnd,
 } from "../test-scripts/test-logging";
@@ -51,7 +50,6 @@ test.afterEach(async ({ page }, testInfo) => {
 
 test.describe.serial("Add Tune Tests", () => {
   test("test-newtune-1", async ({ page }) => {
-    await logServerHealth("https://localhost:3000");
     const ttPO = new TuneEditorPageObject(page);
     await ttPO.gotoMainPage();
 
@@ -103,7 +101,6 @@ test.describe.serial("Add Tune Tests", () => {
   });
 
   test("test-import-1", async ({ page }) => {
-    await logServerHealth("https://localhost:3000");
     const ttPO = new TuneEditorPageObject(page);
     await ttPO.gotoMainPage();
 

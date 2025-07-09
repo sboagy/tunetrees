@@ -9,7 +9,6 @@ import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import {
   logTestStart,
   logTestEnd,
-  logServerHealth,
   logBrowserContextStart,
   logBrowserContextEnd,
 } from "../test-scripts/test-logging";
@@ -21,9 +20,6 @@ test.beforeEach(async ({ page }, testInfo) => {
 
   // Log browser context creation
   logBrowserContextStart();
-
-  // Check server health before test
-  await logServerHealth("https://localhost:3000");
 
   // Your existing setup
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
@@ -37,9 +33,6 @@ test.beforeEach(async ({ page }, testInfo) => {
 test.afterEach(async ({ page }, testInfo) => {
   // Log browser context cleanup
   logBrowserContextEnd();
-
-  // Check server health after test
-  await logServerHealth("https://localhost:3000");
 
   // Your existing cleanup
   // await restartBackend();

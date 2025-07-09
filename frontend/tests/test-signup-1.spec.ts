@@ -14,7 +14,6 @@ import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import {
   logTestStart,
   logTestEnd,
-  logServerHealth,
   logBrowserContextStart,
   logBrowserContextEnd,
 } from "../test-scripts/test-logging";
@@ -292,7 +291,6 @@ async function initialSignIn(page: Page) {
   const ttPO = new TuneTreesPageObject(page);
 
   await checkHealth();
-  await logServerHealth("https://localhost:3000");
 
   await page.goto("https://localhost:3000", {
     timeout: initialPageLoadTimeout,
