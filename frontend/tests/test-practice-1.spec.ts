@@ -6,11 +6,10 @@ import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { type Page, expect, test } from "@playwright/test";
 import path from "node:path";
 import {
-  logTestStart,
-  logTestEnd,
-  logServerHealth,
-  logBrowserContextStart,
-  logBrowserContextEnd,
+    logTestStart,
+    logTestEnd,
+    logBrowserContextStart,
+    logBrowserContextEnd,
 } from "../test-scripts/test-logging";
 
 test.use({
@@ -52,7 +51,6 @@ test.describe.serial("Practice Tests", () => {
   test("Test for the predicted number of rows in the Practice tab", async ({
     page,
   }) => {
-    await logServerHealth("https://localhost:3000");
     const ttPO = new TuneTreesPageObject(page);
 
     await ttPO.navigateToPracticeTab();

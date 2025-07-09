@@ -2,7 +2,7 @@ import { restartBackend } from "@/test-scripts/global-setup";
 
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 
-import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
+import { navigateToPageWithRetry } from "@/test-scripts/navigation-utils";
 
 import { test } from "@playwright/test";
 
@@ -42,10 +42,8 @@ test("test-login-1", async ({ page }) => {
 
   const isCookieSave = process.env.SAVE_COOKIES === "true";
 
-  await page.goto("https://localhost:3000", {
-    timeout: initialPageLoadTimeout,
-    waitUntil: "networkidle",
-  });
+  // Use improved navigation with retry logic
+  await navigateToPageWithRetry(page, "https://localhost:3000");
   if (isCookieSave) {
     await runLoginWithCookieSave(
       page,

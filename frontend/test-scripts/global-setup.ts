@@ -109,10 +109,11 @@ async function globalSetup() {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   let serverUp = false;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 20; i++) {
+    // Reduced from 30 to 20 attempts
     serverUp = await checkServer();
     if (serverUp) break;
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 1500)); // Reduced from 2000ms to 1500ms
   }
 
   if (!serverUp) {
