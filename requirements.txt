@@ -1,4 +1,5 @@
 # To do: replace this with a pyproject.toml file
+alembic ~= 1.16.4
 anyio ~= 4.7.0
 attrs~=24.3.0
 beautifulsoup4 ~= 4.12.3

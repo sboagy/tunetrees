@@ -41,6 +41,7 @@
         "**/tree-main.txt",
         "**/tree-bugfix_*",
         "**/tree-*",
-        "**/test_stashed_folder"
+        "**/test_stashed_folder",
+        "alembic/versions/*.py"
     ]
 }
