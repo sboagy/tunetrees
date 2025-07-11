@@ -98,6 +98,10 @@ test("test-notes-1", async ({ page }) => {
   );
   await expect(firstNoteLocator).toBeVisible();
 
+  // Instead of increasing the timeout, ensure the save action is fully awaited before checking for the new note.
+  // The previous `await responsePromise;` should guarantee the backend save is done.
+  // To further reduce flakiness, you can add a short waitForSelector for the new note text,
+  // but usually Playwright's default timeout (5s) is enough.
   const editorFieldLocator1 = firstNoteLocator.getByText(newNoteText);
   await expect(editorFieldLocator1).toBeVisible();
 

@@ -6,10 +6,10 @@ import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { type Page, expect, test } from "@playwright/test";
 import path from "node:path";
 import {
-    logTestStart,
-    logTestEnd,
-    logBrowserContextStart,
-    logBrowserContextEnd,
+  logTestStart,
+  logTestEnd,
+  logBrowserContextStart,
+  logBrowserContextEnd,
 } from "../test-scripts/test-logging";
 
 test.use({
