@@ -2,14 +2,35 @@
  * E2E tests for FSRS optimization functionality in the scheduling options form.
  */
 
+import { restartBackend } from "@/test-scripts/global-setup";
+import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+import { setTestDefaults } from "@/test-scripts/set-test-defaults";
+import { getStorageState } from "@/test-scripts/storage-state";
 import { test, expect } from "@playwright/test";
 
-test.describe("FSRS Optimization Tests", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/user-settings/scheduling-options");
-    await page.waitForLoadState("networkidle");
-  });
+test.use({
+  storageState: getStorageState("STORAGE_STATE_TEST1"),
+  trace: "retain-on-failure",
+  // actionTimeout: 10_000,
+});
 
+test.beforeEach(async ({ page }, testInfo) => {
+  console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+  // doConsolelogs(page, testInfo);
+  // await page.waitForTimeout(1);
+  await setTestDefaults(page);
+  await applyNetworkThrottle(page);
+  await page.goto("/user-settings/scheduling-options");
+  await page.waitForLoadState("domcontentloaded");
+});
+
+test.afterEach(async ({ page }) => {
+  // After each test is run in this set, restore the backend to its original state.
+  await restartBackend();
+  await page.waitForTimeout(1_000);
+});
+
+test.describe("FSRS Optimization Tests", () => {
   test("should display auto-optimize button when FSRS is selected", async ({
     page,
   }) => {
@@ -51,9 +72,6 @@ test.describe("FSRS Optimization Tests", () => {
   });
 
   test("should work with real backend when available", async ({ page }) => {
-    await page.goto("/user-settings/scheduling-options");
-    await page.waitForLoadState("networkidle");
-
     const fsrsRadio = page.locator('input[type="radio"][value="FSRS"]');
     if (await fsrsRadio.isVisible()) {
       await fsrsRadio.check();
