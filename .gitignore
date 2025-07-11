@@ -326,3 +326,4 @@ xtest_stashed_folder
 **/__pycache__/**/*.*
 github-action-logs
 github-action-logs/**/*
+tunetrees_do.sqlite3
