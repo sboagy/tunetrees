@@ -71,5 +71,5 @@ target-version = "py38"
 select = ["E", "F", "W", "C90"]
 ignore = ["E501"]
 exclude = [
-    "alembic/versions/*.py",  # Exclude auto-generated migration files
+    "alembic/versions/*.py", # Exclude auto-generated migration files
 ]
