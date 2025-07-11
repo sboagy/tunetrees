@@ -220,6 +220,82 @@ practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
 
 ## Testing & Debugging
 
+### Playwright E2E Testing Guidelines
+
+When creating new Playwright tests for TuneTrees:
+
+1. **Authentication & Storage State**: For features requiring login, set up storage state:
+
+   ```typescript
+   test.use({
+     storageState: getStorageState("STORAGE_STATE_TEST1"),
+     trace: "retain-on-failure",
+   });
+   ```
+
+2. **Test Setup (beforeEach)**: Always include proper test initialization:
+
+   ```typescript
+   test.beforeEach(async ({ page }, testInfo) => {
+     console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+     await setTestDefaults(page);
+     await applyNetworkThrottle(page);
+     await page.goto("/your-page-route");
+     await page.waitForLoadState("domcontentloaded");
+   });
+   ```
+
+3. **Page Readiness**: Use `page.waitForLoadState("domcontentloaded")` for page readiness, not network idle timeouts.
+
+4. **Test Cleanup (afterEach)**: Always restore backend state:
+
+   ```typescript
+   test.afterEach(async ({ page }) => {
+     await restartBackend();
+     await page.waitForTimeout(1_000);
+   });
+   ```
+
+5. **Page Objects**: Use existing Page Object classes from `frontend/test-scripts/`:
+
+   - `tunetrees.po.ts` - Main application Page Object
+   - `tune-editor.po.ts` - Specialized for tune editing workflows
+   - **Add new locators to Page Objects** when you find yourself repeating the same selector paths across tests
+   - Create new Page Objects following these patterns when needed
+
+6. **Defensive Testing**: Always check element visibility before interactions:
+
+   ```typescript
+   const element = page.locator("selector");
+   if (await element.isVisible()) {
+     await element.click();
+     // ... test logic
+   }
+   ```
+
+7. **Required Imports**: Include these standard imports for TuneTrees tests:
+
+   ```typescript
+   import { restartBackend } from "@/test-scripts/global-setup";
+   import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+   import { setTestDefaults } from "@/test-scripts/set-test-defaults";
+   import { getStorageState } from "@/test-scripts/storage-state";
+   import { test, expect } from "@playwright/test";
+   ```
+
+8. **Locator Management**: When adding new locators to Page Objects, follow these patterns:
+
+   ```typescript
+   // In Page Object file (e.g., tunetrees.po.ts)
+   readonly fsrsRadioButton = this.page.locator('input[type="radio"][value="FSRS"]');
+   readonly optimizeButton = this.page.locator('button:has-text("Auto-Optimize Parameters")');
+
+   // Use in tests instead of repeating selectors
+   const po = new TuneTreesPageObject(page);
+   await po.fsrsRadioButton.check();
+   await expect(po.optimizeButton).toBeVisible();
+   ```
+
 ### Diagnostic Functions
 
 - `query_and_print_tune_by_id(tune_id)`: Debug specific practice records
