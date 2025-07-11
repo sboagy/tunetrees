@@ -59,6 +59,7 @@ const staticDefaultValues: Partial<SpacedRepetitionFormValues> = {
 const SchedulingOptionsForm = () => {
   const [defaultValues, setDefaultValues] =
     useState<Partial<SpacedRepetitionFormValues>>(staticDefaultValues);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const { toast } = useToast();
 
   const logAndToastError = useCallback(
@@ -124,6 +125,49 @@ const SchedulingOptionsForm = () => {
       ),
     });
   }
+
+  const handleOptimizeParams = async () => {
+    if (!session?.user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+      });
+      return;
+    }
+
+    setIsOptimizing(true);
+    try {
+      const response = await fetch(
+        `/api/preferences/optimize_fsrs?user_id=${userId}&alg_type=FSRS&force_optimization=true`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      // Update the form with optimized parameters
+      form.setValue("fsrs_weights", result.optimized_parameters.join(", "));
+
+      toast({
+        title: "Success",
+        description: `FSRS parameters optimized! Used ${result.review_count} review records. Loss: ${result.loss.toFixed(
+          4,
+        )}`,
+      });
+    } catch (error) {
+      logAndToastError(error, "Failed to optimize FSRS parameters");
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
 
   return (
     <Form {...form}>
@@ -204,6 +248,24 @@ const SchedulingOptionsForm = () => {
                         style={{ resize: "vertical" }}
                       />
                     </FormControl>
+                    <FormDescription>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isOptimizing || !session?.user?.id}
+                        onClick={() => void handleOptimizeParams()}
+                        className="mt-2"
+                      >
+                        {isOptimizing
+                          ? "Optimizing..."
+                          : "Auto-Optimize Parameters"}
+                      </Button>
+                      <span className="ml-2 text-sm">
+                        Automatically optimize weights based on your practice
+                        history
+                      </span>
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -235,6 +297,15 @@ const SchedulingOptionsForm = () => {
                   </FormItem>
                 )}
               />
+
+              <Button
+                onClick={() => void handleOptimizeParams()}
+                variant="outline"
+                disabled={isOptimizing}
+                className="w-full h-12"
+              >
+                {isOptimizing ? "Optimizing..." : "Optimize FSRS Parameters"}
+              </Button>
             </>
           )}
 

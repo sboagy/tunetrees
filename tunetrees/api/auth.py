@@ -212,7 +212,9 @@ async def get_user_by_account(
                 orm.Account.provider_account_id == providerAccountId,
             )
 
-            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            result: Result = db.execute(
+                stmt
+            )  # pyright: ignore[reportMissingTypeArgument]
             which_row: Optional[Row[orm.Account]] = result.fetchone()
             if which_row and len(which_row) > 0:
                 account: orm.Account = which_row[0]
@@ -348,7 +350,9 @@ async def link_account(account: AccountModel) -> AccountModel:
                 orm.Account.provider_account_id == account.provider_account_id,
             )
 
-            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            result: Result = db.execute(
+                stmt
+            )  # pyright: ignore[reportMissingTypeArgument]
             which_row: Optional[Row[orm.Account]] = result.fetchone()
             if which_row and len(which_row) > 0:
                 found_orm_account: orm.Account = which_row[0]
@@ -396,7 +400,9 @@ async def unlink_account(provider: str, providerAccountId: str) -> None:
                 orm.Account.provider_account_id == providerAccountId,
             )
 
-            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            result: Result = db.execute(
+                stmt
+            )  # pyright: ignore[reportMissingTypeArgument]
             which_row: Optional[Row[orm.Account]] = result.fetchone()
             if which_row and len(which_row) > 0:
                 orm_account: orm.Account = which_row[0]
@@ -437,7 +443,9 @@ async def create_session(session: SessionModel) -> SessionModel:
             stmt = select(orm.Session).where(
                 orm.Session.session_token == orm_session.session_token
             )
-            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            result: Result = db.execute(
+                stmt
+            )  # pyright: ignore[reportMissingTypeArgument]
             which_row: Optional[Row[orm.Session]] = result.fetchone()
             if which_row and len(which_row) > 0:
                 orm_session_new: orm.Session = which_row[0]
@@ -471,7 +479,9 @@ async def get_session_and_user(sessionToken: str) -> Optional[SessionAndUserMode
     try:
         with SessionLocal() as db:
             stmt = select(orm.Session).where(orm.Session.session_token == sessionToken)
-            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            result: Result = db.execute(
+                stmt
+            )  # pyright: ignore[reportMissingTypeArgument]
             which_row: Optional[Row[orm.User]] = result.fetchone()
             if which_row and len(which_row) > 0:
                 orm_session: orm.Session = which_row[0]
@@ -526,7 +536,9 @@ async def update_session(session: SessionModel) -> SessionModel:
             session_query = select(orm.User).where(
                 orm.Session.session_token == session.session_token
             )
-            result: Result = db.execute(session_query)  # pyright: ignore[reportMissingTypeArgument]
+            result: Result = db.execute(
+                session_query
+            )  # pyright: ignore[reportMissingTypeArgument]
             which_row: Optional[Row[orm.Session]] = result.fetchone()
             if which_row and len(which_row) > 0:
                 orm_session: orm.Session = which_row[0]
@@ -588,7 +600,9 @@ async def create_verification_token(
             stmt = select(orm.VerificationToken).where(
                 orm.VerificationToken.identifier == verification_token.identifier
             )
-            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            result: Result = db.execute(
+                stmt
+            )  # pyright: ignore[reportMissingTypeArgument]
             which_row: Optional[Row[orm.Session]] = result.fetchone()
             if which_row and len(which_row) > 0:
                 orm_verification_token_new: orm.VerificationToken = which_row[0]
@@ -628,7 +642,9 @@ async def use_verification_token(
                     status_code=422, detail="params must have identifier"
                 )
 
-            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            result: Result = db.execute(
+                stmt
+            )  # pyright: ignore[reportMissingTypeArgument]
             which_row: Optional[Row[orm.VerificationToken]] = result.fetchone()
             if which_row and len(which_row) > 0:
                 orm_verification_token: orm.VerificationToken = which_row[0]
@@ -670,7 +686,9 @@ def query_user_to_auth_user(
 ) -> Optional[UserModel]:
     try:
         with SessionLocal() as db:
-            result: Result = db.execute(stmt)  # pyright: ignore[reportMissingTypeArgument]
+            result: Result = db.execute(
+                stmt
+            )  # pyright: ignore[reportMissingTypeArgument]
             which_row: Optional[Row[orm.User]] = result.fetchone()
             if which_row and len(which_row) > 0:
                 user: orm.User = which_row[0]

@@ -101,9 +101,11 @@ class SM2Scheduler(SpacedRepetitionScheduler):
             "interval": result["interval"],
             "step": None,
             "repetitions": result["repetitions"],
-            "review_datetime": str(result["review_datetime"])
-            if "review_datetime" in result
-            else str(practiced),
+            "review_datetime": (
+                str(result["review_datetime"])
+                if "review_datetime" in result
+                else str(practiced)
+            ),
             "review_duration": None,
         }
 
@@ -129,9 +131,11 @@ class SM2Scheduler(SpacedRepetitionScheduler):
             "interval": result["interval"],
             "step": None,
             "repetitions": result["repetitions"],
-            "review_datetime": str(result["review_datetime"])
-            if "review_datetime" in result
-            else str(practiced),
+            "review_datetime": (
+                str(result["review_datetime"])
+                if "review_datetime" in result
+                else str(practiced)
+            ),
             "review_duration": None,
         }
 
@@ -251,12 +255,14 @@ class FSRScheduler(SpacedRepetitionScheduler):
         return {
             "id": getattr(card_reviewed, "card_id", None),
             "quality": review_log.rating,
-            "easiness": FSRScheduler._difficulty_to_e_factor(card_reviewed.difficulty)
-            if card_reviewed.difficulty is not None
-            else 0,
-            "difficulty": card_reviewed.difficulty
-            if card_reviewed.difficulty is not None
-            else 0,
+            "easiness": (
+                FSRScheduler._difficulty_to_e_factor(card_reviewed.difficulty)
+                if card_reviewed.difficulty is not None
+                else 0
+            ),
+            "difficulty": (
+                card_reviewed.difficulty if card_reviewed.difficulty is not None else 0
+            ),
             "interval": getattr(card_reviewed, "interval", 0),
             "step": getattr(card_reviewed, "step", 0),
             "repetitions": getattr(card_reviewed, "repetitions", 0),

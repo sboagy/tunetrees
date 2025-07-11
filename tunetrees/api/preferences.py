@@ -1,13 +1,47 @@
 from fastapi import APIRouter, HTTPException, Query, status
+from typing import Dict, Any, List
+from pydantic import BaseModel
 
 from tunetrees.app.database import (
     SessionLocal,
+)
+from tunetrees.app.schedule import (
+    optimize_fsrs_parameters,
+    create_tuned_scheduler,
+    get_user_review_history,
 )
 from tunetrees.models.tunetrees import PrefsSpacedRepetition
 from tunetrees.models.tunetrees_pydantic import (
     PrefsSpacedRepetitionModel,
     PrefsSpacedRepetitionModelPartial,
+    AlgorithmType,
 )  # Import SessionLocal from your database module
+
+
+# Response models for FSRS endpoints
+class ISchedulerConfig(BaseModel):
+    parameters: List[float]
+    desired_retention: float
+    maximum_interval: int
+    enable_fuzzing: bool
+
+
+class IOptimizationResponse(BaseModel):
+    message: str
+    user_id: int
+    algorithm: AlgorithmType
+    review_count: int
+    loss: float
+    optimized_parameters: List[float]
+    scheduler_config: Dict[str, Any]
+
+
+class ISchedulerResponse(BaseModel):
+    message: str
+    user_id: int
+    algorithm: AlgorithmType
+    scheduler_config: ISchedulerConfig
+
 
 # Existing preferences_router
 preferences_router = APIRouter(prefix="/preferences", tags=["preferences"])
@@ -108,3 +142,105 @@ def delete_prefs_spaced_repetition(
         db.delete(db_prefs)
         db.commit()
     return None  # No content to return for status code 204
+
+
+@preferences_router.post(
+    "/optimize_fsrs",
+    response_model=IOptimizationResponse,
+    summary="Optimize FSRS parameters",
+    description="Optimize the FSRS parameters based on user review history.",
+    status_code=status.HTTP_200_OK,
+)
+def optimize_fsrs(
+    user_id: int = Query(..., description="The user ID"),
+    alg_type: AlgorithmType = Query(
+        AlgorithmType.FSRS, description="The algorithm type (e.g., SM2, FSRS)"
+    ),
+    force_optimization: bool = Query(
+        False, description="Force re-optimization even if preferences exist"
+    ),
+) -> IOptimizationResponse:
+    with SessionLocal() as db:
+        try:
+            # Get user review history for validation
+            review_history = get_user_review_history(db, str(user_id))
+
+            if len(review_history) < 10:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient review history: {len(review_history)} records. Need at least 10.",
+                )
+
+            # Optimize FSRS parameters
+            optimized_params, loss = optimize_fsrs_parameters(
+                db, str(user_id), alg_type
+            )
+
+            # Create and save tuned scheduler which handles the preference creation/update
+            scheduler = create_tuned_scheduler(
+                db, str(user_id), alg_type, force_optimization=force_optimization
+            )
+
+            return IOptimizationResponse(
+                message="FSRS optimization completed successfully",
+                user_id=user_id,
+                algorithm=alg_type,
+                review_count=len(review_history),
+                loss=loss,
+                optimized_parameters=list(optimized_params),
+                scheduler_config={
+                    "desired_retention": scheduler.desired_retention,
+                    "maximum_interval": scheduler.maximum_interval,
+                    "enable_fuzzing": scheduler.enable_fuzzing,
+                },
+            )
+
+        except HTTPException:
+            # Re-raise HTTPException as-is
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Error during FSRS optimization: {str(e)}"
+            )
+
+
+@preferences_router.post(
+    "/create_tuned_scheduler",
+    response_model=ISchedulerResponse,
+    summary="Create a tuned scheduler",
+    description="Create a tuned scheduler based on user preferences.",
+    status_code=status.HTTP_200_OK,
+)
+def create_tuned_scheduler_endpoint(
+    user_id: int = Query(..., description="The user ID"),
+    alg_type: AlgorithmType = Query(
+        AlgorithmType.FSRS, description="The algorithm type (e.g., SM2, FSRS)"
+    ),
+    force_optimization: bool = Query(False, description="Force re-optimization"),
+) -> ISchedulerResponse:
+    with SessionLocal() as db:
+        try:
+            # Create the tuned scheduler - this will handle optimization if needed
+            scheduler = create_tuned_scheduler(
+                db, str(user_id), alg_type, force_optimization=force_optimization
+            )
+
+            return ISchedulerResponse(
+                message="Tuned scheduler created successfully",
+                user_id=user_id,
+                algorithm=alg_type,
+                scheduler_config=ISchedulerConfig(
+                    parameters=list(scheduler.parameters),
+                    desired_retention=scheduler.desired_retention,
+                    maximum_interval=scheduler.maximum_interval,
+                    enable_fuzzing=scheduler.enable_fuzzing,
+                ),
+            )
+
+        except HTTPException:
+            # Re-raise HTTPException as-is
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Error creating tuned scheduler: {str(e)}"
+            )

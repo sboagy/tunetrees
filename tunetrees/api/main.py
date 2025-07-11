@@ -32,6 +32,7 @@ logger.debug("(tunetrees/api/main.py (26): test debug message)")
 import tunetrees.api.auth as auth  # noqa: E402
 import tunetrees.api.tunetrees as tunetrees_api  # noqa: E402
 from tunetrees.api import settings  # noqa: E402
+from tunetrees.api.preferences import preferences_router  # noqa: E402
 
 logger.debug("(tunetrees/api/main.py (31): test debug message)")
 
@@ -93,6 +94,7 @@ reload_trigger_func()
 app.include_router(auth.router)
 app.include_router(tunetrees_api.router)
 app.include_router(settings.settings_router)
+app.include_router(preferences_router)
 
 app.include_router(auth.router)
 

@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple
 from typing_extensions import TypedDict
 
 from fsrs import Rating, Scheduler, ReviewLog
+from fsrs.optimizer import Optimizer
 from sqlalchemy import Row, and_, select, update
 from sqlalchemy.orm.session import Session
 from tabulate import tabulate
@@ -540,9 +541,13 @@ def get_user_review_history(
             continue
 
         try:
-            practiced_dt = datetime.strptime(record.practiced, TT_DATE_FORMAT)
+            practiced_dt = datetime.strptime(record.practiced, TT_DATE_FORMAT).replace(
+                tzinfo=timezone.utc
+            )
             review_dt = (
-                datetime.strptime(record.review_date, TT_DATE_FORMAT)
+                datetime.strptime(record.review_date, TT_DATE_FORMAT).replace(
+                    tzinfo=timezone.utc
+                )
                 if record.review_date
                 else practiced_dt
             )
@@ -574,6 +579,129 @@ def get_user_review_history(
             continue
 
     return review_logs
+
+
+def optimize_fsrs_parameters(
+    db: Session, user_ref: str, alg_type: AlgorithmType
+) -> Tuple[Tuple[float, ...], float]:
+    """
+    Optimize FSRS parameters for a user using the Optimizer.
+
+    Args:
+        db (Session): SQLAlchemy session.
+        user_ref (str): User reference ID.
+        alg_type (AlgorithmType): Algorithm type (e.g., FSRS, SM2).
+
+    Returns:
+        Tuple[tuple, float]: Optimized parameters and loss value.
+    """
+    # Fetch user's review history
+    review_logs = get_user_review_history(db, user_ref)
+
+    if len(review_logs) < 10:
+        log.warning(
+            f"Insufficient review history for user {user_ref}: {len(review_logs)} records"
+        )
+        # Return default parameters
+        scheduler = Scheduler()
+        return scheduler.parameters, 0.0
+
+    log.info(
+        f"Optimizing FSRS parameters for user {user_ref} with {len(review_logs)} review records"
+    )
+
+    try:
+        # Initialize optimizer with review logs
+        optimizer = Optimizer(review_logs)
+
+        # Run optimization
+        optimized_params = optimizer.compute_optimal_parameters()
+
+        log.info(f"FSRS optimization completed. Parameters: {optimized_params}")
+
+        return (
+            tuple(optimized_params),
+            0.0,
+        )  # FSRS optimizer doesn't return loss directly
+
+    except Exception as e:
+        log.error(f"Error optimizing FSRS parameters: {e}")
+        # Return default parameters on error
+        scheduler = Scheduler()
+        return scheduler.parameters, 0.0
+
+
+def create_tuned_scheduler(
+    db: Session,
+    user_ref: str,
+    alg_type: AlgorithmType = AlgorithmType.FSRS,
+    force_optimization: bool = False,
+) -> Scheduler:
+    """
+    Create a new scheduler with optimized parameters for a user.
+
+    Args:
+        db (Session): SQLAlchemy session.
+        user_ref (str): User reference ID.
+        alg_type (AlgorithmType): Algorithm type (e.g., FSRS, SM2).
+        force_optimization (bool): Force re-optimization even if preferences exist.
+
+    Returns:
+        Scheduler: A new scheduler with optimized parameters.
+    """
+    # Check if we should optimize or use existing preferences
+    existing_prefs = None
+    if not force_optimization:
+        try:
+            existing_prefs = get_prefs_spaced_repetition(db, user_ref, alg_type)
+        except Exception:
+            # No existing preferences, will optimize
+            pass
+
+    if existing_prefs and not force_optimization:
+        # Use existing optimized parameters
+        weights = json.loads(existing_prefs.fsrs_weights)
+        scheduler = Scheduler(
+            parameters=tuple(weights),
+            desired_retention=existing_prefs.request_retention,
+            maximum_interval=existing_prefs.maximum_interval,
+            enable_fuzzing=existing_prefs.enable_fuzzing,
+        )
+        log.info(f"Using existing optimized parameters for user {user_ref}")
+    else:
+        # Optimize parameters
+        optimized_weights, loss = optimize_fsrs_parameters(db, user_ref, alg_type)
+
+        # Create scheduler with optimized parameters
+        scheduler = Scheduler(
+            parameters=optimized_weights,
+            desired_retention=0.9,  # Default target retention
+            maximum_interval=36500,  # Default max interval (~100 years)
+            enable_fuzzing=True,
+        )
+
+        # Save the optimized parameters
+        prefs = PrefsSpacedRepetition(
+            user_id=user_ref,
+            alg_type=alg_type,
+            fsrs_weights=json.dumps(optimized_weights),
+            request_retention=scheduler.desired_retention,
+            maximum_interval=scheduler.maximum_interval,
+            learning_steps=json.dumps(
+                [td.total_seconds() for td in scheduler.learning_steps]
+            ),
+            relearning_steps=json.dumps(
+                [td.total_seconds() for td in scheduler.relearning_steps]
+            ),
+            enable_fuzzing=scheduler.enable_fuzzing,
+        )
+
+        save_prefs_spaced_repetition(db, prefs)
+        log.info(
+            f"Created and saved optimized scheduler for user {user_ref} with loss: {loss}"
+        )
+
+    return scheduler
 
 
 if __name__ == "__main__":
