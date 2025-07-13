@@ -105,6 +105,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             include_object=include_object,
+            render_as_batch=True,  # Enable batch mode for SQLite
         )
 
         with context.begin_transaction():

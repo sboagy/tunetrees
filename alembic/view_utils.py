@@ -41,9 +41,9 @@ def get_view_definitions(db_path: str) -> Dict[str, str]:
 
 
 def create_views_from_target_db() -> None:
-    """Create views based on the target database schema (tunetrees.sqlite3)."""
+    """Create views based on the target database schema (tunetrees_test_clean.sqlite3)."""
     # Look for the target database in the project root
-    target_db = "tunetrees.sqlite3"
+    target_db = "tunetrees_test_clean.sqlite3"
     if not os.path.exists(target_db):
         print(f"Warning: Target database {target_db} not found, using hardcoded views")
         create_views_hardcoded()

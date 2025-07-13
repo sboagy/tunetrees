@@ -47,7 +47,12 @@ fi
 echo ""
 echo "Generating migration: $migration_msg"
 
-# Generate the migration
+# Configure Alembic to use target database (tunetrees_test_clean.sqlite3) 
+# This represents the schema we want to achieve
+echo "Configuring Alembic to compare against target schema..."
+sed -i '' 's|sqlalchemy.url = .*|sqlalchemy.url = sqlite:///./tunetrees_test_clean.sqlite3|' alembic.ini
+
+# Generate the migration - this will compare current baseline against target schema
 alembic revision --autogenerate -m "$migration_msg"
 
 # Get the most recent migration file

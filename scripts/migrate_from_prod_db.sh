@@ -1,5 +1,11 @@
 #!/bin/bash
 
+read -p "This script is depricated, use scripts/migrate_prod_with_alembic.sh instead.  Continue? (n/y) " response
+if [[ "$response" != "y" && "$response" != "Y" ]]; then
+    echo "Exiting script."
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 if [ "$PWD" = "$SCRIPT_DIR" ]; then
     cd ..

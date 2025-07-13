@@ -15,8 +15,9 @@ to get some insight into the vision of the project.
   - [1.3. Technology Usage](#13-technology-usage)
     - [1.3.1. Frontend:](#131-frontend)
     - [1.3.2. Backend:](#132-backend)
-  - [1.4. Schema:](#14-schema)
-  - [1.5. Alternatives or Potential Technology Evolution](#15-alternatives-or-potential-technology-evolution)
+  - [1.4. Database Files](#14-database-files)
+  - [1.5. Schema:](#15-schema)
+  - [1.6. Alternatives or Potential Technology Evolution](#16-alternatives-or-potential-technology-evolution)
 - [2. Development Processes](#2-development-processes)
   - [2.1. Generation of ORM code](#21-generation-of-orm-code)
     - [2.1.1. VSCode Processes (🚧 This Section a Work in Progress 🚧)](#211-vscode-processes--this-section-a-work-in-progress-)
@@ -129,9 +130,56 @@ Handles user data management, review scheduling, and API requests.
 - Database: Stores user data, including tunes, practice history, and review schedules.
 - Review Scheduler: Determines when tunes should be reviewed based on the user's progress.
 
-### 1.4. Schema:
+### 1.4. Database Files
+
+The TuneTrees project includes several SQLite database files that serve different purposes in development, testing, and migration workflows:
+
+#### Checked-in Database Files
+
+**`tunetrees_test_clean.sqlite3`** - **Base Test Database**
+
+- Contains clean test data with known state for reproducible testing
+- Used as the source of truth for desired schema during development
+- Copied to `tunetrees_test.sqlite3` (ignored) for each test run
+- **Always tracked in git** - serves as the target schema for migrations
+
+**`production_baseline.sqlite3`** - **Clean Schema Baseline**
+
+- Contains database schema without production data
+- Used by Alembic for clean schema comparisons during migration generation
+- Represents the baseline schema that production databases start from
+- **Tracked in git** - provides stable reference for migration system
+
+**`true_production_baseline.sqlite3`** - **Production Data Snapshot**
+
+- Snapshot of actual production database at a specific point in time
+- Contains real user data and represents deployed production state
+- Used for testing migrations against real data to ensure data preservation
+- **Tracked in git** - provides production data reference for migration testing
+
+#### Working Database Files (Ignored)
+
+The following database files are generated during development and are ignored by git:
+
+- `tunetrees.sqlite3` - Main development database (working copy)
+- `tunetrees_test.sqlite3` - Transient test database (copied from clean version)
+- `tunetrees_production.sqlite3` - Downloaded production database for migration
+- `*_temp_*.sqlite3` - Temporary files created during migration processes
+
+#### Database File Workflow
+
+1. **Schema Changes**: Made directly in `tunetrees_test_clean.sqlite3` using database tools
+2. **Migration Generation**: Alembic compares `production_baseline.sqlite3` vs `tunetrees_test_clean.sqlite3`
+3. **Migration Testing**: Uses `true_production_baseline.sqlite3` to verify data preservation
+4. **Production Deployment**: Downloads live production database and applies migrations
+
+For detailed information about database migrations, see [Database Migration with Alembic](docs/database-migration-alembic.md).
+
+### 1.5. Schema:
 
 The database is organized as follows: Each user can have multiple playlists, and each playlist is associated with a specific musical instrument. These playlists contain tunes, which are stored separately and shared across all users. TuneTrees doesn't aim to be a complete tune repository, so it only stores basic tune information. For more detailed details, users can refer to external resources.
+
+For information about database migrations using Alembic, see [Database Migration with Alembic](docs/database-migration-alembic.md).
 
 The complete entity relationship diagram is illustrated by the following diagram:
 
@@ -348,28 +396,28 @@ Since SQLite can't directly have descriptions for the fields, this is arguably t
 
 ##### practice_record
 
-This associates a the current state of practice, unique to tune/playlist/user.
+This associates the current state of practice, unique to tune/playlist/user.
 
 | Type    | Name             | Description                                                                                             |
 | ------- | ---------------- | ------------------------------------------------------------------------------------------------------- |
+| INTEGER | id               | Primary key, autoincrement                                                                              |
 | INTEGER | playlist_ref     | References the playlist (`playlist.playlist_id`)                                                        |
 | INTEGER | tune_ref         | References the tune (`tune.id`)                                                                         |
 | TEXT    | practiced        | Date/time or string indicating when the practice occurred                                               |
 | INTEGER | quality          | Quality rating of the practice session                                                                  |
-| INTEGER | id               | Primary key, autoincrement                                                                              |
 | REAL    | easiness         | Easiness factor for spaced repetition, when using SM2                                                   |
 | INTEGER | interval         | Interval (days) until next review                                                                       |
 | INTEGER | repetitions      | Number of times this tune has been reviewed                                                             |
-| TEXT    | review_date      | Scheduled date for next review (maybe should be call Due)                                               |
-| TEXT    | backup_practiced | Backup of practice date/time or notes (deprecated, not need given `practice_history` table)             |
-| REAL    | stability        | Stability metric for spaced repetition                                                                  |
+| TEXT    | review_date      | Scheduled date for next review (maybe should be called Due)                                             |
+| TEXT    | backup_practiced | Backup of practice date/time or notes (deprecated, not needed given `practice_history` table)           |
+| REAL    | stability        | Stability metric for spaced repetition, when using FSRS                                                 |
 | INTEGER | elapsed_days     | Days elapsed since last review                                                                          |
 | INTEGER | lapses           | Number of times the tune was forgotten                                                                  |
 | INTEGER | state            | Enum representing the learning state (one of Learning = 1, Review = 2, Relearning = 3, or null/0 = NEW) |
 | REAL    | difficulty       | Difficulty metric for the tune, when using FSRS                                                         |
 | INTEGER | step             | Current learning or relearning step or None if the tune is in the Review state                          |
 
-### 1.5. Alternatives or Potential Technology Evolution
+### 1.6. Alternatives or Potential Technology Evolution
 
 1. Down the line, I can switch to MySQL or PostgreSQL if needed.
 2. For the front end, I may experiment with a Kotlin frontend at some point.
@@ -382,6 +430,8 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
 
 The SQLAlchemy ORM code is contained in the `tunetrees/models` package in the `tunetrees.py`
 module. It should always be generated with the following procedure:
+
+For database schema changes and migrations, refer to [Database Migration with Alembic](docs/database-migration-alembic.md).
 
 First, make sure you have [sqlacodegen-v2](https://pypi.org/project/sqlacodegen-v2/) installed:
 
