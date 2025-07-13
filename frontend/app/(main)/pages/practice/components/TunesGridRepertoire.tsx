@@ -28,7 +28,10 @@ import type { ITableStateTable, ITuneOverview } from "../types";
 import AddTuneButtonAndDialog from "./AddTuneButtonAndDialog";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import DeleteTuneButton from "./DeleteTuneButton";
-import { useSitDownDate } from "./SitdownDateProvider";
+import {
+  getSitdownDateFromBrowser,
+  useSitDownDate,
+} from "./SitdownDateProvider";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
@@ -253,9 +256,11 @@ export default function TunesGridRepertoire({
     }
     console.log("updates", updates);
 
+    const sitdownDate = getSitdownDateFromBrowser();
     const promiseResult = submitPracticeFeedbacks({
       playlistId,
       updates,
+      sitdownDate,
     });
     promiseResult
       .then((result) => {

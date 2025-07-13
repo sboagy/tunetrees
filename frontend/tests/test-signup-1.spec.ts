@@ -1,3 +1,4 @@
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
@@ -10,17 +11,28 @@ import type { Page } from "@playwright/test";
 import { checkHealth } from "../test-scripts/check-servers";
 
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
+import {
+  logTestStart,
+  logTestEnd,
+  logBrowserContextStart,
+  logBrowserContextEnd,
+} from "../test-scripts/test-logging";
 
 test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
+  await setTestDefaults(page);
   await applyNetworkThrottle(page);
 });
 
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
   await page.waitForTimeout(100);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
 });
 
 test.describe.serial("Signup Tests", () => {
@@ -42,11 +54,11 @@ test.describe.serial("Signup Tests", () => {
 
       await page.goto(linkBackURL, {
         timeout: initialPageLoadTimeout,
-        waitUntil: "networkidle",
+        waitUntil: "domcontentloaded", // More reliable than networkidle in CI
       });
     } else {
       const gmailLoginURL = "https://mail.google.com/";
-      await page.goto(gmailLoginURL, { waitUntil: "networkidle" });
+      await page.goto(gmailLoginURL, { waitUntil: "domcontentloaded" });
 
       const emailInput = page.getByRole("textbox", {
         name: "Email or phone",
@@ -106,7 +118,7 @@ test.describe.serial("Signup Tests", () => {
 
       await page.goto(verificationLink, {
         timeout: initialPageLoadTimeout,
-        waitUntil: "networkidle",
+        waitUntil: "domcontentloaded", // More reliable than networkidle in CI
       });
     }
 
@@ -163,7 +175,7 @@ test.describe.serial("Signup Tests", () => {
       // Open Gmail in a new tab
       const gmailPage = await page.context().newPage();
       const gmailLoginURL = "https://mail.google.com/";
-      await gmailPage.goto(gmailLoginURL, { waitUntil: "networkidle" });
+      await gmailPage.goto(gmailLoginURL, { waitUntil: "domcontentloaded" });
 
       const emailInput = gmailPage.getByRole("textbox", {
         name: "Email or phone",
@@ -282,7 +294,7 @@ async function initialSignIn(page: Page) {
 
   await page.goto("https://localhost:3000", {
     timeout: initialPageLoadTimeout,
-    waitUntil: "networkidle",
+    waitUntil: "domcontentloaded", // More reliable than networkidle in CI
   });
 
   if (
@@ -296,8 +308,13 @@ async function initialSignIn(page: Page) {
   const topSignInButton = ttPO.page.getByRole("button", {
     name: "New user",
   });
+  await topSignInButton.waitFor({ state: "visible" });
   await topSignInButton.click();
+
+  // Wait for the signup dialog to appear
   const userEmailLocator = ttPO.page.getByTestId("user_email");
+  await userEmailLocator.waitFor({ state: "visible", timeout: 10000 });
+
   const user = process.env.TEST2_LOGIN_USER_EMAIL;
   const pw = process.env.TEST2_LOGIN_USER_PASSWORD;
   const userName = process.env.TEST2_LOGIN_USER_NAME;

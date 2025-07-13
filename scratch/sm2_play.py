@@ -29,16 +29,20 @@ def main():
     print(review)
 
     # second review
-    review = SMTwo(review.easiness, review.interval, review.repetitions).review(3, "2021-3-14")
+    review = SMTwo(review.easiness, review.interval, review.repetitions).review(
+        3, "2021-3-14"
+    )
     # review prints similar to example above.
 
     print(review)
 
-    review = SMTwo(review.easiness, review.interval, review.repetitions).review(4, "2021-3-20")
+    review = SMTwo(review.easiness, review.interval, review.repetitions).review(
+        4, "2021-3-20"
+    )
     # review prints similar to example above.
 
     print(review)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

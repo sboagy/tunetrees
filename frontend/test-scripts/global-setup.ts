@@ -31,6 +31,13 @@ const checkServer = async () => {
 };
 
 async function globalSetup() {
+  // Set default sitdown date for tests from env, if not already set
+  if (!process.env.NEXT_PUBLIC_TT_SITDOWN_DATE_DEFAULT) {
+    process.env.NEXT_PUBLIC_TT_SITDOWN_DATE_DEFAULT =
+      // "1970-01-01T11:47:57.671465-00:00";
+      "2024-07-08 12:27:08";
+  }
+
   const serverPreUp = await checkServer();
   if (serverPreUp) {
     console.log("Server is already up and running.");
@@ -83,9 +90,7 @@ async function globalSetup() {
           process.env.TUNETREES_DEPLOY_BASE_DIR ||
           `${tunetreesBackendDeployBaseDir}`,
         LOGLEVEL: "DEBUG",
-        TT_REVIEW_SITDOWN_DATE:
-          // The TT_REVIEW_SITDOWN_DATE must be specified in Coordinated Universal Time (UTC).
-          process.env.TT_REVIEW_SITDOWN_DATE || "2024-07-08 12:27:08",
+        // TT_REVIEW_SITDOWN_DATE is deprecated and no longer used
       },
       stdio: ["ignore", fastAPIFd, fastAPIFd],
     },
@@ -104,10 +109,11 @@ async function globalSetup() {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   let serverUp = false;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 20; i++) {
+    // Reduced from 30 to 20 attempts
     serverUp = await checkServer();
     if (serverUp) break;
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 1500)); // Reduced from 2000ms to 1500ms
   }
 
   if (!serverUp) {

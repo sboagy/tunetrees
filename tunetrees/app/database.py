@@ -25,9 +25,9 @@ def check_integrity(db: Session, context_string: Optional[str] = "") -> None:
     try:
         result = db.execute(text("PRAGMA integrity_check;"))
         integrity_check = result.scalar()
-        assert integrity_check == "ok", (
-            f"Integrity check failed{f' ({context_string})'}: {integrity_check}"
-        )
+        assert (
+            integrity_check == "ok"
+        ), f"Integrity check failed{f' ({context_string})'}: {integrity_check}"
     except Exception as e:
         logger.error(f"Integrity check error{f' ({context_string})'}: {e}")
         raise
@@ -58,15 +58,32 @@ def wait_for_integrity(db: Session):
 
 # SQLALCHEMY_DATABASE_URL = "sqlite:///./sql_app.db"
 # SQLALCHEMY_DATABASE_URL = "postgresql://user:password@postgresserver/db"
-default_db_location = Path(__file__).parent.parent.parent.joinpath("tunetrees.sqlite3")
-db_location_str = os.environ.get("TUNETREES_DB")
+
+# Determine the repository root (3 levels up from this file: tunetrees/app/database.py -> repo root)
+repo_root = Path(__file__).parent.parent.parent
+default_db_location: Path = repo_root.joinpath("tunetrees.sqlite3")
+
+db_location_str = os.environ.get("TUNETREES_DB", os.environ.get("DATABASE_URL"))
 if db_location_str is not None:
     db_location_str = db_location_str.strip()
-db_location_path = Path(db_location_str) if db_location_str else default_db_location
+    # If it's a SQLAlchemy URL, extract the path
+    if db_location_str.startswith("sqlite:///"):
+        db_location_str = db_location_str.replace("sqlite:///", "")
+
+    # Create Path object from the extracted string
+    db_path = Path(db_location_str)
+
+    # If it's not an absolute path, resolve it relative to the repo root
+    if not db_path.is_absolute():
+        db_location_path = repo_root.joinpath(db_path)
+    else:
+        db_location_path = db_path
+else:
+    db_location_path = default_db_location
+
 assert db_location_path
-if not db_location_path.exists():
-    logging.getLogger().error(f"Database file not found: {db_location_path}")
-    raise FileNotFoundError(f"Database file not found: {db_location_path}")
+# Note: Don't check file existence at import time to allow tests to set up the database
+# The file existence will be checked when the database is actually accessed
 
 stop_words = ["a", "an", "the", "of", "in", "on", "at", "to", "for", "with", "by"]
 
@@ -84,6 +101,11 @@ SessionLocalInternal = sessionmaker(
 
 @contextmanager
 def SessionLocal() -> Iterator[Session]:
+    # Check database file existence when actually accessing it
+    if not db_location_path.exists():
+        logger.error(f"Database file not found: {db_location_path}")
+        raise FileNotFoundError(f"Database file not found: {db_location_path}")
+
     db = SessionLocalInternal()
     try:
         check_integrity(db, "before")

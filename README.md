@@ -15,8 +15,9 @@ to get some insight into the vision of the project.
   - [1.3. Technology Usage](#13-technology-usage)
     - [1.3.1. Frontend:](#131-frontend)
     - [1.3.2. Backend:](#132-backend)
-  - [1.4. Schema:](#14-schema)
-  - [1.5. Alternatives or Potential Technology Evolution](#15-alternatives-or-potential-technology-evolution)
+  - [1.4. Database Files](#14-database-files)
+  - [1.5. Schema:](#15-schema)
+  - [1.6. Alternatives or Potential Technology Evolution](#16-alternatives-or-potential-technology-evolution)
 - [2. Development Processes](#2-development-processes)
   - [2.1. Generation of ORM code](#21-generation-of-orm-code)
     - [2.1.1. VSCode Processes (🚧 This Section a Work in Progress 🚧)](#211-vscode-processes--this-section-a-work-in-progress-)
@@ -129,101 +130,294 @@ Handles user data management, review scheduling, and API requests.
 - Database: Stores user data, including tunes, practice history, and review schedules.
 - Review Scheduler: Determines when tunes should be reviewed based on the user's progress.
 
-### 1.4. Schema:
+### 1.4. Database Files
+
+The TuneTrees project includes several SQLite database files that serve different purposes in development, testing, and migration workflows:
+
+#### Checked-in Database Files
+
+**`tunetrees_test_clean.sqlite3`** - **Base Test Database**
+
+- Contains clean test data with known state for reproducible testing
+- Used as the source of truth for desired schema during development
+- Copied to `tunetrees_test.sqlite3` (ignored) for each test run
+- **Always tracked in git** - serves as the target schema for migrations
+
+**`production_baseline.sqlite3`** - **Clean Schema Baseline**
+
+- Contains database schema without production data
+- Used by Alembic for clean schema comparisons during migration generation
+- Represents the baseline schema that production databases start from
+- **Tracked in git** - provides stable reference for migration system
+
+**`true_production_baseline.sqlite3`** - **Production Data Snapshot**
+
+- Snapshot of actual production database at a specific point in time
+- Contains real user data and represents deployed production state
+- Used for testing migrations against real data to ensure data preservation
+- **Tracked in git** - provides production data reference for migration testing
+
+#### Working Database Files (Ignored)
+
+The following database files are generated during development and are ignored by git:
+
+- `tunetrees.sqlite3` - Main development database (working copy)
+- `tunetrees_test.sqlite3` - Transient test database (copied from clean version)
+- `tunetrees_production.sqlite3` - Downloaded production database for migration
+- `*_temp_*.sqlite3` - Temporary files created during migration processes
+
+#### Database File Workflow
+
+1. **Schema Changes**: Made directly in `tunetrees_test_clean.sqlite3` using database tools
+2. **Migration Generation**: Alembic compares `production_baseline.sqlite3` vs `tunetrees_test_clean.sqlite3`
+3. **Migration Testing**: Uses `true_production_baseline.sqlite3` to verify data preservation
+4. **Production Deployment**: Downloads live production database and applies migrations
+
+For detailed information about database migrations, see [Database Migration with Alembic](docs/database-migration-alembic.md).
+
+### 1.5. Schema:
 
 The database is organized as follows: Each user can have multiple playlists, and each playlist is associated with a specific musical instrument. These playlists contain tunes, which are stored separately and shared across all users. TuneTrees doesn't aim to be a complete tune repository, so it only stores basic tune information. For more detailed details, users can refer to external resources.
+
+For information about database migrations using Alembic, see [Database Migration with Alembic](docs/database-migration-alembic.md).
 
 The complete entity relationship diagram is illustrated by the following diagram:
 
 ```mermaid
 erDiagram
+    GENRE {
+        TEXT id PK
+        TEXT name
+        TEXT region
+        TEXT description
+    }
+    TUNE_TYPE {
+        TEXT id PK
+        TEXT name
+        TEXT rhythm
+        TEXT description
+    }
+    GENRE_TUNE_TYPE {
+        TEXT genre_id FK
+        TEXT tune_type_id FK
+    }
+    USER {
+        INTEGER id PK
+        TEXT hash
+        TEXT name
+        TEXT email
+        TEXT email_verified
+        TEXT image
+        BOOLEAN deleted
+        TEXT sr_alg_type
+    }
     ACCOUNT {
-        TEXT user_id
-        TEXT provider_account_id
+        TEXT user_id FK
+        TEXT provider_account_id PK
         TEXT provider
         TEXT type
         TEXT access_token
         TEXT id_token
         TEXT refresh_token
         TEXT scope
-        integer expires_at
+        INTEGER expires_at
         TEXT session_state
         TEXT token_type
     }
-
-    EXTERNAL_REF {
-        integer id
+    INSTRUMENT {
+        INTEGER id PK
+        INTEGER private_to_user FK
+        TEXT instrument
+        TEXT description
+        TEXT genre_default
+        BOOLEAN deleted
+    }
+    PLAYLIST {
+        INTEGER playlist_id PK
+        INTEGER user_ref FK
+        INTEGER instrument_ref
+        BOOLEAN deleted
+        TEXT sr_alg_type
+    }
+    PLAYLIST_TUNE {
+        INTEGER playlist_ref PK, FK
+        INTEGER tune_ref PK, FK
+        TEXT current
+        TEXT learned
+        BOOLEAN deleted
+    }
+    PREFS_SPACED_REPETITION {
+        TEXT alg_type PK
+        INTEGER user_id PK, FK
+        TEXT fsrs_weights
+        REAL request_retention
+        INTEGER maximum_interval
+    }
+    SESSION {
+        TEXT session_token PK
+        TEXT expires
+        TEXT user_id FK
+    }
+    TAB_GROUP_MAIN_STATE {
+        INTEGER id PK
+        INTEGER user_id FK
+        TEXT which_tab
+        INTEGER playlist_id
+        TEXT tab_spec
+    }
+    TABLE_STATE {
+        INTEGER user_id PK, FK
+        TEXT screen_size PK
+        TEXT purpose PK
+        INTEGER playlist_id PK, FK
+        TEXT settings
+        INTEGER current_tune
+    }
+    TUNE {
+        INTEGER id PK
+        TEXT type
+        TEXT structure
+        TEXT title
+        TEXT mode
+        TEXT incipit
+        TEXT genre FK
+        BOOLEAN deleted
+        INTEGER private_for FK
+    }
+    NOTE {
+        INTEGER id PK
+        INTEGER user_ref FK
+        INTEGER tune_ref FK
+        INTEGER playlist_ref FK
+        TEXT created_date
+        TEXT note_text
+        INTEGER public
+        INTEGER favorite
+        BOOLEAN deleted
+    }
+    PRACTICE_RECORD {
+        INTEGER id PK
+        INTEGER playlist_ref FK
+        INTEGER tune_ref FK
+        TEXT practiced
+        INTEGER quality
+        REAL easiness
+        INTEGER interval
+        INTEGER repetitions
+        TEXT review_date
+        TEXT backup_practiced
+        REAL stability
+        INTEGER elapsed_days
+        INTEGER lapses
+        INTEGER state
+        REAL difficulty
+        INTEGER step
+    }
+    REFERENCE {
+        INTEGER id PK
         TEXT url
         TEXT ref_type
-        integer tune_ref
+        INTEGER tune_ref FK
+        INTEGER public
+        INTEGER favorite
+        INTEGER user_ref FK
+        TEXT comment
+        TEXT title
+        BOOLEAN deleted
     }
-
-    PLAYLIST {
-        integer PLAYLIST_ID
-        integer USER_REF
-        TEXT instrument
+    TABLE_TRANSIENT_DATA {
+        INTEGER user_id PK, FK
+        INTEGER tune_id PK, FK
+        INTEGER playlist_id PK, FK
+        TEXT purpose
+        TEXT note_private
+        TEXT note_public
+        TEXT recall_eval
     }
-
-    PRACTICE_RECORD {
-        integer PLAYLIST_REF
-        TEXT TUNE_REF
-        TEXT Practiced
-        TEXT Quality
-        integer ID
-        REAL Easiness
-        integer Interval
-        integer Repetitions
-        integer ReviewDate
-        TEXT BackupPracticed
+    TAG {
+        INTEGER tag_id PK
+        INTEGER user_ref FK
+        INTEGER tune_ref FK
+        TEXT tag_text
     }
-
-    SESSION {
-        TEXT expires
-        TEXT session_token
-        TEXT user_id
+    TUNE_OVERRIDE {
+        INTEGER id PK
+        INTEGER tune_ref FK
+        TEXT title
+        TEXT type
+        TEXT structure
+        TEXT genre FK
+        TEXT mode
+        TEXT incipit
+        BOOLEAN deleted
+        INTEGER user_ref FK
     }
-
-    TUNE {
-        integer ID
-        TEXT Type
-        TEXT Structure
-        TEXT Title
-        TEXT Mode
-        TEXT Incipit
-    }
-
-    USER {
-        integer ID
-        TEXT Name
-        TEXT Email
-        TEXT Password
-    }
-
-    USER_ANNOTATION_SET {
-        integer id
-        integer user_id
-        TEXT Content
-    }
-
     VERIFICATION_TOKEN {
-        integer id
-        integer user_id
+        TEXT identifier PK
         TEXT token
-        integer expires_at
+        TEXT expires
     }
 
     %% Relationships
-    ACCOUNT }|--|| USER : "references"
-    USER_ANNOTATION_SET }|--|| USER : "belongs to"
-    VERIFICATION_TOKEN }|--|| USER : "belongs to"
-    SESSION }|--|| USER : "references"
-    EXTERNAL_REF }|--|| TUNE : "references"
-    PRACTICE_RECORD }|--|| PLAYLIST : "belongs to"
-    PRACTICE_RECORD }|--|| TUNE : "references"
-    PLAYLIST }|--|| USER : "belongs to"
+    GENRE_TUNE_TYPE }|--|| GENRE : "genre_id"
+    GENRE_TUNE_TYPE }|--|| TUNE_TYPE : "tune_type_id"
+    INSTRUMENT }|--|| USER : "private_to_user"
+    PLAYLIST }|--|| USER : "user_ref"
+    PLAYLIST_TUNE }|--|| PLAYLIST : "playlist_ref"
+    PLAYLIST_TUNE }|--|| TUNE : "tune_ref"
+    PREFS_SPACED_REPETITION }|--|| USER : "user_id"
+    SESSION }|--|| USER : "user_id"
+    TAB_GROUP_MAIN_STATE }|--|| USER : "user_id"
+    TABLE_STATE }|--|| USER : "user_id"
+    TABLE_STATE }|--|| PLAYLIST : "playlist_id"
+    TUNE }|--|| GENRE : "genre"
+    TUNE }|--|| USER : "private_for"
+    NOTE }|--|| USER : "user_ref"
+    NOTE }|--|| TUNE : "tune_ref"
+    NOTE }|--|| PLAYLIST : "playlist_ref"
+    PRACTICE_RECORD }|--|| PLAYLIST : "playlist_ref"
+    PRACTICE_RECORD }|--|| TUNE : "tune_ref"
+    REFERENCE }|--|| TUNE : "tune_ref"
+    REFERENCE }|--|| USER : "user_ref"
+    TABLE_TRANSIENT_DATA }|--|| USER : "user_id"
+    TABLE_TRANSIENT_DATA }|--|| TUNE : "tune_id"
+    TABLE_TRANSIENT_DATA }|--|| PLAYLIST : "playlist_id"
+    TAG }|--|| USER : "user_ref"
+    TAG }|--|| TUNE : "tune_ref"
+    TUNE_OVERRIDE }|--|| TUNE : "tune_ref"
+    TUNE_OVERRIDE }|--|| GENRE : "genre"
+    TUNE_OVERRIDE }|--|| USER : "user_ref"
+    ACCOUNT }|--|| USER : "user_id"
 ```
 
-### 1.5. Alternatives or Potential Technology Evolution
+#### 1.4.1. Notable Table/Field Descriptions
+
+Since SQLite can't directly have descriptions for the fields, this is arguably the best place to track these.
+
+##### practice_record
+
+This associates the current state of practice, unique to tune/playlist/user.
+
+| Type    | Name             | Description                                                                                             |
+| ------- | ---------------- | ------------------------------------------------------------------------------------------------------- |
+| INTEGER | id               | Primary key, autoincrement                                                                              |
+| INTEGER | playlist_ref     | References the playlist (`playlist.playlist_id`)                                                        |
+| INTEGER | tune_ref         | References the tune (`tune.id`)                                                                         |
+| TEXT    | practiced        | Date/time or string indicating when the practice occurred                                               |
+| INTEGER | quality          | Quality rating of the practice session                                                                  |
+| REAL    | easiness         | Easiness factor for spaced repetition, when using SM2                                                   |
+| INTEGER | interval         | Interval (days) until next review                                                                       |
+| INTEGER | repetitions      | Number of times this tune has been reviewed                                                             |
+| TEXT    | review_date      | Scheduled date for next review (maybe should be called Due)                                             |
+| TEXT    | backup_practiced | Backup of practice date/time or notes (deprecated, not needed given `practice_history` table)           |
+| REAL    | stability        | Stability metric for spaced repetition, when using FSRS                                                 |
+| INTEGER | elapsed_days     | Days elapsed since last review                                                                          |
+| INTEGER | lapses           | Number of times the tune was forgotten                                                                  |
+| INTEGER | state            | Enum representing the learning state (one of Learning = 1, Review = 2, Relearning = 3, or null/0 = NEW) |
+| REAL    | difficulty       | Difficulty metric for the tune, when using FSRS                                                         |
+| INTEGER | step             | Current learning or relearning step or None if the tune is in the Review state                          |
+
+### 1.6. Alternatives or Potential Technology Evolution
 
 1. Down the line, I can switch to MySQL or PostgreSQL if needed.
 2. For the front end, I may experiment with a Kotlin frontend at some point.
@@ -236,6 +430,8 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
 
 The SQLAlchemy ORM code is contained in the `tunetrees/models` package in the `tunetrees.py`
 module. It should always be generated with the following procedure:
+
+For database schema changes and migrations, refer to [Database Migration with Alembic](docs/database-migration-alembic.md).
 
 First, make sure you have [sqlacodegen-v2](https://pypi.org/project/sqlacodegen-v2/) installed:
 
@@ -529,6 +725,26 @@ tests.
 Stability of Playwright testing relies on setting the environment variable for the frontend to
 `TT_REVIEW_SITDOWN_DATE`, which must be specified in Coordinated Universal Time (UTC).  
 This value should be set to `2024-12-31 16:47:57.671465+00:00`.
+
+##### 4.3.1.2. Test Cookies
+
+\[ This section should be considered as not stable. And, certainly the refresh of the storage state needs to
+be automated. See https://github.com/sboagy/tunetrees/issues/189 . \]
+
+In order to not have every test log in, the TuneTrees playwright tests save login information into
+`test-scripts/storageStateSboagyLogin.json`. If you run the tests, and you don't get a logged in state,
+i.e. it just sits there, it's likely because `storageStateSboagyLogin.json` is stale, and needs to be rebuilt.
+
+In order for the `storageStateSboagyLogin.json` to be rebuild, one should set the environment variable `SAVE_COOKIES` to
+`true`, or uncomment the `process.env.SAVE_COOKIES = "true"` in `frontend/playwright.config.ts`, and then run the "test-login-1" playwright test.
+
+On the server, this information is stored in a secret and needs to be base64 encoded before setting the secret:
+
+```
+base64 -i test-scripts/storageStateSboagyLogin.json -o test-scripts/storageStateSboagyLogin.b64
+```
+
+Once you've got the `storageStateSboagyLogin.b64` file, copy and paste that into the STORAGE_STATE_TEST1 [environment secret found in the TuneTrees git repository](https://github.com/sboagy/tunetrees/settings/environments).
 
 ### 4.4. Python Backend Testing
 

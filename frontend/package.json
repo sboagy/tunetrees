@@ -24,7 +24,7 @@
     "prebuild": "npm run build:theme-script"
   },
   "engines": {
-    "node": ">=v22.9.0"
+    "node": ">=v22.17.0"
   },
   "dependencies": {
     "-": "^0.0.1",

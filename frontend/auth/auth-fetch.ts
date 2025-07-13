@@ -14,7 +14,8 @@ import type {
   IUser,
   IVerificationToken,
 } from "@/app/(main)/pages/practice/types";
-import { _baseURL } from "./auth-tt-adapter";
+
+const _baseURL = process.env.TT_API_BASE_URL;
 
 export async function updateUserInDatabase(
   userId: number,

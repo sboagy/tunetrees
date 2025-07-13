@@ -31,7 +31,8 @@ import { type NextRequest, NextResponse } from "next/server";
 //   }
 // }
 
-const _baseURL = process.env.NEXT_BASE_URL;
+const _baseURL = process.env.NEXT_BASE_URL; // For frontend callback URLs
+const _apiBaseURL = process.env.TT_API_BASE_URL; // For backend API calls
 
 export async function GET(req: NextRequest) {
   console.log("GET request for verify-user: ", req);
@@ -84,7 +85,7 @@ export async function GET(req: NextRequest) {
     const stringifyUser = JSON.stringify(userPatch);
 
     const updateUserResponse = await axios.patch(
-      `${_baseURL}/auth/update-user/${user.id}`,
+      `${_apiBaseURL}/auth/update-user/${user.id}`,
       stringifyUser,
       {
         headers: {

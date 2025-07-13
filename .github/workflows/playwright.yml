@@ -17,6 +17,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
+
+      - name: Print Node version
+        run: node --version
+        working-directory: frontend
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -38,21 +43,44 @@ jobs:
         working-directory: frontend
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
         working-directory: frontend
 
       - name: Install Playwright Chromium Browser
         run: npx playwright install chromium --with-deps
         working-directory: frontend
 
+      - name: Print playwright version
+        run: npm list playwright --depth=0
+        working-directory: frontend
+
+      - name: Debug environment
+        run: |
+          echo "CI=$CI"
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+        working-directory: frontend
+
+      # I think the way these tests are set up, we don't want to start the Next.js server manually.
+      # - name: Install wait-on
+      #   run: npm install -g wait-on
+      #   working-directory: frontend
+
+      # - name: Start Next.js server
+      #   run: next dev --experimental-https &
+      #   working-directory: frontend
+
+      # - name: Wait for Next.js server to be ready
+      #   run: wait-on https://localhost:3000
+      #   working-directory: frontend
+
       - name: Run Frontend Playwright tests
         # run: npx playwright test --project=chromium --grep "test-practice-1-2"
-        run: npx playwright test --project=chromium
+        run: npx playwright test --project=chromium --reporter=list
         working-directory: frontend
         env:
           NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
-          NEXT_PUBLIC_TT_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
-          TT_API_BASE_URL: ${{ vars.NEXT_PUBLIC_TT_BASE_URL }}
+          TT_API_BASE_URL: ${{ vars.TT_API_BASE_URL }}
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}

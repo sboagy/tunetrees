@@ -99,7 +99,9 @@ const formSchema = z.object({
   practiced: z.string().nullable().optional(), // practice_record.practiced
   quality: z.number().int().nullable().optional(), // practice_record.quality
   easiness: z.number().nullable().optional(), // practice_record.easiness
+  difficulty: z.number().nullable().optional(), // practice_record.difficulty
   interval: z.number().nullable().optional(), // practice_record.interval
+  step: z.number().nullable().optional(), // practice_record.step
   repetitions: z.number().nullable().optional(), // practice_record.repetitions
   review_date: z.string().nullable().optional(), // practice_record.review_date
   backup_practiced: z.string().nullable().optional(), // practice_record.review_date
@@ -326,7 +328,9 @@ export default function TuneEditor({
       practiced: data.practiced ?? "",
       quality: data.quality ?? 0,
       easiness: data.easiness ?? 0,
+      difficulty: data.difficulty ?? 0,
       interval: data.interval ?? 0,
+      step: data.step ?? 0,
       repetitions: data.repetitions ?? 0,
       review_date: data.review_date ?? "",
       // tags: z.string().nullable().optional(),
@@ -347,7 +351,9 @@ export default function TuneEditor({
         practiced: data.practiced ?? "",
         quality: data.quality ?? 0,
         easiness: data.easiness ?? 0,
+        difficulty: data.difficulty ?? 0,
         interval: data.interval ?? 0,
+        step: data.step ?? 0,
         repetitions: data.repetitions ?? 0,
         review_date: data.review_date ?? "",
       };
@@ -1021,6 +1027,32 @@ export default function TuneEditor({
 
                   <FormField
                     control={form.control}
+                    name="difficulty"
+                    render={({ field }) => (
+                      <FormItem
+                        className="tune-form-item-style"
+                        data-testid="tt-tune-editor-difficulty"
+                      >
+                        <FormLabel className="tune-form-label-style">
+                          <em>Difficulty:</em>{" "}
+                        </FormLabel>
+
+                        <FormControl className="tune-form-control-style">
+                          <Input
+                            type="number"
+                            {...field}
+                            value={field.value?.toString() || ""}
+                            onChange={(e) =>
+                              field.onChange(e.target.valueAsNumber)
+                            }
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="interval"
                     render={({ field }) => (
                       <FormItem
@@ -1029,6 +1061,32 @@ export default function TuneEditor({
                       >
                         <FormLabel className="tune-form-label-style">
                           <em>Interval:</em>{" "}
+                        </FormLabel>
+
+                        <FormControl className="tune-form-control-style">
+                          <Input
+                            type="number"
+                            {...field}
+                            value={field.value?.toString() || ""}
+                            onChange={(e) =>
+                              field.onChange(e.target.valueAsNumber)
+                            }
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="step"
+                    render={({ field }) => (
+                      <FormItem
+                        className="tune-form-item-style"
+                        data-testid="tt-tune-editor-step"
+                      >
+                        <FormLabel className="tune-form-label-style">
+                          <em>Step:</em>{" "}
                         </FormLabel>
 
                         <FormControl className="tune-form-control-style">

@@ -4,24 +4,21 @@ import time
 import urllib.parse
 from datetime import datetime, timezone
 from os import environ
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pydantic
 from fastapi import (
     APIRouter,
     Body,
-    Form,
     HTTPException,
     Path,
     Query,
 )
-from sqlalchemy import ColumnElement, Table, and_, delete, insert
+from sqlalchemy import ColumnElement, Table, and_, delete, func, insert
 from sqlalchemy.future import select
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.query import Query as QueryOrm
 from starlette import status as status
-from starlette.responses import RedirectResponse
 
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
@@ -30,9 +27,7 @@ from tunetrees.app.queries import (
 from tunetrees.app.schedule import (
     TuneFeedbackUpdate,
     TuneScheduleUpdate,
-    query_and_print_tune_by_id,
     update_practice_feedbacks,
-    update_practice_record,
     update_practice_schedules,
 )
 from tunetrees.models.tunetrees import (
@@ -46,10 +41,10 @@ from tunetrees.models.tunetrees import (
     Tune,
     TuneOverride,
     TuneType,
+    t_genre_tune_type,
     t_practice_list_joined,
     t_practice_list_staged,
     t_view_playlist_joined,
-    t_genre_tune_type,
 )
 from tunetrees.models.tunetrees_pydantic import (
     ColumnSort,
@@ -139,7 +134,7 @@ async def get_scheduled_tunes_overview(
     response_model=List[PracticeListStagedModel],
     description="Retrieve an overview of repertoire tunes for a user and playlist with optional filters and pagination.",
 )
-async def get_tunes_staged(
+async def get_repertoire_tunes_overview(
     user_id: int,
     playlist_ref: int,
     show_deleted: bool = Query(False),
@@ -227,22 +222,6 @@ async def get_tune_staged(
         raise HTTPException(status_code=500, detail=f"Unable to fetch tune: {e}")
 
 
-@router.post("/practice/submit_feedback")
-async def submit_feedback(
-    selected_tune: Annotated[int, Form()],
-    vote_type: Annotated[str, Form()],
-    user_id: Annotated[str, Form()],
-    playlist_id: Annotated[str, Form()],
-):
-    assert user_id
-    logger.debug(f"{selected_tune=}, {vote_type=}")
-    # query_and_print_tune_by_id(634)
-
-    update_practice_record(f"{selected_tune}", vote_type, playlist_id)
-
-    return status.HTTP_302_FOUND
-
-
 # DEADCODE: Dead code?
 @router.post("/practice/submit_schedules/{playlist_id}")
 async def submit_schedules(
@@ -271,32 +250,6 @@ async def submit_feedbacks(
     )
 
     return status.HTTP_302_FOUND
-
-
-@router.post("/practice/feedback")
-async def feedback(
-    selected_tune: Annotated[int, Form()],
-    vote_type: Annotated[str, Form()],
-    user_id: Annotated[str, Form()],
-    playlist_id: Annotated[str, Form()],
-):
-    """Submit feedback for a tune for the direct use of the backend server.
-    If successful, redirect to the practice page.
-    """
-    assert user_id
-    logger.debug(f"{selected_tune=}, {vote_type=}")
-    query_and_print_tune_by_id(634)
-
-    update_practice_record(f"{selected_tune}", vote_type, playlist_id)
-
-    query_and_print_tune_by_id(634)
-
-    # I think this redirect is here in order to redirect to the practice page after
-    # submitting feedback when the feedback was submitted via a form when using
-    # the backend server directly. -sb
-    #
-    html_result = RedirectResponse("/practice", status_code=status.HTTP_302_FOUND)
-    return html_result
 
 
 def update_table(
@@ -346,6 +299,9 @@ async def get_playlist_tune_overview(user_id: int, playlist_ref: int, tune_id: i
                     status_code=404, detail=f"Tune not found: ({tune_id})"
                 )
             return PlaylistTuneJoinedModel.model_validate(result)
+    except HTTPException as e:
+        logger.error(f"Unable to fetch tune ({tune_id}): {e}")
+        raise
     except Exception as e:
         logger.error(f"Unable to fetch tune ({tune_id}): {e}")
         raise HTTPException(

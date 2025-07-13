@@ -53,6 +53,8 @@ export default [
       "**/next.config.js",
       "**/next.config.mjs",
       ".prettierrc.js",
+      "**/playwright-report/**",
+      "**/test-env.js",
     ],
   },
   // Global rules that apply to all files - disable problematic node rules
@@ -228,6 +230,36 @@ export default [
           ignore: ["Sidebar.tsx"],
         },
       ],
+    },
+  },
+  // Configuration for browser scripts in public/scripts/
+  {
+    files: ["public/scripts/**/*.js"],
+    languageOptions: {
+      parser: undefined, // Use default ESLint parser for JavaScript
+      globals: {
+        window: "readonly",
+        document: "readonly",
+        localStorage: "readonly",
+        console: "readonly",
+      },
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: "script",
+      },
+    },
+    rules: {
+      // Disable all TypeScript-specific rules
+      "@typescript-eslint/await-thenable": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
+      "@typescript-eslint/unbound-method": "off",
+      "@typescript-eslint/no-misused-promises": "off",
+      "@typescript-eslint/prefer-nullish-coalescing": "off",
+      "@typescript-eslint/prefer-optional-chain": "off",
+      // Use basic JavaScript rules instead
+      "no-unused-vars": "off", // Allow unused vars in this case
+      "no-undef": "off", // We're defining globals above
     },
   },
 ];

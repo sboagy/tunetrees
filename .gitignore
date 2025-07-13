@@ -298,6 +298,14 @@ design/ui_grammar/UIGrammarLexer.tokens
 design/ui_grammar/UIGrammarListener.py
 design/ui_grammar/UIGrammarParser.py
 tunetrees_test.sqlite3
+tunetrees.sqlite3
+tunetrees_production.sqlite3
+tunetrees_actual_production.sqlite3
+prod_migration_temp.sqlite3
+temp_empty.sqlite3
+temp_production_baseline.sqlite3
+temp_production_for_baseline.sqlite3
+test_migration.sqlite3
 fastapi.pid
 storageStateSboagyLogin.json
 storageState*.json
@@ -320,3 +328,10 @@ current_requirements.txt
 compiled_requirements.txt
 frontend/test-scripts/storageStateSboagyLogin.b64
 iti_import_output
+frontend/public/test-browser.properties
+xtest_stashed_folder
+**/__pycache__
+**/__pycache__/**/*.*
+github-action-logs
+github-action-logs/**/*
+tunetrees_do.sqlite3

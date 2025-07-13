@@ -160,7 +160,8 @@ function verificationTokenSerializer(
   };
 }
 
-export const _baseURL = process.env.NEXT_BASE_URL;
+// Removed _baseURL export since it's now defined locally in auth-fetch.ts
+// which is the only place that should be making direct API calls to the backend
 
 // The createUser method of ttHttpAdapter will strip the hash off,
 // unfortunately, which we need for authentication.  So use this

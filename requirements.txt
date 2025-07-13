@@ -1,12 +1,13 @@
 # To do: replace this with a pyproject.toml file
+alembic ~= 1.16.4
 anyio ~= 4.7.0
 attrs~=24.3.0
 beautifulsoup4 ~= 4.12.3
 black ~= 24.10.0
 build ~= 0.10.0
 click ~= 8.1.7
-fastapi ~= 0.115.6
-fsrs~=4.1.1
+fastapi ~= 0.115.14
+fsrs~=6.1.0
 h11 ~= 0.14.0
 httpx ~= 0.28.1
 idna ~= 3.10

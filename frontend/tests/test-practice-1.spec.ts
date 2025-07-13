@@ -3,8 +3,14 @@ import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { screenShotDir } from "@/test-scripts/paths-for-tests";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
-import { type Locator, type Page, expect, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
 import path from "node:path";
+import {
+  logTestStart,
+  logTestEnd,
+  logBrowserContextStart,
+  logBrowserContextEnd,
+} from "../test-scripts/test-logging";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -14,31 +20,24 @@ test.use({
 
 // testInfo.project.name,
 
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
+
 test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
+  await setTestDefaults(page);
   await applyNetworkThrottle(page, 0);
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
 });
-
-async function clickWithTimeAfter(
-  page: Page,
-  locator: Locator,
-  timeout = 9000,
-) {
-  await locator.waitFor({ state: "attached", timeout: timeout });
-  await locator.waitFor({ state: "visible", timeout: timeout });
-  await expect(locator).toBeAttached({ timeout: timeout });
-  await expect(locator).toBeVisible({ timeout: timeout });
-  await expect(locator).toBeEnabled({ timeout: timeout });
-  // await locator.click({ trial: true });
-  await locator.click({ timeout: timeout });
-}
 
 async function checkForCellId(page: Page, cellId: number) {
   const idCell = page.getByRole("cell", { name: `${cellId}` });
@@ -48,27 +47,10 @@ async function checkForCellId(page: Page, cellId: number) {
   await expect(idCell).toHaveText(`${cellId}`);
 }
 
-async function setReviewEval(page: Page, tuneId: number, evalType: string) {
-  const qualityButton = page
-    .getByRole("row", { name: `${tuneId} ` })
-    .getByTestId("tt-recal-eval-popover-trigger");
-  await expect(qualityButton).toBeVisible({ timeout: 60000 });
-  await expect(qualityButton).toBeEnabled({ timeout: 60000 });
-  await clickWithTimeAfter(page, qualityButton);
-  await page
-    .getByTestId("tt-recal-eval-group-menu")
-    .waitFor({ state: "visible", timeout: 60000 });
-  const responseRecalledButton = page.getByTestId(`tt-recal-eval-${evalType}`);
-  await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
-  await expect(responseRecalledButton).toBeEnabled({ timeout: 60000 });
-  await clickWithTimeAfter(page, responseRecalledButton);
-  await page
-    .getByTestId("tt-recal-eval-popover-content")
-    .waitFor({ state: "detached", timeout: 60000 });
-}
-
 test.describe.serial("Practice Tests", () => {
-  test("test-practice-1-1", async ({ page }) => {
+  test("Test for the predicted number of rows in the Practice tab", async ({
+    page,
+  }) => {
     const ttPO = new TuneTreesPageObject(page);
 
     await ttPO.navigateToPracticeTab();
@@ -87,18 +69,23 @@ test.describe.serial("Practice Tests", () => {
     console.log("===> test-practice-1.ts:45 ~ ", "test complete!");
   });
 
-  test("test-practice-1-2", async ({ page }) => {
+  test("Basic set review evaluations, submit, and check new row count", async ({
+    page,
+  }) => {
     const ttPO = new TuneTreesPageObject(page);
 
     await ttPO.navigateToPracticeTab();
 
+    const rowCountBefore = await ttPO.tunesGridRows.count();
+    console.log(`Number of rows before submit: ${rowCountBefore}`);
+
     console.log("===> test-practice-1.ts:77 ~ ");
-    await setReviewEval(page, 1081, "struggled");
+    await ttPO.setReviewEval(1081, "struggled");
 
-    await setReviewEval(page, 2451, "trivial");
-    await setReviewEval(page, 2451, "(Not Set)");
+    await ttPO.setReviewEval(2451, "trivial");
+    await ttPO.setReviewEval(2451, "(Not Set)");
 
-    await setReviewEval(page, 1684, "failed");
+    await ttPO.setReviewEval(1684, "failed");
 
     const submitButton = page.getByRole("button", {
       name: "Submit Practiced Tunes",
@@ -110,10 +97,11 @@ test.describe.serial("Practice Tests", () => {
     await page.screenshot({
       path: path.join(screenShotDir, "practice_just_before_submitted.png"),
     });
-    await clickWithTimeAfter(page, submitButton, 1000);
+    await ttPO.clickWithTimeAfter(submitButton, 1000);
     await page.screenshot({
       path: path.join(screenShotDir, "practice_just_after_submitted.png"),
     });
+    await ttPO.waitForSuccessfullySubmitted();
     // page.on("response", (data) => {
     //   console.log("===> test-practice-1.ts:108 ~ data", data);
     // });
@@ -127,7 +115,9 @@ test.describe.serial("Practice Tests", () => {
     await checkForCellId(page, 2451);
   });
 
-  test("test-practice-1-3", async ({ page }) => {
+  test("Check that server/database is restored after submit test", async ({
+    page,
+  }) => {
     /**
      * This just repeats the first test to ensure that the server was restarted properly,
      * and that the test can run multiple times without issue.

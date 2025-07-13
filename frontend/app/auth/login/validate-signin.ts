@@ -9,7 +9,7 @@ import { matchPasswordWithHash } from "@/auth/password-match";
 import { formatDateForEmailVerification } from "@/lib/date-utils";
 import axios from "axios";
 
-const _baseURL = process.env.NEXT_BASE_URL;
+const _baseURL = process.env.TT_API_BASE_URL;
 
 export async function updateUserEmailVerification(user: IExtendedAdapterUser) {
   user.emailVerified = new Date();

@@ -37,7 +37,7 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 0 : 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ["html", { outputFolder: "playwright-report", open: "never", merge: true }],
@@ -127,21 +127,18 @@ export default defineConfig({
 
   /* Run the local dev server before starting the tests */
   webServer: {
-    // When in the github actions CI, the server will be started by
-    // the playwright test runner, controlled by
-    // tunetrees/.github/workflows/playwright.yml,
-    // so this shouldn't have any effect in that environment.
+    // Playwright will start the server using this webServer config in both local and CI environments.
+    // Setting reuseExistingServer: true avoids server startup/shutdown race conditions.
     command: "npm run dev 2>&1 | tee test-results/frontend.log", // Combine the command and arguments
     env: {
       NEXT_BASE_URL: process.env.NEXT_BASE_URL || "",
-      NEXT_PUBLIC_TT_BASE_URL: process.env.NEXT_PUBLIC_TT_BASE_URL || "",
       NEXT_PUBLIC_MOCK_EXTERNAL_APIS:
         process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS || "true",
       NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION:
         process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "true",
       TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
       AUTH_SECRET: process.env.AUTH_SECRET || "",
-      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",
+      NEXTAUTH_SECRET: process.env.AUTH_SECRET || "",
       AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
       AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET || "",
       AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || "",
@@ -151,13 +148,21 @@ export default defineConfig({
       GITHUB_CLIENT_ID: process.env.GGITHUB_CLIENT_ID || "",
       GITHUB_CLIENT_SECRET: process.env.GGITHUB_CLIENT_SECRET || "",
       TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
-      CI: process.env.TT_AUTH_SENDGRID_API_KEY || "",
     },
     url: "https://localhost:3000/api/health",
+
     // Playwright seems to trip up due to SSL errors (because the self-signed certificate
     // via "next dev --experimental-https" won't be trusted), so we ignore them.
-    ignoreHTTPSErrors: true,
-    reuseExistingServer: !process.env.CI,
+
+    // CoPilot absolutely lied to me about this: ignoreHTTPSErrors is not a valid property
+    // for webServer; it is set globally in the `use` block above.
+    // This property is absolutely necessary to make the tests work!
+    ignoreHTTPSErrors: true, // Accept self-signed certificates
+
+    // reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true, // try to reuse the existing server if it is already running
+
+    timeout: 30_000, // Give more time for server startup
 
     // timeout: 2 * 1000,
   },

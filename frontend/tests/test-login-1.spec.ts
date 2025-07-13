@@ -1,31 +1,38 @@
-import path from "node:path";
-
 import { restartBackend } from "@/test-scripts/global-setup";
 
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 
-import {
-  initialPageLoadTimeout,
-  screenShotDir,
-} from "@/test-scripts/paths-for-tests";
+import { navigateToPageWithRetry } from "@/test-scripts/navigation-utils";
 
 import { test } from "@playwright/test";
 
 import { checkHealth } from "../test-scripts/check-servers";
 
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { runLoginWithCookieSave } from "@/test-scripts/run-login2";
+import {
+  logTestStart,
+  logTestEnd,
+  logBrowserContextStart,
+  logBrowserContextEnd,
+} from "../test-scripts/test-logging";
 
 test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   // doConsolelogs(page, testInfo);
+  await setTestDefaults(page);
   await applyNetworkThrottle(page);
 });
 
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
   await page.waitForTimeout(100);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
 });
 
 test("test-login-1", async ({ page }) => {
@@ -35,10 +42,8 @@ test("test-login-1", async ({ page }) => {
 
   const isCookieSave = process.env.SAVE_COOKIES === "true";
 
-  await page.goto("https://localhost:3000", {
-    timeout: initialPageLoadTimeout,
-    waitUntil: "networkidle",
-  });
+  // Use improved navigation with retry logic
+  await navigateToPageWithRetry(page, "https://localhost:3000");
   if (isCookieSave) {
     await runLoginWithCookieSave(
       page,
@@ -55,16 +60,9 @@ test("test-login-1", async ({ page }) => {
 
   // await page.waitForTimeout(1000 * 3);
 
-  await page.screenshot({
-    path: path.join(screenShotDir, "page_just_loaded.png"),
-  });
-
   console.log("===> test-login-1:106 ~ waiting for selector");
   await page.waitForSelector('role=tab[name="Repertoire"]', {
     state: "visible",
-  });
-  await page.screenshot({
-    path: path.join(screenShotDir, "page_just_after_repertoire_select.png"),
   });
 
   console.log("===> test-login-1:100 ~ ", "test-1 completed");

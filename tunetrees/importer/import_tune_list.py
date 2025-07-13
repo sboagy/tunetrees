@@ -4,7 +4,8 @@ from http.client import HTTPResponse
 from os import environ
 from pathlib import Path
 from time import sleep
-from typing import List, TypedDict
+from typing import List
+from typing_extensions import TypedDict
 from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen

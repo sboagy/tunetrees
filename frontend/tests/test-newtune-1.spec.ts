@@ -1,8 +1,15 @@
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { TuneEditorPageObject } from "@/test-scripts/tune-editor.po";
 import { expect, test } from "@playwright/test";
+import {
+  logTestStart,
+  logTestEnd,
+  logBrowserContextStart,
+  logBrowserContextEnd,
+} from "../test-scripts/test-logging";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -13,6 +20,8 @@ test.use({
 });
 
 test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
 
   // Add this at the start to see ALL requests
@@ -27,13 +36,16 @@ test.beforeEach(async ({ page }, testInfo) => {
 
   // doConsolelogs(page, testInfo);
   // await page.waitForTimeout(1);
+  await setTestDefaults(page);
   await applyNetworkThrottle(page);
 });
 
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
   await page.waitForTimeout(1_000);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
 });
 
 test.describe.serial("Add Tune Tests", () => {

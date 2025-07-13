@@ -22,11 +22,18 @@
         },
         {
             "label": "clean_and_stop",
-            "dependsOn": ["stop_server", "clean_test_db"]
+            "dependsOn": [
+                "stop_server",
+                "clean_test_db"
+            ]
         },
         {
             "label": "stop_clean_start_server",
-            "dependsOn": ["stop_server", "clean_test_db", "start_server"]
+            "dependsOn": [
+                "stop_server",
+                "clean_test_db",
+                "start_server"
+            ]
         }
     ]
 }

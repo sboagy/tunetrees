@@ -14,14 +14,34 @@
         "reportUnknownArgumentType": "none",
         "reportMissingParameterType": "none"
     },
-    "python.analysis.exclude": [
-        ".venv",
-        ".venv/**",
-        ".venv/**/*.py"
-    ],
-    "python.testing.pytestArgs": [
-        "design/ui_grammar/tests"
-    ],
+    // "python.testing.pytestArgs": [
+    //     "tests"
+    // ],
+    // "python.envFile": "${workspaceFolder}/.env",
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.analysis.exclude": [
+        "**/node_modules",
+        "**/.venv",
+        "**/venv",
+        "**/.git",
+        "**/build",
+        "**/dist",
+        "**/data",
+        "**/output",
+        "**/iti_import_output",
+        "**/old.venv",
+        "**/saved.venv",
+        "**/scratch",
+        "**/tree-*.txt",
+        "**/tree-backup-*",
+        "**/tree-main.txt",
+        "**/tree-bugfix_*",
+        "**/tree-*",
+        "**/test_stashed_folder",
+        "alembic/versions/*.py"
+    ]
 }

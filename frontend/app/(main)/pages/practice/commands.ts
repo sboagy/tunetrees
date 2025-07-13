@@ -1,8 +1,18 @@
 "use server";
 
+import { convertToPythonUTCString } from "@/lib/date-utils";
 import axios from "axios";
 
 const baseURL = process.env.TT_API_BASE_URL;
+
+if (!baseURL) {
+  console.error(
+    "TT_API_BASE_URL environment variable is not set in commands.ts!",
+  );
+  throw new Error("TT_API_BASE_URL environment variable is not set");
+}
+
+console.log("Commands API baseURL:", baseURL);
 
 interface IPracticeFeedbackProps {
   id: number;
@@ -31,7 +41,7 @@ export const submitPracticeFeedback = async ({
   try {
     const response = await axios({
       method: "post",
-      url: `${baseURL}/practice/submit_feedback`,
+      url: `${baseURL}/tunetrees/practice/submit_feedback`,
       data: {
         selected_tune: id,
         vote_type: feedback,
@@ -61,30 +71,39 @@ export interface ITuneUpdate {
 interface IPracticeFeedbacksProps {
   playlistId: number;
   updates: { [key: string]: ITuneUpdate };
+
+  sitdownDate: Date;
 }
 
-export const submitPracticeFeedbacks = async ({
-  playlistId,
-  updates,
-}: IPracticeFeedbacksProps): Promise<string> => {
+export const submitPracticeFeedbacks = async (
+  props: IPracticeFeedbacksProps,
+): Promise<string> => {
+  const { playlistId, updates, sitdownDate } = props;
   if (!baseURL) {
     console.error("Base URL is not defined");
     return "Error: Base URL is not defined";
   }
-  const url = `${baseURL}/practice/submit_feedbacks`;
+  const url = `${baseURL}/tunetrees/practice/submit_feedbacks`;
   console.log(
     `Submitting feedbacks for user_id: ${playlistId}, updates: ${JSON.stringify(updates)} url: ${url}`,
   );
 
   try {
-    // Note the TT_REVIEW_SITDOWN_DATE env variable, if set, must be in UTC!
-    const reviewSitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
+    if (
+      !sitdownDate ||
+      !(sitdownDate instanceof Date) ||
+      Number.isNaN(sitdownDate.getTime())
+    ) {
+      throw new Error(
+        "A valid sitdownDate (Date object) must be provided to submitPracticeFeedbacks.",
+      );
+    }
     const response = await axios({
       method: "post",
-      url: `${baseURL}/practice/submit_feedbacks/${playlistId}`,
+      url: `${url}/${playlistId}`,
       data: updates,
       params: {
-        sitdown_date: reviewSitdownDate,
+        sitdown_date: convertToPythonUTCString(sitdownDate.toISOString()),
       },
       headers: {
         key: "Access-Control-Allow-Origin",
@@ -126,7 +145,7 @@ export const submitPracticeSchedules = async ({
     console.error("Base URL is not defined");
     return "Error: Base URL is not defined";
   }
-  const url = `${baseURL}/practice/submit_schedules`;
+  const url = `${baseURL}/tunetrees/practice/submit_schedules`;
   console.log(
     `Submitting feedbacks for user_id: ${playlist_id}, updates: ${JSON.stringify(updates)} url: ${url}`,
   );
@@ -134,7 +153,7 @@ export const submitPracticeSchedules = async ({
   try {
     const response = await axios({
       method: "post",
-      url: `${baseURL}/practice/submit_schedules/${playlist_id}`,
+      url: `${baseURL}/tunetrees/practice/submit_schedules/${playlist_id}`,
       data: updates,
       headers: {
         key: "Access-Control-Allow-Origin",

@@ -1,4 +1,4 @@
-import { type Page, expect } from "@playwright/test";
+import { type Locator, type Page, expect } from "@playwright/test";
 import { checkHealth } from "./check-servers";
 import { initialPageLoadTimeout } from "./paths-for-tests";
 
@@ -35,6 +35,7 @@ export class TuneTreesPageObject {
   readonly tabsMenuCatalogChoice;
   readonly catalogTab;
   readonly tableStatus;
+  readonly toast;
 
   constructor(page: Page) {
     this.page = page;
@@ -107,6 +108,7 @@ export class TuneTreesPageObject {
     );
 
     this.tableStatus = this.page.getByText(" row(s) selected.");
+    this.toast = this.page.getByTestId("shadcn-toast");
   }
 
   onError = (exception: Error): void => {
@@ -119,11 +121,15 @@ export class TuneTreesPageObject {
 
     await this.page.goto(this.pageLocation, {
       timeout: initialPageLoadTimeout,
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded", // More reliable than networkidle in CI
     });
     this.page.on("pageerror", this.onError);
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForSelector("body");
+
+    const pageContent = await this.page.content();
+    console.log("Page content after goto:", pageContent.slice(0, 500)); // Log first 500 chars for inspection
+
     await this.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
 
     // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
@@ -143,14 +149,19 @@ export class TuneTreesPageObject {
     let rowCount = await this.tunesGridRows.count();
     let iterations = 0;
 
-    while (rowCount < 2 && iterations < 12) {
+    const maxIterations = 12; // 12 seconds max wait time
+    while (rowCount < 2 && iterations < maxIterations) {
       await this.page.waitForTimeout(1000); // wait for 1 second before checking again
       rowCount = await this.tunesGridRows.count();
       iterations++;
     }
 
-    if (iterations >= 12) {
-      console.warn("Table population check exceeded 12 iterations.");
+    if (iterations >= maxIterations) {
+      console.warn(`
+    waitForTablePopulationToStart(): Table population check exceeded ${maxIterations} iterations.
+    Actual iterations: ${iterations}
+    Row count: ${rowCount}.
+    `);
     }
   }
 
@@ -246,6 +257,37 @@ export class TuneTreesPageObject {
     // await expect(ttPracticeTab2).toBeVisible({ timeout: 60000 });
   }
 
+  async clickWithTimeAfter(locator: Locator, timeout = 9000) {
+    await locator.waitFor({ state: "attached", timeout: timeout });
+    await locator.waitFor({ state: "visible", timeout: timeout });
+    await expect(locator).toBeAttached({ timeout: timeout });
+    await expect(locator).toBeVisible({ timeout: timeout });
+    await expect(locator).toBeEnabled({ timeout: timeout });
+    // await locator.click({ trial: true });
+    await locator.click({ timeout: timeout });
+  }
+
+  async setReviewEval(tuneId: number, evalType: string) {
+    const qualityButton = this.page
+      .getByRole("row", { name: `${tuneId} ` })
+      .getByTestId("tt-recal-eval-popover-trigger");
+    await expect(qualityButton).toBeVisible({ timeout: 60000 });
+    await expect(qualityButton).toBeEnabled({ timeout: 60000 });
+    await this.clickWithTimeAfter(qualityButton);
+    await this.page
+      .getByTestId("tt-recal-eval-group-menu")
+      .waitFor({ state: "visible", timeout: 60000 });
+    const responseRecalledButton = this.page.getByTestId(
+      `tt-recal-eval-${evalType}`,
+    );
+    await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
+    await expect(responseRecalledButton).toBeEnabled({ timeout: 60000 });
+    await this.clickWithTimeAfter(responseRecalledButton);
+    await this.page
+      .getByTestId("tt-recal-eval-popover-content")
+      .waitFor({ state: "detached", timeout: 60000 });
+  }
+
   async runLogin(
     user: string | undefined,
     pw: string | undefined,
@@ -259,8 +301,12 @@ export class TuneTreesPageObject {
     }
 
     const topSignInButton = this.page.getByRole("button", { name: "Sign in" });
+    await topSignInButton.waitFor({ state: "visible" });
     await topSignInButton.click();
+
+    // Wait for the login dialog to appear
     const userEmailLocator = this.page.getByTestId("user_email");
+    await userEmailLocator.waitFor({ state: "visible", timeout: 10000 });
     await userEmailLocator.fill(user || "");
     await userEmailLocator.press("Tab");
     const passwordEntryBox = this.page.getByTestId("user_password");
@@ -292,5 +338,12 @@ export class TuneTreesPageObject {
     await this.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
 
     console.log("===> run-login2.ts:50 ~ ", "Login completed");
+  }
+
+  async waitForSuccessfullySubmitted(): Promise<void> {
+    await expect(this.toast.last()).toContainText(
+      "Practice successfully submitted",
+      { timeout: 60000 },
+    );
   }
 }
