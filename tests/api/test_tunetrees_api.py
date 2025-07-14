@@ -5,7 +5,7 @@ def test_get_scheduled_tunes_overview(reset_test_db, api_client):  # type: ignor
     from datetime import datetime, timezone
 
     # Create a UTC datetime for the sitdown_date parameter
-    sitdown_date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    sitdown_date = datetime.now(timezone.utc).isoformat()
 
     response = api_client.get(
         f"/tunetrees/scheduled_tunes_overview/1/1?sitdown_date={sitdown_date}"
