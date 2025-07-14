@@ -37,8 +37,8 @@ services:
       NODE_ENV: production
       # NEXT_PUBLIC_TT_BASE_URL: ${NEXT_PUBLIC_TT_BASE_URL}
       NEXT_BASE_URL: "http://server:8000"
-      NEXT_PUBLIC_TT_BASE_URL: "http://server:8000/tunetrees"
-      TT_API_BASE_URL: "http://server:8000/tunetrees"
+      NEXT_PUBLIC_TT_BASE_URL: "http://server:8000"
+      TT_API_BASE_URL: "http://server:8000"
       NEXTAUTH_URL: https://tunetrees.com
       # NEXT_PUBLIC_TT_BASE_URL: https://tunetrees.com
       NEXTAUTH_URL_INTERNAL: http://frontend:3000
@@ -47,8 +47,7 @@ services:
       - 3000:3000
     networks:
       - backend
-    volumes:
-      - ${TUNETREES_DEPLOY_BASE_DIR}/.next/cache:/usr/src/app/.next/cache:rw
+    user: "1000:1000"
     # webserver_local:
     #   image: nginx:mainline-alpine
     #   container_name: webserver
@@ -118,7 +117,6 @@ services:
     #
     # command: certonly --webroot --webroot-path=/var/www/certbot --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
     # command: certonly --webroot --webroot-path=/var/www/certbot --email sboagy@gmail.com --agree-tos --no-eff-email --force-renewal -d tunetrees.com  -d www.tunetrees.com
-
 
 volumes:
   # certbot-etc:
