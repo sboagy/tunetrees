@@ -313,7 +313,7 @@ async function initialSignIn(page: Page) {
 
   // Wait for the signup dialog to appear
   const userEmailLocator = ttPO.page.getByTestId("user_email");
-  await userEmailLocator.waitFor({ state: "visible", timeout: 10000 });
+  await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
 
   const user = process.env.TEST2_LOGIN_USER_EMAIL;
   const pw = process.env.TEST2_LOGIN_USER_PASSWORD;

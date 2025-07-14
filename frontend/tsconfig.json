@@ -2,7 +2,12 @@
   "extends": "./node_modules/gts/tsconfig-google.json",
   "compilerOptions": {
     "target": "es2022",
-    "lib": ["es2022", "dom", "dom.iterable", "esnext"],
+    "lib": [
+      "es2022",
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     // "sourceMap": true,
     "outDir": ".next",
     "allowJs": true,
@@ -25,9 +30,15 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"],
-      "auth": ["./auth/"],
-      "components": ["./components/"],
+      "@/*": [
+        "./*"
+      ],
+      "auth": [
+        "./auth/"
+      ],
+      "components": [
+        "./components/"
+      ],
       "public/*": [
         "./public/*"
       ],
@@ -37,7 +48,10 @@
       "@/public/*": [
         "./public/*"
       ],
-      "*": ["src/*", "public/*"]
+      "*": [
+        "src/*",
+        "public/*"
+      ]
       // "next-auth-http-adapter": [
       //   "./../../../gitmisc/next-auth-http-adapter/src"
       // ]
@@ -62,6 +76,7 @@
     ".next/**/*.tsx",
     "auth/auth-types.ts",
     "react-quill.d.ts",
+    "global.d.ts",
     "eslint.config.mjs",
     "playwright.config.ts",
     "postcss.config.mjs",

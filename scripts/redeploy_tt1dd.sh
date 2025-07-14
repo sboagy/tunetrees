@@ -5,7 +5,7 @@ if [ "$PWD" = "$SCRIPT_DIR" ]; then
     cd ..
 fi
 
-if [ ! -f "tunetrees.sqlite3" ]; then
+if [ ! -f "tunetrees_production_baseline.sqlite3" ]; then
     echo "current directory must be the root of the tunetrees repo"
     exit 1
 fi
