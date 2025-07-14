@@ -298,6 +298,7 @@ export function get_columns(
       <Checkbox
         checked={info.row.getIsSelected()}
         onCheckedChange={handleItemCheckboxChange}
+        data-testid="tt-row-checkbox"
       />
     );
   }

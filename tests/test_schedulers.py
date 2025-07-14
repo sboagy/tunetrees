@@ -21,8 +21,10 @@ class DummyPrefs:
 
 
 def test_sm2_first_review_and_review():
+    from datetime import timezone
+
     scheduler = SM2Scheduler()
-    now = datetime.now()
+    now = datetime.now(timezone.utc)  # Make datetime timezone-aware
     result = scheduler.first_review(4, now)
     assert isinstance(result, dict)
     assert "easiness" in result
@@ -35,6 +37,8 @@ def test_sm2_first_review_and_review():
 
 
 def test_fsrs_first_review_and_review():
+    from datetime import timezone
+
     prefs = DummyPrefs()
     scheduler = FSRScheduler(
         fsrs_weights=prefs.fsrs_weights,
@@ -44,7 +48,7 @@ def test_fsrs_first_review_and_review():
         relearning_steps=prefs.relearning_steps,
         enable_fuzzing=prefs.enable_fuzzing,
     )
-    now = datetime.now()
+    now = datetime.now(timezone.utc)  # Make datetime timezone-aware
     # Test first review (NEW)
     review_result_dict = scheduler.first_review(4, now, quality_text="NEW")
     assert isinstance(review_result_dict, dict)

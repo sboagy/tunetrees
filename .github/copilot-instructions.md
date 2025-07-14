@@ -157,6 +157,87 @@ npx playwright test
 - **Frontend**: Playwright E2E tests in `frontend/tests/` with GitHub Actions CI
 - **CI/CD**: Automated testing on push/PR via GitHub Actions
 
+### Branch Naming Conventions
+
+Follow these naming conventions for Git branches to maintain consistency and enable automated workflows. Based on industry standards like GitFlow, GitHub Flow, and conventional commits.
+
+**Format**: `{type}/{brief-description}` or `{type}/{brief-description}-{issue-number}`
+
+**Primary Types** (following conventional commits):
+
+- `feat/` or `feature/` - New features or enhancements
+- `fix/` or `bugfix/` - Bug fixes and hotfixes
+- `docs/` - Documentation-only changes
+- `style/` - Code style/formatting changes (no logic changes)
+- `refactor/` - Code refactoring without feature changes
+- `test/` - Adding or modifying tests
+- `chore/` - Maintenance, dependencies, tooling
+- `perf/` - Performance improvements
+- `ci/` - CI/CD configuration changes
+
+**Additional Types** (for workflow management):
+
+- `release/` - Release preparation branches
+- `hotfix/` - Critical production fixes
+- `experiment/` - Experimental or spike work
+
+**Guidelines**:
+
+- **Use kebab-case** (hyphens) for descriptions - industry standard
+- **Keep concise but descriptive** - aim for 2-4 words
+- **Include issue numbers** when applicable for traceability
+- **Lowercase only** for consistency across platforms
+- **No strict length limit** - prioritize clarity over brevity
+
+**Examples**:
+
+```bash
+feat/user-authentication          # New authentication system
+feat/spaced-repetition-123        # Feature with issue reference
+fix/login-redirect-bug            # Bug fix
+fix/database-connection-456       # Bug fix with issue number
+docs/api-documentation            # Documentation update
+refactor/schedule-algorithm       # Code refactoring
+test/e2e-playlist-management      # Test additions
+chore/update-dependencies         # Maintenance work
+perf/optimize-query-performance   # Performance improvement
+hotfix/critical-data-loss-789     # Critical production fix
+release/v2.1.0                    # Release preparation
+experiment/new-ui-framework       # Experimental work
+```
+
+**Branch Management**:
+
+```bash
+# Create and switch to new branch
+git checkout -b feat/user-authentication
+
+# Create branch from specific commit/branch
+git checkout -b hotfix/critical-fix main
+
+# Push and set upstream tracking
+git push -u origin feat/user-authentication
+
+# Create branch with issue reference
+git checkout -b fix/login-redirect-456
+```
+
+**Integration Patterns**:
+
+- **Feature branches**: `feat/` → merge to `main` via PR
+- **Hotfixes**: `hotfix/` → merge to `main` and `develop` if using GitFlow
+- **Release branches**: `release/` → merge to `main` and tag version
+- **Experiments**: `experiment/` → merge or delete based on outcome
+
+This naming convention enables:
+
+- **Conventional commits compatibility** for automated changelogs
+- **Semantic versioning integration** for automated releases
+- **GitHub/GitLab automation** with type-based workflow triggers
+- **Clear intent communication** through standardized type prefixes
+- **Issue tracking integration** via optional number suffixes
+- **Tool compatibility** with popular Git workflows and CI/CD systems
+
 ## Deployment (DigitalOcean)
 
 ### Docker Multi-Service Setup

@@ -2,7 +2,14 @@
 
 
 def test_get_scheduled_tunes_overview(reset_test_db, api_client):  # type: ignore
-    response = api_client.get("/tunetrees/scheduled_tunes_overview/1/1")
+    from datetime import datetime, timezone
+
+    # Create a UTC datetime for the sitdown_date parameter
+    sitdown_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    response = api_client.get(
+        f"/tunetrees/scheduled_tunes_overview/1/1?sitdown_date={sitdown_date}"
+    )
     assert response.status_code in (200, 404)
 
 
@@ -39,5 +46,12 @@ def test_submit_schedules(reset_test_db, api_client):  # type: ignore
 
 
 def test_submit_feedbacks(reset_test_db, api_client):  # type: ignore
-    response = api_client.post("/tunetrees/practice/submit_feedbacks/1", json={})
+    from datetime import datetime, timezone
+
+    # Create a UTC datetime for the sitdown_date parameter
+    sitdown_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    response = api_client.post(
+        f"/tunetrees/practice/submit_feedbacks/1?sitdown_date={sitdown_date}", json={}
+    )
     assert response.status_code in (200, 302, 422)
