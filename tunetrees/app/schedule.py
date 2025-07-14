@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 from typing_extensions import TypedDict
 
 from fsrs import Rating, Scheduler, ReviewLog
@@ -171,10 +171,14 @@ class ReviewResult(TypedDict):
 def update_practice_feedbacks(
     user_tune_updates: dict[str, TuneFeedbackUpdate],
     playlist_ref: str | int,
-    review_sitdown_date: Optional[datetime] = None,
+    review_sitdown_date: datetime,
 ) -> None:
     playlist_ref_int: int = int(playlist_ref)
-    sitdown_date: datetime = review_sitdown_date or datetime.now(timezone.utc)
+    if review_sitdown_date.tzinfo is None or review_sitdown_date.tzinfo.utcoffset(
+        review_sitdown_date
+    ) != timedelta(0):
+        raise ValueError("review_sitdown_date must be timezone aware and in UTC")
+
     with SessionLocal() as db:
         try:
             user_ref: str = fetch_user_ref_from_playlist_ref(db, playlist_ref_int)
@@ -187,7 +191,7 @@ def update_practice_feedbacks(
                     tune_update=tune_update,
                     user_ref=user_ref,
                     playlist_ref=playlist_ref_int,
-                    sitdown_date=sitdown_date,
+                    sitdown_date=review_sitdown_date,
                     alg_type=alg_type,
                 )
             db.commit()
@@ -236,6 +240,11 @@ def get_latest_practice_record(
 
 def parse_review_date(review_date: datetime | str) -> str:
     if isinstance(review_date, datetime):
+        if review_date.tzinfo is None or review_date.tzinfo.utcoffset(
+            review_date
+        ) != timedelta(0):
+            raise ValueError("review_date must be timezone aware and in UTC")
+
         return datetime.strftime(review_date, TT_DATE_FORMAT)
     elif isinstance(review_date, str):  # type: ignore
         try:
@@ -244,6 +253,10 @@ def parse_review_date(review_date: datetime | str) -> str:
             log.error(f"Unable to parse date: {review_date}")
             raise
         review_date_dt = review_date_dt.replace(second=0, microsecond=0)
+        if review_date_dt.tzinfo is None:
+            review_date_dt = review_date_dt.replace(tzinfo=timezone.utc)
+        elif review_date_dt.tzinfo.utcoffset(review_date_dt) != timedelta(0):
+            raise ValueError("review_date must be in UTC")
         return review_date_dt.strftime(TT_DATE_FORMAT)
     else:
         raise ValueError(
@@ -359,6 +372,10 @@ def _process_single_tune_feedback(
     sitdown_date: datetime,
     alg_type: AlgorithmType,
 ) -> None:
+    if sitdown_date.tzinfo is None or sitdown_date.tzinfo.utcoffset(
+        sitdown_date
+    ) != timedelta(0):
+        raise ValueError("review_sitdown_date must be timezone aware and in UTC")
     practice_record = get_latest_practice_record(db, tune_id, playlist_ref)
     quality_int = validate_and_get_quality(tune_update, tune_id)
     if quality_int is None:

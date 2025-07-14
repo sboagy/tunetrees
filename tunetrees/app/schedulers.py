@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Tuple, Dict, Any
 from fsrs import Card, Rating, State, Scheduler, ReviewLog
 from supermemo2 import sm_two
@@ -6,6 +6,7 @@ from supermemo2 import sm_two
 
 from tunetrees.models.quality import NEW, RESCHEDULED
 from tunetrees.models.tunetrees_pydantic import AlgorithmType
+from datetime import timedelta
 
 
 # For maximum compatibility with all type checkers, alias to Dict[str, Any]
@@ -177,17 +178,27 @@ class FSRScheduler(SpacedRepetitionScheduler):
         practiced: datetime,
         quality_text: Optional[str] = None,
     ) -> ReviewResultDict:
-        # Use all arguments to avoid linter/type checker warnings
-        _ = (practiced,)
         if quality_text == NEW:
             state = State.Learning
         elif quality_text == RESCHEDULED:
             state = State.Relearning
         else:
             state = State.Review
-        card = Card(state=state, difficulty=0, stability=1.0, due=practiced)
+        # Set initial difficulty to 1.0 to avoid ZeroDivisionError in FSRS calculations
+        #     Attributes:
+        # card_id: The id of the card. Defaults to the epoch milliseconds of when the card was created.
+        # state: The card's current learning state.
+        # step: The card's current learning or relearning step or None if the card is in the Review state.
+        # stability: Core mathematical parameter used for future scheduling.
+        # difficulty: Core mathematical parameter used for future scheduling.
+        # due: The date and time when the card is due next.
+        # last_review: The date and time of the card's last review.
+        card = Card(state=state, difficulty=1.0, stability=1.0, due=practiced, step=0)
         rating = self._quality_to_fsrs_rating(quality)
-        card_reviewed, review_log = self.scheduler.review_card(card, rating)
+        card_reviewed, review_log = self.scheduler.review_card(
+            card, rating, review_datetime=practiced
+        )
+        card_reviewed.due = practiced  # Ensure the due date is set to the sitdown date
         return self._review_result(card_reviewed, review_log)
 
     @staticmethod

@@ -101,9 +101,12 @@ async def get_scheduled_tunes_overview(
     playlist_ref: str,
     show_deleted: bool = Query(False),
     show_playlist_deleted: bool = Query(False),
-    sitdown_date: Optional[datetime] = Query(None),
+    sitdown_date: datetime = Query(..., description="Review sitdown date is required"),
 ) -> list[PlaylistTuneJoinedModel]:
     try:
+        # FSRS requires dates to be timezoned, so ensure sitdown_date has a UTC timezone.
+        if sitdown_date.tzinfo is None:
+            sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
         with SessionLocal() as db:
             if DEBUG_SLOWDOWN > 0:
                 time.sleep(DEBUG_SLOWDOWN)
@@ -239,9 +242,13 @@ async def submit_schedules(
 async def submit_feedbacks(
     playlist_id: str,
     tune_updates: Dict[str, TuneFeedbackUpdate],
-    sitdown_date: Optional[datetime] = Query(None),
+    sitdown_date: datetime = Query(...),
 ):
     logger.debug(f"{tune_updates=}")
+
+    # FSRS requires dates to be timezoned, so ensure sitdown_date has a UTC timezone.
+    if sitdown_date.tzinfo is None:
+        sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
 
     update_practice_feedbacks(
         tune_updates,
