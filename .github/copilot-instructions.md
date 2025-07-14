@@ -187,24 +187,31 @@ Follow these naming conventions for Git branches to maintain consistency and ena
 - **Keep concise but descriptive** - aim for 2-4 words
 - **Include issue numbers** when applicable for traceability
 - **Lowercase only** for consistency across platforms
-- **No strict length limit** - prioritize clarity over brevity
+- **20-character limit** - keep total branch name under 20 characters using abbreviations when needed
 
 **Examples**:
 
 ```bash
-feat/user-authentication          # New authentication system
-feat/spaced-repetition-123        # Feature with issue reference
-fix/login-redirect-bug            # Bug fix
-fix/database-connection-456       # Bug fix with issue number
-docs/api-documentation            # Documentation update
-refactor/schedule-algorithm       # Code refactoring
-test/e2e-playlist-management      # Test additions
-chore/update-dependencies         # Maintenance work
-perf/optimize-query-performance   # Performance improvement
-hotfix/critical-data-loss-789     # Critical production fix
-release/v2.1.0                    # Release preparation
-experiment/new-ui-framework       # Experimental work
+feat/user-auth               # New authentication system (abbreviated)
+feat/spaced-rep-123          # Feature with issue reference (abbreviated)
+fix/login-redirect-bug       # Bug fix
+fix/db-conn-456              # Bug fix with issue number (abbreviated)
+docs/api-docs                # Documentation update (abbreviated)
+refactor/sched-algo          # Code refactoring (abbreviated)
+test/e2e-playlist-mgmt       # Test additions (abbreviated)
+chore/update-deps            # Maintenance work (abbreviated)
+perf/optimize-query-456      # Performance improvement
+hotfix/critical-fix-789      # Critical production fix
 ```
+
+test/e2e-playlist-management # Test additions
+chore/update-dependencies # Maintenance work
+perf/optimize-query-performance # Performance improvement
+hotfix/critical-data-loss-789 # Critical production fix
+release/v2.1.0 # Release preparation
+experiment/new-ui-framework # Experimental work
+
+````
 
 **Branch Management**:
 
@@ -220,7 +227,7 @@ git push -u origin feat/user-authentication
 
 # Create branch with issue reference
 git checkout -b fix/login-redirect-456
-```
+````
 
 **Integration Patterns**:
 
