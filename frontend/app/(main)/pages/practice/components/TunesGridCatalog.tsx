@@ -207,11 +207,11 @@ export default function TunesGridCatalog({
     if (alreadyInRepertoire.length > 0) {
       if (tunesToAddToPlaylist.length > 0) {
         userConfirmed = window.confirm(
-          `The following tunes are already in the current repertoir: ${alreadyInRepertoire.join(",")}. Do you want to add tunes with ids ${tunesToAddToPlaylist.join(",")} to your repertoire?`,
+          `The following tunes are already in the current repertoire: ${alreadyInRepertoire.join(",")}. Do you want to add tunes with ids ${tunesToAddToPlaylist.join(",")} to your repertoire?`,
         );
       } else {
         window.alert(
-          `All the selected tunes are already in the current repertoir: ${alreadyInRepertoire.join(",")}.`,
+          `All the selected tunes are already in the current repertoire: ${alreadyInRepertoire.join(",")}.`,
         );
         return;
       }
