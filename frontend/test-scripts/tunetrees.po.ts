@@ -213,6 +213,7 @@ export class TuneTreesPageObject {
     // Make sure the "Add To Review" button is visible
     await this.addToReviewButton.waitFor({ state: "visible" });
     await this.waitForTablePopulationToStart();
+    await this.page.waitForTimeout(2000);
   }
 
   async navigateToPracticeTab() {
@@ -255,6 +256,32 @@ export class TuneTreesPageObject {
     //   })
     //   .nth(2);
     // await expect(ttPracticeTab2).toBeVisible({ timeout: 60000 });
+  }
+
+  async navigateToIrishTenorBanjoInstrument(
+    shouldExpectZeroTable = true,
+  ): Promise<void> {
+    // Switch from default Irish Flute to Irish Tenor Banjo
+    const instrumentSelector1 = this.page
+      .getByRole("button", { name: "Instrument: Irish Flute (id-1)" })
+      .first();
+    await instrumentSelector1.waitFor({ state: "visible" });
+    await instrumentSelector1.click();
+
+    await this.page.getByText("Irish Tenor Banjo (id-18)").click();
+
+    // Verify the instrument has been switched
+    const instrumentSelector2 = this.page
+      .getByRole("button", { name: "Instrument: Irish Tenor Banjo (id-18)" })
+      .first();
+    await instrumentSelector2.waitFor({ state: "visible" });
+
+    // Conditionally check that the table shows zero entries
+    if (shouldExpectZeroTable) {
+      await expect(this.tableStatus).toContainText(
+        "0 of 0 row(s) selected., lapsed: 0, current: 0, future: 0, new: 0",
+      );
+    }
   }
 
   async clickWithTimeAfter(locator: Locator, timeout = 9000) {
@@ -345,5 +372,106 @@ export class TuneTreesPageObject {
       "Practice successfully submitted",
       { timeout: 60000 },
     );
+  }
+
+  async navigateToCatalogTab(): Promise<void> {
+    // Open the tabs menu to access Catalog
+    await this.tabsMenuButton.click();
+    await this.tabsMenuCatalogChoice.click();
+
+    await expect(this.catalogTab).toBeVisible();
+    await this.catalogTab.click();
+
+    // Verify we can see the Add To Repertoire button
+    await expect(this.addToRepertoireButton).toBeVisible();
+    await expect(this.addToRepertoireButton).toBeEnabled();
+
+    await this.page.waitForTimeout(2000);
+  }
+
+  async addTuneToSelection(tune_id: string): Promise<void> {
+    await this.page.evaluate((tuneId: number) => {
+      window.scrollToTuneById?.(tuneId);
+    }, Number(tune_id));
+
+    await this.page.waitForTimeout(1000);
+
+    const tuneCheckbox = this.page
+      .getByTestId(`${tune_id}_select`)
+      .getByTestId("tt-row-checkbox");
+
+    await expect(tuneCheckbox).toBeVisible();
+    await expect(tuneCheckbox).toBeEnabled();
+    await tuneCheckbox.check();
+    await expect(tuneCheckbox).toBeChecked();
+  }
+
+  async scrollToTuneById(tuneId: number): Promise<void> {
+    await this.page.evaluate((id: number) => {
+      if (window.scrollToTuneById) {
+        window.scrollToTuneById(id);
+      } else {
+        console.warn(`scrollToTuneById function not defined for tune ID ${id}`);
+      }
+    }, tuneId);
+    await this.page.waitForTimeout(500); // Allow time for scrolling
+  }
+
+  async expectTuneInTableAndClick(
+    tune_id: number,
+    tune_name: string,
+  ): Promise<void> {
+    await this.scrollToTuneById(tune_id);
+
+    const tuneRow = this.page
+      .getByRole("row")
+      .filter({ hasText: String(tune_id) })
+      .filter({ hasText: tune_name });
+
+    await expect(tuneRow).toBeVisible({ timeout: 10000 });
+
+    await tuneRow.click();
+  }
+
+  async expectTuneUnselected(tune_id: string): Promise<void> {
+    const tuneCheckbox = this.page
+      .getByTestId(`${tune_id}_select`)
+      .getByTestId("tt-row-checkbox");
+
+    await expect(tuneCheckbox).toBeVisible();
+    await expect(tuneCheckbox).toBeEnabled();
+
+    // Add debugging to see the actual state
+    const isChecked = await tuneCheckbox.isChecked();
+    console.log(`Tune ${tune_id} checkbox state: ${isChecked}`);
+
+    // Wait a bit for potential state changes
+    await this.page.waitForTimeout(200);
+
+    // Check state again after waiting
+    const isCheckedAfter = await tuneCheckbox.isChecked();
+    console.log(`Tune ${tune_id} checkbox state after wait: ${isCheckedAfter}`);
+
+    await expect(tuneCheckbox).not.toBeChecked({ timeout: 100 });
+  }
+
+  setupConsoleErrorHandling(): void {
+    // Set up error handling for console errors
+    this.page.on("console", (msg) => {
+      if (msg.type() === "error") {
+        console.log("Browser console error:", msg.text());
+      }
+    });
+  }
+
+  setupNetworkFailureHandling(): void {
+    // Listen for network failures
+    this.page.on("requestfailed", (request) => {
+      console.log(
+        "Network request failed:",
+        request.url(),
+        request.failure()?.errorText,
+      );
+    });
   }
 }

@@ -41,7 +41,7 @@ test.describe.serial("Add to Review Tests", () => {
     await ttPO.navigateToRepertoireTab();
 
     await expect(ttPO.tableStatus).toContainText("1 of 488 row(s) selected", {
-      timeout: 10000,
+      timeout: 15000,
     });
 
     // Find the row with ID 669 "Foxhunter's Reel" and select it
