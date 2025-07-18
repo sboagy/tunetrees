@@ -135,7 +135,7 @@ test.describe.serial("Secondary Playlist Tests - Issue 201", () => {
     console.log("test-secondary-playlist-add-to-repertoire completed");
   });
 
-  test.skip("test-secondary-playlist-switching", async ({ page }) => {
+  test("test-secondary-playlist-add-to-review", async ({ page }) => {
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
 
@@ -145,34 +145,40 @@ test.describe.serial("Secondary Playlist Tests - Issue 201", () => {
     // Navigate to the Catalog tab
     await ttPO.navigateToCatalogTab();
 
-    // Test switching between different playlists/instruments
-    // This should test the secondary playlist functionality
+    // Test for Issue 201: Secondary playlist functionality
+    // Select specific tunes to test the secondary playlist issue
+    await ttPO.addTuneToSelection("66");
+    await ttPO.addTuneToSelection("54");
 
-    // Look for playlist/instrument selector
-    const playlistSelector = page
-      .locator('[data-testid*="playlist"], [data-testid*="instrument"]')
-      .first();
-    if (await playlistSelector.isVisible()) {
-      await playlistSelector.click();
+    // Wait for button to be enabled
+    await expect(ttPO.addToRepertoireButton).toBeEnabled();
 
-      // Wait for dropdown to appear
-      await page.waitForTimeout(500);
+    await ttPO.addToRepertoireButton.click();
 
-      // Look for other playlist options
-      const playlistOptions = page.locator(
-        '[role="menuitem"], [role="option"]',
-      );
-      const optionCount = await playlistOptions.count();
+    await page.waitForTimeout(1_000);
 
-      if (optionCount > 1) {
-        // Select a different playlist
-        await playlistOptions.nth(1).click();
+    await ttPO.repertoireTabTrigger.click({ timeout: 60000 });
+    await page.waitForTimeout(2_000);
 
-        // Wait for the change to take effect
-        await page.waitForTimeout(1_000);
-      }
-    }
+    const rowCount = await ttPO.tunesGridRows.count();
+    expect(rowCount).toBe(3);
 
-    console.log("Secondary playlist switching test completed");
+    await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
+    await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
+
+    await ttPO.addTuneToSelection("66");
+    await ttPO.addTuneToSelection("54");
+
+    await expect(ttPO.addToReviewButton).toBeEnabled();
+
+    await ttPO.addToReviewButton.click();
+    await page.waitForTimeout(1_000);
+    await ttPO.practiceTabTrigger.click({ timeout: 60000 });
+    await page.waitForTimeout(1_000);
+
+    await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
+    await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
+
+    console.log("Secondary playlist 'Add To Review' completed");
   });
 });

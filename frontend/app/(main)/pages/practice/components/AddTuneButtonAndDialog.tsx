@@ -690,7 +690,7 @@ export default function AddTuneButtonAndDialog({
   const [currentGenre, setCurrentGenre] = useState<string | null>(null);
 
   useEffect(() => {
-    if (playlistId) {
+    if (playlistId && playlistId > 0) {
       getPlaylistById(playlistId)
         .then((playlist) => {
           console.log("Fetched playlist:", playlist);

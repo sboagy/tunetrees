@@ -9,6 +9,7 @@ import {
 } from "./TunesTable"; // Add this import
 
 import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 
 import type {
@@ -274,6 +275,27 @@ export default function TunesGridRepertoire({
         tableState.rowSelection = {};
         table.setState(tableState);
         void saveTableState(table, userId, "repertoire", playlistId);
+
+        // Show success toast notification
+        const tuneCount = selectedTunes.length;
+        const tuneIds = selectedTunes
+          .map((tune) => tune.id)
+          .filter((id) => id !== undefined);
+
+        const toastTitle = `${tuneCount} tune${tuneCount === 1 ? "" : "s"} added to review queue`;
+        let toastDescription = "";
+
+        if (tuneCount <= 10 && tuneIds.length > 0) {
+          toastDescription = `Tune IDs: ${tuneIds.join(", ")}`;
+        } else if (tuneCount > 10) {
+          toastDescription = "Too many tunes to list individually";
+        }
+
+        toast({
+          title: toastTitle,
+          description: toastDescription,
+          variant: "default",
+        });
       })
       .catch((error) => {
         console.error("Error submit_practice_feedbacks_result:", error);

@@ -41,6 +41,8 @@ stmt = select(PracticeRecord).where(PracticeRecord.tune_ref == tune_id)
 result = db.execute(stmt).scalars().all()
 ```
 
+**Critical Database Schema Note**: The `practice_record` table uses a unique constraint on `(tune_ref, playlist_ref, practiced)` to support historical practice record tracking. When creating new practice records, ensure unique timestamps to avoid constraint violations. The `upsert_practice_record` function automatically handles this by setting the current timestamp for new records.
+
 ### TypeScript Conventions
 
 ```typescript
@@ -140,8 +142,9 @@ npm run start  # Production build
 npm run lint  # Must pass without warnings
 npm run type-check  # TypeScript strict checking
 
-# Run frontend tests
-npx playwright test
+# Run frontend tests - MUST use the environment setup script
+./run-playwright-tests.sh [test-file-pattern]  # Properly sets up environment and database
+# Do NOT use: npx playwright test directly - it lacks proper environment setup
 ```
 
 ### Code Quality Checks
@@ -312,7 +315,16 @@ practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
 
 When creating new Playwright tests for TuneTrees:
 
-1. **Authentication & Storage State**: For features requiring login, set up storage state:
+1. **Running Tests**: ALWAYS use the environment setup script:
+
+   ```bash
+   cd frontend
+   ./run-playwright-tests.sh [test-file-pattern]
+   ```
+
+   Do NOT use `npx playwright test` directly - it lacks proper environment setup including database initialization and environment variables.
+
+2. **Authentication & Storage State**: For features requiring login, set up storage state:
 
    ```typescript
    test.use({
@@ -321,7 +333,7 @@ When creating new Playwright tests for TuneTrees:
    });
    ```
 
-2. **Test Setup (beforeEach)**: Always include proper test initialization:
+3. **Test Setup (beforeEach)**: Always include proper test initialization:
 
    ```typescript
    test.beforeEach(async ({ page }, testInfo) => {
@@ -333,9 +345,9 @@ When creating new Playwright tests for TuneTrees:
    });
    ```
 
-3. **Page Readiness**: Use `page.waitForLoadState("domcontentloaded")` for page readiness, not network idle timeouts.
+4. **Page Readiness**: Use `page.waitForLoadState("domcontentloaded")` for page readiness, not network idle timeouts.
 
-4. **Test Cleanup (afterEach)**: Always restore backend state:
+5. **Test Cleanup (afterEach)**: Always restore backend state:
 
    ```typescript
    test.afterEach(async ({ page }) => {
@@ -344,14 +356,14 @@ When creating new Playwright tests for TuneTrees:
    });
    ```
 
-5. **Page Objects**: Use existing Page Object classes from `frontend/test-scripts/`:
+6. **Page Objects**: Use existing Page Object classes from `frontend/test-scripts/`:
 
    - `tunetrees.po.ts` - Main application Page Object
    - `tune-editor.po.ts` - Specialized for tune editing workflows
    - **Add new locators to Page Objects** when you find yourself repeating the same selector paths across tests
    - Create new Page Objects following these patterns when needed
 
-6. **Defensive Testing**: Always check element visibility before interactions:
+7. **Defensive Testing**: Always check element visibility before interactions:
 
    ```typescript
    const element = page.locator("selector");
@@ -361,7 +373,7 @@ When creating new Playwright tests for TuneTrees:
    }
    ```
 
-7. **Required Imports**: Include these standard imports for TuneTrees tests:
+8. **Required Imports**: Include these standard imports for TuneTrees tests:
 
    ```typescript
    import { restartBackend } from "@/test-scripts/global-setup";
@@ -371,7 +383,7 @@ When creating new Playwright tests for TuneTrees:
    import { test, expect } from "@playwright/test";
    ```
 
-8. **Locator Management**: When adding new locators to Page Objects, follow these patterns:
+9. **Locator Management**: When adding new locators to Page Objects, follow these patterns:
 
    ```typescript
    // In Page Object file (e.g., tunetrees.po.ts)
