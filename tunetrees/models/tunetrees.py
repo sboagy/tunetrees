@@ -388,7 +388,7 @@ class Note(Base):
 class PracticeRecord(Base):
     __tablename__ = "practice_record"
     __table_args__ = (
-        UniqueConstraint("tune_ref", "playlist_ref"),
+        UniqueConstraint("tune_ref", "playlist_ref", "practiced"),
         Index("practice_record_id_index", "id"),
     )
 

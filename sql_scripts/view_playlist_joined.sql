@@ -1,5 +1,4 @@
-CREATE VIEW
-	view_playlist_joined AS
+CREATE VIEW view_playlist_joined AS
 SELECT
 	p.playlist_id,
 	p.user_ref,
@@ -13,3 +12,4 @@ SELECT
 FROM
 	playlist p
 	JOIN instrument i ON p.instrument_ref = i.id;
+

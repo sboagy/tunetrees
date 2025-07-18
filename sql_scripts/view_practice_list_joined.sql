@@ -1,4 +1,5 @@
-CREATE VIEW practice_list_joined as
+CREATE VIEW
+	practice_list_joined as
 SELECT
 	tune.id AS id,
 	COALESCE(tune_override.title, tune.title) AS title,
@@ -60,7 +61,25 @@ FROM
 	LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
 	LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
 	LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
-	LEFT JOIN practice_record ON practice_record.tune_ref = tune.id
+	LEFT JOIN (
+		SELECT
+			pr.*
+		FROM
+			practice_record pr
+			INNER JOIN (
+				SELECT
+					tune_ref,
+					playlist_ref,
+					MAX(id) as max_id
+				FROM
+					practice_record
+				GROUP BY
+					tune_ref,
+					playlist_ref
+			) latest ON pr.tune_ref = latest.tune_ref
+			AND pr.playlist_ref = latest.playlist_ref
+			AND pr.id = latest.max_id
+	) practice_record ON practice_record.tune_ref = tune.id
 	AND practice_record.playlist_ref = playlist_tune.playlist_ref
 	LEFT JOIN tag ON tag.tune_ref = COALESCE(tune_override.id, tune.id)
 WHERE
@@ -68,4 +87,3 @@ WHERE
 		tune_override.user_ref IS NULL
 		OR tune_override.user_ref = playlist.user_ref
 	);
-
