@@ -186,8 +186,9 @@ You can use either the emoji (🎨) or the text code (`:art:`) - both are equiva
 - ✨ `:sparkles:` - Introduce new features
 - 📝 `:memo:` - Add or update documentation
 - 🚀 `:rocket:` - Deploy stuff
-- � `:ambulance:` - Critical hotfix
+- 🚑 `:ambulance:` - Critical hotfix
 - ♻️ `:recycle:` - Refactor code
+- 🏗️ `:building_construction:` - Make architectural changes
 
 **Dependencies & Build:**
 
@@ -201,34 +202,48 @@ You can use either the emoji (🎨) or the text code (`:art:`) - both are equiva
 **Database & Infrastructure:**
 
 - 🗃️ `:card_file_box:` - Perform database related changes
-- 🏗️ `:building_construction:` - Make architectural changes
-- � `:loud_sound:` - Add or update logs
+- 🔊 `:loud_sound:` - Add or update logs
 - 🔇 `:mute:` - Remove logs
 
 **Frontend & UX:**
 
-- 📱 `:mobile_phone:` - Work on responsive design
-- 🚸 `:children_crossing:` - Improve user experience/usability
+- 📱 `:iphone:` - Work on responsive design
+- � `:lipstick:` - Add or update the UI and style files
+- �🚸 `:children_crossing:` - Improve user experience/usability
 - 🌐 `:globe_with_meridians:` - Internationalization (i18n)
 - ♿ `:wheelchair:` - Improve accessibility
 - 💫 `:dizzy:` - Add or update animations
 
 **Code Quality & Testing:**
 
+- ✅ `:white_check_mark:` - Add, update, or pass tests
 - 🧪 `:test_tube:` - Add or update tests
-- � `:bulb:` - Add or update comments in source code
+- 💡 `:bulb:` - Add or update comments in source code
 - 🏷️ `:label:` - Add or update types
 - 🥅 `:goal_net:` - Catch errors
 - 🤡 `:clown_face:` - Mock things
+
+**Configuration & Maintenance:**
+
+- 🔧 `:wrench:` - Change configuration files
+- ⚙️ `:gear:` - Update CI/CD pipeline
+- 🩹 `:adhesive_bandage:` - Simple fix for a non-critical issue
+- 🧹 `:broom:` - Clean up code or files
 
 **Other:**
 
 - 💬 `:speech_balloon:` - Add or update text and literals
 - 👥 `:busts_in_silhouette:` - Add or update contributor(s)
-- � `:mag:` - Improve SEO
+- 🔍 `:mag:` - Improve SEO
 - 🌱 `:seedling:` - Add or update seed files
 - 🚩 `:triangular_flag_on_post:` - Add, update, or remove feature flags
 - 🥚 `:egg:` - Add or update an easter egg
+- 🚧 `:construction:` - Work in progress
+- ⚠️ `:warning:` - Address warnings or introduce breaking changes
+- ↩️ `:leftwards_arrow_with_hook:` - Revert changes
+- ⏪ `:rewind:` - Revert previous commits
+- 🔖 `:bookmark:` - Release/Version tags
+- 🎉 `:tada:` - Begin a project
 
 **Commit Structure Best Practices:**
 
@@ -248,6 +263,56 @@ You can use either the emoji (🎨) or the text code (`:art:`) - both are equiva
 ```
 
 This approach creates cleaner git history, easier code review, and safer rollback capabilities.
+
+### Gitmoji Selection Guidelines
+
+**CRITICAL**: Always carefully examine the actual code changes before selecting gitmojis. Don't rely solely on file names or user descriptions.
+
+**Gitmoji Selection Process:**
+
+1. **Analyze the diff**: Read through the actual code changes line by line
+2. **Identify change types**: Look for patterns in the modifications (refer to the gitmoji categories in the Commit Message Guidelines section above)
+3. **Apply multiple gitmojis**: When changes span multiple categories, use multiple gitmojis in order of importance
+4. **Prioritize by impact**: Place the most significant change type first
+
+**Multiple Gitmoji Examples:**
+
+```bash
+# Database schema + frontend changes
+🗃️✨ Add user preferences table and settings UI
+
+# Bug fix + test addition
+🐛✅ Fix authentication timeout and add regression tests
+
+# Performance + refactoring + tests
+⚡️♻️🧪 Optimize query performance, refactor cache logic, and add benchmarks
+
+# UI + accessibility improvements
+💄♿ Update button styles and improve keyboard navigation
+
+# Configuration + dependency updates
+🔧⬆️ Update Docker config and upgrade Node.js dependencies
+```
+
+**Guidelines for Multiple Gitmojis:**
+
+- **Maximum 3 gitmojis** per commit to maintain readability
+- **Order by significance**: Most important change first
+- **Related changes only**: Don't combine unrelated modifications
+- **Consider splitting**: If you need 4+ gitmojis, consider multiple commits
+
+**Change Detection Checklist:**
+
+- [ ] Are new files being created? (✨ `:sparkles:`)
+- [ ] Are bugs being fixed? (🐛 `:bug:`)
+- [ ] Are tests being added/modified? (✅ `:white_check_mark:` or 🧪 `:test_tube:`)
+- [ ] Are dependencies changing? (➕➖⬆️⬇️)
+- [ ] Are UI/styles being modified? (💄 `:lipstick:`)
+- [ ] Are database schemas changing? (🗃️ `:card_file_box:`)
+- [ ] Are configuration files being updated? (🔧 `:wrench:`)
+- [ ] Is code being refactored without functional changes? (♻️ `:recycle:`)
+- [ ] Are performance optimizations being made? (⚡️ `:zap:`)
+- [ ] Is documentation being updated? (📝 `:memo:`)
 
 ### Testing Strategy
 

@@ -312,6 +312,8 @@ storageState*.json
 tree-*.txt
 frontend/playwright-reports/** */
 frontend/playwright-reports/playwright*
+playwright-reports/
+playwright-reports/**/*
 scratch/request_from_axios.txt
 scratch/request_from_swagger.txt
 frontend/scratch/shark_request_from_client.txt
