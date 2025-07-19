@@ -19,7 +19,7 @@ TuneTrees is a spaced repetition learning app for musical tunes built with FastA
 - **Next.js 15.1.3 with App Router**: Modern file-based routing in `app/` directory
 - **TypeScript**: Strict typing with `I` prefix for interfaces, **NO `any!` types allowed**
 - **Styling**: Tailwind CSS with Headless UI components
-- **UI Guidelines**: Follow `frontend/UI_STYLE_GUIDE2.md` for component patterns and design system
+- **UI Guidelines**: Comprehensive patterns in `frontend/UI_STYLE_GUIDE2.md`. Core patterns automatically included via `.github/instructions/ui-development.instructions.md` when editing frontend files
 - **Authentication**: NextAuth.js v5 beta configured in `auth.ts`
 - **State Management**: React built-in hooks + custom context providers
 - **Testing**: Playwright E2E tests in `tests/` directory
@@ -69,7 +69,7 @@ interface IApiError {
 
 ### UI/UX Development
 
-- **Style Guide**: Follow `frontend/UI_STYLE_GUIDE2.md` for all component development
+- **Style Guide**: Comprehensive UI patterns in `frontend/UI_STYLE_GUIDE2.md`, with core patterns automatically included for frontend development
 - **Tailwind CSS**: Utility-first styling approach
 - **Headless UI**: Accessible component primitives
 - **Responsive design**: Mobile-first approach
@@ -154,6 +154,101 @@ npm run type-check  # TypeScript strict checking
 - **Prettier**: Consistent formatting enforced
 - **Type checking**: Full TypeScript compilation without errors
 
+### Git Operations & GitHub Integration
+
+**IMPORTANT**: Always use the GitHub MCP server tools for git operations instead of basic `git` commands when available. The GitHub MCP server provides:
+
+- Better GitHub API integration with proper authentication
+- Richer metadata and PR/issue association
+- GitHub-specific features like workflow triggers
+- Superior error handling for GitHub operations
+
+**Preferred tools for commits:**
+
+- `mcp_github_push_files` - For pushing multiple files in a single commit
+- `mcp_github_create_pull_request` - For creating commits via GitHub API
+- `mcp_github_update_pull_request` - For updating PR with commit information
+
+**Only fall back to basic `git` commands if GitHub MCP server tools are unavailable.**
+
+### Commit Message Guidelines
+
+**REQUIRED**: Always use gitmojis to lead commit messages for clear visual categorization.
+
+You can use either the emoji (🎨) or the text code (`:art:`) - both are equivalent:
+
+**Core Development:**
+
+- 🎨 `:art:` - Improve structure/format of the code
+- ⚡️ `:zap:` - Improve performance
+- 🔥 `:fire:` - Remove code or files
+- 🐛 `:bug:` - Fix a bug
+- ✨ `:sparkles:` - Introduce new features
+- 📝 `:memo:` - Add or update documentation
+- 🚀 `:rocket:` - Deploy stuff
+- � `:ambulance:` - Critical hotfix
+- ♻️ `:recycle:` - Refactor code
+
+**Dependencies & Build:**
+
+- ➕ `:heavy_plus_sign:` - Add or update dependencies
+- ➖ `:heavy_minus_sign:` - Remove a dependency
+- ⬆️ `:arrow_up:` - Upgrade a dependency
+- ⬇️ `:arrow_down:` - Downgrade a dependency
+- 🔨 `:hammer:` - Add or update build scripts
+- 📦 `:package:` - Add or update compiled files or packages
+
+**Database & Infrastructure:**
+
+- 🗃️ `:card_file_box:` - Perform database related changes
+- 🏗️ `:building_construction:` - Make architectural changes
+- � `:loud_sound:` - Add or update logs
+- 🔇 `:mute:` - Remove logs
+
+**Frontend & UX:**
+
+- 📱 `:mobile_phone:` - Work on responsive design
+- 🚸 `:children_crossing:` - Improve user experience/usability
+- 🌐 `:globe_with_meridians:` - Internationalization (i18n)
+- ♿ `:wheelchair:` - Improve accessibility
+- 💫 `:dizzy:` - Add or update animations
+
+**Code Quality & Testing:**
+
+- 🧪 `:test_tube:` - Add or update tests
+- � `:bulb:` - Add or update comments in source code
+- 🏷️ `:label:` - Add or update types
+- 🥅 `:goal_net:` - Catch errors
+- 🤡 `:clown_face:` - Mock things
+
+**Other:**
+
+- 💬 `:speech_balloon:` - Add or update text and literals
+- 👥 `:busts_in_silhouette:` - Add or update contributor(s)
+- � `:mag:` - Improve SEO
+- 🌱 `:seedling:` - Add or update seed files
+- 🚩 `:triangular_flag_on_post:` - Add, update, or remove feature flags
+- 🥚 `:egg:` - Add or update an easter egg
+
+**Commit Structure Best Practices:**
+
+- **Break commits into logical units** when possible (e.g., separate backend fixes, database changes, and frontend improvements)
+- **Each commit should have a single clear purpose** that can be described in the first line
+- **Use descriptive commit bodies** with bullet points for multiple changes
+- **Reference issues/PRs** when applicable
+- **Follow conventional commit format**: `<gitmoji> <type>: <description>`
+- **Always ask for user approval** before executing commits - present the proposed commit message(s) and wait for confirmation
+
+**Example Multi-Commit Approach:**
+
+```
+🔒 Fix authentication constraint violation in user endpoint
+🗃️ Update database schema for historical user tracking
+✨ Add frontend validation and improve user experience
+```
+
+This approach creates cleaner git history, easier code review, and safer rollback capabilities.
+
 ### Testing Strategy
 
 - **Backend**: pytest in `tests/` directory with GitHub Actions CI
@@ -205,16 +300,9 @@ test/e2e-playlist-mgmt       # Test additions (abbreviated)
 chore/update-deps            # Maintenance work (abbreviated)
 perf/optimize-query-456      # Performance improvement
 hotfix/critical-fix-789      # Critical production fix
+release/v2.1.0               # Release preparation
+experiment/new-ui-framework  # Experimental work
 ```
-
-test/e2e-playlist-management # Test additions
-chore/update-dependencies # Maintenance work
-perf/optimize-query-performance # Performance improvement
-hotfix/critical-data-loss-789 # Critical production fix
-release/v2.1.0 # Release preparation
-experiment/new-ui-framework # Experimental work
-
-````
 
 **Branch Management**:
 
@@ -230,7 +318,7 @@ git push -u origin feat/user-authentication
 
 # Create branch with issue reference
 git checkout -b fix/login-redirect-456
-````
+```
 
 **Integration Patterns**:
 
@@ -409,7 +497,7 @@ When creating new Playwright tests for TuneTrees:
 - `main.py`: API structure and dependency injection patterns
 - `frontend/app/`: Next.js App Router pages and layouts
 - `frontend/components/`: Reusable UI components with Tailwind CSS
-- `frontend/UI_STYLE_GUIDE2.md`: UI component patterns and design system
+- `frontend/UI_STYLE_GUIDE2.md`: Complete UI component patterns and design system
 - `compose.yaml`: Production deployment configuration
 - `docker-bake.hcl`: Multi-platform container build configuration
 
@@ -419,4 +507,4 @@ When creating new Playwright tests for TuneTrees:
 - **Clean lints**: All ESLint rules must pass without warnings
 - **Proper formatting**: Consistent code style via Prettier
 - **Type safety**: Full TypeScript compilation without errors
-- **UI consistency**: Follow `frontend/UI_STYLE_GUIDE2.md` for all UI components
+- **UI consistency**: Comprehensive patterns in `frontend/UI_STYLE_GUIDE2.md`, with core patterns automatically included for frontend development
