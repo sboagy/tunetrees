@@ -1559,9 +1559,33 @@ def upsert_practice_record(
                         f"Generated timestamp {current_time} for new practice record"
                     )
                 else:
+                    # Check if a record with this timestamp already exists to avoid unique constraint violation
+                    import datetime
+
+                    frontend_timestamp = update_data["practiced"]
                     logger.debug(
-                        f"Using frontend-provided timestamp {update_data['practiced']} for new practice record"
+                        f"Using frontend-provided timestamp {frontend_timestamp} for new practice record"
                     )
+
+                    # Check for existing record with same timestamp
+                    conflict_stmt = select(PracticeRecord).where(
+                        PracticeRecord.playlist_ref == playlist_ref,
+                        PracticeRecord.tune_ref == tune_ref,
+                        PracticeRecord.practiced == frontend_timestamp,
+                    )
+                    existing_record = db.execute(conflict_stmt).scalar_one_or_none()
+
+                    if existing_record:
+                        # Increment by one second to avoid unique constraint violation
+                        dt = datetime.datetime.strptime(
+                            frontend_timestamp, "%Y-%m-%d %H:%M:%S"
+                        )
+                        dt += datetime.timedelta(seconds=1)
+                        new_timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        update_data["practiced"] = new_timestamp
+                        logger.debug(
+                            f"Incremented timestamp to {new_timestamp} to avoid constraint violation"
+                        )
 
                 db_record = PracticeRecord(
                     playlist_ref=playlist_ref, tune_ref=tune_ref, **update_data
