@@ -306,12 +306,15 @@ temp_empty.sqlite3
 temp_production_baseline.sqlite3
 temp_production_for_baseline.sqlite3
 test_migration.sqlite3
+production_baseline.sqlite3
 fastapi.pid
 storageStateSboagyLogin.json
 storageState*.json
 tree-*.txt
 frontend/playwright-reports/** */
 frontend/playwright-reports/playwright*
+playwright-reports/
+playwright-reports/**/*
 scratch/request_from_axios.txt
 scratch/request_from_swagger.txt
 frontend/scratch/shark_request_from_client.txt

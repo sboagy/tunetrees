@@ -26,13 +26,25 @@ fi
 echo -e "${YELLOW}This script generates a new Alembic migration based on your model changes.${NC}"
 echo ""
 echo "Before running this:"
-echo "1. Make sure you've updated your SQLAlchemy models in tunetrees/models/"
-echo "2. Test your changes locally"
+echo "1. Make schema changes directly in tunetrees_test_clean.sqlite3 using database tools"
+echo "2. Regenerate SQLAlchemy models: sqlacodegen_v2 sqlite:///tunetrees_test_clean.sqlite3 > tunetrees/models/tunetrees.py"
+echo "3. Test your changes locally"
 echo ""
 
-read -p "Have you made and tested your model changes? (y/n): " changes_ready
+read -p "Have you made schema changes and regenerated SQLAlchemy models? (y/n): " changes_ready
 if [[ "$changes_ready" != "y" && "$changes_ready" != "Y" ]]; then
-    echo "Please make your model changes first, then run this script again."
+    echo "Please make your schema changes and regenerate models first, then run this script again."
+    echo "Remember: sqlacodegen_v2 sqlite:///tunetrees_test_clean.sqlite3 > tunetrees/models/tunetrees.py"
+    exit 1
+fi
+
+# Download current production database for migration generation
+echo ""
+echo -e "${YELLOW}Downloading current production database...${NC}"
+if scp -i ~/.ssh/id_rsa_ttdroplet sboag@165.227.182.140:tunetrees/tunetrees.sqlite3 tunetrees_production.sqlite3; then
+    echo -e "${GREEN}✓ Production database downloaded successfully${NC}"
+else
+    echo "ERROR: Failed to download production database. Check your SSH connection and credentials."
     exit 1
 fi
 
@@ -47,12 +59,9 @@ fi
 echo ""
 echo "Generating migration: $migration_msg"
 
-# Configure Alembic to use target database (tunetrees_test_clean.sqlite3) 
-# This represents the schema we want to achieve
-echo "Configuring Alembic to compare against target schema..."
-sed -i '' 's|sqlalchemy.url = .*|sqlalchemy.url = sqlite:///./tunetrees_test_clean.sqlite3|' alembic.ini
-
-# Generate the migration - this will compare current baseline against target schema
+# Generate the migration - Alembic compares migration history vs SQLAlchemy models
+# (SQLAlchemy models should be generated from tunetrees_test_clean.sqlite3)
+echo "Generating migration from current state to target schema..."
 alembic revision --autogenerate -m "$migration_msg"
 
 # Get the most recent migration file

@@ -178,6 +178,8 @@ export function TunesTableComponent({
     console.log(
       `LF7 ==>TunesTableComponent<== (interceptedRowSelectionChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}, ${JSON.stringify(newRowSelectionState)}}`,
     );
+
+    // Save the table state (fire and forget for now to avoid blocking the UI)
     void saveTableState(table, userId, tablePurpose, playlistId);
 
     if (selectionChangedCallback) {

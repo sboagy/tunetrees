@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import ColumnsMenu from "./ColumnsMenu";
-import { useTunesTable } from "./TunesTable"; // Add this import
+import { useTunesTable, saveTableState } from "./TunesTable"; // Add this import
 
 import { Input } from "@/components/ui/input";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
@@ -207,11 +207,11 @@ export default function TunesGridCatalog({
     if (alreadyInRepertoire.length > 0) {
       if (tunesToAddToPlaylist.length > 0) {
         userConfirmed = window.confirm(
-          `The following tunes are already in the current repertoir: ${alreadyInRepertoire.join(",")}. Do you want to add tunes with ids ${tunesToAddToPlaylist.join(",")} to your repertoire?`,
+          `The following tunes are already in the current repertoire: ${alreadyInRepertoire.join(",")}. Do you want to add tunes with ids ${tunesToAddToPlaylist.join(",")} to your repertoire?`,
         );
       } else {
         window.alert(
-          `All the selected tunes are already in the current repertoir: ${alreadyInRepertoire.join(",")}.`,
+          `All the selected tunes are already in the current repertoire: ${alreadyInRepertoire.join(",")}.`,
         );
         return;
       }
@@ -242,21 +242,34 @@ export default function TunesGridCatalog({
           console.error("Error adding tune to repertoire:", error);
         });
     }
-    const rows = table.getSelectedRowModel().rows;
-    for (const row of rows) {
-      console.log("Selected row:", row.original);
-      row.toggleSelected();
-    }
-    setRepertoireTunesRefreshId(0);
 
-    // const rowSelectionCopy = { ...table.getState().rowSelection };
-    // for (const tuneId of tunesToAddToPlaylist) {
-    //   delete rowSelectionCopy[tuneId];
-    // }
-    // table.setState({ ...table.getState(), rowSelection: rowSelectionCopy });
-    // const status = await saveTableState(table, userId, "catalog");
-    // console.log("saveTableState status:", status);
-    // triggerRefresh();
+    // Clear all row selections - the original logic was incorrect
+    // Row selection keys are row indices as strings, not tune IDs
+    table.setRowSelection({});
+
+    // Wait a moment for the table state to update
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Save the table state with cleared selections
+    try {
+      const status = await saveTableState(table, userId, "catalog", playlistId);
+      console.log("saveTableState status:", status);
+
+      // Check for HTTP success status codes (200-299)
+      if (status >= 200 && status < 300) {
+        console.log("Table state saved successfully with cleared selections");
+      } else {
+        console.warn(
+          `Table state save returned status: ${status}, but continuing...`,
+        );
+      }
+    } catch (error) {
+      console.error("Error saving table state with cleared selections:", error);
+      // Don't fail the operation - the selections are cleared in memory
+    }
+
+    setRepertoireTunesRefreshId(0);
+    triggerRefresh();
   };
 
   return (

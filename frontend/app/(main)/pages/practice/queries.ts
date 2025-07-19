@@ -1358,17 +1358,17 @@ export async function createPracticeRecord(
   return res.data;
 }
 
-// export async function updatePracticeRecord(
-//   tuneRef: number,
-//   playlistRef: number,
-//   record: Partial<IPracticeRecord>,
-// ): Promise<IPracticeRecord> {
-//   const res = await client.patch<IPracticeRecord>(
-//     `/practice_record/${playlistRef}/${tuneRef}`,
-//     record,
-//   );
-//   return res.data;
-// }
+export async function updatePracticeRecord(
+  tuneRef: number,
+  playlistRef: number,
+  record: Partial<IPracticeRecord>,
+): Promise<IPracticeRecord> {
+  const res = await client.patch<IPracticeRecord>(
+    `/practice_record/${playlistRef}/${tuneRef}`,
+    record,
+  );
+  return res.data;
+}
 
 export async function upsertPracticeRecord(
   tuneRef: number,

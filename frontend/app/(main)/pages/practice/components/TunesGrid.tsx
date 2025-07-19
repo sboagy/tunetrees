@@ -186,6 +186,45 @@ const TunesGrid = ({
     }
   }, [currentTune, currentTablePurpose, table, rowVirtualizer]);
 
+  useEffect(() => {
+    function scrollToTuneById(tuneId: number, attempt = 0) {
+      const numberOfAttempts = 6;
+      if (attempt >= numberOfAttempts) {
+        console.log(
+          `scrollToTuneById: Failed to find row for tuneId=${tuneId} after ${numberOfAttempts} attempts`,
+        );
+        return;
+      }
+      const rowIndex = table
+        .getRowModel()
+        .rows.findIndex((row) => row.original.id === tuneId);
+
+      if (rowIndex !== -1 && tuneId !== null) {
+        rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
+
+        if (rowRefs.current[tuneId]) {
+          rowRefs.current[tuneId].scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      } else {
+        setTimeout(
+          () => scrollToTuneById(tuneId, attempt + 1),
+          20 + attempt * 100,
+        );
+      }
+    }
+
+    // Attach to window for external usage
+    window.scrollToTuneById = scrollToTuneById;
+
+    // Cleanup on unmount
+    return () => {
+      window.scrollToTuneById = undefined;
+    };
+  }, [table, rowVirtualizer]);
+
   return (
     <tableContext.Provider value={table}>
       <div
@@ -245,6 +284,7 @@ const TunesGrid = ({
                   marginTop: "2px",
                   height: `${totalSize}px`, // Set the total height for the body
                 }}
+                data-testid="tunes-grid-body"
               >
                 {virtualRows.map((virtualRow: VirtualItem) => {
                   const row = table.getRowModel().rows[virtualRow.index];

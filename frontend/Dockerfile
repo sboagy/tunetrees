@@ -140,6 +140,9 @@ ENV NODE_ENV=production
 # in terminal. Maybe do this only in a dev container later.
 RUN apk --no-cache add curl
 
+# Create the cache directory with proper permissions before switching to node user
+RUN mkdir -p /usr/src/app/.next/cache && chown -R node:node /usr/src/app/.next/cache
+
 # Run the application as a non-root user.
 USER node
 

@@ -1425,9 +1425,14 @@ async def get_view_playlist_joined(
 def get_practice_record(playlist_ref: int, tune_ref: int) -> PracticeRecordModel:
     try:
         with SessionLocal() as db:
-            stmt = select(PracticeRecord).where(
-                PracticeRecord.playlist_ref == playlist_ref,
-                PracticeRecord.tune_ref == tune_ref,
+            # Get the latest practice record for this tune/playlist combination
+            stmt = (
+                select(PracticeRecord)
+                .where(
+                    PracticeRecord.playlist_ref == playlist_ref,
+                    PracticeRecord.tune_ref == tune_ref,
+                )
+                .order_by(PracticeRecord.id.desc())
             )
             record = db.execute(stmt).scalar_one_or_none()
 
@@ -1481,9 +1486,14 @@ def update_practice_record_patch(
 ) -> PracticeRecordModel:
     try:
         with SessionLocal() as db:
-            stmt = select(PracticeRecord).where(
-                PracticeRecord.playlist_ref == playlist_ref,
-                PracticeRecord.tune_ref == tune_ref,
+            # Get the latest practice record for this tune/playlist combination
+            stmt = (
+                select(PracticeRecord)
+                .where(
+                    PracticeRecord.playlist_ref == playlist_ref,
+                    PracticeRecord.tune_ref == tune_ref,
+                )
+                .order_by(PracticeRecord.id.desc())
             )
             db_record = db.execute(stmt).scalar_one_or_none()
 
@@ -1518,9 +1528,14 @@ def upsert_practice_record(
 ) -> PracticeRecordModel:
     try:
         with SessionLocal() as db:
-            stmt = select(PracticeRecord).where(
-                PracticeRecord.playlist_ref == playlist_ref,
-                PracticeRecord.tune_ref == tune_ref,
+            # Get the latest practice record for this tune/playlist combination
+            stmt = (
+                select(PracticeRecord)
+                .where(
+                    PracticeRecord.playlist_ref == playlist_ref,
+                    PracticeRecord.tune_ref == tune_ref,
+                )
+                .order_by(PracticeRecord.id.desc())
             )
             db_record = db.execute(stmt).scalar_one_or_none()
 
@@ -1536,11 +1551,53 @@ def upsert_practice_record(
                     f"Creating new practice record for playlist_ref={playlist_ref}, tune_ref={tune_ref}"
                 )
             else:
-                # Update existing record
-                for key, value in update_data.items():
-                    setattr(db_record, key, value)
+                # For historical tracking, always create a new record instead of updating
+                # This preserves the historical practice data
+                # Use the practiced date from the frontend if provided, otherwise generate one
+                if "practiced" not in update_data or not update_data["practiced"]:
+                    # Only generate a timestamp if none was provided by the frontend
+                    import datetime
+
+                    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    update_data["practiced"] = current_time
+                    logger.debug(
+                        f"Generated timestamp {current_time} for new practice record"
+                    )
+                else:
+                    # Check if a record with this timestamp already exists to avoid unique constraint violation
+                    import datetime
+
+                    frontend_timestamp = update_data["practiced"]
+                    logger.debug(
+                        f"Using frontend-provided timestamp {frontend_timestamp} for new practice record"
+                    )
+
+                    # Check for existing record with same timestamp
+                    conflict_stmt = select(PracticeRecord).where(
+                        PracticeRecord.playlist_ref == playlist_ref,
+                        PracticeRecord.tune_ref == tune_ref,
+                        PracticeRecord.practiced == frontend_timestamp,
+                    )
+                    existing_record = db.execute(conflict_stmt).scalar_one_or_none()
+
+                    if existing_record:
+                        # Increment by one second to avoid unique constraint violation
+                        dt = datetime.datetime.strptime(
+                            frontend_timestamp, "%Y-%m-%d %H:%M:%S"
+                        )
+                        dt += datetime.timedelta(seconds=1)
+                        new_timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        update_data["practiced"] = new_timestamp
+                        logger.debug(
+                            f"Incremented timestamp to {new_timestamp} to avoid constraint violation"
+                        )
+
+                db_record = PracticeRecord(
+                    playlist_ref=playlist_ref, tune_ref=tune_ref, **update_data
+                )
+                db.add(db_record)
                 logger.debug(
-                    f"Updating practice record for playlist_ref={playlist_ref}, tune_ref={tune_ref}"
+                    f"Creating new practice record for playlist_ref={playlist_ref}, tune_ref={tune_ref} (historical tracking)"
                 )
 
             db.commit()
@@ -1564,9 +1621,14 @@ def upsert_practice_record(
 def delete_practice_record(playlist_ref: int, tune_ref: int) -> None:
     try:
         with SessionLocal() as db:
-            stmt = select(PracticeRecord).where(
-                PracticeRecord.playlist_ref == playlist_ref,
-                PracticeRecord.tune_ref == tune_ref,
+            # Get the latest practice record for this tune/playlist combination
+            stmt = (
+                select(PracticeRecord)
+                .where(
+                    PracticeRecord.playlist_ref == playlist_ref,
+                    PracticeRecord.tune_ref == tune_ref,
+                )
+                .order_by(PracticeRecord.id.desc())
             )
             db_record = db.execute(stmt).scalar_one_or_none()
             if not db_record:

@@ -221,6 +221,7 @@ def get_latest_practice_record(
         practice_record: PracticeRecord = row_result_tuple[0]
         return practice_record
     else:
+        # Return a new practice record with default values for a first-time tune
         practice_record = PracticeRecord(
             id=None,
             tune_ref=tune_id,
@@ -234,7 +235,6 @@ def get_latest_practice_record(
             quality=0,
             practiced="",
         )
-        # db.add(practice_record)
         return practice_record
 
 
@@ -376,7 +376,9 @@ def _process_single_tune_feedback(
         sitdown_date
     ) != timedelta(0):
         raise ValueError("review_sitdown_date must be timezone aware and in UTC")
-    practice_record = get_latest_practice_record(db, tune_id, playlist_ref)
+
+    # Get the latest practice record for reference, but always create a new one
+    latest_practice_record = get_latest_practice_record(db, tune_id, playlist_ref)
     quality_int = validate_and_get_quality(tune_update, tune_id)
     if quality_int is None:
         return
@@ -412,7 +414,7 @@ def _process_single_tune_feedback(
             quality_text=quality_str,
         )
     else:
-        last_review_str = practice_record.review_date
+        last_review_str = latest_practice_record.review_date
 
         if last_review_str:
             try:
@@ -427,13 +429,13 @@ def _process_single_tune_feedback(
 
         review_result_dict = scheduler.review(
             quality=quality_int,
-            easiness=practice_record.easiness,
-            interval=practice_record.interval,
-            repetitions=practice_record.repetitions,
+            easiness=latest_practice_record.easiness,
+            interval=latest_practice_record.interval,
+            repetitions=latest_practice_record.repetitions,
             practiced=sitdown_date,
-            stability=getattr(practice_record, "stability", None),
-            difficulty=getattr(practice_record, "difficulty", None),
-            step=getattr(practice_record, "step", None),
+            stability=getattr(latest_practice_record, "stability", None),
+            difficulty=getattr(latest_practice_record, "difficulty", None),
+            step=getattr(latest_practice_record, "step", None),
             last_review=last_review,
         )
 
@@ -443,14 +445,23 @@ def _process_single_tune_feedback(
     else:
         review_date_str = parse_review_date(review_dt)
 
-    practice_record.easiness = review_result_dict.get("easiness")
-    practice_record.difficulty = review_result_dict.get("difficulty")
-    practice_record.interval = review_result_dict.get("interval")
-    practice_record.step = review_result_dict.get("step")
-    practice_record.repetitions = review_result_dict.get("repetitions")
-    practice_record.review_date = review_date_str
-    practice_record.quality = quality_int
-    practice_record.practiced = sitdown_date.strftime(TT_DATE_FORMAT)
+    # Always create a new practice record for historical tracking
+    new_practice_record = PracticeRecord(
+        id=None,
+        tune_ref=tune_id,
+        playlist_ref=playlist_ref,
+        easiness=review_result_dict.get("easiness"),
+        difficulty=review_result_dict.get("difficulty"),
+        interval=review_result_dict.get("interval"),
+        step=review_result_dict.get("step"),
+        repetitions=review_result_dict.get("repetitions"),
+        review_date=review_date_str,
+        quality=quality_int,
+        practiced=sitdown_date.strftime(TT_DATE_FORMAT),
+    )
+
+    # Always add the new practice record to the database
+    db.add(new_practice_record)
 
 
 class TuneScheduleUpdate(TypedDict):

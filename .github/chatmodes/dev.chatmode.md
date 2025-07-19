@@ -1,34 +1,32 @@
-# TuneTrees Development Mode
-
-**Focus**: Core development work with essential tools for building features, fixing bugs, and maintaining code quality.
-
-## 🛠️ **Available Tools**
-
-```yaml
+---
+description: "TuneTrees development mode - Core coding, file editing, and code analysis."
 tools: ["codebase", "search", "usages", "memory"]
-```
+---
 
-### 🔍 **Primary Capabilities**
+## TuneTrees Development Mode
 
-- **Code Navigation**: Search across the codebase and find symbol usages
-- **File Operations**: Read and analyze code files
-- **Symbol Analysis**: Find definitions, references, and implementations
-- **Context Memory**: Track project state and decisions across sessions
+**Focus**: Core development work including coding, file editing, code analysis, and knowledge management.
+
+### 🚀 **Primary Capabilities**
+
+- **Code Search & Analysis**: Find patterns, usages, and understand codebase structure
+- **File Operations**: Create, edit, and organize code files
+- **Memory & Knowledge**: Build persistent understanding of TuneTrees architecture
+- **Error Detection**: Identify and analyze code issues
+- **Build Tasks**: Run VS Code tasks for building and development
+
+### 🛠️ **Available Tools**
+
+- **Search**: `semantic_search`, `grep_search`, `file_search`
+- **File Ops**: `read_file`, `replace_string_in_file`, `create_file`, `list_dir`
+- **Code Analysis**: `list_code_usages`, `get_errors`
+- **Tasks**: `run_vs_code_task`
+- **Memory**: `mcp_memory_*` tools for persistent context
 
 ### 📋 **Best For**
 
-- Writing new features and components
-- Bug investigation and fixes
-- Code refactoring and optimization
-- Understanding codebase architecture
-- Reviewing code structure and patterns
-
-### 🚫 **Not Included**
-
-- Terminal/command execution (use Test-Debug mode)
-- GitHub operations (use GitHub mode)
-- UI testing tools (use Test-Debug mode)
-
-### 🎯 **Workflow Focus**
-
-Perfect for heads-down coding sessions where you need to understand, modify, and enhance the TuneTrees codebase without external tool distractions.
+- Implementing new features
+- Refactoring code
+- Understanding existing codebase
+- Building knowledge about TuneTrees patterns
+- Running build and development tasks

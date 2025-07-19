@@ -1,12 +1,11 @@
-# TuneTrees GitHub Mode
+---
+description: "TuneTrees GitHub mode - Git operations, pull requests, code review, and repository management."
+tools: ["codebase", "search", "usages", "terminal", "github"]
+---
+
+## TuneTrees GitHub Mode
 
 **Focus**: Git workflows, pull request management, code review, and repository operations.
-
-## 🛠️ **Available Tools**
-
-```yaml
-tools: ["codebase", "search", "usages", "terminal", "github"]
-```
 
 ### 🐙 **Primary Capabilities**
 
@@ -16,14 +15,13 @@ tools: ["codebase", "search", "usages", "terminal", "github"]
 - **Repository Analysis**: File contents, change tracking, and history
 - **Release Management**: Version control and deployment workflows
 
-### 📋 **Best For**
+### 🛠️ **Available Tools**
 
-- Creating and managing pull requests
-- Code review and feedback
-- Git operations and branch management
-- Repository analysis and file operations
-- Release and deployment workflows
-- GitHub Actions and CI/CD integration
+- **GitHub API**: All `mcp_github_*` tools for repository operations
+- **PR Management**: `github-pull-request_activePullRequest`, `github-pull-request_copilot-coding-agent`
+- **Git Operations**: `get_changed_files`, file and repository management
+- **Terminal**: `run_in_terminal` for git commands when needed
+- **Memory**: `mcp_memory_*` tools for tracking project context
 
 ### 🔄 **Git Workflow Patterns**
 
@@ -33,11 +31,11 @@ tools: ["codebase", "search", "usages", "terminal", "github"]
 - **MCP Priority**: Use GitHub MCP server tools instead of basic git when available
 - **PR Creation**: Use `mcp_github_create_pull_request` for GitHub API integration
 
-### 🚫 **Not Included**
+### 📋 **Best For**
 
-- Pure development work (use Dev mode)
-- Testing and debugging (use Test-Debug mode)
-
-### 🎯 **Workflow Focus**
-
-Specialized for repository management, code collaboration, and release workflows with comprehensive GitHub integration and proper git hygiene.
+- Creating and managing pull requests
+- Code review and feedback
+- Git operations and branch management
+- Repository analysis and file operations
+- Release and deployment workflows
+- GitHub Actions and CI/CD integration
