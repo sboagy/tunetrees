@@ -265,21 +265,47 @@ export class TuneTreesPageObject {
     const instrumentSelector1 = this.page
       .getByRole("button", { name: "Instrument: Irish Flute (id-1)" })
       .first();
-    await instrumentSelector1.waitFor({ state: "visible" });
+    
+    // Wait for the button to be visible and enabled
+    await instrumentSelector1.waitFor({ state: "visible", timeout: 30000 });
+    await instrumentSelector1.waitFor({ state: "attached", timeout: 30000 });
+    await expect(instrumentSelector1).toBeEnabled({ timeout: 30000 });
+    
+    // Click to open the dropdown
     await instrumentSelector1.click();
 
-    await this.page.getByText("Irish Tenor Banjo (id-18)").click();
+    // Wait for the dropdown menu to be visible
+    const dropdownMenu = this.page.locator('[role="menu"]').first();
+    await dropdownMenu.waitFor({ state: "visible", timeout: 10000 });
 
-    // Verify the instrument has been switched
+    // Wait for the specific Irish Tenor Banjo option to be visible and clickable
+    const tenorBanjoOption = this.page.getByText("Irish Tenor Banjo (id-18)");
+    await tenorBanjoOption.waitFor({ state: "visible", timeout: 10000 });
+    await tenorBanjoOption.waitFor({ state: "attached", timeout: 10000 });
+    
+    // Add a small delay to ensure the dropdown is fully rendered
+    await this.page.waitForTimeout(500);
+    
+    // Click the Irish Tenor Banjo option
+    await tenorBanjoOption.click();
+
+    // Wait for the dropdown to close
+    await dropdownMenu.waitFor({ state: "detached", timeout: 10000 });
+
+    // Verify the instrument has been switched - wait longer for the UI to update
     const instrumentSelector2 = this.page
       .getByRole("button", { name: "Instrument: Irish Tenor Banjo (id-18)" })
       .first();
-    await instrumentSelector2.waitFor({ state: "visible" });
+    await instrumentSelector2.waitFor({ state: "visible", timeout: 30000 });
+
+    // Wait for any network requests to complete
+    await this.page.waitForTimeout(1000);
 
     // Conditionally check that the table shows zero entries
     if (shouldExpectZeroTable) {
       await expect(this.tableStatus).toContainText(
         "0 of 0 row(s) selected., lapsed: 0, current: 0, future: 0, new: 0",
+        { timeout: 30000 },
       );
     }
   }
