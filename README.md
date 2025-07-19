@@ -143,13 +143,6 @@ The TuneTrees project includes several SQLite database files that serve differen
 - Copied to `tunetrees_test.sqlite3` (ignored) for each test run
 - **Always tracked in git** - serves as the target schema for migrations
 
-**`production_baseline.sqlite3`** - **Clean Schema Baseline**
-
-- Contains database schema without production data
-- Used by Alembic for clean schema comparisons during migration generation
-- Represents the baseline schema that production databases start from
-- **Tracked in git** - provides stable reference for migration system
-
 **`true_production_baseline.sqlite3`** - **Production Data Snapshot**
 
 - Snapshot of actual production database at a specific point in time
@@ -163,15 +156,16 @@ The following database files are generated during development and are ignored by
 
 - `tunetrees.sqlite3` - Main development database (working copy)
 - `tunetrees_test.sqlite3` - Transient test database (copied from clean version)
-- `tunetrees_production.sqlite3` - Downloaded production database for migration
+- `tunetrees_production.sqlite3` - Downloaded production database for migration operations
+- `production_baseline.sqlite3` - Clean schema reference (generated when needed)
 - `*_temp_*.sqlite3` - Temporary files created during migration processes
 
 #### Database File Workflow
 
 1. **Schema Changes**: Made directly in `tunetrees_test_clean.sqlite3` using database tools
-2. **Migration Generation**: Alembic compares `production_baseline.sqlite3` vs `tunetrees_test_clean.sqlite3`
+2. **Migration Generation**: `scripts/generate_migration.sh` automatically downloads production database and compares migration history vs target schema
 3. **Migration Testing**: Uses `true_production_baseline.sqlite3` to verify data preservation
-4. **Production Deployment**: Downloads live production database and applies migrations
+4. **Production Deployment**: Applies migrations to live production database
 
 For detailed information about database migrations, see [Database Migration with Alembic](docs/database-migration-alembic.md).
 
@@ -250,7 +244,7 @@ erDiagram
         TEXT alg_type PK
         INTEGER user_id PK, FK
         TEXT fsrs_weights
-        REAL request_retention
+        REAL request_3retention
         INTEGER maximum_interval
     }
     SESSION {
@@ -442,7 +436,7 @@ pip install "sqlacodegen-v2 ~= 0.1.4"
 Then, generate the `tunetrees.py` python file which will contain the TuneTrees ORM code.
 
 ```bash
-sqlacodegen_v2 sqlite:///tunetrees.sqlite3 > tunetrees/models/tunetrees.py
+sqlacodegen_v2 sqlite:///tunetrees_test_clean.sqlite3 > tunetrees/models/tunetrees.py
 ```
 
 Then remove the extra `from sqlalchemy.orm.base import Mapped` line from the generated code.
