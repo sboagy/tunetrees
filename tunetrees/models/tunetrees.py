@@ -390,6 +390,13 @@ class PracticeRecord(Base):
     __table_args__ = (
         UniqueConstraint("tune_ref", "playlist_ref", "practiced"),
         Index("practice_record_id_index", "id"),
+        Index("practice_record_practiced_index", "practiced"),
+        Index(
+            "practice_record_tune_playlist_practiced_index",
+            "tune_ref",
+            "playlist_ref",
+            "practiced",
+        ),
     )
 
     id = mapped_column(Integer, primary_key=True)
