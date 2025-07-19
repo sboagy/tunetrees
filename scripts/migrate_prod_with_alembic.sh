@@ -10,8 +10,10 @@ if [ "$PWD" = "$SCRIPT_DIR" ]; then
     cd ..
 fi
 
-if [ ! -f "tunetrees.sqlite3" ]; then
+# Check we're in the tunetrees repo root by looking for key files
+if [ ! -f "tunetrees_test_clean.sqlite3" ] || [ ! -f "alembic.ini" ] || [ ! -d "tunetrees" ]; then
     echo "ERROR: current directory must be the root of the tunetrees repo"
+    echo "Expected files: tunetrees_test_clean.sqlite3, alembic.ini, tunetrees/ directory"
     exit 1
 fi
 
@@ -19,6 +21,7 @@ fi
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}=== TuneTrees Production Database Migration with Alembic ===${NC}"
@@ -108,9 +111,9 @@ echo -e "${GREEN}✓ All views dropped (will be recreated by migration)${NC}"
 echo -e "${YELLOW}Step 4: Apply Alembic Migrations${NC}"
 echo "Applying migrations to production database..."
 
-# Temporarily update alembic.ini to point to the production database
-original_db_url=$(grep "sqlalchemy.url" alembic.ini)
-sed -i '' 's|sqlalchemy.url = .*|sqlalchemy.url = sqlite:///./tunetrees_production.sqlite3|' alembic.ini
+# Verify alembic.ini points to the correct database
+current_db_url=$(grep "sqlalchemy.url" alembic.ini)
+echo "Using database: $current_db_url"
 
 # Check if the production database has alembic_version table
 echo "Checking production database migration state..."
@@ -125,9 +128,6 @@ fi
 
 # Apply migrations to the production database
 alembic upgrade head
-
-# Restore original alembic.ini
-sed -i '' "s|sqlalchemy.url = .*|${original_db_url}|" alembic.ini
 
 echo -e "${GREEN}✓ Migration completed successfully!${NC}"
 
@@ -187,11 +187,22 @@ else
     echo "$(date '+%Y-%m-%d %H:%M:%S') $CURRENT_HEAD $(whoami)"
 fi
 
+# Update production baseline snapshot
+echo ""
+echo -e "${CYAN}Updating production baseline snapshot...${NC}"
+if cp tunetrees_production.sqlite3 true_production_baseline.sqlite3; then
+    echo -e "${GREEN}✓ Updated true_production_baseline.sqlite3 with migrated production state${NC}"
+else
+    echo -e "${RED}✗ Failed to update true_production_baseline.sqlite3${NC}"
+    exit 1
+fi
+
 echo ""
 echo -e "${GREEN}=== Migration Summary ===${NC}"
 echo "✓ Downloaded production DB to: $backup_file"
 echo "✓ Created local backup: tunetrees_local_backup/tunetrees_${backup_date}.sqlite3"
 echo "✓ Applied Alembic migrations to: tunetrees_production.sqlite3"
+echo "✓ Updated production baseline: true_production_baseline.sqlite3"
 if [[ "$upload_confirm" == "y" || "$upload_confirm" == "Y" ]]; then
     echo "✓ Uploaded to production server"
 else
