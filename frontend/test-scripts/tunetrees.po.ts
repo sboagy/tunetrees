@@ -265,12 +265,12 @@ export class TuneTreesPageObject {
     const instrumentSelector1 = this.page
       .getByRole("button", { name: "Instrument: Irish Flute (id-1)" })
       .first();
-    
+
     // Wait for the button to be visible and enabled
     await instrumentSelector1.waitFor({ state: "visible", timeout: 30000 });
     await instrumentSelector1.waitFor({ state: "attached", timeout: 30000 });
     await expect(instrumentSelector1).toBeEnabled({ timeout: 30000 });
-    
+
     // Click to open the dropdown
     await instrumentSelector1.click();
 
@@ -282,10 +282,10 @@ export class TuneTreesPageObject {
     const tenorBanjoOption = this.page.getByText("Irish Tenor Banjo (id-18)");
     await tenorBanjoOption.waitFor({ state: "visible", timeout: 10000 });
     await tenorBanjoOption.waitFor({ state: "attached", timeout: 10000 });
-    
+
     // Add a small delay to ensure the dropdown is fully rendered
     await this.page.waitForTimeout(500);
-    
+
     // Click the Irish Tenor Banjo option
     await tenorBanjoOption.click();
 
