@@ -1486,9 +1486,14 @@ def update_practice_record_patch(
 ) -> PracticeRecordModel:
     try:
         with SessionLocal() as db:
-            stmt = select(PracticeRecord).where(
-                PracticeRecord.playlist_ref == playlist_ref,
-                PracticeRecord.tune_ref == tune_ref,
+            # Get the latest practice record for this tune/playlist combination
+            stmt = (
+                select(PracticeRecord)
+                .where(
+                    PracticeRecord.playlist_ref == playlist_ref,
+                    PracticeRecord.tune_ref == tune_ref,
+                )
+                .order_by(PracticeRecord.id.desc())
             )
             db_record = db.execute(stmt).scalar_one_or_none()
 

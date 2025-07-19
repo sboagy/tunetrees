@@ -31,8 +31,8 @@ import {
   getPlaylistTuneOverview,
   getTuneTypesByGenre,
   updatePlaylistTunes,
+  updatePracticeRecord,
   updateTuneInPlaylistFromTuneOverview,
-  upsertPracticeRecord,
 } from "../queries";
 import { updateCurrentTuneInDb } from "../settings";
 import type {
@@ -155,6 +155,19 @@ export default function TuneEditor({
   const { importUrl, setImportUrl } = useImportUrl();
   const [publicMode, setPublicMode] = useState<boolean>(false);
 
+  // Track original practice record values to detect changes
+  const [originalPracticeData, setOriginalPracticeData] = useState<{
+    practiced?: string | null;
+    quality?: number | null;
+    easiness?: number | null;
+    difficulty?: number | null;
+    interval?: number | null;
+    step?: number | null;
+    repetitions?: number | null;
+    review_date?: string | null;
+    backup_practiced?: string | null;
+  } | null>(null);
+
   const { tunes: repertoireTunes } = useRepertoireTunes();
 
   const isTuneInRepertoire = (tuneId: number): boolean => {
@@ -255,6 +268,20 @@ export default function TuneEditor({
               ),
               // learned: transformToDatetimeLocal(tuneOverview.learned as string),
             });
+
+            // Store original practice record values for change detection
+            // Store the original UTC values for datetime fields for accurate comparison
+            setOriginalPracticeData({
+              practiced: tuneOverview.practiced, // Store original UTC format
+              quality: tuneOverview.quality,
+              easiness: tuneOverview.easiness,
+              difficulty: tuneOverview.difficulty,
+              interval: tuneOverview.interval,
+              step: tuneOverview.step,
+              repetitions: tuneOverview.repetitions,
+              review_date: tuneOverview.review_date, // Store original UTC format
+              backup_practiced: tuneOverview.backup_practiced,
+            });
           } else {
             console.error(
               `Failed to fetch tune: ${userId} ${playlistId} ${tuneId}`,
@@ -315,7 +342,8 @@ export default function TuneEditor({
   }
 
   /**
-   * Saves the practice record part of the data. If updating the practice record fails,
+   * Saves the practice record part of the data by updating the latest practice record.
+   * If updating the latest practice record fails (404 - no record exists),
    * it attempts to create a new practice record.
    *
    * @param data - The data to be saved, inferred from the form schema.
@@ -335,16 +363,19 @@ export default function TuneEditor({
       review_date: data.review_date ?? "",
       // tags: z.string().nullable().optional(),
     };
-    const responsePracticeRecordUpdate = await upsertPracticeRecord(
+
+    // Try to update the latest practice record first
+    const responsePracticeRecordUpdate = await updatePracticeRecord(
       tuneId,
       playlistId,
       practiceRecord,
     );
     if ("detail" in responsePracticeRecordUpdate) {
       console.log(
-        "Failed to update tune:",
+        "Failed to update latest practice record:",
         responsePracticeRecordUpdate.detail,
       );
+      // If update failed (likely 404 - no record exists), create a new one
       const practiceRecord2: Partial<IPracticeRecord> = {
         tune_ref: tuneId,
         playlist_ref: playlistId,
@@ -364,11 +395,11 @@ export default function TuneEditor({
       );
       if ("detail" in responsePracticeRecordUpdate2) {
         console.error(
-          "Failed to update tune:",
+          "Failed to create practice record:",
           responsePracticeRecordUpdate2.detail,
         );
         handleError(
-          `Failed to update tune: ${typeof responsePracticeRecordUpdate2.detail === "string" ? responsePracticeRecordUpdate2.detail : "Unknown error"}`,
+          `Failed to create practice record: ${typeof responsePracticeRecordUpdate2.detail === "string" ? responsePracticeRecordUpdate2.detail : "Unknown error"}`,
         );
         // Don't close the editor on error
         return true;
@@ -376,6 +407,60 @@ export default function TuneEditor({
     }
     return false;
   }
+
+  /**
+   * Checks if any practice record fields have changed from their original values.
+   *
+   * @param currentData - The current form data (with UTC converted datetime fields)
+   * @returns true if any practice record fields have changed, false otherwise
+   */
+  const hasPracticeRecordChanged = (
+    currentData: z.infer<typeof formSchema>,
+  ): boolean => {
+    if (!originalPracticeData) {
+      return false; // No original data to compare against
+    }
+
+    // For datetime fields, compare the UTC values (currentData already has UTC conversion)
+    const datetimeFields = ["practiced", "review_date"] as const;
+    for (const field of datetimeFields) {
+      const currentUtcValue = currentData[field];
+      const originalUtcValue = originalPracticeData[field];
+
+      // Handle null/undefined equivalence
+      if ((currentUtcValue === null) !== (originalUtcValue === null)) {
+        return true;
+      }
+
+      if (currentUtcValue !== originalUtcValue) {
+        return true;
+      }
+    }
+
+    // For non-datetime fields, compare directly
+    const nonDatetimeFields = [
+      "quality",
+      "easiness",
+      "difficulty",
+      "interval",
+      "step",
+      "repetitions",
+      "backup_practiced",
+    ] as const;
+
+    return nonDatetimeFields.some((field) => {
+      const currentValue = currentData[field];
+      const originalValue = originalPracticeData[field];
+
+      // Handle null/undefined equivalence
+      if ((currentValue === null) !== (originalValue === null)) {
+        return true;
+      }
+
+      // Compare actual values
+      return currentValue !== originalValue;
+    });
+  };
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     console.log(data);
@@ -423,7 +508,7 @@ export default function TuneEditor({
     console.log("Tune updated successfully");
 
     if (isTuneInRepertoire(tuneId) === true) {
-      console.log("Saving user specfic data");
+      console.log("Saving user specific data");
 
       const errorOccured = await savePlaylistPart(dataLocal);
       if (errorOccured) {
@@ -431,10 +516,16 @@ export default function TuneEditor({
         return;
       }
 
-      const errorOccured2 = await savePracticeRecordPart(dataLocal);
-      if (errorOccured2) {
-        // Don't close the editor on error
-        return;
+      // Only save practice record if the practice fields have actually changed
+      if (hasPracticeRecordChanged(dataLocal)) {
+        console.log("Practice record fields have changed, saving...");
+        const errorOccured2 = await savePracticeRecordPart(dataLocal);
+        if (errorOccured2) {
+          // Don't close the editor on error
+          return;
+        }
+      } else {
+        console.log("Practice record fields unchanged, skipping save");
       }
 
       // TODO: Save tags
