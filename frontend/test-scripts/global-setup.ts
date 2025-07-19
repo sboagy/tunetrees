@@ -173,7 +173,29 @@ export async function restartBackend() {
       await restartBackendHard();
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Increase wait time in CI environment and add health check
+    const waitTime = process.env.CI ? 5000 : 2000;
+    await new Promise((resolve) => setTimeout(resolve, waitTime));
+    
+    // Add health check to ensure server is actually ready
+    let serverReady = false;
+    for (let i = 0; i < 10; i++) {
+      try {
+        const response = await axios.get("http://localhost:8000/hello/test");
+        if (response.status === 200) {
+          serverReady = true;
+          break;
+        }
+      } catch {
+        // Server not ready yet, wait a bit more
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+    
+    if (!serverReady) {
+      console.warn("FastAPI server may not be fully ready after restart");
+    }
+    
     console.log("FastAPI server hopefully reloaded (but not restarted).");
   } catch (error) {
     console.error("Error restarting FastAPI server:", error);
