@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Tuple
-from typing_extensions import TypedDict
+from typing import Dict, List, Tuple, Optional
+from typing_extensions import TypedDict, NotRequired
 
 from fsrs import Rating, Scheduler, ReviewLog
 from fsrs.optimizer import Optimizer
@@ -91,6 +91,8 @@ class BadTuneID(Exception):
 
 class TuneFeedbackUpdate(TypedDict):
     feedback: str
+    goal: NotRequired[str | None]  # Practice goal (e.g., 'recall', 'fluency', etc.)
+    technique: NotRequired[str | None]  # Practice technique (e.g., 'fsrs', 'sm2', etc.)
 
 
 def fetch_algorithm_type(db: Session, user_ref: str) -> AlgorithmType:
@@ -363,6 +365,116 @@ def get_prefs_spaced_repetition(
     return prefs_spaced_repitition
 
 
+def _process_non_recall_goal(
+    db: Session,
+    tune_id: str,
+    tune_update: TuneFeedbackUpdate,
+    user_ref: str,
+    playlist_ref: int,
+    sitdown_date: datetime,
+    goal: str,
+    technique: Optional[str],
+    alg_type: AlgorithmType,
+) -> None:
+    """Process practice feedback for non-recall goals (Issue #205).
+
+    This implements goal-specific scheduling strategies:
+    - initial_learn: More frequent practice with shorter intervals
+    - fluency: Focus on consistent quality with moderate intervals
+    - session_ready: Intensive short-term practice
+    - performance_polish: Refined practice with quality focus
+    """
+    quality_int = validate_and_get_quality(tune_update, tune_id)
+    if quality_int is None:
+        return
+
+    # Get or create latest practice record
+    latest_practice_record = get_latest_practice_record(db, tune_id, playlist_ref)
+
+    # Calculate next review date based on goal-specific strategies
+    next_review_date = _calculate_goal_specific_review_date(
+        goal, technique, quality_int, sitdown_date, latest_practice_record
+    )
+
+    # Create new practice record with goal-specific scheduling
+    new_practice_record = PracticeRecord(
+        id=None,
+        tune_ref=tune_id,
+        playlist_ref=playlist_ref,
+        quality=quality_int,
+        practiced=sitdown_date.strftime(TT_DATE_FORMAT),
+        review_date=next_review_date.strftime(TT_DATE_FORMAT),
+        backup_practiced=sitdown_date.strftime(TT_DATE_FORMAT),
+        # Set basic interval/repetition tracking
+        interval=max(1, (next_review_date - sitdown_date).days),
+        repetitions=(latest_practice_record.repetitions + 1)
+        if latest_practice_record
+        else 1,
+        # Keep FSRS fields for future integration
+        easiness=latest_practice_record.easiness if latest_practice_record else 2.5,
+        stability=latest_practice_record.stability if latest_practice_record else 1.0,
+        difficulty=latest_practice_record.difficulty if latest_practice_record else 0.5,
+        state=1,  # Learning state for non-recall goals
+        step=0,
+        elapsed_days=0,
+        lapses=latest_practice_record.lapses if latest_practice_record else 0,
+    )
+
+    # Add the new practice record to the database
+    db.add(new_practice_record)
+    log.debug(
+        f"Created goal-specific practice record for tune {tune_id}, goal: {goal}, technique: {technique}"
+    )
+
+
+def _calculate_goal_specific_review_date(
+    goal: str,
+    technique: Optional[str],
+    quality: int,
+    sitdown_date: datetime,
+    latest_record: Optional[PracticeRecord],
+) -> datetime:
+    """Calculate next review date based on practice goal and technique."""
+
+    # Base intervals for different goals (in days)
+    goal_base_intervals = {
+        "initial_learn": [0.1, 0.5, 1, 2, 4],  # Very frequent practice
+        "fluency": [1, 3, 7, 14, 21],  # Building consistency
+        "session_ready": [0.5, 1, 2, 3, 5],  # Intensive short-term
+        "performance_polish": [2, 5, 10, 15, 21],  # Quality refinement
+    }
+
+    base_intervals = goal_base_intervals.get(
+        goal, [1, 3, 7, 14, 30]
+    )  # Default fallback
+
+    # Determine step based on quality and previous repetitions
+    current_step = 0
+    if latest_record and latest_record.repetitions:
+        current_step = min(latest_record.repetitions, len(base_intervals) - 1)
+
+    # Adjust step based on quality (0-5 scale)
+    if quality >= 4:  # Good/Easy
+        current_step = min(current_step + 1, len(base_intervals) - 1)
+    elif quality <= 2:  # Again/Hard
+        current_step = max(0, current_step - 1)
+    # Quality 3 (Good) keeps same step
+
+    # Get interval and apply technique-specific modifiers
+    interval_days = base_intervals[current_step]
+
+    if technique == "daily_practice":
+        interval_days = min(interval_days, 1.0)  # Cap at daily
+    elif technique == "motor_skills":
+        interval_days *= 0.7  # More frequent for motor skill development
+    elif technique == "metronome":
+        interval_days *= 0.8  # Slightly more frequent for timing work
+
+    # Convert to timedelta and add to sitdown_date
+    interval_delta = timedelta(days=interval_days)
+    return sitdown_date + interval_delta
+
+
 def _process_single_tune_feedback(
     db: Session,
     tune_id: str,
@@ -383,6 +495,35 @@ def _process_single_tune_feedback(
     if quality_int is None:
         return
     quality_str = tune_update.get("feedback")
+
+    # Extract goal and technique from tune update (Issue #205)
+    goal = tune_update.get("goal", "recall")  # Default to recall if not specified
+    technique = tune_update.get("technique")  # Used for goal-specific techniques
+
+    # Implement goal-specific scheduling strategies
+    if goal not in [
+        "initial_learn",
+        "recall",
+        "fluency",
+        "session_ready",
+        "performance_polish",
+    ]:
+        log.warning(f"Unknown goal '{goal}', falling back to recall logic")
+        goal = "recall"
+
+    # For non-recall goals, we implement different scheduling approaches
+    if goal != "recall":
+        return _process_non_recall_goal(
+            db,
+            tune_id,
+            tune_update,
+            user_ref,
+            playlist_ref,
+            sitdown_date,
+            goal,
+            technique,
+            alg_type,
+        )
 
     # Fetch spaced repetition preferences for the user and algorithm
     prefs_spaced_repetition: PrefsSpacedRepetition = get_prefs_spaced_repetition(
