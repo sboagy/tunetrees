@@ -17,6 +17,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
+from sqlalchemy.orm.base import Mapped
 from sqlalchemy.sql.sqltypes import NullType
 
 Base = declarative_base()
@@ -50,6 +51,8 @@ class PlaylistTune(Base):
     current = mapped_column(Text)
     learned = mapped_column(Text)
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
+    goal = mapped_column(Text, server_default=text("'recall'"))
+    technique = mapped_column(Text)
 
 
 t_practice_list_joined = Table(
