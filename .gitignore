@@ -338,3 +338,6 @@ xtest_stashed_folder
 github-action-logs
 github-action-logs/**/*
 tunetrees_do.sqlite3
+playwright-output
+playwright-output/**/*.*
+mcp-memory/Dockerfile

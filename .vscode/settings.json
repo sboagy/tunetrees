@@ -43,5 +43,13 @@
         "**/tree-*",
         "**/test_stashed_folder",
         "alembic/versions/*.py"
-    ]
+    ],
+    "chat.mcp.serverSampling": {
+        "tunetrees/.vscode/mcp.json: playwright": {
+            "allowedModels": [
+                "github.copilot-chat/gpt-4.1",
+                "github.copilot-chat/claude-sonnet-4"
+            ]
+        }
+    }
 }
