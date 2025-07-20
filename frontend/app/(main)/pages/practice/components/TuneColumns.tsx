@@ -1,6 +1,8 @@
 "use client";
 
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
+import RowGoalComboBox from "@/app/(main)/pages/practice/components/RowGoalComboBox";
+import RowTechniqueComboBox from "@/app/(main)/pages/practice/components/RowTechniqueComboBox";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { transformToDatetimeLocalForDisplay } from "@/lib/date-utils";
@@ -160,6 +162,8 @@ export function get_columns(
   purpose: TablePurpose,
   onRecallEvalChange?: (tuneId: number, newValue: string) => void,
   setTunesRefreshId?: (newRefreshId: number) => void,
+  onGoalChange?: (tuneId: number, newValue: string | null) => void,
+  onTechniqueChange?: (tuneId: number, newValue: string | null) => void,
 ): ColumnDef<ITuneOverview, TunesGridColumnGeneralType>[] {
   const determineHeaderCheckedState = (
     table: TanstackTable<ITuneOverview>,
@@ -365,6 +369,48 @@ export function get_columns(
           },
           size: 50,
         },
+    ...(purpose === "practice"
+      ? [
+          {
+            accessorKey: "goal",
+            header: ({ column }: { column: Column<ITuneOverview, unknown> }) =>
+              sortableHeader(column, "Goal", setTunesRefreshId),
+            enableHiding: false,
+            cell: (
+              info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
+            ) => (
+              <RowGoalComboBox
+                info={info}
+                userId={userId}
+                playlistId={playlistId}
+                purpose={purpose}
+                onGoalChange={onGoalChange}
+              />
+            ),
+            accessorFn: (row: ITuneOverview) => row.goal,
+            size: 150,
+          },
+          {
+            accessorKey: "technique",
+            header: ({ column }: { column: Column<ITuneOverview, unknown> }) =>
+              sortableHeader(column, "Technique", setTunesRefreshId),
+            enableHiding: false,
+            cell: (
+              info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
+            ) => (
+              <RowTechniqueComboBox
+                info={info}
+                userId={userId}
+                playlistId={playlistId}
+                purpose={purpose}
+                onTechniqueChange={onTechniqueChange}
+              />
+            ),
+            accessorFn: (row: ITuneOverview) => row.technique,
+            size: 150,
+          },
+        ]
+      : []),
     {
       accessorKey: "title",
       header: ({ column }) =>

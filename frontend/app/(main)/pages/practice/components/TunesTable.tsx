@@ -33,6 +33,8 @@ export interface IScheduledTunesType {
   tablePurpose: TablePurpose;
   globalFilter?: string;
   onRecallEvalChange?: (tuneId: number, newValue: string) => void;
+  onGoalChange?: (tuneId: number, newValue: string | null) => void;
+  onTechniqueChange?: (tuneId: number, newValue: string | null) => void;
   onTableCreated?: (table: TanstackTable<ITuneOverview>) => void;
   selectionChangedCallback?:
     | ((
@@ -91,6 +93,8 @@ export function TunesTableComponent({
   tablePurpose,
   globalFilter = "",
   onRecallEvalChange,
+  onGoalChange,
+  onTechniqueChange,
   onTableCreated,
   selectionChangedCallback = null,
   filterStringCallback,
@@ -287,6 +291,8 @@ export function TunesTableComponent({
     tablePurpose,
     onRecallEvalChange,
     setTunesRefreshId,
+    onGoalChange,
+    onTechniqueChange,
   );
 
   const table: TanstackTable<ITuneOverview> = useReactTable({

@@ -119,6 +119,30 @@ export default function TunesGridScheduled({
     [setTunes],
   );
 
+  const handleGoalChange = useCallback(
+    (tuneId: number, newValue: string | null): void => {
+      setTunes((prevTunes: ITuneOverview[]) =>
+        prevTunes.map(
+          (tune): ITuneOverview =>
+            tune.id === tuneId ? { ...tune, goal: newValue } : tune,
+        ),
+      );
+    },
+    [setTunes],
+  );
+
+  const handleTechniqueChange = useCallback(
+    (tuneId: number, newValue: string | null): void => {
+      setTunes((prevTunes: ITuneOverview[]) =>
+        prevTunes.map(
+          (tune): ITuneOverview =>
+            tune.id === tuneId ? { ...tune, technique: newValue } : tune,
+        ),
+      );
+    },
+    [setTunes],
+  );
+
   const [isLoading, setIsLoading] = useState(true);
 
   // See comment for isRefreshing in RepertoireTunesGrid.tsx.
@@ -164,6 +188,8 @@ export default function TunesGridScheduled({
     tablePurpose: "practice",
     globalFilter: "",
     onRecallEvalChange: handleRecallEvalChange,
+    onGoalChange: handleGoalChange,
+    onTechniqueChange: handleTechniqueChange,
     setIsLoading,
   });
 
@@ -182,7 +208,11 @@ export default function TunesGridScheduled({
       const feedback: string | null | undefined = row.original.recall_eval;
 
       if (feedback) {
-        updates[idString] = { feedback: feedback };
+        updates[idString] = {
+          feedback: feedback,
+          goal: tune.goal || null,
+          technique: tune.technique || null,
+        };
       } else {
         continue;
       }
