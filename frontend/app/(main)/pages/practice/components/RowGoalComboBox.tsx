@@ -26,26 +26,20 @@ export function RowGoalComboBox(props: RowGoalComboBoxProps) {
   const currentGoal = info.row.original.goal;
   const tuneId = info.row.original.id;
 
+  // Default to RECALL when goal is null
+  const displayGoal = currentGoal || PracticeGoalEnum.RECALL;
+
   const handleValueChange = (newValue: string) => {
     if (!onGoalChange || !tuneId) return;
-
-    // Handle the "none" case for clearing selection
-    if (newValue === "none") {
-      onGoalChange(tuneId, null);
-    } else {
-      onGoalChange(tuneId, newValue);
-    }
+    onGoalChange(tuneId, newValue);
   };
 
   return (
-    <Select value={currentGoal || "none"} onValueChange={handleValueChange}>
+    <Select value={displayGoal} onValueChange={handleValueChange}>
       <SelectTrigger className="w-full h-8 text-xs">
         <SelectValue placeholder="Goal..." />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="none">
-          <em className="text-muted-foreground">Default</em>
-        </SelectItem>
         {Object.values(PracticeGoalEnum).map((goal) => (
           <SelectItem key={goal} value={goal}>
             {practiceGoalLabels[goal]}

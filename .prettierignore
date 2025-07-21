@@ -1,0 +1,2 @@
+# Ignore chatmode files because VS Code's parser is picky about YAML formatting
+.github/chatmodes/*.md
