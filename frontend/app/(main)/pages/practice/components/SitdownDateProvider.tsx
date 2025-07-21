@@ -45,13 +45,20 @@ const SitDownDateContext = createContext<ISitDownDateContextType | undefined>(
 );
 
 export const SitDownDateProvider = ({ children }: { children: ReactNode }) => {
-  const [sitDownDate] = useState<Date | null>(null);
+  const [sitDownDate, setSitDownDate] = useState<Date | null>(null);
   const [acceptableDelinquencyDays, setAcceptableDelinquencyDays] =
     useState<number>(7);
 
   useEffect(() => {
-    // Prefer a test date injected by Playwright or set in localStorage
-    // Sitdown date is now handled in browser-driven logic elsewhere
+    // Initialize sitdown date from browser context
+    try {
+      const date = getSitdownDateFromBrowser();
+      setSitDownDate(date);
+    } catch (error) {
+      console.error("Failed to initialize sitdown date:", error);
+      // Fall back to current date
+      setSitDownDate(new Date());
+    }
   }, []); // the effect runs only once, after the initial render of the component.
 
   return (
