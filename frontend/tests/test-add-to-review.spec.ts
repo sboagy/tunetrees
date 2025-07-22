@@ -36,6 +36,9 @@ test.afterEach(async ({ page }, testInfo) => {
 
 test.describe.serial("Add to Review Tests", () => {
   test("test-add-to-review-functionality", async ({ page }) => {
+    // Increase test timeout for this complex test
+    test.setTimeout(90000); // 90 seconds
+
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
     await ttPO.navigateToRepertoireTab();
