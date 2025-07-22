@@ -149,37 +149,39 @@ export default function TunesGridScheduled({
   // (not used in this component)
 
   // Only fetch scheduled tunes on the client after mount or refresh
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchTunes() {
-      setIsLoading(true);
-      try {
-        const sitdownDate = getSitdownDateFromBrowser();
+  // Leave this commented out for now, as we are using the useEffect above,
+  // but I'm not 100% sure if we maybe we do actually need it.
+  // useEffect(() => {
+  //   let cancelled = false;
+  //   async function fetchTunes() {
+  //     setIsLoading(true);
+  //     try {
+  //       const sitdownDate = getSitdownDateFromBrowser();
 
-        const result = await getScheduledTunesOverview(
-          userId,
-          playlistId,
-          sitdownDate,
-          showDeleted,
-        );
-        if (!cancelled) {
-          setTunes(result);
-        }
-      } catch {
-        if (!cancelled) {
-          setTunes([]); // or handle error
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-    void fetchTunes();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, playlistId, setTunes]);
+  //       const result = await getScheduledTunesOverview(
+  //         userId,
+  //         playlistId,
+  //         sitdownDate,
+  //         showDeleted,
+  //       );
+  //       if (!cancelled) {
+  //         setTunes(result);
+  //       }
+  //     } catch {
+  //       if (!cancelled) {
+  //         setTunes([]); // or handle error
+  //       }
+  //     } finally {
+  //       if (!cancelled) {
+  //         setIsLoading(false);
+  //       }
+  //     }
+  //   }
+  //   void fetchTunes();
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  // }, [userId, playlistId, setTunes]);
 
   // Move table creation after tunes are loaded
   const [tableComponent, table] = useTunesTable({
