@@ -160,13 +160,13 @@ test.describe.serial("Practice Session Complete Workflow", () => {
       await recallDropdowns.first().click();
       await page.getByTestId("tt-recal-eval-easy").click();
 
-      // Verify submit button is still disabled (not all tunes evaluated)
+      // Verify submit button is now enabled (partial evaluation allowed)
       const submitButton = page.getByRole("button", {
         name: "Submit Practiced Tunes",
       });
-      await expect(submitButton).toBeDisabled();
+      await expect(submitButton).toBeEnabled();
       console.log(
-        "Submit button correctly remains disabled with partial selection",
+        "Submit button correctly enabled with partial selection (Practice Goals & Techniques System)",
       );
     }
   });
