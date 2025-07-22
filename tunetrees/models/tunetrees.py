@@ -17,7 +17,6 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
-from sqlalchemy.orm.base import Mapped
 from sqlalchemy.sql.sqltypes import NullType
 
 Base = declarative_base()
