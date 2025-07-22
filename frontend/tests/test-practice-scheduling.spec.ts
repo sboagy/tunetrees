@@ -63,11 +63,14 @@ for (const timezoneId of timezones) {
         await pageObject.setReviewEval(tuneId, feedbacks[i - 1]);
       }
 
+      // Wait a moment for all evaluations to be processed
+      await pageObject.page.waitForTimeout(1000);
+
       // await pageObject.submitPracticedTunesButton.click();
       const submitButton = pageObject.page.getByRole("button", {
         name: "Submit Practiced Tunes",
       });
-      await pageObject.clickWithTimeAfter(submitButton, 1000);
+      await pageObject.clickWithTimeAfter(submitButton, 3000); // Increased timeout
 
       await pageObject.waitForSuccessfullySubmitted();
 

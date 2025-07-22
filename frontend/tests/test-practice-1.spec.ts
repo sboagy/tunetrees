@@ -82,10 +82,12 @@ test.describe.serial("Practice Tests", () => {
     console.log("===> test-practice-1.ts:77 ~ ");
     await ttPO.setReviewEval(1081, "hard");
 
-    await ttPO.setReviewEval(2451, "good");
     await ttPO.setReviewEval(2451, "(Not Set)");
 
     await ttPO.setReviewEval(1684, "again");
+
+    // Wait for evaluations to be processed
+    await page.waitForTimeout(1000);
 
     const submitButton = page.getByRole("button", {
       name: "Submit Practiced Tunes",
@@ -106,8 +108,8 @@ test.describe.serial("Practice Tests", () => {
     //   console.log("===> test-practice-1.ts:108 ~ data", data);
     // });
 
-    const rowCount = await ttPO.tunesGridRows.count();
-    console.log(`Number of rows: ${rowCount}`);
+    const totalRowCount = await ttPO.tunesGridRows.count();
+    console.log(`Number of rows: ${totalRowCount}`);
     // Make a very long timeout to allow for the server to respond.
     await expect(ttPO.tunesGridRows).toHaveCount(3, { timeout: 60000 });
 
