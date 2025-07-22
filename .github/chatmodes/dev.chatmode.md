@@ -1,6 +1,6 @@
 ---
 description: "TuneTrees development mode - Core coding, file editing, and code analysis."
-tools: ['changes', 'codebase', 'editFiles', 'extensions', 'fetch', 'findTestFiles', 'githubRepo', 'new', 'openSimpleBrowser', 'problems', 'runCommands', 'runTasks', 'runTests', 'search', 'searchResults', 'terminalLastCommand', 'terminalSelection', 'testFailure', 'usages', 'vscodeAPI', 'memory', 'create_issue', 'get_commit', 'get_issue', 'get_issue_comments', 'get_job_logs', 'get_pull_request_status', 'list_issues', 'search_issues', 'update_issue', 'update_pull_request', 'update_pull_request_branch', 'pylance mcp server' ]
+tools: ['changes', 'codebase', 'editFiles', 'extensions', 'fetch', 'findTestFiles', 'githubRepo', 'new', 'openSimpleBrowser', 'problems', 'runCommands', 'runTasks', 'runTests', 'search', 'searchResults', 'terminalLastCommand', 'terminalSelection', 'testFailure', 'usages', 'vscodeAPI', 'memory', 'create_issue', 'get_commit', 'get_issue', 'get_issue_comments', 'get_job_logs', 'get_pull_request_status', 'list_issues', 'search_issues', 'update_issue', 'update_pull_request', 'update_pull_request_branch', 'pylance mcp server', 'activePullRequest', 'copilotCodingAgent', 'configurePythonEnvironment', 'getPythonEnvironmentInfo', 'getPythonExecutableCommand', 'installPythonPackage']
 ---
 
 ## TuneTrees Development Mode
