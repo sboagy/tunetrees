@@ -109,6 +109,30 @@ def fetch_algorithm_type(db: Session, user_ref: str) -> AlgorithmType:
         return AlgorithmType.FSRS
 
 
+def get_default_technique_for_user(db: Session, user_ref: str) -> str:
+    """Get the default technique for a user from user.sr_alg_type.
+
+    Args:
+        db: Database session
+        user_ref: User reference ID
+
+    Returns:
+        str: Default technique based on user's sr_alg_type preference,
+             defaults to 'fsrs' if not specified
+    """
+    from tunetrees.models.tunetrees import User
+
+    stmt = select(User.sr_alg_type).where(User.id == user_ref)
+    result = db.execute(stmt).one_or_none()
+
+    if result and result[0]:
+        sr_alg_type = result[0].lower()  # Convert 'FSRS' -> 'fsrs', 'SM2' -> 'sm2'
+        return sr_alg_type
+    else:
+        # Default to 'fsrs' if user preference not found or empty
+        return "fsrs"
+
+
 def fetch_user_ref_from_playlist_ref(db: Session, playlist_ref: int) -> str:
     stmt = select(Playlist.user_ref).where(Playlist.playlist_id == playlist_ref)
     user_ref_result = db.execute(stmt).one_or_none()
@@ -135,6 +159,20 @@ def difficulty_to_e_factor(d: float) -> float:
 
 
 def quality_to_fsrs_rating(quality_int: int) -> Rating:
+    """Convert quality value to FSRS Rating.
+
+    For 6-value SM2 system (0-5):
+    - 0,1 -> Again
+    - 2 -> Hard
+    - 3 -> Good
+    - 4,5 -> Easy
+
+    For 4-value FSRS system (0-3):
+    - 0 -> Again
+    - 1 -> Hard
+    - 2 -> Good
+    - 3 -> Easy
+    """
     if quality_int in (0, 1):
         return Rating.Again
     elif quality_int == 2:
@@ -147,7 +185,29 @@ def quality_to_fsrs_rating(quality_int: int) -> Rating:
         raise ValueError(f"Unexpected quality value: {quality_int}")
 
 
+def quality_to_fsrs_rating_direct(quality_int: int) -> Rating:
+    """Convert 4-value quality directly to FSRS Rating (0-3 -> Rating).
+
+    This is used when the frontend sends 4-value quality lists.
+    - 0 -> Again
+    - 1 -> Hard
+    - 2 -> Good
+    - 3 -> Easy
+    """
+    if quality_int == 0:
+        return Rating.Again
+    elif quality_int == 1:
+        return Rating.Hard
+    elif quality_int == 2:
+        return Rating.Good
+    elif quality_int == 3:
+        return Rating.Easy
+    else:
+        raise ValueError(f"Unexpected quality value for 4-value system: {quality_int}")
+
+
 def fsrs_rating_to_quality(rating: Rating):
+    """Convert FSRS Rating back to 6-value quality for legacy compatibility."""
     if rating == Rating.Again:
         return 0
     elif rating == Rating.Hard:
@@ -156,6 +216,25 @@ def fsrs_rating_to_quality(rating: Rating):
         return 3
     elif rating == Rating.Easy:
         return 5
+
+
+def fsrs_rating_to_quality_direct(rating: Rating) -> int:
+    """Convert FSRS Rating directly to 4-value quality (Rating -> 0-3).
+
+    This is used when working with 4-value quality lists.
+    - Again -> 0
+    - Hard -> 1
+    - Good -> 2
+    - Easy -> 3
+    """
+    if rating == Rating.Again:
+        return 0
+    elif rating == Rating.Hard:
+        return 1
+    elif rating == Rating.Good:
+        return 2
+    elif rating == Rating.Easy:
+        return 3
 
 
 class ReviewResult(TypedDict):
@@ -280,6 +359,44 @@ def validate_and_get_quality(
     if quality_str == NOT_SET:
         return None  # type: ignore
     return quality_int
+
+
+def get_quality_value_bounds(technique: str | None) -> tuple[int, int]:
+    """Get the min/max quality values for a given technique.
+
+    Returns:
+        tuple: (min_value, max_value) for the quality scale
+        - SM2: (0, 5) - 6-value system
+        - FSRS and goal-specific: (0, 3) - 4-value system
+    """
+    if technique == "sm2":
+        return (0, 5)  # 6-value system for SM2
+    else:
+        return (0, 3)  # 4-value system for FSRS and goal-specific techniques
+
+
+def is_4_value_quality_system(technique: str | None) -> bool:
+    """Check if the technique uses 4-value quality system (0-3).
+
+    Returns:
+        bool: True for FSRS and goal-specific techniques, False for SM2
+    """
+    return technique != "sm2"
+
+
+def get_appropriate_quality_mapping_function(technique: str | None):
+    """Get the appropriate quality-to-FSRS-rating function based on technique.
+
+    Args:
+        technique: The practice technique (e.g., 'fsrs', 'sm2', 'motor_skills', etc.)
+
+    Returns:
+        callable: The appropriate mapping function
+    """
+    if is_4_value_quality_system(technique):
+        return quality_to_fsrs_rating_direct  # Use direct 4-value mapping
+    else:
+        return quality_to_fsrs_rating  # Use traditional 6-value mapping
 
 
 def save_prefs_spaced_repetition(db: Session, prefs: PrefsSpacedRepetition) -> None:
@@ -407,9 +524,9 @@ def _process_non_recall_goal(
         backup_practiced=sitdown_date.strftime(TT_DATE_FORMAT),
         # Set basic interval/repetition tracking
         interval=max(1, (next_review_date - sitdown_date).days),
-        repetitions=(latest_practice_record.repetitions + 1)
-        if latest_practice_record
-        else 1,
+        repetitions=(
+            (latest_practice_record.repetitions + 1) if latest_practice_record else 1
+        ),
         # Keep FSRS fields for future integration
         easiness=latest_practice_record.easiness if latest_practice_record else 2.5,
         stability=latest_practice_record.stability if latest_practice_record else 1.0,
@@ -475,6 +592,24 @@ def _calculate_goal_specific_review_date(
     return sitdown_date + interval_delta
 
 
+def normalize_quality_for_scheduler(quality_int: int, technique: str | None) -> int:
+    """Pass-through quality value - no conversion needed.
+
+    With the new technique-aware system, the quality value is stored
+    in its native format (4-value for FSRS, 6-value for SM2) and
+    the technique column tells us which system it's in.
+
+    Args:
+        quality_int: Original quality value from frontend
+        technique: Practice technique that determines quality scale
+
+    Returns:
+        int: Quality value unchanged (no conversion)
+    """
+    # Direct pass-through - technique column tells us which system quality is in
+    return quality_int
+
+
 def _process_single_tune_feedback(
     db: Session,
     tune_id: str,
@@ -499,6 +634,13 @@ def _process_single_tune_feedback(
     # Extract goal and technique from tune update (Issue #205)
     goal = tune_update.get("goal", "recall")  # Default to recall if not specified
     technique = tune_update.get("technique")  # Used for goal-specific techniques
+
+    # If technique is not provided, default based on user's algorithm preference
+    if technique is None:
+        technique = get_default_technique_for_user(db, user_ref)
+
+    # Normalize quality for scheduler compatibility
+    normalized_quality_int = normalize_quality_for_scheduler(quality_int, technique)
 
     # Implement goal-specific scheduling strategies
     if goal not in [
@@ -550,7 +692,7 @@ def _process_single_tune_feedback(
 
     if quality_str == NEW or quality_str == RESCHEDULED:
         review_result_dict = scheduler.first_review(
-            quality=quality_int,
+            quality=normalized_quality_int,
             practiced=sitdown_date,
             quality_text=quality_str,
         )
@@ -569,7 +711,7 @@ def _process_single_tune_feedback(
             last_review = None
 
         review_result_dict = scheduler.review(
-            quality=quality_int,
+            quality=normalized_quality_int,
             easiness=latest_practice_record.easiness,
             interval=latest_practice_record.interval,
             repetitions=latest_practice_record.repetitions,
