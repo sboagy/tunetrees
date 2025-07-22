@@ -6,6 +6,7 @@ import {
 import { TuneTreesPageObject } from "../test-scripts/tunetrees.po";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { getStorageState } from "@/test-scripts/storage-state";
+import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 
 // Extend the Window interface to include __TT_REVIEW_SITDOWN_DATE__
 declare global {
@@ -29,6 +30,7 @@ for (const timezoneId of timezones) {
 
     test.beforeEach(async ({ page }) => {
       await setTestDefaults(page);
+      await applyNetworkThrottle(page);
       pageObject = new TuneTreesPageObject(page);
       await pageObject.gotoMainPage();
     });
@@ -46,7 +48,7 @@ for (const timezoneId of timezones) {
 
     test("User submits quality feedback and tunes are rescheduled", async () => {
       await pageObject.navigateToPracticeTab();
-      const feedbacks = ["struggled", "trivial", "(Not Set)", "failed"];
+      const feedbacks = ["hard", "good", "(Not Set)", "again"];
 
       // Fill in quality feedback for each scheduled tune
       const rows = pageObject.tunesGridRows;

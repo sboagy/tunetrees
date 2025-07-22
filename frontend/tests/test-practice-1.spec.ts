@@ -80,12 +80,12 @@ test.describe.serial("Practice Tests", () => {
     console.log(`Number of rows before submit: ${rowCountBefore}`);
 
     console.log("===> test-practice-1.ts:77 ~ ");
-    await ttPO.setReviewEval(1081, "struggled");
+    await ttPO.setReviewEval(1081, "hard");
 
-    await ttPO.setReviewEval(2451, "trivial");
+    await ttPO.setReviewEval(2451, "good");
     await ttPO.setReviewEval(2451, "(Not Set)");
 
-    await ttPO.setReviewEval(1684, "failed");
+    await ttPO.setReviewEval(1684, "again");
 
     const submitButton = page.getByRole("button", {
       name: "Submit Practiced Tunes",

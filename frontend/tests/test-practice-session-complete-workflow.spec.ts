@@ -2,11 +2,15 @@ import { test, expect } from "@playwright/test";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { setTestDefaults } from "@/test-scripts/set-test-defaults";
-import { runLoginWithCookieSave } from "@/test-scripts/run-login2";
+import { runLoginStandalone } from "@/test-scripts/run-login2";
 import { navigateToPageWithRetry } from "@/test-scripts/navigation-utils";
 import { checkHealth } from "@/test-scripts/check-servers";
+import {
+  navigateToPracticeTabStandalone,
+  navigateToRepertoireTabStandalone,
+} from "@/test-scripts/tunetrees.po";
 
-test.describe("Practice Session Complete Workflow", () => {
+test.describe.serial("Practice Session Complete Workflow", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
     await setTestDefaults(page);
@@ -17,28 +21,34 @@ test.describe("Practice Session Complete Workflow", () => {
 
     // Navigate to the app and handle login (matching the MCP demo workflow)
     await navigateToPageWithRetry(page, "https://localhost:3000");
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(2_000);
 
     // Always perform login as part of the complete workflow test
-    await runLoginWithCookieSave(
+    await runLoginStandalone(
       page,
       process.env.TEST1_LOGIN_USER_EMAIL,
       process.env.TEST1_LOGIN_USER_PASSWORD,
     );
 
     await page.waitForLoadState("domcontentloaded");
+
+    // I shouldn't have to do this!!! But it seems to be necessary?
+    await navigateToRepertoireTabStandalone(page);
+
+    await page.waitForLoadState("domcontentloaded");
   });
 
   test.afterEach(async ({ page }) => {
     await restartBackend();
-    await page.waitForTimeout(1_000);
+    await page.waitForTimeout(2_000);
+    await page.waitForLoadState("domcontentloaded");
   });
-
   test("should complete full practice session workflow with recall quality evaluations", async ({
     page,
   }) => {
     // Step 1: Navigate to Practice tab
-    await page.getByRole("tab", { name: "Practice" }).click();
-    await page.waitForLoadState("domcontentloaded");
+    await navigateToPracticeTabStandalone(page);
 
     // Step 2: Wait for data to load and verify we have scheduled tunes
     // Use the same approach as the working tests - count recall quality dropdowns
@@ -47,7 +57,7 @@ test.describe("Practice Session Complete Workflow", () => {
     );
 
     // Wait for dropdowns to appear with timeout
-    await expect(tuneDropdowns.first()).toBeVisible({ timeout: 30000 });
+    await expect(tuneDropdowns.first()).toBeVisible({ timeout: 40000 });
 
     const tuneCount = await tuneDropdowns.count();
     expect(tuneCount).toBeGreaterThan(0);
@@ -71,24 +81,23 @@ test.describe("Practice Session Complete Workflow", () => {
     const dropdownCount = await recallDropdowns.count();
     console.log(`Found ${dropdownCount} recall quality dropdowns`);
 
-    // Step 6: Select recall quality for each tune
+    // Step 6: Select recall quality for each tune (FSRS system)
     const qualityRatings = [
       {
-        testId: "tt-recal-eval-trivial",
-        description: "4: correct response after a hesitation",
+        testId: "tt-recal-eval-good",
+        description: "Good: satisfactory recall performance",
       },
       {
-        testId: "tt-recal-eval-perfect",
-        description: "5: perfect response",
+        testId: "tt-recal-eval-easy",
+        description: "Easy: effortless and confident recall",
       },
       {
-        testId: "tt-recal-eval-struggled",
-        description: "3: correct response recalled with serious difficulty",
+        testId: "tt-recal-eval-hard",
+        description: "Hard: difficult recall with effort",
       },
       {
-        testId: "tt-recal-eval-barely",
-        description:
-          "2: incorrect response; where the correct one seemed easy to recall",
+        testId: "tt-recal-eval-again",
+        description: "Again: need to practice again soon",
       },
     ];
 
@@ -138,8 +147,7 @@ test.describe("Practice Session Complete Workflow", () => {
 
   test("should handle partial recall quality selection", async ({ page }) => {
     // Navigate to Practice tab
-    await page.getByRole("tab", { name: "Practice" }).click();
-    await page.waitForLoadState("domcontentloaded");
+    await navigateToPracticeTabStandalone(page);
 
     // Get recall quality dropdowns
     const recallDropdowns = page.locator(
@@ -148,9 +156,9 @@ test.describe("Practice Session Complete Workflow", () => {
     const dropdownCount = await recallDropdowns.count();
 
     if (dropdownCount > 0) {
-      // Select quality for only the first tune
+      // Select quality for only the first tune (using FSRS)
       await recallDropdowns.first().click();
-      await page.getByTestId("tt-recal-eval-perfect").click();
+      await page.getByTestId("tt-recal-eval-easy").click();
 
       // Verify submit button is still disabled (not all tunes evaluated)
       const submitButton = page.getByRole("button", {
@@ -167,8 +175,7 @@ test.describe("Practice Session Complete Workflow", () => {
     page,
   }) => {
     // Navigate to Practice tab
-    await page.getByRole("tab", { name: "Practice" }).click();
-    await page.waitForLoadState("domcontentloaded");
+    await navigateToPracticeTabStandalone(page);
 
     // Get first recall quality dropdown
     const firstDropdown = page
@@ -177,19 +184,25 @@ test.describe("Practice Session Complete Workflow", () => {
       )
       .first();
 
-    if (await firstDropdown.isVisible()) {
+    await page.waitForTimeout(500); // bit of time to ensure dropdown is ready
+    await firstDropdown.waitFor({ state: "attached", timeout: 50000 });
+
+    if (await firstDropdown.isVisible({ timeout: 50000 })) {
+      await firstDropdown.isEnabled({ timeout: 50000 });
+
+      await page.waitForTimeout(2000);
+
       // Click to open dropdown
       await firstDropdown.click();
+
       await page.waitForTimeout(500); // Wait for dropdown to open
 
-      // Verify key quality options are present using testid selectors
+      // Verify key quality options are present using testid selectors (FSRS system)
       const expectedTestIds = [
-        "tt-recal-eval-trivial", // 4: correct response after a hesitation
-        "tt-recal-eval-perfect", // 5: perfect response
-        "tt-recal-eval-struggled", // 3: correct response recalled with serious difficulty
-        "tt-recal-eval-barely", // 2: incorrect response; where the correct one seemed easy to recall
-        "tt-recal-eval-failed", // 1: incorrect response; the correct one remembered
-        "tt-recal-eval-blackout", // 0: complete blackout
+        "tt-recal-eval-again", // Again: need to practice again soon
+        "tt-recal-eval-hard", // Hard: difficult recall with effort
+        "tt-recal-eval-good", // Good: satisfactory recall performance
+        "tt-recal-eval-easy", // Easy: effortless and confident recall
       ];
 
       for (const testId of expectedTestIds) {
@@ -197,6 +210,9 @@ test.describe("Practice Session Complete Workflow", () => {
       }
 
       console.log("All key recall quality options are present in dropdown");
+    } else {
+      console.log("Recall quality dropdown not visible or enabled");
+      expect(false).toBe(true);
     }
   });
 
@@ -204,8 +220,7 @@ test.describe("Practice Session Complete Workflow", () => {
     page,
   }) => {
     // Navigate to Practice tab
-    await page.getByRole("tab", { name: "Practice" }).click();
-    await page.waitForLoadState("domcontentloaded");
+    await navigateToPracticeTabStandalone(page);
 
     // Wait for table to load and check if we have data
     await page.waitForTimeout(1000); // Give time for data to load

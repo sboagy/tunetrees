@@ -18,11 +18,25 @@ export async function setupDatabase(): Promise<void> {
       testDatabasePath,
     );
     await fs.copyFile(cleanDatabasePath, testDatabasePath);
+
+    // Verify the copy by checking the file stats
+    const srcStats = await fs.stat(cleanDatabasePath);
+    const destStats = await fs.stat(testDatabasePath);
+
+    if (srcStats.size !== destStats.size) {
+      throw new Error("File copy incomplete: size mismatch.");
+    }
+    if (srcStats.mtimeMs > destStats.mtimeMs) {
+      throw new Error(
+        "File copy incomplete: destination file is older than source.",
+      );
+    }
+
     function sleep(ms: number): Promise<void> {
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
-    await sleep(1000);
+    await sleep(2000);
     console.log("Database setup complete.");
   } catch (error) {
     console.error("Error setting up database:", error);
