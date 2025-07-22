@@ -88,7 +88,8 @@ unset NEXTAUTH_SECRET
 
 # npx dotenv -f -e .env.local -- bash -c 'echo "NEXTAUTH_SECRET after unset, with dotenv: $NEXTAUTH_SECRET"'
 
-# npx dotenv -f .env.local -- npx playwright test $REPORTER_ARG $TEST_FILE_ARG $PLAYWRIGHT_ARGS
+# Run Playwright tests with environment variables loaded
+npx dotenv -f .env.local -- npx playwright test $REPORTER_ARG $TEST_FILE_ARG $PLAYWRIGHT_ARGS
 
 # Capture the exit code from playwright
 PLAYWRIGHT_EXIT_CODE=$?

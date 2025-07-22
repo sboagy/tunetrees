@@ -98,7 +98,7 @@ export default defineConfig({
       },
       // dependencies: ["backend"],
       testMatch: "test*.ts",
-      timeout: 30_000, // 30 seconds timeout per test
+      timeout: process.env.CI ? 50_000 : 30_000, // 50 seconds in CI, 30 seconds locally
     },
 
     // {
