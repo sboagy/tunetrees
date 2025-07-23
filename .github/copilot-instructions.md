@@ -466,88 +466,254 @@ practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
 
 ### Playwright E2E Testing Guidelines
 
-When creating new Playwright tests for TuneTrees:
+**CRITICAL**: All TuneTrees Playwright tests MUST follow these patterns for consistency, reliability, and maintainability.
 
-1. **Running Tests**: ALWAYS use the environment setup script:
+#### 1. **Running Tests**: Environment Setup Script
 
-   ```bash
-   cd frontend
-   ./run-playwright-tests.sh [test-file-pattern]
-   ```
+ALWAYS use the environment setup script:
 
-   Do NOT use `npx playwright test` directly - it lacks proper environment setup including database initialization and environment variables.
+```bash
+cd frontend
+./run-playwright-tests.sh [test-file-pattern]
+```
 
-2. **Authentication & Storage State**: For features requiring login, set up storage state:
+Do NOT use `npx playwright test` directly - it lacks proper environment setup including database initialization and environment variables.
 
-   ```typescript
-   test.use({
-     storageState: getStorageState("STORAGE_STATE_TEST1"),
-     trace: "retain-on-failure",
-   });
-   ```
+#### 2. **Authentication Pattern: Storage State (PREFERRED)**
 
-3. **Test Setup (beforeEach)**: Always include proper test initialization:
+**Use storage state for authentication in most cases** instead of manual login:
 
-   ```typescript
-   test.beforeEach(async ({ page }, testInfo) => {
-     console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
-     await setTestDefaults(page);
-     await applyNetworkThrottle(page);
-     await page.goto("/your-page-route");
-     await page.waitForLoadState("domcontentloaded");
-   });
-   ```
+```typescript
+import { getStorageState } from "@/test-scripts/storage-state";
 
-4. **Page Readiness**: Use `page.waitForLoadState("domcontentloaded")` for page readiness, not network idle timeouts.
+test.use({
+  storageState: getStorageState("STORAGE_STATE_TEST1"),
+  trace: "retain-on-failure",
+  viewport: { width: 1728 - 50, height: 1117 - 200 },
+});
+```
 
-5. **Test Cleanup (afterEach)**: Always restore backend state:
+Storage state is faster, more reliable, and consistent than manual login. Only use manual login patterns like `runLoginStandalone()` when there's a specific reason to test the login flow itself or when storage state doesn't meet the test requirements.
 
-   ```typescript
-   test.afterEach(async ({ page }) => {
-     await restartBackend();
-     await page.waitForTimeout(1_000);
-   });
-   ```
+#### 3. **Test Structure: Standard Pattern (REQUIRED)**
 
-6. **Page Objects**: Use existing Page Object classes from `frontend/test-scripts/`:
+**Imports**: Always include these standard imports:
 
-   - `tunetrees.po.ts` - Main application Page Object
-   - `tune-editor.po.ts` - Specialized for tune editing workflows
-   - **Add new locators to Page Objects** when you find yourself repeating the same selector paths across tests
-   - Create new Page Objects following these patterns when needed
+```typescript
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
+import { restartBackend } from "@/test-scripts/global-setup";
+import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+import { getStorageState } from "@/test-scripts/storage-state";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
+import { expect, test } from "@playwright/test";
+import {
+  logTestStart,
+  logTestEnd,
+  logBrowserContextStart,
+  logBrowserContextEnd,
+} from "../test-scripts/test-logging";
+```
 
-7. **Defensive Testing**: Always check element visibility before interactions:
+**beforeEach Pattern**: Always include proper logging and setup:
 
-   ```typescript
-   const element = page.locator("selector");
-   if (await element.isVisible()) {
-     await element.click();
-     // ... test logic
-   }
-   ```
+```typescript
+test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
+  console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+  await setTestDefaults(page);
+  await applyNetworkThrottle(page);
+  // Do NOT navigate here - let individual tests handle navigation
+});
+```
 
-8. **Required Imports**: Include these standard imports for TuneTrees tests:
+**afterEach Pattern**: Always restore backend state with logging:
 
-   ```typescript
-   import { restartBackend } from "@/test-scripts/global-setup";
-   import { applyNetworkThrottle } from "@/test-scripts/network-utils";
-   import { setTestDefaults } from "@/test-scripts/set-test-defaults";
-   import { getStorageState } from "@/test-scripts/storage-state";
-   import { test, expect } from "@playwright/test";
-   ```
+```typescript
+test.afterEach(async ({ page }, testInfo) => {
+  await restartBackend();
+  await page.waitForTimeout(1_000);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
+});
+```
 
-9. **Locator Management**: When adding new locators to Page Objects, follow these patterns:
+#### 4. **Page Objects: Mandatory Usage (REQUIRED)**
 
-   ```typescript
-   // In Page Object file (e.g., tunetrees.po.ts)
-   readonly fsrsRadioButton = this.page.locator('input[type="radio"][value="FSRS"]');
-   readonly optimizeButton = this.page.locator('button:has-text("Auto-Optimize Parameters")');
+**ALWAYS** use Page Objects instead of raw selectors:
 
-   // Use in tests instead of repeating selectors
-   const po = new TuneTreesPageObject(page);
-   await po.fsrsRadioButton.check();
-   await expect(po.optimizeButton).toBeVisible();
-   ```
+- **`TuneTreesPageObject`** (`frontend/test-scripts/tunetrees.po.ts`): Main application navigation and common elements
+- **`TuneEditorPageObject`** (`frontend/test-scripts/tune-editor.po.ts`): Tune editing workflows
+
+**Navigation Pattern**: Always use Page Object methods:
+
+```typescript
+test("example-test", async ({ page }) => {
+  const ttPO = new TuneTreesPageObject(page);
+  await ttPO.gotoMainPage(); // REQUIRED first step
+  await ttPO.navigateToRepertoireTab(); // Use Page Object methods
+
+  // Use Page Object locators
+  await expect(ttPO.tunesGrid).toBeVisible();
+  await ttPO.repertoireTabTrigger.click();
+});
+```
+
+#### 5. **Locator Management: DRY Principle (REQUIRED)**
+
+**Add locators to Page Objects** instead of repeating selectors:
+
+```typescript
+// BAD: Repeating selectors across tests
+const sortButton = page.locator('button[title*="sort"]');
+const columnHeader = page.getByRole("columnheader").filter({ hasText: "Id" });
+
+// GOOD: Add to Page Object
+// In tunetrees.po.ts:
+readonly idColumnHeader = this.page.getByRole("columnheader").filter({ hasText: "ID" });
+readonly typeSortButton = this.page.locator('button[title*="sort Type"]');
+
+// In test:
+const ttPO = new TuneTreesPageObject(page);
+await expect(ttPO.idColumnHeader).toBeVisible();
+await ttPO.typeSortButton.click();
+```
+
+**When to add new locators**:
+
+- If you use the same selector in 2+ tests
+- If the selector is complex or likely to change
+- If it represents a key UI component
+
+#### 6. **Navigation Best Practices (REQUIRED)**
+
+**Standard Navigation Flow**:
+
+```typescript
+test("example-test", async ({ page }) => {
+  const ttPO = new TuneTreesPageObject(page);
+
+  // 1. Always start with gotoMainPage()
+  await ttPO.gotoMainPage();
+
+  // 2. Use Page Object navigation methods
+  await ttPO.navigateToRepertoireTab();
+  await ttPO.navigateToPracticeTab();
+
+  // 3. Wait for content to load
+  await page.waitForLoadState("domcontentloaded");
+});
+```
+
+**Available Page Object Navigation Methods**:
+
+- `gotoMainPage()`: Initial navigation with authentication check
+- `navigateToRepertoireTab()`: Navigate to repertoire grid
+- `navigateToPracticeTab()`: Navigate to practice mode
+- `navigateToTune(tuneName)`: Navigate to specific tune
+
+#### 7. **Common Locators in Page Objects**
+
+**Use existing locators from TuneTreesPageObject**:
+
+```typescript
+// Grid and table elements
+ttPO.tunesGrid;
+ttPO.tunesGridRows;
+ttPO.tableStatus;
+
+// Navigation
+ttPO.repertoireTabTrigger;
+ttPO.practiceTabTrigger;
+ttPO.mainTabGroup;
+
+// Actions
+ttPO.addToReviewButton;
+ttPO.submitPracticedTunesButton;
+ttPO.filterInput;
+```
+
+#### 8. **Error Handling and Debugging**
+
+**Defensive Testing**:
+
+```typescript
+// Always check visibility before interaction
+const element = ttPO.sortButton;
+if (await element.isVisible()) {
+  await element.click();
+} else {
+  console.log("Element not visible, taking alternative action");
+}
+
+// Use proper timeouts
+await expect(ttPO.tunesGrid).toBeVisible({ timeout: 15000 });
+```
+
+**Debugging Output**:
+
+```typescript
+// Use console.log for debugging
+console.log("Current URL:", page.url());
+console.log("Element count:", await ttPO.tunesGridRows.count());
+
+// Take screenshots for debugging
+await page.screenshot({ path: "debug-screenshot.png" });
+```
+
+#### 9. **Test Data and State Management**
+
+**Database State**: Tests automatically use clean database via `restartBackend()`
+
+**Test Isolation**: Each test starts with fresh backend state
+
+**Storage State**: Authentication persists across tests in same file
+
+#### 10. **Performance and Reliability**
+
+**Timeouts**: Use appropriate timeouts based on operation:
+
+- Page loads: 15-30 seconds
+- Element visibility: 5-10 seconds
+- Quick actions: 1-2 seconds
+
+**Wait Strategies**:
+
+```typescript
+// Preferred: Wait for specific conditions
+await expect(ttPO.tunesGrid).toBeVisible();
+
+// Avoid: Fixed timeouts unless necessary
+await page.waitForTimeout(500); // Only for animations/transitions
+```
+
+#### 11. **Adding New Tests: Checklist**
+
+When creating new tests, ensure:
+
+- [ ] Uses `getStorageState("STORAGE_STATE_TEST1")` for authentication
+- [ ] Includes proper logging in beforeEach/afterEach
+- [ ] Uses `TuneTreesPageObject` or `TuneEditorPageObject`
+- [ ] Calls `ttPO.gotoMainPage()` first
+- [ ] Uses existing Page Object locators when possible
+- [ ] Adds new locators to Page Objects if needed
+- [ ] Includes proper error handling and timeouts
+- [ ] Follows DRY principles (no repeated selectors)
+- [ ] Includes meaningful console.log statements for debugging
+
+#### 12. **Remote Copilot Instructions**
+
+When **GitHub Copilot** creates or modifies tests:
+
+1. **PREFER storage state authentication** - use manual login only when testing login flows specifically
+2. **ALWAYS use Page Objects** - never raw page.locator() calls when Page Object methods exist
+3. **ALWAYS call ttPO.gotoMainPage() first** in any test that navigates
+4. **ALWAYS add reusable locators to Page Objects** instead of inline selectors
+5. **ALWAYS include proper logging** (logTestStart, logTestEnd, etc.)
+6. **ALWAYS use defensive programming** with proper visibility checks
+7. **ALWAYS follow the established patterns** from existing working tests
+
+This ensures consistency, maintainability, and reliability across all TuneTrees E2E tests.
 
 ### Diagnostic Functions
 
