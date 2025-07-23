@@ -282,6 +282,16 @@ export default function LoginDialog(): JSX.Element {
                     {passwordError}
                   </p>
                 )}
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="link"
+                    asChild
+                    className="p-0 h-auto text-sm text-primary hover:underline"
+                  >
+                    <a href="/auth/password-reset">Forgot password?</a>
+                  </Button>
+                </div>
                 <Button
                   type="submit"
                   variant="secondary"

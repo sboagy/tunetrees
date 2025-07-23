@@ -30,7 +30,9 @@ TuneTrees is a spaced repetition learning app for musical tunes built with FastA
 
 - **Strict typing**: No `any` types - use proper TypeScript interfaces and generics
 - **Clean lints**: Code must pass all linting rules without warnings
-- **Proper formatting**: Consistent code formatting via Prettier/ESLint
+- **Prettier formatting**: ALWAYS run prettier on code before committing - use `npx prettier --write <files>` 
+- **Automatic formatting**: Use prettier for consistent code style - it handles indentation, spacing, line breaks, and semicolons
+- **ESLint compliance**: All ESLint rules must pass without warnings after prettier formatting
 - **Interface naming**: Use `I` prefix for all TypeScript interfaces
 
 ### Database Layer (SQLAlchemy 2.0.35)
@@ -151,8 +153,9 @@ npm run type-check  # TypeScript strict checking
 
 - **TypeScript**: Strict mode enabled, no `any` types permitted
 - **ESLint**: All rules must pass without warnings
-- **Prettier**: Consistent formatting enforced
+- **Prettier**: Consistent formatting enforced - ALWAYS run `npx prettier --write <files>` before commits
 - **Type checking**: Full TypeScript compilation without errors
+- **Pre-commit formatting**: Use `npx prettier --write .` to format all files or target specific files with patterns like `"app/**/*.{ts,tsx}"`
 
 ### Git Operations & GitHub Integration
 
@@ -170,6 +173,35 @@ npm run type-check  # TypeScript strict checking
 - `mcp_github_update_pull_request` - For updating PR with commit information
 
 **Only fall back to basic `git` commands if GitHub MCP server tools are unavailable.**
+
+### Code Formatting Workflow (CRITICAL)
+
+**ALWAYS use prettier for code formatting before any commit or file edit completion:**
+
+```bash
+# Format specific files (RECOMMENDED for targeted changes)
+npx prettier --write app/auth/login/page.tsx app/auth/password-reset/route.ts
+
+# Format by pattern (useful for related files)
+npx prettier --write "app/auth/**/*.{ts,tsx}"
+
+# Format all files (use sparingly, only when needed)
+npx prettier --write .
+```
+
+**Integration with tools:**
+- **After creating/editing files**: ALWAYS run prettier on the modified files
+- **Before commits**: Run prettier to ensure consistent formatting
+- **Never commit unformatted code**: Prettier fixes indentation, spacing, quotes, and semicolons automatically
+- **Use the run_in_terminal tool**: Call prettier via terminal rather than manual formatting
+
+**Prettier handles:**
+- Consistent indentation (2 spaces for TypeScript/React)
+- Line length optimization (automatic wrapping)
+- Quote consistency (double quotes for strings)
+- Semicolon placement (always add)
+- Bracket spacing and trailing commas
+- Import statement formatting
 
 ### Commit Message Guidelines
 
@@ -736,6 +768,6 @@ This ensures consistency, maintainability, and reliability across all TuneTrees 
 
 - **No `any` types**: Use proper TypeScript interfaces and generics
 - **Clean lints**: All ESLint rules must pass without warnings
-- **Proper formatting**: Consistent code style via Prettier
+- **Prettier formatting**: Consistent code style enforced - ALWAYS run `npx prettier --write <files>` before commits
 - **Type safety**: Full TypeScript compilation without errors
 - **UI consistency**: Comprehensive patterns in `frontend/UI_STYLE_GUIDE2.md`, with core patterns automatically included for frontend development
