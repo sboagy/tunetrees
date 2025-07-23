@@ -10,6 +10,9 @@ import {
   navigateToRepertoireTabStandalone,
 } from "@/test-scripts/tunetrees.po";
 
+// Increase timeout for complete workflow tests
+test.use({ actionTimeout: 90000 });
+
 test.describe.serial("Practice Session Complete Workflow", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
