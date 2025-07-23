@@ -100,6 +100,7 @@ function rotateSorting<TData, TValue>(
     column.toggleSorting(false, true);
   }
   console.log("column.getIsSorted(): ", column.getIsSorted());
+
   if (setTunesRefreshId) {
     setTunesRefreshId(-1);
   }

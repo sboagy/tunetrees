@@ -136,7 +136,7 @@ export default defineConfig({
   webServer: {
     // Playwright will start the server using this webServer config in both local and CI environments.
     // Setting reuseExistingServer: true avoids server startup/shutdown race conditions.
-    command: "npm run dev 2>&1 | tee test-results/frontend.log", // Combine the command and arguments
+    command: `npm run dev 2>&1 | tee ${process.env.TUNETREES_FRONTEND_LOG || "test-results/frontend.log"}`, // Combine the command and arguments
     env: {
       NEXT_BASE_URL: process.env.NEXT_BASE_URL || "",
       NEXT_PUBLIC_MOCK_EXTERNAL_APIS:

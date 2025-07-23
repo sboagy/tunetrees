@@ -26,6 +26,15 @@ export class TuneTreesPageObject {
   readonly addtuneButtonNew;
   readonly addtuneButtonImport;
 
+  readonly idColumnHeader;
+  readonly idColumnHeaderSortButton;
+  readonly scheduledColumnHeader;
+  readonly scheduledColumnHeaderSortButton;
+  readonly typeColumnHeader;
+  readonly typeColumnHeaderSortButton;
+  readonly titleColumnHeader;
+  readonly titleColumnHeaderSortButton;
+
   readonly selectSettingButton;
 
   readonly tuneEditorSubmitButton;
@@ -97,6 +106,31 @@ export class TuneTreesPageObject {
 
     this.addtuneButtonNew = page.getByTestId("addtune-button-new");
     this.addtuneButtonImport = page.getByTestId("addtune-button-import");
+
+    this.idColumnHeader = page
+      .getByRole("cell", { name: "Id", exact: true })
+      .locator("div");
+    this.idColumnHeaderSortButton = page
+      .getByRole("cell", { name: "Id", exact: true })
+      .getByRole("button");
+    this.scheduledColumnHeader = page
+      .getByRole("cell", { name: "Scheduled", exact: true })
+      .locator("div");
+    this.scheduledColumnHeaderSortButton = page
+      .getByRole("cell", { name: "Scheduled", exact: true })
+      .getByRole("button");
+    this.typeColumnHeader = page
+      .getByRole("cell", { name: "Type", exact: true })
+      .locator("div");
+    this.typeColumnHeaderSortButton = page
+      .getByRole("cell", { name: "Type", exact: true })
+      .getByRole("button");
+    this.titleColumnHeader = page
+      .getByRole("cell", { name: "Title", exact: true })
+      .locator("div");
+    this.titleColumnHeaderSortButton = page
+      .getByRole("cell", { name: "Title", exact: true })
+      .getByRole("button");
 
     this.selectSettingButton = page.getByTestId("tt-select-setting");
 

@@ -58,6 +58,10 @@ mkdir -p "$OUTPUT_DIR"
 export PLAYWRIGHT_TEST_RESULTS_DIR="$OUTPUT_DIR/test-results"
 export PLAYWRIGHT_HTML_REPORT="$OUTPUT_DIR/html-report"
 
+# Set custom log paths for frontend and backend logs
+export TUNETREES_FRONTEND_LOG="$OUTPUT_DIR/test-results/frontend.log"
+export TUNETREES_FASTAPI_LOG="$OUTPUT_DIR/test-results/fastapi.log"
+
 # Check if --reporter is already specified in arguments
 REPORTER_SPECIFIED=false
 for arg in "$@"; do
@@ -97,6 +101,7 @@ PLAYWRIGHT_EXIT_CODE=$?
 # Always cleanup before exiting (even on successful runs)
 echo "🧹 Performing final cleanup..."
 pkill -f "uvicorn.*main:app" 2>/dev/null || true
+
 # pkill -f "playwright test-server" 2>/dev/null || true
 # Don't kill the main playwright test process here
 
@@ -110,7 +115,9 @@ fi
 echo "📊 Results saved to: $OUTPUT_DIR"
 echo "🔍 To view HTML report: npx playwright show-report $OUTPUT_DIR/html-report"
 echo "🔍 To view traces: npx playwright show-trace $OUTPUT_DIR/test-results/*/trace.zip"
-echo "💡 For HTML report: add --reporter=html to command"
+echo "� Frontend logs: $OUTPUT_DIR/test-results/frontend.log"
+echo "📋 Backend logs: $OUTPUT_DIR/test-results/fastapi.log"
+echo "�💡 For HTML report: add --reporter=html to command"
 
 # Exit with the same code as playwright
 exit $PLAYWRIGHT_EXIT_CODE
