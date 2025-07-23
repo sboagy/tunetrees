@@ -8,6 +8,43 @@ export type ScreenSize = "small" | "full";
 
 export type TablePurpose = "practice" | "repertoire" | "catalog";
 
+// Practice Goals Enums (matching backend)
+export enum PracticeGoalEnum {
+  INITIAL_LEARN = "initial_learn",
+  RECALL = "recall",
+  FLUENCY = "fluency",
+  SESSION_READY = "session_ready",
+  PERFORMANCE_POLISH = "performance_polish",
+}
+
+export enum PracticeTechniqueEnum {
+  FSRS = "fsrs",
+  SM2 = "sm2",
+  DAILY_PRACTICE = "daily_practice",
+  MOTOR_SKILLS = "motor_skills",
+  METRONOME = "metronome",
+  CUSTOM = "custom",
+}
+
+// Practice Goal display labels for UI
+export const practiceGoalLabels: Record<PracticeGoalEnum, string> = {
+  [PracticeGoalEnum.INITIAL_LEARN]: "Initial Learn",
+  [PracticeGoalEnum.RECALL]: "Recall",
+  [PracticeGoalEnum.FLUENCY]: "Fluency",
+  [PracticeGoalEnum.SESSION_READY]: "Session Ready",
+  [PracticeGoalEnum.PERFORMANCE_POLISH]: "Performance Polish",
+};
+
+// Practice Technique display labels for UI
+export const practiceTechniqueLabels: Record<PracticeTechniqueEnum, string> = {
+  [PracticeTechniqueEnum.FSRS]: "FSRS Algorithm",
+  [PracticeTechniqueEnum.SM2]: "SM2 Algorithm",
+  [PracticeTechniqueEnum.DAILY_PRACTICE]: "Daily Practice",
+  [PracticeTechniqueEnum.MOTOR_SKILLS]: "Motor Skills",
+  [PracticeTechniqueEnum.METRONOME]: "Metronome Practice",
+  [PracticeTechniqueEnum.CUSTOM]: "Custom Approach",
+};
+
 export interface ITableTransientData {
   user_id: number;
   tune_id: number;
@@ -132,6 +169,9 @@ export interface ITuneOverview extends ITune {
   notes?: string | null;
   favorite_url?: string | null;
   playlist_deleted?: boolean | null;
+  // Practice Goals fields (Issue #205)
+  goal?: string | null;
+  technique?: string | null;
 }
 
 export interface ITuneOverviewImported extends ITuneOverview {

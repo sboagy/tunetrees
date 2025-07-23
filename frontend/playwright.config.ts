@@ -53,7 +53,7 @@ export default defineConfig({
   ),
 
   expect: {
-    timeout: 20_000,
+    timeout: 20_000, // 20 seconds
   },
 
   use: {
@@ -88,10 +88,17 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 720 },
+        // Force Playwright to launch browser window on the same screen as the process (not the active screen)
+        launchOptions: {
+          // On multi-monitor setups, Playwright/Chromium will launch on the primary screen by default.
+          // To force a specific screen, set the window position explicitly.
+          // Example: position at (0,0) on the screen where the process starts.
+          args: ["--window-position=0,0"],
+        },
       },
       // dependencies: ["backend"],
       testMatch: "test*.ts",
-      timeout: 6 * 60 * 1000, // 6 minutes timeout per test (temporarily increased)
+      timeout: process.env.CI ? 50_000 : 30_000, // 50 seconds in CI, 30 seconds locally
     },
 
     // {
@@ -138,7 +145,7 @@ export default defineConfig({
         process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "true",
       TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
       AUTH_SECRET: process.env.AUTH_SECRET || "",
-      NEXTAUTH_SECRET: process.env.AUTH_SECRET || "",
+      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",
       AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
       AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET || "",
       AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || "",

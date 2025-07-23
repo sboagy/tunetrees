@@ -2,14 +2,14 @@ import path from "node:path";
 
 import { fileURLToPath } from "node:url";
 
-import type { Page } from "@playwright/test";
+import type { Cookie, Page } from "@playwright/test";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const __filename = fileURLToPath(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const __dirname = path.dirname(__filename);
 
-export async function runLoginWithCookieSave(
+export async function runLoginStandalone(
   page: Page,
   user: string | undefined,
   pw: string | undefined,
@@ -21,11 +21,6 @@ export async function runLoginWithCookieSave(
     console.log("===> run-login2.ts:20 ~ ", "No login credentials found");
     throw new Error("No login credentials found");
   }
-
-  const storageStatePath = path.resolve(
-    __dirname,
-    "storageStateSboagyLogin.json",
-  );
 
   await page.getByRole("button", { name: "Sign in" }).click();
   const userEmailLocator = page.getByTestId("user_email");
@@ -49,6 +44,36 @@ export async function runLoginWithCookieSave(
   );
 
   await signInButton.click();
-  await page.waitForTimeout(4000);
+
+  let sessionCookie: Cookie | undefined;
+  for (let i = 0; i < 10; i++) {
+    const cookies = await page.context().cookies();
+    sessionCookie = cookies.find(
+      (cookie) =>
+        cookie.name === "__Secure-authjs.session-token" ||
+        cookie.name === "next-auth.session-token" ||
+        cookie.name === "authjs.session-token",
+    );
+    if (sessionCookie) break;
+    await page.waitForTimeout(200); // wait a bit before retrying
+  }
+  if (!sessionCookie) {
+    console.warn("NextAuth session cookie not found!");
+    // You might want to pause here for debugging or retry
+  }
+}
+
+export async function runLoginWithCookieSave(
+  page: Page,
+  user: string | undefined,
+  pw: string | undefined,
+): Promise<void> {
+  await runLoginStandalone(page, user, pw);
+
+  const storageStatePath = path.resolve(
+    __dirname,
+    "storageStateSboagyLogin.json",
+  );
+
   await page.context().storageState({ path: storageStatePath });
 }

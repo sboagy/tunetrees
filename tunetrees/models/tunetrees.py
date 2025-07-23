@@ -50,6 +50,8 @@ class PlaylistTune(Base):
     current = mapped_column(Text)
     learned = mapped_column(Text)
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
+    goal = mapped_column(Text, server_default=text("'recall'"))
+    technique = mapped_column(Text)
 
 
 t_practice_list_joined = Table(

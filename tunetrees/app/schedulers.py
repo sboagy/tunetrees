@@ -243,6 +243,14 @@ class FSRScheduler(SpacedRepetitionScheduler):
 
     @staticmethod
     def _quality_to_fsrs_rating(quality_int: int) -> Rating:
+        """Convert quality value to FSRS Rating.
+
+        This expects normalized 6-value quality input (0-5 scale):
+        - 0,1 -> Again
+        - 2 -> Hard
+        - 3 -> Good
+        - 4,5 -> Easy
+        """
         if quality_int in (0, 1):
             return Rating.Again
         elif quality_int == 2:

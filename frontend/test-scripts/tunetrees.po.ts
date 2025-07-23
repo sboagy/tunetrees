@@ -501,3 +501,20 @@ export class TuneTreesPageObject {
     });
   }
 }
+
+export interface INavigateToPracticeTabStandaloneParams {
+  page: Page;
+  practiceTabTrigger: Locator;
+}
+
+export async function navigateToPracticeTabStandalone(
+  page: Page,
+): Promise<void> {
+  const ttPO = new TuneTreesPageObject(page);
+  await ttPO.navigateToPracticeTab();
+}
+
+export async function navigateToRepertoireTabStandalone(page: Page) {
+  const ttPO = new TuneTreesPageObject(page);
+  await ttPO.navigateToRepertoireTab();
+}

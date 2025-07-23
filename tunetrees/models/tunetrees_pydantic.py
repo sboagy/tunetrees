@@ -30,6 +30,30 @@ class AlgTypeEnum(str, Enum):
 AlgorithmType = AlgTypeEnum
 
 
+class PracticeGoalEnum(str, Enum):
+    """Practice goals as defined in Issue #205"""
+
+    initial_learn = "initial_learn"
+    recall = "recall"
+    fluency = "fluency"
+    session_ready = "session_ready"
+    performance_polish = "performance_polish"
+
+
+class PracticeTechniqueEnum(str, Enum):
+    """Practice techniques for different goals"""
+
+    # For recall goal
+    fsrs = "fsrs"
+    sm2 = "sm2"
+    # For other goals (to be expanded)
+    daily_practice = "daily_practice"
+    motor_skills = "motor_skills"
+    metronome = "metronome"
+    # Open for future expansion
+    custom = "custom"
+
+
 class WhichTabEnum(str, Enum):
     scheduled = "scheduled"
     repertoire = "repertoire"
@@ -57,6 +81,8 @@ class PlaylistTuneModel(BaseModel):
     current: str
     learned: str
     deleted: Optional[bool]
+    goal: Optional[str] = "recall"  # Default to recall, stored as TEXT in database
+    technique: Optional[str] = None  # Open text field as requested in Issue #205
 
 
 class PlaylistTuneModelPartial(BaseModel):
@@ -67,6 +93,8 @@ class PlaylistTuneModelPartial(BaseModel):
     current: Optional[str] = None
     learned: Optional[str] = None
     deleted: Optional[bool] = None
+    goal: Optional[str] = None
+    technique: Optional[str] = None
 
 
 class TuneModel(BaseModel):

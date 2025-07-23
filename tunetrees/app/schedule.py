@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Tuple
-from typing_extensions import TypedDict
+from typing import Dict, List, Tuple, Optional
+from typing_extensions import TypedDict, NotRequired
 
 from fsrs import Rating, Scheduler, ReviewLog
 from fsrs.optimizer import Optimizer
@@ -91,6 +91,8 @@ class BadTuneID(Exception):
 
 class TuneFeedbackUpdate(TypedDict):
     feedback: str
+    goal: NotRequired[str | None]  # Practice goal (e.g., 'recall', 'fluency', etc.)
+    technique: NotRequired[str | None]  # Practice technique (e.g., 'fsrs', 'sm2', etc.)
 
 
 def fetch_algorithm_type(db: Session, user_ref: str) -> AlgorithmType:
@@ -105,6 +107,30 @@ def fetch_algorithm_type(db: Session, user_ref: str) -> AlgorithmType:
     else:
         log.debug(f"No alg_type found for user_ref: {user_ref}")
         return AlgorithmType.FSRS
+
+
+def get_default_technique_for_user(db: Session, user_ref: str) -> str:
+    """Get the default technique for a user from user.sr_alg_type.
+
+    Args:
+        db: Database session
+        user_ref: User reference ID
+
+    Returns:
+        str: Default technique based on user's sr_alg_type preference,
+             defaults to 'fsrs' if not specified
+    """
+    from tunetrees.models.tunetrees import User
+
+    stmt = select(User.sr_alg_type).where(User.id == user_ref)
+    result = db.execute(stmt).one_or_none()
+
+    if result and result[0]:
+        sr_alg_type = result[0].lower()  # Convert 'FSRS' -> 'fsrs', 'SM2' -> 'sm2'
+        return sr_alg_type
+    else:
+        # Default to 'fsrs' if user preference not found or empty
+        return "fsrs"
 
 
 def fetch_user_ref_from_playlist_ref(db: Session, playlist_ref: int) -> str:
@@ -133,6 +159,20 @@ def difficulty_to_e_factor(d: float) -> float:
 
 
 def quality_to_fsrs_rating(quality_int: int) -> Rating:
+    """Convert quality value to FSRS Rating.
+
+    For 6-value SM2 system (0-5):
+    - 0,1 -> Again
+    - 2 -> Hard
+    - 3 -> Good
+    - 4,5 -> Easy
+
+    For 4-value FSRS system (0-3):
+    - 0 -> Again
+    - 1 -> Hard
+    - 2 -> Good
+    - 3 -> Easy
+    """
     if quality_int in (0, 1):
         return Rating.Again
     elif quality_int == 2:
@@ -145,7 +185,29 @@ def quality_to_fsrs_rating(quality_int: int) -> Rating:
         raise ValueError(f"Unexpected quality value: {quality_int}")
 
 
+def quality_to_fsrs_rating_direct(quality_int: int) -> Rating:
+    """Convert 4-value quality directly to FSRS Rating (0-3 -> Rating).
+
+    This is used when the frontend sends 4-value quality lists.
+    - 0 -> Again
+    - 1 -> Hard
+    - 2 -> Good
+    - 3 -> Easy
+    """
+    if quality_int == 0:
+        return Rating.Again
+    elif quality_int == 1:
+        return Rating.Hard
+    elif quality_int == 2:
+        return Rating.Good
+    elif quality_int == 3:
+        return Rating.Easy
+    else:
+        raise ValueError(f"Unexpected quality value for 4-value system: {quality_int}")
+
+
 def fsrs_rating_to_quality(rating: Rating):
+    """Convert FSRS Rating back to 6-value quality for legacy compatibility."""
     if rating == Rating.Again:
         return 0
     elif rating == Rating.Hard:
@@ -154,6 +216,25 @@ def fsrs_rating_to_quality(rating: Rating):
         return 3
     elif rating == Rating.Easy:
         return 5
+
+
+def fsrs_rating_to_quality_direct(rating: Rating) -> int:
+    """Convert FSRS Rating directly to 4-value quality (Rating -> 0-3).
+
+    This is used when working with 4-value quality lists.
+    - Again -> 0
+    - Hard -> 1
+    - Good -> 2
+    - Easy -> 3
+    """
+    if rating == Rating.Again:
+        return 0
+    elif rating == Rating.Hard:
+        return 1
+    elif rating == Rating.Good:
+        return 2
+    elif rating == Rating.Easy:
+        return 3
 
 
 class ReviewResult(TypedDict):
@@ -280,6 +361,44 @@ def validate_and_get_quality(
     return quality_int
 
 
+def get_quality_value_bounds(technique: str | None) -> tuple[int, int]:
+    """Get the min/max quality values for a given technique.
+
+    Returns:
+        tuple: (min_value, max_value) for the quality scale
+        - SM2: (0, 5) - 6-value system
+        - FSRS and goal-specific: (0, 3) - 4-value system
+    """
+    if technique == "sm2":
+        return (0, 5)  # 6-value system for SM2
+    else:
+        return (0, 3)  # 4-value system for FSRS and goal-specific techniques
+
+
+def is_4_value_quality_system(technique: str | None) -> bool:
+    """Check if the technique uses 4-value quality system (0-3).
+
+    Returns:
+        bool: True for FSRS and goal-specific techniques, False for SM2
+    """
+    return technique != "sm2"
+
+
+def get_appropriate_quality_mapping_function(technique: str | None):
+    """Get the appropriate quality-to-FSRS-rating function based on technique.
+
+    Args:
+        technique: The practice technique (e.g., 'fsrs', 'sm2', 'motor_skills', etc.)
+
+    Returns:
+        callable: The appropriate mapping function
+    """
+    if is_4_value_quality_system(technique):
+        return quality_to_fsrs_rating_direct  # Use direct 4-value mapping
+    else:
+        return quality_to_fsrs_rating  # Use traditional 6-value mapping
+
+
 def save_prefs_spaced_repetition(db: Session, prefs: PrefsSpacedRepetition) -> None:
     """
     Save or update the given PrefsSpacedRepetition object in the database.
@@ -363,6 +482,134 @@ def get_prefs_spaced_repetition(
     return prefs_spaced_repitition
 
 
+def _process_non_recall_goal(
+    db: Session,
+    tune_id: str,
+    tune_update: TuneFeedbackUpdate,
+    user_ref: str,
+    playlist_ref: int,
+    sitdown_date: datetime,
+    goal: str,
+    technique: Optional[str],
+    alg_type: AlgorithmType,
+) -> None:
+    """Process practice feedback for non-recall goals (Issue #205).
+
+    This implements goal-specific scheduling strategies:
+    - initial_learn: More frequent practice with shorter intervals
+    - fluency: Focus on consistent quality with moderate intervals
+    - session_ready: Intensive short-term practice
+    - performance_polish: Refined practice with quality focus
+    """
+    quality_int = validate_and_get_quality(tune_update, tune_id)
+    if quality_int is None:
+        return
+
+    # Get or create latest practice record
+    latest_practice_record = get_latest_practice_record(db, tune_id, playlist_ref)
+
+    # Calculate next review date based on goal-specific strategies
+    next_review_date = _calculate_goal_specific_review_date(
+        goal, technique, quality_int, sitdown_date, latest_practice_record
+    )
+
+    # Create new practice record with goal-specific scheduling
+    new_practice_record = PracticeRecord(
+        id=None,
+        tune_ref=tune_id,
+        playlist_ref=playlist_ref,
+        quality=quality_int,
+        practiced=sitdown_date.strftime(TT_DATE_FORMAT),
+        review_date=next_review_date.strftime(TT_DATE_FORMAT),
+        backup_practiced=sitdown_date.strftime(TT_DATE_FORMAT),
+        # Set basic interval/repetition tracking
+        interval=max(1, (next_review_date - sitdown_date).days),
+        repetitions=(
+            (latest_practice_record.repetitions + 1) if latest_practice_record else 1
+        ),
+        # Keep FSRS fields for future integration
+        easiness=latest_practice_record.easiness if latest_practice_record else 2.5,
+        stability=latest_practice_record.stability if latest_practice_record else 1.0,
+        difficulty=latest_practice_record.difficulty if latest_practice_record else 0.5,
+        state=1,  # Learning state for non-recall goals
+        step=0,
+        elapsed_days=0,
+        lapses=latest_practice_record.lapses if latest_practice_record else 0,
+    )
+
+    # Add the new practice record to the database
+    db.add(new_practice_record)
+    log.debug(
+        f"Created goal-specific practice record for tune {tune_id}, goal: {goal}, technique: {technique}"
+    )
+
+
+def _calculate_goal_specific_review_date(
+    goal: str,
+    technique: Optional[str],
+    quality: int,
+    sitdown_date: datetime,
+    latest_record: Optional[PracticeRecord],
+) -> datetime:
+    """Calculate next review date based on practice goal and technique."""
+
+    # Base intervals for different goals (in days)
+    goal_base_intervals = {
+        "initial_learn": [0.1, 0.5, 1, 2, 4],  # Very frequent practice
+        "fluency": [1, 3, 7, 14, 21],  # Building consistency
+        "session_ready": [0.5, 1, 2, 3, 5],  # Intensive short-term
+        "performance_polish": [2, 5, 10, 15, 21],  # Quality refinement
+    }
+
+    base_intervals = goal_base_intervals.get(
+        goal, [1, 3, 7, 14, 30]
+    )  # Default fallback
+
+    # Determine step based on quality and previous repetitions
+    current_step = 0
+    if latest_record and latest_record.repetitions:
+        current_step = min(latest_record.repetitions, len(base_intervals) - 1)
+
+    # Adjust step based on quality (0-5 scale)
+    if quality >= 4:  # Good/Easy
+        current_step = min(current_step + 1, len(base_intervals) - 1)
+    elif quality <= 2:  # Again/Hard
+        current_step = max(0, current_step - 1)
+    # Quality 3 (Good) keeps same step
+
+    # Get interval and apply technique-specific modifiers
+    interval_days = base_intervals[current_step]
+
+    if technique == "daily_practice":
+        interval_days = min(interval_days, 1.0)  # Cap at daily
+    elif technique == "motor_skills":
+        interval_days *= 0.7  # More frequent for motor skill development
+    elif technique == "metronome":
+        interval_days *= 0.8  # Slightly more frequent for timing work
+
+    # Convert to timedelta and add to sitdown_date
+    interval_delta = timedelta(days=interval_days)
+    return sitdown_date + interval_delta
+
+
+def normalize_quality_for_scheduler(quality_int: int, technique: str | None) -> int:
+    """Pass-through quality value - no conversion needed.
+
+    With the new technique-aware system, the quality value is stored
+    in its native format (4-value for FSRS, 6-value for SM2) and
+    the technique column tells us which system it's in.
+
+    Args:
+        quality_int: Original quality value from frontend
+        technique: Practice technique that determines quality scale
+
+    Returns:
+        int: Quality value unchanged (no conversion)
+    """
+    # Direct pass-through - technique column tells us which system quality is in
+    return quality_int
+
+
 def _process_single_tune_feedback(
     db: Session,
     tune_id: str,
@@ -383,6 +630,42 @@ def _process_single_tune_feedback(
     if quality_int is None:
         return
     quality_str = tune_update.get("feedback")
+
+    # Extract goal and technique from tune update (Issue #205)
+    goal = tune_update.get("goal", "recall")  # Default to recall if not specified
+    technique = tune_update.get("technique")  # Used for goal-specific techniques
+
+    # If technique is not provided, default based on user's algorithm preference
+    if technique is None:
+        technique = get_default_technique_for_user(db, user_ref)
+
+    # Normalize quality for scheduler compatibility
+    normalized_quality_int = normalize_quality_for_scheduler(quality_int, technique)
+
+    # Implement goal-specific scheduling strategies
+    if goal not in [
+        "initial_learn",
+        "recall",
+        "fluency",
+        "session_ready",
+        "performance_polish",
+    ]:
+        log.warning(f"Unknown goal '{goal}', falling back to recall logic")
+        goal = "recall"
+
+    # For non-recall goals, we implement different scheduling approaches
+    if goal != "recall":
+        return _process_non_recall_goal(
+            db,
+            tune_id,
+            tune_update,
+            user_ref,
+            playlist_ref,
+            sitdown_date,
+            goal,
+            technique,
+            alg_type,
+        )
 
     # Fetch spaced repetition preferences for the user and algorithm
     prefs_spaced_repetition: PrefsSpacedRepetition = get_prefs_spaced_repetition(
@@ -409,7 +692,7 @@ def _process_single_tune_feedback(
 
     if quality_str == NEW or quality_str == RESCHEDULED:
         review_result_dict = scheduler.first_review(
-            quality=quality_int,
+            quality=normalized_quality_int,
             practiced=sitdown_date,
             quality_text=quality_str,
         )
@@ -428,7 +711,7 @@ def _process_single_tune_feedback(
             last_review = None
 
         review_result_dict = scheduler.review(
-            quality=quality_int,
+            quality=normalized_quality_int,
             easiness=latest_practice_record.easiness,
             interval=latest_practice_record.interval,
             repetitions=latest_practice_record.repetitions,
