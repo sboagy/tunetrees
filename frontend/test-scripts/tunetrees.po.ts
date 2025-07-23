@@ -28,6 +28,8 @@ export class TuneTreesPageObject {
 
   readonly idColumnHeader;
   readonly idColumnHeaderSortButton;
+  readonly scheduledColumnHeader;
+  readonly scheduledColumnHeaderSortButton;
 
   readonly selectSettingButton;
 
@@ -106,6 +108,12 @@ export class TuneTreesPageObject {
       .locator("div");
     this.idColumnHeaderSortButton = page
       .getByRole("cell", { name: "Id", exact: true })
+      .getByRole("button");
+    this.scheduledColumnHeader = page
+      .getByRole("cell", { name: "Scheduled", exact: true })
+      .locator("div");
+    this.scheduledColumnHeaderSortButton = page
+      .getByRole("cell", { name: "Scheduled", exact: true })
       .getByRole("button");
 
     this.selectSettingButton = page.getByTestId("tt-select-setting");

@@ -47,8 +47,30 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     const tunesGrid = page.locator("table").first();
     await expect(tunesGrid).toBeVisible({ timeout: 15000 });
 
-    // Find the ID column header with sorting arrow
+    // CRITICAL: Scroll to tune 947 first to ensure visibility in virtual table
+    console.log("Scrolling to tune ID 947 for virtual table visibility...");
+    await ttPO.scrollToTuneById(947);
+    await page.waitForTimeout(1000);
 
+    // CRITICAL: Clear the Scheduled column sorting first (it's pre-sorted)
+    // This prevents multi-column sorting confusion where Scheduled takes precedence
+    console.log(
+      "Clearing Scheduled column sorting to avoid multi-column interference...",
+    );
+    await expect(ttPO.scheduledColumnHeader).toBeVisible({ timeout: 15000 });
+    await expect(ttPO.scheduledColumnHeaderSortButton).toBeVisible();
+
+    // Click the Scheduled column to cycle through its sort states until unsorted
+    // This ensures it shows double arrows (ArrowUpDown) and doesn't interfere
+    // Scheduled is likely pre-sorted ascending, so: asc → desc → unsorted
+    await ttPO.scheduledColumnHeaderSortButton.click();
+    await page.waitForTimeout(500);
+    await ttPO.scheduledColumnHeaderSortButton.click(); // Should now be unsorted
+    await page.waitForTimeout(500);
+
+    console.log("Scheduled column cleared, now testing ID column sorting...");
+
+    // Find the ID column header with sorting arrow
     await expect(ttPO.idColumnHeader).toBeVisible({ timeout: 15000 });
 
     // Find the sorting button within the ID column header
