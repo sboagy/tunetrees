@@ -51,7 +51,9 @@ export function SocialLoginButtons(providerMap: ProviderMap) {
                 alt={provider.name}
               />
               <Label className="ml-3">
-                {loadingProvider === provider.id ? "Connecting..." : provider.name}
+                {loadingProvider === provider.id
+                  ? "Connecting..."
+                  : provider.name}
               </Label>
             </>
           </LoadingButton>

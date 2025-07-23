@@ -11,7 +11,17 @@ interface ILoadingButtonProps extends ButtonProps {
 }
 
 const LoadingButton = React.forwardRef<HTMLButtonElement, ILoadingButtonProps>(
-  ({ className, children, loading = false, spinnerSize = "sm", disabled, ...props }, ref) => {
+  (
+    {
+      className,
+      children,
+      loading = false,
+      spinnerSize = "sm",
+      disabled,
+      ...props
+    },
+    ref,
+  ) => {
     return (
       <Button
         className={cn(className)}
@@ -20,16 +30,12 @@ const LoadingButton = React.forwardRef<HTMLButtonElement, ILoadingButtonProps>(
         {...props}
       >
         {loading && (
-          <Spinner
-            size={spinnerSize}
-            className="mr-2"
-            aria-hidden="true"
-          />
+          <Spinner size={spinnerSize} className="mr-2" aria-hidden="true" />
         )}
         {children}
       </Button>
     );
-  }
+  },
 );
 
 LoadingButton.displayName = "LoadingButton";

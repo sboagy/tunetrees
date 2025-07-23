@@ -125,28 +125,28 @@ export default function LoginDialog(): JSX.Element {
 
   const onSubmit = async (data: LoginFormValues) => {
     console.log("onSubmit called with data:", data);
-    
+
     if (!validateEmail(userEmail)) {
       return;
     }
 
     setIsLoading(true);
     setPasswordError(null);
-    
+
     try {
       console.log("Sign in attempt with:", {
         email: userEmail,
         password: data.password,
         csrfToken: data.csrfToken,
       });
-      
+
       const result = await signIn("credentials", {
         redirect: false,
         email: userEmail,
         password: data.password,
         csrfToken: data.csrfToken,
       });
-      
+
       if (result?.error) {
         // Given limitations of next-auth, such that we can't get the error instance
         // or error message, this is the best we can do for now.
