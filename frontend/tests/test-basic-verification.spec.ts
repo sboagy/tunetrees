@@ -1,30 +1,68 @@
-import { test, expect } from "@playwright/test";
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
+import { restartBackend } from "@/test-scripts/global-setup";
+import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+import { getStorageState } from "@/test-scripts/storage-state";
+import {
+  navigateToRepertoireTabStandalone,
+  TuneTreesPageObject,
+} from "@/test-scripts/tunetrees.po";
+import { expect, test } from "@playwright/test";
+import {
+  logTestStart,
+  logTestEnd,
+  logBrowserContextStart,
+  logBrowserContextEnd,
+} from "../test-scripts/test-logging";
+
+test.use({
+  storageState: getStorageState("STORAGE_STATE_TEST1"),
+  trace: "retain-on-failure",
+  viewport: { width: 1728 - 50, height: 1117 - 200 },
+});
+
+test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
+  console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+  await setTestDefaults(page);
+  await applyNetworkThrottle(page);
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  await restartBackend();
+  await page.waitForTimeout(1_000);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
+});
 
 test.describe("Basic TuneGrid Verification", () => {
   test("verify-sorting-functionality-simple", async ({ page }) => {
-    // Navigate to the application (we'll handle auth separately)
-    await page.goto("http://localhost:3000");
-    
-    // Add basic console logging to see what's happening
-    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-    page.on('pageerror', err => console.log('PAGE ERROR:', err.message));
+    // Navigate using the established pattern with Page Object
+    const ttPO = new TuneTreesPageObject(page);
+    await ttPO.gotoMainPage();
+    await navigateToRepertoireTabStandalone(page);
+    await page.waitForLoadState("domcontentloaded");
 
-    // Wait for page to load
-    await page.waitForLoadState('domcontentloaded');
-    
-    // Take a screenshot to see current state
-    await page.screenshot({ path: 'test-verification-step1.png' });
-    
-    // Check if we can see any grid elements
-    const gridElements = await page.locator('[data-testid*="grid"]').count();
-    const sortButtons = await page.locator('button[title*="sort"]').count();
-    const tableRows = await page.locator('table tr').count();
-    
-    console.log("Grid elements found:", gridElements);
-    console.log("Sort buttons found:", sortButtons);
-    console.log("Table rows found:", tableRows);
-    
-    // Basic verification that the page loads
-    expect(gridElements).toBeGreaterThanOrEqual(0);
+    // Wait for the grid to be visible using Page Object
+    await expect(ttPO.tunesGrid).toBeVisible({ timeout: 15000 });
+
+    // Check basic grid functionality using Page Object locators
+    const gridRows = await ttPO.tunesGridRows.count();
+    console.log("Table rows found:", gridRows);
+
+    // Verify that sort buttons are available using Page Object
+    await expect(ttPO.idColumnHeaderSortButton).toBeVisible();
+    console.log("✅ ID column sort button is visible");
+
+    // Basic verification that the page loads and has data
+    expect(gridRows).toBeGreaterThan(1);
+    console.log("✅ Grid has data rows:", gridRows);
+
+    // Verify table status is showing
+    await expect(ttPO.tableStatus).toBeVisible();
+    const tableStatusText = await ttPO.tableStatus.textContent();
+    console.log("Table status:", tableStatusText);
+
+    console.log("✅ Basic TuneGrid verification completed successfully!");
   });
 });
