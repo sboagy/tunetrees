@@ -174,36 +174,50 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     const tunesGrid = page.locator("table").first();
     await expect(tunesGrid).toBeVisible({ timeout: 15000 });
 
-    // Test sorting by Type column first
-    const typeColumnHeader = page
-      .getByRole("columnheader")
-      .filter({ hasText: "Type" });
-    await expect(typeColumnHeader).toBeVisible();
+    // CRITICAL: Clear the Scheduled column sorting first (it's pre-sorted)
+    // This prevents multi-column sorting confusion where Scheduled takes precedence
+    console.log(
+      "Clearing Scheduled column sorting to avoid multi-column interference...",
+    );
+    await expect(ttPO.scheduledColumnHeader).toBeVisible({ timeout: 15000 });
+    await expect(ttPO.scheduledColumnHeaderSortButton).toBeVisible();
 
-    const typeSortButton = typeColumnHeader.locator('button[title*="sort"]');
-    await typeSortButton.click();
+    // Click the Scheduled column to cycle through its sort states until unsorted
+    // Scheduled is likely pre-sorted ascending, so: asc → desc → unsorted
+    await ttPO.scheduledColumnHeaderSortButton.click();
+    await page.waitForTimeout(500);
+    await ttPO.scheduledColumnHeaderSortButton.click(); // Should now be unsorted
+    await page.waitForTimeout(500);
+
+    console.log(
+      "Scheduled column cleared, now testing multi-column sorting...",
+    );
+
+    // Test sorting by Type column first using Page Object locators
+    await expect(ttPO.typeColumnHeader).toBeVisible({ timeout: 15000 });
+    await expect(ttPO.typeColumnHeaderSortButton).toBeVisible();
+
+    await ttPO.typeColumnHeaderSortButton.click();
     await page.waitForTimeout(1000);
 
     // Then sort by Title while holding shift (multicolumn)
-    const titleColumnHeader = page
-      .getByRole("columnheader")
-      .filter({ hasText: "Title" });
-    await expect(titleColumnHeader).toBeVisible();
-
-    const titleSortButton = titleColumnHeader.locator('button[title*="sort"]');
+    await expect(ttPO.titleColumnHeader).toBeVisible({ timeout: 15000 });
+    await expect(ttPO.titleColumnHeaderSortButton).toBeVisible();
 
     // Use keyboard modifier for multicolumn sorting
     await page.keyboard.down("Shift");
-    await titleSortButton.click();
+    await ttPO.titleColumnHeaderSortButton.click();
     await page.keyboard.up("Shift");
     await page.waitForTimeout(1000);
 
     // Verify that both columns show sorting indicators
-    const typeSortArrow = typeColumnHeader.locator("svg");
-    const titleSortArrow = titleColumnHeader.locator("svg");
+    const typeSortArrow = ttPO.typeColumnHeaderSortButton.locator("svg");
+    const titleSortArrow = ttPO.titleColumnHeaderSortButton.locator("svg");
 
     await expect(typeSortArrow).toBeVisible();
     await expect(titleSortArrow).toBeVisible();
+
+    console.log("✅ Multi-column sorting is working correctly!");
   });
 
   test("test-repertoire-color-coding", async ({ page }) => {
@@ -286,7 +300,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     }
 
     // Always verify the basic grid structure is present
-    expect(tableRows.count()).toBeGreaterThan(1);
+    expect(await tableRows.count()).toBeGreaterThan(1);
   });
 
   test("test-sorting-persistence", async ({ page }) => {
