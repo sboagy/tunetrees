@@ -100,12 +100,10 @@ function rotateSorting<TData, TValue>(
     column.toggleSorting(false, true);
   }
   console.log("column.getIsSorted(): ", column.getIsSorted());
-  
-  // REMOVED: Don't trigger data refresh when sorting - this was breaking sorting
-  // The sorting state will be saved by the table's sorting change handler
-  // if (setTunesRefreshId) {
-  //   setTunesRefreshId(-1);
-  // }
+
+  if (setTunesRefreshId) {
+    setTunesRefreshId(-1);
+  }
 
   // column.toggleSorting(column.getIsSorted() === "asc");
 }
