@@ -59,7 +59,16 @@ async function globalSetup() {
     fs.mkdirSync(testResultsDir, { recursive: true });
   }
 
-  const fastAPILog = path.resolve(testResultsDir, "fastapi.log");
+  // Use environment variable for log path if available, otherwise default
+  const fastAPILog =
+    process.env.TUNETREES_FASTAPI_LOG ||
+    path.resolve(testResultsDir, "fastapi.log");
+
+  // Ensure the directory for the custom log path exists
+  const logDir = path.dirname(fastAPILog);
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
 
   console.log(`Backend logs will be written to ${fastAPILog}`);
 

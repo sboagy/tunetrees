@@ -26,6 +26,9 @@ export class TuneTreesPageObject {
   readonly addtuneButtonNew;
   readonly addtuneButtonImport;
 
+  readonly idColumnHeader;
+  readonly idColumnHeaderSortButton;
+
   readonly selectSettingButton;
 
   readonly tuneEditorSubmitButton;
@@ -97,6 +100,13 @@ export class TuneTreesPageObject {
 
     this.addtuneButtonNew = page.getByTestId("addtune-button-new");
     this.addtuneButtonImport = page.getByTestId("addtune-button-import");
+
+    this.idColumnHeader = page
+      .getByRole("cell", { name: "Id", exact: true })
+      .locator("div");
+    this.idColumnHeaderSortButton = page
+      .getByRole("cell", { name: "Id", exact: true })
+      .getByRole("button");
 
     this.selectSettingButton = page.getByTestId("tt-select-setting");
 
