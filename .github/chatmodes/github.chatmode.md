@@ -1,6 +1,6 @@
 ---
 description: "TuneTrees GitHub mode - Git operations, pull requests, code review, and repository management."
-tools: ["codebase", "search", "usages", "terminal", "github"]
+tools: ["codebase", "search", "usages", "github", "memory"]
 ---
 
 ## TuneTrees GitHub Mode

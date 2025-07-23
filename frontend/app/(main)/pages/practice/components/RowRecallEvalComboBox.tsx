@@ -13,7 +13,10 @@ import {
 import type { CellContext } from "@tanstack/react-table";
 import { Check, ChevronDownIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { getColorForEvaluation, qualityList } from "../quality-list";
+import {
+  getColorForEvaluation,
+  getQualityListForGoalAndTechnique,
+} from "../quality-lists";
 import {
   createOrUpdateTableTransientData,
   deleteTableTransientData,
@@ -58,6 +61,12 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(
     info.row.original.recall_eval ?? null,
+  );
+
+  // Get appropriate quality list based on goal and technique
+  const qualityList = getQualityListForGoalAndTechnique(
+    info.row.original.goal,
+    info.row.original.technique,
   );
 
   const saveData = async (changed_value: string) => {
@@ -122,6 +131,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
         asChild
         className={`w-[9em] sm:w-[18em] h-[2em] justify-between whitespace-nowrap overflow-hidden text-ellipsis  ${getColorForEvaluation(
           selectedQuality ?? null,
+          qualityList,
           true,
         )}`}
         style={{

@@ -1,0 +1,17 @@
+// {
+//     "servers": {
+//         "playwright": {
+//             "command": "npx",
+//             "args": [
+//                 "@playwright/mcp@latest",
+//                 "--caps=vision",
+//                 "--config",
+//                 "playwright-mcp-config.json"
+//             ],
+//             "cwd": "./frontend",
+//             "env": {
+//                 "DOTENV_CONFIG_PATH": ".env.local"
+//             }
+//         }
+//     }
+// }

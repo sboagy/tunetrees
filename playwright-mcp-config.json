@@ -1,0 +1,18 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "contextOptions": {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      }
+    }
+  },
+  "server": {
+    "port": 3001,
+    "host": "localhost"
+  },
+  "capabilities": ["core", "vision"],
+  "saveTrace": false,
+  "outputDir": "./playwright-output"
+}
