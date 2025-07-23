@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isPasswordValid } from "@/lib/password-utils";
 
 export const accountFormSchema = z
   .object({
@@ -16,19 +17,22 @@ export const accountFormSchema = z
     user_id: z.string().optional(),
     password: z
       .string()
-      .min(2, {
-        message: "Password must be at least 2 characters.",
+      .min(8, {
+        message: "Password must be at least 8 characters.",
       })
-      .max(30, {
-        message: "Password must not be longer than 30 characters.",
+      .max(128, {
+        message: "Password must not be longer than 128 characters.",
+      })
+      .refine(isPasswordValid, {
+        message: "Password must meet at least 3 security requirements.",
       }),
     password_confirmation: z
       .string()
-      .min(2, {
-        message: "Password must be at least 2 characters.",
+      .min(8, {
+        message: "Password must be at least 8 characters.",
       })
-      .max(30, {
-        message: "Password must not be longer than 30 characters.",
+      .max(128, {
+        message: "Password must not be longer than 128 characters.",
       }),
 
     email: z
