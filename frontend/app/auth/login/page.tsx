@@ -19,6 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { XCircle } from "lucide-react";
 import { getCsrfToken, signIn } from "next-auth/react"; // Ensure getCsrfToken is imported
@@ -36,6 +37,7 @@ export default function LoginDialog(): JSX.Element {
   // Initialize userEmail state
   const [userEmail, setUserEmail] = useState<string>("");
   const [userEmailParam, setUserEmailParam] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Fetch email from searchParams asynchronously
   useEffect(() => {
@@ -123,38 +125,48 @@ export default function LoginDialog(): JSX.Element {
 
   const onSubmit = async (data: LoginFormValues) => {
     console.log("onSubmit called with data:", data);
-    if (validateEmail(userEmail)) {
+    
+    if (!validateEmail(userEmail)) {
+      return;
+    }
+
+    setIsLoading(true);
+    setPasswordError(null);
+    
+    try {
       console.log("Sign in attempt with:", {
         email: userEmail,
         password: data.password,
         csrfToken: data.csrfToken,
       });
-      try {
-        const result = await signIn("credentials", {
-          redirect: false,
-          email: userEmail,
-          password: data.password,
-          csrfToken: data.csrfToken,
-        });
-        if (result?.error) {
-          // Given limitations of next-auth, such that we can't get the error instance
-          // or error message, this is the best we can do for now.
-          setPasswordError(`User login failed, error class: ${result.error}`);
+      
+      const result = await signIn("credentials", {
+        redirect: false,
+        email: userEmail,
+        password: data.password,
+        csrfToken: data.csrfToken,
+      });
+      
+      if (result?.error) {
+        // Given limitations of next-auth, such that we can't get the error instance
+        // or error message, this is the best we can do for now.
+        setPasswordError(`User login failed, error class: ${result.error}`);
+      } else {
+        console.log("Sign in successful");
+        if (typeof window !== "undefined") {
+          window.location.href = "/";
         } else {
-          console.log("Sign in successful");
-          if (typeof window !== "undefined") {
-            window.location.href = "/";
-          } else {
-            setPasswordError("Problem redirecting to home page");
-            console.log("Login successful, but window is undefined");
-          }
+          setPasswordError("Problem redirecting to home page");
+          console.log("Login successful, but window is undefined");
         }
-      } catch (error) {
-        setPasswordError(`${(error as Error).message}`);
-        console.log(
-          `User not found ===> page.tsx:149 ~ ${(error as Error).message}`,
-        );
       }
+    } catch (error) {
+      setPasswordError(`${(error as Error).message}`);
+      console.log(
+        `User not found ===> page.tsx:149 ~ ${(error as Error).message}`,
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -282,10 +294,12 @@ export default function LoginDialog(): JSX.Element {
                     {passwordError}
                   </p>
                 )}
-                <Button
+                <LoadingButton
                   type="submit"
                   variant="secondary"
+                  loading={isLoading}
                   disabled={
+                    isLoading ||
                     !csrfToken ||
                     !!emailError ||
                     !!passwordError ||
@@ -293,9 +307,10 @@ export default function LoginDialog(): JSX.Element {
                     !form.getValues("email")
                   }
                   className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
+                  data-testid="login-submit-button"
                 >
-                  Sign In
-                </Button>
+                  {isLoading ? "Signing In..." : "Sign In"}
+                </LoadingButton>
               </form>
               {userEmailParam === "" && (
                 <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
