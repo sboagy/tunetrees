@@ -27,6 +27,8 @@ import {
 import { providerMap } from "@/auth";
 import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 import { PasswordInput } from "@/components/PasswordInput";
+import { PasswordStrengthValidator } from "@/components/auth/password-strength-validator";
+import type { IPasswordStrengthResult } from "@/lib/password-validation";
 import {
   Card,
   CardContent,
@@ -92,6 +94,8 @@ export default function SignInPage(): JSX.Element {
   const [passwordConfirmationError, setPasswordConfirmationError] = useState<
     string | null
   >(null);
+  const [passwordStrengthResult, setPasswordStrengthResult] =
+    useState<IPasswordStrengthResult | null>(null);
 
   const validateEmail = useCallback((email: string): boolean => {
     if (email === "") {
@@ -142,6 +146,15 @@ export default function SignInPage(): JSX.Element {
       setPasswordConfirmationError("Passwords do not match");
     }
   }
+
+  const handlePasswordStrengthChange = (result: IPasswordStrengthResult) => {
+    setPasswordStrengthResult(result);
+    if (!result.isValid && form.getValues("password").length > 0) {
+      setPasswordError("Password does not meet security requirements");
+    } else {
+      setPasswordError(null);
+    }
+  };
 
   const handlePasswordChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -320,6 +333,12 @@ export default function SignInPage(): JSX.Element {
                   </FormItem>
                 )}
               />
+              {/* Password Strength Validator */}
+              <PasswordStrengthValidator
+                password={form.getValues("password")}
+                onStrengthChange={handlePasswordStrengthChange}
+                className="mt-2"
+              />
               {passwordError && (
                 <p className="text-red-500 text-sm" role="alert">
                   {passwordError}
@@ -381,7 +400,10 @@ export default function SignInPage(): JSX.Element {
                   !form.getValues("password") ||
                   !form.getValues("password_confirmation") ||
                   !form.getValues("email") ||
-                  !form.getValues("name")
+                  !form.getValues("name") ||
+                  (passwordStrengthResult
+                    ? !passwordStrengthResult.isValid
+                    : true)
                 }
                 className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
               >

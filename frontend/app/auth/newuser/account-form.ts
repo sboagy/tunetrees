@@ -1,4 +1,25 @@
 import { z } from "zod";
+import { validatePasswordStrength } from "@/lib/password-validation";
+
+// Enhanced password validation using strength validator
+const passwordSchema = z
+  .string()
+  .min(8, {
+    message: "Password must be at least 8 characters.",
+  })
+  .max(100, {
+    message: "Password must not be longer than 100 characters.",
+  })
+  .refine(
+    (password) => {
+      const result = validatePasswordStrength(password);
+      return result.isValid;
+    },
+    {
+      message:
+        "Password does not meet security requirements. Check the strength indicator below.",
+    },
+  );
 
 export const accountFormSchema = z
   .object({
@@ -14,22 +35,8 @@ export const accountFormSchema = z
     //         message: "User Name must not be longer than 30 characters.",
     //     }),
     user_id: z.string().optional(),
-    password: z
-      .string()
-      .min(2, {
-        message: "Password must be at least 2 characters.",
-      })
-      .max(30, {
-        message: "Password must not be longer than 30 characters.",
-      }),
-    password_confirmation: z
-      .string()
-      .min(2, {
-        message: "Password must be at least 2 characters.",
-      })
-      .max(30, {
-        message: "Password must not be longer than 30 characters.",
-      }),
+    password: passwordSchema,
+    password_confirmation: passwordSchema,
 
     email: z
       .string()
