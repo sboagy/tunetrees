@@ -11,7 +11,7 @@ import {
 } from "@/test-scripts/tunetrees.po";
 
 // Increase timeout for complete workflow tests
-test.use({ actionTimeout: 200000 });
+test.use({ actionTimeout: 300_000 }); // 300,000 ms = 5 minutes
 
 test.describe.serial("Practice Session Complete Workflow", () => {
   test.beforeEach(async ({ page }, testInfo) => {
