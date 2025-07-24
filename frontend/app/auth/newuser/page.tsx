@@ -92,6 +92,7 @@ export default function SignInPage(): JSX.Element {
   const [passwordConfirmationError, setPasswordConfirmationError] = useState<
     string | null
   >(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const validateEmail = useCallback((email: string): boolean => {
     if (email === "") {
@@ -177,24 +178,31 @@ export default function SignInPage(): JSX.Element {
 
   const onSubmitHandler = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);
-    const host = window.location.host;
+    setIsLoading(true);
+    
+    try {
+      const host = window.location.host;
 
-    const result = await newUser(data, host);
-    console.log(`newUser status result ${result.status}`);
+      const result = await newUser(data, host);
+      console.log(`newUser status result ${result.status}`);
 
-    if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
-      const linkBackURL = result.linkBackURL;
-      // Store the linkBackURL in local storage for testing purposes
-      if (typeof window !== "undefined") {
-        localStorage.setItem("linkBackURL", linkBackURL);
-      } else {
-        console.log(
-          "onSubmit(): window is undefined, cannot store linkBackURL for playwright tests",
-        );
+      if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+        const linkBackURL = result.linkBackURL;
+        // Store the linkBackURL in local storage for testing purposes
+        if (typeof window !== "undefined") {
+          localStorage.setItem("linkBackURL", linkBackURL);
+        } else {
+          console.log(
+            "onSubmit(): window is undefined, cannot store linkBackURL for playwright tests",
+          );
+        }
       }
-    }
 
-    router.push(`/auth/verify-request?email=${data.email}`);
+      router.push(`/auth/verify-request?email=${data.email}`);
+    } catch (error) {
+      console.error("Error during signup:", error);
+      setIsLoading(false);
+    }
   };
 
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
@@ -286,6 +294,7 @@ export default function SignInPage(): JSX.Element {
                         {...field}
                         onChange={(e) => void handleEmailChange(e, field)}
                         required
+                        disabled={isLoading}
                         className={emailError ? "border-red-500" : ""}
                         autoFocus
                         data-testid="user_email"
@@ -313,6 +322,7 @@ export default function SignInPage(): JSX.Element {
                         autoComplete="new-password"
                         {...field}
                         onChange={(e) => handlePasswordChange(e, field)}
+                        disabled={isLoading}
                         data-testid="user_password"
                       />
                     </FormControl>
@@ -340,6 +350,7 @@ export default function SignInPage(): JSX.Element {
                         onChange={(e) =>
                           handlePasswordConfirmationChange(e, field)
                         }
+                        disabled={isLoading}
                         data-testid="user_password_verification"
                       />
                     </FormControl>
@@ -363,6 +374,7 @@ export default function SignInPage(): JSX.Element {
                         placeholder="Your name"
                         {...field}
                         onChange={(e) => handleUserNameChange(e, field)}
+                        disabled={isLoading}
                         data-testid="user_name"
                       />
                     </FormControl>
@@ -373,6 +385,8 @@ export default function SignInPage(): JSX.Element {
               <Button
                 type="submit"
                 variant="secondary"
+                loading={isLoading}
+                loadingText="Creating account..."
                 disabled={
                   !_crsfToken ||
                   !!emailError ||
@@ -381,7 +395,8 @@ export default function SignInPage(): JSX.Element {
                   !form.getValues("password") ||
                   !form.getValues("password_confirmation") ||
                   !form.getValues("email") ||
-                  !form.getValues("name")
+                  !form.getValues("name") ||
+                  isLoading
                 }
                 className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
               >

@@ -76,6 +76,7 @@ export default function LoginDialog(): JSX.Element {
 
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const validateEmail = useCallback((email: string): boolean => {
     if (email === "") {
@@ -124,6 +125,7 @@ export default function LoginDialog(): JSX.Element {
   const onSubmit = async (data: LoginFormValues) => {
     console.log("onSubmit called with data:", data);
     if (validateEmail(userEmail)) {
+      setIsLoading(true);
       console.log("Sign in attempt with:", {
         email: userEmail,
         password: data.password,
@@ -140,17 +142,20 @@ export default function LoginDialog(): JSX.Element {
           // Given limitations of next-auth, such that we can't get the error instance
           // or error message, this is the best we can do for now.
           setPasswordError(`User login failed, error class: ${result.error}`);
+          setIsLoading(false);
         } else {
           console.log("Sign in successful");
           if (typeof window !== "undefined") {
             window.location.href = "/";
           } else {
             setPasswordError("Problem redirecting to home page");
+            setIsLoading(false);
             console.log("Login successful, but window is undefined");
           }
         }
       } catch (error) {
         setPasswordError(`${(error as Error).message}`);
+        setIsLoading(false);
         console.log(
           `User not found ===> page.tsx:149 ~ ${(error as Error).message}`,
         );
@@ -237,6 +242,7 @@ export default function LoginDialog(): JSX.Element {
                           value={userEmail}
                           onChange={(e) => void handleEmailChange(e, field)}
                           required
+                          disabled={isLoading}
                           className={emailError ? "border-red-500" : ""}
                           autoFocus={userEmailParam === ""}
                           data-testid="user_email"
@@ -270,6 +276,7 @@ export default function LoginDialog(): JSX.Element {
                           }}
                           autoFocus={userEmailParam !== ""}
                           required
+                          disabled={isLoading}
                           data-testid="user_password"
                         />
                       </FormControl>
@@ -285,12 +292,15 @@ export default function LoginDialog(): JSX.Element {
                 <Button
                   type="submit"
                   variant="secondary"
+                  loading={isLoading}
+                  loadingText="Signing in..."
                   disabled={
                     !csrfToken ||
                     !!emailError ||
                     !!passwordError ||
                     !password ||
-                    !form.getValues("email")
+                    !form.getValues("email") ||
+                    isLoading
                   }
                   className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
                 >
