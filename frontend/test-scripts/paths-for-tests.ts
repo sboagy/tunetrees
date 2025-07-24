@@ -45,4 +45,4 @@ if (!fs.existsSync(screenShotDir)) {
   fs.mkdirSync(screenShotDir, { recursive: true });
 }
 
-export const initialPageLoadTimeout = 30000; // Reduced from 50s to 30s
+export const initialPageLoadTimeout = process.env.CI === "true" ? 50000 : 30000; // 50s if CI, otherwise 30s
