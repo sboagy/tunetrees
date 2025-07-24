@@ -179,7 +179,7 @@ export default function SignInPage(): JSX.Element {
   const onSubmitHandler = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);
     setIsLoading(true);
-    
+
     try {
       const host = window.location.host;
 

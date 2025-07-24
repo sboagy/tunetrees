@@ -9,12 +9,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp";
 import { useRouter } from "next/navigation"; // Use the next/navigation module for client-side navigation
 import { useSearchParams } from "next/navigation";
@@ -40,15 +35,17 @@ export default function VerifyRequest(): JSX.Element {
     setError(null);
 
     try {
-      const response = await fetch(`/api/verify-user?email=${encodeURIComponent(email)}&token=${code}`);
-      
+      const response = await fetch(
+        `/api/verify-user?email=${encodeURIComponent(email)}&token=${code}`,
+      );
+
       if (response?.ok && response?.statusText === "OK") {
         console.log("Verification successful");
         router.push("/");
         router.refresh();
         return;
       }
-      
+
       throw new Error(`Verification failed: ${response.statusText}`);
     } catch (error) {
       console.error("Error verifying code:", error);
@@ -65,7 +62,9 @@ export default function VerifyRequest(): JSX.Element {
       <div className="w-full max-w-md p-4">
         <Card className="w-full">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center">Check Your Email</CardTitle>
+            <CardTitle className="text-2xl text-center">
+              Check Your Email
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="text-center space-y-2">
@@ -76,8 +75,13 @@ export default function VerifyRequest(): JSX.Element {
                 Please enter the 6-digit verification code below:
               </p>
             </div>
-            
-            <form onSubmit={handleOnSubmit} className="space-y-6">
+
+            <form
+              onSubmit={(e) => {
+                void handleOnSubmit(e);
+              }}
+              className="space-y-6"
+            >
               <div className="flex justify-center">
                 <InputOTP
                   maxLength={6}
@@ -102,13 +106,13 @@ export default function VerifyRequest(): JSX.Element {
                   </InputOTPGroup>
                 </InputOTP>
               </div>
-              
+
               {error && (
                 <p className="text-red-500 text-sm text-center" role="alert">
                   {error}
                 </p>
               )}
-              
+
               <Button
                 type="submit"
                 variant="secondary"

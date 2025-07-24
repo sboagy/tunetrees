@@ -1,5 +1,5 @@
 "use client";
-import type { ProviderMap } from "@/auth";
+import type { ProviderMap, ProviderDict } from "@/auth";
 import { doSocialLogin2 } from "@/auth/social-login";
 import { Label } from "@/components/ui/label";
 import { Button } from "./ui/button";
@@ -12,7 +12,10 @@ const providerLogoPath = "https://authjs.dev/img/providers";
 export function SocialLoginButtons(providerMap: ProviderMap) {
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
 
-  const handleSocialLogin = async (providerId: string, provider: any) => {
+  const handleSocialLogin = async (
+    providerId: string,
+    provider: ProviderDict,
+  ) => {
     setLoadingProvider(providerId);
     try {
       await doSocialLogin2(provider);
@@ -39,7 +42,9 @@ export function SocialLoginButtons(providerMap: ProviderMap) {
             loading={loadingProvider === provider.id}
             loadingText={`Signing in with ${provider.name}...`}
             disabled={loadingProvider !== null}
-            onClick={() => handleSocialLogin(provider.id, provider)}
+            onClick={() => {
+              void handleSocialLogin(provider.id, provider);
+            }}
           >
             <>
               <img
