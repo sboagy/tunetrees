@@ -119,7 +119,7 @@ export default function ResetPasswordPage(): JSX.Element {
 
   if (isSuccess) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CheckCircle className="mx-auto h-12 w-12 text-green-600" />
@@ -148,7 +148,7 @@ export default function ResetPasswordPage(): JSX.Element {
 
   if (errorMessage && (!token || !email)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-red-600">
@@ -177,7 +177,7 @@ export default function ResetPasswordPage(): JSX.Element {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-gray-900">
@@ -216,6 +216,7 @@ export default function ResetPasswordPage(): JSX.Element {
                           size="sm"
                           className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                           onClick={() => setShowPassword(!showPassword)}
+                          aria-label="Toggle password visibility"
                         >
                           {showPassword ? (
                             <EyeOff className="h-4 w-4" />
@@ -252,6 +253,7 @@ export default function ResetPasswordPage(): JSX.Element {
                           onClick={() =>
                             setShowConfirmPassword(!showConfirmPassword)
                           }
+                          aria-label="Toggle confirm password visibility"
                         >
                           {showConfirmPassword ? (
                             <EyeOff className="h-4 w-4" />
@@ -267,8 +269,10 @@ export default function ResetPasswordPage(): JSX.Element {
               />
 
               {errorMessage && (
-                <div className="rounded-md bg-red-50 p-4">
-                  <p className="text-sm text-red-800">{errorMessage}</p>
+                <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    {errorMessage}
+                  </p>
                 </div>
               )}
             </CardContent>

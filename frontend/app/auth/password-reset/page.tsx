@@ -27,7 +27,7 @@ import { z } from "zod";
 
 // Schema for password reset request
 const passwordResetRequestSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  email: z.string().email("Invalid email"),
 });
 
 type PasswordResetRequestValues = z.infer<typeof passwordResetRequestSchema>;
@@ -39,6 +39,7 @@ export default function PasswordResetPage(): JSX.Element {
 
   const form = useForm<PasswordResetRequestValues>({
     resolver: zodResolver(passwordResetRequestSchema),
+    mode: "onBlur",
     defaultValues: {
       email: "",
     },
@@ -74,7 +75,7 @@ export default function PasswordResetPage(): JSX.Element {
 
   if (isSuccess) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <Mail className="mx-auto h-12 w-12 text-green-600" />
@@ -105,7 +106,7 @@ export default function PasswordResetPage(): JSX.Element {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-gray-900">
@@ -145,8 +146,10 @@ export default function PasswordResetPage(): JSX.Element {
               />
 
               {errorMessage && (
-                <div className="rounded-md bg-red-50 p-4">
-                  <p className="text-sm text-red-800">{errorMessage}</p>
+                <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    {errorMessage}
+                  </p>
                 </div>
               )}
             </CardContent>
