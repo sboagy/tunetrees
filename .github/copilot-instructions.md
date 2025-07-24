@@ -30,7 +30,7 @@ TuneTrees is a spaced repetition learning app for musical tunes built with FastA
 
 - **Strict typing**: No `any` types - use proper TypeScript interfaces and generics
 - **Clean lints**: Code must pass all linting rules without warnings
-- **Prettier formatting**: ALWAYS run prettier on code before committing - use `npx prettier --write <files>` 
+- **Prettier formatting**: ALWAYS run prettier on code before committing - use `npx prettier --write <files>`
 - **Automatic formatting**: Use prettier for consistent code style - it handles indentation, spacing, line breaks, and semicolons
 - **ESLint compliance**: All ESLint rules must pass without warnings after prettier formatting
 - **Interface naming**: Use `I` prefix for all TypeScript interfaces
@@ -190,12 +190,14 @@ npx prettier --write .
 ```
 
 **Integration with tools:**
+
 - **After creating/editing files**: ALWAYS run prettier on the modified files
 - **Before commits**: Run prettier to ensure consistent formatting
 - **Never commit unformatted code**: Prettier fixes indentation, spacing, quotes, and semicolons automatically
 - **Use the run_in_terminal tool**: Call prettier via terminal rather than manual formatting
 
 **Prettier handles:**
+
 - Consistent indentation (2 spaces for TypeScript/React)
 - Line length optimization (automatic wrapping)
 - Quote consistency (double quotes for strings)
