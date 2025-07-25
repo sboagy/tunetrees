@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SMSLogin } from "@/components/SMSLogin";
+import { SMSLogin } from "@/components/SmsLogin";
 import { PasskeyLogin } from "@/components/PasskeyLogin";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

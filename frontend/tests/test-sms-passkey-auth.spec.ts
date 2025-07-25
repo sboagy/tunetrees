@@ -3,7 +3,6 @@ import { getStorageState } from "@/test-scripts/storage-state";
 import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
-import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import {
   logTestStart,
   logTestEnd,
@@ -32,50 +31,46 @@ test.afterEach(async ({ page }, testInfo) => {
   logTestEnd(testInfo);
 });
 
-test("should display phone number field in signup form", async ({ page }) => {
+test("should allow signup without phone number field", async ({ page }) => {
   await page.goto("/auth/newuser");
   await page.waitForLoadState("domcontentloaded");
 
-  // Check that phone number field is present
-  const phoneField = page.getByTestId("user_phone");
-  await expect(phoneField).toBeVisible();
+  // Check that basic form fields are present
+  const emailField = page.getByTestId("user_email");
+  const passwordField = page.getByTestId("user_password");
+  const passwordVerificationField = page.getByTestId(
+    "user_password_verification",
+  );
+  const nameField = page.getByTestId("user_name");
 
-  // Check placeholder text
-  await expect(phoneField).toHaveAttribute("placeholder", "+1234567890");
-  await expect(phoneField).toHaveAttribute("type", "tel");
+  await expect(emailField).toBeVisible();
+  await expect(passwordField).toBeVisible();
+  await expect(passwordVerificationField).toBeVisible();
+  await expect(nameField).toBeVisible();
 
-  // Check that field is optional (form should be submittable without it)
-  await page.getByTestId("user_email").fill("test@example.com");
-  await page.getByTestId("user_password").fill("password123");
-  await page.getByTestId("user_password_verification").fill("password123");
-  await page.getByTestId("user_name").fill("Test User");
+  // Fill form with valid data
+  await emailField.fill("test@example.com");
+  await passwordField.fill("password123");
+  await passwordVerificationField.fill("password123");
+  await nameField.fill("Test User");
 
   const submitButton = page.getByRole("button", { name: "Sign Up" });
   await expect(submitButton).toBeEnabled();
 });
 
-test("should validate phone number format", async ({ page }) => {
-  await page.goto("/auth/newuser");
+test("should show auth test page with SMS and passkey options", async ({
+  page,
+}) => {
+  await page.goto("/auth-test");
   await page.waitForLoadState("domcontentloaded");
 
-  const phoneField = page.getByTestId("user_phone");
+  // Check for SMS authentication component
+  const smsAuth = page.locator("text=SMS Authentication");
+  await expect(smsAuth).toBeVisible();
 
-  // Test invalid phone number
-  await phoneField.fill("invalid-phone");
-  await phoneField.blur();
-
-  // Should show validation error (may need to check for error message)
-  // Note: Validation might be handled by form library
-
-  // Test valid phone number
-  await phoneField.fill("+1234567890");
-  await phoneField.blur();
-
-  // Should not show error
-  const errorMessage = page
-    .locator('p[role="alert"]')
-    .filter({ hasText: /phone/i });
-  await expect(errorMessage).not.toBeVisible();
+  // Check for Passkey authentication component
+  const passkeyAuth = page.locator("text=Passkey Authentication");
+  await expect(passkeyAuth).toBeVisible();
 });
 
 test("should show SMS authentication option on login page", async ({

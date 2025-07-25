@@ -111,6 +111,5 @@ export {
   TableFooter,
   TableHead,
   TableHeader,
-  // eslint-disable-next-line prettier/prettier
-  TableRow
+  TableRow,
 };

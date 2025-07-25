@@ -60,14 +60,14 @@ export function SMSLogin({ onSuccess }: ISMSLoginProps) {
           description: "Verification code sent to your phone",
         });
       } else {
-        const error = await response.json();
+        const errorData = await response.json();
         toast({
           title: "Error",
-          description: error.message || "Failed to send verification code",
+          description: errorData.message || "Failed to send verification code",
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to send verification code",
@@ -106,14 +106,14 @@ export function SMSLogin({ onSuccess }: ISMSLoginProps) {
         });
         onSuccess?.(user);
       } else {
-        const error = await response.json();
+        const errorData = await response.json();
         toast({
           title: "Error",
-          description: error.error || "Invalid verification code",
+          description: errorData.error || "Invalid verification code",
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to verify code",
@@ -153,7 +153,7 @@ export function SMSLogin({ onSuccess }: ISMSLoginProps) {
               disabled={loading}
             />
             <Button
-              onClick={sendCode}
+              onClick={() => void sendCode()}
               disabled={loading || !phone}
               className="w-full"
             >
@@ -176,7 +176,7 @@ export function SMSLogin({ onSuccess }: ISMSLoginProps) {
             />
             <div className="flex gap-2">
               <Button
-                onClick={verifyCode}
+                onClick={() => void verifyCode()}
                 disabled={loading || !code}
                 className="flex-1"
               >

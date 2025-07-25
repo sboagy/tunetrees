@@ -93,10 +93,7 @@ export const providers: Provider[] = [
     sendVerificationRequest,
     maxAge: 24 * 60 * 60, // How long the email verification link is valid for (default 24h)
   }),
-  SMSProvider({
-    apiKey: process.env.TT_SMS_API_KEY,
-    from: process.env.TT_SMS_FROM_NUMBER,
-  }),
+  SMSProvider(),
   WebAuthnProvider(),
 
   GitHubProvider({

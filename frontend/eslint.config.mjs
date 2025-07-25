@@ -55,6 +55,7 @@ export default [
       ".prettierrc.js",
       "**/playwright-report/**",
       "**/test-env.js",
+      "**/public/scripts/theme-init.js", // Generated file
     ],
   },
   // Global rules that apply to all files - disable problematic node rules

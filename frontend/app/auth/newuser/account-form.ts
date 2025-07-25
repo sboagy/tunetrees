@@ -47,12 +47,6 @@ export const accountFormSchema = z
       .max(30, {
         message: "Name must not be longer than 30 characters.",
       }),
-    phone: z
-      .string()
-      .optional()
-      .refine((val) => !val || /^\+?[1-9]\d{1,14}$/.test(val), {
-        message: "Please enter a valid phone number",
-      }),
     //   dob: z.date({
     //     required_error: "A date of birth is required.",
     //   }),

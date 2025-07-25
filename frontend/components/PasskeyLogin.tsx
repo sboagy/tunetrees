@@ -62,19 +62,17 @@ export function PasskeyLogin({ onSuccess }: IPasskeyLoginProps) {
 
       // Convert challenge and credential IDs from base64
       const challengeBuffer = new Uint8Array(
-        atob(options.challenge)
-          .split("")
-          .map((char) => char.charCodeAt(0)),
+        [...atob(options.challenge)].map((char) => char.charCodeAt(0)),
       );
 
-      const allowCredentials = options.allowCredentials?.map((cred: any) => ({
-        ...cred,
-        id: new Uint8Array(
-          atob(cred.id)
-            .split("")
-            .map((char) => char.charCodeAt(0)),
-        ),
-      }));
+      const allowCredentials = options.allowCredentials?.map(
+        (cred: { id: string; type: string; transports?: string[] }) => ({
+          ...cred,
+          id: new Uint8Array(
+            [...atob(cred.id)].map((char) => char.charCodeAt(0)),
+          ),
+        }),
+      );
 
       // Start WebAuthn authentication
       const credential = (await navigator.credentials.get({
@@ -139,9 +137,15 @@ export function PasskeyLogin({ onSuccess }: IPasskeyLoginProps) {
           variant: "destructive",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Passkey authentication error:", error);
-      if (error.name === "NotAllowedError") {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to authenticate with passkey";
+      const errorName = error instanceof Error ? error.name : "UnknownError";
+
+      if (errorName === "NotAllowedError") {
         toast({
           title: "Authentication Cancelled",
           description: "Passkey authentication was cancelled",
@@ -149,7 +153,7 @@ export function PasskeyLogin({ onSuccess }: IPasskeyLoginProps) {
       } else {
         toast({
           title: "Error",
-          description: error.message || "Failed to authenticate with passkey",
+          description: errorMessage,
           variant: "destructive",
         });
       }
@@ -170,7 +174,11 @@ export function PasskeyLogin({ onSuccess }: IPasskeyLoginProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button onClick={authenticate} disabled={loading} className="w-full">
+        <Button
+          onClick={() => void authenticate()}
+          disabled={loading}
+          className="w-full"
+        >
           <Key className="h-4 w-4 mr-2" />
           {loading ? "Authenticating..." : "Sign in with Passkey"}
         </Button>

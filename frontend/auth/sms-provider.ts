@@ -24,11 +24,7 @@ export interface ISMSProviderConfig {
   }) => Promise<void>;
 }
 
-export default function SMSProvider(_options: {
-  apiKey?: string;
-  from?: string;
-  sendVerificationRequest?: ISMSProviderConfig["sendVerificationRequest"];
-}): Provider {
+export default function SMSProvider(): Provider {
   return {
     id: "sms",
     name: "SMS",
