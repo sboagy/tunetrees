@@ -6,7 +6,7 @@
 
 import type { Provider } from "next-auth/providers";
 
-export interface SMSProviderConfig {
+export interface ISMSProviderConfig {
   id: string;
   name: string;
   type: "credentials";
@@ -14,20 +14,20 @@ export interface SMSProviderConfig {
     phone: { label: string; type: string; placeholder: string };
     code: { label: string; type: string; placeholder: string };
   };
-  authorize: (credentials: any) => Promise<any>;
+  authorize: (credentials: Record<string, unknown>) => Promise<unknown>;
   sendVerificationRequest?: (params: {
     identifier: string;
     url: string;
     expires: Date;
-    provider: SMSProviderConfig;
+    provider: ISMSProviderConfig;
     token: string;
   }) => Promise<void>;
 }
 
-export default function SMSProvider(options: {
+export default function SMSProvider(_options: {
   apiKey?: string;
   from?: string;
-  sendVerificationRequest?: SMSProviderConfig["sendVerificationRequest"];
+  sendVerificationRequest?: ISMSProviderConfig["sendVerificationRequest"];
 }): Provider {
   return {
     id: "sms",
@@ -77,6 +77,5 @@ export default function SMSProvider(options: {
 
       return null;
     },
-    sendVerificationRequest: options.sendVerificationRequest,
   };
 }

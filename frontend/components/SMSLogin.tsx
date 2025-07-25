@@ -13,8 +13,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Smartphone, MessageSquare } from "lucide-react";
 
+interface IUser {
+  id: string;
+  email?: string;
+  name?: string;
+  phone?: string;
+}
+
 interface ISMSLoginProps {
-  onSuccess?: (user: any) => void;
+  onSuccess?: (user: IUser) => void;
 }
 
 export function SMSLogin({ onSuccess }: ISMSLoginProps) {

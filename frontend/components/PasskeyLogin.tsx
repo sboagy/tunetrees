@@ -12,8 +12,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Fingerprint, Key } from "lucide-react";
 
+interface IUser {
+  id: string;
+  email?: string;
+  name?: string;
+  phone?: string;
+}
+
 interface IPasskeyLoginProps {
-  onSuccess?: (user: any) => void;
+  onSuccess?: (user: IUser) => void;
 }
 
 export function PasskeyLogin({ onSuccess }: IPasskeyLoginProps) {

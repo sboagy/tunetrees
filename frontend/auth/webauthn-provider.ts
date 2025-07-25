@@ -6,14 +6,14 @@
 
 import type { Provider } from "next-auth/providers";
 
-export interface WebAuthnProviderConfig {
+export interface IWebAuthnProviderConfig {
   id: string;
   name: string;
   type: "credentials";
   credentials: {
     assertion: { label: string; type: string };
   };
-  authorize: (credentials: any) => Promise<any>;
+  authorize: (credentials: Record<string, unknown>) => Promise<unknown>;
 }
 
 export default function WebAuthnProvider(): Provider {

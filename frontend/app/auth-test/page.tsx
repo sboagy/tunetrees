@@ -16,11 +16,20 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+interface IUser {
+  id: string;
+  email?: string;
+  name?: string;
+  phone?: string;
+}
+
 export default function AuthTestPage() {
-  const [authenticatedUser, setAuthenticatedUser] = useState<any>(null);
+  const [authenticatedUser, setAuthenticatedUser] = useState<IUser | null>(
+    null,
+  );
   const { toast } = useToast();
 
-  const handleAuthSuccess = (user: any) => {
+  const handleAuthSuccess = (user: IUser) => {
     setAuthenticatedUser(user);
     toast({
       title: "Authentication Successful",

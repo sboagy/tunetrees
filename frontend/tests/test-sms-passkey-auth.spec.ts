@@ -33,8 +33,6 @@ test.afterEach(async ({ page }, testInfo) => {
 });
 
 test("should display phone number field in signup form", async ({ page }) => {
-  const ttPO = new TuneTreesPageObject(page);
-
   await page.goto("/auth/newuser");
   await page.waitForLoadState("domcontentloaded");
 
@@ -89,9 +87,9 @@ test("should show SMS authentication option on login page", async ({
   // The SMS provider should be available in the provider list
   // Note: This test might need adjustment based on actual login page implementation
   const providers = page.locator("[data-provider]");
-  const smsProvider = providers.filter({ hasText: /sms/i });
 
   // SMS might be shown as an option
   // This test validates the provider is configured, even if not visible on login page
   console.log("SMS provider integration test - checking configuration");
+  console.log("Providers found:", await providers.count());
 });
