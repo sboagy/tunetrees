@@ -46,9 +46,26 @@ jobs:
         run: npm ci
         working-directory: frontend
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/package-lock.json') }}
+
       - name: Install Playwright Chromium Browser
-        run: npx playwright install chromium --with-deps
+        run: |
+          # Retry installation up to 3 times to handle transient download failures
+          for i in {1..3}; do
+            if npx playwright install chromium --with-deps; then
+              break
+            else
+              echo "Attempt $i failed, retrying in 30 seconds..."
+              sleep 30
+            fi
+          done
         working-directory: frontend
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
 
       - name: Print playwright version
         run: npm list playwright --depth=0
@@ -80,7 +97,13 @@ jobs:
 
       - name: Run Frontend Playwright tests
         # run: npx playwright test --project=chromium --grep "test-practice-1-2"
-        run: npx playwright test --project=chromium --reporter=list
+        run: |
+          echo "Starting Playwright tests with debug info..."
+          echo "Node version: $(node --version)"
+          echo "Playwright version: $(npx playwright --version)"
+          echo "Browser installation status:"
+          npx playwright install --dry-run || true
+          npx playwright test --project=chromium --reporter=list
         working-directory: frontend
         env:
           NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
