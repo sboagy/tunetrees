@@ -619,9 +619,9 @@ await ttPO.typeSortButton.click();
 - If the selector is complex or likely to change
 - If it represents a key UI component
 
-#### 5a. **Data Test IDs: Preferred Selector Strategy (REQUIRED)**
+#### 5a. **Data Test IDs: Preferred Selector Strategy (RECOMMENDED)**
 
-**ALWAYS prefer `data-testid` attributes** for reliable element targeting:
+**PREFER `data-testid` attributes** for reliable element targeting:
 
 ```typescript
 // EXCELLENT: Using data-testid attributes
@@ -794,8 +794,8 @@ When creating new tests, ensure:
 - [ ] Calls `ttPO.gotoMainPage()` first
 - [ ] Uses existing Page Object locators when possible
 - [ ] Adds new locators to Page Objects if needed (with proper TypeScript types)
-- [ ] **ALWAYS adds `data-testid` attributes to new UI elements**
-- [ ] **ALWAYS uses `data-testid` selectors via `page.getByTestId()` for new elements**
+- [ ] **Adds `data-testid` attributes to new UI elements** (recommended for reliability)
+- [ ] **Uses `data-testid` selectors via `page.getByTestId()` for new elements** (preferred approach)
 - [ ] Includes proper error handling and timeouts
 - [ ] Follows DRY principles (no repeated selectors)
 - [ ] Includes meaningful console.log statements for debugging
@@ -811,9 +811,9 @@ When **GitHub Copilot** creates or modifies tests:
 5. **ALWAYS include proper logging** (logTestStart, logTestEnd, etc.)
 6. **ALWAYS use defensive programming** with proper visibility checks
 7. **ALWAYS follow the established patterns** from existing working tests
-8. **ALWAYS add `data-testid` attributes** to new UI components for reliable testing
-9. **ALWAYS use `page.getByTestId()` for new elements** instead of CSS selectors
-10. **ALWAYS update Page Objects** when adding new `data-testid` attributes
+8. **ADD `data-testid` attributes** to new UI components for reliable testing (recommended)
+9. **USE `page.getByTestId()` for new elements** instead of CSS selectors (preferred)
+10. **UPDATE Page Objects** when adding new `data-testid` attributes
 
 This ensures consistency, maintainability, and reliability across all TuneTrees E2E tests.
 
