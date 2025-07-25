@@ -1,6 +1,7 @@
 _notes
 .gitconfig
 frontend/.next/
+ci-logs/
 
 node_modules
 
