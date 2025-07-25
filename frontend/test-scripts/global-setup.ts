@@ -78,8 +78,10 @@ async function globalSetup() {
   const fastAPIFd = fs.openSync(fastAPILog, "a");
 
   const fastapiProcess: ChildProcess = spawn(
-    path.join(venvBinDir, "uvicorn"),
+    "python",
     [
+      "-m",
+      "uvicorn",
       "tunetrees.api.main:app",
       "--reload",
       "--host",

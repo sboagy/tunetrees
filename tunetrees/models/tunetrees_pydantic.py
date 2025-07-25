@@ -722,30 +722,6 @@ class VerificationTokenParamsModel(BaseModel):
     token: str
 
 
-class AuthenticatorModel(BaseModel):
-    credential_id: str = Field(description="Unique identifier for the credential")
-    user_id: int = Field(description="User ID this credential belongs to")
-    credential_public_key: str = Field(description="Public key for the credential")
-    counter: int = Field(description="Counter for replay attack prevention")
-    credential_device_type: str = Field(description="Type of device ('singleDevice' or 'multiDevice')")
-    credential_backed_up: bool = Field(description="Whether the credential is backed up")
-    transports: Optional[str] = Field(default=None, description="Comma-separated list of transports")
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class AuthenticatorModelPartial(BaseModel):
-    credential_id: Optional[str] = None
-    user_id: Optional[int] = None
-    credential_public_key: Optional[str] = None
-    counter: Optional[int] = None
-    credential_device_type: Optional[str] = None
-    credential_backed_up: Optional[bool] = None
-    transports: Optional[str] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class TuneTypeModel(BaseModel):
     id: str
     name: Optional[str] = None

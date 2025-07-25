@@ -3,10 +3,15 @@ import sqlite3
 import pytest
 import gc
 import threading
+import os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from tunetrees.api.tunetrees import router
+
+
+# Set test database environment variable before any imports that use the database
+os.environ["TUNETREES_DB"] = "tunetrees_test.sqlite3"
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
