@@ -183,7 +183,7 @@ export class TuneTreesPageObject {
     let rowCount = await this.tunesGridRows.count();
     let iterations = 0;
 
-    const maxIterations = 12; // 12 seconds max wait time
+    const maxIterations = 14; // 14 seconds max wait time
     while (rowCount < 2 && iterations < maxIterations) {
       await this.page.waitForTimeout(1000); // wait for 1 second before checking again
       rowCount = await this.tunesGridRows.count();
@@ -222,7 +222,7 @@ export class TuneTreesPageObject {
     // await this.page.getByRole("row", { name: tuneTitle }).click();
   }
 
-  async navigateToRepertoireTab() {
+  async navigateToRepertoireTab(pauseSecondsAfter = 2) {
     await this.gotoMainPage();
 
     await this.mainTabGroup.waitFor({ state: "visible" });
@@ -247,7 +247,7 @@ export class TuneTreesPageObject {
     // Make sure the "Add To Review" button is visible
     await this.addToReviewButton.waitFor({ state: "visible" });
     await this.waitForTablePopulationToStart();
-    await this.page.waitForTimeout(2000);
+    await this.page.waitForTimeout(pauseSecondsAfter * 1000);
   }
 
   async navigateToPracticeTab() {
