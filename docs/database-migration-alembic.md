@@ -71,6 +71,106 @@ Alembic is a database migration tool for SQLAlchemy that provides automated data
 
 The key insight is that instead of manually writing SQL to change your database, you define your desired schema in a target database file (`tunetrees_test_clean.sqlite3`), and Alembic figures out the transformation steps automatically by comparing this target with your production baseline. SQLAlchemy models are automatically generated from this database to keep code and schema in sync. This eliminates human error and ensures consistent schema changes across development, testing, and production environments.
 
+## Database Files in the Migration System
+
+The TuneTrees project uses several SQLite database files that serve different purposes in the migration and development workflow. Understanding these files is crucial for working with the migration system effectively.
+
+### Checked-in Database Files (Git Tracked)
+
+**`tunetrees_test_clean.sqlite3`** - **Schema Source of Truth**
+
+- Contains the **target schema** that represents your desired database structure
+- Used as the source for auto-generating SQLAlchemy models via `sqlacodegen_v2`
+- Alembic compares this schema against production to generate migrations
+- Contains clean test data with known state for reproducible testing
+- **Always tracked in git** - this is the authoritative definition of your schema
+- **Schema changes are made directly in this file** using database tools
+
+**`true_production_baseline.sqlite3`** - **Production Data Snapshot**
+
+- Snapshot of actual production database at a specific point in time
+- Contains real user data and represents the deployed production state at baseline
+- Used by migration scripts to establish the baseline migration that matches production
+- Used for testing migrations against real data to ensure data preservation
+- **Tracked in git** - provides reproducible production reference for migration testing
+- **Never modified directly** - replaced when new production snapshots are needed
+
+### Working Database Files (Git Ignored)
+
+The following database files are generated during development and migration operations. They are all ignored by git since they are transient working files:
+
+**`tunetrees_production.sqlite3`** - **Downloaded Production Database**
+
+- Downloaded from Digital Ocean during migration operations
+- Contains live production data that will be migrated
+- Temporarily modified during migration testing and application
+- **The primary target for production migrations**
+
+**`tunetrees.sqlite3`** - **Main Development Database**
+
+- Default database used by the backend application during development
+- Referenced in `tunetrees/app/database.py` as the default location
+- Working copy that can be freely modified during development
+- Often copied from `tunetrees_test_clean.sqlite3` for local development
+
+**`tunetrees_test.sqlite3`** - **Test Runtime Database**
+
+- Copied from `tunetrees_test_clean.sqlite3` for each test run
+- Used by test suites to avoid modifying the clean test database
+- Automatically cleaned and recreated for each test session
+
+**Other Temporary Files:**
+
+- `*_temp_*.sqlite3` - Temporary files created during migration processes
+- `test_migration.sqlite3` - Used by migration testing scripts
+- `production_baseline.sqlite3` - Generated baseline schema reference files
+
+### Database File Workflow in Migrations
+
+**Schema Development:**
+
+1. Make schema changes directly in `tunetrees_test_clean.sqlite3` using database tools
+2. Auto-generate SQLAlchemy models: `sqlacodegen_v2 sqlite:///tunetrees_test_clean.sqlite3 > tunetrees/models/tunetrees.py`
+3. Test changes locally using `tunetrees.sqlite3` (copied from clean version)
+
+**Migration Generation:**
+
+1. Scripts download production database to `tunetrees_production.sqlite3`
+2. Alembic compares `tunetrees_test_clean.sqlite3` (target) vs production baseline (current state)
+3. Migration scripts are auto-generated with transformation steps
+
+**Migration Testing:**
+
+1. Use `true_production_baseline.sqlite3` to simulate realistic data scenarios
+2. Apply migrations to temporary copies to verify data preservation
+3. Test rollback capabilities if implemented
+
+**Production Deployment:**
+
+1. Download live production database to `tunetrees_production.sqlite3`
+2. Apply migrations directly to this file (preserving real data)
+3. Upload migrated database back to Digital Ocean
+
+### Alembic Configuration and Database URLs
+
+The `alembic.ini` file contains a `sqlalchemy.url` setting, but **this is largely a fallback value**. Most migration operations override this URL programmatically:
+
+- **Migration scripts use `-x db_url="<path>"` command line arguments** to specify exact database files
+- **Different operations use different databases** depending on the migration phase
+- **The alembic.ini URL is only used when no override is specified**
+
+Examples of URL overrides in migration scripts:
+
+```bash
+# Test migration on specific database
+alembic -x db_url="sqlite:///$(pwd)/test_migration.sqlite3" upgrade head
+
+# Scripts also temporarily modify alembic.ini during operations
+sed -i 's|sqlalchemy.url = .*|sqlalchemy.url = sqlite:///./tunetrees_production.sqlite3|' alembic.ini
+```
+
+This design allows the same Alembic configuration to work with multiple database files depending on the specific migration operation being performed.
+
 ## Migration Workflow
 
 ### 0. One-Time Setup: Establish Correct Baseline
