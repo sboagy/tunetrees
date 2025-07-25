@@ -46,26 +46,28 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/package-lock.json') }}
-
-      - name: Install Playwright Chromium Browser
+      - name: Install system Chrome browser dependencies
         run: |
-          # Retry installation up to 3 times to handle transient download failures
-          for i in {1..3}; do
-            if npx playwright install chromium --with-deps; then
-              break
-            else
-              echo "Attempt $i failed, retrying in 30 seconds..."
-              sleep 30
-            fi
-          done
-        working-directory: frontend
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+          # Install Chrome browser dependencies that are needed for system Chrome
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 \
+            libatk-bridge2.0-0 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxrandr2 \
+            libgbm1 \
+            libxss1 \
+            libasound2
+
+      - name: Verify Chrome installation
+        run: |
+          echo "Chrome version:"
+          google-chrome --version || echo "Chrome not found"
+          echo "Chrome location:"
+          which google-chrome || echo "Chrome not in PATH"
 
       - name: Print playwright version
         run: npm list playwright --depth=0
@@ -98,11 +100,14 @@ jobs:
       - name: Run Frontend Playwright tests
         # run: npx playwright test --project=chromium --grep "test-practice-1-2"
         run: |
-          echo "Starting Playwright tests with debug info..."
+          echo "Starting Playwright tests..."
           echo "Node version: $(node --version)"
-          echo "Playwright version: $(npx playwright --version)"
-          echo "Browser installation status:"
-          npx playwright install --dry-run || true
+          echo "NPM version: $(npm --version)"
+          echo "Playwright version:"
+          npx playwright --version
+          echo "Browser installation check:"
+          npx playwright install --dry-run chromium || echo "Browser check failed, but continuing..."
+          echo "Running tests..."
           npx playwright test --project=chromium --reporter=list
         working-directory: frontend
         env:
