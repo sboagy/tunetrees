@@ -75,6 +75,8 @@ t_practice_list_joined = Table(
     Column("step", Integer),
     Column("repetitions", Integer),
     Column("review_date", Text),
+    Column("goal", Text),
+    Column("technique", Text),
     Column("tags", NullType),
     Column("playlist_ref", Integer),
     Column("user_ref", Integer),
@@ -111,6 +113,8 @@ t_practice_list_staged = Table(
     Column("repetitions", Integer),
     Column("review_date", Text),
     Column("backup_practiced", Text),
+    Column("goal", Text),
+    Column("technique", Text),
     Column("tags", NullType),
     Column("purpose", Text),
     Column("note_private", Text),
@@ -417,6 +421,8 @@ class PracticeRecord(Base):
     state = mapped_column(Integer)
     difficulty = mapped_column(Float)
     step = mapped_column(Integer)
+    goal = mapped_column(Text, server_default=text("'recall'"))
+    technique = mapped_column(Text)
 
     playlist: Mapped[Optional["Playlist"]] = relationship(
         "Playlist", back_populates="practice_record"

@@ -41,7 +41,9 @@ test.describe.serial("Add to Review Tests", () => {
 
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
-    await ttPO.navigateToRepertoireTab();
+
+    // We should already be on the Repertoire tab at the point.  Assert that fact:
+    await expect(ttPO.addToReviewButton).toBeVisible();
 
     await expect(ttPO.tableStatus).toContainText("1 of 488 row(s) selected", {
       timeout: 15000,

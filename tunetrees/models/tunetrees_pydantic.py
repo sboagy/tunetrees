@@ -415,6 +415,8 @@ class PracticeRecordModel(BaseModel):
     state: Optional[int]
     difficulty: Optional[float]
     step: Optional[int]
+    goal: Optional[str] = "recall"
+    technique: Optional[str]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -434,8 +436,10 @@ class PracticeRecordModelPartial(BaseModel):
     elapsed_days: Optional[int] = None
     lapses: Optional[int] = None
     state: Optional[int] = None
-    difficulty: Optional[float]
-    step: Optional[int]
+    difficulty: Optional[float] = None
+    step: Optional[int] = None
+    goal: Optional[str] = "recall"
+    technique: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
