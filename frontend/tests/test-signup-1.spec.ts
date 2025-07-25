@@ -261,6 +261,274 @@ test.describe.serial("Signup Tests", () => {
 
     console.log("===> test-signup-1.spec.ts:128 ~ test-1 completed");
   });
+
+  test("test-password-validation-weak-password", async ({ page }) => {
+    console.log(
+      "===> test-signup-1.spec.ts ~ Password validation test - weak password",
+    );
+    const ttPO = new TuneTreesPageObject(page);
+
+    await checkHealth();
+    await page.goto("https://localhost:3000", {
+      timeout: initialPageLoadTimeout,
+      waitUntil: "domcontentloaded",
+    });
+
+    const topSignInButton = ttPO.page.getByRole("button", {
+      name: "New user",
+    });
+    await topSignInButton.waitFor({ state: "visible" });
+    await topSignInButton.click();
+
+    // Wait for the signup dialog to appear
+    const userEmailLocator = ttPO.page.getByTestId("user_email");
+    await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
+
+    // Fill in basic user info
+    await userEmailLocator.fill("test@example.com");
+    await userEmailLocator.press("Tab");
+
+    const userNameBox = ttPO.page.getByTestId("user_name");
+    await userNameBox.fill("Test User");
+
+    // Test weak password
+    const passwordEntryBox = ttPO.page.getByTestId("user_password");
+    await passwordEntryBox.fill("weak");
+
+    // Check that password strength indicator appears
+    const strengthIndicator = page.locator(
+      'span.text-sm.font-medium:has-text("Password Strength")',
+    );
+    await expect(strengthIndicator).toBeVisible();
+
+    // Check that requirements are visible
+    const requirementsHeader = page.getByText("Requirements:");
+    await expect(requirementsHeader).toBeVisible();
+
+    // Verify progress bar is present and shows weak strength
+    const progressBar = page.locator('div[role="progressbar"]');
+    await expect(progressBar).toBeVisible();
+
+    // Verify strength text shows "weak" - target the visible strength indicator
+    const strengthText = page.locator(
+      'span.text-sm.font-medium.capitalize:has-text("weak")',
+    );
+    await expect(strengthText).toBeVisible();
+
+    // Verify password verification field shows validation error
+    const passwordVerificationBox = ttPO.page.getByTestId(
+      "user_password_verification",
+    );
+    await passwordVerificationBox.fill("different");
+    await passwordVerificationBox.blur();
+
+    // Check that Sign Up button is disabled due to validation errors
+    const dialogSignInButton = ttPO.page.getByRole("button", {
+      name: "Sign Up",
+      exact: true,
+    });
+    await expect(dialogSignInButton).toBeDisabled();
+
+    console.log(
+      "===> test-signup-1.spec.ts ~ Password validation test - weak password completed",
+    );
+  });
+
+  test("test-password-validation-progressive-strength", async ({ page }) => {
+    console.log(
+      "===> test-signup-1.spec.ts ~ Password validation test - progressive strength",
+    );
+    const ttPO = new TuneTreesPageObject(page);
+
+    await checkHealth();
+    await page.goto("https://localhost:3000", {
+      timeout: initialPageLoadTimeout,
+      waitUntil: "domcontentloaded",
+    });
+
+    const topSignInButton = ttPO.page.getByRole("button", {
+      name: "New user",
+    });
+    await topSignInButton.waitFor({ state: "visible" });
+    await topSignInButton.click();
+
+    // Wait for the signup dialog to appear
+    const userEmailLocator = ttPO.page.getByTestId("user_email");
+    await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
+
+    // Fill in basic user info
+    await userEmailLocator.fill("test@example.com");
+    const userNameBox = ttPO.page.getByTestId("user_name");
+    await userNameBox.fill("Test User");
+
+    const passwordEntryBox = ttPO.page.getByTestId("user_password");
+    const progressBar = page.locator('div[role="progressbar"]');
+
+    // Test progressive password strength improvement
+
+    // Step 1: Start with short password
+    await passwordEntryBox.fill("Ab");
+    await expect(progressBar).toBeVisible();
+
+    // Step 2: Add length (but still missing requirements)
+    await passwordEntryBox.fill("Abcdefgh");
+    await expect(progressBar).toBeVisible();
+
+    // Step 3: Add number
+    await passwordEntryBox.fill("Abcdefgh1");
+    await expect(progressBar).toBeVisible();
+
+    // Step 4: Add special character for strong password
+    await passwordEntryBox.fill("Abcdefgh1!");
+    await expect(
+      page.locator('span.text-sm.font-medium.capitalize:has-text("strong")'),
+    ).toBeVisible();
+    await expect(progressBar).toBeVisible();
+
+    // Verify password strength component is working
+    const strengthIndicator = page.locator(
+      'span.text-sm.font-medium:has-text("Password Strength")',
+    );
+    await expect(strengthIndicator).toBeVisible();
+
+    console.log(
+      "===> test-signup-1.spec.ts ~ Password validation test - progressive strength completed",
+    );
+  });
+
+  test("test-password-validation-matching-verification", async ({ page }) => {
+    console.log(
+      "===> test-signup-1.spec.ts ~ Password validation test - matching verification",
+    );
+    const ttPO = new TuneTreesPageObject(page);
+
+    await checkHealth();
+    await page.goto("https://localhost:3000", {
+      timeout: initialPageLoadTimeout,
+      waitUntil: "domcontentloaded",
+    });
+
+    const topSignInButton = ttPO.page.getByRole("button", {
+      name: "New user",
+    });
+    await topSignInButton.waitFor({ state: "visible" });
+    await topSignInButton.click();
+
+    // Wait for the signup dialog to appear
+    const userEmailLocator = ttPO.page.getByTestId("user_email");
+    await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
+
+    // Fill in user info
+    await userEmailLocator.fill("test@example.com");
+    const userNameBox = ttPO.page.getByTestId("user_name");
+    await userNameBox.fill("Test User");
+
+    const passwordEntryBox = ttPO.page.getByTestId("user_password");
+    const passwordVerificationBox = ttPO.page.getByTestId(
+      "user_password_verification",
+    );
+    const dialogSignInButton = ttPO.page.getByRole("button", {
+      name: "Sign Up",
+      exact: true,
+    });
+
+    // Enter strong password
+    const strongPassword = "StrongPass123!";
+    await passwordEntryBox.fill(strongPassword);
+
+    // Test mismatched password verification
+    await passwordVerificationBox.fill("DifferentPass123!");
+    await passwordVerificationBox.blur();
+
+    // Button should be disabled due to password mismatch
+    await expect(dialogSignInButton).toBeDisabled();
+
+    // Test matching password verification
+    await passwordVerificationBox.fill(strongPassword);
+    await passwordVerificationBox.blur();
+
+    // Button should now be enabled
+    await expect(dialogSignInButton).toBeEnabled();
+
+    // Test that clearing verification field disables button again
+    await passwordVerificationBox.fill("");
+    await passwordVerificationBox.blur();
+    await expect(dialogSignInButton).toBeDisabled();
+
+    // Restore matching passwords
+    await passwordVerificationBox.fill(strongPassword);
+    await expect(dialogSignInButton).toBeEnabled();
+
+    console.log(
+      "===> test-signup-1.spec.ts ~ Password validation test - matching verification completed",
+    );
+  });
+
+  test("test-password-validation-form-submission", async ({ page }) => {
+    console.log(
+      "===> test-signup-1.spec.ts ~ Password validation test - form submission with valid password",
+    );
+    const ttPO = new TuneTreesPageObject(page);
+
+    await checkHealth();
+    await page.goto("https://localhost:3000", {
+      timeout: initialPageLoadTimeout,
+      waitUntil: "domcontentloaded",
+    });
+
+    const topSignInButton = ttPO.page.getByRole("button", {
+      name: "New user",
+    });
+    await topSignInButton.waitFor({ state: "visible" });
+    await topSignInButton.click();
+
+    // Wait for the signup dialog to appear
+    const userEmailLocator = ttPO.page.getByTestId("user_email");
+    await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
+
+    // Fill in complete valid form
+    const testEmail = `test.validation.${Date.now()}@example.com`;
+    await userEmailLocator.fill(testEmail);
+
+    const userNameBox = ttPO.page.getByTestId("user_name");
+    await userNameBox.fill("Test Validation User");
+
+    const passwordEntryBox = ttPO.page.getByTestId("user_password");
+    const passwordVerificationBox = ttPO.page.getByTestId(
+      "user_password_verification",
+    );
+
+    const validPassword = "ValidPass123!";
+    await passwordEntryBox.fill(validPassword);
+    await passwordVerificationBox.fill(validPassword);
+
+    // Verify password strength shows as Strong
+    const strengthText = page.locator(
+      'span.text-sm.font-medium.capitalize:has-text("strong")',
+    );
+    await expect(strengthText).toBeVisible();
+
+    // Verify password strength component is present
+    const strengthIndicator = page.locator(
+      'span.text-sm.font-medium:has-text("Password Strength")',
+    );
+    await expect(strengthIndicator).toBeVisible();
+
+    // Verify progress bar is present
+    const progressBar = page.locator('div[role="progressbar"]');
+    await expect(progressBar).toBeVisible();
+
+    // Submit form - check that it's enabled for valid passwords
+    const dialogSignInButton = ttPO.page.getByRole("button", {
+      name: "Sign Up",
+      exact: true,
+    });
+    await expect(dialogSignInButton).toBeEnabled();
+
+    console.log(
+      "===> test-signup-1.spec.ts ~ Password validation test - form submission completed",
+    );
+  });
 });
 
 async function processPlaylistDialog(page: Page) {
