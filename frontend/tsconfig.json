@@ -73,6 +73,8 @@
     "hooks/**/*.tsx",
     "auth/**/*.ts",
     "lib/**/*.ts",
+    "__tests__/**/*.ts",
+    "__tests__/**/*.tsx",
     ".next/types/**/*.ts",
     ".next/**/*.tsx",
     "auth/auth-types.ts",
