@@ -23,7 +23,8 @@ test.describe.serial("Practice Session Complete Workflow", () => {
     await checkHealth();
 
     // Navigate to the app and handle login (matching the MCP demo workflow)
-    await navigateToPageWithRetry(page, "https://localhost:3000");
+    // Navigate directly to /home to avoid redirect interruption
+    await navigateToPageWithRetry(page, "https://localhost:3000/home");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(2_000);
 
