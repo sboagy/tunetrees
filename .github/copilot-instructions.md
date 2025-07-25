@@ -619,6 +619,69 @@ await ttPO.typeSortButton.click();
 - If the selector is complex or likely to change
 - If it represents a key UI component
 
+#### 5a. **Data Test IDs: Preferred Selector Strategy (RECOMMENDED)**
+
+**PREFER `data-testid` attributes** for reliable element targeting:
+
+```typescript
+// EXCELLENT: Using data-testid attributes
+readonly passwordResetPasswordInput = page.getByTestId("password-reset-password-input");
+readonly passwordStrengthIndicator = page.getByTestId("password-strength-indicator");
+readonly submitButton = page.getByTestId("form-submit-button");
+
+// GOOD: Semantic selectors when data-testid isn't available
+readonly emailInput = page.getByRole("textbox", { name: "Email" });
+readonly loginDialog = page.getByRole("dialog", { name: "Sign In" });
+
+// AVOID: CSS selectors that can break easily
+readonly fragileButton = page.locator('.btn-primary.submit-btn'); // ❌ Brittle
+```
+
+**Add `data-testid` to components** when creating or modifying UI elements:
+
+```tsx
+// Add data-testid to interactive elements and key components
+<Input
+  type="password"
+  placeholder="Enter password"
+  data-testid="password-input"
+/>
+
+<Button
+  type="submit"
+  disabled={isLoading}
+  data-testid="form-submit-button"
+>
+  Submit
+</Button>
+
+<div className="password-strength" data-testid="password-strength-indicator">
+  {/* Component content */}
+</div>
+```
+
+**`data-testid` Naming Conventions**:
+
+- Use kebab-case: `data-testid="password-reset-form"`
+- Be descriptive: `data-testid="user-profile-edit-button"`
+- Include context: `data-testid="signup-password-input"` vs `data-testid="login-password-input"`
+- Group related elements: `data-testid="password-requirement-length"`, `data-testid="password-requirement-uppercase"`
+
+**Update Page Objects** when adding new `data-testid` attributes:
+
+```typescript
+// Always add new testid-based locators to Page Objects
+// In tunetrees.po.ts:
+readonly signupPasswordInput: Locator;
+readonly signupConfirmInput: Locator;
+readonly passwordStrengthIndicator: Locator;
+
+// In constructor:
+this.signupPasswordInput = page.getByTestId("signup-password-input");
+this.signupConfirmInput = page.getByTestId("signup-confirm-input");
+this.passwordStrengthIndicator = page.getByTestId("password-strength-indicator");
+```
+
 #### 6. **Navigation Best Practices (REQUIRED)**
 
 **Standard Navigation Flow**:
@@ -730,7 +793,9 @@ When creating new tests, ensure:
 - [ ] Uses `TuneTreesPageObject` or `TuneEditorPageObject`
 - [ ] Calls `ttPO.gotoMainPage()` first
 - [ ] Uses existing Page Object locators when possible
-- [ ] Adds new locators to Page Objects if needed
+- [ ] Adds new locators to Page Objects if needed (with proper TypeScript types)
+- [ ] **Adds `data-testid` attributes to new UI elements** (recommended for reliability)
+- [ ] **Uses `data-testid` selectors via `page.getByTestId()` for new elements** (preferred approach)
 - [ ] Includes proper error handling and timeouts
 - [ ] Follows DRY principles (no repeated selectors)
 - [ ] Includes meaningful console.log statements for debugging
@@ -746,6 +811,9 @@ When **GitHub Copilot** creates or modifies tests:
 5. **ALWAYS include proper logging** (logTestStart, logTestEnd, etc.)
 6. **ALWAYS use defensive programming** with proper visibility checks
 7. **ALWAYS follow the established patterns** from existing working tests
+8. **ADD `data-testid` attributes** to new UI components for reliable testing (recommended)
+9. **USE `page.getByTestId()` for new elements** instead of CSS selectors (preferred)
+10. **UPDATE Page Objects** when adding new `data-testid` attributes
 
 This ensures consistency, maintainability, and reliability across all TuneTrees E2E tests.
 

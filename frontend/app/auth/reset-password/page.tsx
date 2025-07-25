@@ -17,6 +17,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
+import { isPasswordValid } from "@/lib/password-utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, CheckCircle, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
@@ -26,15 +28,15 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-// Schema for new password
+// Schema for new password using enhanced validation
 const passwordResetSchema = z
   .object({
     password: z
       .string()
-      .min(8, "Password must be at least 8 characters")
-      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-      .regex(/[0-9]/, "Password must contain at least one number"),
+      .min(1, "Password is required")
+      .refine((password) => isPasswordValid(password), {
+        message: "Password does not meet security requirements",
+      }),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -209,6 +211,7 @@ export default function ResetPasswordPage(): JSX.Element {
                           type={showPassword ? "text" : "password"}
                           placeholder="Enter new password"
                           disabled={isLoading}
+                          data-testid="password-reset-password-input"
                         />
                         <Button
                           type="button"
@@ -217,6 +220,7 @@ export default function ResetPasswordPage(): JSX.Element {
                           className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                           onClick={() => setShowPassword(!showPassword)}
                           aria-label="Toggle password visibility"
+                          data-testid="password-reset-password-toggle"
                         >
                           {showPassword ? (
                             <EyeOff className="h-4 w-4" />
@@ -226,6 +230,11 @@ export default function ResetPasswordPage(): JSX.Element {
                         </Button>
                       </div>
                     </FormControl>
+                    {/* Real-time password strength indicator */}
+                    <PasswordStrengthIndicator
+                      password={form.watch("password") || ""}
+                      className="mt-2"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -244,6 +253,7 @@ export default function ResetPasswordPage(): JSX.Element {
                           type={showConfirmPassword ? "text" : "password"}
                           placeholder="Confirm new password"
                           disabled={isLoading}
+                          data-testid="password-reset-confirm-input"
                         />
                         <Button
                           type="button"
@@ -254,6 +264,7 @@ export default function ResetPasswordPage(): JSX.Element {
                             setShowConfirmPassword(!showConfirmPassword)
                           }
                           aria-label="Toggle confirm password visibility"
+                          data-testid="password-reset-confirm-toggle"
                         >
                           {showConfirmPassword ? (
                             <EyeOff className="h-4 w-4" />
@@ -278,7 +289,12 @@ export default function ResetPasswordPage(): JSX.Element {
             </CardContent>
 
             <CardFooter className="flex flex-col space-y-4">
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading}
+                data-testid="password-reset-submit-button"
+              >
                 {isLoading ? "Resetting password..." : "Reset password"}
               </Button>
 

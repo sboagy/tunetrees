@@ -27,6 +27,7 @@ import {
 import { providerMap } from "@/auth";
 import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 import { PasswordInput } from "@/components/PasswordInput";
+import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
 import {
   Card,
   CardContent,
@@ -316,6 +317,11 @@ export default function SignInPage(): JSX.Element {
                         data-testid="user_password"
                       />
                     </FormControl>
+                    {/* Real-time password strength indicator */}
+                    <PasswordStrengthIndicator
+                      password={form.watch("password") || ""}
+                      className="mt-2"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}

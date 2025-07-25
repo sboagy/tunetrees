@@ -54,6 +54,10 @@ jobs:
         run: npm list playwright --depth=0
         working-directory: frontend
 
+      - name: Run Jest Unit Tests
+        run: npm run test:unit
+        working-directory: frontend
+
       - name: Debug environment
         run: |
           echo "CI=$CI"
