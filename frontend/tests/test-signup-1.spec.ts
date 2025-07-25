@@ -7,6 +7,7 @@ import { initialPageLoadTimeout } from "@/test-scripts/paths-for-tests";
 
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { isPasswordValid } from "@/lib/password-utils";
 
 import { checkHealth } from "../test-scripts/check-servers";
 
@@ -584,16 +585,24 @@ async function initialSignIn(page: Page) {
   await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
 
   const user = process.env.TEST2_LOGIN_USER_EMAIL;
-  const pw = process.env.TEST2_LOGIN_USER_PASSWORD;
+  let pw = process.env.TEST2_LOGIN_USER_PASSWORD;
   const userName = process.env.TEST2_LOGIN_USER_NAME;
+
+  // Ensure password meets new validation requirements
+  // If environment password is weak, use a strong default for testing
+  if (!pw || !isPasswordValid(pw)) {
+    pw = "TestPass123!"; // Strong password that meets all requirements
+    console.log("Using strong test password due to validation requirements");
+  }
+
   await userEmailLocator.fill(user || "");
   await userEmailLocator.press("Tab");
   const passwordEntryBox = ttPO.page.getByTestId("user_password");
-  await passwordEntryBox.fill(pw || "");
+  await passwordEntryBox.fill(pw);
   const passwordEntryVerificationBox = ttPO.page.getByTestId(
     "user_password_verification",
   );
-  await passwordEntryVerificationBox.fill(pw || "");
+  await passwordEntryVerificationBox.fill(pw);
 
   const userNameBox = ttPO.page.getByTestId("user_name");
   await userNameBox.fill(userName || "");
