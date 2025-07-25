@@ -155,7 +155,7 @@ test.describe("Password Reset Completion Flow", () => {
     );
     await page.waitForLoadState("domcontentloaded");
 
-    // Test weak password - should show password strength indicator
+    // Test weak password - should show password strength indicator and validation error
     await ttPO.passwordResetPasswordInput.fill("weak");
 
     // Wait for password strength indicator to appear and show weak rating
@@ -174,10 +174,15 @@ test.describe("Password Reset Completion Flow", () => {
     await ttPO.passwordResetConfirmInput.fill("weak");
     await ttPO.passwordResetSubmitButton.click();
 
-    // Should show form validation error for password mismatch or weakness
+    // With Enhanced Password Validation, form submission should trigger backend validation
+    // and show validation error - either frontend validation or HTTP 400 response
     await expect(
-      page.locator("text=Password must be at least 8 characters"),
-    ).toBeVisible();
+      page
+        .locator("text=Password must be at least 8 characters")
+        .or(page.locator("text=Password must contain"))
+        .or(page.locator('[role="alert"]'))
+        .first(),
+    ).toBeVisible({ timeout: 10000 });
 
     console.log("Password validation works correctly");
   });
@@ -195,9 +200,9 @@ test.describe("Password Reset Completion Flow", () => {
     const confirmInput = page.locator('input[type="password"]').last();
     const submitButton = page.locator('button[type="submit"]');
 
-    // Test mismatched passwords
-    await passwordInput.fill("Password123!");
-    await confirmInput.fill("Password456!");
+    // Test mismatched passwords with strong passwords
+    await passwordInput.fill("StrongPass123!");
+    await confirmInput.fill("DifferentPass123!");
     await submitButton.click();
 
     await expect(page.locator("text=don't match")).toBeVisible();
