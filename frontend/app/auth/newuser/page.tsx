@@ -66,6 +66,7 @@ export default function SignInPage(): JSX.Element {
       password: "", // Add initial value for password
       password_confirmation: "", // Add initial value for password_confirmation
       name: "", // Add initial value for name
+      phone: "", // Add initial value for phone
       csrfToken: "", // Initialize with empty string
     },
   });
@@ -364,6 +365,24 @@ export default function SignInPage(): JSX.Element {
                         {...field}
                         onChange={(e) => handleUserNameChange(e, field)}
                         data-testid="user_name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="tel"
+                        placeholder="+1234567890"
+                        {...field}
+                        data-testid="user_phone"
                       />
                     </FormControl>
                     <FormMessage />

@@ -18,6 +18,8 @@ from tunetrees.models import tunetrees as orm
 from tunetrees.models.tunetrees_pydantic import (
     AccountModel,
     AccountType,
+    AuthenticatorModel,
+    AuthenticatorModelPartial,
     SessionAndUserModel,
     SessionModel,
     UserModel,
@@ -122,6 +124,8 @@ async def create_user(user: UserModel) -> Optional[UserModel]:
                 name=user.name,
                 email=user.email,
                 email_verified=user.email_verified,
+                phone=user.phone,
+                phone_verified=user.phone_verified,
                 image=user.image,
                 hash=user.hash,
             )
@@ -680,6 +684,8 @@ def query_user_to_auth_user(
                     name=str(user.name),
                     email=str(user.email),
                     email_verified=user.email_verified,  # for the moment
+                    phone=user.phone,
+                    phone_verified=user.phone_verified,
                     hash=user.hash,
                     image=None,  # for the moment
                     sr_alg_type=user.sr_alg_type,  # for the moment
@@ -687,6 +693,143 @@ def query_user_to_auth_user(
                 return auth_user
             else:
                 return None
+    except Exception as e:
+        logger.error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occured")
+
+
+# WebAuthn/Passkey Authenticator endpoints
+
+@router.post("/create-authenticator/", response_model=AuthenticatorModel)
+async def create_authenticator(authenticator: AuthenticatorModel) -> AuthenticatorModel:
+    try:
+        with SessionLocal() as db:
+            orm_authenticator = orm.Authenticator(
+                credential_id=authenticator.credential_id,
+                user_id=authenticator.user_id,
+                credential_public_key=authenticator.credential_public_key,
+                counter=authenticator.counter,
+                credential_device_type=authenticator.credential_device_type,
+                credential_backed_up=authenticator.credential_backed_up,
+                transports=authenticator.transports,
+            )
+
+            db.add(orm_authenticator)
+            db.commit()
+            db.flush(orm_authenticator)
+
+            return AuthenticatorModel.model_validate(orm_authenticator)
+
+    except HTTPException as e:
+        logger.error("HTTPException (secondary catch): %s" % e)
+        raise
+    except Exception as e:
+        logger.error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occured")
+
+
+@router.get(
+    "/get-authenticator/{credential_id}",
+    response_model=Optional[AuthenticatorModel],
+    response_model_exclude_none=True,
+)
+async def get_authenticator(credential_id: str) -> Optional[AuthenticatorModel]:
+    try:
+        with SessionLocal() as db:
+            stmt = select(orm.Authenticator).where(orm.Authenticator.credential_id == credential_id)
+            result = db.execute(stmt)
+            which_row = result.fetchone()
+            if which_row and len(which_row) > 0:
+                authenticator: orm.Authenticator = which_row[0]
+                return AuthenticatorModel.model_validate(authenticator)
+            else:
+                return None
+    except HTTPException as e:
+        logger.error("HTTPException (secondary catch): %s" % e)
+        raise
+    except Exception as e:
+        logger.error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occured")
+
+
+@router.get(
+    "/get-authenticators-by-user/{user_id}",
+    response_model=list[AuthenticatorModel],
+    response_model_exclude_none=True,
+)
+async def get_authenticators_by_user(user_id: int) -> list[AuthenticatorModel]:
+    try:
+        with SessionLocal() as db:
+            stmt = select(orm.Authenticator).where(orm.Authenticator.user_id == user_id)
+            result = db.execute(stmt)
+            authenticators = result.scalars().all()
+            return [AuthenticatorModel.model_validate(auth) for auth in authenticators]
+    except HTTPException as e:
+        logger.error("HTTPException (secondary catch): %s" % e)
+        raise
+    except Exception as e:
+        logger.error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occured")
+
+
+@router.patch(
+    "/update-authenticator/{credential_id}",
+    response_model=AuthenticatorModel,
+    response_model_exclude_none=True,
+)
+async def update_authenticator(
+    credential_id: str = Path(..., description="Credential ID"), 
+    authenticator: AuthenticatorModelPartial = Body(...)
+) -> AuthenticatorModel:
+    try:
+        with SessionLocal() as db:
+            # Extract fields to update
+            authenticator_dict: dict[str, Optional[Any]] = authenticator.model_dump(exclude_unset=True)
+            update_dict = {key: value for key, value in authenticator_dict.items()}
+
+            # Query the existing authenticator
+            stmt = select(orm.Authenticator).where(orm.Authenticator.credential_id == credential_id)
+            existing_authenticator = db.execute(stmt).scalar_one_or_none()
+
+            if not existing_authenticator:
+                raise HTTPException(status_code=404, detail="Authenticator Not Found")
+
+            # Update the fields dynamically
+            for key, value in update_dict.items():
+                setattr(existing_authenticator, key, value)
+
+            # Commit the changes
+            db.commit()
+            db.refresh(existing_authenticator)
+
+            # Return the updated authenticator
+            return AuthenticatorModel.model_validate(existing_authenticator)
+
+    except HTTPException as e:
+        logger.error(f"HTTPException (secondary catch): {e}")
+        raise
+
+    except Exception as e:
+        logger.error(f"Unexpected Exception: {e}")
+        raise HTTPException(status_code=500, detail="Unexpected error occurred")
+
+
+@router.delete("/delete-authenticator/{credential_id}", response_model=None)
+async def delete_authenticator(credential_id: str) -> None:
+    try:
+        with SessionLocal() as db:
+            stmt = select(orm.Authenticator).where(orm.Authenticator.credential_id == credential_id)
+            orm_authenticator = db.execute(stmt).scalar_one_or_none()
+            if orm_authenticator:
+                db.delete(orm_authenticator)
+                db.commit()
+            else:
+                raise HTTPException(status_code=404, detail="Authenticator Not Found")
+
+            return None
+    except HTTPException as e:
+        logger.error("HTTPException (secondary catch): %s" % e)
+        raise
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")

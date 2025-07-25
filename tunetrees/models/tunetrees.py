@@ -148,6 +148,8 @@ class User(Base):
     name = mapped_column(Text)
     email = mapped_column(Text)
     email_verified = mapped_column(Text, server_default=text("NULL"))
+    phone = mapped_column(Text)
+    phone_verified = mapped_column(Text, server_default=text("NULL"))
     image = mapped_column(Text)
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
     sr_alg_type = mapped_column(Text)
@@ -186,6 +188,9 @@ class User(Base):
     tune_override: Mapped[List["TuneOverride"]] = relationship(
         "TuneOverride", uselist=True, back_populates="user"
     )
+    authenticator: Mapped[List["Authenticator"]] = relationship(
+        "Authenticator", uselist=True, back_populates="user"
+    )
 
 
 class VerificationToken(Base):
@@ -194,6 +199,20 @@ class VerificationToken(Base):
     identifier = mapped_column(Text, primary_key=True)
     token = mapped_column(Text)
     expires = mapped_column(Text)
+
+
+class Authenticator(Base):
+    __tablename__ = "authenticator"
+
+    credential_id = mapped_column(Text, primary_key=True)
+    user_id = mapped_column(ForeignKey("user.id"), nullable=False)
+    credential_public_key = mapped_column(Text, nullable=False)
+    counter = mapped_column(Integer, nullable=False)
+    credential_device_type = mapped_column(Text, nullable=False)
+    credential_backed_up = mapped_column(Boolean, nullable=False)
+    transports = mapped_column(Text)
+
+    user: Mapped["User"] = relationship("User", back_populates="authenticator")
 
 
 t_view_playlist_joined = Table(

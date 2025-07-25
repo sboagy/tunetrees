@@ -38,6 +38,9 @@ import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import SendgridProvider from "next-auth/providers/sendgrid";
 
+import SMSProvider from "./sms-provider";
+import WebAuthnProvider from "./webauthn-provider";
+
 import { viewSettingsDefault } from "@/app/user-settings/view-settings-default";
 import type { AdapterUser } from "next-auth/adapters";
 import type { JWT } from "next-auth/jwt";
@@ -90,6 +93,11 @@ export const providers: Provider[] = [
     sendVerificationRequest,
     maxAge: 24 * 60 * 60, // How long the email verification link is valid for (default 24h)
   }),
+  SMSProvider({
+    apiKey: process.env.TT_SMS_API_KEY,
+    from: process.env.TT_SMS_FROM_NUMBER,
+  }),
+  WebAuthnProvider(),
 
   GitHubProvider({
     clientId: process.env.GITHUB_CLIENT_ID ?? "",
@@ -293,6 +301,9 @@ const config = {
   // experimental: {
   //   enableWebAuthn: true,
   // },
+  experimental: {
+    enableWebAuthn: true,
+  },
   debug: process.env.NODE_ENV !== "production",
   // debug: true,
 } satisfies NextAuthConfig;
