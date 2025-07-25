@@ -46,6 +46,16 @@ export class TuneTreesPageObject {
   readonly tableStatus;
   readonly toast;
 
+  // Password Reset locators
+  readonly passwordResetPasswordInput: Locator;
+  readonly passwordResetConfirmInput: Locator;
+  readonly passwordResetSubmitButton: Locator;
+  readonly passwordResetPasswordToggle: Locator;
+  readonly passwordResetConfirmToggle: Locator;
+  readonly passwordStrengthIndicator: Locator;
+  readonly passwordStrengthLevel: Locator;
+  readonly passwordRequirements: Locator;
+
   constructor(page: Page) {
     this.page = page;
 
@@ -143,6 +153,28 @@ export class TuneTreesPageObject {
 
     this.tableStatus = this.page.getByText(" row(s) selected.");
     this.toast = this.page.getByTestId("shadcn-toast");
+
+    // Password Reset locators
+    this.passwordResetPasswordInput = page.getByTestId(
+      "password-reset-password-input",
+    );
+    this.passwordResetConfirmInput = page.getByTestId(
+      "password-reset-confirm-input",
+    );
+    this.passwordResetSubmitButton = page.getByTestId(
+      "password-reset-submit-button",
+    );
+    this.passwordResetPasswordToggle = page.getByTestId(
+      "password-reset-password-toggle",
+    );
+    this.passwordResetConfirmToggle = page.getByTestId(
+      "password-reset-confirm-toggle",
+    );
+    this.passwordStrengthIndicator = page.getByTestId(
+      "password-strength-indicator",
+    );
+    this.passwordStrengthLevel = page.getByTestId("password-strength-level");
+    this.passwordRequirements = page.getByTestId("password-requirements");
   }
 
   onError = (exception: Error): void => {

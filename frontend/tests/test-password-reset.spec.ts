@@ -3,6 +3,7 @@ import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import {
   logTestStart,
   logTestEnd,
@@ -145,6 +146,7 @@ test.describe("Password Reset Completion Flow", () => {
   });
 
   test("should validate password requirements", async ({ page }) => {
+    const ttPO = new TuneTreesPageObject(page);
     const testEmail = "test@example.com";
     const testToken = "123456";
 
@@ -153,17 +155,29 @@ test.describe("Password Reset Completion Flow", () => {
     );
     await page.waitForLoadState("domcontentloaded");
 
-    const passwordInput = page.locator('input[type="password"]').first();
-    const confirmInput = page.locator('input[type="password"]').last();
-    const submitButton = page.locator('button[type="submit"]');
+    // Test weak password - should show password strength indicator
+    await ttPO.passwordResetPasswordInput.fill("weak");
 
-    // Test weak password
-    await passwordInput.fill("weak");
-    await confirmInput.fill("weak");
-    await submitButton.click();
+    // Wait for password strength indicator to appear and show weak rating
+    await expect(ttPO.passwordStrengthIndicator).toBeVisible();
+    await expect(ttPO.passwordStrengthLevel).toHaveText("weak");
 
-    // Should show validation errors
-    await expect(page.locator("text=at least 8 characters")).toBeVisible();
+    // Check that specific requirement shows as not met
+    await expect(ttPO.passwordRequirements).toBeVisible();
+    await expect(
+      ttPO.passwordRequirements
+        .locator("span")
+        .filter({ hasText: "At least 8 characters" })
+        .first(),
+    ).toBeVisible();
+
+    await ttPO.passwordResetConfirmInput.fill("weak");
+    await ttPO.passwordResetSubmitButton.click();
+
+    // Should show form validation error for password mismatch or weakness
+    await expect(
+      page.locator("text=Password must be at least 8 characters"),
+    ).toBeVisible();
 
     console.log("Password validation works correctly");
   });
