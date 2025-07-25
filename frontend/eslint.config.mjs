@@ -55,6 +55,8 @@ export default [
       ".prettierrc.js",
       "**/playwright-report/**",
       "**/test-env.js",
+      "**/jest.config.{js,cjs}",
+      "**/jest.setup.{js,cjs}",
     ],
   },
   // Global rules that apply to all files - disable problematic node rules
@@ -230,6 +232,39 @@ export default [
           ignore: ["Sidebar.tsx"],
         },
       ],
+    },
+  },
+  // Configuration for Jest configuration files
+  {
+    files: ["jest.config.{js,cjs}", "jest.setup.{js,cjs}"],
+    languageOptions: {
+      parser: undefined, // Use default ESLint parser for JavaScript
+      globals: {
+        module: "readonly",
+        require: "readonly",
+        __dirname: "readonly",
+        process: "readonly",
+      },
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: "commonjs",
+      },
+    },
+    rules: {
+      // Disable all TypeScript-specific rules for Jest config files
+      "@typescript-eslint/await-thenable": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
+      "@typescript-eslint/unbound-method": "off",
+      "@typescript-eslint/no-misused-promises": "off",
+      "@typescript-eslint/prefer-nullish-coalescing": "off",
+      "@typescript-eslint/prefer-optional-chain": "off",
+      "@typescript-eslint/no-var-requires": "off",
+      "@typescript-eslint/no-require-imports": "off",
+      // Use basic JavaScript rules instead
+      "no-unused-vars": "off",
+      "no-undef": "off",
+      ...disabledNodeRules,
     },
   },
   // Configuration for browser scripts in public/scripts/
