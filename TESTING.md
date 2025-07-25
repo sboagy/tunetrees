@@ -11,7 +11,7 @@ This document explains how to run tests in the TuneTrees monorepo.
 pytest tests/ -v
 
 # Alternative: Use the clean test runner script
-python run_tests.py
+python scripts/run_tests.py
 ```
 
 ### Test Structure

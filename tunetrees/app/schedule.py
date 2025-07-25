@@ -514,14 +514,18 @@ def _process_non_recall_goal(
     )
 
     # Create new practice record with goal-specific scheduling
+    practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
+
     new_practice_record = PracticeRecord(
         id=None,
         tune_ref=tune_id,
         playlist_ref=playlist_ref,
         quality=quality_int,
-        practiced=sitdown_date.strftime(TT_DATE_FORMAT),
+        practiced=practiced_str,
         review_date=next_review_date.strftime(TT_DATE_FORMAT),
-        backup_practiced=sitdown_date.strftime(TT_DATE_FORMAT),
+        backup_practiced=practiced_str,
+        goal=goal,
+        technique=technique,
         # Set basic interval/repetition tracking
         interval=max(1, (next_review_date - sitdown_date).days),
         repetitions=(
@@ -729,6 +733,8 @@ def _process_single_tune_feedback(
         review_date_str = parse_review_date(review_dt)
 
     # Always create a new practice record for historical tracking
+    practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
+
     new_practice_record = PracticeRecord(
         id=None,
         tune_ref=tune_id,
@@ -740,7 +746,9 @@ def _process_single_tune_feedback(
         repetitions=review_result_dict.get("repetitions"),
         review_date=review_date_str,
         quality=quality_int,
-        practiced=sitdown_date.strftime(TT_DATE_FORMAT),
+        practiced=practiced_str,
+        goal=goal,
+        technique=technique,
     )
 
     # Always add the new practice record to the database

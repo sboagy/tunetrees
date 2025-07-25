@@ -244,19 +244,24 @@ async def submit_feedbacks(
     tune_updates: Dict[str, TuneFeedbackUpdate],
     sitdown_date: datetime = Query(...),
 ):
-    logger.debug(f"{tune_updates=}")
+    try:
+        logger.debug(f"{tune_updates=}")
 
-    # FSRS requires dates to be timezoned, so ensure sitdown_date has a UTC timezone.
-    if sitdown_date.tzinfo is None:
-        sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
+        # FSRS requires dates to be timezoned, so ensure sitdown_date has a UTC timezone.
+        if sitdown_date.tzinfo is None:
+            sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
 
-    update_practice_feedbacks(
-        tune_updates,
-        playlist_id,
-        review_sitdown_date=sitdown_date,
-    )
+        update_practice_feedbacks(
+            tune_updates,
+            playlist_id,
+            review_sitdown_date=sitdown_date,
+        )
 
-    return status.HTTP_302_FOUND
+        return status.HTTP_302_FOUND
+    except Exception as e:
+        logger.error(f"Error in submit_feedbacks: {e}")
+        # Return a proper HTTP error instead of letting it bubble up as a 500
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 def update_table(
