@@ -91,7 +91,10 @@ async function globalSetup() {
       env: {
         ...process.env,
         PATH: `${venvBinDir}:${process.env.PATH}`,
-        PYTHONPATH: `${tunetreesBackendDeployBaseDir}:${venvLibDir}:${process.env.PYTHONPATH || ""}`,
+        PYTHONPATH:
+          venvLibDir && venvLibDir.trim() !== ""
+            ? `${tunetreesBackendDeployBaseDir}:${String(venvLibDir)}:${process.env.PYTHONPATH || ""}`
+            : `${tunetreesBackendDeployBaseDir}:${process.env.PYTHONPATH || ""}`,
         PYTHONDONTWRITEBYTECODE: "1",
         PYTHONUNBUFFERED: "1",
         TUNETREES_DB: process.env.TUNETREES_DB || `${testDatabasePath}`,
