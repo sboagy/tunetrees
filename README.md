@@ -132,42 +132,14 @@ Handles user data management, review scheduling, and API requests.
 
 ### 1.4. Database Files
 
-The TuneTrees project includes several SQLite database files that serve different purposes in development, testing, and migration workflows:
+The TuneTrees project uses several SQLite database files for development, testing, and migration operations. For detailed information about these database files and how they work with the migration system, see [Database Migration with Alembic](docs/database-migration-alembic.md#database-files-in-the-migration-system).
 
-#### Checked-in Database Files
+**Key Database Files:**
 
-**`tunetrees_test_clean.sqlite3`** - **Base Test Database**
-
-- Contains clean test data with known state for reproducible testing
-- Used as the source of truth for desired schema during development
-- Copied to `tunetrees_test.sqlite3` (ignored) for each test run
-- **Always tracked in git** - serves as the target schema for migrations
-
-**`true_production_baseline.sqlite3`** - **Production Data Snapshot**
-
-- Snapshot of actual production database at a specific point in time
-- Contains real user data and represents deployed production state
-- Used for testing migrations against real data to ensure data preservation
-- **Tracked in git** - provides production data reference for migration testing
-
-#### Working Database Files (Ignored)
-
-The following database files are generated during development and are ignored by git:
-
-- `tunetrees.sqlite3` - Main development database (working copy)
-- `tunetrees_test.sqlite3` - Transient test database (copied from clean version)
-- `tunetrees_production.sqlite3` - Downloaded production database for migration operations
-- `production_baseline.sqlite3` - Clean schema reference (generated when needed)
-- `*_temp_*.sqlite3` - Temporary files created during migration processes
-
-#### Database File Workflow
-
-1. **Schema Changes**: Made directly in `tunetrees_test_clean.sqlite3` using database tools
-2. **Migration Generation**: `scripts/generate_migration.sh` automatically downloads production database and compares migration history vs target schema
-3. **Migration Testing**: Uses `true_production_baseline.sqlite3` to verify data preservation
-4. **Production Deployment**: Applies migrations to live production database
-
-For detailed information about database migrations, see [Database Migration with Alembic](docs/database-migration-alembic.md).
+- `tunetrees_test_clean.sqlite3` - Schema source of truth (checked into git)
+- `true_production_baseline.sqlite3` - Production data snapshot (checked into git)
+- `tunetrees_production.sqlite3` - Downloaded production database (ignored by git)
+- `tunetrees.sqlite3` - Main development database (ignored by git)
 
 ### 1.5. Schema:
 

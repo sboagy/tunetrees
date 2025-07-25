@@ -161,12 +161,94 @@ fi
 echo "Views in migrated database:"
 sqlite3 tunetrees_production.sqlite3 "SELECT '  - ' || name FROM sqlite_master WHERE type='view' ORDER BY name;"
 
-echo -e "${YELLOW}Step 6: Upload to Production${NC}"
+echo -e "${YELLOW}Step 6: Critical Schema Validation${NC}"
+echo "Performing final schema comparison before upload..."
+
+# Function to extract schema in normalized format for comparison
+extract_schema_for_comparison() {
+    local db_file="$1"
+    local temp_file="$2"
+    
+    # Extract schemas with proper formatting and organization
+    {
+        echo "-- ===== TABLES ====="
+        sqlite3 "$db_file" "SELECT '-- Table: ' || name || CHAR(10) || sql || CHAR(10) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'alembic_version' ORDER BY name;"
+        echo ""
+        
+        echo "-- ===== INDEXES ====="
+        sqlite3 "$db_file" "SELECT '-- Index: ' || name || CHAR(10) || sql || CHAR(10) FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%' AND sql IS NOT NULL ORDER BY name;"
+        echo ""
+        
+        echo "-- ===== VIEWS ====="
+        sqlite3 "$db_file" "SELECT '-- View: ' || name || CHAR(10) || sql || CHAR(10) FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+        echo ""
+        
+        echo "-- ===== TRIGGERS ====="
+        sqlite3 "$db_file" "SELECT '-- Trigger: ' || name || CHAR(10) || sql || CHAR(10) FROM sqlite_master WHERE type='trigger' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+    } > "$temp_file"
+    
+    # Clean up any empty sections
+    sed -i.bak '/^-- ===== [A-Z]* =====$/,/^-- ===== [A-Z]* =====$/{
+        /^-- ===== [A-Z]* =====$/!{
+            /^-- ===== [A-Z]* =====$/!{
+                /^$/d
+            }
+        }
+    }' "$temp_file" 2>/dev/null || true
+    rm -f "$temp_file.bak" 2>/dev/null || true
+}
+
+# Create temporary files for schema comparison
+TEMP_MIGRATED_SCHEMA=$(mktemp)
+TEMP_CLEAN_SCHEMA=$(mktemp)
+
+# Ensure cleanup on exit
+cleanup_temp_files() {
+    rm -f "$TEMP_MIGRATED_SCHEMA" "$TEMP_CLEAN_SCHEMA"
+}
+trap cleanup_temp_files EXIT
+
+echo "Extracting migrated database schema..."
+extract_schema_for_comparison "tunetrees_production.sqlite3" "$TEMP_MIGRATED_SCHEMA"
+
+echo "Extracting clean test schema..."
+extract_schema_for_comparison "tunetrees_test_clean.sqlite3" "$TEMP_CLEAN_SCHEMA"
+
+echo "Comparing schemas..."
+if diff -q "$TEMP_CLEAN_SCHEMA" "$TEMP_MIGRATED_SCHEMA" >/dev/null 2>&1; then
+    echo -e "${GREEN}✅ SCHEMA VALIDATION PASSED: Migrated database schema matches clean test schema exactly!${NC}"
+    echo ""
+else
+    echo -e "${RED}❌ SCHEMA VALIDATION FAILED: Migrated database schema differs from clean test schema!${NC}"
+    echo ""
+    echo -e "${YELLOW}Schema differences detected:${NC}"
+    diff -u "$TEMP_CLEAN_SCHEMA" "$TEMP_MIGRATED_SCHEMA" | head -20
+    echo ""
+    echo -e "${RED}CRITICAL: Schema drift detected! Upload blocked for safety.${NC}"
+    echo ""
+    echo "This indicates the migration didn't produce the expected schema."
+    echo "Possible causes:"
+    echo "  - Migration script is incomplete or incorrect"
+    echo "  - Production database had unexpected pre-existing changes"
+    echo "  - Migration failed to apply completely"
+    echo ""
+    echo "To debug this:"
+    echo "  1. Review the schema differences above"
+    echo "  2. Check if migration scripts are complete"
+    echo "  3. Ensure tunetrees_test_clean.sqlite3 represents the target schema"
+    echo "  4. Re-run migration after fixing the issues"
+    echo ""
+    echo -e "${YELLOW}Migration aborted - database NOT uploaded to production.${NC}"
+    exit 1
+fi
+
+echo -e "${YELLOW}Step 7: Upload to Production${NC}"
 echo "Migration completed successfully!"
 echo ""
 echo "Migrated database is ready: tunetrees_production.sqlite3"
+echo -e "${GREEN}✓ Schema validation passed - safe to upload${NC}"
 echo ""
-echo -e "${RED}IMPORTANT: Review the migrated database before uploading!${NC}"
+echo -e "${RED}IMPORTANT: Final review before uploading to production!${NC}"
 echo ""
 
 read -p "Upload migrated database to production server? (y/n): " upload_confirm

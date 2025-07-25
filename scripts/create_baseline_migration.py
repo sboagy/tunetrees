@@ -4,10 +4,10 @@ Script to create a proper baseline migration from production database.
 This generates CREATE TABLE statements by reflecting the production database schema.
 """
 
-import sqlite3
-from sqlalchemy import create_engine, MetaData, Table, text
-from sqlalchemy.schema import CreateTable
 from datetime import datetime
+
+from sqlalchemy import MetaData, create_engine
+from sqlalchemy.schema import CreateTable
 
 # Connect to production database
 engine = create_engine("sqlite:///temp_production_for_baseline.sqlite3")

@@ -4,6 +4,14 @@ frontend/.next/
 
 node_modules
 
+# Schema analysis artifacts
+*_schema_*.sql
+schema_diff_*.txt
+production_backup_*.sqlite3
+tunetrees_production_backup_*.sqlite3
+tunetrees_production_manual.sqlite3
+tunetrees_test_emergency.sqlite3
+
 # Byte-compiled / optimized / DLL files
 __pycache__/**/*.*
 __pycache__
