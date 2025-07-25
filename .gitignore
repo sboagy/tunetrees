@@ -274,6 +274,7 @@ tunetrees_local_backup
 backup_practice*.sqlite
 backup_practice*.sqlite3
 tunetrees_*.sqlite3.bak
+test_*_migration.sqlite3
 tsconfig.json.bak
 babel.config.js.bak
 

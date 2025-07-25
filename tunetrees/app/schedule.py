@@ -524,6 +524,8 @@ def _process_non_recall_goal(
         practiced=practiced_str,
         review_date=next_review_date.strftime(TT_DATE_FORMAT),
         backup_practiced=practiced_str,
+        goal=goal,
+        technique=technique,
         # Set basic interval/repetition tracking
         interval=max(1, (next_review_date - sitdown_date).days),
         repetitions=(
@@ -745,6 +747,8 @@ def _process_single_tune_feedback(
         review_date=review_date_str,
         quality=quality_int,
         practiced=practiced_str,
+        goal=goal,
+        technique=technique,
     )
 
     # Always add the new practice record to the database
