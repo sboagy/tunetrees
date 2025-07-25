@@ -37,17 +37,22 @@ test.describe.serial("Practice Session Complete Workflow", () => {
 
     await page.waitForLoadState("domcontentloaded");
 
+    await page.waitForTimeout(2000); // Wait for the page to stabilize
+
     // I shouldn't have to do this!!! But it seems to be necessary?
     await navigateToRepertoireTabStandalone(page);
 
     await page.waitForLoadState("domcontentloaded");
+
+    await page.waitForTimeout(2000); // Wait for the page to stabilize
   });
 
   test.afterEach(async ({ page }) => {
     await restartBackend();
-    await page.waitForTimeout(2_000);
     await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(2_000);
   });
+
   test("should complete full practice session workflow with recall quality evaluations", async ({
     page,
   }) => {
