@@ -39,14 +39,20 @@ export function PasswordStrengthIndicator({
   const progressColor = getStrengthProgressColor(strength.level);
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div
+      className={cn("space-y-3", className)}
+      data-testid="password-strength-indicator"
+    >
       {/* Strength Level and Progress Bar */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Password Strength
           </span>
-          <span className={cn("text-sm font-medium capitalize", strengthColor)}>
+          <span
+            className={cn("text-sm font-medium capitalize", strengthColor)}
+            data-testid="password-strength-level"
+          >
             {strength.level}
           </span>
         </div>
@@ -70,7 +76,7 @@ export function PasswordStrengthIndicator({
 
       {/* Requirements Checklist */}
       {showRequirements && (
-        <div className="space-y-1">
+        <div className="space-y-1" data-testid="password-requirements">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Requirements:
           </span>
@@ -79,6 +85,7 @@ export function PasswordStrengthIndicator({
               <li
                 key={requirement.id}
                 className="flex items-center space-x-2 text-sm"
+                data-testid={`password-requirement-${requirement.id}`}
               >
                 {requirement.met ? (
                   <CheckCircle
