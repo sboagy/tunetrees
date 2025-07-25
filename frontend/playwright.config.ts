@@ -90,8 +90,6 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
         // Force Playwright to launch browser window on the same screen as the process (not the active screen)
         launchOptions: {
-          // Use system Chrome browser instead of downloading Chromium to avoid download issues
-          executablePath: process.env.CI ? "/usr/bin/google-chrome" : undefined,
           // On multi-monitor setups, Playwright/Chromium will launch on the primary screen by default.
           // To force a specific screen, set the window position explicitly.
           // Example: position at (0,0) on the screen where the process starts.
