@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { getCsrfToken } from "next-auth/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { type ControllerRenderProps, useForm } from "react-hook-form";
 
 import {
@@ -178,6 +178,12 @@ export default function SignInPage(): JSX.Element {
   };
 
   const router = useRouter();
+
+  // Memoize password strength calculation to prevent excessive re-renders
+  const passwordStrength = useMemo(() => {
+    const password = form.watch("password") || "";
+    return calculatePasswordStrength(password);
+  }, [form.watch("password")]);
 
   const onSubmitHandler = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);
@@ -405,8 +411,7 @@ export default function SignInPage(): JSX.Element {
                   !!emailError ||
                   !!passwordError ||
                   !!passwordConfirmationError ||
-                  calculatePasswordStrength(form.getValues("password") || "")
-                    .level === "weak"
+                  passwordStrength.level === "weak"
                 }
                 className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
                 data-testid="signup-submit-button"
