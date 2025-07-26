@@ -29,6 +29,7 @@ import { providerMap } from "@/auth";
 import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 import { PasswordInput } from "@/components/PasswordInput";
 import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
+import { calculatePasswordStrength } from "@/lib/password-utils";
 import {
   Card,
   CardContent,
@@ -400,7 +401,12 @@ export default function SignInPage(): JSX.Element {
                   !form.getValues("password") ||
                   !form.getValues("password_confirmation") ||
                   !form.getValues("email") ||
-                  !form.getValues("name")
+                  !form.getValues("name") ||
+                  !!emailError ||
+                  !!passwordError ||
+                  !!passwordConfirmationError ||
+                  calculatePasswordStrength(form.getValues("password") || "")
+                    .level === "weak"
                 }
                 className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
                 data-testid="signup-submit-button"
