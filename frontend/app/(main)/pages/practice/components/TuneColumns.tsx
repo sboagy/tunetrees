@@ -2,6 +2,7 @@
 
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
 import RowGoalComboBox from "@/app/(main)/pages/practice/components/RowGoalComboBox";
+import { RowTechniqueComboBox } from "@/app/(main)/pages/practice/components/RowTechniqueComboBox";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { transformToDatetimeLocalForDisplay } from "@/lib/date-utils";
@@ -396,6 +397,36 @@ export function get_columns(
             enableHiding: true,
             cell: (
               info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
+            ) => {
+              return info.getValue() || "recall";
+            },
+            accessorFn: (row: ITuneOverview) => row.goal,
+            size: 150,
+          },
+          {
+            accessorKey: "technique",
+            header: ({ column }: { column: Column<ITuneOverview, unknown> }) =>
+              sortableHeader(column, "Algorithm", setTunesRefreshId),
+            enableHiding: true,
+            cell: (
+              info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
+            ) => {
+              return info.getValue() || "SM2";
+            },
+            accessorFn: (row: ITuneOverview) => row.technique,
+            size: 150,
+          },
+        ]
+      : []),
+    ...(purpose === "repertoire"
+      ? [
+          {
+            accessorKey: "goal",
+            header: ({ column }: { column: Column<ITuneOverview, unknown> }) =>
+              sortableHeader(column, "Goal", setTunesRefreshId),
+            enableHiding: true,
+            cell: (
+              info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
             ) => (
               <RowGoalComboBox
                 info={info}
@@ -415,9 +446,15 @@ export function get_columns(
             enableHiding: true,
             cell: (
               info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
-            ) => {
-              return info.getValue() || "SM2";
-            },
+            ) => (
+              <RowTechniqueComboBox
+                info={info}
+                userId={userId}
+                playlistId={playlistId}
+                purpose={purpose}
+                onTechniqueChange={onTechniqueChange}
+              />
+            ),
             accessorFn: (row: ITuneOverview) => row.technique,
             size: 150,
           },
