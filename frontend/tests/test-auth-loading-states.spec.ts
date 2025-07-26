@@ -109,13 +109,18 @@ test.describe("Auth Loading States", () => {
       const firstSocialButton = socialButtons.first();
       await expect(firstSocialButton).toBeVisible();
 
+      // Check initial state
+      const initialText = await firstSocialButton.textContent();
+      console.log("Initial social button text:", initialText);
+
       // Click the social login button
       const clickPromise = firstSocialButton.click();
 
-      // Check for loading state
+      // Check that loading state appears (now has 300ms delay so should be visible)
       await expect(firstSocialButton).toContainText("Connecting...");
       await expect(firstSocialButton).toBeDisabled();
 
+      // Wait for the click to complete (which will navigate)
       await clickPromise;
     } else {
       console.log("No social login buttons found - skipping social login test");

@@ -14,6 +14,8 @@ export function SocialLoginButtons(providerMap: ProviderMap) {
   const handleSocialLogin = async (provider: ProviderDict) => {
     setLoadingProvider(provider.id);
     try {
+      // Add a small delay to ensure loading state is visible to users
+      await new Promise((resolve) => setTimeout(resolve, 300));
       await doSocialLogin2(provider);
     } catch (error) {
       console.error("Social login error:", error);

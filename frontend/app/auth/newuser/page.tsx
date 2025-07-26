@@ -397,10 +397,6 @@ export default function SignInPage(): JSX.Element {
                 loading={isLoading}
                 disabled={
                   isLoading ||
-                  !_crsfToken ||
-                  !!emailError ||
-                  !!passwordError ||
-                  !!passwordConfirmationError ||
                   !form.getValues("password") ||
                   !form.getValues("password_confirmation") ||
                   !form.getValues("email") ||

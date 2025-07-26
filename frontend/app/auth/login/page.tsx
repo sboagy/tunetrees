@@ -127,6 +127,7 @@ export default function LoginDialog(): JSX.Element {
     console.log("onSubmit called with data:", data);
 
     if (!validateEmail(userEmail)) {
+      console.log("onSubmit - email validation failed");
       return;
     }
 
@@ -310,11 +311,10 @@ export default function LoginDialog(): JSX.Element {
                   loading={isLoading}
                   disabled={
                     isLoading ||
-                    !csrfToken ||
                     !!emailError ||
                     !!passwordError ||
                     !password ||
-                    !form.getValues("email")
+                    !userEmail
                   }
                   className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
                   data-testid="login-submit-button"
