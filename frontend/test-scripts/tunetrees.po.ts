@@ -46,6 +46,16 @@ export class TuneTreesPageObject {
   readonly tableStatus;
   readonly toast;
 
+  // Password Reset locators
+  readonly passwordResetPasswordInput: Locator;
+  readonly passwordResetConfirmInput: Locator;
+  readonly passwordResetSubmitButton: Locator;
+  readonly passwordResetPasswordToggle: Locator;
+  readonly passwordResetConfirmToggle: Locator;
+  readonly passwordStrengthIndicator: Locator;
+  readonly passwordStrengthLevel: Locator;
+  readonly passwordRequirements: Locator;
+
   constructor(page: Page) {
     this.page = page;
 
@@ -143,6 +153,28 @@ export class TuneTreesPageObject {
 
     this.tableStatus = this.page.getByText(" row(s) selected.");
     this.toast = this.page.getByTestId("shadcn-toast");
+
+    // Password Reset locators
+    this.passwordResetPasswordInput = page.getByTestId(
+      "password-reset-password-input",
+    );
+    this.passwordResetConfirmInput = page.getByTestId(
+      "password-reset-confirm-input",
+    );
+    this.passwordResetSubmitButton = page.getByTestId(
+      "password-reset-submit-button",
+    );
+    this.passwordResetPasswordToggle = page.getByTestId(
+      "password-reset-password-toggle",
+    );
+    this.passwordResetConfirmToggle = page.getByTestId(
+      "password-reset-confirm-toggle",
+    );
+    this.passwordStrengthIndicator = page.getByTestId(
+      "password-strength-indicator",
+    );
+    this.passwordStrengthLevel = page.getByTestId("password-strength-level");
+    this.passwordRequirements = page.getByTestId("password-requirements");
   }
 
   onError = (exception: Error): void => {
@@ -164,7 +196,7 @@ export class TuneTreesPageObject {
     const pageContent = await this.page.content();
     console.log("Page content after goto:", pageContent.slice(0, 500)); // Log first 500 chars for inspection
 
-    await this.tableStatus.waitFor({ state: "visible", timeout: 25_0000 });
+    await this.tableStatus.waitFor({ state: "visible", timeout: 25_000 });
 
     // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
     //   timeout: 60000,
@@ -183,7 +215,7 @@ export class TuneTreesPageObject {
     let rowCount = await this.tunesGridRows.count();
     let iterations = 0;
 
-    const maxIterations = 12; // 12 seconds max wait time
+    const maxIterations = 14; // 14 seconds max wait time
     while (rowCount < 2 && iterations < maxIterations) {
       await this.page.waitForTimeout(1000); // wait for 1 second before checking again
       rowCount = await this.tunesGridRows.count();
@@ -222,7 +254,7 @@ export class TuneTreesPageObject {
     // await this.page.getByRole("row", { name: tuneTitle }).click();
   }
 
-  async navigateToRepertoireTab() {
+  async navigateToRepertoireTab(pauseSecondsAfter = 2) {
     await this.gotoMainPage();
 
     await this.mainTabGroup.waitFor({ state: "visible" });
@@ -247,7 +279,7 @@ export class TuneTreesPageObject {
     // Make sure the "Add To Review" button is visible
     await this.addToReviewButton.waitFor({ state: "visible" });
     await this.waitForTablePopulationToStart();
-    await this.page.waitForTimeout(2000);
+    await this.page.waitForTimeout(pauseSecondsAfter * 1000);
   }
 
   async navigateToPracticeTab() {
@@ -422,7 +454,7 @@ export class TuneTreesPageObject {
     // });
     //
     // instead, we'll wait for the tableStatus to be visible.
-    await this.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
+    await this.tableStatus.waitFor({ state: "visible", timeout: 20_000 });
 
     console.log("===> run-login2.ts:50 ~ ", "Login completed");
   }

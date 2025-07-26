@@ -1,0 +1,76 @@
+name: Frontend Unit Tests
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-unit-tests.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-unit-tests.yml"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  unit-tests:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Run TypeScript compilation
+        run: npm run compile
+        working-directory: frontend
+
+      - name: Run Linting
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Run Jest Unit Tests
+        run: npm run test:unit
+        working-directory: frontend
+
+      - name: Run Jest Unit Tests with Coverage
+        run: npm run test:unit:coverage
+        working-directory: frontend
+
+      - name: Upload Coverage Reports
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: jest-coverage-report
+          path: frontend/coverage/
+          retention-days: 7
+
+      - name: Comment PR with Coverage
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'frontend/coverage/lcov-report/index.html';
+            if (fs.existsSync(path)) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '✅ Unit tests passed! Coverage report available in artifacts.'
+              });
+            }

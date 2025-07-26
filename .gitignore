@@ -1,8 +1,17 @@
 _notes
 .gitconfig
 frontend/.next/
+ci-logs/
 
 node_modules
+
+# Schema analysis artifacts
+*_schema_*.sql
+schema_diff_*.txt
+production_backup_*.sqlite3
+tunetrees_production_backup_*.sqlite3
+tunetrees_production_manual.sqlite3
+tunetrees_test_emergency.sqlite3
 
 # Byte-compiled / optimized / DLL files
 __pycache__/**/*.*
@@ -274,6 +283,7 @@ tunetrees_local_backup
 backup_practice*.sqlite
 backup_practice*.sqlite3
 tunetrees_*.sqlite3.bak
+test_*_migration.sqlite3
 tsconfig.json.bak
 babel.config.js.bak
 

@@ -237,16 +237,28 @@ export default function TunesGridScheduled({
       updates,
       sitdownDate,
     });
+
+    // Handle the submission result properly - wait for completion before showing success
     promiseResult
       .then((result) => {
         console.log("submitPracticeFeedbacks result:", result);
+
+        // Only show success and trigger refresh after successful submission
+        // Increment local refreshId to trigger reload
+        setRefreshId((id) => id + 1);
+
+        toast({
+          title: "Success",
+          description: "Practice successfully submitted",
+        });
       })
       .catch((error) => {
         handleError(
           "Error submit_practice_feedbacks_result. Please try again.",
         );
         console.error("Error submit_practice_feedbacks_result:", error);
-        throw error;
+        // Don't throw error here - just handle it
+        return; // Exit early on error
       });
 
     const promiseResult2 = deleteTableTransientData(
@@ -262,16 +274,8 @@ export default function TunesGridScheduled({
       .catch((error) => {
         handleError("Error deleting table transient data. Please try again.");
         console.error("Error submitting feedbacks:", error);
-        throw error;
+        // Don't throw error here - just handle it
       });
-
-    // Increment local refreshId to trigger reload
-    setRefreshId((id) => id + 1);
-
-    toast({
-      title: "Success",
-      description: "Practice successfully submitted",
-    });
 
     // refreshData()
     //   .then((result) => {

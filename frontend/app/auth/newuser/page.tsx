@@ -28,6 +28,7 @@ import {
 import { providerMap } from "@/auth";
 import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 import { PasswordInput } from "@/components/PasswordInput";
+import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
 import {
   Card,
   CardContent,
@@ -331,6 +332,11 @@ export default function SignInPage(): JSX.Element {
                         data-testid="user_password"
                       />
                     </FormControl>
+                    {/* Real-time password strength indicator */}
+                    <PasswordStrengthIndicator
+                      password={form.watch("password") || ""}
+                      className="mt-2"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -407,11 +413,11 @@ export default function SignInPage(): JSX.Element {
               </LoadingButton>
             </form>
             <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
-              <div className="flex-1 bg-neutral-300 h-[1px]" />
-              <span className="text-xs leading-4 uppercase text-neutral-500">
+              <div className="flex-1 bg-neutral-300 dark:bg-neutral-600 h-[1px]" />
+              <span className="text-xs leading-4 uppercase text-neutral-500 dark:text-neutral-400">
                 or sign up with
               </span>
-              <div className="flex-1 bg-neutral-300 h-[1px]" />
+              <div className="flex-1 bg-neutral-300 dark:bg-neutral-600 h-[1px]" />
             </div>
           </Form>
         </CardContent>

@@ -294,6 +294,16 @@ export default function LoginDialog(): JSX.Element {
                     {passwordError}
                   </p>
                 )}
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="link"
+                    asChild
+                    className="p-0 h-auto text-sm text-primary hover:underline"
+                  >
+                    <a href="/auth/password-reset">Forgot password?</a>
+                  </Button>
+                </div>
                 <LoadingButton
                   type="submit"
                   variant="secondary"
@@ -314,11 +324,11 @@ export default function LoginDialog(): JSX.Element {
               </form>
               {userEmailParam === "" && (
                 <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
-                  <div className="flex-1 bg-neutral-300 h-[1px]" />
-                  <span className="text-xs leading-4 uppercase text-neutral-500">
+                  <div className="flex-1 bg-neutral-300 dark:bg-neutral-600 h-[1px]" />
+                  <span className="text-xs leading-4 uppercase text-neutral-500 dark:text-neutral-400">
                     or sign in with
                   </span>
-                  <div className="flex-1 bg-neutral-300 h-[1px]" />
+                  <div className="flex-1 bg-neutral-300 dark:bg-neutral-600 h-[1px]" />
                 </div>
               )}
             </Form>

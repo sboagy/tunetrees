@@ -30,7 +30,9 @@ TuneTrees is a spaced repetition learning app for musical tunes built with FastA
 
 - **Strict typing**: No `any` types - use proper TypeScript interfaces and generics
 - **Clean lints**: Code must pass all linting rules without warnings
-- **Proper formatting**: Consistent code formatting via Prettier/ESLint
+- **Prettier formatting**: ALWAYS run prettier on code before committing - use `npx prettier --write <files>`
+- **Automatic formatting**: Use prettier for consistent code style - it handles indentation, spacing, line breaks, and semicolons
+- **ESLint compliance**: All ESLint rules must pass without warnings after prettier formatting
 - **Interface naming**: Use `I` prefix for all TypeScript interfaces
 
 ### Database Layer (SQLAlchemy 2.0.35)
@@ -151,8 +153,9 @@ npm run type-check  # TypeScript strict checking
 
 - **TypeScript**: Strict mode enabled, no `any` types permitted
 - **ESLint**: All rules must pass without warnings
-- **Prettier**: Consistent formatting enforced
+- **Prettier**: Consistent formatting enforced - ALWAYS run `npx prettier --write <files>` before commits
 - **Type checking**: Full TypeScript compilation without errors
+- **Pre-commit formatting**: Use `npx prettier --write .` to format all files or target specific files with patterns like `"app/**/*.{ts,tsx}"`
 
 ### Git Operations & GitHub Integration
 
@@ -170,6 +173,37 @@ npm run type-check  # TypeScript strict checking
 - `mcp_github_update_pull_request` - For updating PR with commit information
 
 **Only fall back to basic `git` commands if GitHub MCP server tools are unavailable.**
+
+### Code Formatting Workflow (CRITICAL)
+
+**ALWAYS use prettier for code formatting before any commit or file edit completion:**
+
+```bash
+# Format specific files (RECOMMENDED for targeted changes)
+npx prettier --write app/auth/login/page.tsx app/auth/password-reset/route.ts
+
+# Format by pattern (useful for related files)
+npx prettier --write "app/auth/**/*.{ts,tsx}"
+
+# Format all files (use sparingly, only when needed)
+npx prettier --write .
+```
+
+**Integration with tools:**
+
+- **After creating/editing files**: ALWAYS run prettier on the modified files
+- **Before commits**: Run prettier to ensure consistent formatting
+- **Never commit unformatted code**: Prettier fixes indentation, spacing, quotes, and semicolons automatically
+- **Use the run_in_terminal tool**: Call prettier via terminal rather than manual formatting
+
+**Prettier handles:**
+
+- Consistent indentation (2 spaces for TypeScript/React)
+- Line length optimization (automatic wrapping)
+- Quote consistency (double quotes for strings)
+- Semicolon placement (always add)
+- Bracket spacing and trailing commas
+- Import statement formatting
 
 ### Commit Message Guidelines
 
@@ -585,6 +619,69 @@ await ttPO.typeSortButton.click();
 - If the selector is complex or likely to change
 - If it represents a key UI component
 
+#### 5a. **Data Test IDs: Preferred Selector Strategy (RECOMMENDED)**
+
+**PREFER `data-testid` attributes** for reliable element targeting:
+
+```typescript
+// EXCELLENT: Using data-testid attributes
+readonly passwordResetPasswordInput = page.getByTestId("password-reset-password-input");
+readonly passwordStrengthIndicator = page.getByTestId("password-strength-indicator");
+readonly submitButton = page.getByTestId("form-submit-button");
+
+// GOOD: Semantic selectors when data-testid isn't available
+readonly emailInput = page.getByRole("textbox", { name: "Email" });
+readonly loginDialog = page.getByRole("dialog", { name: "Sign In" });
+
+// AVOID: CSS selectors that can break easily
+readonly fragileButton = page.locator('.btn-primary.submit-btn'); // ❌ Brittle
+```
+
+**Add `data-testid` to components** when creating or modifying UI elements:
+
+```tsx
+// Add data-testid to interactive elements and key components
+<Input
+  type="password"
+  placeholder="Enter password"
+  data-testid="password-input"
+/>
+
+<Button
+  type="submit"
+  disabled={isLoading}
+  data-testid="form-submit-button"
+>
+  Submit
+</Button>
+
+<div className="password-strength" data-testid="password-strength-indicator">
+  {/* Component content */}
+</div>
+```
+
+**`data-testid` Naming Conventions**:
+
+- Use kebab-case: `data-testid="password-reset-form"`
+- Be descriptive: `data-testid="user-profile-edit-button"`
+- Include context: `data-testid="signup-password-input"` vs `data-testid="login-password-input"`
+- Group related elements: `data-testid="password-requirement-length"`, `data-testid="password-requirement-uppercase"`
+
+**Update Page Objects** when adding new `data-testid` attributes:
+
+```typescript
+// Always add new testid-based locators to Page Objects
+// In tunetrees.po.ts:
+readonly signupPasswordInput: Locator;
+readonly signupConfirmInput: Locator;
+readonly passwordStrengthIndicator: Locator;
+
+// In constructor:
+this.signupPasswordInput = page.getByTestId("signup-password-input");
+this.signupConfirmInput = page.getByTestId("signup-confirm-input");
+this.passwordStrengthIndicator = page.getByTestId("password-strength-indicator");
+```
+
 #### 6. **Navigation Best Practices (REQUIRED)**
 
 **Standard Navigation Flow**:
@@ -696,7 +793,9 @@ When creating new tests, ensure:
 - [ ] Uses `TuneTreesPageObject` or `TuneEditorPageObject`
 - [ ] Calls `ttPO.gotoMainPage()` first
 - [ ] Uses existing Page Object locators when possible
-- [ ] Adds new locators to Page Objects if needed
+- [ ] Adds new locators to Page Objects if needed (with proper TypeScript types)
+- [ ] **Adds `data-testid` attributes to new UI elements** (recommended for reliability)
+- [ ] **Uses `data-testid` selectors via `page.getByTestId()` for new elements** (preferred approach)
 - [ ] Includes proper error handling and timeouts
 - [ ] Follows DRY principles (no repeated selectors)
 - [ ] Includes meaningful console.log statements for debugging
@@ -712,6 +811,9 @@ When **GitHub Copilot** creates or modifies tests:
 5. **ALWAYS include proper logging** (logTestStart, logTestEnd, etc.)
 6. **ALWAYS use defensive programming** with proper visibility checks
 7. **ALWAYS follow the established patterns** from existing working tests
+8. **ADD `data-testid` attributes** to new UI components for reliable testing (recommended)
+9. **USE `page.getByTestId()` for new elements** instead of CSS selectors (preferred)
+10. **UPDATE Page Objects** when adding new `data-testid` attributes
 
 This ensures consistency, maintainability, and reliability across all TuneTrees E2E tests.
 
@@ -736,6 +838,6 @@ This ensures consistency, maintainability, and reliability across all TuneTrees 
 
 - **No `any` types**: Use proper TypeScript interfaces and generics
 - **Clean lints**: All ESLint rules must pass without warnings
-- **Proper formatting**: Consistent code style via Prettier
+- **Prettier formatting**: Consistent code style enforced - ALWAYS run `npx prettier --write <files>` before commits
 - **Type safety**: Full TypeScript compilation without errors
 - **UI consistency**: Comprehensive patterns in `frontend/UI_STYLE_GUIDE2.md`, with core patterns automatically included for frontend development
