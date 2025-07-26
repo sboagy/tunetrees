@@ -27,7 +27,10 @@ test.afterEach(async ({ page }, testInfo) => {
 test.describe("Auth Loading States", () => {
   test("login form shows loading state during submission", async ({ page }) => {
     // Navigate to login page
-    await page.goto("https://localhost:3000/auth/login");
+    await page.goto("https://localhost:3000/auth/login", {
+      waitUntil: "domcontentloaded", // More reliable than networkidle in CI
+    });
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait for form to load
     await expect(page.getByTestId("user_email")).toBeVisible();
@@ -63,8 +66,10 @@ test.describe("Auth Loading States", () => {
     page,
   }) => {
     // Navigate to signup page
-    await page.goto("https://localhost:3000/auth/newuser");
-
+    await page.goto("https://localhost:3000/auth/newuser", {
+      waitUntil: "domcontentloaded", // More reliable than networkidle in CI
+    });
+    await page.waitForLoadState("domcontentloaded");
     // Wait for form to load
     await expect(page.getByTestId("user_email")).toBeVisible();
     await expect(page.getByTestId("user_password")).toBeVisible();
@@ -100,8 +105,10 @@ test.describe("Auth Loading States", () => {
 
   test("social login buttons show loading states", async ({ page }) => {
     // Navigate to login page
-    await page.goto("https://localhost:3000/auth/login");
-
+    await page.goto("https://localhost:3000/auth/login", {
+      waitUntil: "domcontentloaded", // More reliable than networkidle in CI
+    });
+    await page.waitForLoadState("domcontentloaded");
     // Look for social login buttons (these may or may not be present depending on config)
     const socialButtons = page.locator('[data-testid^="social-login-"]');
 
