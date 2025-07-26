@@ -19,7 +19,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 
 test.afterEach(async ({ page }, testInfo) => {
   await restartBackend();
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(1_000);
   logBrowserContextEnd();
   logTestEnd(testInfo);
 });
@@ -31,6 +31,7 @@ test.describe("Auth Loading States", () => {
       waitUntil: "domcontentloaded", // More reliable than networkidle in CI
     });
     await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1_000);
 
     // Wait for form to load
     await expect(page.getByTestId("user_email")).toBeVisible();
@@ -70,6 +71,7 @@ test.describe("Auth Loading States", () => {
       waitUntil: "domcontentloaded", // More reliable than networkidle in CI
     });
     await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1_000);
     // Wait for form to load
     await expect(page.getByTestId("user_email")).toBeVisible();
     await expect(page.getByTestId("user_password")).toBeVisible();
@@ -109,6 +111,7 @@ test.describe("Auth Loading States", () => {
       waitUntil: "domcontentloaded", // More reliable than networkidle in CI
     });
     await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1_000);
     // Look for social login buttons (these may or may not be present depending on config)
     const socialButtons = page.locator('[data-testid^="social-login-"]');
 
