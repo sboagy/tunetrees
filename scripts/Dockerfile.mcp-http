@@ -1,0 +1,41 @@
+# Multi-stage build for HTTP-enabled MCP Memory Server
+FROM node:18-alpine AS mcp-base
+
+# Install the official MCP memory server
+RUN npm install -g @modelcontextprotocol/server-memory
+
+# Python stage for HTTP wrapper
+FROM python:3.11-alpine AS python-stage
+
+# Install FastAPI and dependencies
+RUN pip install fastapi uvicorn
+
+# Create non-root user
+RUN adduser -D -s /bin/sh mcpuser
+
+# Set up working directory
+WORKDIR /app
+RUN chown mcpuser:mcpuser /app
+
+# Copy the HTTP wrapper script
+COPY http_mcp_wrapper.py /app/
+RUN chown mcpuser:mcpuser /app/http_mcp_wrapper.py
+
+# Copy Node.js and MCP server from first stage
+COPY --from=mcp-base /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=mcp-base /usr/local/bin/node /usr/local/bin/node
+RUN ln -s /usr/local/lib/node_modules/@modelcontextprotocol/server-memory/dist/index.js /usr/local/bin/mcp-server-memory
+RUN chmod +x /usr/local/bin/mcp-server-memory
+
+# Switch to non-root user
+USER mcpuser
+
+# Expose HTTP port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
+
+# Start the HTTP wrapper
+CMD ["python", "/app/http_mcp_wrapper.py"]
