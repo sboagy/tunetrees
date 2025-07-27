@@ -15,9 +15,10 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { getCsrfToken } from "next-auth/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { type ControllerRenderProps, useForm } from "react-hook-form";
 
 import {
@@ -28,6 +29,7 @@ import { providerMap } from "@/auth";
 import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 import { PasswordInput } from "@/components/PasswordInput";
 import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
+import { calculatePasswordStrength } from "@/lib/password-utils";
 import {
   Card,
   CardContent,
@@ -59,6 +61,7 @@ export default function SignInPage(): JSX.Element {
   let email = searchParams.get("email") || "";
 
   const [_crsfToken, setCrsfToken] = useState("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
@@ -176,26 +179,45 @@ export default function SignInPage(): JSX.Element {
 
   const router = useRouter();
 
+  // Memoize password strength calculation to prevent excessive re-renders
+  const passwordStrength = useMemo(() => {
+    const password = form.watch("password") || "";
+    return calculatePasswordStrength(password);
+  }, [form.watch("password")]);
+
   const onSubmitHandler = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);
-    const host = window.location.host;
 
-    const result = await newUser(data, host);
-    console.log(`newUser status result ${result.status}`);
+    setIsLoading(true);
+    setEmailError(null);
+    setPasswordError(null);
+    setPasswordConfirmationError(null);
 
-    if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
-      const linkBackURL = result.linkBackURL;
-      // Store the linkBackURL in local storage for testing purposes
-      if (typeof window !== "undefined") {
-        localStorage.setItem("linkBackURL", linkBackURL);
-      } else {
-        console.log(
-          "onSubmit(): window is undefined, cannot store linkBackURL for playwright tests",
-        );
+    try {
+      const host = window.location.host;
+
+      const result = await newUser(data, host);
+      console.log(`newUser status result ${result.status}`);
+
+      if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+        const linkBackURL = result.linkBackURL;
+        // Store the linkBackURL in local storage for testing purposes
+        if (typeof window !== "undefined") {
+          localStorage.setItem("linkBackURL", linkBackURL);
+        } else {
+          console.log(
+            "onSubmit(): window is undefined, cannot store linkBackURL for playwright tests",
+          );
+        }
       }
-    }
 
-    router.push(`/auth/verify-request?email=${data.email}`);
+      router.push(`/auth/verify-request?email=${data.email}`);
+    } catch (error) {
+      console.error("Signup error:", error);
+      setEmailError("An error occurred during sign up. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
@@ -376,23 +398,26 @@ export default function SignInPage(): JSX.Element {
                   </FormItem>
                 )}
               />
-              <Button
+              <LoadingButton
                 type="submit"
                 variant="secondary"
+                loading={isLoading}
                 disabled={
-                  !_crsfToken ||
-                  !!emailError ||
-                  !!passwordError ||
-                  !!passwordConfirmationError ||
+                  isLoading ||
                   !form.getValues("password") ||
                   !form.getValues("password_confirmation") ||
                   !form.getValues("email") ||
-                  !form.getValues("name")
+                  !form.getValues("name") ||
+                  !!emailError ||
+                  !!passwordError ||
+                  !!passwordConfirmationError ||
+                  passwordStrength.level === "weak"
                 }
                 className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
+                data-testid="signup-submit-button"
               >
-                Sign Up
-              </Button>
+                {isLoading ? "Creating Account..." : "Sign Up"}
+              </LoadingButton>
             </form>
             <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
               <div className="flex-1 bg-neutral-300 dark:bg-neutral-600 h-[1px]" />

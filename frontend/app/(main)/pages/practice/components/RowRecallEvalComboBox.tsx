@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/popover";
 import type { CellContext } from "@tanstack/react-table";
 import { Check, ChevronDownIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getColorForEvaluation,
   getQualityListForGoalAndTechnique,
@@ -59,9 +59,33 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
   const isOpen = openPopoverId === info.row.original.id;
 
   const popoverRef = useRef<HTMLDivElement>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(
     info.row.original.recall_eval ?? null,
   );
+
+  // Debounced popover state change to prevent bouncing
+  const debouncedSetPopoverId = useCallback(
+    (id: number | null) => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      debounceTimeoutRef.current = setTimeout(() => {
+        setOpenPopoverId(id);
+        debounceTimeoutRef.current = null;
+      }, 50); // 50ms debounce to prevent rapid state changes
+    },
+    [setOpenPopoverId],
+  );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Get appropriate quality list based on goal and technique
   const qualityList = getQualityListForGoalAndTechnique(
@@ -114,8 +138,8 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
       return;
     }
     if (!popoverRef.current.contains(event.relatedTarget as Node)) {
-      // setIsOpen(false);
-      setOpenPopoverId(isOpen ? null : (info.row.original.id ?? null));
+      // Use debounced function to prevent rapid state changes
+      debouncedSetPopoverId(null);
     }
   };
 
@@ -123,7 +147,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
     <Popover
       open={isOpen}
       onOpenChange={(open) =>
-        setOpenPopoverId(open ? (info.row.original.id ?? null) : null)
+        debouncedSetPopoverId(open ? (info.row.original.id ?? null) : null)
       }
       data-testid="tt-recal-eval-popover"
     >
@@ -139,8 +163,8 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
         }}
         onClick={(event) => {
           event.stopPropagation(); // Prevents the click from reaching the TableRow
-          // setIsOpen((prev) => !prev);
-          setOpenPopoverId(isOpen ? null : (info.row.original.id ?? null));
+          // Use debounced function to prevent rapid state changes
+          debouncedSetPopoverId(isOpen ? null : (info.row.original.id ?? null));
         }}
         onBlur={handleBlur}
         disabled={isDisabled}
@@ -187,34 +211,37 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                       "===> RowRecallEvalComboBox.tsx:183 ~ onSelect - newValue: ",
                       newValue,
                     );
+
+                    // Close popover immediately to prevent bouncing
+                    setOpenPopoverId(null);
+
+                    // Update state optimistically
                     setSelectedQuality(newValue);
                     info.row.original.recall_eval = newValue;
-                    // if (onRecallEvalChange) {
-                    //   onRecallEvalChange(info.row.original.id ?? -1, newValue); // Call the callback
-                    // }
 
                     console.log(
                       `===> RowRecallEvalComboBox.tsx:206 ~ calling saveDate(${newValue})`,
                     );
-                    // setIsOpen(false);
-                    setOpenPopoverId(null);
 
+                    // Save data with minimal state updates to prevent bouncing
                     saveData(newValue)
                       .then(() => {
                         if (onRecallEvalChange) {
                           onRecallEvalChange(
                             info.row.original.id ?? -1,
                             newValue,
-                          ); // Call the callback
+                          );
                         }
-
-                        const tableState = info.table.getState();
-                        info.table.setState(tableState);
+                        // Removed table state refresh that was causing bouncing
                       })
                       .catch((error) => {
                         console.error(
                           "===> RowRecallEvalComboBox.tsx:216 ~ error",
                           error,
+                        );
+                        // Revert optimistic update on error
+                        setSelectedQuality(
+                          info.row.original.recall_eval ?? null,
                         );
                       });
                   }}
