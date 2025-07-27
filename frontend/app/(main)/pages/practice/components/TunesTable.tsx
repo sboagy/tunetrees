@@ -94,6 +94,7 @@ export function TunesTableComponent({
   globalFilter = "",
   onRecallEvalChange,
   onGoalChange,
+  onTechniqueChange,
   onTableCreated,
   selectionChangedCallback = null,
   filterStringCallback,
@@ -293,6 +294,7 @@ export function TunesTableComponent({
     onRecallEvalChange,
     setTunesRefreshId,
     onGoalChange,
+    onTechniqueChange,
   );
 
   const table: TanstackTable<ITuneOverview> = useReactTable({

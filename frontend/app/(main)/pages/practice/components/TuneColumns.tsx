@@ -164,6 +164,7 @@ export function get_columns(
   onRecallEvalChange?: (tuneId: number, newValue: string) => void,
   setTunesRefreshId?: (newRefreshId: number) => void,
   onGoalChange?: (tuneId: number, newValue: string | null) => void,
+  onTechniqueChange?: (tuneId: number, newValue: string | null) => void,
 ): ColumnDef<ITuneOverview, TunesGridColumnGeneralType>[] {
   const determineHeaderCheckedState = (
     table: TanstackTable<ITuneOverview>,
