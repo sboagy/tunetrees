@@ -39,7 +39,6 @@ import GoogleProvider from "next-auth/providers/google";
 import SendgridProvider from "next-auth/providers/sendgrid";
 
 import SMSProvider from "./sms-provider";
-import WebAuthnProvider from "./webauthn-provider";
 
 import { viewSettingsDefault } from "@/app/user-settings/view-settings-default";
 import type { AdapterUser } from "next-auth/adapters";
@@ -93,8 +92,7 @@ export const providers: Provider[] = [
     sendVerificationRequest,
     maxAge: 24 * 60 * 60, // How long the email verification link is valid for (default 24h)
   }),
-  SMSProvider(),
-  WebAuthnProvider(),
+  SMSProvider({ apiUrl: process.env.NEXT_PUBLIC_API_URL }),
 
   GitHubProvider({
     clientId: process.env.GITHUB_CLIENT_ID ?? "",

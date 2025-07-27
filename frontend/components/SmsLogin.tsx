@@ -159,7 +159,9 @@ export function SmsLogin({ onSuccess }: ISMSLoginProps) {
               </p>
             </div>
             <Button
-              onClick={handleSendCode}
+              onClick={() => {
+                void handleSendCode();
+              }}
               disabled={isLoading || !phone.trim()}
               className="w-full"
               data-testid="sms-send-code-button"
@@ -188,7 +190,9 @@ export function SmsLogin({ onSuccess }: ISMSLoginProps) {
             </div>
             <div className="space-y-2">
               <Button
-                onClick={handleVerifyCode}
+                onClick={() => {
+                  void handleVerifyCode();
+                }}
                 disabled={isLoading || !code.trim()}
                 className="w-full"
                 data-testid="sms-verify-code-button"

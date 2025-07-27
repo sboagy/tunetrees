@@ -1,27 +1,10 @@
 // SMS Provider for NextAuth.js
 // This integrates SMS verification with the NextAuth.js authentication flow
 
-import { Provider } from "next-auth/providers";
+import type { CredentialsConfig } from "next-auth/providers/credentials";
+import type { User } from "next-auth";
 
-interface ISMSProfile {
-  id: string;
-  phone: string;
-  name?: string;
-  email?: string;
-}
-
-interface ISMSAccount {
-  provider: "sms";
-  type: "sms";
-  providerAccountId: string;
-}
-
-interface ISMSCredentials {
-  phone: string;
-  code: string;
-}
-
-export interface ISMSProvider extends Provider {
+export interface ISMSProvider extends CredentialsConfig {
   id: "sms";
   name: "SMS";
   type: "credentials";
@@ -30,8 +13,9 @@ export interface ISMSProvider extends Provider {
     code: { label: "Code"; type: "text" };
   };
   authorize: (
-    credentials: ISMSCredentials | undefined,
-  ) => Promise<ISMSProfile | null>;
+    credentials: Partial<Record<string, unknown>>,
+    request: Request,
+  ) => Promise<User | null>;
 }
 
 export function SMSProvider(config: { apiUrl?: string }): ISMSProvider {
@@ -43,8 +27,12 @@ export function SMSProvider(config: { apiUrl?: string }): ISMSProvider {
       phone: { label: "Phone", type: "tel" },
       code: { label: "Code", type: "text" },
     },
-    async authorize(credentials) {
-      if (!credentials?.phone || !credentials?.code) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async authorize(credentials, request) {
+      const phone = credentials?.phone as string | undefined;
+      const code = credentials?.code as string | undefined;
+
+      if (!phone || !code) {
         return null;
       }
 
@@ -60,8 +48,8 @@ export function SMSProvider(config: { apiUrl?: string }): ISMSProvider {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            phone: credentials.phone,
-            code: credentials.code,
+            phone: phone,
+            code: code,
           }),
         });
 
