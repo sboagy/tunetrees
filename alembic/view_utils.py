@@ -106,6 +106,8 @@ def create_views_hardcoded() -> None:
             practice_record.step,
             practice_record.repetitions,
             practice_record.review_date,
+            playlist_tune.goal,
+            playlist_tune.technique,
             (
                 SELECT
                     group_concat (tag.tag_text, ' ')
@@ -199,6 +201,8 @@ def create_views_hardcoded() -> None:
             practice_record.repetitions,
             practice_record.review_date,
             practice_record.backup_practiced,
+            playlist_tune.goal,
+            playlist_tune.technique,
             (
                 SELECT
                     group_concat (tag.tag_text, ' ')
