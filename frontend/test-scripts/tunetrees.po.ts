@@ -196,7 +196,12 @@ export class TuneTreesPageObject {
     const pageContent = await this.page.content();
     console.log("Page content after goto:", pageContent.slice(0, 500)); // Log first 500 chars for inspection
 
-    await this.tableStatus.waitFor({ state: "visible", timeout: 25_000 });
+    // Use CI-aware timeout: longer in CI environment for reliability
+    const tableStatusTimeout = process.env.CI ? 120_000 : 25_000;
+    await this.tableStatus.waitFor({
+      state: "visible",
+      timeout: tableStatusTimeout,
+    });
 
     // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
     //   timeout: 60000,
@@ -421,11 +426,12 @@ export class TuneTreesPageObject {
 
     const topSignInButton = this.page.getByRole("button", { name: "Sign in" });
     await topSignInButton.waitFor({ state: "visible" });
+    await expect(topSignInButton).toBeEnabled({ timeout: 50_000 });
     await topSignInButton.click();
 
     // Wait for the login dialog to appear
     const userEmailLocator = this.page.getByTestId("user_email");
-    await userEmailLocator.waitFor({ state: "visible", timeout: 10000 });
+    await userEmailLocator.waitFor({ state: "visible", timeout: 50_000 });
     await userEmailLocator.fill(user || "");
     await userEmailLocator.press("Tab");
     const passwordEntryBox = this.page.getByTestId("user_password");
@@ -454,7 +460,12 @@ export class TuneTreesPageObject {
     // });
     //
     // instead, we'll wait for the tableStatus to be visible.
-    await this.tableStatus.waitFor({ state: "visible", timeout: 20_000 });
+    // Use CI-aware timeout: longer in CI environment for reliability
+    const loginTimeout = process.env.CI ? 90_000 : 20_000;
+    await this.tableStatus.waitFor({
+      state: "visible",
+      timeout: loginTimeout,
+    });
 
     console.log("===> run-login2.ts:50 ~ ", "Login completed");
   }

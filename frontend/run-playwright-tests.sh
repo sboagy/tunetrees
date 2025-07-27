@@ -9,6 +9,8 @@ cleanup() {
     
     # Kill any remaining FastAPI servers
     pkill -f "uvicorn.*main:app" 2>/dev/null || true
+
+    ./kill_backend_3000_servers.sh
     
     # Kill any remaining playwright processes (but not the test runner itself)
     # pkill -f "playwright test-server" 2>/dev/null || true
@@ -101,6 +103,7 @@ PLAYWRIGHT_EXIT_CODE=$?
 # Always cleanup before exiting (even on successful runs)
 echo "🧹 Performing final cleanup..."
 pkill -f "uvicorn.*main:app" 2>/dev/null || true
+./kill_backend_3000_servers.sh
 
 # pkill -f "playwright test-server" 2>/dev/null || true
 # Don't kill the main playwright test process here
