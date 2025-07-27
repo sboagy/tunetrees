@@ -124,6 +124,5 @@ export {
   ToastTitle,
   ToastViewport,
   type ToastActionElement,
-  // eslint-disable-next-line prettier/prettier
-  type ToastProps
+  type ToastProps,
 };

@@ -55,6 +55,7 @@ export default [
       ".prettierrc.js",
       "**/playwright-report/**",
       "**/test-env.js",
+      "**/public/scripts/theme-init.js", // Generated file
       "**/jest.config.{js,cjs}",
       "**/jest.setup.{js,cjs}",
       "**/take-screenshots.js",
