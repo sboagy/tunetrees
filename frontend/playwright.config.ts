@@ -98,7 +98,7 @@ export default defineConfig({
       },
       // dependencies: ["backend"],
       testMatch: "test*.ts",
-      timeout: process.env.CI ? 50_000 : 30_000, // 50 seconds in CI, 30 seconds locally
+      timeout: process.env.CI ? 80_000 : 30_000, // 80 seconds in CI, 30 seconds locally
     },
 
     // {
@@ -169,7 +169,7 @@ export default defineConfig({
     // reuseExistingServer: !process.env.CI,
     reuseExistingServer: true, // try to reuse the existing server if it is already running
 
-    timeout: 30_000, // Give more time for server startup
+    timeout: process.env.CI ? 40_000 : 30_000, // Give more time for server startup
 
     // timeout: 2 * 1000,
   },

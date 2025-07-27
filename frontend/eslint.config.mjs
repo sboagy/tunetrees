@@ -57,6 +57,7 @@ export default [
       "**/test-env.js",
       "**/jest.config.{js,cjs}",
       "**/jest.setup.{js,cjs}",
+      "**/take-screenshots.js",
     ],
   },
   // Global rules that apply to all files - disable problematic node rules

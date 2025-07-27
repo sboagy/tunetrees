@@ -59,6 +59,10 @@ test.describe.serial("Tune Edit Tests", () => {
 
     // ========== First do a title edit, then Cancel ==============
     await ttPO.openTuneEditorForCurrentTune();
+
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1_000);
+
     await doEditAndButtonClick(
       ttPO,
       "tt-tune-editor-title",
@@ -95,6 +99,9 @@ test.describe.serial("Tune Edit Tests", () => {
     await ttPO.navigateToTune("Boyne Hunt");
 
     await ttPO.openTuneEditorForCurrentTune();
+
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1_000);
 
     const typeValue = await ttPO.ffType.textContent();
     console.log("===> test-edit-1.spec.ts:99 ~ ", typeValue);
@@ -159,6 +166,9 @@ test.describe.serial("Tune Edit Tests", () => {
 
     await ttPO.openTuneEditorForCurrentTune();
 
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1_000);
+
     // Confirm that the values are as expected
     for (const formField of ttPO.sampleBoyneHunt) {
       const sampleLocator = formField.locator;
@@ -170,7 +180,7 @@ test.describe.serial("Tune Edit Tests", () => {
     for (const formField of ttPO.sampleBoyneHunt) {
       // await formField.locator.fill(formField.modification);
       await ttPO.doFormFieldValueMod(formField);
-      await page.waitForTimeout(50);
+      await page.waitForTimeout(100);
     }
 
     // Confirm all the fields were changed
