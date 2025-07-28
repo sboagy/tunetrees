@@ -28,7 +28,7 @@ def test_check_practice_list_staged_columns():
     db_url = os.environ.get("DATABASE_URL") or os.environ.get("TUNETREES_DB")
     print(f"DATABASE_URL={os.environ.get('DATABASE_URL')}")
     print(f"TUNETREES_DB={os.environ.get('TUNETREES_DB')}")
-    
+
     if db_url and db_url.startswith("sqlite:///"):
         # Extract the path from the URL
         db_path = db_url.replace("sqlite:///", "")
@@ -107,7 +107,7 @@ def test_direct_sql_on_practice_list_staged():
     db_url = os.environ.get("DATABASE_URL") or os.environ.get("TUNETREES_DB")
     print(f"DATABASE_URL={os.environ.get('DATABASE_URL')}")
     print(f"TUNETREES_DB={os.environ.get('TUNETREES_DB')}")
-    
+
     if db_url and db_url.startswith("sqlite:///"):
         # Extract the path from the URL
         db_path = db_url.replace("sqlite:///", "")

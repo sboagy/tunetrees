@@ -23,6 +23,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 def _setup_environment_variables(dst_path: Path) -> None:
     """Set up environment variables for test database."""
     import os
+
     if not os.environ.get("TUNETREES_DB") and not os.environ.get("DATABASE_URL"):
         os.environ["TUNETREES_DB"] = str(dst_path)
         print(f"Set TUNETREES_DB to: {dst_path}")
@@ -52,12 +53,14 @@ def _reload_database_engine() -> None:
     from tunetrees.app import database
 
     # Clear existing engine
-    if hasattr(database, 'sqlalchemy_database_engine'):
+    if hasattr(database, "sqlalchemy_database_engine"):
         database.sqlalchemy_database_engine.dispose()
         print("Disposed existing SQLAlchemy engine")
 
     # Recalculate database path
-    database.db_location_str = os.environ.get("TUNETREES_DB", os.environ.get("DATABASE_URL"))
+    database.db_location_str = os.environ.get(
+        "TUNETREES_DB", os.environ.get("DATABASE_URL")
+    )
     if not database.db_location_str:
         return
 
@@ -72,11 +75,14 @@ def _reload_database_engine() -> None:
     else:
         database.db_location_path = db_path
 
-    database.SQLALCHEMY_DATABASE_URL = f"sqlite:///{database.db_location_path.absolute()}"
+    database.SQLALCHEMY_DATABASE_URL = (
+        f"sqlite:///{database.db_location_path.absolute()}"
+    )
 
     # Recreate engine
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
+
     database.sqlalchemy_database_engine = create_engine(
         database.SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
     )
