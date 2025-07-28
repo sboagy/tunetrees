@@ -145,8 +145,8 @@ def query_practice_list_scheduled(
         filters = [
             t_practice_list_staged.c.user_ref == user_ref,
             t_practice_list_staged.c.playlist_id == playlist_ref,
-            t_practice_list_staged.c.review_date > lower_bound_date,
-            t_practice_list_staged.c.review_date <= review_sitdown_date,
+            t_practice_list_staged.c.latest_review_date > lower_bound_date,
+            t_practice_list_staged.c.latest_review_date <= review_sitdown_date,
         ]
         if not show_deleted:
             filters.append(t_practice_list_staged.c.deleted.is_(False))
@@ -162,7 +162,7 @@ def query_practice_list_scheduled(
         raise
 
     scheduled_rows_query_sorted = practice_list_query.order_by(
-        func.DATE(t_practice_list_staged.c.review_date).desc()
+        func.DATE(t_practice_list_staged.c.latest_review_date).desc()
     )
     # scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
     scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip)

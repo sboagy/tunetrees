@@ -92,7 +92,6 @@ class BadTuneID(Exception):
 class TuneFeedbackUpdate(TypedDict):
     feedback: str
     goal: NotRequired[str | None]  # Practice goal (e.g., 'recall', 'fluency', etc.)
-    technique: NotRequired[str | None]  # Practice technique (e.g., 'fsrs', 'sm2', etc.)
 
 
 def fetch_algorithm_type(db: Session, user_ref: str) -> AlgorithmType:
@@ -635,13 +634,11 @@ def _process_single_tune_feedback(
         return
     quality_str = tune_update.get("feedback")
 
-    # Extract goal and technique from tune update (Issue #205)
+    # Extract goal from tune update (Issue #205)
     goal = tune_update.get("goal", "recall")  # Default to recall if not specified
-    technique = tune_update.get("technique")  # Used for goal-specific techniques
 
-    # If technique is not provided, default based on user's algorithm preference
-    if technique is None:
-        technique = get_default_technique_for_user(db, user_ref)
+    # Technique is determined by user's algorithm preference, not from playlist_tune (Issue #232)
+    technique = get_default_technique_for_user(db, user_ref)
 
     # Normalize quality for scheduler compatibility
     normalized_quality_int = normalize_quality_for_scheduler(quality_int, technique)

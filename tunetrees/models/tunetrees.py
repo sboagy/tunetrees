@@ -42,18 +42,6 @@ class Genre(Base):
     )
 
 
-class PlaylistTune(Base):
-    __tablename__ = "playlist_tune"
-
-    playlist_ref = mapped_column(Integer, primary_key=True)
-    tune_ref = mapped_column(Integer, primary_key=True)
-    current = mapped_column(Text)
-    learned = mapped_column(Text)
-    deleted = mapped_column(Boolean, server_default=text("FALSE"))
-    goal = mapped_column(Text, server_default=text("'recall'"))
-    technique = mapped_column(Text)
-
-
 t_practice_list_joined = Table(
     "practice_list_joined",
     metadata,
@@ -67,17 +55,15 @@ t_practice_list_joined = Table(
     Column("deleted", Boolean),
     Column("private_for", Integer),
     Column("learned", Text),
-    Column("practiced", Text),
-    Column("quality", Integer),
-    Column("easiness", Float),
-    Column("difficulty", Float),
-    Column("interval", Integer),
-    Column("step", Integer),
-    Column("repetitions", Integer),
-    Column("review_date", Text),
+    Column("latest_practiced", Text),
+    Column("latest_quality", Integer),
+    Column("latest_easiness", Float),
+    Column("latest_difficulty", Float),
+    Column("latest_interval", Integer),
+    Column("latest_step", Integer),
+    Column("latest_repetitions", Integer),
+    Column("latest_review_date", Text),
     Column("goal", Text),
-    Column("technique", Text),
-    Column("tags", NullType),
     Column("playlist_ref", Integer),
     Column("user_ref", Integer),
     Column("playlist_deleted", Boolean),
@@ -100,22 +86,20 @@ t_practice_list_staged = Table(
     Column("private_for", Integer),
     Column("deleted", Boolean),
     Column("learned", Text),
+    Column("goal", Text),
     Column("user_ref", Integer),
     Column("playlist_id", Integer),
     Column("instrument", Text),
     Column("playlist_deleted", Boolean),
-    Column("practiced", Text),
-    Column("quality", Integer),
-    Column("easiness", Float),
-    Column("difficulty", Float),
-    Column("interval", Integer),
-    Column("step", Integer),
-    Column("repetitions", Integer),
-    Column("review_date", Text),
-    Column("backup_practiced", Text),
-    Column("goal", Text),
-    Column("technique", Text),
-    Column("tags", NullType),
+    Column("latest_practiced", Text),
+    Column("latest_quality", Integer),
+    Column("latest_easiness", Float),
+    Column("latest_difficulty", Float),
+    Column("latest_interval", Integer),
+    Column("latest_step", Integer),
+    Column("latest_repetitions", Integer),
+    Column("latest_review_date", Text),
+    Column("latest_backup_practiced", Text),
     Column("purpose", Text),
     Column("note_private", Text),
     Column("note_public", Text),
@@ -269,6 +253,9 @@ class Playlist(Base):
     note: Mapped[List["Note"]] = relationship(
         "Note", uselist=True, back_populates="playlist"
     )
+    playlist_tune: Mapped[List["PlaylistTune"]] = relationship(
+        "PlaylistTune", uselist=True, back_populates="playlist"
+    )
     practice_record: Mapped[List["PracticeRecord"]] = relationship(
         "PracticeRecord", uselist=True, back_populates="playlist"
     )
@@ -344,6 +331,9 @@ class Tune(Base):
     note: Mapped[List["Note"]] = relationship(
         "Note", uselist=True, back_populates="tune"
     )
+    playlist_tune: Mapped[List["PlaylistTune"]] = relationship(
+        "PlaylistTune", uselist=True, back_populates="tune"
+    )
     practice_record: Mapped[List["PracticeRecord"]] = relationship(
         "PracticeRecord", uselist=True, back_populates="tune"
     )
@@ -389,6 +379,24 @@ class Note(Base):
     )
     tune: Mapped["Tune"] = relationship("Tune", back_populates="note")
     user: Mapped[Optional["User"]] = relationship("User", back_populates="note")
+
+
+class PlaylistTune(Base):
+    __tablename__ = "playlist_tune"
+
+    playlist_ref = mapped_column(
+        ForeignKey("playlist.playlist_id"), primary_key=True, nullable=False
+    )
+    tune_ref = mapped_column(ForeignKey("tune.id"), primary_key=True, nullable=False)
+    deleted = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
+    current = mapped_column(Text)
+    learned = mapped_column(Text)
+    goal = mapped_column(Text, server_default=text("'recall'"))
+
+    playlist: Mapped["Playlist"] = relationship(
+        "Playlist", back_populates="playlist_tune"
+    )
+    tune: Mapped["Tune"] = relationship("Tune", back_populates="playlist_tune")
 
 
 class PracticeRecord(Base):
