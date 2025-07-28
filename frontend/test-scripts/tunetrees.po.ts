@@ -185,6 +185,10 @@ export class TuneTreesPageObject {
   async gotoMainPage() {
     await checkHealth();
 
+    // Set up error and network monitoring before navigation
+    this.setupConsoleErrorHandling();
+    this.setupNetworkFailureHandling();
+
     await this.page.goto(this.pageLocation, {
       timeout: initialPageLoadTimeout,
       waitUntil: "domcontentloaded", // More reliable than networkidle in CI
@@ -427,23 +431,43 @@ export class TuneTreesPageObject {
       throw new Error("No login credentials found");
     }
 
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(1000);
+
     const topSignInButton = this.page.getByRole("button", { name: "Sign in" });
     await topSignInButton.waitFor({ state: "visible" });
     await expect(topSignInButton).toBeEnabled({ timeout: 50_000 });
     await topSignInButton.click();
 
-    // Wait for the login dialog to appear
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(2000); // Increased wait for form to fully load
+
+    // Wait for the login dialog to appear and all form elements to be ready
     const userEmailLocator = this.page.getByTestId("user_email");
     await userEmailLocator.waitFor({ state: "visible", timeout: 50_000 });
-    await userEmailLocator.fill(user || "");
-    await userEmailLocator.press("Tab");
+
+    // Wait for the password field to also be present to ensure form is fully loaded
     const passwordEntryBox = this.page.getByTestId("user_password");
+    await passwordEntryBox.waitFor({ state: "visible", timeout: 50_000 });
+
+    // Wait for the form element to be present to ensure all hidden fields (including CSRF) are loaded
+    const loginForm = this.page.locator("form").first();
+    await loginForm.waitFor({ state: "attached", timeout: 10_000 });
+
+    // Wait for any hidden CSRF tokens or form setup to complete
+    await this.page.waitForTimeout(1500);
+
+    await userEmailLocator.fill(user || "", { timeout: 5000 });
+    await this.page.waitForTimeout(10); // helps with the crsf token being set
+    await userEmailLocator.press("Tab");
     await passwordEntryBox.fill(pw || "");
+
     const dialogSignInButton = this.page.getByRole("button", {
       name: "Sign In",
       exact: true,
     });
     await passwordEntryBox.press("Tab");
+    await this.page.waitForTimeout(10);
 
     await this.page.waitForFunction(
       (button) => {
@@ -567,6 +591,9 @@ export class TuneTreesPageObject {
       if (msg.type() === "error") {
         console.log("Browser console error:", msg.text());
       }
+      if (msg.type() === "warning") {
+        console.log("Browser console warning:", msg.text());
+      }
     });
   }
 
@@ -578,6 +605,13 @@ export class TuneTreesPageObject {
         request.url(),
         request.failure()?.errorText,
       );
+    });
+
+    // Listen for response errors (like 500 status codes)
+    this.page.on("response", (response) => {
+      if (response.status() >= 400) {
+        console.log(`HTTP ${response.status()} error: ${response.url()}`);
+      }
     });
   }
 }
