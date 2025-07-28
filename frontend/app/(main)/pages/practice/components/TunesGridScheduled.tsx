@@ -34,8 +34,6 @@ type ScheduledTunesGridProps = {
 export default function TunesGridScheduled({
   userId,
 }: ScheduledTunesGridProps): JSX.Element {
-  // Local refreshId for client-side refresh logic
-  const [refreshId, setRefreshId] = useState(0);
   const { toast } = useToast();
 
   const handleError = useCallback(
@@ -48,8 +46,9 @@ export default function TunesGridScheduled({
     [toast],
   );
 
-  const { tunes, setTunes } = useScheduledTunes();
-  const { triggerRefresh } = useTuneDataRefresh();
+  const { tunes, setTunes, tunesRefreshId, setTunesRefreshId } =
+    useScheduledTunes();
+  const { triggerRefresh, refreshId } = useTuneDataRefresh();
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
   const { currentPlaylist: playlistId } = usePlaylist();
   const showDeleted = false; // Should become a state variable at some point
@@ -74,38 +73,56 @@ export default function TunesGridScheduled({
   }, [tunes]);
 
   // Only fetch scheduled tunes on the client after mount or refresh
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+  // Using the same pattern as TunesGridRepertoire
   useEffect(() => {
-    let cancelled = false;
-    async function fetchTunes() {
-      setIsLoading(true);
-      try {
-        const sitdownDate = getSitdownDateFromBrowser();
+    if (playlistId > 0 && tunesRefreshId !== refreshId) {
+      console.log(
+        `useEffect ===> TunesGridScheduled.tsx ~ call fetchTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId}`,
+      );
 
-        const result = await getScheduledTunesOverview(
-          userId,
-          playlistId,
-          sitdownDate,
-          showDeleted,
-        );
-        if (!cancelled) {
-          setTunes(result);
-        }
-      } catch {
-        if (!cancelled) {
-          setTunes([]); // or handle error
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
+      let cancelled = false;
+      async function fetchTunes() {
+        setIsLoading(true);
+        try {
+          const sitdownDate = getSitdownDateFromBrowser();
+
+          const result = await getScheduledTunesOverview(
+            userId,
+            playlistId,
+            sitdownDate,
+            showDeleted,
+          );
+          if (!cancelled) {
+            setTunes(result);
+            setTunesRefreshId(refreshId);
+            console.log(`LF1 ScheduledGrid setTunesRefreshId(${refreshId})`);
+          }
+        } catch (error) {
+          if (!cancelled) {
+            console.error("Error fetching scheduled tunes:", error);
+            setTunes([]); // or handle error
+          }
+        } finally {
+          if (!cancelled) {
+            setIsLoading(false);
+          }
         }
       }
+      void fetchTunes();
+      return () => {
+        cancelled = true;
+      };
     }
-    void fetchTunes();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, playlistId, refreshId, setTunes]);
+    // Return empty cleanup function for the else case
+    return () => {};
+  }, [
+    refreshId,
+    tunesRefreshId,
+    userId,
+    playlistId,
+    setTunes,
+    setTunesRefreshId,
+  ]);
 
   const handleRecallEvalChange = useCallback(
     (tuneId: number, newValue: string): void => {
@@ -125,18 +142,6 @@ export default function TunesGridScheduled({
         prevTunes.map(
           (tune): ITuneOverview =>
             tune.id === tuneId ? { ...tune, goal: newValue } : tune,
-        ),
-      );
-    },
-    [setTunes],
-  );
-
-  const handleTechniqueChange = useCallback(
-    (tuneId: number, newValue: string | null): void => {
-      setTunes((prevTunes: ITuneOverview[]) =>
-        prevTunes.map(
-          (tune): ITuneOverview =>
-            tune.id === tuneId ? { ...tune, technique: newValue } : tune,
         ),
       );
     },
@@ -191,7 +196,6 @@ export default function TunesGridScheduled({
     globalFilter: "",
     onRecallEvalChange: handleRecallEvalChange,
     onGoalChange: handleGoalChange,
-    onTechniqueChange: handleTechniqueChange,
     setIsLoading,
   });
 
@@ -213,7 +217,6 @@ export default function TunesGridScheduled({
         updates[idString] = {
           feedback: feedback,
           goal: tune.goal || null,
-          technique: tune.technique || null,
         };
       } else {
         continue;
@@ -232,11 +235,18 @@ export default function TunesGridScheduled({
     }
 
     const sitdownDate = getSitdownDateFromBrowser();
+
+    console.log("About to call submitPracticeFeedbacks");
     const promiseResult = submitPracticeFeedbacks({
       playlistId,
       updates,
       sitdownDate,
     });
+
+    console.log(
+      "submitPracticeFeedbacks called, promiseResult:",
+      promiseResult,
+    );
 
     // Handle the submission result properly - wait for completion before showing success
     promiseResult
@@ -244,8 +254,11 @@ export default function TunesGridScheduled({
         console.log("submitPracticeFeedbacks result:", result);
 
         // Only show success and trigger refresh after successful submission
-        // Increment local refreshId to trigger reload
-        setRefreshId((id) => id + 1);
+        // Use global refresh trigger to ensure data reloads
+        console.log(
+          "🔄 Triggering refresh after successful practice feedback submission",
+        );
+        triggerRefresh();
 
         toast({
           title: "Success",
@@ -253,6 +266,7 @@ export default function TunesGridScheduled({
         });
       })
       .catch((error) => {
+        console.log("Promise catch block executed, error:", error);
         handleError(
           "Error submit_practice_feedbacks_result. Please try again.",
         );

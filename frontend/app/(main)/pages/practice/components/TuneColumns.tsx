@@ -2,7 +2,6 @@
 
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
 import RowGoalComboBox from "@/app/(main)/pages/practice/components/RowGoalComboBox";
-import { RowTechniqueComboBox } from "@/app/(main)/pages/practice/components/RowTechniqueComboBox";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { transformToDatetimeLocalForDisplay } from "@/lib/date-utils";
@@ -164,7 +163,6 @@ export function get_columns(
   onRecallEvalChange?: (tuneId: number, newValue: string) => void,
   setTunesRefreshId?: (newRefreshId: number) => void,
   onGoalChange?: (tuneId: number, newValue: string | null) => void,
-  onTechniqueChange?: (tuneId: number, newValue: string | null) => void,
 ): ColumnDef<ITuneOverview, TunesGridColumnGeneralType>[] {
   const determineHeaderCheckedState = (
     table: TanstackTable<ITuneOverview>,
@@ -404,19 +402,6 @@ export function get_columns(
             accessorFn: (row: ITuneOverview) => row.goal,
             size: 150,
           },
-          {
-            accessorKey: "technique",
-            header: ({ column }: { column: Column<ITuneOverview, unknown> }) =>
-              sortableHeader(column, "Algorithm", setTunesRefreshId),
-            enableHiding: true,
-            cell: (
-              info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
-            ) => {
-              return info.getValue() || "SM2";
-            },
-            accessorFn: (row: ITuneOverview) => row.technique,
-            size: 150,
-          },
         ]
       : []),
     ...(purpose === "repertoire"
@@ -438,25 +423,6 @@ export function get_columns(
               />
             ),
             accessorFn: (row: ITuneOverview) => row.goal,
-            size: 150,
-          },
-          {
-            accessorKey: "technique",
-            header: ({ column }: { column: Column<ITuneOverview, unknown> }) =>
-              sortableHeader(column, "Algorithm", setTunesRefreshId),
-            enableHiding: true,
-            cell: (
-              info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
-            ) => (
-              <RowTechniqueComboBox
-                info={info}
-                userId={userId}
-                playlistId={playlistId}
-                purpose={purpose}
-                onTechniqueChange={onTechniqueChange}
-              />
-            ),
-            accessorFn: (row: ITuneOverview) => row.technique,
             size: 150,
           },
         ]
@@ -542,7 +508,7 @@ export function get_columns(
         size: 120,
       },
       {
-        accessorKey: "practiced",
+        accessorKey: "latest_practiced",
         header: ({ column }) =>
           sortableHeader(column, "Practiced", setTunesRefreshId),
         cell: (info) => {
@@ -554,7 +520,7 @@ export function get_columns(
         size: 120,
       },
       {
-        accessorKey: "quality",
+        accessorKey: "latest_quality",
         header: ({ column }) =>
           sortableHeader(column, "Quality", setTunesRefreshId),
         cell: (info) => {
@@ -565,19 +531,19 @@ export function get_columns(
         size: 12 * 8, // Approximate width for 11 characters
       },
       {
-        accessorKey: "easiness",
+        accessorKey: "latest_easiness",
         header: ({ column }) =>
           sortableHeader(column, "Easiness", setTunesRefreshId),
         cell: (info) => {
-          const value = info.getValue() as number;
-          return value.toFixed(2);
+          const value = info.getValue() as number | null;
+          return value ? value.toFixed(2) : "";
         },
         enableSorting: true,
         enableHiding: true,
         size: 14 * 8, // Approximate width for 11 characters
       },
       {
-        accessorKey: "interval",
+        accessorKey: "latest_interval",
         header: ({ column }) =>
           sortableHeader(column, "Interval", setTunesRefreshId),
         cell: (info) => {
@@ -588,7 +554,7 @@ export function get_columns(
         size: 13 * 8, // Approximate width for 11 characters
       },
       {
-        accessorKey: "repetitions",
+        accessorKey: "latest_repetitions",
         header: ({ column }) =>
           sortableHeader(column, "Repetitions", setTunesRefreshId),
         cell: (info) => {
@@ -599,7 +565,7 @@ export function get_columns(
         size: 16 * 8, // Approximate width for 11 characters
       },
       {
-        accessorKey: "review_date",
+        accessorKey: "latest_review_date",
         header: ({ column }) =>
           sortableHeader(column, "Scheduled", setTunesRefreshId),
         cell: (info) => {

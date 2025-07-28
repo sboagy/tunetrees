@@ -90,7 +90,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
   // Get appropriate quality list based on goal and technique
   const qualityList = getQualityListForGoalAndTechnique(
     info.row.original.goal,
-    info.row.original.technique,
+    info.row.original.latest_technique,
   );
 
   const saveData = async (changed_value: string) => {

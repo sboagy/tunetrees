@@ -121,11 +121,11 @@ export const TunesProviderRepertoire = ({
     let futureCounter = 0;
     let newCounter = 0;
     for (const tune of tuneList) {
-      if (!tune.review_date) {
+      if (!tune.latest_review_date) {
         newCounter += 1;
         continue;
       }
-      const scheduledDate = new Date(tune.review_date);
+      const scheduledDate = new Date(tune.latest_review_date);
       if (scheduledDate < lowerBoundReviewSitdownDate) {
         lapsedCounter += 1;
       } else if (

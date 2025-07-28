@@ -67,7 +67,6 @@ export const submitPracticeFeedback = async ({
 export interface ITuneUpdate {
   feedback: string;
   goal?: string | null;
-  technique?: string | null;
 }
 
 interface IPracticeFeedbacksProps {
