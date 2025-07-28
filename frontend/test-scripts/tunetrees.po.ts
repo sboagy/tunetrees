@@ -243,10 +243,13 @@ export class TuneTreesPageObject {
       state: "visible",
     });
     await this.repertoireTabTrigger.click();
+    await this.page.waitForTimeout(100);
 
     await this.filterInput.waitFor({ state: "visible" });
     await this.filterInput.waitFor({ state: "attached" });
     await this.filterInput.click();
+    await this.page.waitForTimeout(100);
+    await this.page.waitForLoadState("domcontentloaded");
 
     await this.page.waitForTimeout(1000);
     await this.filterInput.fill(tuneTitle, { timeout: 90_000 });

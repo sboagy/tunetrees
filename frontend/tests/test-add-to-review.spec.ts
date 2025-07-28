@@ -49,6 +49,10 @@ test.describe.serial("Add to Review Tests", () => {
       timeout: 15000,
     });
 
+    // Filter for "Foxhunter" to make the tune visible
+    await ttPO.filterInput.fill("Foxhunter");
+    await page.waitForTimeout(1000); // Wait for filtering to complete
+
     // Find the row with ID 669 "Foxhunter's Reel" and select it
     const foxhunterRow = page
       .getByRole("row")
@@ -65,6 +69,10 @@ test.describe.serial("Add to Review Tests", () => {
     const foxhunterCheckbox = foxhunterRow.getByTestId("tt-row-checkbox");
     // await expect(foxhunterCheckbox).toBeVisible();
     await foxhunterCheckbox.check();
+
+    // Clear the filter to see all tunes again
+    await ttPO.filterInput.clear();
+    await page.waitForTimeout(1000); // Wait for filtering to reset
 
     // Verify that 2 tunes are now selected (assuming Sweep's Hornpipe was already selected)
     await expect(ttPO.tableStatus).toContainText("2 of 488 row(s) selected", {
