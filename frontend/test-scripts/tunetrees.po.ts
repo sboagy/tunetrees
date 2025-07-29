@@ -207,6 +207,8 @@ export class TuneTreesPageObject {
 
     const pageContent = await this.page.content();
     console.log("Page content after goto:", pageContent.slice(0, 500)); // Log first 500 chars for inspection
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(1000);
 
     // Use CI-aware timeout: longer in CI environment for reliability
     const tableStatusTimeout = process.env.CI ? 120_000 : 25_000;
