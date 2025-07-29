@@ -17,7 +17,12 @@ from tunetrees.app.queries import (
 )
 from tunetrees.app.schedulers import SpacedRepetitionScheduler
 from tunetrees.models.quality import NEW, NOT_SET, RESCHEDULED, quality_lookup
-from tunetrees.models.tunetrees import Playlist, PracticeRecord, PrefsSpacedRepetition
+from tunetrees.models.tunetrees import (
+    Playlist,
+    PlaylistTune,
+    PracticeRecord,
+    PrefsSpacedRepetition,
+)
 from tunetrees.models.tunetrees_pydantic import AlgorithmType
 import json
 
@@ -344,6 +349,44 @@ def parse_review_date(review_date: datetime | str) -> str:
         )
 
 
+def update_playlist_tune_scheduled(
+    db: Session,
+    tune_id: str,
+    playlist_ref: int,
+    review_date_str: str,
+) -> None:
+    """Update the scheduled field in playlist_tune table (Step 2 of 6-step plan).
+
+    This function updates the playlist_tune.scheduled field with the same review date
+    that gets written to practice_record.review_date, enabling the transition from
+    practice_record-based scheduling to playlist_tune-based scheduling.
+    """
+    try:
+        # Find the playlist_tune record
+        stmt = select(PlaylistTune).where(
+            and_(
+                PlaylistTune.tune_ref == int(tune_id),
+                PlaylistTune.playlist_ref == playlist_ref,
+                PlaylistTune.deleted.is_(False),
+            )
+        )
+        playlist_tune = db.execute(stmt).scalar_one_or_none()
+
+        if playlist_tune:
+            # Update the scheduled field
+            playlist_tune.scheduled = review_date_str
+            log.debug(
+                f"Updated playlist_tune.scheduled for tune {tune_id}, playlist {playlist_ref}: {review_date_str}"
+            )
+        else:
+            log.warning(
+                f"PlaylistTune not found for tune {tune_id}, playlist {playlist_ref}"
+            )
+    except Exception as e:
+        log.error(f"Error updating playlist_tune.scheduled: {e}")
+        raise
+
+
 def validate_and_get_quality(
     tune_update: TuneFeedbackUpdate, tune_id: str
 ) -> int | None:
@@ -545,6 +588,10 @@ def _process_non_recall_goal(
     log.debug(
         f"Created goal-specific practice record for tune {tune_id}, goal: {goal}, technique: {technique}"
     )
+
+    # Step 2: Also update playlist_tune.scheduled with the same review date
+    review_date_str = next_review_date.strftime(TT_DATE_FORMAT)
+    update_playlist_tune_scheduled(db, tune_id, playlist_ref, review_date_str)
 
 
 def _calculate_goal_specific_review_date(
@@ -750,6 +797,10 @@ def _process_single_tune_feedback(
 
     # Always add the new practice record to the database
     db.add(new_practice_record)
+
+    # Step 2: Also update playlist_tune.scheduled with the same review date
+    if review_date_str:  # Only update if we have a valid review date
+        update_playlist_tune_scheduled(db, tune_id, playlist_ref, review_date_str)
 
 
 class TuneScheduleUpdate(TypedDict):

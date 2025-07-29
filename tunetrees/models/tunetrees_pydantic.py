@@ -82,6 +82,7 @@ class PlaylistTuneModel(BaseModel):
     learned: str
     deleted: Optional[bool]
     goal: Optional[str] = "recall"  # Default to recall, stored as TEXT in database
+    scheduled: Optional[str] = None  # Next review date for this tune in this playlist
 
 
 class PlaylistTuneModelPartial(BaseModel):
@@ -93,6 +94,7 @@ class PlaylistTuneModelPartial(BaseModel):
     learned: Optional[str] = None
     deleted: Optional[bool] = None
     goal: Optional[str] = None
+    scheduled: Optional[str] = None
 
 
 class TuneModel(BaseModel):
@@ -559,6 +561,9 @@ class PlaylistTuneJoinedModel(BaseModel):
     deleted: Optional[bool] = None
     learned: Optional[str] = None
     goal: Optional[str] = None
+    scheduled: Optional[str] = (
+        None  # Next review date for this tune from playlist_tune table
+    )
     latest_practiced: Optional[str] = None
     latest_quality: Optional[int] = None
     latest_easiness: Optional[float] = None
@@ -590,6 +595,7 @@ class PracticeListStagedModel(BaseModel):
     deleted: Optional[bool] = None
     learned: Optional[str] = None
     goal: Optional[str] = None
+    scheduled: Optional[str] = None  # Next review date for this tune in this playlist
     user_ref: Optional[int] = None
     playlist_id: Optional[int] = None
     instrument: Optional[str] = None
