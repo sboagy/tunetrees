@@ -226,6 +226,8 @@ export class TuneTreesPageObject {
       tableStatusText,
     );
     await this.waitForTablePopulationToStart();
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(1000);
   }
 
   async waitForTablePopulationToStart() {
@@ -599,7 +601,24 @@ export class TuneTreesPageObject {
     // Set up error handling for console errors
     this.page.on("console", (msg) => {
       if (msg.type() === "error") {
-        console.log("Browser console error:", msg.text());
+        const errorText = msg.text();
+        const location = msg.location();
+        const timestamp = new Date().toISOString();
+
+        console.log(`[${timestamp}] Browser console error:`, errorText);
+        console.log(
+          `  Location: ${location.url}:${location.lineNumber}:${location.columnNumber}`,
+        );
+
+        // Enhanced logging for fetch errors
+        if (
+          errorText.includes("Failed to fetch") ||
+          errorText.includes("TypeError: Failed to fetch")
+        ) {
+          console.log("  ⚠️  FETCH ERROR DETECTED");
+          console.log(`  Error details: ${errorText}`);
+          console.log(`  URL where error occurred: ${location.url}`);
+        }
       }
       if (msg.type() === "warning") {
         console.log("Browser console warning:", msg.text());
@@ -627,6 +646,8 @@ export class TuneTreesPageObject {
     this.page.on("requestfailed", (request) => {
       const errorText = request.failure()?.errorText ?? "";
       const url = request.url();
+      const method = request.method();
+      const timestamp = new Date().toISOString();
 
       // Check if this is an expected HTTPS error from localhost
       const isExpectedHttpsError = expectedHttpsErrors.some((error) =>
@@ -640,15 +661,36 @@ export class TuneTreesPageObject {
           console.log("(DEBUG) Filtered expected HTTPS error:", url, errorText);
         }
       } else {
-        // Log unexpected network failures
-        console.log("Network request failed:", url, errorText);
+        // Log unexpected network failures with enhanced details
+        console.log(`[${timestamp}] 🚨 Network request failed:`);
+        console.log(`  Method: ${method}`);
+        console.log(`  URL: ${url}`);
+        console.log(`  Error: ${errorText}`);
+
+        // Check if this is a backend API call
+        if (url.includes("localhost:8000") || url.includes("/tunetrees/")) {
+          console.log("  ⚠️  BACKEND API FAILURE - This is likely your issue!");
+          console.log(
+            `  🔍 API Endpoint: ${url.split("/tunetrees/")[1] || "unknown"}`,
+          );
+        }
       }
     });
 
     // Listen for response errors (like 500 status codes)
     this.page.on("response", (response) => {
       if (response.status() >= 400) {
-        console.log(`HTTP ${response.status()} error: ${response.url()}`);
+        const timestamp = new Date().toISOString();
+        console.log(
+          `[${timestamp}] HTTP ${response.status()} error: ${response.url()}`,
+        );
+
+        // Enhanced logging for backend errors
+        if (response.url().includes("localhost:8000")) {
+          console.log(
+            `  🚨 Backend server error - Status: ${response.status()}`,
+          );
+        }
       }
     });
   }
