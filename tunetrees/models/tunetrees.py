@@ -55,6 +55,8 @@ t_practice_list_joined = Table(
     Column("deleted", Boolean),
     Column("private_for", Integer),
     Column("learned", Text),
+    Column("goal", Text),
+    Column("scheduled", Text),
     Column("latest_practiced", Text),
     Column("latest_quality", Integer),
     Column("latest_easiness", Float),
@@ -63,7 +65,8 @@ t_practice_list_joined = Table(
     Column("latest_step", Integer),
     Column("latest_repetitions", Integer),
     Column("latest_review_date", Text),
-    Column("goal", Text),
+    Column("latest_technique", Text),
+    Column("tags", NullType),
     Column("playlist_ref", Integer),
     Column("user_ref", Integer),
     Column("playlist_deleted", Boolean),
@@ -87,6 +90,7 @@ t_practice_list_staged = Table(
     Column("deleted", Boolean),
     Column("learned", Text),
     Column("goal", Text),
+    Column("scheduled", Text),
     Column("user_ref", Integer),
     Column("playlist_id", Integer),
     Column("instrument", Text),
@@ -100,6 +104,8 @@ t_practice_list_staged = Table(
     Column("latest_repetitions", Integer),
     Column("latest_review_date", Text),
     Column("latest_backup_practiced", Text),
+    Column("latest_technique", Text),
+    Column("tags", NullType),
     Column("purpose", Text),
     Column("note_private", Text),
     Column("note_public", Text),
@@ -392,6 +398,7 @@ class PlaylistTune(Base):
     current = mapped_column(Text)
     learned = mapped_column(Text)
     goal = mapped_column(Text, server_default=text("'recall'"))
+    scheduled = mapped_column(Text)
 
     playlist: Mapped["Playlist"] = relationship(
         "Playlist", back_populates="playlist_tune"

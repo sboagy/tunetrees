@@ -99,6 +99,7 @@ def create_views_hardcoded() -> None:
             tune.private_for,
             playlist_tune.learned,
             playlist_tune.goal,
+            playlist_tune.scheduled,
             practice_record.practiced AS latest_practiced,
             practice_record.quality AS latest_quality,
             practice_record.easiness AS latest_easiness,
@@ -189,6 +190,7 @@ def create_views_hardcoded() -> None:
             tune.deleted,
             playlist_tune.learned,
             playlist_tune.goal,
+            playlist_tune.scheduled,
             playlist.user_ref AS user_ref,
             playlist.playlist_id AS playlist_id,
             instrument.instrument AS instrument,
@@ -247,7 +249,21 @@ def create_views_hardcoded() -> None:
             LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
             LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
             LEFT JOIN instrument ON instrument.id = playlist.instrument_ref
-            LEFT JOIN practice_record ON practice_record.tune_ref = tune.id
+            LEFT JOIN (
+                SELECT
+                    pr.*
+                FROM practice_record pr
+                INNER JOIN (
+                    SELECT
+                        tune_ref,
+                        playlist_ref,
+                        MAX(id) as max_id
+                    FROM practice_record
+                    GROUP BY tune_ref, playlist_ref
+                ) latest ON pr.tune_ref = latest.tune_ref
+                    AND pr.playlist_ref = latest.playlist_ref
+                    AND pr.id = latest.max_id
+            ) practice_record ON practice_record.tune_ref = tune.id
             AND practice_record.playlist_ref = playlist_tune.playlist_ref
             LEFT JOIN tag ON tag.tune_ref = tune.id
             LEFT JOIN table_transient_data td ON td.tune_id = tune.id
