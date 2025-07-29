@@ -608,13 +608,41 @@ export class TuneTreesPageObject {
   }
 
   setupNetworkFailureHandling(): void {
+    // Define expected HTTPS-related errors from experimental Next.js setup
+    // These errors are expected when running the app with HTTPS on localhost
+    // and should not be treated as failures in tests.
+    // They are filtered out to avoid cluttering the test logs.
+    // This is particularly relevant for Next.js apps running with experimental features.
+    // See: https://nextjs.org/docs/app/api-reference/cli/next#using-https-during-development
+    const expectedHttpsErrors = [
+      "net::ECONNRESET",
+      "net::ERR_ABORTED",
+      "net::ERR_CERT_AUTHORITY_INVALID",
+      "net::ERR_CERT_COMMON_NAME_INVALID",
+    ];
+
+    const isDebugMode = process.env.PLAYWRIGHT_DEBUG_NETWORK === "true";
+
     // Listen for network failures
     this.page.on("requestfailed", (request) => {
-      console.log(
-        "Network request failed:",
-        request.url(),
-        request.failure()?.errorText,
+      const errorText = request.failure()?.errorText ?? "";
+      const url = request.url();
+
+      // Check if this is an expected HTTPS error from localhost
+      const isExpectedHttpsError = expectedHttpsErrors.some((error) =>
+        errorText.includes(error),
       );
+      const isLocalhostRequest = url.includes("https://localhost:3000");
+
+      if (isExpectedHttpsError && isLocalhostRequest) {
+        // Only log in debug mode for expected errors
+        if (isDebugMode) {
+          console.log("(DEBUG) Filtered expected HTTPS error:", url, errorText);
+        }
+      } else {
+        // Log unexpected network failures
+        console.log("Network request failed:", url, errorText);
+      }
     });
 
     // Listen for response errors (like 500 status codes)
