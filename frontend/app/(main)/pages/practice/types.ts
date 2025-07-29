@@ -161,7 +161,7 @@ export interface ITuneOverview extends ITune {
   latest_interval: number | null;
   latest_step: number | null;
   latest_repetitions: number | null;
-  latest_review_date: string | null;
+  latest_review_date: string | null; // Historical data - use scheduled for current scheduling
   latest_backup_practiced?: string | null;
   external_ref?: string | null;
   tags?: string | null;
@@ -171,6 +171,8 @@ export interface ITuneOverview extends ITune {
   playlist_deleted?: boolean | null;
   // Practice Goals fields (Issue #205)
   goal?: string | null;
+  // Scheduled review date for this tune in this playlist (from playlist_tune table)
+  scheduled?: string | null;
   // Latest technique from practice record (read-only display)
   latest_technique?: string | null;
 }

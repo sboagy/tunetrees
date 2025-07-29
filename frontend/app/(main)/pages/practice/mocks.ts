@@ -52,6 +52,7 @@ export function getMockTune(): ITuneOverview {
     latest_interval: 3,
     latest_repetitions: 10,
     latest_review_date: "2023-01-03",
+    scheduled: "2023-01-05", // Current scheduling date
     latest_backup_practiced: "2023-01-04",
     external_ref: "http://example.com",
     tags: "tag1, tag2",
@@ -121,6 +122,7 @@ export const ERROR_TUNE: ITuneOverview[] = [
     latest_interval: 0,
     latest_repetitions: 0,
     latest_review_date: "Error",
+    scheduled: "Error", // Current scheduling date
     latest_backup_practiced: "Error",
     tags: "Error", // Optional property, should't need to be set
     recall_eval: "Error", // Optional property, should't need to be set
@@ -147,6 +149,7 @@ export const ERROR_PLAYLIST_TUNE: ITuneOverview = {
   latest_interval: 0,
   latest_repetitions: 0,
   latest_review_date: "Error",
+  scheduled: "Error", // Current scheduling date
   tags: "Error", // Optional property, should't need to be set
   user_ref: 0,
   playlist_ref: 0,
