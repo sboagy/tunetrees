@@ -507,6 +507,28 @@ export function get_columns(
       TunesGridColumnGeneralType
     >[] = [
       {
+        accessorKey: "scheduled",
+        header: ({ column }) =>
+          sortableHeader(column, "Scheduled", setTunesRefreshId),
+        cell: (info) => {
+          return transformToDatetimeLocalForDisplay(info.getValue() as string);
+        },
+        enableSorting: true,
+        enableHiding: true,
+        sortingFn: datetimeTextSortingFn,
+      },
+      {
+        accessorKey: "latest_review_date",
+        header: ({ column }) =>
+          sortableHeader(column, "Latest Review", setTunesRefreshId),
+        cell: (info) => {
+          return transformToDatetimeLocalForDisplay(info.getValue() as string);
+        },
+        enableSorting: true,
+        enableHiding: true,
+        sortingFn: datetimeTextSortingFn,
+      },
+      {
         accessorKey: "learned",
         header: ({ column }) =>
           sortableHeader(column, "Learned", setTunesRefreshId),
@@ -574,28 +596,6 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 16 * 8, // Approximate width for 11 characters
-      },
-      {
-        accessorKey: "scheduled",
-        header: ({ column }) =>
-          sortableHeader(column, "Scheduled", setTunesRefreshId),
-        cell: (info) => {
-          return transformToDatetimeLocalForDisplay(info.getValue() as string);
-        },
-        enableSorting: true,
-        enableHiding: true,
-        sortingFn: datetimeTextSortingFn,
-      },
-      {
-        accessorKey: "latest_review_date",
-        header: ({ column }) =>
-          sortableHeader(column, "Latest Review", setTunesRefreshId),
-        cell: (info) => {
-          return transformToDatetimeLocalForDisplay(info.getValue() as string);
-        },
-        enableSorting: true,
-        enableHiding: true,
-        sortingFn: datetimeTextSortingFn,
       },
       // {
       //   accessorKey: "backup_practiced",
