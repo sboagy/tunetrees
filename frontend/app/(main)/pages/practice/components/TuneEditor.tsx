@@ -264,7 +264,7 @@ export default function TuneEditor({
                 tuneOverview.latest_practiced as string,
               ),
               review_date: transformToDatetimeLocalForInput(
-                tuneOverview.latest_review_date as string,
+                tuneOverview.latest_review_date as string, // Historical review date from practice_record
               ),
               // learned: transformToDatetimeLocal(tuneOverview.learned as string),
             });
@@ -279,7 +279,7 @@ export default function TuneEditor({
               interval: tuneOverview.latest_interval,
               step: tuneOverview.latest_step,
               repetitions: tuneOverview.latest_repetitions,
-              review_date: tuneOverview.latest_review_date, // Store original UTC format
+              review_date: tuneOverview.latest_review_date, // Historical review date from practice_record
               backup_practiced: tuneOverview.latest_backup_practiced,
             });
           } else {

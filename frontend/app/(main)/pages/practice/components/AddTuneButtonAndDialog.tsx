@@ -234,6 +234,7 @@ export default function AddTuneButtonAndDialog({
       latest_interval: null,
       latest_repetitions: null,
       latest_review_date: null,
+      scheduled: null, // Current scheduling date
       latest_backup_practiced: null,
       external_ref: null,
       tags: null,

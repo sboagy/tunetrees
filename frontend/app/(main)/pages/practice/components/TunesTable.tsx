@@ -144,7 +144,7 @@ export function TunesTableComponent({
             latest_easiness: false,
             latest_interval: false,
             latest_repetitions: false,
-            latest_review_date: true,
+            scheduled: true,
             latest_backup_practiced: false,
             external_ref: false,
             notes_private: true,

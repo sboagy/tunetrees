@@ -88,6 +88,16 @@ const datetimeTextSortingFn: SortingFn<ITuneOverview> = (
   // return -1; //-1, 0, or 1 - access any row dat using rowA.original and rowB.original
 };
 
+const numericSortingFn: SortingFn<ITuneOverview> = (
+  rowA: Row<ITuneOverview>,
+  rowB: Row<ITuneOverview>,
+  columnId: string,
+) => {
+  const numA = Number(rowA.getValue(columnId)) || 0;
+  const numB = Number(rowB.getValue(columnId)) || 0;
+  return numA < numB ? -1 : numA > numB ? 1 : 0;
+};
+
 function rotateSorting<TData, TValue>(
   column: Column<TData, TValue>,
   setTunesRefreshId?: (newRefreshId: number) => void,
@@ -331,6 +341,7 @@ export function get_columns(
         // return <span>{info.row.original.id}</span>;
       },
       accessorFn: (row) => row.id,
+      sortingFn: numericSortingFn,
       enableSorting: true,
       enableHiding: true,
       size: 80,
@@ -565,9 +576,20 @@ export function get_columns(
         size: 16 * 8, // Approximate width for 11 characters
       },
       {
-        accessorKey: "latest_review_date",
+        accessorKey: "scheduled",
         header: ({ column }) =>
           sortableHeader(column, "Scheduled", setTunesRefreshId),
+        cell: (info) => {
+          return transformToDatetimeLocalForDisplay(info.getValue() as string);
+        },
+        enableSorting: true,
+        enableHiding: true,
+        sortingFn: datetimeTextSortingFn,
+      },
+      {
+        accessorKey: "latest_review_date",
+        header: ({ column }) =>
+          sortableHeader(column, "Latest Review", setTunesRefreshId),
         cell: (info) => {
           return transformToDatetimeLocalForDisplay(info.getValue() as string);
         },
