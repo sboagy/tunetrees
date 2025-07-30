@@ -113,7 +113,7 @@ async def health_check():
         "status": "healthy",
         "service": "tunetrees-api",
         "version": "1.0.0",
-        "message": "TuneTrees API is running"
+        "message": "TuneTrees API is running",
     }
 
 
