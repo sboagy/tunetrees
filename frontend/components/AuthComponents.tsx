@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 
 export function SignIn(props: React.ComponentPropsWithRef<typeof Button>) {
   const router = useRouter();
-  console.log("Constructing the SignIn button");
+  // console.log("Constructing the SignIn button");
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -29,7 +29,7 @@ export function NewUser(
   // crsf_token: string,
 ) {
   const router = useRouter();
-  console.log("Constructing the New User button");
+  // console.log("Constructing the New User button");
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -51,7 +51,7 @@ export function NewUser(
 }
 
 export function DemoUser(props: React.ComponentPropsWithRef<typeof Button>) {
-  console.log("Constructing the DemoUser button");
+  // console.log("Constructing the DemoUser button");
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -70,7 +70,7 @@ export function DemoUser(props: React.ComponentPropsWithRef<typeof Button>) {
 }
 
 export function SignOut(props: React.ComponentPropsWithRef<typeof Button>) {
-  console.log("Constructing the SignOut button");
+  // console.log("Constructing the SignOut button");
 
   const handleClick = () => {
     console.log("Handling SignOut request");
@@ -94,7 +94,7 @@ export function UserSettingsMenuItem(
   props: React.ComponentPropsWithRef<typeof Button>,
 ) {
   const router = useRouter();
-  console.log("Constructing the UserSettingsMenuItem button");
+  // console.log("Constructing the UserSettingsMenuItem button");
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
