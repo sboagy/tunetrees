@@ -27,13 +27,16 @@ export default function UserButton() {
   // debugger
 
   const { data: session } = useSession();
-  if (!session) {
-    console.log("No session found (UserButton)");
-  } else {
-    console.log("Session found (UserButton)");
-  }
+  // Removed debug logging for production
+  // if (!session) {
+  //   console.log("No session found (UserButton)");
+  // } else {
+  //   console.log("Session found (UserButton)");
+  // }
+  // if (!session?.user) {
+  //   console.log("No user found in session (UserButton)");
+
   if (!session?.user) {
-    console.log("No user found in session (UserButton)");
     // let csrfToken = cookies().get("__Host-authjs.csrf-token")?.value.split("|")[0];
     // const csrfToken = cookies().get("authjs.csrf-token")?.value ?? "";
     return (
@@ -48,7 +51,7 @@ export default function UserButton() {
       </div>
     );
   }
-  console.log("Session found! (UserButton)");
+  // console.log("Session found! (UserButton)");
   const unknownUserNameString = "";
   return (
     <div className="flex items-center">
