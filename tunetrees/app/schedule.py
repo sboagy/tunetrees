@@ -564,7 +564,7 @@ def _process_non_recall_goal(
         playlist_ref=playlist_ref,
         quality=quality_int,
         practiced=practiced_str,
-        review_date=next_review_date.strftime(TT_DATE_FORMAT),
+        review_date=practiced_str,  # FIXED: Record actual review date, not next review date
         backup_practiced=practiced_str,
         goal=goal,
         technique=technique,
@@ -788,7 +788,7 @@ def _process_single_tune_feedback(
         interval=review_result_dict.get("interval"),
         step=review_result_dict.get("step"),
         repetitions=review_result_dict.get("repetitions"),
-        review_date=review_date_str,
+        review_date=practiced_str,  # FIXED: Record actual review date, not next review date
         quality=quality_int,
         practiced=practiced_str,
         goal=goal,
