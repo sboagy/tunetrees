@@ -18,7 +18,7 @@ declare global {
 
 // Parameterize timezones for future expansion
 const timezones = ["Asia/Karachi", "America/New_York"]; // UTC+5, EST (Eastern Time), add more as needed
-const timezoneId = timezones[1];
+const timezoneId = timezones[0];
 
 test.use({
   timezoneId,
