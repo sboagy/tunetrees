@@ -7,6 +7,8 @@ from sqlalchemy.engine.row import Row
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import get_tune_table, query_practice_list_scheduled
 from tunetrees.models.tunetrees import Tune
+import pytz
+from dateutil import parser
 
 
 def test_basic_connect_and_read():
@@ -74,7 +76,15 @@ def test_practice_list_joined():
         except Exception as e:
             print(f"Could not determine SQLAlchemy DB path: {e}")
 
-        review_sitdown_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
+        # Create the date in EST and convert to UTC
+
+        # Note: fromisoformat does not handle timezones well, so use strptime
+        # Parse a datetime string that includes EST as part of the string
+        naive_dt = parser.parse("2024-12-31 11:47:57.671465 EST")
+        # The resulting datetime object will have tzinfo set to EST
+        # Convert to UTC for database queries
+        # Parse the datetime string with timezone info directly
+        review_sitdown_date = naive_dt.astimezone(pytz.utc)
         tunes: List[Row[Any]] = query_practice_list_scheduled(
             db,
             limit=1000,
