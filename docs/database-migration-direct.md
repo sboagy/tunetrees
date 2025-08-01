@@ -105,15 +105,18 @@ For complex schema changes that require data transformation:
 ### Common Issues
 
 **Schema Comparison Fails**
+
 - Ensure `tunetrees_test_clean.sqlite3` has the correct target schema
 - Check that SQLite `.schema` output is clean (no comments or extra whitespace)
 
 **Column Mapping Issues**
+
 - Review column names and types carefully
 - Use SQLite tools to inspect schema differences
 - Consider using custom mapping logic for complex transformations
 
 **Deployment Failures**
+
 - Verify SSH key access to production server
 - Check disk space on production server
 - Ensure production services can be restarted
@@ -121,6 +124,7 @@ For complex schema changes that require data transformation:
 ### Recovery Procedures
 
 **Rollback Production Database**
+
 ```bash
 # Find the backup file
 ls -la tunetrees_do_backup/
@@ -142,15 +146,15 @@ The migration script automatically logs all operations and maintains:
 
 ## Comparison with Alembic
 
-| Feature | Alembic | Direct Migration |
-|---------|---------|------------------|
-| Development Style | Code-first | Database-first |
-| Schema Definition | Python models | Direct SQL |
-| Version Control | Migration files | Database files |
-| Rollback | Automatic | Manual with backups |
-| Complexity | High | Low |
-| Data Transformations | Python code | SQL + manual mapping |
-| Production Safety | Version tracking | Multiple confirmations |
+| Feature              | Alembic          | Direct Migration       |
+| -------------------- | ---------------- | ---------------------- |
+| Development Style    | Code-first       | Database-first         |
+| Schema Definition    | Python models    | Direct SQL             |
+| Version Control      | Migration files  | Database files         |
+| Rollback             | Automatic        | Manual with backups    |
+| Complexity           | High             | Low                    |
+| Data Transformations | Python code      | SQL + manual mapping   |
+| Production Safety    | Version tracking | Multiple confirmations |
 
 ## Best Practices
 

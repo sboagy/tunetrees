@@ -9,7 +9,8 @@ set -euo pipefail
 # Configuration
 SOURCE_SCHEMA_DB="tunetrees_test_clean.sqlite3"
 PRODUCTION_SERVER="sboag@165.227.182.140"
-PRODUCTION_DB_PATH="/home/sboag/tunetrees/tunetrees_production.sqlite3"
+# PRODUCTION_DB_PATH="/home/sboag/tunetrees/tunetrees_production.sqlite3"
+PRODUCTION_DB_PATH="tunetrees/tunetrees.sqlite3"
 TEMP_DIR="migration_temp"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
@@ -63,7 +64,7 @@ download_production_db() {
 
 # Function to backup production database
 backup_production_db() {
-    local backup_name="tunetrees_production_backup_${TIMESTAMP}.sqlite3"
+    local backup_name="tunetrees_production_backup_$(date +%Y-%m-%d_%H-%M-%S).sqlite3"
     
     log "Creating backup of production database"
     scp -i ~/.ssh/id_rsa_ttdroplet "$PRODUCTION_SERVER:$PRODUCTION_DB_PATH" "./tunetrees_do_backup/$backup_name"
@@ -89,6 +90,181 @@ compare_schemas() {
     fi
 }
 
+# Function to generate human-readable schema summary
+generate_schema_summary() {
+    local diff_file="$1"
+    
+    echo ""
+    echo "=== ACTUAL SCHEMA DIFFERENCES ==="
+    echo ""
+    
+    # Compare table schemas directly from the databases
+    local source_db="$SOURCE_SCHEMA_DB"
+    local prod_db="$TEMP_DIR/production_current.sqlite3"
+    
+    # Get list of tables from both databases
+    local source_tables=$(sqlite3 "$source_db" "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;")
+    local prod_tables=$(sqlite3 "$prod_db" "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;")
+    
+    local changes_found=false
+    
+    # Check each table for differences
+    for table in $source_tables; do
+        if echo "$prod_tables" | grep -q "^$table$"; then
+            # Table exists in both - check for column differences
+            local source_cols=$(sqlite3 "$source_db" "PRAGMA table_info($table);" | cut -d'|' -f2)
+            local prod_cols=$(sqlite3 "$prod_db" "PRAGMA table_info($table);" | cut -d'|' -f2)
+            
+            # Check for column set differences (ignore order)
+            local source_col_set=$(echo "$source_cols" | sort | tr '\n' '|')
+            local prod_col_set=$(echo "$prod_cols" | sort | tr '\n' '|')
+            local has_column_changes=false
+            
+            # Find added columns (in source but not in production)
+            local added_cols=""
+            for col in $source_cols; do
+                if ! echo "$prod_cols" | grep -q "^$col$"; then
+                    added_cols="$added_cols$col "
+                    has_column_changes=true
+                fi
+            done
+            
+            # Find removed columns (in production but not in source)
+            local removed_cols=""
+            for col in $prod_cols; do
+                if ! echo "$source_cols" | grep -q "^$col$"; then
+                    removed_cols="$removed_cols$col "
+                    has_column_changes=true
+                fi
+            done
+            
+            # Check for actual type/constraint changes (not just order)
+            local has_constraint_changes=false
+            for col in $source_cols; do
+                if echo "$prod_cols" | grep -q "^$col$"; then
+                    local source_info=$(sqlite3 "$source_db" "PRAGMA table_info($table);" | grep "^[0-9]*|$col|")
+                    local prod_info=$(sqlite3 "$prod_db" "PRAGMA table_info($table);" | grep "^[0-9]*|$col|")
+                    
+                    # Compare everything except column order (cid field)
+                    local source_without_cid=$(echo "$source_info" | cut -d'|' -f2-6)
+                    local prod_without_cid=$(echo "$prod_info" | cut -d'|' -f2-6)
+                    
+                    if [ "$source_without_cid" != "$prod_without_cid" ]; then
+                        has_constraint_changes=true
+                        break
+                    fi
+                fi
+            done
+            
+            # Check for index changes
+            local source_indexes=$(sqlite3 "$source_db" "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='$table' AND name NOT LIKE 'sqlite_%';")
+            local prod_indexes=$(sqlite3 "$prod_db" "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='$table' AND name NOT LIKE 'sqlite_%';")
+            local has_index_changes=false
+            if [ "$source_indexes" != "$prod_indexes" ]; then
+                has_index_changes=true
+            fi
+            
+            # Only show table if there are actual changes (not just column order)
+            if [ "$has_column_changes" = true ] || [ "$has_constraint_changes" = true ] || [ "$has_index_changes" = true ]; then
+                echo -e "${YELLOW}🔧 $table${NC}:"
+                
+                if [ -n "$added_cols" ]; then
+                    echo -e "   ${GREEN}+ Added columns:${NC} $added_cols"
+                fi
+                if [ -n "$removed_cols" ]; then
+                    echo -e "   ${RED}- Removed columns:${NC} $removed_cols"
+                fi
+                
+                # Show detailed type/constraint changes only for columns that actually changed
+                if [ "$has_constraint_changes" = true ]; then
+                    echo -e "   ${BLUE}~ Type/constraint changes:${NC}"
+                    for col in $source_cols; do
+                        if echo "$prod_cols" | grep -q "^$col$"; then
+                            local source_info=$(sqlite3 "$source_db" "PRAGMA table_info($table);" | grep "^[0-9]*|$col|")
+                            local prod_info=$(sqlite3 "$prod_db" "PRAGMA table_info($table);" | grep "^[0-9]*|$col|")
+                            
+                            # Compare everything except column order (cid field)
+                            local source_without_cid=$(echo "$source_info" | cut -d'|' -f2-6)
+                            local prod_without_cid=$(echo "$prod_info" | cut -d'|' -f2-6)
+                            
+                            if [ "$source_without_cid" != "$prod_without_cid" ]; then
+                                # Extract specific field differences
+                                local source_type=$(echo "$source_info" | cut -d'|' -f3)
+                                local prod_type=$(echo "$prod_info" | cut -d'|' -f3)
+                                local source_notnull=$(echo "$source_info" | cut -d'|' -f4)
+                                local prod_notnull=$(echo "$prod_info" | cut -d'|' -f4)
+                                local source_default=$(echo "$source_info" | cut -d'|' -f5)
+                                local prod_default=$(echo "$prod_info" | cut -d'|' -f5)
+                                local source_pk=$(echo "$source_info" | cut -d'|' -f6)
+                                local prod_pk=$(echo "$prod_info" | cut -d'|' -f6)
+                                
+                                echo -e "     ${col}:"
+                                if [ "$source_type" != "$prod_type" ]; then
+                                    echo -e "       Type: ${prod_type} → ${source_type}"
+                                fi
+                                if [ "$source_notnull" != "$prod_notnull" ]; then
+                                    local source_null_text=$([ "$source_notnull" = "1" ] && echo "NOT NULL" || echo "NULL")
+                                    local prod_null_text=$([ "$prod_notnull" = "1" ] && echo "NOT NULL" || echo "NULL")
+                                    echo -e "       Null: ${prod_null_text} → ${source_null_text}"
+                                fi
+                                if [ "$source_default" != "$prod_default" ]; then
+                                    echo -e "       Default: '${prod_default}' → '${source_default}'"
+                                fi
+                                if [ "$source_pk" != "$prod_pk" ]; then
+                                    local source_pk_text=$([ "$source_pk" = "1" ] && echo "PK" || echo "not PK")
+                                    local prod_pk_text=$([ "$prod_pk" = "1" ] && echo "PK" || echo "not PK")
+                                    echo -e "       Primary Key: ${prod_pk_text} → ${source_pk_text}"
+                                fi
+                            fi
+                        fi
+                    done
+                fi
+                
+                # Show index changes
+                if [ "$has_index_changes" = true ]; then
+                    echo -e "   ${YELLOW}📊 Index changes:${NC}"
+                    
+                    # Show added indexes
+                    for idx in $source_indexes; do
+                        if ! echo "$prod_indexes" | grep -q "^$idx$"; then
+                            echo -e "     + Added: $idx"
+                        fi
+                    done
+                    
+                    # Show removed indexes
+                    for idx in $prod_indexes; do
+                        if ! echo "$source_indexes" | grep -q "^$idx$"; then
+                            echo -e "     - Removed: $idx"
+                        fi
+                    done
+                fi
+                
+                changes_found=true
+            fi
+        else
+            echo -e "${GREEN}📋 $table${NC} - new table"
+            changes_found=true
+        fi
+    done
+    
+    # Check for dropped tables
+    for table in $prod_tables; do
+        if ! echo "$source_tables" | grep -q "^$table$"; then
+            echo -e "${RED}🗑️  $table${NC} - table dropped"
+            changes_found=true
+        fi
+    done
+    
+    if [ "$changes_found" = false ]; then
+        echo -e "${BLUE}ℹ️  No actual table or column differences found${NC}"
+        echo -e "${YELLOW}⚠️  Differences may be formatting/constraint changes only${NC}"
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}� Full details: $diff_file${NC}"
+    echo ""
+}
+
 # Function to create migration database
 create_migration_db() {
     local source_db="$1"
@@ -97,21 +273,19 @@ create_migration_db() {
     
     log "Creating migration database with new schema"
     
-    # Copy source database as template (has the target schema)
-    cp "$source_db" "$migration_db"
+    # Extract schema from source database (our target schema)
+    local schema_file="$TEMP_DIR/target_schema.sql"
+    sqlite3 "$source_db" ".schema" > "$schema_file"
     
-    # Clear all data from migration database (keep schema only)
-    log "Clearing data from migration database"
-    sqlite3 "$migration_db" "
-        PRAGMA foreign_keys = OFF;
-        DELETE FROM practice_record;
-        DELETE FROM prefs_spaced_repetition;
-        DELETE FROM playlist;  
-        DELETE FROM tune;
-        DELETE FROM user;
-        PRAGMA foreign_keys = ON;
-    "
+    # Filter out SQLite internal objects that cannot be created manually
+    local clean_schema_file="$TEMP_DIR/target_schema_clean.sql"
+    grep -v -E "CREATE TABLE sqlite_(sequence|stat[0-9]+)" "$schema_file" > "$clean_schema_file"
     
+    # Create completely fresh database with target schema
+    rm -f "$migration_db"  # Remove if exists
+    sqlite3 "$migration_db" < "$clean_schema_file"
+    
+    log "Fresh migration database created with target schema"
     success "Migration database created: $migration_db"
 }
 
@@ -237,8 +411,12 @@ apply_column_mapping() {
     
     log "Applying column mapping for $table"
     
-    # Attach source database to target database
-    sqlite3 "$target_db" "ATTACH DATABASE '$source_db' AS source;"
+    # Verify the table exists in source database first
+    local table_exists=$(sqlite3 "$source_db" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='$table';")
+    if [ -z "$table_exists" ] || [ "$table_exists" -eq 0 ]; then
+        warn "Table $table does not exist in source database - skipping"
+        return
+    fi
     
     # Get common columns
     local source_cols=$(sqlite3 "$source_db" "PRAGMA table_info($table);" | cut -d'|' -f2)
@@ -256,14 +434,16 @@ apply_column_mapping() {
     
     if [ -n "$common_cols" ]; then
         log "Copying columns: $common_cols"
-        sqlite3 "$target_db" "INSERT INTO $table ($common_cols) SELECT $common_cols FROM source.$table;"
+        # Use ATTACH DATABASE approach for data copying
+        sqlite3 "$target_db" "
+            ATTACH DATABASE '$source_db' AS source_db;
+            INSERT INTO $table ($common_cols) SELECT $common_cols FROM source_db.$table;
+            DETACH DATABASE source_db;
+        "
         success "Data copied for table $table"
     else
         error "No compatible columns found for $table"
     fi
-    
-    # Detach source database
-    sqlite3 "$target_db" "DETACH DATABASE source;"
 }
 
 # Function to validate migrated data
@@ -312,10 +492,19 @@ deploy_migration() {
     success "Migration deployed successfully!"
     
     # Restart production services
-    log "Restarting production services"
-    ssh -i ~/.ssh/id_rsa_ttdroplet "$PRODUCTION_SERVER" "cd tunetrees && docker-compose restart"
+    log "Redeply production services"
+    echo -n "Redeply production services for current branch? (y/n): "
+    read -r response
     
-    success "Production services restarted"
+    if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+        echo "Redeploy opted out by user"
+        exit 0
+    fi
+
+    ./scripts/redeploy_tt1dd.sh
+    # ssh -i ~/.ssh/id_rsa_ttdroplet "$PRODUCTION_SERVER" "cd tunetrees && docker-compose restart"
+    
+    success "Production services redeployed successfully!"
 }
 
 # Main migration workflow
@@ -355,13 +544,16 @@ main() {
     
     # Step 5: Show differences and confirm
     echo "=== SCHEMA DIFFERENCES DETECTED ==="
-    cat "$schema_diff"
-    echo ""
+    
+    # Generate human-readable summary
+    generate_schema_summary "$schema_diff"
+    
     echo -n "Continue with migration? (y/n): "
     read -r response
     
     if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
-        error "Migration cancelled by user"
+        echo "Migration opted out by user"
+        exit 0
     fi
     
     # Step 6: Create migration database
