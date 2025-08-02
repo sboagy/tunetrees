@@ -30,6 +30,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 logger.debug("(tunetrees/api/main.py (26): test debug message)")
 
 import tunetrees.api.auth as auth  # noqa: E402
+import tunetrees.api.sms as sms  # noqa: E402
 import tunetrees.api.tunetrees as tunetrees_api  # noqa: E402
 from tunetrees.api import settings  # noqa: E402
 from tunetrees.api.preferences import preferences_router  # noqa: E402
@@ -41,6 +42,10 @@ tags_metadata = [
         "name": "auth",
         "description": "Operations for authentication and user management, designed to be "
         "used by the frontend auth.js/nextauth adapter.",
+    },
+    {
+        "name": "sms",
+        "description": "SMS verification and authentication services using Twilio.",
     },
     {
         "name": "tunetrees",
@@ -92,6 +97,7 @@ app = FastAPI(debug=True, openapi_tags=tags_metadata)
 reload_trigger_func()
 
 app.include_router(auth.router)
+app.include_router(sms.router)
 app.include_router(tunetrees_api.router)
 app.include_router(settings.settings_router)
 app.include_router(preferences_router)

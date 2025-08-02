@@ -122,6 +122,8 @@ async def create_user(user: UserModel) -> Optional[UserModel]:
                 name=user.name,
                 email=user.email,
                 email_verified=user.email_verified,
+                phone=user.phone,
+                phone_verified=user.phone_verified,
                 image=user.image,
                 hash=user.hash,
             )
@@ -680,6 +682,8 @@ def query_user_to_auth_user(
                     name=str(user.name),
                     email=str(user.email),
                     email_verified=user.email_verified,  # for the moment
+                    phone=user.phone,
+                    phone_verified=user.phone_verified,
                     hash=user.hash,
                     image=None,  # for the moment
                     sr_alg_type=user.sr_alg_type,  # for the moment
@@ -690,3 +694,6 @@ def query_user_to_auth_user(
     except Exception as e:
         logger.error("Unknown error: %s" % e)
         raise HTTPException(status_code=500, detail="Unknown error occured")
+
+
+

@@ -19,17 +19,11 @@ export const testDatabasePath = path.resolve(
   "tunetrees_test.sqlite3",
 );
 
-// Determine the virtual environment's bin directory
-export const venvBinDir = path.resolve(
-  tunetreesBackendDeployBaseDir,
-  ".venv/bin",
-);
+// Use the global Python installation bin directory
+export const venvBinDir = "/home/runner/.local/bin";
 
-// Determine the virtual environment's lib directory for PYTHONPATH
-export const venvLibDir = path.resolve(
-  tunetreesBackendDeployBaseDir,
-  ".venv/lib/python3.12/site-packages",
-);
+// Use the global Python installation lib directory for PYTHONPATH
+export const venvLibDir: string = "";
 
 export const playwrightTestResulsDir = path.join(
   testResultsDirPath,
