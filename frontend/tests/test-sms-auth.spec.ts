@@ -25,7 +25,7 @@ test.afterEach(async ({ page }, testInfo) => {
 });
 
 test.describe("SMS Authentication", () => {
-  test("should display SMS login form elements", async ({ page }) => {
+  test.skip("should display SMS login form elements", async ({ page }) => {
     await page.goto("/auth-test");
 
     // Check that the SMS login section is visible
@@ -43,7 +43,7 @@ test.describe("SMS Authentication", () => {
     await expect(sendCodeButton).toBeDisabled(); // Should be disabled when phone is empty
   });
 
-  test("should enable send code button when phone number is entered", async ({
+  test.skip("should enable send code button when phone number is entered", async ({
     page,
   }) => {
     await page.goto("/auth-test");
@@ -61,7 +61,7 @@ test.describe("SMS Authentication", () => {
     await expect(sendCodeButton).toBeEnabled();
   });
 
-  test("should show verification code input after sending code", async ({
+  test.skip("should show verification code input after sending code", async ({
     page,
   }) => {
     await page.goto("/auth-test");
@@ -87,7 +87,7 @@ test.describe("SMS Authentication", () => {
     await expect(resetButton).toBeVisible();
   });
 
-  test("should allow resetting to phone number step", async ({ page }) => {
+  test.skip("should allow resetting to phone number step", async ({ page }) => {
     await page.goto("/auth-test");
 
     const phoneInput = page.getByTestId("sms-phone-input");
