@@ -351,3 +351,13 @@ tunetrees_do.sqlite3
 playwright-output
 playwright-output/**/*.*
 mcp-memory/Dockerfile
+migration_temp/production_current.sqlite3
+migration_temp/production_schema.sql
+migration_temp/schema_differences.diff
+migration_temp/source_playlist_tune_columns.txt
+migration_temp/source_practice_record_columns.txt
+migration_temp/source_schema.sql
+migration_temp/target_playlist_tune_columns.txt
+migration_temp/target_practice_record_columns.txt
+migration_temp/target_schema.sql
+migration_temp/tunetrees_migrated.sqlite3

@@ -82,7 +82,7 @@ class PlaylistTuneModel(BaseModel):
     learned: str
     deleted: Optional[bool]
     goal: Optional[str] = "recall"  # Default to recall, stored as TEXT in database
-    technique: Optional[str] = None  # Open text field as requested in Issue #205
+    scheduled: Optional[str] = None  # Next review date for this tune in this playlist
 
 
 class PlaylistTuneModelPartial(BaseModel):
@@ -94,7 +94,7 @@ class PlaylistTuneModelPartial(BaseModel):
     learned: Optional[str] = None
     deleted: Optional[bool] = None
     goal: Optional[str] = None
-    technique: Optional[str] = None
+    scheduled: Optional[str] = None
 
 
 class TuneModel(BaseModel):
@@ -560,14 +560,20 @@ class PlaylistTuneJoinedModel(BaseModel):
     private_for: Optional[int] = None
     deleted: Optional[bool] = None
     learned: Optional[str] = None
-    practiced: Optional[str] = None
-    quality: Optional[int] = None
-    easiness: Optional[float] = None
-    difficulty: Optional[float] = None
-    interval: Optional[int] = None
-    step: Optional[int] = None
-    repetitions: Optional[int] = None
-    review_date: Optional[str] = None
+    goal: Optional[str] = None
+    scheduled: Optional[str] = (
+        None  # Next review date for this tune from playlist_tune table
+    )
+    latest_practiced: Optional[str] = None
+    latest_quality: Optional[int] = None
+    latest_easiness: Optional[float] = None
+    latest_difficulty: Optional[float] = None
+    latest_interval: Optional[int] = None
+    latest_step: Optional[int] = None
+    latest_repetitions: Optional[int] = None
+    latest_review_date: Optional[str] = None
+    latest_technique: Optional[str] = None
+    latest_goal: Optional[str] = None
     tags: Optional[str] = None
     recall_eval: Optional[str] = None
     notes: Optional[str] = None
@@ -589,19 +595,23 @@ class PracticeListStagedModel(BaseModel):
     private_for: Optional[int] = None
     deleted: Optional[bool] = None
     learned: Optional[str] = None
+    goal: Optional[str] = None
+    scheduled: Optional[str] = None  # Next review date for this tune in this playlist
     user_ref: Optional[int] = None
     playlist_id: Optional[int] = None
     instrument: Optional[str] = None
     playlist_deleted: Optional[bool] = None
-    practiced: Optional[str] = None
-    quality: Optional[int] = None
-    easiness: Optional[float] = None
-    difficulty: Optional[float] = None
-    interval: Optional[int] = None
-    step: Optional[int] = None
-    repetitions: Optional[int] = None
-    review_date: Optional[str] = None
-    backup_practiced: Optional[str] = None
+    latest_practiced: Optional[str] = None
+    latest_quality: Optional[int] = None
+    latest_easiness: Optional[float] = None
+    latest_difficulty: Optional[float] = None
+    latest_interval: Optional[int] = None
+    latest_step: Optional[int] = None
+    latest_repetitions: Optional[int] = None
+    latest_review_date: Optional[str] = None
+    latest_backup_practiced: Optional[str] = None
+    latest_technique: Optional[str] = None
+    latest_goal: Optional[str] = None
     tags: Optional[str] = None
     purpose: Optional[str] = None
     note_private: Optional[str] = None

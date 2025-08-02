@@ -96,13 +96,13 @@ const formSchema = z.object({
   incipit: z.string().nullable().optional(),
   genre: z.string().nullable().optional(),
   learned: z.string().nullable().optional(), // playlist_tune.learned
-  practiced: z.string().nullable().optional(), // practice_record.practiced
-  quality: z.number().int().nullable().optional(), // practice_record.quality
-  easiness: z.number().nullable().optional(), // practice_record.easiness
-  difficulty: z.number().nullable().optional(), // practice_record.difficulty
-  interval: z.number().nullable().optional(), // practice_record.interval
-  step: z.number().nullable().optional(), // practice_record.step
-  repetitions: z.number().nullable().optional(), // practice_record.repetitions
+  latest_practiced: z.string().nullable().optional(), // practice_record.practiced
+  latest_quality: z.number().int().nullable().optional(), // practice_record.quality
+  latest_easiness: z.number().nullable().optional(), // practice_record.easiness
+  latest_difficulty: z.number().nullable().optional(), // practice_record.difficulty
+  latest_interval: z.number().nullable().optional(), // practice_record.interval
+  latest_step: z.number().nullable().optional(), // practice_record.step
+  latest_repetitions: z.number().nullable().optional(), // practice_record.repetitions
   review_date: z.string().nullable().optional(), // practice_record.review_date
   backup_practiced: z.string().nullable().optional(), // practice_record.review_date
   note_private: z.string().nullable().optional(), // not used
@@ -260,11 +260,11 @@ export default function TuneEditor({
               ...tuneOverview,
               title: tuneOverview.title ?? undefined,
               type: tuneOverview.type,
-              practiced: transformToDatetimeLocalForInput(
-                tuneOverview.practiced as string,
+              latest_practiced: transformToDatetimeLocalForInput(
+                tuneOverview.latest_practiced as string,
               ),
               review_date: transformToDatetimeLocalForInput(
-                tuneOverview.review_date as string,
+                tuneOverview.latest_review_date as string, // Historical review date from practice_record
               ),
               // learned: transformToDatetimeLocal(tuneOverview.learned as string),
             });
@@ -272,15 +272,15 @@ export default function TuneEditor({
             // Store original practice record values for change detection
             // Store the original UTC values for datetime fields for accurate comparison
             setOriginalPracticeData({
-              practiced: tuneOverview.practiced, // Store original UTC format
-              quality: tuneOverview.quality,
-              easiness: tuneOverview.easiness,
-              difficulty: tuneOverview.difficulty,
-              interval: tuneOverview.interval,
-              step: tuneOverview.step,
-              repetitions: tuneOverview.repetitions,
-              review_date: tuneOverview.review_date, // Store original UTC format
-              backup_practiced: tuneOverview.backup_practiced,
+              practiced: tuneOverview.latest_practiced, // Store original UTC format
+              quality: tuneOverview.latest_quality,
+              easiness: tuneOverview.latest_easiness,
+              difficulty: tuneOverview.latest_difficulty,
+              interval: tuneOverview.latest_interval,
+              step: tuneOverview.latest_step,
+              repetitions: tuneOverview.latest_repetitions,
+              review_date: tuneOverview.latest_review_date, // Historical review date from practice_record
+              backup_practiced: tuneOverview.latest_backup_practiced,
             });
           } else {
             console.error(
@@ -324,7 +324,7 @@ export default function TuneEditor({
       const playlistTune2: IPlaylistTune = {
         tune_ref: tuneId,
         playlist_ref: playlistId,
-        current: data.practiced ?? "T", // for now
+        current: data.latest_practiced ?? "T", // for now
         learned: data.learned ?? "",
         deleted: false,
       };
@@ -353,13 +353,13 @@ export default function TuneEditor({
     data: z.infer<typeof formSchema>,
   ): Promise<boolean> {
     const practiceRecord: Partial<IPracticeRecord> = {
-      practiced: data.practiced ?? "",
-      quality: data.quality ?? 0,
-      easiness: data.easiness ?? 0,
-      difficulty: data.difficulty ?? 0,
-      interval: data.interval ?? 0,
-      step: data.step ?? 0,
-      repetitions: data.repetitions ?? 0,
+      practiced: data.latest_practiced ?? "",
+      quality: data.latest_quality ?? 0,
+      easiness: data.latest_easiness ?? 0,
+      difficulty: data.latest_difficulty ?? 0,
+      interval: data.latest_interval ?? 0,
+      step: data.latest_step ?? 0,
+      repetitions: data.latest_repetitions ?? 0,
       review_date: data.review_date ?? "",
       // tags: z.string().nullable().optional(),
     };
@@ -379,13 +379,13 @@ export default function TuneEditor({
       const practiceRecord2: Partial<IPracticeRecord> = {
         tune_ref: tuneId,
         playlist_ref: playlistId,
-        practiced: data.practiced ?? "",
-        quality: data.quality ?? 0,
-        easiness: data.easiness ?? 0,
-        difficulty: data.difficulty ?? 0,
-        interval: data.interval ?? 0,
-        step: data.step ?? 0,
-        repetitions: data.repetitions ?? 0,
+        practiced: data.latest_practiced ?? "",
+        quality: data.latest_quality ?? 0,
+        easiness: data.latest_easiness ?? 0,
+        difficulty: data.latest_difficulty ?? 0,
+        interval: data.latest_interval ?? 0,
+        step: data.latest_step ?? 0,
+        repetitions: data.latest_repetitions ?? 0,
         review_date: data.review_date ?? "",
       };
       const responsePracticeRecordUpdate2 = await createPracticeRecord(
@@ -422,10 +422,21 @@ export default function TuneEditor({
     }
 
     // For datetime fields, compare the UTC values (currentData already has UTC conversion)
-    const datetimeFields = ["practiced", "review_date"] as const;
-    for (const field of datetimeFields) {
-      const currentUtcValue = currentData[field];
-      const originalUtcValue = originalPracticeData[field];
+    // Map form field names to originalPracticeData field names
+    const datetimeFieldMappings = [
+      {
+        formField: "latest_practiced" as const,
+        originalField: "practiced" as const,
+      },
+      {
+        formField: "review_date" as const,
+        originalField: "review_date" as const,
+      },
+    ];
+
+    for (const { formField, originalField } of datetimeFieldMappings) {
+      const currentUtcValue = currentData[formField];
+      const originalUtcValue = originalPracticeData[originalField];
 
       // Handle null/undefined equivalence
       if ((currentUtcValue === null) !== (originalUtcValue === null)) {
@@ -438,19 +449,41 @@ export default function TuneEditor({
     }
 
     // For non-datetime fields, compare directly
-    const nonDatetimeFields = [
-      "quality",
-      "easiness",
-      "difficulty",
-      "interval",
-      "step",
-      "repetitions",
-      "backup_practiced",
-    ] as const;
+    // Map form field names to originalPracticeData field names
+    const nonDatetimeFieldMappings = [
+      {
+        formField: "latest_quality" as const,
+        originalField: "quality" as const,
+      },
+      {
+        formField: "latest_easiness" as const,
+        originalField: "easiness" as const,
+      },
+      {
+        formField: "latest_difficulty" as const,
+        originalField: "difficulty" as const,
+      },
+      {
+        formField: "latest_interval" as const,
+        originalField: "interval" as const,
+      },
+      {
+        formField: "latest_step" as const,
+        originalField: "step" as const,
+      },
+      {
+        formField: "latest_repetitions" as const,
+        originalField: "repetitions" as const,
+      },
+      {
+        formField: "backup_practiced" as const,
+        originalField: "backup_practiced" as const,
+      },
+    ];
 
-    return nonDatetimeFields.some((field) => {
-      const currentValue = currentData[field];
-      const originalValue = originalPracticeData[field];
+    return nonDatetimeFieldMappings.some(({ formField, originalField }) => {
+      const currentValue = currentData[formField];
+      const originalValue = originalPracticeData[originalField];
 
       // Handle null/undefined equivalence
       if ((currentValue === null) !== (originalValue === null)) {
@@ -479,7 +512,9 @@ export default function TuneEditor({
     const isNewTuneImported = isNewTune() && isTuneImported();
     const saveInMainTuneTable = isTuneUserPrivateForUser || isNewTuneImported;
     const saveAsOverride = !saveInMainTuneTable;
-    const practicedUtc = transformToDatetimeUtcForDB(data.practiced ?? "");
+    const practicedUtc = transformToDatetimeUtcForDB(
+      data.latest_practiced ?? "",
+    );
     const reviewDateUtc = transformToDatetimeUtcForDB(data.review_date ?? "");
 
     const dataLocal = {
@@ -1000,7 +1035,38 @@ export default function TuneEditor({
 
                   <FormField
                     control={form.control}
-                    name="practiced"
+                    name="tags"
+                    render={({ field }) => (
+                      <FormItem
+                        className="tune-form-item-style2"
+                        data-testid="tt-tune-editor-tags"
+                      >
+                        <FormLabel className="tune-form-label-style">
+                          <em>Tags:</em>{" "}
+                        </FormLabel>
+
+                        <FormControl className="tune-form-control-style">
+                          <Input {...field} value={field.value || ""} />
+                        </FormControl>
+
+                        <FormDescription>
+                          Separate tags with commas
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="items-center my-4 tune-form-item-style w-3/5">
+                    <hr className="flex-grow border-t border-gray-300" />
+                    <span className="px-4 text-gray-500">
+                      Most Recent Practice Record
+                    </span>
+                    <hr className="flex-grow border-t border-gray-300" />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="latest_practiced"
                     render={({ field }) => (
                       <FormItem
                         className="tune-form-item-style"
@@ -1023,7 +1089,7 @@ export default function TuneEditor({
 
                   <FormField
                     control={form.control}
-                    name="quality"
+                    name="latest_quality"
                     render={({ field }) => (
                       <FormItem
                         className="tune-form-item-style"
@@ -1092,7 +1158,7 @@ export default function TuneEditor({
 
                   <FormField
                     control={form.control}
-                    name="easiness"
+                    name="latest_easiness"
                     render={({ field }) => (
                       <FormItem
                         className="tune-form-item-style"
@@ -1118,7 +1184,7 @@ export default function TuneEditor({
 
                   <FormField
                     control={form.control}
-                    name="difficulty"
+                    name="latest_difficulty"
                     render={({ field }) => (
                       <FormItem
                         className="tune-form-item-style"
@@ -1144,7 +1210,7 @@ export default function TuneEditor({
 
                   <FormField
                     control={form.control}
-                    name="interval"
+                    name="latest_interval"
                     render={({ field }) => (
                       <FormItem
                         className="tune-form-item-style"
@@ -1170,7 +1236,7 @@ export default function TuneEditor({
 
                   <FormField
                     control={form.control}
-                    name="step"
+                    name="latest_step"
                     render={({ field }) => (
                       <FormItem
                         className="tune-form-item-style"
@@ -1196,7 +1262,7 @@ export default function TuneEditor({
 
                   <FormField
                     control={form.control}
-                    name="repetitions"
+                    name="latest_repetitions"
                     render={({ field }) => (
                       <FormItem
                         className="tune-form-item-style"
@@ -1239,29 +1305,6 @@ export default function TuneEditor({
                             value={field.value as string}
                           />
                         </FormControl>
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="tags"
-                    render={({ field }) => (
-                      <FormItem
-                        className="tune-form-item-style2"
-                        data-testid="tt-tune-editor-tags"
-                      >
-                        <FormLabel className="tune-form-label-style">
-                          <em>Tags:</em>{" "}
-                        </FormLabel>
-
-                        <FormControl className="tune-form-control-style">
-                          <Input {...field} value={field.value || ""} />
-                        </FormControl>
-
-                        <FormDescription>
-                          Separate tags with commas
-                        </FormDescription>
                       </FormItem>
                     )}
                   />

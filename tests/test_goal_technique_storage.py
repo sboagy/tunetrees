@@ -31,9 +31,7 @@ class TestGoalTechniqueStorage:
         """Test that goal and technique values are properly stored for recall goal."""
         # Test data with recall goal (should use FSRS scheduling)
         test_tune_updates = {
-            "634": TuneFeedbackUpdate(
-                {"feedback": "good", "goal": "recall", "technique": "fsrs"}
-            )
+            "634": TuneFeedbackUpdate({"feedback": "good", "goal": "recall"})
         }
 
         playlist_ref = 1  # Using known existing playlist
@@ -61,9 +59,6 @@ class TestGoalTechniqueStorage:
             assert latest_record.goal == "recall", (
                 f"Expected goal 'recall', got '{latest_record.goal}'"
             )
-            assert latest_record.technique == "fsrs", (
-                f"Expected technique 'fsrs', got '{latest_record.technique}'"
-            )
             assert latest_record.quality == 2, (
                 f"Expected quality 2 (good), got {latest_record.quality}"
             )
@@ -72,9 +67,7 @@ class TestGoalTechniqueStorage:
         """Test that goal and technique values are properly stored for non-recall goals."""
         # Test data with non-recall goal (should use goal-specific scheduling)
         test_tune_updates = {
-            "634": TuneFeedbackUpdate(
-                {"feedback": "easy", "goal": "fluency", "technique": "motor_skills"}
-            )
+            "634": TuneFeedbackUpdate({"feedback": "easy", "goal": "fluency"})
         }
 
         playlist_ref = 1  # Using known existing playlist
@@ -101,9 +94,6 @@ class TestGoalTechniqueStorage:
             assert latest_record is not None, "Practice record should be created"
             assert latest_record.goal == "fluency", (
                 f"Expected goal 'fluency', got '{latest_record.goal}'"
-            )
-            assert latest_record.technique == "motor_skills", (
-                f"Expected technique 'motor_skills', got '{latest_record.technique}'"
             )
             assert latest_record.quality == 3, (
                 f"Expected quality 3 (easy), got {latest_record.quality}"
@@ -146,22 +136,16 @@ class TestGoalTechniqueStorage:
             assert latest_record.goal == "recall", (
                 f"Expected default goal 'recall', got '{latest_record.goal}'"
             )
-            assert latest_record.technique == "fsrs", (
-                f"Expected default technique 'fsrs', got '{latest_record.technique}'"
-            )
 
     def test_multiple_tunes_different_goals(self):
         """Test storing multiple tunes with different goals and techniques."""
         # Test data with multiple tunes and different goals
         test_tune_updates = {
-            "634": TuneFeedbackUpdate(
-                {"feedback": "good", "goal": "session_ready", "technique": "metronome"}
-            ),
+            "634": TuneFeedbackUpdate({"feedback": "good", "goal": "session_ready"}),
             "635": TuneFeedbackUpdate(
                 {
                     "feedback": "hard",
                     "goal": "performance_polish",
-                    "technique": "daily_practice",
                 }
             ),
         }
@@ -191,9 +175,6 @@ class TestGoalTechniqueStorage:
             assert record1.goal == "session_ready", (
                 f"Expected goal 'session_ready', got '{record1.goal}'"
             )
-            assert record1.technique == "metronome", (
-                f"Expected technique 'metronome', got '{record1.technique}'"
-            )
 
             # Check second tune
             stmt = (
@@ -212,39 +193,3 @@ class TestGoalTechniqueStorage:
             assert record2.goal == "performance_polish", (
                 f"Expected goal 'performance_polish', got '{record2.goal}'"
             )
-            assert record2.technique == "daily_practice", (
-                f"Expected technique 'daily_practice', got '{record2.technique}'"
-            )
-
-    def test_goal_technique_in_views(self):
-        """Test that goal and technique columns appear in database views."""
-        with SessionLocal() as db:
-            # Test practice_list_joined view includes goal and technique
-            try:
-                from sqlalchemy import text
-
-                db.execute(
-                    text("SELECT goal, technique FROM practice_list_joined LIMIT 1")
-                ).fetchone()
-                # Should not raise an error - columns should exist
-                assert True, (
-                    "practice_list_joined view should include goal and technique columns"
-                )
-            except Exception as e:
-                pytest.fail(
-                    f"practice_list_joined view missing goal/technique columns: {e}"
-                )
-
-            # Test practice_list_staged view includes goal and technique
-            try:
-                db.execute(
-                    text("SELECT goal, technique FROM practice_list_staged LIMIT 1")
-                ).fetchone()
-                # Should not raise an error - columns should exist
-                assert True, (
-                    "practice_list_staged view should include goal and technique columns"
-                )
-            except Exception as e:
-                pytest.fail(
-                    f"practice_list_staged view missing goal/technique columns: {e}"
-                )

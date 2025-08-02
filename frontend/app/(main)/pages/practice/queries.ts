@@ -67,6 +67,7 @@ export async function getScheduledTunesOverview(
   playlistId: number,
   sitdownDate: Date,
   showDeleted = false,
+  acceptable_delinquency_window = 7,
 ): Promise<ITuneOverviewScheduled[]> {
   if (
     !sitdownDate ||
@@ -92,7 +93,7 @@ export async function getScheduledTunesOverview(
         params: {
           show_playlist_deleted: showDeleted,
           sitdown_date: sitdownDateUtcString,
-          acceptable_delinquency_window: 7,
+          acceptable_delinquency_window: acceptable_delinquency_window,
         },
       },
     );
@@ -185,13 +186,14 @@ export async function getTunesOnlyIntoOverview(
       user_ref: null,
       playlist_ref: null,
       learned: null,
-      practiced: null,
-      quality: null,
-      easiness: null,
-      interval: null,
-      repetitions: null,
-      review_date: null,
-      backup_practiced: null,
+      latest_practiced: null,
+      latest_quality: null,
+      latest_easiness: null,
+      latest_interval: null,
+      latest_repetitions: null,
+      latest_review_date: null,
+      scheduled: null, // Current scheduling date
+      latest_backup_practiced: null,
       external_ref: null,
       tags: null,
       recall_eval: null,
@@ -200,6 +202,10 @@ export async function getTunesOnlyIntoOverview(
       playlist_deleted: null,
       difficulty: null,
       step: null,
+      latest_difficulty: null,
+      latest_step: null,
+      latest_technique: null,
+      latest_goal: null,
     }));
   } catch (error) {
     console.error("Error in getTunesOnly: ", error);
