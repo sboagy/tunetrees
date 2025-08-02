@@ -19,14 +19,36 @@ export const testDatabasePath = path.resolve(
   "tunetrees_test.sqlite3",
 );
 
-// Use local .venv for development, CI path for CI environment
-export const venvBinDir =
-  process.env.CI === "true"
-    ? "/home/runner/.local/bin"
-    : path.resolve(backendDirPath, ".venv", "bin");
+// Determine the virtual environment's bin directory
+export const venvBinDir = path.resolve(
+  tunetreesBackendDeployBaseDir,
+  ".venv/bin",
+);
 
-// Use the global Python installation lib directory for PYTHONPATH
-export const venvLibDir: string = "";
+// Dynamically determine the virtual environment's lib directory for PYTHONPATH
+function getVenvLibDir(): string {
+  const venvLibPath = path.resolve(tunetreesBackendDeployBaseDir, ".venv/lib");
+
+  if (!fs.existsSync(venvLibPath)) {
+    throw new Error(
+      `Virtual environment lib directory not found: ${venvLibPath}`,
+    );
+  }
+
+  // Find the python directory (e.g., python3.12, python3.11, etc.)
+  const libEntries = fs.readdirSync(venvLibPath);
+  const pythonDir = libEntries.find((entry) => entry.startsWith("python3."));
+
+  if (!pythonDir) {
+    throw new Error(
+      `No python3.x directory found in ${venvLibPath}. Available entries: ${libEntries.join(", ")}`,
+    );
+  }
+
+  return path.resolve(venvLibPath, pythonDir, "site-packages");
+}
+
+export const venvLibDir = getVenvLibDir();
 
 export const playwrightTestResulsDir = path.join(
   testResultsDirPath,
