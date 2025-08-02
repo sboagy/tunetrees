@@ -198,6 +198,7 @@ export default function TunesGridScheduled({
     onRecallEvalChange: handleRecallEvalChange,
     onGoalChange: handleGoalChange,
     setIsLoading,
+    setTunesRefreshId, // Add this missing parameter
   });
 
   const submitPracticeFeedbacksHandler = () => {
