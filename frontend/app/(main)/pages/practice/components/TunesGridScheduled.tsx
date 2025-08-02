@@ -20,7 +20,7 @@ import { useTune } from "./CurrentTuneContext";
 import FlashcardPanel from "./FlashcardPanel";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useScheduledTunes } from "./TunesContextScheduled";
-import TunesGrid from "./TunesGrid";
+import TunesGrid, { acceptableDelinquencyWindow } from "./TunesGrid";
 import { useTunesTable } from "./TunesTable";
 import { useToast } from "@/hooks/use-toast";
 import { getSitdownDateFromBrowser } from "./SitdownDateProvider";
@@ -91,6 +91,7 @@ export default function TunesGridScheduled({
             playlistId,
             sitdownDate,
             showDeleted,
+            acceptableDelinquencyWindow,
           );
           if (!cancelled) {
             setTunes(result);
