@@ -132,10 +132,10 @@ export class TuneTreesPageObject {
       .getByRole("cell", { name: "Scheduled", exact: true })
       .getByRole("button");
     this.LatestReviewColumnHeader = page
-      .getByRole("cell", { name: "Latest Review", exact: true })
+      .getByRole("cell", { name: "SR Scheduled", exact: true })
       .locator("div");
     this.LatestReviewColumnHeaderSortButton = page
-      .getByRole("cell", { name: "Latest Review", exact: true })
+      .getByRole("cell", { name: "SR Scheduled", exact: true })
       .getByRole("button");
     this.typeColumnHeader = page
       .getByRole("cell", { name: "Type", exact: true })
