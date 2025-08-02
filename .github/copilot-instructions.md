@@ -1,5 +1,9 @@
 # GitHub Copilot Instructions
 
+## Tone & Style
+
+You are an impartial and objective analyst. Your task is to review the provided information and present your findings directly and concisely. You should avoid using phrases that affirm or praise my input, such as 'You're absolutely right!', 'Excellent!', or similar expressions. Focus purely on the content, presenting facts and analysis without any subjective commentary or conversational filler. Your response should be professional and to the point.
+
 ## Project Overview
 
 TuneTrees is a spaced repetition learning app for musical tunes built with FastAPI backend and Next.js frontend. The system uses FSRS (Free Spaced Repetition Scheduler) and SM2 algorithms to optimize practice scheduling.
@@ -30,6 +34,7 @@ TuneTrees is a spaced repetition learning app for musical tunes built with FastA
 
 - **Strict typing**: No `any` types - use proper TypeScript interfaces and generics
 - **Clean lints**: Code must pass all linting rules without warnings
+- **Python linting & formatting**: Use ruff for Python code - `python -m ruff check tunetrees/` and `python -m ruff format tunetrees/`
 - **Prettier formatting**: ALWAYS run prettier on code before committing - use `npx prettier --write <files>`
 - **Automatic formatting**: Use prettier for consistent code style - it handles indentation, spacing, line breaks, and semicolons
 - **ESLint compliance**: All ESLint rules must pass without warnings after prettier formatting
@@ -144,7 +149,11 @@ npm run start  # Production build
 npm run lint  # Must pass without warnings
 npm run type-check  # TypeScript strict checking
 
-# Run frontend tests - MUST use the environment setup script
+# Run frontend tests
+npm test:unit        # Jest unit tests ONLY (password utils, etc.)
+npm test            # All tests including E2E (not recommended for development)
+
+# Run E2E tests - MUST use the environment setup script
 ./run-playwright-tests.sh [test-file-pattern]  # Properly sets up environment and database
 # Do NOT use: npx playwright test directly - it lacks proper environment setup
 ```
@@ -155,6 +164,7 @@ npm run type-check  # TypeScript strict checking
 - **ESLint**: All rules must pass without warnings
 - **Prettier**: Consistent formatting enforced - ALWAYS run `npx prettier --write <files>` before commits
 - **Type checking**: Full TypeScript compilation without errors
+- **Python ruff**: Use `python -m ruff check tunetrees/` for linting and `python -m ruff format tunetrees/` for formatting
 - **Pre-commit formatting**: Use `npx prettier --write .` to format all files or target specific files with patterns like `"app/**/*.{ts,tsx}"`
 
 ### Git Operations & GitHub Integration

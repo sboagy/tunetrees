@@ -15,6 +15,27 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Parse command line arguments
+SKIP_DOWNLOAD=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skip-download)
+            SKIP_DOWNLOAD=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--skip-download]"
+            echo "  --skip-download    Skip downloading production database (use existing tunetrees_production.sqlite3)"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
 echo -e "${GREEN}=== TuneTrees Schema Migration Generator ===${NC}"
 
 # Check if Alembic is available
@@ -40,12 +61,21 @@ fi
 
 # Download current production database for migration generation
 echo ""
-echo -e "${YELLOW}Downloading current production database...${NC}"
-if scp -i ~/.ssh/id_rsa_ttdroplet sboag@165.227.182.140:tunetrees/tunetrees.sqlite3 tunetrees_production.sqlite3; then
-    echo -e "${GREEN}✓ Production database downloaded successfully${NC}"
+if [ "$SKIP_DOWNLOAD" = true ]; then
+    echo -e "${YELLOW}Skipping production database download (using existing tunetrees_production.sqlite3)${NC}"
+    if [ ! -f "tunetrees_production.sqlite3" ]; then
+        echo "ERROR: tunetrees_production.sqlite3 not found. Run without --skip-download first."
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Using existing production database${NC}"
 else
-    echo "ERROR: Failed to download production database. Check your SSH connection and credentials."
-    exit 1
+    echo -e "${YELLOW}Downloading current production database...${NC}"
+    if scp -i ~/.ssh/id_rsa_ttdroplet sboag@165.227.182.140:tunetrees/tunetrees.sqlite3 tunetrees_production.sqlite3; then
+        echo -e "${GREEN}✓ Production database downloaded successfully${NC}"
+    else
+        echo "ERROR: Failed to download production database. Check your SSH connection and credentials."
+        exit 1
+    fi
 fi
 
 # Prompt for migration message

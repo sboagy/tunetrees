@@ -88,6 +88,16 @@ const datetimeTextSortingFn: SortingFn<ITuneOverview> = (
   // return -1; //-1, 0, or 1 - access any row dat using rowA.original and rowB.original
 };
 
+const numericSortingFn: SortingFn<ITuneOverview> = (
+  rowA: Row<ITuneOverview>,
+  rowB: Row<ITuneOverview>,
+  columnId: string,
+) => {
+  const numA = Number(rowA.getValue(columnId)) || 0;
+  const numB = Number(rowB.getValue(columnId)) || 0;
+  return numA < numB ? -1 : numA > numB ? 1 : 0;
+};
+
 function rotateSorting<TData, TValue>(
   column: Column<TData, TValue>,
   setTunesRefreshId?: (newRefreshId: number) => void,
@@ -331,6 +341,7 @@ export function get_columns(
         // return <span>{info.row.original.id}</span>;
       },
       accessorFn: (row) => row.id,
+      sortingFn: numericSortingFn,
       enableSorting: true,
       enableHiding: true,
       size: 80,
@@ -396,6 +407,23 @@ export function get_columns(
             enableHiding: true,
             cell: (
               info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
+            ) => {
+              return info.getValue() || "recall";
+            },
+            accessorFn: (row: ITuneOverview) => row.goal,
+            size: 150,
+          },
+        ]
+      : []),
+    ...(purpose === "repertoire"
+      ? [
+          {
+            accessorKey: "goal",
+            header: ({ column }: { column: Column<ITuneOverview, unknown> }) =>
+              sortableHeader(column, "Goal", setTunesRefreshId),
+            enableHiding: true,
+            cell: (
+              info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
             ) => (
               <RowGoalComboBox
                 info={info}
@@ -406,19 +434,6 @@ export function get_columns(
               />
             ),
             accessorFn: (row: ITuneOverview) => row.goal,
-            size: 150,
-          },
-          {
-            accessorKey: "technique",
-            header: ({ column }: { column: Column<ITuneOverview, unknown> }) =>
-              sortableHeader(column, "Algorithm", setTunesRefreshId),
-            enableHiding: true,
-            cell: (
-              info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
-            ) => {
-              return info.getValue() || "SM2";
-            },
-            accessorFn: (row: ITuneOverview) => row.technique,
             size: 150,
           },
         ]
@@ -492,6 +507,18 @@ export function get_columns(
       TunesGridColumnGeneralType
     >[] = [
       {
+        id: "scheduled",
+        accessorFn: (row) => row.scheduled || row.latest_review_date || "",
+        header: ({ column }) =>
+          sortableHeader(column, "Scheduled", setTunesRefreshId),
+        cell: (info) => {
+          return transformToDatetimeLocalForDisplay(info.getValue() as string);
+        },
+        enableSorting: true,
+        enableHiding: true,
+        sortingFn: datetimeTextSortingFn,
+      },
+      {
         accessorKey: "learned",
         header: ({ column }) =>
           sortableHeader(column, "Learned", setTunesRefreshId),
@@ -504,7 +531,7 @@ export function get_columns(
         size: 120,
       },
       {
-        accessorKey: "practiced",
+        accessorKey: "latest_practiced",
         header: ({ column }) =>
           sortableHeader(column, "Practiced", setTunesRefreshId),
         cell: (info) => {
@@ -516,30 +543,50 @@ export function get_columns(
         size: 120,
       },
       {
-        accessorKey: "quality",
+        accessorKey: "latest_goal",
         header: ({ column }) =>
-          sortableHeader(column, "Quality", setTunesRefreshId),
+          sortableHeader(column, "Prev Goal", setTunesRefreshId),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
-        size: 12 * 8, // Approximate width for 11 characters
       },
       {
-        accessorKey: "easiness",
+        accessorKey: "latest_technique",
+        header: ({ column }) =>
+          sortableHeader(column, "Prev Alg", setTunesRefreshId),
+        cell: (info) => {
+          return info.getValue() ?? "sm2";
+        },
+        enableSorting: true,
+        enableHiding: true,
+      },
+      {
+        accessorKey: "latest_quality",
+        header: ({ column }) =>
+          sortableHeader(column, "Prev Qual", setTunesRefreshId),
+        cell: (info) => {
+          return info.getValue();
+        },
+        enableSorting: true,
+        enableHiding: true,
+        size: 12 * 9, // Approximate width for 11 characters
+      },
+      {
+        accessorKey: "latest_easiness",
         header: ({ column }) =>
           sortableHeader(column, "Easiness", setTunesRefreshId),
         cell: (info) => {
-          const value = info.getValue() as number;
-          return value.toFixed(2);
+          const value = info.getValue() as number | null;
+          return value ? value.toFixed(2) : "";
         },
         enableSorting: true,
         enableHiding: true,
         size: 14 * 8, // Approximate width for 11 characters
       },
       {
-        accessorKey: "interval",
+        accessorKey: "latest_interval",
         header: ({ column }) =>
           sortableHeader(column, "Interval", setTunesRefreshId),
         cell: (info) => {
@@ -550,7 +597,7 @@ export function get_columns(
         size: 13 * 8, // Approximate width for 11 characters
       },
       {
-        accessorKey: "repetitions",
+        accessorKey: "latest_repetitions",
         header: ({ column }) =>
           sortableHeader(column, "Repetitions", setTunesRefreshId),
         cell: (info) => {
@@ -561,9 +608,9 @@ export function get_columns(
         size: 16 * 8, // Approximate width for 11 characters
       },
       {
-        accessorKey: "review_date",
+        accessorKey: "latest_review_date",
         header: ({ column }) =>
-          sortableHeader(column, "Scheduled", setTunesRefreshId),
+          sortableHeader(column, "SR Scheduled", setTunesRefreshId),
         cell: (info) => {
           return transformToDatetimeLocalForDisplay(info.getValue() as string);
         },

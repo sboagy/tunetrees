@@ -23,7 +23,7 @@ type RowTechniqueComboBoxProps = {
 
 export function RowTechniqueComboBox(props: RowTechniqueComboBoxProps) {
   const { info, onTechniqueChange } = props;
-  const currentTechnique = info.row.original.technique;
+  const currentTechnique = info.row.original.latest_technique;
   const tuneId = info.row.original.id;
 
   const handleValueChange = (newValue: string) => {

@@ -112,6 +112,17 @@ async def root():
     return {"message": "Hello World"}
 
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and testing"""
+    return {
+        "status": "healthy",
+        "service": "tunetrees-api",
+        "version": "1.0.0",
+        "message": "TuneTrees API is running",
+    }
+
+
 @app.get("/hello/{name}")
 async def say_hello(name: str):
     logger.debug(f"(tunetrees/api/main.py (75): say_hello {name} invoked!)")

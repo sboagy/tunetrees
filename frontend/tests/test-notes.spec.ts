@@ -54,11 +54,14 @@ test("test-notes-1", async ({ page }) => {
   await expect(newNoteLocator).toBeEnabled();
   await newNoteLocator.click({ trial: true });
   await newNoteLocator.click();
+  await ttPO.page.waitForLoadState("domcontentloaded");
+  await ttPO.page.waitForTimeout(1000);
 
   const noteEditBoxLocator = page.locator(".jodit-wysiwyg");
   await expect(noteEditBoxLocator).toBeVisible();
   await expect(noteEditBoxLocator).toBeEditable();
   await noteEditBoxLocator.click();
+  await ttPO.page.waitForTimeout(1000);
 
   const newNoteText = "abcdef";
 

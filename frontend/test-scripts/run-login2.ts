@@ -40,13 +40,13 @@ export async function runLoginStandalone(
       return !btn.disabled;
     },
     await signInButton.elementHandle(),
-    { timeout: 2000 },
+    { timeout: 5000 }, // Increased timeout for CSRF token fetch
   );
 
   await signInButton.click();
 
   let sessionCookie: Cookie | undefined;
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 30; i++) {
     const cookies = await page.context().cookies();
     sessionCookie = cookies.find(
       (cookie) =>

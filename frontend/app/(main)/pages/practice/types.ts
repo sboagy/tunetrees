@@ -154,15 +154,15 @@ export interface ITuneOverview extends ITune {
   user_ref?: number | null;
   playlist_ref?: number | null;
   learned: string | null;
-  practiced: string | null;
-  quality: number | null;
-  easiness: number | null;
-  difficulty: number | null;
-  interval: number | null;
-  step: number | null;
-  repetitions: number | null;
-  review_date: string | null;
-  backup_practiced?: string | null;
+  latest_practiced: string | null;
+  latest_quality: number | null;
+  latest_easiness: number | null;
+  latest_difficulty: number | null;
+  latest_interval: number | null;
+  latest_step: number | null;
+  latest_repetitions: number | null;
+  latest_review_date: string | null; // Historical data - use scheduled for current scheduling
+  latest_backup_practiced?: string | null;
   external_ref?: string | null;
   tags?: string | null;
   recall_eval?: string | null;
@@ -171,7 +171,12 @@ export interface ITuneOverview extends ITune {
   playlist_deleted?: boolean | null;
   // Practice Goals fields (Issue #205)
   goal?: string | null;
-  technique?: string | null;
+  // Scheduled review date for this tune in this playlist (from playlist_tune table)
+  scheduled?: string | null;
+  // Latest technique from practice record (read-only display)
+  latest_technique?: string | null;
+  // Latest goal from practice record (read-only display)
+  latest_goal?: string | null;
 }
 
 export interface ITuneOverviewImported extends ITuneOverview {

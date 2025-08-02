@@ -183,48 +183,44 @@ export async function getTableStateTable(
     console.error("getTableStateTable: playlistId is invalid");
     throw new Error("getTableStateTable: playlistId is invalid");
   }
-  // Check if a write is in progress
-  if (tableStateMutex.isLocked()) {
-    console.log(`=> getTableStateTable (waitForUnlock): purpose=${purpose}`);
-    await tableStateMutex.waitForUnlock();
-    // Proceed with GET
-  }
 
-  try {
-    console.log(`=> getTableStateTable: purpose=${purpose}`);
-    const response = await client.get<ITableStateTable>(
-      `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
-    );
-    if (response.data === null) {
+  return tableStateMutex.runExclusive(async () => {
+    try {
+      console.log(`=> getTableStateTable: purpose=${purpose}`);
+      const response = await client.get<ITableStateTable>(
+        `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
+      );
+      if (response.data === null) {
+        console.log(
+          "getTableStateTable response is null, status: ",
+          response.status,
+        );
+        return null;
+      }
+      response.data.settings = JSON.parse(
+        response.data.settings as string,
+      ) as TableState;
+      const tableStateTable: ITableStateTable = response.data;
+      // rowSelection: ${JSON.stringify(tableStateTable.settings.rowSelection)}
+      const tableSettings = tableStateTable.settings as TableState;
       console.log(
-        "getTableStateTable response is null, status: ",
-        response.status,
+        `LF6: getTableStateTable: purpose=${purpose} playlistId=${playlistId}, currentTune=${tableStateTable.current_tune} rowSelection: ${JSON.stringify(tableSettings.rowSelection)}`,
       );
-      return null;
+      console.log("=> getTableStateTable response status: ", response.status);
+      return tableStateTable;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error(
+          `getTableStateTable error: ${error.response?.status} ${error.response?.data}`,
+        );
+      }
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null; // Return null for 404 status
+      }
+      console.error("getTableState error: ", error);
+      throw error;
     }
-    response.data.settings = JSON.parse(
-      response.data.settings as string,
-    ) as TableState;
-    const tableStateTable: ITableStateTable = response.data;
-    // rowSelection: ${JSON.stringify(tableStateTable.settings.rowSelection)}
-    const tableSettings = tableStateTable.settings as TableState;
-    console.log(
-      `LF6: getTableStateTable: purpose=${purpose} playlistId=${playlistId}, currentTune=${tableStateTable.current_tune} rowSelection: ${JSON.stringify(tableSettings.rowSelection)}`,
-    );
-    console.log("=> getTableStateTable response status: ", response.status);
-    return tableStateTable;
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error(
-        `getTableStateTable error: ${error.response?.status} ${error.response?.data}`,
-      );
-    }
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      return null; // Return null for 404 status
-    }
-    console.error("getTableState error: ", error);
-    throw error;
-  }
+  });
 }
 
 export async function getTableState(
@@ -491,58 +487,55 @@ export async function getTabGroupMainState(
   userId: number,
   playlistId: number,
 ): Promise<ITabGroupMainStateModel | null> {
-  if (tabGroupMainStateMutex.isLocked()) {
-    console.log(
-      `=> getTabGroupMainState (waitForUnlock): playlistId=${playlistId}`,
-    );
-    await tabGroupMainStateMutex.waitForUnlock();
-    // Proceed with GET
-  }
-
-  try {
-    let response = await client.get(`/tab_group_main_state/${userId}`);
-    console.log(
-      "getTabGroupMainState response status from GET: ",
-      response.status,
-    );
-    if (response.data === null) {
+  return tabGroupMainStateMutex.runExclusive(async () => {
+    try {
+      let response = await client.get(`/tab_group_main_state/${userId}`);
       console.log(
-        "getTabGroupMainState response.data is null, creating new tab group main state",
-      );
-
-      // const initialTabSpecString = JSON.stringify(initialTabSpec);
-      const tabGroupMainStateModel: Partial<ITabGroupMainStateModel> = {
-        user_id: userId,
-        which_tab: initialTabSpec[0].id,
-        // tab_spec: initialTabSpecString,
-        playlist_id: playlistId,
-      };
-      response = await client.post(
-        "/tab_group_main_state",
-        tabGroupMainStateModel,
-      );
-      console.log(
-        "getTabGroupMainState response status from POST: ",
+        "getTabGroupMainState response status from GET: ",
         response.status,
       );
-      if (!(response.status >= 200 && response.status < 300)) {
-        console.error("Error creating tab group main state:", response.status);
-        throw new Error("Error creating tab group main state");
+      if (response.data === null) {
+        console.log(
+          "getTabGroupMainState response.data is null, creating new tab group main state",
+        );
+
+        // const initialTabSpecString = JSON.stringify(initialTabSpec);
+        const tabGroupMainStateModel: Partial<ITabGroupMainStateModel> = {
+          user_id: userId,
+          which_tab: initialTabSpec[0].id,
+          // tab_spec: initialTabSpecString,
+          playlist_id: playlistId,
+        };
+        response = await client.post(
+          "/tab_group_main_state",
+          tabGroupMainStateModel,
+        );
+        console.log(
+          "getTabGroupMainState response status from POST: ",
+          response.status,
+        );
+        if (!(response.status >= 200 && response.status < 300)) {
+          console.error(
+            "Error creating tab group main state:",
+            response.status,
+          );
+          throw new Error("Error creating tab group main state");
+        }
       }
+      if (response.data.tab_spec !== null) {
+        response.data.tab_spec = JSON.parse(
+          response.data.tab_spec as string,
+        ) as ITabSpec[];
+      }
+      return response.data as ITabGroupMainStateModel;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        return null; // Return null for 404 status
+      }
+      console.error("getTabGroupMainState error: ", error);
+      throw error;
     }
-    if (response.data.tab_spec !== null) {
-      response.data.tab_spec = JSON.parse(
-        response.data.tab_spec as string,
-      ) as ITabSpec[];
-    }
-    return response.data as ITabGroupMainStateModel;
-  } catch (error) {
-    if (isAxiosError(error) && error.response?.status === 404) {
-      return null; // Return null for 404 status
-    }
-    console.error("getTabGroupMainState error: ", error);
-    throw error;
-  }
+  });
 }
 
 export async function updateTabGroupMainState(

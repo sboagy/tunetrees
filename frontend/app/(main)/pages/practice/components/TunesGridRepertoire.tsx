@@ -35,7 +35,7 @@ import {
 } from "./SitdownDateProvider";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
-import TunesGrid from "./TunesGrid";
+import TunesGrid, { acceptableDelinquencyWindow } from "./TunesGrid";
 
 type RepertoireGridProps = {
   userId: number;
@@ -322,7 +322,9 @@ export default function TunesGridRepertoire({
     // reviewSitdownDateNoHours has to go to the server, thus is set by useEffect.
     if (sitDownDate) {
       const lowerBoundReviewSitdownDate = new Date(sitDownDate);
-      lowerBoundReviewSitdownDate.setDate(sitDownDate.getDate() - 7);
+      lowerBoundReviewSitdownDate.setDate(
+        sitDownDate.getDate() - acceptableDelinquencyWindow,
+      );
       if (scheduledDate < lowerBoundReviewSitdownDate) {
         return "underline text-gray-300";
       }

@@ -68,8 +68,13 @@ profile = "black"
 [tool.ruff]
 line-length = 88
 target-version = "py38"
-select = ["E", "F", "W", "C90"]
-ignore = ["E501"]
 exclude = [
     "alembic/versions/*.py", # Exclude auto-generated migration files
 ]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "C90"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tunetrees/importer/makesets.py" = ["C901"] # Complex legacy importer functions

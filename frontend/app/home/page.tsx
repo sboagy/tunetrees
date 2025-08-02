@@ -9,7 +9,7 @@ const HomePage = async () => {
   const session: Session | null = await auth();
 
   if (!session) {
-    console.log("No session found (HomePage)");
+    // console.log("No session found (HomePage)");
     redirect("/");
   }
 
@@ -18,7 +18,7 @@ const HomePage = async () => {
     redirect("/");
   }
 
-  console.log("Session found! (HomePage)");
+  // console.log("Session found! (HomePage)");
 
   const userId = session?.user?.id ? Number.parseInt(session?.user?.id) : 1;
 
