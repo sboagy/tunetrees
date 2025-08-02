@@ -25,7 +25,7 @@
     "posttest": "npm run lint",
     "biome_lint": "npx @biomejs/biome lint --fix app lib components auth *.ts *.json",
     "biome_lint:fix": "npx @biomejs/biome check --organize-imports-enabled=true --fix app lib components auth *.ts *.json && npx prettier --write app lib components auth *.ts *.json",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --strict",
     "build:theme-script": "tsc -p tsconfig.theme-script.json",
     "prebuild": "npm run build:theme-script"
   },

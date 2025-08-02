@@ -314,7 +314,8 @@ export default function LoginDialog(): JSX.Element {
                     !!emailError ||
                     !!passwordError ||
                     !password ||
-                    !userEmail
+                    !userEmail ||
+                    !csrfToken // Add CSRF token check
                   }
                   className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
                   data-testid="login-submit-button"

@@ -153,6 +153,7 @@ export function TunesTableComponent({
             deleted: false,
             goal: true,
             latest_technique: false,
+            latest_goal: false,
           },
     );
 

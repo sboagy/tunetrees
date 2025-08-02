@@ -573,6 +573,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     latest_repetitions: Optional[int] = None
     latest_review_date: Optional[str] = None
     latest_technique: Optional[str] = None
+    latest_goal: Optional[str] = None
     tags: Optional[str] = None
     recall_eval: Optional[str] = None
     notes: Optional[str] = None
@@ -610,6 +611,7 @@ class PracticeListStagedModel(BaseModel):
     latest_review_date: Optional[str] = None
     latest_backup_practiced: Optional[str] = None
     latest_technique: Optional[str] = None
+    latest_goal: Optional[str] = None
     tags: Optional[str] = None
     purpose: Optional[str] = None
     note_private: Optional[str] = None

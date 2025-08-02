@@ -175,6 +175,8 @@ export interface ITuneOverview extends ITune {
   scheduled?: string | null;
   // Latest technique from practice record (read-only display)
   latest_technique?: string | null;
+  // Latest goal from practice record (read-only display)
+  latest_goal?: string | null;
 }
 
 export interface ITuneOverviewImported extends ITuneOverview {

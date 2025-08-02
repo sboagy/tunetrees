@@ -511,18 +511,12 @@ export function get_columns(
         header: ({ column }) =>
           sortableHeader(column, "Scheduled", setTunesRefreshId),
         cell: (info) => {
-          return transformToDatetimeLocalForDisplay(info.getValue() as string);
-        },
-        enableSorting: true,
-        enableHiding: true,
-        sortingFn: datetimeTextSortingFn,
-      },
-      {
-        accessorKey: "latest_review_date",
-        header: ({ column }) =>
-          sortableHeader(column, "Latest Review", setTunesRefreshId),
-        cell: (info) => {
-          return transformToDatetimeLocalForDisplay(info.getValue() as string);
+          const scheduled = info.getValue() as string | null | undefined;
+          const latestReview = info.row.original.latest_review_date ?? "";
+          if (!scheduled) {
+            return transformToDatetimeLocalForDisplay(latestReview);
+          }
+          return transformToDatetimeLocalForDisplay(scheduled);
         },
         enableSorting: true,
         enableHiding: true,
@@ -553,15 +547,35 @@ export function get_columns(
         size: 120,
       },
       {
-        accessorKey: "latest_quality",
+        accessorKey: "latest_goal",
         header: ({ column }) =>
-          sortableHeader(column, "Quality", setTunesRefreshId),
+          sortableHeader(column, "Prev Goal", setTunesRefreshId),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
-        size: 12 * 8, // Approximate width for 11 characters
+      },
+      {
+        accessorKey: "latest_technique",
+        header: ({ column }) =>
+          sortableHeader(column, "Prev Alg", setTunesRefreshId),
+        cell: (info) => {
+          return info.getValue() ?? "sm2";
+        },
+        enableSorting: true,
+        enableHiding: true,
+      },
+      {
+        accessorKey: "latest_quality",
+        header: ({ column }) =>
+          sortableHeader(column, "Prev Qual", setTunesRefreshId),
+        cell: (info) => {
+          return info.getValue();
+        },
+        enableSorting: true,
+        enableHiding: true,
+        size: 12 * 9, // Approximate width for 11 characters
       },
       {
         accessorKey: "latest_easiness",
@@ -596,6 +610,17 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 16 * 8, // Approximate width for 11 characters
+      },
+      {
+        accessorKey: "latest_review_date",
+        header: ({ column }) =>
+          sortableHeader(column, "SR Scheduled", setTunesRefreshId),
+        cell: (info) => {
+          return transformToDatetimeLocalForDisplay(info.getValue() as string);
+        },
+        enableSorting: true,
+        enableHiding: true,
+        sortingFn: datetimeTextSortingFn,
       },
       // {
       //   accessorKey: "backup_practiced",

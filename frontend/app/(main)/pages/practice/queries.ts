@@ -203,6 +203,8 @@ export async function getTunesOnlyIntoOverview(
       step: null,
       latest_difficulty: null,
       latest_step: null,
+      latest_technique: null,
+      latest_goal: null,
     }));
   } catch (error) {
     console.error("Error in getTunesOnly: ", error);
