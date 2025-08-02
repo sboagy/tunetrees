@@ -507,16 +507,12 @@ export function get_columns(
       TunesGridColumnGeneralType
     >[] = [
       {
-        accessorKey: "scheduled",
+        id: "scheduled",
+        accessorFn: (row) => row.scheduled || row.latest_review_date || "",
         header: ({ column }) =>
           sortableHeader(column, "Scheduled", setTunesRefreshId),
         cell: (info) => {
-          const scheduled = info.getValue() as string | null | undefined;
-          const latestReview = info.row.original.latest_review_date ?? "";
-          if (!scheduled) {
-            return transformToDatetimeLocalForDisplay(latestReview);
-          }
-          return transformToDatetimeLocalForDisplay(scheduled);
+          return transformToDatetimeLocalForDisplay(info.getValue() as string);
         },
         enableSorting: true,
         enableHiding: true,
