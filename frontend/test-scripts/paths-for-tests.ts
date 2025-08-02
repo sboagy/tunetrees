@@ -19,8 +19,11 @@ export const testDatabasePath = path.resolve(
   "tunetrees_test.sqlite3",
 );
 
-// Use the global Python installation bin directory
-export const venvBinDir = "/home/runner/.local/bin";
+// Use local .venv for development, CI path for CI environment
+export const venvBinDir =
+  process.env.CI === "true"
+    ? "/home/runner/.local/bin"
+    : path.resolve(backendDirPath, ".venv", "bin");
 
 // Use the global Python installation lib directory for PYTHONPATH
 export const venvLibDir: string = "";

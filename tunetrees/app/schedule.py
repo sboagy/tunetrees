@@ -300,10 +300,10 @@ def get_latest_practice_record(
             )
         )
         .order_by(PracticeRecord.id.desc())
+        .limit(1)
     )
-    row_result_tuple: Row[Tuple[PracticeRecord]] | None = db.execute(stmt).one_or_none()
-    if row_result_tuple is not None:
-        practice_record: PracticeRecord = row_result_tuple[0]
+    practice_record: PracticeRecord | None = db.execute(stmt).scalar_one_or_none()
+    if practice_record is not None:
         return practice_record
     else:
         # Return a new practice record with default values for a first-time tune

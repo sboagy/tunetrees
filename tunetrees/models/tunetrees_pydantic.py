@@ -685,6 +685,13 @@ class UserModel(BaseModel):
     image: Optional[str] = Field(default=None, alias="image")
     hash: Optional[str] = Field(default=None, alias="hash")
     sr_alg_type: Optional[str] = Field(default="FSRS")
+    phone: Optional[str] = Field(default=None, alias="phone")
+    phone_verified: Optional[datetime.datetime] = Field(
+        default=None, alias="phone_verified"
+    )
+    acceptable_delinquency_window: Optional[int] = Field(
+        default=21, alias="acceptable_delinquency_window"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -705,6 +712,13 @@ class UserModelPartial(BaseModel):
     image: Optional[str] = Field(default=None, alias="image")
     hash: Optional[str] = Field(default=None, alias="hash")
     sr_alg_type: Optional[str] = Field(default="FSRS")
+    phone: Optional[str] = Field(default=None, alias="phone")
+    phone_verified: Optional[datetime.datetime] = Field(
+        default=None, alias="phone_verified"
+    )
+    acceptable_delinquency_window: Optional[int] = Field(
+        default=21, alias="acceptable_delinquency_window"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 

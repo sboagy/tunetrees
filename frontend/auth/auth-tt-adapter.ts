@@ -66,6 +66,9 @@ const userExtendedAdapterSchema = z.object({
   name: z.string().optional().nullable(),
   image: z.string().optional(),
   view_settings: z.string().optional(),
+  phone: z.string().optional().nullable(),
+  phoneVerified: z.date().optional().nullable(),
+  acceptableDelinquencyWindow: z.number().optional(),
 });
 
 export const getUserExtendedByEmailSchema =
@@ -82,6 +85,9 @@ export interface IExtendedAdapterUser extends AdapterUser {
   hash?: string | null;
   view_settings?: string;
   image?: string;
+  phone?: string | null;
+  phoneVerified?: Date | null;
+  acceptableDelinquencyWindow?: number;
 }
 
 export interface IAdapterUserAndSession {
@@ -97,6 +103,10 @@ function userSerializer(res: IUser | null): IExtendedAdapterUser | null {
   if (res?.email_verified) {
     emailVerified = new Date(res.email_verified);
   }
+  let phoneVerified = null;
+  if (res?.phone_verified) {
+    phoneVerified = new Date(res.phone_verified);
+  }
   const serializedUser = {
     id: res?.id?.toString() ?? "",
     name: res?.name ?? "",
@@ -104,6 +114,9 @@ function userSerializer(res: IUser | null): IExtendedAdapterUser | null {
     image: res?.image,
     emailVerified: emailVerified,
     hash: res?.hash, // ugh, "next-auth-http-adapter" will strip this
+    phone: res?.phone,
+    phoneVerified: phoneVerified,
+    acceptableDelinquencyWindow: res?.acceptable_delinquency_window,
   };
   return serializedUser;
 }
@@ -193,6 +206,17 @@ function createTuneTreesHttpAdapter(): Adapter {
         if ("image" in user) {
           user4db.image = user.image as string;
         }
+        const userExt = user as IExtendedAdapterUser;
+        if (userExt.phone) {
+          user4db.phone = userExt.phone;
+        }
+        if (userExt.phoneVerified) {
+          user4db.phone_verified = userExt.phoneVerified.toISOString();
+        }
+        if (userExt.acceptableDelinquencyWindow) {
+          user4db.acceptable_delinquency_window =
+            userExt.acceptableDelinquencyWindow;
+        }
 
         const payload = await createUserInDatabase(user4db);
         const serialized = userSerializer(payload);
@@ -272,6 +296,16 @@ function createTuneTreesHttpAdapter(): Adapter {
         const userExt = user as IExtendedAdapterUser;
         if (userExt.hash) {
           user4db.hash = userExt.hash;
+        }
+        if (userExt.phone) {
+          user4db.phone = userExt.phone;
+        }
+        if (userExt.phoneVerified) {
+          user4db.phone_verified = userExt.phoneVerified.toISOString();
+        }
+        if (userExt.acceptableDelinquencyWindow) {
+          user4db.acceptable_delinquency_window =
+            userExt.acceptableDelinquencyWindow;
         }
         const isServer = typeof window === "undefined";
         console.log("===> auth-tt-adapter.ts:268 ~ isServer", isServer);

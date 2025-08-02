@@ -77,8 +77,12 @@ async function globalSetup() {
 
   const fastAPIFd = fs.openSync(fastAPILog, "a");
 
+  // Determine the Python executable path
+  const pythonExecutable =
+    process.env.CI === "true" ? "python" : path.join(venvBinDir, "python");
+
   const fastapiProcess: ChildProcess = spawn(
-    "python",
+    pythonExecutable,
     [
       "-m",
       "uvicorn",
