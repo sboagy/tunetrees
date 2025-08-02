@@ -36,7 +36,9 @@ type Props = {
 };
 
 // TODO: get acceptableDelinquencyWindow from user settings or context
-export const acceptableDelinquencyWindow = 7; // Default to 7 days
+export const acceptableDelinquencyWindow = Number(
+  process.env.NEXT_PUBLIC_ACCEPTABLE_DELINQUENCY_WINDOW ?? 7,
+);
 
 const TunesGrid = ({
   table,
