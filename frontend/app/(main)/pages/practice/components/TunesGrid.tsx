@@ -35,6 +35,9 @@ type Props = {
   newCount?: number | null;
 };
 
+// TODO: get acceptableDelinquencyWindow from user settings or context
+export const acceptableDelinquencyWindow = 7; // Default to 7 days
+
 const TunesGrid = ({
   table,
   userId,
