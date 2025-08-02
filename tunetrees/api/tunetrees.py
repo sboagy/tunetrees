@@ -94,15 +94,38 @@ DEBUG_SLOWDOWN = int(environ.get("DEBUG_SLOWDOWN", 0))
 
 @router.get(
     "/scheduled_tunes_overview/{user_id}/{playlist_ref}",
-    response_model=list[PlaylistTuneJoinedModel],
+    response_model=List[PlaylistTuneJoinedModel],
+    summary="Get Scheduled Tunes Overview",
+    description=(
+        "Retrieve an overview of scheduled tunes for a specific user and playlist. "
+        "Returns a list of scheduled tunes, including their joined playlist information, "
+        "for the given user and playlist reference. Supports filtering for deleted tunes and playlists, "
+        "and requires a review sitdown date to determine scheduling. The acceptable delinquency window "
+        "can be customized to adjust which tunes are considered delinquent."
+    ),
 )
 async def get_scheduled_tunes_overview(
-    user_id: str,
-    playlist_ref: str,
-    show_deleted: bool = Query(False),
-    show_playlist_deleted: bool = Query(False),
-    sitdown_date: datetime = Query(..., description="Review sitdown date is required"),
-) -> list[PlaylistTuneJoinedModel]:
+    user_id: int = Path(..., description="User identifier"),
+    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+    show_deleted: bool = Query(False, description="Include deleted tunes"),
+    show_playlist_deleted: bool = Query(
+        False, description="Include tunes from deleted playlists"
+    ),
+    sitdown_date: datetime = Query(
+        ..., description="Review sitdown date (timezone-aware, UTC recommended)"
+    ),
+    acceptable_delinquency_window: int = Query(
+        7, description="Acceptable delinquency window in days"
+    ),
+) -> List[PlaylistTuneJoinedModel]:
+    """
+    Retrieve an overview of scheduled tunes for a specific user and playlist.
+
+    Returns a list of scheduled tunes, including their joined playlist information,
+    for the given user and playlist reference. Supports filtering for deleted tunes and playlists,
+    and requires a review sitdown date to determine scheduling. The acceptable delinquency window
+    can be customized to adjust which tunes are considered delinquent.
+    """
     try:
         # FSRS requires dates to be timezoned, so ensure sitdown_date has a UTC timezone.
         if sitdown_date.tzinfo is None:
@@ -113,11 +136,12 @@ async def get_scheduled_tunes_overview(
             tunes_scheduled = query_practice_list_scheduled(
                 db,
                 limit=10,
-                user_ref=int(user_id),
-                playlist_ref=int(playlist_ref),
+                user_ref=user_id,
+                playlist_ref=playlist_ref,
                 show_deleted=show_deleted,
                 show_playlist_deleted=show_playlist_deleted,
                 review_sitdown_date=sitdown_date,
+                acceptable_delinquency_window=acceptable_delinquency_window,
             )
             validated_tune_list = [
                 PlaylistTuneJoinedModel.model_validate(tune) for tune in tunes_scheduled

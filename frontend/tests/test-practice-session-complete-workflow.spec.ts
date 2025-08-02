@@ -79,8 +79,12 @@ test.describe.serial("Practice Session Complete Workflow", () => {
     await expect(submitButton).toBeDisabled();
 
     // Step 4: Verify Goal and Technique columns are visible
-    await expect(page.locator("text=Goal")).toBeVisible();
-    // await expect(page.locator("text=Alogrighm")).toBeVisible();
+    const goalHeader = page.getByRole("cell", {
+      name: "Goal",
+      exact: true,
+    });
+
+    await expect(goalHeader).toBeVisible();
     console.log("Goal column confirmed visible");
 
     // Step 5: Get all recall quality dropdowns

@@ -57,7 +57,13 @@ export default defineConfig({
   },
 
   use: {
-    headless: !!process.env.CI, // Run tests in headed mode unless running in CI
+    // Run tests in headless mode if running in CI,
+    // otherwise use PLAYWRIGHT_HEADLESS env var (default: false)
+    headless: process.env.CI
+      ? true
+      : process.env.PLAYWRIGHT_HEADLESS
+        ? process.env.PLAYWRIGHT_HEADLESS === "true"
+        : false,
 
     /* Base URL to use in actions like `await page.goto('/')`. */
     // baseURL: 'http://127.0.0.1:3000',

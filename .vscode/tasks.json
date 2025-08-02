@@ -34,6 +34,43 @@
                 "clean_test_db",
                 "start_server"
             ]
+        },
+        {
+            "label": "Run Playwright Tests (Headless)",
+            "type": "shell",
+            "command": "./run-playwright-tests.sh",
+            "options": {
+                "env": {
+                    "cwd": "${workspaceFolder}/frontend",
+                    "PLAYWRIGHT_HEADLESS": "true"
+                }
+            },
+        },
+        {
+            "label": "Run Playwright Tests (Headed)",
+            "type": "shell",
+            "command": "./run-playwright-tests.sh",
+            "options": {
+                "cwd": "${workspaceFolder}/frontend"
+            },
+        },
+        {
+            "label": "git status",
+            "type": "shell",
+            "command": "git status",
+            "problemMatcher": []
+        },
+        {
+            "label": "check backend health",
+            "type": "shell",
+            "command": "curl -s \"http://localhost:8000/hello/me\" || echo \"Backend not running\"",
+            "problemMatcher": []
+        },
+        {
+            "label": "Wait for server to start and then check backendhealth",
+            "type": "shell",
+            "command": "sleep 3 && curl -s \"http://localhost:8000/hello/me\"",
+            "problemMatcher": []
         }
     ]
 }

@@ -32,7 +32,8 @@ test.describe.serial("Practice Goals E2E Tests", () => {
 
     // Verify goal and technique column headers are visible
     // Note: These appear as cells with text, not columnheader role
-    const goalHeader = page.getByRole("cell", { name: "Goal" });
+    // Use a more specific selector to avoid matching "Prev Goal"
+    const goalHeader = page.getByRole("cell", { name: "Goal", exact: true });
     // const techniqueHeader = page.getByRole("cell", {
     //   name: "Algorithm",
     // });

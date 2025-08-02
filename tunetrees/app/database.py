@@ -25,9 +25,9 @@ def check_integrity(db: Session, context_string: Optional[str] = "") -> None:
     try:
         result = db.execute(text("PRAGMA integrity_check;"))
         integrity_check = result.scalar()
-        assert (
-            integrity_check == "ok"
-        ), f"Integrity check failed{f' ({context_string})'}: {integrity_check}"
+        assert integrity_check == "ok", (
+            f"Integrity check failed{f' ({context_string})'}: {integrity_check}"
+        )
     except Exception as e:
         logger.error(f"Integrity check error{f' ({context_string})'}: {e}")
         raise

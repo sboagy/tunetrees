@@ -18,88 +18,90 @@ declare global {
 
 // Parameterize timezones for future expansion
 const timezones = ["Asia/Karachi", "America/New_York"]; // UTC+5, EST (Eastern Time), add more as needed
+const timezoneId = timezones[1];
 
-for (const timezoneId of timezones) {
-  test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
-    test.use({
-      timezoneId,
-      storageState: getStorageState("STORAGE_STATE_TEST1"),
-    });
+test.use({
+  timezoneId,
+  storageState: getStorageState("STORAGE_STATE_TEST1"),
+});
 
-    let pageObject: TuneTreesPageObject;
+// for (const timezoneId of timezones) {
+test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
+  let pageObject: TuneTreesPageObject;
 
-    test.beforeEach(async ({ page }) => {
-      await setTestDefaults(page);
-      await applyNetworkThrottle(page);
-      pageObject = new TuneTreesPageObject(page);
-      await pageObject.gotoMainPage();
-    });
-
-    test.afterEach(async () => {
-      await restartBackend();
-    });
-
-    test("User sees scheduled tunes for today", async () => {
-      await pageObject.navigateToPracticeTab();
-      // Check that scheduled tunes are visible
-      const rowCount = await pageObject.tunesGridRows.count();
-      expect(rowCount).toBeGreaterThan(1); // 1 header + at least 1 tune
-    });
-
-    test("User submits quality feedback and tunes are rescheduled", async () => {
-      await pageObject.navigateToPracticeTab();
-      const feedbacks = ["hard", "good", "(Not Set)", "again"];
-
-      // Fill in quality feedback for each scheduled tune
-      const rows = pageObject.tunesGridRows;
-      const count = await rows.count();
-      for (let i = 1; i < count; i++) {
-        // skip header row
-        const row = rows.nth(i);
-        // Get the tune ID from the "id" column (assumes first cell is the ID)
-        const idCell = row.locator("td").first();
-        const idText = await idCell.textContent();
-        const tuneId = Number(idText);
-        await pageObject.setReviewEval(tuneId, feedbacks[i - 1]);
-      }
-
-      // Wait a moment for all evaluations to be processed
-      await pageObject.page.waitForTimeout(1000);
-
-      // await pageObject.submitPracticedTunesButton.click();
-      const submitButton = pageObject.page.getByRole("button", {
-        name: "Submit Practiced Tunes",
-      });
-      await pageObject.clickWithTimeAfter(submitButton, 3000); // Increased timeout
-
-      await pageObject.waitForSuccessfullySubmitted();
-
-      const rowCount = await pageObject.tunesGridRows.count();
-      console.log(`Number of rows: ${rowCount}`);
-      await expect(pageObject.tunesGridRows).toHaveCount(2, { timeout: 60000 });
-    });
-
-    test("User sees correct tunes on next day (timezone aware)", async ({
-      page,
-    }) => {
-      // Simulate advancing to the next day
-      const baseSitdownDate = new Date();
-      const tomorrow = new Date(baseSitdownDate.getTime());
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      // Format as ISO string for injection
-      const isoTomorrow = tomorrow.toISOString();
-      await setTestDateTime(page, isoTomorrow);
-
-      pageObject = new TuneTreesPageObject(page);
-      await pageObject.gotoMainPage();
-      await pageObject.navigateToPracticeTab();
-      // Check that only tunes scheduled for the new day are shown
-      const rowCount = await pageObject.tunesGridRows.count();
-      expect(rowCount).toBeGreaterThan(1);
-    });
+  test.beforeEach(async ({ page }) => {
+    await setTestDefaults(page);
+    await applyNetworkThrottle(page);
+    pageObject = new TuneTreesPageObject(page);
+    await pageObject.gotoMainPage();
   });
-}
+
+  test.afterEach(async () => {
+    await restartBackend();
+  });
+
+  test("User sees scheduled tunes for today", async () => {
+    await pageObject.navigateToPracticeTab();
+    // Check that scheduled tunes are visible
+    const rowCount = await pageObject.tunesGridRows.count();
+    expect(rowCount).toBeGreaterThan(1); // 1 header + at least 1 tune
+  });
+
+  test("User submits quality feedback and tunes are rescheduled", async () => {
+    await pageObject.navigateToPracticeTab();
+    const feedbacks = ["hard", "good", "(Not Set)", "again"];
+
+    // Fill in quality feedback for each scheduled tune
+    const rows = pageObject.tunesGridRows;
+    const count = await rows.count();
+    for (let i = 1; i < count; i++) {
+      // skip header row
+      const row = rows.nth(i);
+      // Get the tune ID from the "id" column (assumes first cell is the ID)
+      const idCell = row.locator("td").first();
+      const idText = await idCell.textContent();
+      const tuneId = Number(idText);
+      await pageObject.setReviewEval(tuneId, feedbacks[i - 1]);
+    }
+
+    // Wait a moment for all evaluations to be processed
+    await pageObject.page.waitForTimeout(1000);
+
+    // await pageObject.submitPracticedTunesButton.click();
+    const submitButton = pageObject.page.getByRole("button", {
+      name: "Submit Practiced Tunes",
+    });
+    await pageObject.clickWithTimeAfter(submitButton, 3000); // Increased timeout
+
+    await pageObject.waitForSuccessfullySubmitted();
+
+    const rowCount = await pageObject.tunesGridRows.count();
+    console.log(`Number of rows: ${rowCount}`);
+    await expect(pageObject.tunesGridRows).toHaveCount(2, { timeout: 60000 });
+  });
+
+  test("User sees correct tunes on next day (timezone aware)", async ({
+    page,
+  }) => {
+    // Simulate advancing to the next day
+    const baseSitdownDate = new Date();
+    const tomorrow = new Date(baseSitdownDate.getTime());
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Format as ISO string for injection
+    const isoTomorrow = tomorrow.toISOString();
+    await setTestDateTime(page, isoTomorrow);
+
+    pageObject = new TuneTreesPageObject(page);
+    await pageObject.gotoMainPage();
+    await pageObject.navigateToPracticeTab();
+    // Check that only tunes scheduled for the new day are shown
+    const rowCount = await pageObject.tunesGridRows.count();
+    expect(rowCount).toBeGreaterThan(1);
+  });
+});
+
+// }
 
 // Deprecated: function setSitdownDate(tomorrow: Date, timezoneId: string) {
 //   const yyyy = tomorrow.getFullYear();

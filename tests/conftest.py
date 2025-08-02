@@ -20,6 +20,94 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         print(f"Active threads at session end: {threading_active}")
 
 
+def _setup_environment_variables(dst_path: Path) -> None:
+    """Set up environment variables for test database."""
+    import os
+
+    if not os.environ.get("TUNETREES_DB") and not os.environ.get("DATABASE_URL"):
+        os.environ["TUNETREES_DB"] = str(dst_path)
+        print(f"Set TUNETREES_DB to: {dst_path}")
+    else:
+        print("TUNETREES_DB or DATABASE_URL already set, not overriding")
+
+
+def _verify_source_database(src_path: Path) -> None:
+    """Verify source database exists and has required schema."""
+    if not src_path.exists():
+        print(f"✗ Source DB not found: {src_path}")
+        return
+
+    print(f"Source DB exists: {src_path}")
+    with sqlite3.connect(src_path) as conn:
+        cursor = conn.execute("PRAGMA table_info(practice_record)")
+        cols = [row[1] for row in cursor.fetchall()]
+        if "difficulty" in cols:
+            print("✓ Source DB has difficulty column in practice_record")
+        else:
+            print("✗ Source DB missing difficulty column in practice_record")
+
+
+def _reload_database_engine() -> None:
+    """Reload SQLAlchemy database engine with current environment variables."""
+    import os
+    from tunetrees.app import database
+
+    # Clear existing engine
+    if hasattr(database, "sqlalchemy_database_engine"):
+        database.sqlalchemy_database_engine.dispose()
+        print("Disposed existing SQLAlchemy engine")
+
+    # Recalculate database path
+    database.db_location_str = os.environ.get(
+        "TUNETREES_DB", os.environ.get("DATABASE_URL")
+    )
+    if not database.db_location_str:
+        return
+
+    database.db_location_str = database.db_location_str.strip()
+    if database.db_location_str.startswith("sqlite:///"):
+        database.db_location_str = database.db_location_str.replace("sqlite:///", "")
+
+    db_path = Path(database.db_location_str)
+    repo_root = Path(__file__).parent.parent
+    if not db_path.is_absolute():
+        database.db_location_path = repo_root.joinpath(db_path)
+    else:
+        database.db_location_path = db_path
+
+    database.SQLALCHEMY_DATABASE_URL = (
+        f"sqlite:///{database.db_location_path.absolute()}"
+    )
+
+    # Recreate engine
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    database.sqlalchemy_database_engine = create_engine(
+        database.SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    )
+    database.SessionLocalInternal = sessionmaker(
+        autocommit=False, autoflush=False, bind=database.sqlalchemy_database_engine
+    )
+    print(f"Recreated engine with URL: {database.SQLALCHEMY_DATABASE_URL}")
+
+
+def _verify_destination_database(dst_path: Path) -> None:
+    """Verify destination database was created correctly."""
+    if not dst_path.exists():
+        print(f"✗ Destination DB not found after copy: {dst_path}")
+        return
+
+    print(f"✓ Destination DB exists after copy: {dst_path}")
+    with sqlite3.connect(dst_path) as conn:
+        cursor = conn.execute("PRAGMA table_info(practice_record)")
+        cols = [row[1] for row in cursor.fetchall()]
+        if "difficulty" in cols:
+            print("✓ Destination DB has difficulty column in practice_record")
+        else:
+            print("✗ Destination DB missing difficulty column in practice_record")
+
+
 @pytest.fixture(autouse=True, scope="function")
 def reset_test_db():
     """Automatically copy the clean test DB before each test."""
@@ -27,35 +115,18 @@ def reset_test_db():
     src_path = repo_root / "tunetrees_test_clean.sqlite3"
     dst_path = repo_root / "tunetrees_test.sqlite3"
 
-    # Debug: Check if source file exists and has the difficulty column
-    if src_path.exists():
-        print(f"Source DB exists: {src_path}")
-        # Quick check for difficulty column in source
-        with sqlite3.connect(src_path) as conn:
-            cursor = conn.execute("PRAGMA table_info(practice_record)")
-            cols = [row[1] for row in cursor.fetchall()]
-            if "difficulty" in cols:
-                print("✓ Source DB has difficulty column in practice_record")
-            else:
-                print("✗ Source DB missing difficulty column in practice_record")
-    else:
-        print(f"✗ Source DB not found: {src_path}")
+    _setup_environment_variables(dst_path)
+    _verify_source_database(src_path)
 
     print(f"Copying test DB from {src_path} to {dst_path}")
     shutil.copyfile(src_path, dst_path)
 
-    # Debug: Verify the copy worked
-    if dst_path.exists():
-        print(f"✓ Destination DB exists after copy: {dst_path}")
-        with sqlite3.connect(dst_path) as conn:
-            cursor = conn.execute("PRAGMA table_info(practice_record)")
-            cols = [row[1] for row in cursor.fetchall()]
-            if "difficulty" in cols:
-                print("✓ Destination DB has difficulty column in practice_record")
-            else:
-                print("✗ Destination DB missing difficulty column in practice_record")
-    else:
-        print(f"✗ Destination DB not found after copy: {dst_path}")
+    try:
+        _reload_database_engine()
+    except Exception as e:
+        print(f"Warning: Could not reload database configuration: {e}")
+
+    _verify_destination_database(dst_path)
 
 
 @pytest.fixture(scope="session")

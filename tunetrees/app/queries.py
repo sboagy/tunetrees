@@ -106,27 +106,35 @@ def query_practice_list_scheduled(
     show_playlist_deleted=False,
 ) -> List[Row[Any]]:
     """Get a list of tunes to practice on the review_sitdown_date.
-    (This version uses the practice_list_joined view, instead of
-    constructing a view via the get_practice_list_query function.)
 
-    Get all tunes scheduled between the acceptable_delinquency_window and review_sitdown_date, but limit number to the `limit` var.
+    FIXED: Now uses playlist_tune.scheduled column for filtering with fallback to practice_record.latest_review_date.
+    This ensures scheduling is based on the current scheduled date (mutable) when available, but gracefully
+    falls back to historical practice record data during the transition period when scheduled column may be null.
+
+    Uses the practice_list_staged view to get all tunes scheduled between the
+    acceptable_delinquency_window and review_sitdown_date, limited by the `limit` parameter.
 
     Args:
-        db (Session): _description_
-        skip (int, optional): _description_. Defaults to 0.
-        limit (int, optional): _description_. Defaults to 10.
-        print_table (bool, optional): _description_. Defaults to False.
-        review_sitdown_date (_type_, optional): _description_. Defaults to datetime.today().
-        acceptable_delinquency_window (int, optional): _description_. Defaults to 7 days.
+        db (Session): Database session
+        skip (int, optional): Number of results to skip for pagination. Defaults to 0.
+        limit (int, optional): Maximum number of results to return. Defaults to 16.
+        print_table (bool, optional): Whether to print debug table. Defaults to False.
+        review_sitdown_date (datetime, optional): Target practice date. Defaults to now().
+        acceptable_delinquency_window (int, optional): Days before sitdown_date to include. Defaults to 7.
         playlist_ref (int, optional): The playlist ID to filter on. Defaults to 1.
         user_ref (int, optional): The user ID to filter on. Defaults to 1.
+        show_deleted (bool, optional): Whether to include deleted tunes. Defaults to True.
+        show_playlist_deleted (bool, optional): Whether to include tunes from deleted playlists. Defaults to False.
 
     Returns:
-        List[Tune]: tunes scheduled between the acceptable_delinquency_window and review_sitdown_date, but limit number to the `limit` var.
+        List[Row[Any]]: Tunes scheduled for practice within the specified time window.
     """
     if review_sitdown_date is None:
         review_sitdown_date = datetime.now(timezone.utc)
         print("review_sitdown_date is None, using today: ", review_sitdown_date)
+    else:
+        print("review_sitdown_date: ", review_sitdown_date)
+
     assert isinstance(review_sitdown_date, datetime)
 
     # This is really strange, but it seems to be necessary to add a
@@ -140,13 +148,22 @@ def query_practice_list_scheduled(
         days=acceptable_delinquency_window
     )
 
-    # Create the query
+    # Create the query - FIXED: Use scheduled column with fallback to latest_review_date
+    # This handles the transition period where scheduled column may be null
     try:
         filters = [
             t_practice_list_staged.c.user_ref == user_ref,
             t_practice_list_staged.c.playlist_id == playlist_ref,
-            t_practice_list_staged.c.review_date > lower_bound_date,
-            t_practice_list_staged.c.review_date <= review_sitdown_date,
+            func.coalesce(
+                t_practice_list_staged.c.scheduled,
+                t_practice_list_staged.c.latest_review_date,
+            )
+            > lower_bound_date.strftime("%Y-%m-%d %H:%M:%S"),
+            func.coalesce(
+                t_practice_list_staged.c.scheduled,
+                t_practice_list_staged.c.latest_review_date,
+            )
+            <= review_sitdown_date.strftime("%Y-%m-%d %H:%M:%S"),
         ]
         if not show_deleted:
             filters.append(t_practice_list_staged.c.deleted.is_(False))
@@ -162,7 +179,12 @@ def query_practice_list_scheduled(
         raise
 
     scheduled_rows_query_sorted = practice_list_query.order_by(
-        func.DATE(t_practice_list_staged.c.review_date).desc()
+        func.DATE(
+            func.coalesce(
+                t_practice_list_staged.c.scheduled,
+                t_practice_list_staged.c.latest_review_date,
+            )
+        ).desc()
     )
     # scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
     scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip)

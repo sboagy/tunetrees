@@ -313,6 +313,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
   }
 
   async openTuneEditorForCurrentTune(): Promise<void> {
+    await this.page.waitForLoadState("domcontentloaded");
     await this.sidebarButton.waitFor({
       state: "attached",
       timeout: 60000,

@@ -43,6 +43,7 @@ services:
       # NEXT_PUBLIC_TT_BASE_URL: https://tunetrees.com
       NEXTAUTH_URL_INTERNAL: http://frontend:3000
       # AUTH_TRUST_HOST: ${AUTH_TRUST_HOST}
+      NEXT_PUBLIC_ACCEPTABLE_DELINQUENCY_WINDOW: 21
     ports:
       - 3000:3000
     networks:

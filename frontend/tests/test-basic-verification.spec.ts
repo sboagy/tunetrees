@@ -26,6 +26,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
+  await page.waitForLoadState("domcontentloaded");
 });
 
 test.afterEach(async ({ page }, testInfo) => {

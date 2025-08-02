@@ -180,10 +180,10 @@ export default function SignInPage(): JSX.Element {
   const router = useRouter();
 
   // Memoize password strength calculation to prevent excessive re-renders
+  const watchedPassword = form.watch("password") || "";
   const passwordStrength = useMemo(() => {
-    const password = form.watch("password") || "";
-    return calculatePasswordStrength(password);
-  }, [form.watch("password")]);
+    return calculatePasswordStrength(watchedPassword);
+  }, [watchedPassword]);
 
   const onSubmitHandler = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);

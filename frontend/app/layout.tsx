@@ -24,10 +24,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/jodit@5.2.15/esm/jodit.min.css"
-        />
+        <link rel="stylesheet" href="/jodit.min.css" />
         <ThemeScriptNoFlash />
       </head>
       <body className={`${inter.className} h-full`}>

@@ -35,6 +35,30 @@ test.afterEach(async ({ page }, testInfo) => {
   logTestEnd(testInfo);
 });
 
+// Helper function to clear existing sorts (e.g., Scheduled/Latest Review column)
+import type { Page } from "@playwright/test";
+
+async function clearExistingSorts(ttPO: TuneTreesPageObject, page: Page) {
+  console.log(
+    "Clearing Scheduled/Latest Review column sorting to avoid multi-column interference...",
+  );
+  await expect(ttPO.LatestReviewColumnHeaderSortButton).toBeVisible({
+    timeout: 15000,
+  });
+  await expect(ttPO.LatestReviewColumnHeaderSortButton).toBeVisible();
+
+  // Click the Scheduled/Latest Review column to cycle through its sort states until unsorted
+  // Scheduled is likely pre-sorted ascending, so: asc → desc → unsorted
+  await ttPO.LatestReviewColumnHeaderSortButton.click();
+  await page.waitForTimeout(500);
+  await ttPO.LatestReviewColumnHeaderSortButton.click(); // Should now be unsorted
+  await page.waitForTimeout(500);
+
+  console.log(
+    "Latest Review column cleared, now testing multi-column sorting...",
+  );
+}
+
 test.describe.serial("TuneGrid Regression Tests", () => {
   test("test-column-sorting-arrows-functionality", async ({ page }) => {
     // Navigate to main page first, then repertoire tab using the working pattern
@@ -52,23 +76,8 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     await ttPO.scrollToTuneById(947);
     await page.waitForTimeout(1000);
 
-    // CRITICAL: Clear the Scheduled column sorting first (it's pre-sorted)
-    // This prevents multi-column sorting confusion where Scheduled takes precedence
-    console.log(
-      "Clearing Scheduled column sorting to avoid multi-column interference...",
-    );
-    await expect(ttPO.scheduledColumnHeader).toBeVisible({ timeout: 15000 });
-    await expect(ttPO.scheduledColumnHeaderSortButton).toBeVisible();
-
-    // Click the Scheduled column to cycle through its sort states until unsorted
-    // This ensures it shows double arrows (ArrowUpDown) and doesn't interfere
-    // Scheduled is likely pre-sorted ascending, so: asc → desc → unsorted
-    await ttPO.scheduledColumnHeaderSortButton.click();
-    await page.waitForTimeout(500);
-    await ttPO.scheduledColumnHeaderSortButton.click(); // Should now be unsorted
-    await page.waitForTimeout(500);
-
-    console.log("Scheduled column cleared, now testing ID column sorting...");
+    // ... inside your test:
+    await clearExistingSorts(ttPO, page);
 
     // Find the ID column header with sorting arrow
     await expect(ttPO.idColumnHeader).toBeVisible({ timeout: 15000 });
@@ -174,24 +183,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     const tunesGrid = page.locator("table").first();
     await expect(tunesGrid).toBeVisible({ timeout: 15000 });
 
-    // CRITICAL: Clear the Scheduled column sorting first (it's pre-sorted)
-    // This prevents multi-column sorting confusion where Scheduled takes precedence
-    console.log(
-      "Clearing Scheduled column sorting to avoid multi-column interference...",
-    );
-    await expect(ttPO.scheduledColumnHeader).toBeVisible({ timeout: 15000 });
-    await expect(ttPO.scheduledColumnHeaderSortButton).toBeVisible();
-
-    // Click the Scheduled column to cycle through its sort states until unsorted
-    // Scheduled is likely pre-sorted ascending, so: asc → desc → unsorted
-    await ttPO.scheduledColumnHeaderSortButton.click();
-    await page.waitForTimeout(500);
-    await ttPO.scheduledColumnHeaderSortButton.click(); // Should now be unsorted
-    await page.waitForTimeout(500);
-
-    console.log(
-      "Scheduled column cleared, now testing multi-column sorting...",
-    );
+    await clearExistingSorts(ttPO, page);
 
     // Test sorting by Type column first using Page Object locators
     await expect(ttPO.typeColumnHeader).toBeVisible({ timeout: 15000 });

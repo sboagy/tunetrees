@@ -30,6 +30,8 @@ export class TuneTreesPageObject {
   readonly idColumnHeaderSortButton;
   readonly scheduledColumnHeader;
   readonly scheduledColumnHeaderSortButton;
+  readonly LatestReviewColumnHeader;
+  readonly LatestReviewColumnHeaderSortButton;
   readonly typeColumnHeader;
   readonly typeColumnHeaderSortButton;
   readonly titleColumnHeader;
@@ -129,6 +131,12 @@ export class TuneTreesPageObject {
     this.scheduledColumnHeaderSortButton = page
       .getByRole("cell", { name: "Scheduled", exact: true })
       .getByRole("button");
+    this.LatestReviewColumnHeader = page
+      .getByRole("cell", { name: "SR Scheduled", exact: true })
+      .locator("div");
+    this.LatestReviewColumnHeaderSortButton = page
+      .getByRole("cell", { name: "SR Scheduled", exact: true })
+      .getByRole("button");
     this.typeColumnHeader = page
       .getByRole("cell", { name: "Type", exact: true })
       .locator("div");
@@ -185,6 +193,10 @@ export class TuneTreesPageObject {
   async gotoMainPage() {
     await checkHealth();
 
+    // Set up error and network monitoring before navigation
+    this.setupConsoleErrorHandling();
+    this.setupNetworkFailureHandling();
+
     await this.page.goto(this.pageLocation, {
       timeout: initialPageLoadTimeout,
       waitUntil: "domcontentloaded", // More reliable than networkidle in CI
@@ -195,6 +207,8 @@ export class TuneTreesPageObject {
 
     const pageContent = await this.page.content();
     console.log("Page content after goto:", pageContent.slice(0, 500)); // Log first 500 chars for inspection
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(1000);
 
     // Use CI-aware timeout: longer in CI environment for reliability
     const tableStatusTimeout = process.env.CI ? 120_000 : 25_000;
@@ -212,6 +226,8 @@ export class TuneTreesPageObject {
       tableStatusText,
     );
     await this.waitForTablePopulationToStart();
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(1000);
   }
 
   async waitForTablePopulationToStart() {
@@ -243,10 +259,13 @@ export class TuneTreesPageObject {
       state: "visible",
     });
     await this.repertoireTabTrigger.click();
+    await this.page.waitForTimeout(100);
 
     await this.filterInput.waitFor({ state: "visible" });
     await this.filterInput.waitFor({ state: "attached" });
     await this.filterInput.click();
+    await this.page.waitForTimeout(100);
+    await this.page.waitForLoadState("domcontentloaded");
 
     await this.page.waitForTimeout(1000);
     await this.filterInput.fill(tuneTitle, { timeout: 90_000 });
@@ -424,23 +443,43 @@ export class TuneTreesPageObject {
       throw new Error("No login credentials found");
     }
 
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(1000);
+
     const topSignInButton = this.page.getByRole("button", { name: "Sign in" });
     await topSignInButton.waitFor({ state: "visible" });
     await expect(topSignInButton).toBeEnabled({ timeout: 50_000 });
     await topSignInButton.click();
 
-    // Wait for the login dialog to appear
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(2000); // Increased wait for form to fully load
+
+    // Wait for the login dialog to appear and all form elements to be ready
     const userEmailLocator = this.page.getByTestId("user_email");
     await userEmailLocator.waitFor({ state: "visible", timeout: 50_000 });
-    await userEmailLocator.fill(user || "");
-    await userEmailLocator.press("Tab");
+
+    // Wait for the password field to also be present to ensure form is fully loaded
     const passwordEntryBox = this.page.getByTestId("user_password");
+    await passwordEntryBox.waitFor({ state: "visible", timeout: 50_000 });
+
+    // Wait for the form element to be present to ensure all hidden fields (including CSRF) are loaded
+    const loginForm = this.page.locator("form").first();
+    await loginForm.waitFor({ state: "attached", timeout: 10_000 });
+
+    // Wait for any hidden CSRF tokens or form setup to complete
+    await this.page.waitForTimeout(1500);
+
+    await userEmailLocator.fill(user || "", { timeout: 5000 });
+    await this.page.waitForTimeout(10); // helps with the crsf token being set
+    await userEmailLocator.press("Tab");
     await passwordEntryBox.fill(pw || "");
+
     const dialogSignInButton = this.page.getByRole("button", {
       name: "Sign In",
       exact: true,
     });
     await passwordEntryBox.press("Tab");
+    await this.page.waitForTimeout(10);
 
     await this.page.waitForFunction(
       (button) => {
@@ -562,19 +601,97 @@ export class TuneTreesPageObject {
     // Set up error handling for console errors
     this.page.on("console", (msg) => {
       if (msg.type() === "error") {
-        console.log("Browser console error:", msg.text());
+        const errorText = msg.text();
+        const location = msg.location();
+        const timestamp = new Date().toISOString();
+
+        console.log(`[${timestamp}] Browser console error:`, errorText);
+        console.log(
+          `  Location: ${location.url}:${location.lineNumber}:${location.columnNumber}`,
+        );
+
+        // Enhanced logging for fetch errors
+        if (
+          errorText.includes("Failed to fetch") ||
+          errorText.includes("TypeError: Failed to fetch")
+        ) {
+          console.log("  ⚠️  FETCH ERROR DETECTED");
+          console.log(`  Error details: ${errorText}`);
+          console.log(`  URL where error occurred: ${location.url}`);
+        }
+      }
+      if (msg.type() === "warning") {
+        console.log("Browser console warning:", msg.text());
       }
     });
   }
 
   setupNetworkFailureHandling(): void {
+    // Define expected HTTPS-related errors from experimental Next.js setup
+    // These errors are expected when running the app with HTTPS on localhost
+    // and should not be treated as failures in tests.
+    // They are filtered out to avoid cluttering the test logs.
+    // This is particularly relevant for Next.js apps running with experimental features.
+    // See: https://nextjs.org/docs/app/api-reference/cli/next#using-https-during-development
+    const expectedHttpsErrors = [
+      "net::ECONNRESET",
+      "net::ERR_ABORTED",
+      "net::ERR_CERT_AUTHORITY_INVALID",
+      "net::ERR_CERT_COMMON_NAME_INVALID",
+    ];
+
+    const isDebugMode = process.env.PLAYWRIGHT_DEBUG_NETWORK === "true";
+
     // Listen for network failures
     this.page.on("requestfailed", (request) => {
-      console.log(
-        "Network request failed:",
-        request.url(),
-        request.failure()?.errorText,
+      const errorText = request.failure()?.errorText ?? "";
+      const url = request.url();
+      const method = request.method();
+      const timestamp = new Date().toISOString();
+
+      // Check if this is an expected HTTPS error from localhost
+      const isExpectedHttpsError = expectedHttpsErrors.some((error) =>
+        errorText.includes(error),
       );
+      const isLocalhostRequest = url.includes("https://localhost:3000");
+
+      if (isExpectedHttpsError && isLocalhostRequest) {
+        // Only log in debug mode for expected errors
+        if (isDebugMode) {
+          console.log("(DEBUG) Filtered expected HTTPS error:", url, errorText);
+        }
+      } else {
+        // Log unexpected network failures with enhanced details
+        console.log(`[${timestamp}] 🚨 Network request failed:`);
+        console.log(`  Method: ${method}`);
+        console.log(`  URL: ${url}`);
+        console.log(`  Error: ${errorText}`);
+
+        // Check if this is a backend API call
+        if (url.includes("localhost:8000") || url.includes("/tunetrees/")) {
+          console.log("  ⚠️  BACKEND API FAILURE - This is likely your issue!");
+          console.log(
+            `  🔍 API Endpoint: ${url.split("/tunetrees/")[1] || "unknown"}`,
+          );
+        }
+      }
+    });
+
+    // Listen for response errors (like 500 status codes)
+    this.page.on("response", (response) => {
+      if (response.status() >= 400) {
+        const timestamp = new Date().toISOString();
+        console.log(
+          `[${timestamp}] HTTP ${response.status()} error: ${response.url()}`,
+        );
+
+        // Enhanced logging for backend errors
+        if (response.url().includes("localhost:8000")) {
+          console.log(
+            `  🚨 Backend server error - Status: ${response.status()}`,
+          );
+        }
+      }
     });
   }
 }
