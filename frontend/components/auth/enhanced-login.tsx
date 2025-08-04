@@ -66,7 +66,11 @@ export default function EnhancedLoginPage() {
         setEmailMessage("Check your email for a verification link!");
       }
     } catch (error) {
-      setEmailError("An unexpected error occurred. Please try again.");
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      if (error && typeof error === "object" && "message" in error) {
+        errorMessage = `An unexpected error occurred: ${(error as { message: string }).message}. Please try again.`;
+      }
+      setEmailError(errorMessage);
     } finally {
       setIsEmailLoading(false);
     }
