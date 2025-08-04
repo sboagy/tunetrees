@@ -21,7 +21,7 @@ sniffio ~= 1.3.1           # Detect which async library is being used
 
 # Authentication & Configuration
 python-dotenv >= 1.0.1     # Load environment variables from .env files
-twilio ~= 9.3.7            # SMS and communication service API
+twilio ~= 9.7.0            # SMS and communication service API
 
 # Spaced Repetition Algorithms
 fsrs~=6.1.0                # Free Spaced Repetition Scheduler algorithm
