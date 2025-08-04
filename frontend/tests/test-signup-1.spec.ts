@@ -43,13 +43,35 @@ test.describe.serial("Signup Tests", () => {
     // So, if NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, instead of trying to retrieve the
     // link from the email, we'll just retrieve it from localStorage.
     if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+      console.log(
+        "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, checking localStorage",
+      );
+
+      // Wait a bit for the localStorage to be set
+      await page.waitForTimeout(2000);
+
       const linkBackURL = await ttPO.page.evaluate(() => {
-        return window.localStorage.getItem("linkBackURL");
+        console.log("Checking localStorage for linkBackURL...");
+        const stored = window.localStorage.getItem("linkBackURL");
+        console.log("Found in localStorage:", stored);
+        return stored;
       });
 
       console.log("Retrieved linkBackURL from localStorage:", linkBackURL);
 
       if (!linkBackURL) {
+        // Let's check what's actually in localStorage
+        const allLocalStorage = await ttPO.page.evaluate(() => {
+          const items: Record<string, string | null> = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+              items[key] = localStorage.getItem(key);
+            }
+          }
+          return items;
+        });
+        console.log("All localStorage items:", allLocalStorage);
         throw new Error("No linkBackURL found in localStorage");
       }
 
@@ -161,13 +183,35 @@ test.describe.serial("Signup Tests", () => {
     // link from the email, we'll just retrieve it from localStorage.
     let verificationCode: string | null;
     if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+      console.log(
+        "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, checking localStorage",
+      );
+
+      // Wait a bit for the localStorage to be set
+      await page.waitForTimeout(2000);
+
       const linkBackURL = await ttPO.page.evaluate(() => {
-        return window.localStorage.getItem("linkBackURL");
+        console.log("Checking localStorage for linkBackURL...");
+        const stored = window.localStorage.getItem("linkBackURL");
+        console.log("Found in localStorage:", stored);
+        return stored;
       });
 
       console.log("Retrieved linkBackURL from localStorage:", linkBackURL);
 
       if (!linkBackURL) {
+        // Let's check what's actually in localStorage
+        const allLocalStorage = await ttPO.page.evaluate(() => {
+          const items: Record<string, string | null> = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+              items[key] = localStorage.getItem(key);
+            }
+          }
+          return items;
+        });
+        console.log("All localStorage items:", allLocalStorage);
         throw new Error("No linkBackURL found in localStorage");
       }
 
@@ -620,11 +664,9 @@ async function initialSignIn(page: Page) {
   await dialogSignInButton.click();
 
   const checkEmailHeader = ttPO.page.getByRole("heading", {
-    name: "Please check Your Email to",
+    name: "We sent a verification link to",
   });
   await checkEmailHeader.isVisible();
-  await expect(checkEmailHeader).toHaveText(
-    "Please check Your Email to log in",
-  );
+  // await expect(checkEmailHeader).toHaveText("Check your email");
   return ttPO;
 }

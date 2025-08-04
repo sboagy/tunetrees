@@ -198,17 +198,30 @@ export default function SignInPage(): JSX.Element {
 
       const result = await newUser(data, host);
       console.log(`newUser status result ${result.status}`);
+      console.log(`newUser linkBackURL result ${result.linkBackURL}`);
+      console.log(
+        `NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION value: ${process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION}`,
+      );
 
       if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
         const linkBackURL = result.linkBackURL;
+        console.log(`Setting linkBackURL in localStorage: ${linkBackURL}`);
         // Store the linkBackURL in local storage for testing purposes
         if (typeof window !== "undefined") {
           localStorage.setItem("linkBackURL", linkBackURL);
+          console.log("Successfully stored linkBackURL in localStorage");
+          // Verify it was stored
+          const stored = localStorage.getItem("linkBackURL");
+          console.log(`Verification - retrieved from localStorage: ${stored}`);
         } else {
           console.log(
             "onSubmit(): window is undefined, cannot store linkBackURL for playwright tests",
           );
         }
+      } else {
+        console.log(
+          `NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is not "true", it is: ${process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION}`,
+        );
       }
 
       router.push(`/auth/verify-request?email=${data.email}`);
