@@ -128,6 +128,7 @@ export function SMSVerificationOption({
 
   const handleBackToPhone = () => {
     setStep("phone");
+    setPhone(""); // Clear phone number on reset
     setCode("");
     setError(null);
     setMessage(null);
@@ -228,7 +229,7 @@ export function SMSVerificationOption({
           onClick={handleBackToPhone}
           className="flex-1"
           disabled={disabled || isLoading}
-          data-testid="sms-back-button"
+          data-testid="sms-reset-button"
         >
           Back
         </Button>
@@ -236,7 +237,7 @@ export function SMSVerificationOption({
           onClick={() => void handleVerifyCode()}
           disabled={disabled || isLoading || !code.trim()}
           className="flex-1"
-          data-testid="sms-verify-button"
+          data-testid="sms-verify-code-button"
         >
           {isLoading ? (
             <>

@@ -47,7 +47,7 @@ export function SmsLogin({ onSuccess }: ISMSLoginProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ phone: phone.trim() }),
+        body: JSON.stringify({ phone: phone.trim(), isSignup: true }),
       });
 
       const data = await response.json();

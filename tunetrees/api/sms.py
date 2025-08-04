@@ -68,10 +68,6 @@ async def send_sms_verification(
 ) -> SMSVerificationResponse:
     """Send SMS verification code using Twilio Verify API"""
     try:
-        verify_service_sid = os.getenv("TWILIO_VERIFY_SERVICE_SID")
-        if not verify_service_sid:
-            raise HTTPException(status_code=500, detail="Verify service not configured")
-
         # Check if user with this phone exists
         with SessionLocal() as db:
             stmt = select(orm.User).where(orm.User.phone == request.phone)
@@ -85,6 +81,11 @@ async def send_sms_verification(
 
         # Use Twilio Verify API to send verification
         if os.getenv("NODE_ENV") == "production":
+            verify_service_sid = os.getenv("TWILIO_VERIFY_SERVICE_SID")
+            if not verify_service_sid:
+                raise HTTPException(
+                    status_code=500, detail="Verify service not configured"
+                )
             client = get_twilio_client()
             try:
                 verification = client.verify.services(
@@ -383,12 +384,14 @@ async def send_sms_verification_signup(
 ) -> SMSVerificationResponse:
     """Send SMS verification code for signup (doesn't require existing user)"""
     try:
-        verify_service_sid = os.getenv("TWILIO_VERIFY_SERVICE_SID")
-        if not verify_service_sid:
-            raise HTTPException(status_code=500, detail="Verify service not configured")
-
         # Use Twilio Verify API to send verification
         if os.getenv("NODE_ENV") == "production":
+            verify_service_sid = os.getenv("TWILIO_VERIFY_SERVICE_SID")
+            if not verify_service_sid:
+                raise HTTPException(
+                    status_code=500, detail="Verify service not configured"
+                )
+
             client = get_twilio_client()
             try:
                 verification = client.verify.services(
