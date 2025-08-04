@@ -17,9 +17,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { VerificationMethodSelector } from "@/components/auth/verification-method-selector";
+import { SMSVerificationOption } from "@/components/auth/sms-verification-option";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft, Mail, Phone } from "lucide-react";
 import Link from "next/link";
 import type { JSX } from "react";
 import { useState } from "react";
@@ -38,6 +38,9 @@ export default function PasswordResetPage(): JSX.Element {
   const [isSuccess, setIsSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<"email" | "sms">(
+    "email",
+  );
 
   const form = useForm<PasswordResetRequestValues>({
     resolver: zodResolver(passwordResetRequestSchema),
@@ -76,10 +79,6 @@ export default function PasswordResetPage(): JSX.Element {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleEmailMethod = () => {
-    void onEmailSubmit(form.getValues());
   };
 
   const handleSMSReset = async (phone: string) => {
@@ -149,20 +148,97 @@ export default function PasswordResetPage(): JSX.Element {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-4">
-        <VerificationMethodSelector
-          title="Reset Your Password"
-          description="Choose how you'd like to receive password reset instructions"
-          emailButtonText="Send Reset Email"
-          smsButtonText="Send Reset via SMS"
-          smsDescription="Enter your phone number to receive a password reset code"
-          onEmailMethod={handleEmailMethod}
-          onSMSVerified={(phone) => void handleSMSReset(phone)}
-          onError={handleError}
-          emailDisabled={isLoading}
-          smsDisabled={isLoading}
-          showSMS={true}
-        />
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl">Reset Your Password</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Choose how you'd like to receive password reset instructions
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Method Selection Tabs */}
+              <div className="flex space-x-2">
+                <Button
+                  type="button"
+                  variant={selectedMethod === "email" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setSelectedMethod("email")}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  Email
+                </Button>
+                <Button
+                  type="button"
+                  variant={selectedMethod === "sms" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setSelectedMethod("sms")}
+                >
+                  <Phone className="mr-2 h-4 w-4" />
+                  SMS
+                </Button>
+              </div>
 
+              {/* Email Reset Form */}
+              {selectedMethod === "email" && (
+                <Form {...form}>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void form.handleSubmit(onEmailSubmit)();
+                    }}
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email Address</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="email"
+                              placeholder="Enter your email address"
+                              disabled={isLoading}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Sending..." : "Send Reset Email"}
+                    </Button>
+                  </form>
+                </Form>
+              )}
+
+              {/* SMS Reset Form */}
+              {selectedMethod === "sms" && (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Enter your phone number to receive a password reset code
+                  </p>
+                  <SMSVerificationOption
+                    onVerificationSuccess={(phone) =>
+                      void handleSMSReset(phone)
+                    }
+                    onError={handleError}
+                    disabled={isLoading}
+                    buttonText={isLoading ? "Sending..." : "Send Reset via SMS"}
+                  />
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Error Display */}
         {errorMessage && (
           <Card className="border-red-200">
             <CardContent className="pt-6">
@@ -175,39 +251,7 @@ export default function PasswordResetPage(): JSX.Element {
           </Card>
         )}
 
-        <Card>
-          <CardContent className="pt-6">
-            <Form {...form}>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void handleEmailMethod();
-                }}
-                className="space-y-4"
-              >
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Or enter email directly:</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="email"
-                          placeholder="Enter your email"
-                          disabled={isLoading}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-
+        {/* Back to Login Link */}
         <div className="text-center">
           <Link href="/auth/login">
             <Button variant="ghost" className="w-full">
