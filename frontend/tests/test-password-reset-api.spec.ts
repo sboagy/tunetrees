@@ -145,7 +145,11 @@ test.describe("Password Reset Integration Tests", () => {
     const submitButton = page.locator('button[type="submit"]');
 
     await emailInput.fill("sboagy@example.com"); // Known test user
+    await submitButton.isEnabled();
+    await page.waitForTimeout(1000);
     await submitButton.click();
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1000);
 
     // Step 3: Verify success message
     await expect(

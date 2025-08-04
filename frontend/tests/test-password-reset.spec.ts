@@ -33,21 +33,77 @@ test.afterEach(async ({ page }, testInfo) => {
 });
 
 test.describe("Password Reset Request Flow", () => {
-  test("should display password reset request form", async ({ page }) => {
+  test("should display password reset request form with method selection", async ({
+    page,
+  }) => {
     await page.goto("/auth/password-reset");
     await page.waitForLoadState("domcontentloaded");
 
-    // Check page title and form elements
+    // Check page title
     await expect(page.locator("h1, h2, h3")).toContainText("Reset");
+
+    // Check method selection buttons are visible - use more specific selectors
+    await expect(
+      page
+        .locator('button[type="button"]')
+        .filter({ hasText: "Email" })
+        .first(),
+    ).toBeVisible();
+    await expect(
+      page.locator('button[type="button"]').filter({ hasText: "SMS" }),
+    ).toBeVisible();
+
+    // By default, email method should be selected and form visible
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
 
     console.log("Password reset form is displayed correctly");
   });
 
+  test("should switch between email and SMS methods", async ({ page }) => {
+    await page.goto("/auth/password-reset");
+    await page.waitForLoadState("domcontentloaded");
+
+    // Start with email selected (default)
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+
+    // Click SMS tab - use more specific selector
+    await page
+      .locator('button[type="button"]')
+      .filter({ hasText: "SMS" })
+      .click();
+
+    // Should now show SMS form and hide email form
+    await expect(page.locator('input[type="email"]')).not.toBeVisible();
+    await expect(
+      page.getByText(
+        "Enter your phone number to receive a password reset code",
+      ),
+    ).toBeVisible();
+
+    // Switch back to email - use more specific selector
+    await page
+      .locator('button[type="button"]')
+      .filter({ hasText: "Email" })
+      .first()
+      .click();
+
+    // Should show email form again
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+
+    console.log("Method switching works correctly");
+  });
+
   test("should validate email format", async ({ page }) => {
     await page.goto("/auth/password-reset");
     await page.waitForLoadState("domcontentloaded");
+
+    // Ensure email method is selected - use more specific selector
+    await page
+      .locator('button[type="button"]')
+      .filter({ hasText: "Email" })
+      .first()
+      .click();
 
     const emailInput = page.locator('input[type="email"]');
     const submitButton = page.locator('button[type="submit"]');
@@ -72,11 +128,18 @@ test.describe("Password Reset Request Flow", () => {
     console.log("Email validation works correctly");
   });
 
-  test("should show success message after form submission", async ({
+  test("should show success message after email form submission", async ({
     page,
   }) => {
     await page.goto("/auth/password-reset");
     await page.waitForLoadState("domcontentloaded");
+
+    // Ensure email method is selected - use more specific selector
+    await page
+      .locator('button[type="button"]')
+      .filter({ hasText: "Email" })
+      .first()
+      .click();
 
     const emailInput = page.locator('input[type="email"]');
     const submitButton = page.locator('button[type="submit"]');
