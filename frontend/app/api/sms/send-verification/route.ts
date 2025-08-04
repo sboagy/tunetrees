@@ -1,7 +1,7 @@
 // API route to send SMS verification codes
 // This proxies requests to the backend SMS service
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {

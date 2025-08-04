@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { createVerificationTokenInDatabase } from "@/auth/auth-fetch";
-import crypto from "crypto";
+import crypto from "node:crypto";
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         personalizations: [{ to: [{ email: email }] }],
         from: { email: "admin@tunetrees.com" },
-        subject: `Verify your email for TuneTrees`,
+        subject: "Verify your email for TuneTrees",
         content: [
           {
             type: "text/plain",
