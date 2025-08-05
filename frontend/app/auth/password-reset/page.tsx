@@ -99,10 +99,10 @@ export default function PasswordResetPage(): JSX.Element {
         throw new Error(errorData.message || "Failed to send reset code");
       }
 
-      setSuccessMessage(
-        "If an account with that phone number exists, we've sent you a password reset code.",
-      );
-      setIsSuccess(true);
+      // Redirect to SMS password reset verification page
+      window.location.href = `/auth/sms-password-reset?phone=${encodeURIComponent(
+        phone,
+      )}`;
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "An error occurred",

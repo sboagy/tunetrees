@@ -21,6 +21,8 @@ export const newUser = async (
 ): Promise<{
   status: string;
   linkBackURL: string;
+  smsVerificationRequired?: boolean;
+  phone?: string;
 }> => {
   const email = data.email;
   console.log("newUser data: ", data);
@@ -57,7 +59,7 @@ export const newUser = async (
   const user: Partial<IExtendedAdapterUser> = {
     name: data.name,
     email: email,
-
+    phone: data.phone || null, // Include phone if provided
     hash: bcrypt.hashSync(data.password, bcrypt.genSaltSync()),
   };
 
@@ -122,6 +124,42 @@ export const newUser = async (
     // },
   });
   console.log("Email sent:", sendGridResponse);
+
+  // If user provided a phone number, send SMS verification too
+  if (data.phone) {
+    try {
+      const smsResponse = await fetch(
+        `${process.env.TT_API_BASE_URL || "http://localhost:8000"}/sms/send-verification-signup`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            phone: data.phone,
+          }),
+        },
+      );
+
+      if (smsResponse.ok) {
+        return {
+          status: `User created successfully. Verification email sent to ${email}. SMS verification sent to ${data.phone}.`,
+          linkBackURL: linkBackURL,
+          smsVerificationRequired: true,
+          phone: data.phone,
+        };
+      } else {
+        console.error(
+          "Failed to send SMS verification:",
+          await smsResponse.text(),
+        );
+        // Continue with email-only verification
+      }
+    } catch (error) {
+      console.error("SMS verification error:", error);
+      // Continue with email-only verification
+    }
+  }
 
   return {
     status: `User created successfully.  Verification email sent to ${email}.`,

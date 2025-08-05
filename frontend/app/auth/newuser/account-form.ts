@@ -51,6 +51,20 @@ export const accountFormSchema = z
       .max(30, {
         message: "Name must not be longer than 30 characters.",
       }),
+    phone: z
+      .string()
+      .optional()
+      .refine(
+        (phone) => {
+          if (!phone || phone.trim() === "") return true; // Optional field
+          // Basic phone validation - allow international formats
+          const phoneRegex = /^[+]?[1-9][\d]{0,15}$/;
+          return phoneRegex.test(phone.replace(/[\s\-()]/g, ""));
+        },
+        {
+          message: "Please enter a valid phone number",
+        },
+      ),
     //   dob: z.date({
     //     required_error: "A date of birth is required.",
     //   }),

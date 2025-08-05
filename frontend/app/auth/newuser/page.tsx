@@ -70,6 +70,7 @@ export default function SignInPage(): JSX.Element {
       password: "", // Add initial value for password
       password_confirmation: "", // Add initial value for password_confirmation
       name: "", // Add initial value for name
+      phone: "", // Add initial value for phone
       csrfToken: "", // Initialize with empty string
     },
   });
@@ -177,6 +178,14 @@ export default function SignInPage(): JSX.Element {
     field.onChange(e); // Update the form state
   };
 
+  const handlePhoneChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "phone">,
+  ) => {
+    console.log("handlePhoneChange: phone:", e.target.value);
+    field.onChange(e); // Update the form state
+  };
+
   const router = useRouter();
 
   // Memoize password strength calculation to prevent excessive re-renders
@@ -224,7 +233,18 @@ export default function SignInPage(): JSX.Element {
         );
       }
 
-      router.push(`/auth/verify-request?email=${data.email}`);
+      // Check if SMS verification is required
+      if (result.smsVerificationRequired && result.phone && data.phone) {
+        // Redirect to SMS verification page
+        router.push(
+          `/auth/sms-signup-verification?email=${encodeURIComponent(
+            data.email,
+          )}&phone=${encodeURIComponent(data.phone)}`,
+        );
+      } else {
+        // Redirect to email verification page
+        router.push(`/auth/verify-request?email=${data.email}`);
+      }
     } catch (error) {
       console.error("Signup error:", error);
       setEmailError("An error occurred during sign up. Please try again.");
@@ -405,6 +425,25 @@ export default function SignInPage(): JSX.Element {
                         {...field}
                         onChange={(e) => handleUserNameChange(e, field)}
                         data-testid="user_name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="tel"
+                        placeholder="+1 (555) 123-4567"
+                        {...field}
+                        onChange={(e) => handlePhoneChange(e, field)}
+                        data-testid="user_phone"
                       />
                     </FormControl>
                     <FormMessage />
