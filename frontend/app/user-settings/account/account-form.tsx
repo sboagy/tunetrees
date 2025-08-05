@@ -23,6 +23,7 @@ import type { ControllerRenderProps } from "react-hook-form";
 //   accountFormSchema,
 // } from "@/app/auth/newuser/account-form";
 import { PasswordInput } from "@/components/PasswordInput";
+import { SMSVerificationOption } from "@/components/auth/sms-verification-option";
 import { useRouter } from "next/navigation";
 import { emailSchema } from "@/app/auth/auth-types";
 import { getUser } from "@/app/auth/login/validate-signin";
@@ -39,7 +40,7 @@ import {
 // };
 
 export function AccountForm() {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
   let email = session?.user?.email;
 
   // const searchParams = useSearchParams();
@@ -55,6 +56,7 @@ export function AccountForm() {
       password: "", // Add initial value for password
       password_confirmation: "", // Add initial value for password_confirmation
       name: session?.user?.name || "", // Add initial value for name, empty string if null
+      phone: (session?.user as { phone?: string } | undefined)?.phone || "", // Add initial value for phone
       csrfToken: "", // Initialize with empty string
     },
   });
@@ -71,6 +73,34 @@ export function AccountForm() {
     })();
   }, []);
 
+  // Fetch user data from database to populate form fields, especially phone number
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+  useEffect(() => {
+    void (async () => {
+      if (email) {
+        console.log("Initial fetch: Getting user data for email:", email);
+        const userData = await getUser(email);
+        console.log("Initial fetch: Got user data:", userData);
+        if (userData) {
+          // Update form fields with database data
+          if (userData.phone) {
+            console.log("Initial fetch: Setting phone to:", userData.phone);
+            form.setValue("phone", userData.phone);
+            setStoredPhoneNumber(userData.phone);
+          }
+          if (userData.name) {
+            form.setValue("name", userData.name);
+          }
+          console.log(
+            "Initial fetch: phoneVerified status:",
+            userData.phoneVerified,
+          );
+          setPhoneVerified(!!userData.phoneVerified);
+        }
+      }
+    })();
+  }, [email, form]);
+
   if (email === "" && typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
     email = searchParams.get("email") || email;
@@ -81,6 +111,40 @@ export function AccountForm() {
   const [passwordConfirmationError, setPasswordConfirmationError] = useState<
     string | null
   >(null);
+  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState<boolean>(false);
+  const [storedPhoneNumber, setStoredPhoneNumber] = useState<string>("");
+
+  // Function to refresh user data from database
+  const refreshUserData = useCallback(async () => {
+    if (email) {
+      console.log("refreshUserData: Fetching user data for email:", email);
+      const userData = await getUser(email);
+      console.log("refreshUserData: Got user data:", userData);
+      if (userData) {
+        // Update form fields with latest database data
+        if (userData.phone) {
+          form.setValue("phone", userData.phone);
+          setStoredPhoneNumber(userData.phone);
+        }
+        if (userData.name) {
+          form.setValue("name", userData.name);
+        }
+        // Update session with latest phone verification status
+        console.log(
+          "refreshUserData: Updating session with phone_verified:",
+          !!userData.phoneVerified,
+        );
+        setPhoneVerified(!!userData.phoneVerified);
+        await update({
+          user: {
+            phone: userData.phone,
+            phone_verified: !!userData.phoneVerified,
+          },
+        });
+      }
+    }
+  }, [email, form, update]);
 
   const validateEmail = useCallback((email: string): boolean => {
     if (email === "") {
@@ -160,6 +224,31 @@ export function AccountForm() {
   ) => {
     console.log("handleUserNameChange: name:", e.target.value);
     field.onChange(e); // Update the form state
+  };
+
+  const handlePhoneChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "phone">,
+  ) => {
+    const newPhone = e.target.value;
+    console.log("handlePhoneChange: phone:", newPhone);
+    field.onChange(e); // Update the form state
+
+    // Force form to update immediately
+    form.setValue("phone", newPhone);
+
+    // Show verification if user enters a different phone number
+    const trimmedPhone = newPhone.trim();
+    if (trimmedPhone && trimmedPhone !== storedPhoneNumber) {
+      setShowPhoneVerification(true);
+      setPhoneVerified(false); // New number needs verification
+    } else if (trimmedPhone === storedPhoneNumber) {
+      setShowPhoneVerification(false);
+      setPhoneVerified(true); // Same as stored verified number
+    } else {
+      setShowPhoneVerification(false);
+      setPhoneVerified(false); // Empty field
+    }
   };
 
   const router = useRouter();
@@ -340,6 +429,88 @@ export function AccountForm() {
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Phone Number (Optional)</FormLabel>
+              <FormControl>
+                <Input
+                  type="tel"
+                  placeholder="+1 (555) 123-4567"
+                  {...field}
+                  onChange={(e) => handlePhoneChange(e, field)}
+                  data-testid="user_phone"
+                />
+              </FormControl>
+              <FormMessage />
+              {phoneVerified && form.watch("phone") && (
+                <p className="text-sm text-green-600">
+                  ✓ Phone number verified - SMS password reset available
+                </p>
+              )}
+              {field.value && !phoneVerified && (
+                <p className="text-sm text-yellow-600">
+                  Phone number not verified. SMS password reset will not be
+                  available.
+                </p>
+              )}
+            </FormItem>
+          )}
+        />
+
+        {/* Phone Verification Section - Only show when user enters a different number */}
+        {showPhoneVerification && form.watch("phone") && (
+          <div className="space-y-4 border rounded-lg p-4 bg-muted/5">
+            <h3 className="text-sm font-medium">Verify New Phone Number</h3>
+            <p className="text-sm text-muted-foreground">
+              You've entered a new phone number. Please verify it to enable SMS
+              password reset.
+            </p>
+            {(() => {
+              const currentPhone = form.watch("phone");
+              console.log(
+                "SMSVerificationOption receiving initialPhone:",
+                currentPhone,
+              );
+              return null;
+            })()}
+            <SMSVerificationOption
+              initialPhone={form.watch("phone")}
+              userEmail={session?.user?.email || ""}
+              onVerificationSuccess={(phone) => {
+                console.log("New phone verified:", phone);
+                setShowPhoneVerification(false);
+                form.setValue("phone", phone);
+                setStoredPhoneNumber(phone);
+                setPhoneVerified(true);
+                // Refresh user data to get updated phone data
+                void refreshUserData();
+              }}
+              onError={(error) => {
+                console.error("Phone verification error:", error);
+              }}
+              buttonText="Send Verification Code"
+              description="We'll send a verification code to confirm your new phone number"
+              isSignup={false}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowPhoneVerification(false);
+                // Reset to stored phone number
+                form.setValue("phone", storedPhoneNumber);
+                setPhoneVerified(!!storedPhoneNumber);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+
         <Button
           type="submit"
           variant="secondary"
