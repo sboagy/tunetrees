@@ -598,8 +598,8 @@ test.describe.serial("Signup Tests", () => {
     const userEmailLocator = ttPO.page.getByTestId("user_email");
     await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
 
-    // Use a unique email for this test
-    const testEmail = `unverified.retry.${Date.now()}@example.com`;
+    // Use a unique email for this test (keep under 30 characters)
+    const testEmail = `retry.${Date.now().toString().slice(-6)}@ex.com`;
 
     // Fill out signup form
     await userEmailLocator.fill(testEmail);
@@ -625,7 +625,7 @@ test.describe.serial("Signup Tests", () => {
 
     // Verify we get to the verification page
     const checkEmailHeader = ttPO.page.getByRole("heading", {
-      name: "We sent a verification link to",
+      name: "Check your email",
     });
     await expect(checkEmailHeader).toBeVisible();
 
