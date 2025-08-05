@@ -574,6 +574,97 @@ test.describe.serial("Signup Tests", () => {
       "===> test-signup-1.spec.ts ~ Password validation test - form submission completed",
     );
   });
+
+  test("test-unverified-user-retry-signup", async ({ page }) => {
+    console.log(
+      "===> test-signup-1.spec.ts ~ Test unverified user retry signup scenario",
+    );
+    const ttPO = new TuneTreesPageObject(page);
+
+    await checkHealth();
+    await page.goto("https://localhost:3000", {
+      timeout: initialPageLoadTimeout,
+      waitUntil: "domcontentloaded",
+    });
+
+    // First, attempt initial signup
+    const topSignInButton = ttPO.page.getByRole("button", {
+      name: "New user",
+    });
+    await topSignInButton.waitFor({ state: "visible" });
+    await topSignInButton.click();
+
+    // Wait for the signup dialog to appear
+    const userEmailLocator = ttPO.page.getByTestId("user_email");
+    await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
+
+    // Use a unique email for this test
+    const testEmail = `unverified.retry.${Date.now()}@example.com`;
+
+    // Fill out signup form
+    await userEmailLocator.fill(testEmail);
+    const userNameBox = ttPO.page.getByTestId("user_name");
+    await userNameBox.fill("Unverified Test User");
+
+    const passwordEntryBox = ttPO.page.getByTestId("user_password");
+    const passwordVerificationBox = ttPO.page.getByTestId(
+      "user_password_verification",
+    );
+
+    const testPassword = "TestPass123!";
+    await passwordEntryBox.fill(testPassword);
+    await passwordVerificationBox.fill(testPassword);
+
+    // Submit the first signup attempt
+    const dialogSignInButton = ttPO.page.getByRole("button", {
+      name: "Sign Up",
+      exact: true,
+    });
+    await expect(dialogSignInButton).toBeEnabled();
+    await dialogSignInButton.click();
+
+    // Verify we get to the verification page
+    const checkEmailHeader = ttPO.page.getByRole("heading", {
+      name: "We sent a verification link to",
+    });
+    await expect(checkEmailHeader).toBeVisible();
+
+    console.log(
+      "First signup attempt completed, user created but not verified",
+    );
+
+    // Now simulate user closing browser/navigating away and trying to sign up again
+    await page.goto("https://localhost:3000", {
+      timeout: initialPageLoadTimeout,
+      waitUntil: "domcontentloaded",
+    });
+
+    // Attempt signup again with the same email
+    await topSignInButton.waitFor({ state: "visible" });
+    await topSignInButton.click();
+
+    await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
+    await userEmailLocator.fill(testEmail); // Same email as before
+    await userNameBox.fill("Unverified Test User Retry");
+
+    await passwordEntryBox.fill(testPassword);
+    await passwordVerificationBox.fill(testPassword);
+
+    // This signup attempt should succeed (unverified user should be deleted and replaced)
+    await expect(dialogSignInButton).toBeEnabled();
+    await dialogSignInButton.click();
+
+    // Should successfully reach verification page again
+    await expect(checkEmailHeader).toBeVisible();
+
+    console.log(
+      "Second signup attempt with same email succeeded - unverified user was properly cleaned up",
+    );
+
+    console.log(
+      "===> test-signup-1.spec.ts ~ Unverified user retry signup test completed",
+    );
+  });
 });
 
 async function processPlaylistDialog(page: Page) {

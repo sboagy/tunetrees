@@ -40,9 +40,50 @@ export const newUser = async (
   const existingUser = await getUserExtendedByEmail(email);
 
   if (existingUser) {
-    // TODO:  This should be an dialog box, to the user, giving them the
-    // option to reset their password, or to have the email resent.
-    throw new Error(`User already exists for ${email}.`);
+    console.log(
+      `Found existing user for ${email}:`,
+      JSON.stringify({
+        id: existingUser.id,
+        email: existingUser.email,
+        emailVerified: existingUser.emailVerified,
+        emailVerifiedType: typeof existingUser.emailVerified,
+      }),
+    );
+
+    // Check if the existing user has verified their email
+    if (existingUser.emailVerified) {
+      console.log(`User ${email} is verified, blocking signup`);
+      // User exists and is verified - this is a legitimate conflict
+      // TODO: This should be a dialog box, giving them options to reset password or resend email
+      throw new Error(
+        `User already exists for ${email}. If this is your account, please use the sign-in page or reset your password.`,
+      );
+    } else {
+      console.log(`User ${email} is NOT verified, proceeding with cleanup`);
+      // User exists but email is not verified - they likely abandoned signup
+      // Delete the unverified user to allow them to complete registration
+      console.log(
+        `Removing unverified user account for ${email} to allow signup completion`,
+      );
+
+      if (!ttHttpAdapter.deleteUser) {
+        throw new Error("ttHttpAdapter.deleteUser is not defined.");
+      }
+
+      try {
+        await ttHttpAdapter.deleteUser(existingUser.id);
+        console.log(
+          `Successfully removed unverified user ${existingUser.id} for ${email}`,
+        );
+      } catch (error) {
+        console.error(
+          `Failed to delete unverified user: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+        throw new Error(
+          `Unable to complete signup. Please contact support if this issue persists.`,
+        );
+      }
+    }
   }
 
   if (!ttHttpAdapter.createUser) {

@@ -128,8 +128,12 @@ export default function SignInPage(): JSX.Element {
 
     if (newEmail) {
       const user = await getUser(newEmail);
-      if (user) {
+      if (user && user.emailVerified) {
+        // Only show error for verified users - unverified users can be cleaned up during signup
         setEmailError("Email already in use");
+      } else {
+        // Clear any existing email error if user is unverified or doesn't exist
+        setEmailError(null);
       }
     }
   };

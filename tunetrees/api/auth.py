@@ -288,7 +288,22 @@ async def delete_user(id: str) -> None:
         with SessionLocal() as db:
             orm_user = db.get(UserModel, id)
             if orm_user:
+                # Before deleting the user, clean up any verification tokens for their email
+                if orm_user.email:
+                    stmt = select(orm.VerificationToken).where(
+                        orm.VerificationToken.identifier == orm_user.email
+                    )
+                    result = db.execute(stmt)
+                    verification_tokens = result.scalars().all()
+                    for token in verification_tokens:
+                        logger.info(
+                            f"Deleting verification token for {orm_user.email} during user cleanup"
+                        )
+                        db.delete(token)
+
+                # Now delete the user
                 db.delete(orm_user)
+                db.commit()
             else:
                 raise HTTPException(status_code=404, detail="User Not Found")
 
@@ -298,6 +313,7 @@ async def delete_user(id: str) -> None:
         raise
     except Exception as e:
         logger.error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occurred")
         raise HTTPException(status_code=500, detail="Unknown error occured")
 
 
