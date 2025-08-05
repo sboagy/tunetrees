@@ -40,7 +40,11 @@ export async function POST(request: NextRequest) {
     });
 
     // Send password reset email
-    const resetUrl = `${process.env.NEXTAUTH_URL}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+    const baseUrl =
+      process.env.NEXTAUTH_URL ||
+      process.env.NEXT_BASE_URL ||
+      "https://localhost:3000";
+    const resetUrl = `${baseUrl}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
     await sendGrid({
       to: email,
