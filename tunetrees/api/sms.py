@@ -317,6 +317,75 @@ async def send_sms_password_reset(request: SMSVerificationRequest):
         )
 
 
+@router.post("/verify-password-reset", response_model=SMSVerificationResponse)
+async def verify_sms_password_reset(verification: SMSVerificationCode):
+    """Verify SMS code for password reset and generate reset token"""
+    import time
+    from datetime import datetime, timezone, timedelta
+
+    try:
+        verify_service_sid = os.getenv("TWILIO_VERIFY_SERVICE_SID")
+        if not verify_service_sid:
+            raise HTTPException(status_code=500, detail="Verify service not configured")
+
+        # Verify code with Twilio Verify API
+        if os.getenv("NODE_ENV") == "production":
+            client = get_twilio_client()
+            verification_check = client.verify.services(
+                verify_service_sid
+            ).verification_checks.create(to=verification.phone, code=verification.code)
+
+            if verification_check.status != "approved":
+                raise HTTPException(status_code=401, detail="Invalid verification code")
+        else:
+            # For development, accept any 6-digit code for testing
+            if len(verification.code) != 6 or not verification.code.isdigit():
+                raise HTTPException(
+                    status_code=401, detail="Invalid verification code format"
+                )
+            logger.info(
+                f"SMS password reset verification accepted for {verification.phone} (development mode)"
+            )
+
+        # Look up user by phone number
+        with SessionLocal() as db:
+            stmt = select(orm.User).where(orm.User.phone == verification.phone)
+            user = db.execute(stmt).scalar_one_or_none()
+
+            if not user:
+                raise HTTPException(
+                    status_code=404, detail="No account found with this phone number"
+                )
+
+            # Create temporary reset token (valid for 15 minutes)
+            reset_token = str(int(time.time() * 1000))  # Use timestamp as token
+            expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+
+            # Create verification token for password reset
+            from tunetrees.models.tunetrees import VerificationToken
+
+            verification_token = VerificationToken(
+                identifier=user.email, token=reset_token, expires=expires
+            )
+            db.add(verification_token)
+            db.commit()
+
+            logger.info(
+                f"SMS password reset verification successful for user {user.id}, phone {verification.phone}"
+            )
+
+            return SMSVerificationResponse(
+                success=True,
+                message=f"Password reset verified. Use token {reset_token} to reset password.",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying SMS password reset: {e}")
+        raise HTTPException(status_code=500, detail="Failed to verify password reset")
+
+
 @router.post("/verify-signup", response_model=SMSVerificationResponse)
 async def verify_sms_signup(
     request: SMSSignupVerificationRequest,
@@ -437,3 +506,78 @@ async def send_sms_verification_signup(
     except Exception as e:
         logger.error(f"Error sending SMS signup verification: {e}")
         raise HTTPException(status_code=500, detail="Failed to send verification code")
+
+
+class SMSUserPhoneRequest(BaseModel):
+    user_email: str = Field(description="Email of the existing user")
+    phone: str = Field(description="Phone number to add/verify")
+
+
+class SMSUserPhoneVerificationRequest(BaseModel):
+    user_email: str = Field(description="Email of the existing user")
+    phone: str = Field(description="Phone number being verified")
+    code: str = Field(description="Verification code")
+
+
+@router.post("/send-verification-user-phone", response_model=SMSVerificationResponse)
+async def send_sms_verification_user_phone(
+    request: SMSUserPhoneRequest,
+) -> SMSVerificationResponse:
+    """Send SMS verification code for adding phone to existing user account"""
+    from .sms_user_utils import (
+        verify_user_exists,
+        send_production_sms,
+        log_development_mode,
+    )
+
+    try:
+        verify_user_exists(request.user_email)
+
+        # Use Twilio Verify API to send verification
+        if os.getenv("NODE_ENV") == "production":
+            send_production_sms(request.phone, request.user_email)
+        else:
+            log_development_mode(request.phone, request.user_email)
+
+        return SMSVerificationResponse(
+            success=True, message="Verification code sent to your phone"
+        )
+
+    except HTTPException as e:
+        logger.error(f"HTTP error sending SMS user phone verification: {e.detail}")
+        raise
+    except Exception as e:
+        logger.error(f"Error sending SMS user phone verification: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send verification code")
+
+
+@router.post("/verify-user-phone", response_model=SMSVerificationResponse)
+async def verify_user_phone(
+    request: SMSUserPhoneVerificationRequest,
+) -> SMSVerificationResponse:
+    """Verify SMS code and add phone number to existing user account"""
+    from .sms_user_utils import (
+        verify_production_code,
+        verify_development_code,
+        update_user_phone,
+    )
+
+    try:
+        # Verify the code using appropriate method
+        if os.getenv("NODE_ENV") == "production":
+            verify_production_code(request.phone, request.code)
+        else:
+            verify_development_code(request.phone, request.code)
+
+        # Update user with verified phone number
+        update_user_phone(request.user_email, request.phone)
+
+        return SMSVerificationResponse(
+            success=True, message="Phone number verified and added to your account"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying user phone: {e}")
+        raise HTTPException(status_code=500, detail="Failed to verify phone number")
