@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,8 @@ interface ISMSVerificationOptionProps {
   description?: string;
   disabled?: boolean;
   isSignup?: boolean; // Whether this is for signup verification or existing user
+  initialPhone?: string; // Pre-fill phone number
+  userEmail?: string; // User email for existing user phone verification
 }
 
 // Validates E.164 phone number format
@@ -23,15 +25,39 @@ const validatePhoneNumber = (phone: string): boolean => {
 
 // Formats phone number for display (e.g., +1234567890 -> +1 (234) 567-8900)
 const formatPhoneForDisplay = (phone: string): string => {
+  console.log("formatPhoneForDisplay input:", phone);
   if (!phone.startsWith("+")) return phone;
 
   const digits = phone.slice(1);
+  console.log(
+    "formatPhoneForDisplay digits:",
+    digits,
+    "length:",
+    digits.length,
+  );
+
   if (digits.length === 11 && digits[0] === "1") {
-    // US/Canada number: +1234567890 -> +1 (234) 567-8900
-    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    // US/Canada number: +15084794800 -> +1 (508) 479-4800
+    const formatted = `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    console.log("formatPhoneForDisplay US format result:", formatted);
+    return formatted;
   }
-  // For other countries, just add spaces every 3 digits
-  return `+${digits.replace(/(\d{3})/g, "$1 ").trim()}`;
+
+  if (digits.length === 10 && digits[0] === "1") {
+    // US/Canada number missing leading 1: +1508479480 -> +1 (508) 479-480 (truncated)
+    const formatted = `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    console.log("formatPhoneForDisplay truncated US format result:", formatted);
+    return formatted;
+  }
+
+  // For other countries or malformed numbers, return as-is with minimal formatting
+  if (digits.length <= 4) {
+    return phone; // Too short to format meaningfully
+  }
+
+  // Just return the original phone number for now to avoid mangling
+  console.log("formatPhoneForDisplay returning original:", phone);
+  return phone;
 };
 
 export function SMSVerificationOption({
@@ -41,13 +67,35 @@ export function SMSVerificationOption({
   description = "Enter your phone number to receive a verification code",
   disabled = false,
   isSignup = false,
+  initialPhone = "",
+  userEmail = "",
 }: ISMSVerificationOptionProps) {
-  const [step, setStep] = useState<"phone" | "verify">("phone");
-  const [phone, setPhone] = useState("");
+  // If initialPhone is provided and valid, start with "send" step, otherwise "phone"
+  const [step, setStep] = useState<"phone" | "send" | "verify">(
+    initialPhone && validatePhoneNumber(initialPhone) ? "send" : "phone",
+  );
+  const [phone, setPhone] = useState(initialPhone);
   const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Update phone state when initialPhone changes
+  useEffect(() => {
+    console.log(
+      "SMSVerificationOption: initialPhone changed to:",
+      initialPhone,
+    );
+    setPhone(initialPhone);
+    // Update step based on phone validity
+    if (initialPhone && validatePhoneNumber(initialPhone)) {
+      setStep("send");
+    } else {
+      setStep("phone");
+    }
+  }, [initialPhone]);
+
+  // Remove auto-send functionality - let user manually trigger verification
 
   const handleSendCode = async () => {
     if (!validatePhoneNumber(phone)) {
@@ -61,15 +109,31 @@ export function SMSVerificationOption({
     setError(null);
 
     try {
-      const response = await fetch("/api/sms/send-verification", {
+      // Use user-specific endpoint for existing users with email
+      const isUserPhoneVerification = !isSignup && userEmail;
+      const endpoint = isUserPhoneVerification
+        ? "/api/sms/send-verification-user-phone"
+        : "/api/sms/send-verification";
+
+      const requestBody = isUserPhoneVerification
+        ? { user_email: userEmail, phone: phone }
+        : { phone: phone, isSignup };
+
+      console.log("SMS: Sending request to:", endpoint);
+      console.log("SMS: Request body:", requestBody);
+      console.log("SMS: Phone number being sent:", phone);
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ phone: phone, isSignup }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
+      console.log("SMS: Response status:", response.status);
+      console.log("SMS: Response data:", data);
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to send verification code");
@@ -97,15 +161,22 @@ export function SMSVerificationOption({
     setError(null);
 
     try {
-      const response = await fetch("/api/sms/verify-code", {
+      // Use user-specific endpoint for existing users with email
+      const isUserPhoneVerification = !isSignup && userEmail;
+      const endpoint = isUserPhoneVerification
+        ? "/api/sms/verify-user-phone"
+        : "/api/sms/verify-code";
+
+      const requestBody = isUserPhoneVerification
+        ? { user_email: userEmail, phone: phone, code: code.trim() }
+        : { phone: phone, code: code.trim() };
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          phone: phone,
-          code: code.trim(),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
@@ -127,8 +198,7 @@ export function SMSVerificationOption({
   };
 
   const handleBackToPhone = () => {
-    setStep("phone");
-    setPhone(""); // Clear phone number on reset
+    setStep("send"); // Go back to send step instead of phone if we have initialPhone
     setCode("");
     setError(null);
     setMessage(null);
@@ -171,6 +241,52 @@ export function SMSVerificationOption({
           disabled={disabled || isLoading || !phone.trim()}
           className="w-full"
           variant="outline"
+          data-testid="sms-send-code-button"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Sending...
+            </>
+          ) : (
+            <>
+              <Phone className="mr-2 h-4 w-4" />
+              {buttonText}
+            </>
+          )}
+        </Button>
+      </div>
+    );
+  }
+
+  // Send step - shows just the send button without phone input (for pre-populated phone)
+  if (step === "send") {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            {description} We'll send it to {formatPhoneForDisplay(phone)}
+          </p>
+        </div>
+
+        {error && (
+          <div className="p-3 rounded-md bg-destructive/15 border border-destructive/20">
+            <p className="text-sm text-destructive font-medium">{error}</p>
+          </div>
+        )}
+
+        {message && (
+          <div className="p-3 rounded-md bg-green-50 border border-green-200 dark:bg-green-950 dark:border-green-800">
+            <p className="text-sm text-green-800 dark:text-green-200 font-medium">
+              {message}
+            </p>
+          </div>
+        )}
+
+        <Button
+          onClick={() => void handleSendCode()}
+          disabled={disabled || isLoading || !validatePhoneNumber(phone)}
+          className="w-full"
           data-testid="sms-send-code-button"
         >
           {isLoading ? (
