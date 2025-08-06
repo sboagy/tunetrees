@@ -58,31 +58,30 @@ export const newUser = async (
       throw new Error(
         `User already exists for ${email}. If this is your account, please use the sign-in page or reset your password.`,
       );
-    } else {
-      console.log(`User ${email} is NOT verified, proceeding with cleanup`);
-      // User exists but email is not verified - they likely abandoned signup
-      // Delete the unverified user to allow them to complete registration
+    }
+    console.log(`User ${email} is NOT verified, proceeding with cleanup`);
+    // User exists but email is not verified - they likely abandoned signup
+    // Delete the unverified user to allow them to complete registration
+    console.log(
+      `Removing unverified user account for ${email} to allow signup completion`,
+    );
+
+    if (!ttHttpAdapter.deleteUser) {
+      throw new Error("ttHttpAdapter.deleteUser is not defined.");
+    }
+
+    try {
+      await ttHttpAdapter.deleteUser(existingUser.id);
       console.log(
-        `Removing unverified user account for ${email} to allow signup completion`,
+        `Successfully removed unverified user ${existingUser.id} for ${email}`,
       );
-
-      if (!ttHttpAdapter.deleteUser) {
-        throw new Error("ttHttpAdapter.deleteUser is not defined.");
-      }
-
-      try {
-        await ttHttpAdapter.deleteUser(existingUser.id);
-        console.log(
-          `Successfully removed unverified user ${existingUser.id} for ${email}`,
-        );
-      } catch (error) {
-        console.error(
-          `Failed to delete unverified user: ${error instanceof Error ? error.message : "Unknown error"}`,
-        );
-        throw new Error(
-          `Unable to complete signup. Please contact support if this issue persists.`,
-        );
-      }
+    } catch (error) {
+      console.error(
+        `Failed to delete unverified user: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+      throw new Error(
+        "Unable to complete signup. Please contact support if this issue persists.",
+      );
     }
   }
 
@@ -189,13 +188,11 @@ export const newUser = async (
           smsVerificationRequired: true,
           phone: data.phone,
         };
-      } else {
-        console.error(
-          "Failed to send SMS verification:",
-          await smsResponse.text(),
-        );
-        // Continue with email-only verification
       }
+      console.error(
+        "Failed to send SMS verification:",
+        await smsResponse.text(),
+      );
     } catch (error) {
       console.error("SMS verification error:", error);
       // Continue with email-only verification
