@@ -24,10 +24,9 @@ import type { ControllerRenderProps } from "react-hook-form";
 // } from "@/app/auth/newuser/account-form";
 import { PasswordInput } from "@/components/PasswordInput";
 import { SMSVerificationOption } from "@/components/auth/sms-verification-option";
-import { useRouter } from "next/navigation";
 import { emailSchema } from "@/app/auth/auth-types";
 import { getUser } from "@/app/auth/login/validate-signin";
-import { newUser } from "@/app/auth/newuser/newuser-actions";
+import { updateUser } from "./account-actions";
 import {
   accountFormSchema,
   type AccountFormValues,
@@ -251,28 +250,44 @@ export function AccountForm() {
     }
   };
 
-  const router = useRouter();
-
   const onSubmit = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);
-    const host = window.location.host;
 
-    const result = await newUser(data, host);
-    console.log(`newUser status result ${result.status}`);
+    try {
+      const result = await updateUser(data);
+      console.log(`updateUser status result ${result.status}`);
 
-    if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
-      const linkBackURL = result.linkBackURL;
-      // Store the linkBackURL in local storage for testing purposes
-      if (typeof window !== "undefined") {
-        localStorage.setItem("linkBackURL", linkBackURL);
+      if (result.status === "success") {
+        // Update the session to reflect the changes
+        await update({
+          user: {
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+          },
+        });
+
+        // Show success message (you can add a toast notification here)
+        console.log("Account updated successfully");
+
+        // Optionally redirect to the main page or stay on settings
+        // router.push("/");
       } else {
-        console.log(
-          "onSubmit(): window is undefined, cannot store linkBackURL for playwright tests",
-        );
+        // Handle error case
+        console.error("Update failed:", result.message);
+        // You can set form errors here if needed
+        form.setError("root", {
+          type: "manual",
+          message: result.message,
+        });
       }
+    } catch (error) {
+      console.error("Error during account update:", error);
+      form.setError("root", {
+        type: "manual",
+        message: "An unexpected error occurred. Please try again.",
+      });
     }
-
-    router.push(`/auth/verify-request?email=${data.email}`);
   };
 
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
@@ -340,7 +355,7 @@ export function AccountForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>EMail</FormLabel>
-              <FormControl>
+              <FormControl className="mt-[1px]">
                 <Input
                   type="email"
                   placeholder="person@example.com"
@@ -367,7 +382,7 @@ export function AccountForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Password</FormLabel>
-              <FormControl>
+              <FormControl className="mt-[1px]">
                 <PasswordInput
                   id="password"
                   placeholder="password"
@@ -392,7 +407,7 @@ export function AccountForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Confirm Password</FormLabel>
-              <FormControl>
+              <FormControl className="mt-[1px]">
                 <PasswordInput
                   id="password_confirmation"
                   placeholder="repeat password"
@@ -417,7 +432,7 @@ export function AccountForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Name</FormLabel>
-              <FormControl>
+              <FormControl className="mt-[1px]">
                 <Input
                   placeholder="Your name"
                   {...field}
@@ -434,8 +449,10 @@ export function AccountForm() {
           name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Phone Number (Optional)</FormLabel>
-              <FormControl>
+              <FormLabel>
+                Phone Number (Optional, for SMS verification)
+              </FormLabel>
+              <FormControl className="mt-[1px]">
                 <Input
                   type="tel"
                   placeholder="+1 (555) 123-4567"
