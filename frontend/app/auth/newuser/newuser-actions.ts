@@ -20,7 +20,7 @@ export const newUser = async (
   host: string,
 ): Promise<{
   status: string;
-  linkBackURL: string;
+  linkBackURL?: string;
   smsVerificationRequired?: boolean;
   phone?: string;
 }> => {
@@ -109,63 +109,67 @@ export const newUser = async (
 
   const emailTo = email;
 
-  // const token: string = btoa(
-  //   `${email}:${Math.random().toString(36).substring(2, 15)}`,
-  // );
+  // Check if SMS verification is being used
+  const useSmsVerification = !!data.phone;
 
-  // Generate a 6-digit one-time password for verification
-  const token = Math.floor(100000 + Math.random() * 900000).toString();
-  const expires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours from now
-  if (!ttHttpAdapter.createVerificationToken) {
-    throw new Error("ttHttpAdapter.createVerificationToken is not defined.");
-  }
-  const verificationToken = await ttHttpAdapter.createVerificationToken({
-    identifier: email,
-    expires,
-    token,
-  });
-  if (!verificationToken) {
-    // I think delete user here, which we know was created in this function
-    // if we got this far, if we can't create the verification token.
-    if (!ttHttpAdapter.deleteUser) {
-      throw new Error("ttHttpAdapter.deleteUser is not defined.");
+  let linkBackURL = "";
+  let verificationToken = null;
+
+  // Only create email verification token if NOT using SMS verification
+  if (!useSmsVerification) {
+    // Generate a 6-digit one-time password for verification
+    const token = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours from now
+    if (!ttHttpAdapter.createVerificationToken) {
+      throw new Error("ttHttpAdapter.createVerificationToken is not defined.");
     }
-    try {
-      await ttHttpAdapter.deleteUser(fullUser.id);
-    } catch (error) {
-      console.error(
-        `Failed to delete user after failed verification token creation: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
-      );
+    verificationToken = await ttHttpAdapter.createVerificationToken({
+      identifier: email,
+      expires,
+      token,
+    });
+    if (!verificationToken) {
+      // I think delete user here, which we know was created in this function
+      // if we got this far, if we can't create the verification token.
+      if (!ttHttpAdapter.deleteUser) {
+        throw new Error("ttHttpAdapter.deleteUser is not defined.");
+      }
+      try {
+        await ttHttpAdapter.deleteUser(fullUser.id);
+      } catch (error) {
+        console.error(
+          `Failed to delete user after failed verification token creation: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+        );
+      }
+      throw new Error("Failed to create verification token.");
     }
-    throw new Error("Failed to create verification token.");
+
+    linkBackURL = `https://${host}/api/verify-user?email=${email}&token=${verificationToken.token}`;
+
+    const sendGridResponse = await sendGrid({
+      to: emailTo,
+      from: "admin@tunetrees.com",
+      subject: "Email Verification",
+      html: verification_mail_html({
+        url: linkBackURL,
+        host: `https://${host}`,
+        theme: { brandColor: "#000000", buttonText: "Verify Email" },
+        // theme: { colorScheme: "auto", logo: "/logo4.png" },
+      }),
+      text: verification_mail_text({
+        url: linkBackURL,
+        host: `https://${host}:3000`,
+      }),
+      // dynamicTemplateData: {
+      //   verificationLink: linkBackURL,
+      // },
+    });
+    console.log("Email sent:", sendGridResponse);
   }
 
-  const linkBackURL = `https://${host}/api/verify-user?email=${email}&token=${verificationToken.token}`;
-  // const linkBackURL = `https://${host}/auth/login?email=${email}`;
-
-  const sendGridResponse = await sendGrid({
-    to: emailTo,
-    from: "admin@tunetrees.com",
-    subject: "Email Verification",
-    html: verification_mail_html({
-      url: linkBackURL,
-      host: `https://${host}`,
-      theme: { brandColor: "#000000", buttonText: "Verify Email" },
-      // theme: { colorScheme: "auto", logo: "/logo4.png" },
-    }),
-    text: verification_mail_text({
-      url: linkBackURL,
-      host: `https://${host}:3000`,
-    }),
-    // dynamicTemplateData: {
-    //   verificationLink: linkBackURL,
-    // },
-  });
-  console.log("Email sent:", sendGridResponse);
-
-  // If user provided a phone number, send SMS verification too
+  // If user provided a phone number, send SMS verification (instead of email)
   if (data.phone) {
     try {
       const smsResponse = await fetch(
@@ -183,8 +187,7 @@ export const newUser = async (
 
       if (smsResponse.ok) {
         return {
-          status: `User created successfully. Verification email sent to ${email}. SMS verification sent to ${data.phone}.`,
-          linkBackURL: linkBackURL,
+          status: `User created successfully. SMS verification sent to ${data.phone}.`,
           smsVerificationRequired: true,
           phone: data.phone,
         };
@@ -193,9 +196,21 @@ export const newUser = async (
         "Failed to send SMS verification:",
         await smsResponse.text(),
       );
+
+      // If SMS fails and we didn't send email, we need to create email verification as fallback
+      if (useSmsVerification) {
+        throw new Error(
+          "SMS verification failed and no email backup was prepared. Please try again.",
+        );
+      }
     } catch (error) {
       console.error("SMS verification error:", error);
-      // Continue with email-only verification
+      // If SMS fails and we didn't send email, we need to create email verification as fallback
+      if (useSmsVerification) {
+        throw new Error(
+          "SMS verification failed and no email backup was prepared. Please try again.",
+        );
+      }
     }
   }
 
