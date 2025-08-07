@@ -1,13 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -19,8 +13,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { SMSVerificationOption } from "@/components/auth/sms-verification-option";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Mail, Phone } from "lucide-react";
-import Link from "next/link";
+import { Mail, Phone, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -34,6 +28,7 @@ const passwordResetRequestSchema = z.object({
 type PasswordResetRequestValues = z.infer<typeof passwordResetRequestSchema>;
 
 export default function PasswordResetPage(): JSX.Element {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string>("");
@@ -41,6 +36,16 @@ export default function PasswordResetPage(): JSX.Element {
   const [selectedMethod, setSelectedMethod] = useState<"email" | "sms">(
     "email",
   );
+
+  const handleClose = () => {
+    // Check if user came from login page via referrer or go to home
+    const referrer = document.referrer;
+    if (referrer && referrer.includes("/auth/login")) {
+      router.push("/auth/login");
+    } else {
+      router.push("/");
+    }
+  };
 
   const form = useForm<PasswordResetRequestValues>({
     resolver: zodResolver(passwordResetRequestSchema),
@@ -120,7 +125,16 @@ export default function PasswordResetPage(): JSX.Element {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
+          <CardHeader className="relative text-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="absolute right-2 top-2 h-8 w-8"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
             <Mail className="mx-auto h-12 w-12 text-green-600" />
             <CardTitle className="mt-4 text-2xl font-bold text-gray-900">
               Check your messages
@@ -132,14 +146,6 @@ export default function PasswordResetPage(): JSX.Element {
               The reset code will expire in 1 hour.
             </p>
           </CardContent>
-          <CardFooter>
-            <Link href="/auth/login" className="w-full">
-              <Button variant="outline" className="w-full">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to login
-              </Button>
-            </Link>
-          </CardFooter>
         </Card>
       </div>
     );
@@ -149,7 +155,16 @@ export default function PasswordResetPage(): JSX.Element {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-4">
         <Card>
-          <CardHeader className="text-center">
+          <CardHeader className="relative text-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="absolute right-2 top-2 h-8 w-8"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
             <CardTitle className="text-xl">Reset Your Password</CardTitle>
             <p className="text-sm text-muted-foreground">
               Choose how you'd like to receive password reset instructions
@@ -250,16 +265,6 @@ export default function PasswordResetPage(): JSX.Element {
             </CardContent>
           </Card>
         )}
-
-        {/* Back to Login Link */}
-        <div className="text-center">
-          <Link href="/auth/login">
-            <Button variant="ghost" className="w-full">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to login
-            </Button>
-          </Link>
-        </div>
       </div>
     </div>
   );

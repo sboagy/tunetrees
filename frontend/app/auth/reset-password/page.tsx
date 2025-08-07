@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordStrengthIndicator } from "@/components/ui/password-strength-indicator";
 import { isPasswordValid } from "@/lib/password-utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { CheckCircle, Eye, EyeOff, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { JSX } from "react";
@@ -56,6 +56,16 @@ export default function ResetPasswordPage(): JSX.Element {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+
+  const handleClose = () => {
+    // Check if user came from login page via referrer or go to home
+    const referrer = document.referrer;
+    if (referrer && referrer.includes("/auth/login")) {
+      router.push("/auth/login");
+    } else {
+      router.push("/");
+    }
+  };
 
   useEffect(() => {
     const tokenParam = searchParams.get("token");
@@ -123,7 +133,16 @@ export default function ResetPasswordPage(): JSX.Element {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
+          <CardHeader className="relative text-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="absolute right-2 top-2 h-8 w-8"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
             <CheckCircle className="mx-auto h-12 w-12 text-green-600" />
             <CardTitle className="mt-4 text-2xl font-bold text-gray-900">
               Password reset successful
@@ -152,7 +171,16 @@ export default function ResetPasswordPage(): JSX.Element {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
+          <CardHeader className="relative text-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="absolute right-2 top-2 h-8 w-8"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
             <CardTitle className="text-2xl font-bold text-red-600">
               Invalid Reset Link
             </CardTitle>
@@ -166,12 +194,6 @@ export default function ResetPasswordPage(): JSX.Element {
             <Link href="/auth/password-reset" className="w-full">
               <Button className="w-full">Request new reset link</Button>
             </Link>
-            <Link href="/auth/login" className="w-full">
-              <Button variant="outline" className="w-full">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to login
-              </Button>
-            </Link>
           </CardFooter>
         </Card>
       </div>
@@ -181,7 +203,16 @@ export default function ResetPasswordPage(): JSX.Element {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+        <CardHeader className="relative text-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            className="absolute right-2 top-2 h-8 w-8"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </Button>
           <CardTitle className="text-2xl font-bold text-gray-900">
             Set new password
           </CardTitle>
@@ -297,13 +328,6 @@ export default function ResetPasswordPage(): JSX.Element {
               >
                 {isLoading ? "Resetting password..." : "Reset password"}
               </Button>
-
-              <Link href="/auth/login" className="w-full">
-                <Button variant="ghost" className="w-full">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to login
-                </Button>
-              </Link>
             </CardFooter>
           </form>
         </Form>

@@ -156,14 +156,14 @@ test.describe("Password Reset Request Flow", () => {
     console.log("Success message displayed correctly");
   });
 
-  test("should have back to login link", async ({ page }) => {
+  test("should have close button", async ({ page }) => {
     await page.goto("/auth/password-reset");
     await page.waitForLoadState("domcontentloaded");
 
-    const backLink = page.locator('a[href="/auth/login"]');
-    await expect(backLink).toBeVisible();
+    const closeButton = page.locator('button[aria-label="Close"]');
+    await expect(closeButton).toBeVisible();
 
-    console.log("Back to login link is present");
+    console.log("Close button is present");
   });
 });
 
@@ -298,7 +298,7 @@ test.describe("Password Reset Completion Flow", () => {
     console.log("Missing parameters handled correctly");
   });
 
-  test("should have back to login link", async ({ page }) => {
+  test("should have close button", async ({ page }) => {
     const testEmail = "test@example.com";
     const testToken = "123456";
 
@@ -307,10 +307,10 @@ test.describe("Password Reset Completion Flow", () => {
     );
     await page.waitForLoadState("domcontentloaded");
 
-    const backLink = page.locator('a[href="/auth/login"]');
-    await expect(backLink).toBeVisible();
+    const closeButton = page.locator('button[aria-label="Close"]');
+    await expect(closeButton).toBeVisible();
 
-    console.log("Back to login link is present");
+    console.log("Close button is present");
   });
 });
 
