@@ -118,22 +118,23 @@ describe("newUser function - Bug #3 fix", () => {
       expect(ttHttpAdapter.createUser).not.toHaveBeenCalled();
     });
 
-    it("should allow signup by deleting unverified user", async () => {
+    it("should allow signup by deleting unverified user (SMS verification)", async () => {
       // Arrange: Mock existing unverified user
       (getUserExtendedByEmail as jest.Mock).mockResolvedValue(
         mockExistingUnverifiedUser,
       );
       (ttHttpAdapter.deleteUser as jest.Mock).mockResolvedValue(undefined);
 
-      // Act: Attempt signup with unverified existing user
+      // Act: Attempt signup with unverified existing user and phone number
       const result = await newUser(mockFormData, mockHost);
 
-      // Assert: Should successfully complete signup
+      // Assert: Should successfully complete SMS signup
       expect(result.status).toBe(
-        "User created successfully. Verification email sent to test@example.com. SMS verification sent to +1234567890.",
+        "User created successfully. SMS verification sent to +1234567890.",
       );
-      expect(result.linkBackURL).toContain("test@example.com");
-      expect(result.linkBackURL).toContain("123456");
+      expect(result.smsVerificationRequired).toBe(true);
+      expect(result.phone).toBe("+1234567890");
+      expect(result.linkBackURL).toBeUndefined(); // No email link for SMS verification
 
       // Verify: Should delete unverified user first
       expect(ttHttpAdapter.deleteUser).toHaveBeenCalledWith("user-456");
@@ -182,18 +183,20 @@ describe("newUser function - Bug #3 fix", () => {
       expect(ttHttpAdapter.createUser).not.toHaveBeenCalled();
     });
 
-    it("should proceed normally when no existing user found", async () => {
+    it("should proceed normally when no existing user found (SMS verification)", async () => {
       // Arrange: Mock no existing user
       (getUserExtendedByEmail as jest.Mock).mockResolvedValue(null);
 
-      // Act: Attempt signup with no existing user
+      // Act: Attempt signup with no existing user and phone number
       const result = await newUser(mockFormData, mockHost);
 
-      // Assert: Should successfully complete signup
+      // Assert: Should successfully complete SMS signup
       expect(result.status).toBe(
-        "User created successfully. Verification email sent to test@example.com. SMS verification sent to +1234567890.",
+        "User created successfully. SMS verification sent to +1234567890.",
       );
-      expect(result.linkBackURL).toContain("test@example.com");
+      expect(result.smsVerificationRequired).toBe(true);
+      expect(result.phone).toBe("+1234567890");
+      expect(result.linkBackURL).toBeUndefined(); // No email verification for SMS flow
 
       // Verify: Should not attempt to delete any user
       expect(ttHttpAdapter.deleteUser).not.toHaveBeenCalled();
@@ -205,6 +208,46 @@ describe("newUser function - Bug #3 fix", () => {
           hash: "mocked-hashed-password",
         }),
       );
+    });
+
+    it("should use email verification when no phone number provided", async () => {
+      // Arrange: Mock no existing user and no phone number
+      (getUserExtendedByEmail as jest.Mock).mockResolvedValue(null);
+      const emailOnlyData = { ...mockFormData, phone: "" };
+
+      // Act: Attempt signup without phone number
+      const result = await newUser(emailOnlyData, mockHost);
+
+      // Assert: Should use email verification
+      expect(result.status).toBe(
+        "User created successfully.  Verification email sent to test@example.com.",
+      );
+      expect(result.linkBackURL).toContain("test@example.com");
+      expect(result.linkBackURL).toContain("123456");
+      expect(result.smsVerificationRequired).toBeUndefined();
+      expect(result.phone).toBeUndefined();
+
+      // Verify: Should create verification token for email
+      expect(ttHttpAdapter.createVerificationToken).toHaveBeenCalled();
+      expect(sendGrid).toHaveBeenCalled();
+    });
+
+    it("should handle SMS verification failure with proper error", async () => {
+      // Arrange: Mock SMS failure
+      (getUserExtendedByEmail as jest.Mock).mockResolvedValue(null);
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        text: jest.fn().mockResolvedValue("SMS service unavailable"),
+      });
+
+      // Act & Assert: Should throw error when SMS fails and no email backup
+      await expect(newUser(mockFormData, mockHost)).rejects.toThrow(
+        "SMS verification failed and no email backup was prepared. Please try again.",
+      );
+
+      // Verify: Should not send email when SMS-only flow fails
+      expect(ttHttpAdapter.createVerificationToken).not.toHaveBeenCalled();
+      expect(sendGrid).not.toHaveBeenCalled();
     });
   });
 
