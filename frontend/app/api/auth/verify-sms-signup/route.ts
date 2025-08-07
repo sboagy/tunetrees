@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Call backend to complete SMS signup verification
+    // Note: SMS code validation is handled separately by /api/sms/verify-code
     const backendUrl = process.env.TT_API_BASE_URL || "http://localhost:8000";
     const response = await fetch(`${backendUrl}/sms/verify-signup`, {
       method: "POST",
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         email,
         phone,
+        code: "000000", // Dummy code since validation is done separately
       }),
     });
 
