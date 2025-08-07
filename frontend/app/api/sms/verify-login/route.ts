@@ -1,7 +1,7 @@
 // API route to verify SMS codes for login
 // This proxies requests to the backend SMS service
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {

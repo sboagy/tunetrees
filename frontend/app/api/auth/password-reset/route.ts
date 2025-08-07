@@ -1,6 +1,6 @@
 import { getUserExtendedByEmail, ttHttpAdapter } from "@/auth/auth-tt-adapter";
 import { sendGrid } from "@/auth/helpers";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 const requestSchema = z.object({

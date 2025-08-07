@@ -21,9 +21,11 @@ describe("Password Validation Utils", () => {
         (req) => req.id === "minLength",
       );
       expect(minLengthReq).toBeDefined();
-      expect(minLengthReq!.test("1234567")).toBe(false); // 7 chars
-      expect(minLengthReq!.test("12345678")).toBe(true); // 8 chars
-      expect(minLengthReq!.test("123456789")).toBe(true); // 9 chars
+      if (minLengthReq) {
+        expect(minLengthReq.test("1234567")).toBe(false); // 7 chars
+        expect(minLengthReq.test("12345678")).toBe(true); // 8 chars
+        expect(minLengthReq.test("123456789")).toBe(true); // 9 chars
+      }
     });
 
     it("should test uppercase requirement", () => {
@@ -31,9 +33,11 @@ describe("Password Validation Utils", () => {
         (req) => req.id === "uppercase",
       );
       expect(uppercaseReq).toBeDefined();
-      expect(uppercaseReq!.test("password")).toBe(false);
-      expect(uppercaseReq!.test("Password")).toBe(true);
-      expect(uppercaseReq!.test("PASSWORD")).toBe(true);
+      if (uppercaseReq) {
+        expect(uppercaseReq.test("password")).toBe(false);
+        expect(uppercaseReq.test("Password")).toBe(true);
+        expect(uppercaseReq.test("PASSWORD")).toBe(true);
+      }
     });
 
     it("should test lowercase requirement", () => {
@@ -41,9 +45,11 @@ describe("Password Validation Utils", () => {
         (req) => req.id === "lowercase",
       );
       expect(lowercaseReq).toBeDefined();
-      expect(lowercaseReq!.test("PASSWORD")).toBe(false);
-      expect(lowercaseReq!.test("Password")).toBe(true);
-      expect(lowercaseReq!.test("password")).toBe(true);
+      if (lowercaseReq) {
+        expect(lowercaseReq.test("PASSWORD")).toBe(false);
+        expect(lowercaseReq.test("Password")).toBe(true);
+        expect(lowercaseReq.test("password")).toBe(true);
+      }
     });
 
     it("should test number requirement", () => {
@@ -51,9 +57,11 @@ describe("Password Validation Utils", () => {
         (req) => req.id === "number",
       );
       expect(numberReq).toBeDefined();
-      expect(numberReq!.test("Password")).toBe(false);
-      expect(numberReq!.test("Password1")).toBe(true);
-      expect(numberReq!.test("123456")).toBe(true);
+      if (numberReq) {
+        expect(numberReq.test("Password")).toBe(false);
+        expect(numberReq.test("Password1")).toBe(true);
+        expect(numberReq.test("123456")).toBe(true);
+      }
     });
 
     it("should test special character requirement", () => {
@@ -61,10 +69,12 @@ describe("Password Validation Utils", () => {
         (req) => req.id === "special",
       );
       expect(specialReq).toBeDefined();
-      expect(specialReq!.test("Password1")).toBe(false);
-      expect(specialReq!.test("Password1!")).toBe(true);
-      expect(specialReq!.test("Password@123")).toBe(true);
-      expect(specialReq!.test("Pass#word")).toBe(true);
+      if (specialReq) {
+        expect(specialReq.test("Password1")).toBe(false);
+        expect(specialReq.test("Password1!")).toBe(true);
+        expect(specialReq.test("Password@123")).toBe(true);
+        expect(specialReq.test("Pass#word")).toBe(true);
+      }
     });
   });
 
@@ -197,12 +207,12 @@ describe("Password Validation Utils", () => {
       { password: "!@#$%^&*", expectedLevel: "weak", expectedScore: 2 }, // length + special
     ];
 
-    testCases.forEach(({ password, expectedLevel, expectedScore }) => {
+    for (const { password, expectedLevel, expectedScore } of testCases) {
       it(`should correctly evaluate "${password}"`, () => {
         const result = calculatePasswordStrength(password);
         expect(result.level).toBe(expectedLevel);
         expect(result.score).toBe(expectedScore);
       });
-    });
+    }
   });
 });

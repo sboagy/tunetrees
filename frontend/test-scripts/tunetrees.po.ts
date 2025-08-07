@@ -55,7 +55,6 @@ export class TuneTreesPageObject {
   readonly passwordResetPasswordToggle: Locator;
   readonly passwordResetConfirmToggle: Locator;
   readonly passwordStrengthIndicator: Locator;
-  readonly passwordStrengthLevel: Locator;
   readonly passwordRequirements: Locator;
 
   constructor(page: Page) {
@@ -181,7 +180,6 @@ export class TuneTreesPageObject {
     this.passwordStrengthIndicator = page.getByTestId(
       "password-strength-indicator",
     );
-    this.passwordStrengthLevel = page.getByTestId("password-strength-level");
     this.passwordRequirements = page.getByTestId("password-requirements");
   }
 
