@@ -286,7 +286,7 @@ async def update_user(
 async def delete_user(id: str) -> None:
     try:
         with SessionLocal() as db:
-            orm_user = db.get(UserModel, id)
+            orm_user = db.get(orm.User, id)
             if orm_user:
                 # Before deleting the user, clean up any verification tokens for their email
                 if orm_user.email:
