@@ -3,8 +3,6 @@
 import { useSearchParams } from "next/navigation";
 import type { JSX } from "react";
 
-import Image from "next/image";
-
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -17,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { getCsrfToken } from "next-auth/react";
+import { getCsrfToken, signIn } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type ControllerRenderProps, useForm } from "react-hook-form";
 
@@ -25,6 +23,8 @@ import {
   type AccountFormValues,
   accountFormSchema,
 } from "@/app/auth/newuser/account-form";
+import { SmsVerificationDialog } from "@/components/auth/sms-verification-dialog";
+import { EmailVerificationDialog } from "@/components/auth/email-verification-dialog";
 import { providerMap } from "@/auth";
 import { SocialLoginButtons } from "@/components/AuthSocialLogin";
 import { PasswordInput } from "@/components/PasswordInput";
@@ -38,7 +38,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { XCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { emailSchema } from "../auth-types";
 import { getUser } from "../login/validate-signin";
 import { newUser } from "./newuser-actions";
@@ -59,9 +58,23 @@ const languages = [
 export default function SignInPage(): JSX.Element {
   const searchParams = useSearchParams();
   let email = searchParams.get("email") || "";
+  const phone = searchParams.get("phone") || "";
+  const name = searchParams.get("name") || "";
 
   const [_crsfToken, setCrsfToken] = useState("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // SMS verification dialog state
+  const [showSmsDialog, setShowSmsDialog] = useState(false);
+  const [smsPhone, setSmsPhone] = useState("");
+  const [smsEmail, setSmsEmail] = useState("");
+
+  // Email verification dialog state
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailForVerification, setEmailForVerification] = useState("");
+
+  // Track if user creation is in progress to prevent duplicates
+  const [userCreationInProgress, setUserCreationInProgress] = useState(false);
 
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
@@ -69,8 +82,8 @@ export default function SignInPage(): JSX.Element {
       email: email || "", // Ensure email has an initial value
       password: "", // Add initial value for password
       password_confirmation: "", // Add initial value for password_confirmation
-      name: "", // Add initial value for name
-      phone: "", // Add initial value for phone
+      name: name || "", // Add initial value for name from URL params
+      phone: phone || "", // Add initial value for phone from URL params
       csrfToken: "", // Initialize with empty string
     },
   });
@@ -90,32 +103,60 @@ export default function SignInPage(): JSX.Element {
   if (email === "" && typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
     email = searchParams.get("email") || email;
+    const phoneParam = searchParams.get("phone") || "";
+    const nameParam = searchParams.get("name") || "";
+
+    if (phoneParam && !form.getValues("phone")) {
+      form.setValue("phone", phoneParam);
+    }
+    if (nameParam && !form.getValues("name")) {
+      form.setValue("name", nameParam);
+    }
   }
 
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordConfirmationError, setPasswordConfirmationError] = useState<
-    string | null
-  >(null);
+  // Using React Hook Form's built-in error handling instead of separate state
 
-  const validateEmail = useCallback((email: string): boolean => {
-    if (email === "") {
-      setEmailError(null);
-      return false;
-    }
+  const validateEmail = useCallback(
+    (email: string): boolean => {
+      if (email === "") {
+        form.clearErrors("email");
+        return false;
+      }
 
-    const result = emailSchema.safeParse(email);
-    if (!result.success) {
-      setEmailError(result.error.issues[0].message);
-      return false;
-    }
-    setEmailError(null);
-    return true;
-  }, []);
+      const result = emailSchema.safeParse(email);
+      if (!result.success) {
+        form.setError("email", {
+          type: "manual",
+          message: result.error.issues[0].message,
+        });
+        return false;
+      }
+      form.clearErrors("email");
+      return true;
+    },
+    [form],
+  );
 
   useEffect(() => {
     validateEmail(form.getValues("email"));
   }, [form, validateEmail]);
+
+  // Update form values when URL parameters change (e.g., coming back from SMS verification)
+  useEffect(() => {
+    const emailParam = searchParams.get("email");
+    const phoneParam = searchParams.get("phone");
+    const nameParam = searchParams.get("name");
+
+    if (emailParam && emailParam !== form.getValues("email")) {
+      form.setValue("email", emailParam);
+    }
+    if (phoneParam && phoneParam !== form.getValues("phone")) {
+      form.setValue("phone", phoneParam);
+    }
+    if (nameParam && nameParam !== form.getValues("name")) {
+      form.setValue("name", nameParam);
+    }
+  }, [searchParams, form]);
 
   const handleEmailChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -124,16 +165,26 @@ export default function SignInPage(): JSX.Element {
     const newEmail = e.target.value;
     console.log("handleEmailChange: email:", newEmail);
     field.onChange(e); // Update the form state
-    validateEmail(newEmail);
 
-    if (newEmail) {
+    // First validate the email format
+    const isValidFormat = validateEmail(newEmail);
+
+    // Only check for existing users if the email format is valid
+    if (newEmail && isValidFormat) {
       const user = await getUser(newEmail);
-      if (user && user.emailVerified) {
+      if (user?.emailVerified) {
         // Only show error for verified users - unverified users can be cleaned up during signup
-        setEmailError("Email already in use");
+        form.setError("email", {
+          type: "manual",
+          message: "Email already in use",
+        });
       } else {
-        // Clear any existing email error if user is unverified or doesn't exist
-        setEmailError(null);
+        // Clear any existing "email already in use" error if user is unverified or doesn't exist
+        // Don't clear format validation errors here
+        const currentError = form.getFieldState("email").error;
+        if (currentError?.message === "Email already in use") {
+          form.clearErrors("email");
+        }
       }
     }
   };
@@ -142,13 +193,14 @@ export default function SignInPage(): JSX.Element {
     const pw = form.getValues("password");
     const pwc = form.getValues("password_confirmation");
     if (!pw || !pwc) {
-      setPasswordError(null);
-      setPasswordConfirmationError(null);
+      form.clearErrors(["password", "password_confirmation"]);
     } else if (pw === pwc) {
-      setPasswordError(null);
-      setPasswordConfirmationError(null);
+      form.clearErrors(["password", "password_confirmation"]);
     } else {
-      setPasswordConfirmationError("Passwords do not match");
+      form.setError("password_confirmation", {
+        type: "manual",
+        message: "Passwords do not match",
+      });
     }
   }
 
@@ -190,8 +242,6 @@ export default function SignInPage(): JSX.Element {
     field.onChange(e); // Update the form state
   };
 
-  const router = useRouter();
-
   // Memoize password strength calculation to prevent excessive re-renders
   const watchedPassword = form.watch("password") || "";
   const passwordStrength = useMemo(() => {
@@ -201,10 +251,17 @@ export default function SignInPage(): JSX.Element {
   const onSubmitHandler = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);
 
+    // Prevent duplicate submissions if user creation is already in progress
+    if (userCreationInProgress) {
+      console.log(
+        "User creation already in progress, ignoring duplicate submission",
+      );
+      return;
+    }
+
     setIsLoading(true);
-    setEmailError(null);
-    setPasswordError(null);
-    setPasswordConfirmationError(null);
+    setUserCreationInProgress(true);
+    form.clearErrors(); // Clear all form errors before submit
 
     try {
       const host = window.location.host;
@@ -220,7 +277,7 @@ export default function SignInPage(): JSX.Element {
         const linkBackURL = result.linkBackURL;
         console.log(`Setting linkBackURL in localStorage: ${linkBackURL}`);
         // Store the linkBackURL in local storage for testing purposes
-        if (typeof window !== "undefined") {
+        if (typeof window !== "undefined" && linkBackURL) {
           localStorage.setItem("linkBackURL", linkBackURL);
           console.log("Successfully stored linkBackURL in localStorage");
           // Verify it was stored
@@ -239,22 +296,228 @@ export default function SignInPage(): JSX.Element {
 
       // Check if SMS verification is required
       if (result.smsVerificationRequired && result.phone && data.phone) {
-        // Redirect to SMS verification page
-        router.push(
-          `/auth/sms-signup-verification?email=${encodeURIComponent(
-            data.email,
-          )}&phone=${encodeURIComponent(data.phone)}`,
-        );
+        // Show SMS verification dialog instead of navigating away
+        setSmsEmail(data.email);
+        setSmsPhone(data.phone);
+        setShowSmsDialog(true);
       } else {
-        // Redirect to email verification page
-        router.push(`/auth/verify-request?email=${data.email}`);
+        // Show email verification dialog instead of redirecting
+        setEmailForVerification(data.email);
+        setShowEmailDialog(true);
       }
     } catch (error) {
       console.error("Signup error:", error);
-      setEmailError("An error occurred during sign up. Please try again.");
+      form.setError("email", {
+        type: "manual",
+        message: "An error occurred during sign up. Please try again.",
+      });
     } finally {
       setIsLoading(false);
+      // Don't reset userCreationInProgress here - only reset when dialog is properly closed
     }
+  };
+
+  const handleSmsVerificationComplete = () => {
+    console.log("=== SMS VERIFICATION COMPLETE ===");
+    console.log("About to auto-login user with email:", smsEmail);
+
+    // SMS verification completed successfully
+    // Reset the creation in progress flag since verification is done
+    setUserCreationInProgress(false);
+    // Ensure dialog is closed first
+    setShowSmsDialog(false);
+
+    // Use async function within the handler
+    void (async () => {
+      try {
+        // Get the password from the form
+        const userPassword = form.getValues("password");
+
+        console.log("Auto-signing in user with:", {
+          email: smsEmail,
+          hasPassword: !!userPassword,
+          hasCsrfToken: !!_crsfToken,
+        });
+
+        // Automatically sign in the user since SMS verification is complete
+        const result = await signIn("credentials", {
+          redirect: false,
+          email: smsEmail,
+          password: userPassword,
+          csrfToken: _crsfToken,
+        });
+
+        if (result?.error) {
+          console.error(
+            "Auto-signin failed after SMS verification:",
+            result.error,
+          );
+          // Fallback to login page if auto-signin fails
+          if (typeof window !== "undefined") {
+            window.location.href = `/auth/login?email=${encodeURIComponent(smsEmail)}`;
+          }
+        } else {
+          console.log("Auto-signin successful! Redirecting to home page...");
+          // Success! Redirect to main application
+          if (typeof window !== "undefined") {
+            window.location.href = "/";
+          } else {
+            console.error("Window is undefined, cannot navigate");
+          }
+        }
+      } catch (error) {
+        console.error("Auto-signin error after SMS verification:", error);
+        // Fallback to login page if there's an error
+        if (typeof window !== "undefined") {
+          window.location.href = `/auth/login?email=${encodeURIComponent(smsEmail)}`;
+        } else {
+          console.error("Window is undefined, cannot navigate");
+        }
+      }
+    })();
+  };
+
+  const handleEmailVerificationComplete = () => {
+    console.log("=== EMAIL VERIFICATION COMPLETE ===");
+    console.log("About to auto-login user with email:", emailForVerification);
+
+    // Email verification completed successfully
+    // Reset the creation in progress flag since verification is done
+    setUserCreationInProgress(false);
+    // Ensure dialog is closed first
+    setShowEmailDialog(false);
+
+    // Use async function within the handler
+    void (async () => {
+      try {
+        // Get the password from the form
+        const userPassword = form.getValues("password");
+
+        console.log("Auto-signing in user with:", {
+          email: emailForVerification,
+          hasPassword: !!userPassword,
+          hasCsrfToken: !!_crsfToken,
+        });
+
+        // Automatically sign in the user since email verification is complete
+        const result = await signIn("credentials", {
+          redirect: false,
+          email: emailForVerification,
+          password: userPassword,
+          csrfToken: _crsfToken,
+        });
+
+        if (result?.error) {
+          console.error(
+            "Auto-signin failed after email verification:",
+            result.error,
+          );
+          // Fallback to login page if auto-signin fails
+          if (typeof window !== "undefined") {
+            window.location.href = `/auth/login?email=${encodeURIComponent(emailForVerification)}`;
+          }
+        } else {
+          console.log("Auto-signin successful! Redirecting to home page...");
+          // Success! Redirect to main application
+          if (typeof window !== "undefined") {
+            window.location.href = "/";
+          } else {
+            console.error("Window is undefined, cannot navigate");
+          }
+        }
+      } catch (error) {
+        console.error("Auto-signin error after email verification:", error);
+        // Fallback to login page if there's an error
+        if (typeof window !== "undefined") {
+          window.location.href = `/auth/login?email=${encodeURIComponent(emailForVerification)}`;
+        } else {
+          console.error("Window is undefined, cannot navigate");
+        }
+      }
+    })();
+  };
+
+  const handleEmailDialogClose = (open: boolean) => {
+    if (!open && emailForVerification) {
+      // Dialog is being closed - clean up unverified user if verification wasn't completed
+      console.log(
+        "Email dialog closed, cleaning up unverified user:",
+        emailForVerification,
+      );
+
+      // Use async function within the handler to avoid Promise return type
+      void (async () => {
+        try {
+          // Call cleanup endpoint to remove unverified user
+          const response = await fetch("/api/auth/cleanup-unverified-user", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ email: emailForVerification }),
+          });
+
+          if (response.ok) {
+            console.log("Successfully cleaned up unverified user");
+            // Only reset state after successful cleanup
+            setUserCreationInProgress(false);
+          } else {
+            console.warn(
+              "Failed to clean up unverified user:",
+              await response.text(),
+            );
+            // Reset state anyway so user isn't permanently blocked
+            setUserCreationInProgress(false);
+          }
+        } catch (error) {
+          console.error("Error cleaning up unverified user:", error);
+          // Reset state anyway so user isn't permanently blocked
+          setUserCreationInProgress(false);
+        }
+      })();
+    }
+
+    setShowEmailDialog(open);
+  };
+
+  const handleSmsDialogClose = (open: boolean) => {
+    if (!open && smsPhone) {
+      // Dialog is being closed - clean up unverified user if verification wasn't completed
+      console.log("SMS dialog closed, cleaning up unverified user:", smsPhone);
+
+      // Use async function within the handler to avoid Promise return type
+      void (async () => {
+        try {
+          // Call cleanup endpoint to remove unverified user
+          const response = await fetch("/api/auth/cleanup-unverified-user", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ email: smsEmail }),
+          });
+
+          if (response.ok) {
+            console.log("Successfully cleaned up unverified user");
+            // Only reset state after successful cleanup
+            setUserCreationInProgress(false);
+          } else {
+            console.warn(
+              "Failed to clean up unverified user:",
+              await response.text(),
+            );
+            // Reset state anyway so user isn't permanently blocked
+            setUserCreationInProgress(false);
+          }
+        } catch (error) {
+          console.error("Error cleaning up unverified user:", error);
+          // Reset state anyway so user isn't permanently blocked
+          setUserCreationInProgress(false);
+        }
+      })();
+    }
+
+    setShowSmsDialog(open);
   };
 
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
@@ -268,7 +531,7 @@ export default function SignInPage(): JSX.Element {
   };
 
   return (
-    <div className="flex items-center justify-center mb-0 mt-20">
+    <div className="flex items-center justify-center mb-0 mt-12">
       <Card className="w-[24em]">
         <div className="flex justify-end space-x-2 mt-2 mr-2">
           <Button
@@ -285,17 +548,7 @@ export default function SignInPage(): JSX.Element {
             <XCircle className="h-4 w-4" />
           </Button>
         </div>
-        <CardHeader className="pt-1">
-          <CardTitle className="flex justify-center">
-            <Image
-              src="/logo4.png"
-              alt="Home"
-              width={75}
-              height={75}
-              className="min-w-8"
-              priority={true}
-            />
-          </CardTitle>
+        <CardHeader className="pt-1 pb-4">
           <CardTitle className="text-2xl text-center">Sign up</CardTitle>
         </CardHeader>
         <CardContent>
@@ -314,7 +567,7 @@ export default function SignInPage(): JSX.Element {
                 })(e);
                 console.log("After calling form.handleSubmit"); // Debugging log
               }}
-              className="space-y-6"
+              className="space-y-4"
             >
               <FormField
                 control={form.control}
@@ -338,7 +591,7 @@ export default function SignInPage(): JSX.Element {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>EMail</FormLabel>
+                    <FormLabel className="text-foreground">EMail</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
@@ -346,7 +599,6 @@ export default function SignInPage(): JSX.Element {
                         {...field}
                         onChange={(e) => void handleEmailChange(e, field)}
                         required
-                        className={emailError ? "border-red-500" : ""}
                         autoFocus
                         data-testid="user_email"
                       />
@@ -355,17 +607,12 @@ export default function SignInPage(): JSX.Element {
                   </FormItem>
                 )}
               />
-              {emailError && (
-                <p className="text-red-500 text-sm" role="alert">
-                  {emailError}
-                </p>
-              )}
               <FormField
                 control={form.control}
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel className="text-foreground">Password</FormLabel>
                     <FormControl>
                       <PasswordInput
                         id="password"
@@ -379,23 +626,20 @@ export default function SignInPage(): JSX.Element {
                     {/* Real-time password strength indicator */}
                     <PasswordStrengthIndicator
                       password={form.watch("password") || ""}
-                      className="mt-2"
+                      className="mt-3"
                     />
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              {passwordError && (
-                <p className="text-red-500 text-sm" role="alert">
-                  {passwordError}
-                </p>
-              )}
               <FormField
                 control={form.control}
                 name="password_confirmation"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
+                    <FormLabel className="text-foreground">
+                      Confirm Password
+                    </FormLabel>
                     <FormControl>
                       <PasswordInput
                         id="password_confirmation"
@@ -412,17 +656,12 @@ export default function SignInPage(): JSX.Element {
                   </FormItem>
                 )}
               />
-              {passwordConfirmationError && (
-                <p className="text-red-500 text-sm" role="alert">
-                  {passwordConfirmationError}
-                </p>
-              )}
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel className="text-foreground">Name</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Your name"
@@ -440,7 +679,9 @@ export default function SignInPage(): JSX.Element {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone Number (Optional)</FormLabel>
+                    <FormLabel className="text-foreground">
+                      Phone Number (Optional, for SMS verification)
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type="tel"
@@ -464,9 +705,7 @@ export default function SignInPage(): JSX.Element {
                   !form.getValues("password_confirmation") ||
                   !form.getValues("email") ||
                   !form.getValues("name") ||
-                  !!emailError ||
-                  !!passwordError ||
-                  !!passwordConfirmationError ||
+                  Object.keys(form.formState.errors).length > 0 ||
                   passwordStrength.level === "weak"
                 }
                 className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
@@ -488,6 +727,23 @@ export default function SignInPage(): JSX.Element {
           {SocialLoginButtons(providerMap)}
         </CardFooter>
       </Card>
+
+      {/* SMS Verification Dialog */}
+      <SmsVerificationDialog
+        open={showSmsDialog}
+        onOpenChange={handleSmsDialogClose}
+        phone={smsPhone}
+        email={smsEmail}
+        onVerificationComplete={handleSmsVerificationComplete}
+      />
+
+      {/* Email Verification Dialog */}
+      <EmailVerificationDialog
+        open={showEmailDialog}
+        onOpenChange={handleEmailDialogClose}
+        email={emailForVerification}
+        onVerificationComplete={handleEmailVerificationComplete}
+      />
     </div>
   );
 }
