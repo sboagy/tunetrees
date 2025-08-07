@@ -104,7 +104,7 @@ export async function getUserByAccountFromDatabase(
 }
 
 export async function deleteUserFromDatabase(userId: string): Promise<null> {
-  const res = await fetch(`${_baseURL}/auth/delete-user/${userId}/`, {
+  const res = await fetch(`${_baseURL}/auth/delete-user/${userId}`, {
     method: "DELETE",
     headers: {
       Accept: "application/json",
