@@ -35,6 +35,7 @@ class SMSVerificationCode(BaseModel):
 class SMSSignupVerificationRequest(BaseModel):
     email: str = Field(description="Email address to link with verified phone")
     phone: str = Field(description="Verified phone number")
+    code: str = Field(description="SMS verification code")
 
 
 class SMSVerificationResponse(BaseModel):
@@ -392,51 +393,12 @@ async def verify_sms_signup(
 ) -> SMSVerificationResponse:
     """Complete account verification via SMS after phone verification"""
     try:
-        with SessionLocal() as db:
-            # Find user by email
-            stmt = select(orm.User).where(orm.User.email == request.email)
-            user = db.execute(stmt).scalar_one_or_none()
+        # NOTE: SMS code validation is handled by the /sms/verify-code endpoint
+        # which is called BEFORE this endpoint. This endpoint only completes
+        # the account verification process.
 
-            if not user:
-                raise HTTPException(status_code=404, detail="Account not found")
-
-            # Check if account is already verified
-            if user.email_verified or user.phone_verified:
-                return SMSVerificationResponse(
-                    success=True, message="Account already verified"
-                )
-
-            # Update user with phone number and verify account
-            user.phone = request.phone
-            from datetime import timezone
-
-            user.phone_verified = datetime.now(
-                timezone.utc
-            ).isoformat()  # Store timestamp as string
-            user.email_verified = datetime.now(
-                timezone.utc
-            ).isoformat()  # Set for NextAuth compatibility
-
-            user.modified = datetime.now(timezone.utc)
-
-            # Clean up verification token after successful SMS verification
-            from tunetrees.models.tunetrees import VerificationToken
-
-            stmt_delete = select(VerificationToken).where(
-                VerificationToken.identifier == request.email
-            )
-            tokens_to_delete = db.execute(stmt_delete).scalars().all()
-            for token in tokens_to_delete:
-                db.delete(token)
-
-            db.commit()
-
-            logger.info(
-                f"Account verified via SMS for user {user.id} ({request.email})"
-            )
-            return SMSVerificationResponse(
-                success=True, message="Account verified successfully via SMS"
-            )
+        # Complete the account verification
+        return await _complete_account_verification(request.email, request.phone)
 
     except HTTPException:
         raise
@@ -444,6 +406,55 @@ async def verify_sms_signup(
         logger.error(f"Error completing SMS signup verification: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to complete SMS verification"
+        )
+
+
+async def _complete_account_verification(
+    email: str, phone: str
+) -> SMSVerificationResponse:
+    """Complete account verification after SMS code validation"""
+    with SessionLocal() as db:
+        # Find user by email
+        stmt = select(orm.User).where(orm.User.email == email)
+        user = db.execute(stmt).scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="Account not found")
+
+        # Check if account is already verified
+        if user.email_verified or user.phone_verified:
+            return SMSVerificationResponse(
+                success=True, message="Account already verified"
+            )
+
+        # Update user with phone number and verify account
+        user.phone = phone
+        from datetime import timezone
+
+        user.phone_verified = datetime.now(
+            timezone.utc
+        ).isoformat()  # Store timestamp as string
+        user.email_verified = datetime.now(
+            timezone.utc
+        ).isoformat()  # Set for NextAuth compatibility
+
+        user.modified = datetime.now(timezone.utc)
+
+        # Clean up verification token after successful SMS verification
+        from tunetrees.models.tunetrees import VerificationToken
+
+        stmt_delete = select(VerificationToken).where(
+            VerificationToken.identifier == email
+        )
+        tokens_to_delete = db.execute(stmt_delete).scalars().all()
+        for token in tokens_to_delete:
+            db.delete(token)
+
+        db.commit()
+
+        logger.info(f"Account verified via SMS for user {user.id} ({email})")
+        return SMSVerificationResponse(
+            success=True, message="Account verified successfully via SMS"
         )
 
 
@@ -581,3 +592,69 @@ async def verify_user_phone(
     except Exception as e:
         logger.error(f"Error verifying user phone: {e}")
         raise HTTPException(status_code=500, detail="Failed to verify phone number")
+
+
+@router.post("/verify-signup-complete", response_model=SMSVerificationResponse)
+async def verify_sms_signup_complete(
+    request: SMSSignupVerificationRequest,
+) -> SMSVerificationResponse:
+    """Complete SMS signup verification in a single atomic operation"""
+    try:
+        verify_service_sid = os.getenv("TWILIO_VERIFY_SERVICE_SID")
+        if not verify_service_sid:
+            raise HTTPException(status_code=500, detail="Verify service not configured")
+
+        # Step 1: Verify code with Twilio Verify API
+        if os.getenv("NODE_ENV") == "production":
+            client = get_twilio_client()
+            verification_check = client.verify.services(
+                verify_service_sid
+            ).verification_checks.create(to=request.phone, code=request.code)
+
+            if verification_check.status != "approved":
+                raise HTTPException(status_code=401, detail="Invalid verification code")
+
+            logger.info(f"SMS verification successful for {request.phone}")
+        else:
+            # For development, accept any 6-digit code for testing
+            if len(request.code) != 6 or not request.code.isdigit():
+                raise HTTPException(
+                    status_code=401, detail="Invalid verification code format"
+                )
+            logger.info(
+                f"SMS verification accepted for {request.phone} (development mode)"
+            )
+
+        # Step 2: Complete account verification
+        with SessionLocal() as db:
+            # Find user by email
+            stmt = select(orm.User).where(orm.User.email == request.email)
+            user = db.execute(stmt).scalar_one_or_none()
+
+            if not user:
+                raise HTTPException(status_code=404, detail="Account not found")
+
+            # Update user with phone number and verify account
+            user.phone = request.phone
+            from datetime import timezone
+            from datetime import datetime
+
+            user.phone_verified = datetime.now(timezone.utc)
+            user.email_verified = datetime.now(timezone.utc)
+
+            db.commit()
+            logger.info(
+                f"Account verification completed for {request.email} with phone {request.phone}"
+            )
+
+        return SMSVerificationResponse(
+            success=True, message="Account verified successfully via SMS"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error completing SMS signup verification: {e}")
+        raise HTTPException(
+            status_code=500, detail="Failed to complete SMS verification"
+        )
