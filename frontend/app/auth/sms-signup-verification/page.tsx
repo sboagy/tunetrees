@@ -3,10 +3,16 @@
 import { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageSquare } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp";
 
 export default function SmsSignupVerificationPage() {
   const searchParams = useSearchParams();
@@ -15,12 +21,13 @@ export default function SmsSignupVerificationPage() {
 
   const email = searchParams.get("email") || "";
   const phone = searchParams.get("phone") || "";
+  const name = searchParams.get("name") || "";
 
   const [verificationCode, setVerificationCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
@@ -51,6 +58,7 @@ export default function SmsSignupVerificationPage() {
         body: JSON.stringify({
           email: email,
           phone: phone,
+          // Note: verification code was already validated by /api/sms/verify-code above
         }),
       });
 
@@ -118,103 +126,115 @@ export default function SmsSignupVerificationPage() {
     }
   };
 
+  const handleBackToSignup = () => {
+    // Build the signup URL with preserved form values
+    const signupUrl = new URL("/auth/newuser", window.location.origin);
+    if (email) signupUrl.searchParams.set("email", email);
+    if (phone) signupUrl.searchParams.set("phone", phone);
+    if (name) signupUrl.searchParams.set("name", name);
+
+    router.push(signupUrl.toString());
+  };
+
   if (!email || !phone) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-[400px]">
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">
-              Invalid verification link. Please try signing up again.
-            </p>
-            <Button
-              className="w-full mt-4"
-              onClick={() => router.push("/auth/newuser")}
-            >
-              Back to Sign Up
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+        <div className="flex flex-col space-y-2 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Invalid verification link
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Please try signing up again.
+          </p>
+        </div>
+        <Button onClick={() => router.push("/auth/newuser")}>
+          Back to Sign Up
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <Card className="w-[400px]">
-        <CardHeader>
-          <CardTitle className="text-center">
-            Verify Your Phone Number
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground text-center">
-              We've sent a 6-digit verification code to{" "}
-              <span className="font-medium">{phone}</span>
-            </p>
+    <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+      <div className="flex flex-col space-y-2 text-center">
+        <MessageSquare className="mx-auto h-6 w-6" />
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Check your SMS message
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          We sent a verification code to {phone}
+        </p>
+      </div>
 
-            <form
-              onSubmit={(e) => {
-                void handleSubmit(e);
-              }}
-              className="space-y-4"
+      <div className="grid gap-6">
+        <form
+          onSubmit={(e) => {
+            void handleSubmit(e);
+          }}
+        >
+          <div className="grid gap-2">
+            <div className="grid gap-1">
+              <Label htmlFor="verificationCode">Verification Code</Label>
+              <InputOTP
+                maxLength={6}
+                value={verificationCode}
+                onChange={(value) => setVerificationCode(value)}
+                id="verificationCode"
+                name="verificationCode"
+                pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+                data-testid="sms-verification-code-input"
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+            <Button
+              type="submit"
+              disabled={isLoading || verificationCode.length !== 6}
+              data-testid="sms-verification-submit-button"
             >
-              <div>
-                <Input
-                  type="text"
-                  placeholder="Enter 6-digit code"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  maxLength={6}
-                  className="text-center text-lg tracking-widest"
-                  disabled={isLoading}
-                  data-testid="sms-verification-code-input"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading || verificationCode.length !== 6}
-                data-testid="sms-verification-submit-button"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  "Verify Phone Number"
-                )}
-              </Button>
-            </form>
-
-            <div className="text-center">
-              <Button
-                variant="link"
-                onClick={() => {
-                  void handleResendCode();
-                }}
-                disabled={isResending}
-                className="text-sm"
-                data-testid="sms-verification-resend-button"
-              >
-                {isResending ? "Sending..." : "Resend Code"}
-              </Button>
-            </div>
-
-            <div className="text-center">
-              <Button
-                variant="outline"
-                onClick={() => router.push("/auth/newuser")}
-                className="text-sm"
-              >
-                Back to Sign Up
-              </Button>
-            </div>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                "Verify Code"
+              )}
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </form>
+
+        <div className="text-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void handleResendCode();
+            }}
+            disabled={isResending}
+            className="mr-2"
+            data-testid="sms-verification-resend-button"
+          >
+            {isResending ? "Sending..." : "Resend Code"}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleBackToSignup}>
+            Back to Sign Up
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
