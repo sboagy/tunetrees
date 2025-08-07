@@ -3,8 +3,6 @@
 import { cn } from "@/lib/utils";
 import {
   calculatePasswordStrength,
-  getStrengthColor,
-  getStrengthProgressColor,
   type IPasswordStrength,
 } from "@/lib/password-utils";
 import { CheckCircle, Circle } from "lucide-react";
@@ -30,77 +28,37 @@ export function PasswordStrengthIndicator({
     [password],
   );
 
-  // Don't show anything if password is empty
-  if (!password) {
-    return null;
-  }
-
-  const strengthColor = getStrengthColor(strength.level);
-  const progressColor = getStrengthProgressColor(strength.level);
-
   return (
     <div
-      className={cn("space-y-3", className)}
+      className={cn("space-y-2", className)}
       data-testid="password-strength-indicator"
     >
-      {/* Strength Level and Progress Bar */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Password Strength
-          </span>
-          <span
-            className={cn("text-sm font-medium capitalize", strengthColor)}
-            data-testid="password-strength-level"
-          >
-            {strength.level}
-          </span>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-          <div
-            className={cn(
-              "h-full transition-all duration-300 ease-in-out",
-              progressColor,
-            )}
-            style={{ width: `${strength.percentage}%` }}
-            role="progressbar"
-            aria-valuenow={strength.percentage}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`Password strength: ${strength.level}, ${strength.percentage}% complete`}
-          />
-        </div>
-      </div>
+      {/* Strength Level Hidden */}
 
       {/* Requirements Checklist */}
       {showRequirements && (
         <div className="space-y-1" data-testid="password-requirements">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Requirements:
-          </span>
-          <ul className="space-y-1" role="list">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
             {strength.requirements.map((requirement) => (
-              <li
+              <div
                 key={requirement.id}
-                className="flex items-center space-x-2 text-sm"
+                className="flex items-center space-x-1.5 text-sm"
                 data-testid={`password-requirement-${requirement.id}`}
               >
                 {requirement.met ? (
                   <CheckCircle
-                    className="h-4 w-4 text-green-500"
+                    className="h-3 w-3 text-green-500 flex-shrink-0"
                     aria-hidden="true"
                   />
                 ) : (
                   <Circle
-                    className="h-4 w-4 text-gray-400"
+                    className="h-3 w-3 text-gray-400 flex-shrink-0"
                     aria-hidden="true"
                   />
                 )}
                 <span
                   className={cn(
-                    "text-sm",
+                    "text-xs leading-tight",
                     requirement.met
                       ? "text-green-600 dark:text-green-400"
                       : "text-gray-600 dark:text-gray-400",
@@ -112,9 +70,9 @@ export function PasswordStrengthIndicator({
                   {requirement.met ? "Met" : "Not met"}:{" "}
                   {requirement.description}
                 </span>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
 
