@@ -52,7 +52,7 @@ async function getPrefsSchedulingOptions(
 async function createPrefsSchedulingOptions(
   prefs: IPrefsSchedulingOptionsCreate,
 ): Promise<IPrefsSchedulingOptionsResponse> {
-  const resp = await fetch(`/api/preferences/prefs_scheduling_options`, {
+  const resp = await fetch("/api/preferences/prefs_scheduling_options", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(prefs),
@@ -117,6 +117,8 @@ export default function SchedulingOptionsForm2() {
       exceptions: "",
     },
   });
+
+  const { isDirty, isSubmitting } = form.formState;
 
   useEffect(() => {
     if (userId <= 0) return;
@@ -324,9 +326,11 @@ export default function SchedulingOptionsForm2() {
         <Button
           type="submit"
           data-testid="sched-submit-button"
-          className="w-full h-12"
+          variant="secondary"
+          className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
+          disabled={!isDirty || isSubmitting}
         >
-          Save Scheduling Options
+          {isSubmitting ? "Saving..." : "Update scheduling options"}
         </Button>
       </form>
     </Form>
