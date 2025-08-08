@@ -263,8 +263,13 @@ async def update_user(
                 raise HTTPException(status_code=404, detail="User Not Found")
 
             # Update the fields dynamically
+            original_email = existing_user.email
             for key, value in update_dict.items():
                 setattr(existing_user, key, value)
+
+            # If email changed, clear email_verified to force re-verification
+            if "email" in update_dict and update_dict.get("email") != original_email:
+                existing_user.email_verified = None
 
             # Commit the changes
             db.commit()

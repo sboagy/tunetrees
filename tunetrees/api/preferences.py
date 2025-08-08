@@ -10,11 +10,17 @@ from tunetrees.app.schedule import (
     create_tuned_scheduler,
     get_user_review_history,
 )
-from tunetrees.models.tunetrees import PrefsSpacedRepetition
+from tunetrees.models.tunetrees import (
+    PrefsSpacedRepetition,
+    PrefsSchedulingOptions,
+    User,
+)
 from tunetrees.models.tunetrees_pydantic import (
     PrefsSpacedRepetitionModel,
     PrefsSpacedRepetitionModelPartial,
     AlgorithmType,
+    PrefsSchedulingOptionsModel,
+    PrefsSchedulingOptionsModelPartial,
 )  # Import SessionLocal from your database module
 
 
@@ -142,6 +148,85 @@ def delete_prefs_spaced_repetition(
         db.delete(db_prefs)
         db.commit()
     return None  # No content to return for status code 204
+
+
+# New endpoints: prefs_scheduling_options CRUD with mirroring
+@preferences_router.get(
+    "/prefs_scheduling_options",
+    response_model=PrefsSchedulingOptionsModel,
+    summary="Get scheduling options",
+    description="Retrieve scheduling options for a user.",
+    status_code=status.HTTP_200_OK,
+)
+def get_prefs_scheduling_options(
+    user_id: int = Query(..., description="The user ID"),
+):
+    with SessionLocal() as db:
+        prefs = db.get(PrefsSchedulingOptions, user_id)
+        if not prefs:
+            raise HTTPException(status_code=404, detail="Scheduling options not found")
+        return prefs
+
+
+@preferences_router.post(
+    "/prefs_scheduling_options",
+    response_model=PrefsSchedulingOptionsModel,
+    summary="Create scheduling options",
+    description="Create scheduling options for a user.",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_prefs_scheduling_options(prefs: PrefsSchedulingOptionsModel):
+    with SessionLocal() as db:
+        # Ensure user exists
+        user = db.get(User, prefs.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Create
+        db_prefs = PrefsSchedulingOptions(**prefs.model_dump())
+        db.add(db_prefs)
+        # Mirror acceptable_delinquency_window to user
+        if prefs.acceptable_delinquency_window is not None:
+            user.acceptable_delinquency_window = prefs.acceptable_delinquency_window
+        db.commit()
+        db.refresh(db_prefs)
+        return db_prefs
+
+
+@preferences_router.put(
+    "/prefs_scheduling_options",
+    response_model=PrefsSchedulingOptionsModel,
+    summary="Update scheduling options",
+    description="Update existing scheduling options for a user.",
+    status_code=status.HTTP_200_OK,
+)
+def update_prefs_scheduling_options(
+    user_id: int = Query(..., description="The user ID"),
+    prefs: PrefsSchedulingOptionsModelPartial = Query(...),
+):
+    with SessionLocal() as db:
+        db_prefs = db.get(PrefsSchedulingOptions, user_id)
+        if not db_prefs:
+            raise HTTPException(status_code=404, detail="Scheduling options not found")
+        # Apply updates
+        updates = prefs.model_dump(exclude_unset=True)
+        for key, value in updates.items():
+            setattr(db_prefs, key, value)
+
+        # Mirror acceptable_delinquency_window to user if present
+        if (
+            "acceptable_delinquency_window" in updates
+            and updates["acceptable_delinquency_window"] is not None
+        ):
+            user = db.get(User, user_id)
+            if user:
+                user.acceptable_delinquency_window = updates[
+                    "acceptable_delinquency_window"
+                ]
+
+        db.commit()
+        db.refresh(db_prefs)
+        return db_prefs
 
 
 @preferences_router.post(
