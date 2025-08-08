@@ -81,13 +81,52 @@ async function updatePrefsSchedulingOptions(
   return (await resp.json()) as IPrefsSchedulingOptionsResponse;
 }
 
+// Helpers for optional JSON validation
+const optionalJsonObjectString = z
+  .string()
+  .optional()
+  .refine(
+    (s) => {
+      const str = (s ?? "").trim();
+      if (str === "") return true; // empty allowed
+      try {
+        const parsed = JSON.parse(str);
+        return (
+          parsed !== null &&
+          typeof parsed === "object" &&
+          !Array.isArray(parsed)
+        );
+      } catch {
+        return false;
+      }
+    },
+    { message: "Must be valid JSON object (or leave blank)" },
+  );
+
+const optionalJsonArrayString = z
+  .string()
+  .optional()
+  .refine(
+    (s) => {
+      const str = (s ?? "").trim();
+      if (str === "") return true; // empty allowed
+      try {
+        const parsed = JSON.parse(str);
+        return Array.isArray(parsed);
+      } catch {
+        return false;
+      }
+    },
+    { message: "Must be valid JSON array (or leave blank)" },
+  );
+
 const schema = z.object({
   acceptable_delinquency_window: z.number().min(0).max(365).optional(),
   min_reviews_per_day: z.number().min(0).max(10000).optional(),
   max_reviews_per_day: z.number().min(0).max(10000).optional(),
   days_per_week: z.number().min(0).max(7).optional(),
-  weekly_rules: z.string().optional(),
-  exceptions: z.string().optional(),
+  weekly_rules: optionalJsonObjectString,
+  exceptions: optionalJsonArrayString,
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -108,6 +147,8 @@ export default function SchedulingOptionsForm2() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: "onChange",
+    reValidateMode: "onChange",
     defaultValues: {
       acceptable_delinquency_window: 21,
       min_reviews_per_day: undefined,
@@ -118,7 +159,7 @@ export default function SchedulingOptionsForm2() {
     },
   });
 
-  const { isDirty, isSubmitting } = form.formState;
+  const { isDirty, isSubmitting, isValid } = form.formState;
 
   useEffect(() => {
     if (userId <= 0) return;
@@ -328,7 +369,7 @@ export default function SchedulingOptionsForm2() {
           data-testid="sched-submit-button"
           variant="secondary"
           className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
-          disabled={!isDirty || isSubmitting}
+          disabled={!isDirty || isSubmitting || !isValid}
         >
           {isSubmitting ? "Saving..." : "Update scheduling options"}
         </Button>
