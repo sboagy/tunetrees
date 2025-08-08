@@ -61,7 +61,6 @@ export function AccountForm() {
   });
 
   // Runs once after initial render: The effect runs only once, after the component has rendered for the first time.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     void (async () => {
       const token = await getCsrfToken();
@@ -70,10 +69,9 @@ export function AccountForm() {
         form.setValue("csrfToken", token); // Update form's csrfToken value
       }
     })();
-  }, []);
+  }, [form]);
 
   // Fetch user data from database to populate form fields, especially phone number
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     void (async () => {
       if (email) {

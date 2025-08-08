@@ -27,7 +27,7 @@ export async function updateUser(
     }
 
     const userId = Number(session.user.id);
-    if (isNaN(userId)) {
+    if (Number.isNaN(userId)) {
       return {
         status: "error",
         message: "Invalid user ID",

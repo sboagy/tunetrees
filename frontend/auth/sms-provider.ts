@@ -60,7 +60,7 @@ export function SMSProvider(config: { apiUrl?: string }): ISMSProvider {
 
         const user = await response.json();
 
-        if (user && user.id) {
+        if (user?.id) {
           return {
             id: user.id,
             phone: user.phone,

@@ -92,9 +92,8 @@ export async function authorize(
           "===> auth/index.ts ~ User has verified phone, allowing login",
         );
         return user;
-      } else {
-        throw new InvalidLoginError("SMS verification required");
       }
+      throw new InvalidLoginError("SMS verification required");
     }
 
     if (!credentials.password) {

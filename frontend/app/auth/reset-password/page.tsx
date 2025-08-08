@@ -60,7 +60,7 @@ export default function ResetPasswordPage(): JSX.Element {
   const handleClose = () => {
     // Check if user came from login page via referrer or go to home
     const referrer = document.referrer;
-    if (referrer && referrer.includes("/auth/login")) {
+    if (referrer?.includes("/auth/login")) {
       router.push("/auth/login");
     } else {
       router.push("/");

@@ -66,7 +66,7 @@ export default function LoginDialog(): JSX.Element {
         console.error("Error getting CSRF token:", error);
       }
     })();
-  }, []); // No dependencies to avoid loops
+  }, [form]);
 
   const validateEmail = useCallback((email: string): boolean => {
     if (email === "") {
