@@ -35,7 +35,11 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SessionProvider session={session}>
+          <SessionProvider
+            session={session}
+            refetchOnWindowFocus={false}
+            refetchWhenOffline={false}
+          >
             <ClientContextsWrapper>{children}</ClientContextsWrapper>
           </SessionProvider>
         </ThemeProvider>
