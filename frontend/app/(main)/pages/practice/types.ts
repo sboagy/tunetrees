@@ -283,6 +283,9 @@ export interface IUser {
   image?: string;
   hash?: string;
   sr_alg_type?: string;
+  phone?: string;
+  phone_verified?: string | null; // Assuming datetime is converted to string
+  acceptable_delinquency_window?: number;
 }
 
 export interface IVerificationTokenParams {

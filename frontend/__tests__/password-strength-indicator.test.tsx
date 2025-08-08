@@ -8,7 +8,11 @@ import { PasswordStrengthIndicator } from "@/components/ui/password-strength-ind
 describe("PasswordStrengthIndicator Component", () => {
   it("should render nothing when password is empty", () => {
     const { container } = render(<PasswordStrengthIndicator password="" />);
-    expect(container.firstChild).toBeNull();
+    const indicator = container.querySelector(
+      '[data-testid="password-strength-indicator"]',
+    );
+    expect(indicator).not.toBeNull();
+    expect(indicator?.textContent).toContain("Password strength is weak");
   });
 
   it("should render component when password is provided", () => {
@@ -29,11 +33,11 @@ describe("PasswordStrengthIndicator Component", () => {
   it("should render component with various password strengths", () => {
     const passwords = ["weak", "Password1", "StrongPass123!"];
 
-    passwords.forEach((password) => {
+    for (const password of passwords) {
       const { container } = render(
         <PasswordStrengthIndicator password={password} />,
       );
       expect(container.firstChild).not.toBeNull();
-    });
+    }
   });
 });

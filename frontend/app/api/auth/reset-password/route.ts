@@ -4,7 +4,7 @@ import {
   type IExtendedAdapterUser,
 } from "@/auth/auth-tt-adapter";
 import { hashPassword } from "@/auth/password-hash";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 const resetSchema = z.object({

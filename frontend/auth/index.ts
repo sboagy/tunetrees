@@ -38,6 +38,8 @@ import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import SendgridProvider from "next-auth/providers/sendgrid";
 
+// import SMSProvider from "./sms-provider";
+
 import { viewSettingsDefault } from "@/app/user-settings/view-settings-default";
 import type { AdapterUser } from "next-auth/adapters";
 import type { JWT } from "next-auth/jwt";
@@ -90,6 +92,7 @@ export const providers: Provider[] = [
     sendVerificationRequest,
     maxAge: 24 * 60 * 60, // How long the email verification link is valid for (default 24h)
   }),
+  // SMSProvider({ apiUrl: process.env.NEXT_PUBLIC_API_URL }),
 
   GitHubProvider({
     clientId: process.env.GITHUB_CLIENT_ID ?? "",
@@ -233,6 +236,17 @@ const config = {
       console.log("===> auth index.ts:343 ~ jwt callback");
       if (params.trigger === "update" && params.session?.user) {
         params.token.name = params.session.user.name;
+        // Handle phone data updates when session is updated
+        const sessionUser = params.session.user as User & {
+          phone?: string;
+          phone_verified?: boolean;
+        };
+        if (sessionUser.phone !== undefined) {
+          params.token.phone = sessionUser.phone;
+        }
+        if (sessionUser.phone_verified !== undefined) {
+          params.token.phone_verified = sessionUser.phone_verified;
+        }
       } else if (params.trigger === "update" && params.session) {
         params.token = { ...params.token, user: params.session };
         return params.token;
@@ -241,7 +255,7 @@ const config = {
         return { ...params.token, accessToken: params.account.access_token };
       }
 
-      // If it's a new jwt, add the user id and view settings to the token,
+      // If it's a new jwt, add the user id, phone, and view settings to the token,
       // so that they can be later transferred to the session, in the
       // session callback.
       const email = params.token?.email as string;
@@ -249,6 +263,8 @@ const config = {
         const userRecord = await getUserExtendedByEmail(email);
         if (userRecord?.id) {
           params.token.user_id = userRecord?.id;
+          params.token.phone = userRecord?.phone;
+          params.token.phone_verified = !!userRecord?.phoneVerified; // Convert to boolean
         }
       }
 
@@ -276,13 +292,28 @@ const config = {
     },
     session(params: {
       session: Session & { userId?: string; view_settings?: string };
-      token: JWT & { user_id?: string; view_settings?: string };
+      token: JWT & {
+        user_id?: string;
+        view_settings?: string;
+        phone?: string;
+        phone_verified?: boolean;
+      };
       user: User | AdapterUser;
     }) {
       console.log("===> auth index.ts:392 ~ session callback");
       params.session.userId = params.token.user_id as string;
       if (params.session.user) {
         params.session.user.id = params.token.user_id as string;
+        // Add phone data to session user
+        if (params.token.phone !== undefined) {
+          (params.session.user as User & { phone?: string }).phone =
+            params.token.phone;
+        }
+        if (params.token.phone_verified !== undefined) {
+          (
+            params.session.user as User & { phone_verified?: boolean }
+          ).phone_verified = params.token.phone_verified;
+        }
       }
       if (params.token.view_settings) {
         params.session.view_settings = params.token.view_settings;
@@ -293,6 +324,9 @@ const config = {
   // experimental: {
   //   enableWebAuthn: true,
   // },
+  experimental: {
+    enableWebAuthn: true,
+  },
   debug: process.env.NODE_ENV !== "production",
   // debug: true,
 } satisfies NextAuthConfig;

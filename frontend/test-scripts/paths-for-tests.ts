@@ -25,11 +25,30 @@ export const venvBinDir = path.resolve(
   ".venv/bin",
 );
 
-// Determine the virtual environment's lib directory for PYTHONPATH
-export const venvLibDir = path.resolve(
-  tunetreesBackendDeployBaseDir,
-  ".venv/lib/python3.12/site-packages",
-);
+// Dynamically determine the virtual environment's lib directory for PYTHONPATH
+function getVenvLibDir(): string {
+  const venvLibPath = path.resolve(tunetreesBackendDeployBaseDir, ".venv/lib");
+
+  if (!fs.existsSync(venvLibPath)) {
+    throw new Error(
+      `Virtual environment lib directory not found: ${venvLibPath}`,
+    );
+  }
+
+  // Find the python directory (e.g., python3.12, python3.11, etc.)
+  const libEntries = fs.readdirSync(venvLibPath);
+  const pythonDir = libEntries.find((entry) => entry.startsWith("python3."));
+
+  if (!pythonDir) {
+    throw new Error(
+      `No python3.x directory found in ${venvLibPath}. Available entries: ${libEntries.join(", ")}`,
+    );
+  }
+
+  return path.resolve(venvLibPath, pythonDir, "site-packages");
+}
+
+export const venvLibDir = getVenvLibDir();
 
 export const playwrightTestResulsDir = path.join(
   testResultsDirPath,

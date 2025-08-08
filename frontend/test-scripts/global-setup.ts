@@ -77,9 +77,15 @@ async function globalSetup() {
 
   const fastAPIFd = fs.openSync(fastAPILog, "a");
 
+  // Determine the Python executable path
+  const pythonExecutable =
+    process.env.CI === "true" ? "python" : path.join(venvBinDir, "python");
+
   const fastapiProcess: ChildProcess = spawn(
-    path.join(venvBinDir, "uvicorn"),
+    pythonExecutable,
     [
+      "-m",
+      "uvicorn",
       "tunetrees.api.main:app",
       "--reload",
       "--host",
@@ -91,7 +97,10 @@ async function globalSetup() {
       env: {
         ...process.env,
         PATH: `${venvBinDir}:${process.env.PATH}`,
-        PYTHONPATH: `${tunetreesBackendDeployBaseDir}:${venvLibDir}:${process.env.PYTHONPATH || ""}`,
+        PYTHONPATH:
+          venvLibDir && venvLibDir.trim() !== ""
+            ? `${tunetreesBackendDeployBaseDir}:${String(venvLibDir)}:${process.env.PYTHONPATH || ""}`
+            : `${tunetreesBackendDeployBaseDir}:${process.env.PYTHONPATH || ""}`,
         PYTHONDONTWRITEBYTECODE: "1",
         PYTHONUNBUFFERED: "1",
         TUNETREES_DB: process.env.TUNETREES_DB || `${testDatabasePath}`,

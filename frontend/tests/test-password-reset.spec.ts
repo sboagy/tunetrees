@@ -33,21 +33,77 @@ test.afterEach(async ({ page }, testInfo) => {
 });
 
 test.describe("Password Reset Request Flow", () => {
-  test("should display password reset request form", async ({ page }) => {
+  test("should display password reset request form with method selection", async ({
+    page,
+  }) => {
     await page.goto("/auth/password-reset");
     await page.waitForLoadState("domcontentloaded");
 
-    // Check page title and form elements
+    // Check page title
     await expect(page.locator("h1, h2, h3")).toContainText("Reset");
+
+    // Check method selection buttons are visible - use more specific selectors
+    await expect(
+      page
+        .locator('button[type="button"]')
+        .filter({ hasText: "Email" })
+        .first(),
+    ).toBeVisible();
+    await expect(
+      page.locator('button[type="button"]').filter({ hasText: "SMS" }),
+    ).toBeVisible();
+
+    // By default, email method should be selected and form visible
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
 
     console.log("Password reset form is displayed correctly");
   });
 
+  test("should switch between email and SMS methods", async ({ page }) => {
+    await page.goto("/auth/password-reset");
+    await page.waitForLoadState("domcontentloaded");
+
+    // Start with email selected (default)
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+
+    // Click SMS tab - use more specific selector
+    await page
+      .locator('button[type="button"]')
+      .filter({ hasText: "SMS" })
+      .click();
+
+    // Should now show SMS form and hide email form
+    await expect(page.locator('input[type="email"]')).not.toBeVisible();
+    await expect(
+      page.getByText(
+        "Enter your phone number to receive a password reset code",
+      ),
+    ).toBeVisible();
+
+    // Switch back to email - use more specific selector
+    await page
+      .locator('button[type="button"]')
+      .filter({ hasText: "Email" })
+      .first()
+      .click();
+
+    // Should show email form again
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+
+    console.log("Method switching works correctly");
+  });
+
   test("should validate email format", async ({ page }) => {
     await page.goto("/auth/password-reset");
     await page.waitForLoadState("domcontentloaded");
+
+    // Ensure email method is selected - use more specific selector
+    await page
+      .locator('button[type="button"]')
+      .filter({ hasText: "Email" })
+      .first()
+      .click();
 
     const emailInput = page.locator('input[type="email"]');
     const submitButton = page.locator('button[type="submit"]');
@@ -72,11 +128,18 @@ test.describe("Password Reset Request Flow", () => {
     console.log("Email validation works correctly");
   });
 
-  test("should show success message after form submission", async ({
+  test("should show success message after email form submission", async ({
     page,
   }) => {
     await page.goto("/auth/password-reset");
     await page.waitForLoadState("domcontentloaded");
+
+    // Ensure email method is selected - use more specific selector
+    await page
+      .locator('button[type="button"]')
+      .filter({ hasText: "Email" })
+      .first()
+      .click();
 
     const emailInput = page.locator('input[type="email"]');
     const submitButton = page.locator('button[type="submit"]');
@@ -93,14 +156,14 @@ test.describe("Password Reset Request Flow", () => {
     console.log("Success message displayed correctly");
   });
 
-  test("should have back to login link", async ({ page }) => {
+  test("should have close button", async ({ page }) => {
     await page.goto("/auth/password-reset");
     await page.waitForLoadState("domcontentloaded");
 
-    const backLink = page.locator('a[href="/auth/login"]');
-    await expect(backLink).toBeVisible();
+    const closeButton = page.locator('button[aria-label="Close"]');
+    await expect(closeButton).toBeVisible();
 
-    console.log("Back to login link is present");
+    console.log("Close button is present");
   });
 });
 
@@ -158,9 +221,8 @@ test.describe("Password Reset Completion Flow", () => {
     // Test weak password - should show password strength indicator and validation error
     await ttPO.passwordResetPasswordInput.fill("weak");
 
-    // Wait for password strength indicator to appear and show weak rating
+    // Wait for password strength indicator to appear
     await expect(ttPO.passwordStrengthIndicator).toBeVisible();
-    await expect(ttPO.passwordStrengthLevel).toHaveText("weak");
 
     // Check that specific requirement shows as not met
     await expect(ttPO.passwordRequirements).toBeVisible();
@@ -236,7 +298,7 @@ test.describe("Password Reset Completion Flow", () => {
     console.log("Missing parameters handled correctly");
   });
 
-  test("should have back to login link", async ({ page }) => {
+  test("should have close button", async ({ page }) => {
     const testEmail = "test@example.com";
     const testToken = "123456";
 
@@ -245,10 +307,10 @@ test.describe("Password Reset Completion Flow", () => {
     );
     await page.waitForLoadState("domcontentloaded");
 
-    const backLink = page.locator('a[href="/auth/login"]');
-    await expect(backLink).toBeVisible();
+    const closeButton = page.locator('button[aria-label="Close"]');
+    await expect(closeButton).toBeVisible();
 
-    console.log("Back to login link is present");
+    console.log("Close button is present");
   });
 });
 

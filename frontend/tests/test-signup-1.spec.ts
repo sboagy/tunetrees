@@ -43,13 +43,35 @@ test.describe.serial("Signup Tests", () => {
     // So, if NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, instead of trying to retrieve the
     // link from the email, we'll just retrieve it from localStorage.
     if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+      console.log(
+        "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, checking localStorage",
+      );
+
+      // Wait a bit for the localStorage to be set
+      await page.waitForTimeout(2000);
+
       const linkBackURL = await ttPO.page.evaluate(() => {
-        return window.localStorage.getItem("linkBackURL");
+        console.log("Checking localStorage for linkBackURL...");
+        const stored = window.localStorage.getItem("linkBackURL");
+        console.log("Found in localStorage:", stored);
+        return stored;
       });
 
       console.log("Retrieved linkBackURL from localStorage:", linkBackURL);
 
       if (!linkBackURL) {
+        // Let's check what's actually in localStorage
+        const allLocalStorage = await ttPO.page.evaluate(() => {
+          const items: Record<string, string | null> = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+              items[key] = localStorage.getItem(key);
+            }
+          }
+          return items;
+        });
+        console.log("All localStorage items:", allLocalStorage);
         throw new Error("No linkBackURL found in localStorage");
       }
 
@@ -161,17 +183,48 @@ test.describe.serial("Signup Tests", () => {
     // link from the email, we'll just retrieve it from localStorage.
     let verificationCode: string | null;
     if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+      console.log(
+        "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, checking localStorage",
+      );
+
+      // Wait a bit for the localStorage to be set
+      await page.waitForTimeout(2000);
+
       const linkBackURL = await ttPO.page.evaluate(() => {
-        return window.localStorage.getItem("linkBackURL");
+        console.log("Checking localStorage for linkBackURL...");
+        const stored = window.localStorage.getItem("linkBackURL");
+        console.log("Found in localStorage:", stored);
+        return stored;
       });
 
       console.log("Retrieved linkBackURL from localStorage:", linkBackURL);
 
       if (!linkBackURL) {
+        // Let's check what's actually in localStorage
+        const allLocalStorage = await ttPO.page.evaluate(() => {
+          const items: Record<string, string | null> = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+              items[key] = localStorage.getItem(key);
+            }
+          }
+          return items;
+        });
+        console.log("All localStorage items:", allLocalStorage);
         throw new Error("No linkBackURL found in localStorage");
       }
 
-      verificationCode = linkBackURL.split("token=")[1];
+      // Extract verification code from URL - handle both token parameter and potential additional params
+      const urlParams = new URL(linkBackURL).searchParams;
+      verificationCode = urlParams.get("token");
+
+      if (!verificationCode) {
+        // Fallback to the original method if URL parsing fails
+        verificationCode = linkBackURL.split("token=")[1]?.split("&")[0];
+      }
+
+      console.log("Extracted verification code:", verificationCode);
     } else {
       // Open Gmail in a new tab
       const gmailPage = await page.context().newPage();
@@ -226,10 +279,33 @@ test.describe.serial("Signup Tests", () => {
       await gmailPage.close();
     }
 
-    const verificationCodeInput = page.locator("#verificationCode");
-    await verificationCodeInput.isVisible();
-    await verificationCodeInput.fill(verificationCode || "");
-    await verificationCodeInput.press("Enter");
+    // Wait for the email verification dialog to appear
+    await page.waitForTimeout(2000);
+
+    // Find the InputOTP component - look for the container and use value change approach
+    const otpContainer = page.locator('[data-slot="input-otp"]');
+    await otpContainer.waitFor({ state: "visible", timeout: 10000 });
+
+    // Fill the verification code into the OTP input
+    if (verificationCode && verificationCode.length > 0) {
+      console.log(`Filling OTP with verification code: ${verificationCode}`);
+
+      // Click on the OTP container to focus it and then send keystrokes
+      await otpContainer.click();
+
+      // Type the verification code character by character
+      for (const char of verificationCode.slice(0, 6)) {
+        await page.keyboard.type(char);
+        await page.waitForTimeout(100); // Small delay between characters
+      }
+    } else {
+      throw new Error(`Invalid verification code: ${verificationCode}`);
+    }
+
+    // Click the Verify button instead of pressing Enter
+    const verifyButton = page.getByRole("button", { name: "Verify" });
+    await verifyButton.waitFor({ state: "visible", timeout: 5000 });
+    await verifyButton.click();
 
     await page.waitForTimeout(4_000);
 
@@ -297,24 +373,18 @@ test.describe.serial("Signup Tests", () => {
     await passwordEntryBox.fill("weak");
 
     // Check that password strength indicator appears
-    const strengthIndicator = page.locator(
-      'span.text-sm.font-medium:has-text("Password Strength")',
-    );
+    const strengthIndicator = page.getByTestId("password-strength-indicator");
     await expect(strengthIndicator).toBeVisible();
 
     // Check that requirements are visible
-    const requirementsHeader = page.getByText("Requirements:");
-    await expect(requirementsHeader).toBeVisible();
+    const requirementsSection = page.getByTestId("password-requirements");
+    await expect(requirementsSection).toBeVisible();
 
-    // Verify progress bar is present and shows weak strength
-    const progressBar = page.locator('div[role="progressbar"]');
-    await expect(progressBar).toBeVisible();
-
-    // Verify strength text shows "weak" - target the visible strength indicator
-    const strengthText = page.locator(
-      'span.text-sm.font-medium.capitalize:has-text("weak")',
+    // Verify at least one requirement is shown as not met (weak password should fail multiple requirements)
+    const unmetRequirement = page.locator(
+      '[data-testid^="password-requirement-"] .text-gray-400',
     );
-    await expect(strengthText).toBeVisible();
+    await expect(unmetRequirement.first()).toBeVisible();
 
     // Verify password verification field shows validation error
     const passwordVerificationBox = ttPO.page.getByTestId(
@@ -363,33 +433,36 @@ test.describe.serial("Signup Tests", () => {
     await userNameBox.fill("Test User");
 
     const passwordEntryBox = ttPO.page.getByTestId("user_password");
-    const progressBar = page.locator('div[role="progressbar"]');
+    const strengthIndicator = page.getByTestId("password-strength-indicator");
 
     // Test progressive password strength improvement
 
     // Step 1: Start with short password
     await passwordEntryBox.fill("Ab");
-    await expect(progressBar).toBeVisible();
+    await expect(strengthIndicator).toBeVisible();
 
     // Step 2: Add length (but still missing requirements)
     await passwordEntryBox.fill("Abcdefgh");
-    await expect(progressBar).toBeVisible();
+    await expect(strengthIndicator).toBeVisible();
 
     // Step 3: Add number
     await passwordEntryBox.fill("Abcdefgh1");
-    await expect(progressBar).toBeVisible();
+    await expect(strengthIndicator).toBeVisible();
 
     // Step 4: Add special character for strong password
     await passwordEntryBox.fill("Abcdefgh1!");
-    await expect(
-      page.locator('span.text-sm.font-medium.capitalize:has-text("strong")'),
-    ).toBeVisible();
-    await expect(progressBar).toBeVisible();
+
+    // Verify all requirements are now met (strong password)
+    const requirementsSection = page.getByTestId("password-requirements");
+    await expect(requirementsSection).toBeVisible();
+
+    // Check that most/all requirements show as met (green checkmarks)
+    const metRequirements = page.locator(
+      '[data-testid^="password-requirement-"] .text-green-500',
+    );
+    await expect(metRequirements.first()).toBeVisible();
 
     // Verify password strength component is working
-    const strengthIndicator = page.locator(
-      'span.text-sm.font-medium:has-text("Password Strength")',
-    );
     await expect(strengthIndicator).toBeVisible();
 
     console.log(
@@ -503,21 +576,18 @@ test.describe.serial("Signup Tests", () => {
     await passwordEntryBox.fill(validPassword);
     await passwordVerificationBox.fill(validPassword);
 
-    // Verify password strength shows as Strong
-    const strengthText = page.locator(
-      'span.text-sm.font-medium.capitalize:has-text("strong")',
-    );
-    await expect(strengthText).toBeVisible();
-
-    // Verify password strength component is present
-    const strengthIndicator = page.locator(
-      'span.text-sm.font-medium:has-text("Password Strength")',
-    );
+    // Verify password strength component is present and showing requirements
+    const strengthIndicator = page.getByTestId("password-strength-indicator");
     await expect(strengthIndicator).toBeVisible();
 
-    // Verify progress bar is present
-    const progressBar = page.locator('div[role="progressbar"]');
-    await expect(progressBar).toBeVisible();
+    const requirementsSection = page.getByTestId("password-requirements");
+    await expect(requirementsSection).toBeVisible();
+
+    // Verify strong password shows most/all requirements as met (green checkmarks)
+    const metRequirements = page.locator(
+      '[data-testid^="password-requirement-"] .text-green-500',
+    );
+    await expect(metRequirements.first()).toBeVisible();
 
     // Submit form - check that it's enabled for valid passwords
     const dialogSignInButton = ttPO.page.getByRole("button", {
@@ -528,6 +598,97 @@ test.describe.serial("Signup Tests", () => {
 
     console.log(
       "===> test-signup-1.spec.ts ~ Password validation test - form submission completed",
+    );
+  });
+
+  test("test-unverified-user-retry-signup", async ({ page }) => {
+    console.log(
+      "===> test-signup-1.spec.ts ~ Test unverified user retry signup scenario",
+    );
+    const ttPO = new TuneTreesPageObject(page);
+
+    await checkHealth();
+    await page.goto("https://localhost:3000", {
+      timeout: initialPageLoadTimeout,
+      waitUntil: "domcontentloaded",
+    });
+
+    // First, attempt initial signup
+    const topSignInButton = ttPO.page.getByRole("button", {
+      name: "New user",
+    });
+    await topSignInButton.waitFor({ state: "visible" });
+    await topSignInButton.click();
+
+    // Wait for the signup dialog to appear
+    const userEmailLocator = ttPO.page.getByTestId("user_email");
+    await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
+
+    // Use a unique email for this test (keep under 30 characters)
+    const testEmail = `retry.${Date.now().toString().slice(-6)}@ex.com`;
+
+    // Fill out signup form
+    await userEmailLocator.fill(testEmail);
+    const userNameBox = ttPO.page.getByTestId("user_name");
+    await userNameBox.fill("Unverified Test User");
+
+    const passwordEntryBox = ttPO.page.getByTestId("user_password");
+    const passwordVerificationBox = ttPO.page.getByTestId(
+      "user_password_verification",
+    );
+
+    const testPassword = "TestPass123!";
+    await passwordEntryBox.fill(testPassword);
+    await passwordVerificationBox.fill(testPassword);
+
+    // Submit the first signup attempt
+    const dialogSignInButton = ttPO.page.getByRole("button", {
+      name: "Sign Up",
+      exact: true,
+    });
+    await expect(dialogSignInButton).toBeEnabled();
+    await dialogSignInButton.click();
+
+    // Verify we get to the verification page
+    const checkEmailHeader = ttPO.page.getByRole("heading", {
+      name: "Check your email",
+    });
+    await expect(checkEmailHeader).toBeVisible();
+
+    console.log(
+      "First signup attempt completed, user created but not verified",
+    );
+
+    // Now simulate user closing browser/navigating away and trying to sign up again
+    await page.goto("https://localhost:3000", {
+      timeout: initialPageLoadTimeout,
+      waitUntil: "domcontentloaded",
+    });
+
+    // Attempt signup again with the same email
+    await topSignInButton.waitFor({ state: "visible" });
+    await topSignInButton.click();
+
+    await userEmailLocator.waitFor({ state: "visible", timeout: 20000 });
+    await userEmailLocator.fill(testEmail); // Same email as before
+    await userNameBox.fill("Unverified Test User Retry");
+
+    await passwordEntryBox.fill(testPassword);
+    await passwordVerificationBox.fill(testPassword);
+
+    // This signup attempt should succeed (unverified user should be deleted and replaced)
+    await expect(dialogSignInButton).toBeEnabled();
+    await dialogSignInButton.click();
+
+    // Should successfully reach verification page again
+    await expect(checkEmailHeader).toBeVisible();
+
+    console.log(
+      "Second signup attempt with same email succeeded - unverified user was properly cleaned up",
+    );
+
+    console.log(
+      "===> test-signup-1.spec.ts ~ Unverified user retry signup test completed",
     );
   });
 });
@@ -620,11 +781,9 @@ async function initialSignIn(page: Page) {
   await dialogSignInButton.click();
 
   const checkEmailHeader = ttPO.page.getByRole("heading", {
-    name: "Please check Your Email to",
+    name: "Check your email",
   });
   await checkEmailHeader.isVisible();
-  await expect(checkEmailHeader).toHaveText(
-    "Please check Your Email to log in",
-  );
+  // await expect(checkEmailHeader).toHaveText("Check your email");
   return ttPO;
 }

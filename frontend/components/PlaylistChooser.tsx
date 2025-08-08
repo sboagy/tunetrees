@@ -12,7 +12,7 @@ import {
 import type { IViewPlaylistJoined } from "@/app/(main)/pages/practice/types";
 import { ChevronDownIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import styles from "./PlaylistChooser.module.css";
 import PlaylistDialog from "./PlaylistDialog";
 import { Button } from "./ui/button";
@@ -39,57 +39,63 @@ export default function PlaylistChooser() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchPlaylistsAndSetCurrent = async (
-    userId: number,
-  ): Promise<number> => {
-    try {
-      const playlists = await fetchViewPlaylistJoined(userId);
-      if (typeof playlists === "string") {
-        console.error("Error fetching playlists:", playlists);
-        // return -1;
-      }
-      if (Array.isArray(playlists)) {
-        if (playlists.length === 0 && !isDialogOpen) {
-          setIsDialogOpen(true);
+  const fetchPlaylistsAndSetCurrent = useCallback(
+    async (userId: number): Promise<number> => {
+      try {
+        const playlists = await fetchViewPlaylistJoined(userId);
+        if (typeof playlists === "string") {
+          console.error("Error fetching playlists:", playlists);
+          // return -1;
         }
-        setPlaylistsInMenu(playlists);
-        const tabGroupMainState = await getTabGroupMainState(
-          userId,
-          currentPlaylist,
-        );
-        const playlistId = tabGroupMainState?.playlist_id ?? 1;
-        let playlist = playlists.find(
-          (playlist) => playlist.playlist_id === playlistId,
-        );
-        if (playlist === undefined && playlists.length > 0) {
-          const playlistId2 = playlists[0].playlist_id;
-          playlist = playlists.find(
-            (playlist) => playlist.playlist_id === playlistId2,
+        if (Array.isArray(playlists)) {
+          if (playlists.length === 0 && !isDialogOpen) {
+            setIsDialogOpen(true);
+          }
+          setPlaylistsInMenu(playlists);
+          const tabGroupMainState = await getTabGroupMainState(
+            userId,
+            currentPlaylist,
           );
-        }
-        if (playlist) {
-          setCurrentPlaylist(playlist.playlist_id);
-          setCurrentPlaylistName(playlist.instrument ?? "(None)");
-          setCurrentPlaylistDescription(playlist.description ?? "");
+          const playlistId = tabGroupMainState?.playlist_id ?? 1;
+          let playlist = playlists.find(
+            (playlist) => playlist.playlist_id === playlistId,
+          );
+          if (playlist === undefined && playlists.length > 0) {
+            const playlistId2 = playlists[0].playlist_id;
+            playlist = playlists.find(
+              (playlist) => playlist.playlist_id === playlistId2,
+            );
+          }
+          if (playlist) {
+            const nextId = playlist.playlist_id;
+            const prevId = currentPlaylist;
+            setCurrentPlaylist(nextId);
+            setCurrentPlaylistName(playlist.instrument ?? "(None)");
+            setCurrentPlaylistDescription(playlist.description ?? "");
+            if (prevId !== nextId) {
+              triggerRefresh();
+            }
+          } else {
+            console.log("Playlist not found in playlists array!");
+            setCurrentPlaylist(-1);
+            setCurrentPlaylistName("(None)");
+            setCurrentPlaylistDescription("");
+            triggerRefresh();
+          }
         } else {
-          console.log("Playlist not found in playlists array!");
           setCurrentPlaylist(-1);
-          setCurrentPlaylistName("(None)");
-          setCurrentPlaylistDescription("");
+          triggerRefresh();
+          console.error("playlists should be an array!");
+          return -1;
         }
-        triggerRefresh();
-      } else {
-        setCurrentPlaylist(-1);
-        triggerRefresh();
-        console.error("playlists should be an array!");
+      } catch (error) {
+        console.log("Error fetching playlists and setting current:", error);
         return -1;
       }
-    } catch (error) {
-      console.log("Error fetching playlists and setting current:", error);
-      return -1;
-    }
-    return 0;
-  };
+      return 0;
+    },
+    [currentPlaylist, isDialogOpen, setCurrentPlaylist, triggerRefresh],
+  );
 
   useEffect(() => {
     // This may be a problem if the user is not logged in, or going from not logged in to logged in
@@ -107,7 +113,7 @@ export default function PlaylistChooser() {
     };
 
     void fetchData();
-  });
+  }, [isLoading, session?.user?.id, fetchPlaylistsAndSetCurrent]);
 
   const handleSelect = (playlistObject: IViewPlaylistJoined) => {
     setCurrentPlaylist(playlistObject.playlist_id);

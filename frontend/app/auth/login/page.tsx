@@ -23,70 +23,57 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { XCircle } from "lucide-react";
 import { getCsrfToken, signIn } from "next-auth/react"; // Ensure getCsrfToken is imported
-import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import type { JSX } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { type ControllerRenderProps, useForm } from "react-hook-form";
 import { emailSchema } from "../auth-types";
 import { type LoginFormValues, loginFormSchema } from "./login-form";
 
 export default function LoginDialog(): JSX.Element {
   const searchParams = useSearchParams();
-
-  // Initialize userEmail state
-  const [userEmail, setUserEmail] = useState<string>("");
-  const [userEmailParam, setUserEmailParam] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  // Fetch email from searchParams asynchronously
-  useEffect(() => {
-    const emailParam = searchParams.get("email") || "";
-    console.log(
-      "===> page.tsx:43 ~ LoginDialog useEffect emailParam: ",
-      emailParam,
-    );
-    setUserEmail(emailParam);
-    setUserEmailParam(emailParam);
-    console.log("Extracted email from searchParams:", emailParam);
-  }, [searchParams]);
-
-  const [password, setPassword] = useState("");
-
   const [csrfToken, setCsrfToken] = useState("");
-
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginFormSchema),
-    defaultValues: {
-      email: "", // Start with empty string
-      password: "",
-      csrfToken: "", // Initialize with empty string
-    },
-  });
-
-  // Runs once after initial render: The effect runs only once, after the component has rendered for the first time.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-  useEffect(() => {
-    void (async () => {
-      const token = await getCsrfToken();
-      if (token) {
-        setCsrfToken(token);
-        form.setValue("csrfToken", token); // Update form's csrfToken value
-      }
-    })();
-  }, []);
-
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  // Get email from searchParams - simple approach
+  const emailFromParams = searchParams?.get("email") || "";
+
+  // Memoize the resolver to prevent form recreation
+  const formResolver = useMemo(() => zodResolver(loginFormSchema), []);
+
+  const form = useForm<LoginFormValues>({
+    resolver: formResolver,
+    defaultValues: {
+      email: emailFromParams, // Set directly from params
+      password: "",
+      csrfToken: "",
+    },
+    mode: "onChange",
+  });
+
+  // Single useEffect for CSRF token only
+  useEffect(() => {
+    void (async () => {
+      try {
+        const token = await getCsrfToken();
+        if (token) {
+          setCsrfToken(token);
+          form.setValue("csrfToken", token);
+        }
+      } catch (error) {
+        console.error("Error getting CSRF token:", error);
+      }
+    })();
+  }, [form]);
+
   const validateEmail = useCallback((email: string): boolean => {
     if (email === "") {
-      // setEmailError("Email cannot be empty");
       setEmailError(null);
       setPasswordError(null);
       return false;
     }
-    // TODO: implement token validation logic
     const result = emailSchema.safeParse(email);
     if (!result.success) {
       setEmailError(result.error.issues[0].message);
@@ -98,18 +85,11 @@ export default function LoginDialog(): JSX.Element {
     return true;
   }, []);
 
-  useEffect(() => {
-    validateEmail(userEmail);
-  }, [userEmail, validateEmail]);
+  // Watch form values for validation
+  const currentEmail = form.watch("email");
+  const currentPassword = form.watch("password");
 
-  // Update the form's email field when userEmail state changes
-  useEffect(() => {
-    console.log(
-      "===> page.tsx:105 ~ LoginDialog useEffect (2) userEmail: ",
-      userEmail,
-    );
-    form.setValue("email", userEmail);
-  }, [userEmail, form]);
+  // Remove all the complex useEffects and state management
 
   const handleEmailChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -118,7 +98,6 @@ export default function LoginDialog(): JSX.Element {
     const newEmail = e.target.value;
     console.log("handleEmailChange: email:", newEmail);
     field.onChange(e); // Update the form state
-    setUserEmail(newEmail); // Update userEmail state
     validateEmail(newEmail);
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
   };
@@ -126,7 +105,7 @@ export default function LoginDialog(): JSX.Element {
   const onSubmit = async (data: LoginFormValues) => {
     console.log("onSubmit called with data:", data);
 
-    if (!validateEmail(userEmail)) {
+    if (!validateEmail(data.email)) {
       console.log("onSubmit - email validation failed");
       return;
     }
@@ -136,14 +115,14 @@ export default function LoginDialog(): JSX.Element {
 
     try {
       console.log("Sign in attempt with:", {
-        email: userEmail,
+        email: data.email,
         password: data.password,
         csrfToken: data.csrfToken,
       });
 
       const result = await signIn("credentials", {
         redirect: false,
-        email: userEmail,
+        email: data.email,
         password: data.password,
         csrfToken: data.csrfToken,
       });
@@ -199,15 +178,6 @@ export default function LoginDialog(): JSX.Element {
             </Button>
           </div>
           <CardHeader className="space-y-1 pt-1">
-            <div className="flex justify-center mb-4">
-              <Image
-                src="/logo4.png"
-                alt="TuneTrees Logo"
-                width={64}
-                height={64}
-                priority
-              />
-            </div>
             <CardTitle className="text-2xl text-center">Sign in</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-6">
@@ -244,14 +214,13 @@ export default function LoginDialog(): JSX.Element {
                       <FormControl>
                         <Input
                           id="user_email"
-                          name="user_email"
                           type="email"
                           placeholder="user@example.com"
-                          value={userEmail}
+                          {...field}
                           onChange={(e) => void handleEmailChange(e, field)}
                           required
                           className={emailError ? "border-red-500" : ""}
-                          autoFocus={userEmailParam === ""}
+                          autoFocus={emailFromParams === ""}
                           data-testid="user_email"
                         />
                       </FormControl>
@@ -273,15 +242,13 @@ export default function LoginDialog(): JSX.Element {
                       <FormControl>
                         <Input
                           id="password"
-                          name="password"
                           type="password"
-                          value={password}
+                          {...field}
                           onChange={(e) => {
                             setPasswordError(null);
-                            setPassword(e.target.value);
                             field.onChange(e);
                           }}
-                          autoFocus={userEmailParam !== ""}
+                          autoFocus={emailFromParams !== ""}
                           required
                           data-testid="user_password"
                         />
@@ -313,8 +280,8 @@ export default function LoginDialog(): JSX.Element {
                     isLoading ||
                     !!emailError ||
                     !!passwordError ||
-                    !password ||
-                    !userEmail ||
+                    !currentPassword ||
+                    !currentEmail ||
                     !csrfToken // Add CSRF token check
                   }
                   className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
@@ -323,7 +290,7 @@ export default function LoginDialog(): JSX.Element {
                   {isLoading ? "Signing In..." : "Sign In"}
                 </LoadingButton>
               </form>
-              {userEmailParam === "" && (
+              {emailFromParams === "" && (
                 <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
                   <div className="flex-1 bg-neutral-300 dark:bg-neutral-600 h-[1px]" />
                   <span className="text-xs leading-4 uppercase text-neutral-500 dark:text-neutral-400">
@@ -335,7 +302,7 @@ export default function LoginDialog(): JSX.Element {
             </Form>
           </CardContent>
           <CardFooter className="flex justify-between">
-            {userEmailParam === "" && SocialLoginButtons(providerMap)}
+            {emailFromParams === "" && SocialLoginButtons(providerMap)}
           </CardFooter>
         </Card>
       </div>

@@ -143,6 +143,9 @@ class User(Base):
     image = mapped_column(Text)
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
     sr_alg_type = mapped_column(Text)
+    phone = mapped_column(Text)
+    phone_verified = mapped_column(Text, server_default=text("NULL"))
+    acceptable_delinquency_window = mapped_column(Integer, server_default=text("21"))
 
     account: Mapped[List["Account"]] = relationship(
         "Account", uselist=True, back_populates="user"

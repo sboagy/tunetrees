@@ -122,6 +122,8 @@ async def create_user(user: UserModel) -> Optional[UserModel]:
                 name=user.name,
                 email=user.email,
                 email_verified=user.email_verified,
+                phone=user.phone,
+                phone_verified=user.phone_verified,
                 image=user.image,
                 hash=user.hash,
             )
@@ -284,9 +286,24 @@ async def update_user(
 async def delete_user(id: str) -> None:
     try:
         with SessionLocal() as db:
-            orm_user = db.get(UserModel, id)
+            orm_user = db.get(orm.User, id)
             if orm_user:
+                # Before deleting the user, clean up any verification tokens for their email
+                if orm_user.email:
+                    stmt = select(orm.VerificationToken).where(
+                        orm.VerificationToken.identifier == orm_user.email
+                    )
+                    result = db.execute(stmt)
+                    verification_tokens = result.scalars().all()
+                    for token in verification_tokens:
+                        logger.info(
+                            f"Deleting verification token for {orm_user.email} during user cleanup"
+                        )
+                        db.delete(token)
+
+                # Now delete the user
                 db.delete(orm_user)
+                db.commit()
             else:
                 raise HTTPException(status_code=404, detail="User Not Found")
 
@@ -296,6 +313,7 @@ async def delete_user(id: str) -> None:
         raise
     except Exception as e:
         logger.error("Unknown error: %s" % e)
+        raise HTTPException(status_code=500, detail="Unknown error occurred")
         raise HTTPException(status_code=500, detail="Unknown error occured")
 
 
@@ -574,36 +592,37 @@ async def create_verification_token(
 ) -> VerificationTokenModel:
     try:
         with SessionLocal() as db:
-            orm_verification_token = orm.VerificationToken(
-                identifier=verification_token.identifier,
-                token=verification_token.token,
-                expires=verification_token.expires,
+            # First, check if a verification token already exists for this identifier
+            stmt = select(orm.VerificationToken).where(
+                orm.VerificationToken.identifier == verification_token.identifier
             )
+            existing_token = db.execute(stmt).scalar_one_or_none()
 
-            db.add(orm_verification_token)
+            if existing_token:
+                # Update existing token
+                existing_token.token = verification_token.token
+                existing_token.expires = verification_token.expires
+                orm_verification_token = existing_token
+            else:
+                # Create new token
+                orm_verification_token = orm.VerificationToken(
+                    identifier=verification_token.identifier,
+                    token=verification_token.token,
+                    expires=verification_token.expires,
+                )
+                db.add(orm_verification_token)
 
             db.commit()
             db.flush(orm_verification_token)
 
-            stmt = select(orm.VerificationToken).where(
-                orm.VerificationToken.identifier == verification_token.identifier
+            # Return the updated/created token
+            updated_verification_token = VerificationTokenModel(
+                identifier=orm_verification_token.identifier,
+                token=orm_verification_token.token,
+                expires=orm_verification_token.expires,
             )
-            result = db.execute(stmt)
-            which_row = result.fetchone()
-            if which_row and len(which_row) > 0:
-                orm_verification_token_new: orm.VerificationToken = which_row[0]
 
-                updated_verification_toke = VerificationTokenModel(
-                    identifier=orm_verification_token_new.identifier,
-                    token=orm_verification_token_new.token,
-                    expires=orm_verification_token_new.expires,
-                )
-
-                return updated_verification_toke
-            else:
-                raise HTTPException(
-                    status_code=404, detail="Session Not Found after insert"
-                )
+            return updated_verification_token
 
     except HTTPException as e:
         logger.error("HTTPException (secondary catch): %s" % e)
@@ -680,6 +699,8 @@ def query_user_to_auth_user(
                     name=str(user.name),
                     email=str(user.email),
                     email_verified=user.email_verified,  # for the moment
+                    phone=user.phone,
+                    phone_verified=user.phone_verified,
                     hash=user.hash,
                     image=None,  # for the moment
                     sr_alg_type=user.sr_alg_type,  # for the moment

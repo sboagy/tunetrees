@@ -23,10 +23,10 @@ import type { ControllerRenderProps } from "react-hook-form";
 //   accountFormSchema,
 // } from "@/app/auth/newuser/account-form";
 import { PasswordInput } from "@/components/PasswordInput";
-import { useRouter } from "next/navigation";
+import { SMSVerificationOption } from "@/components/auth/sms-verification-option";
 import { emailSchema } from "@/app/auth/auth-types";
 import { getUser } from "@/app/auth/login/validate-signin";
-import { newUser } from "@/app/auth/newuser/newuser-actions";
+import { updateUser } from "./account-actions";
 import {
   accountFormSchema,
   type AccountFormValues,
@@ -39,7 +39,7 @@ import {
 // };
 
 export function AccountForm() {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
   let email = session?.user?.email;
 
   // const searchParams = useSearchParams();
@@ -55,12 +55,12 @@ export function AccountForm() {
       password: "", // Add initial value for password
       password_confirmation: "", // Add initial value for password_confirmation
       name: session?.user?.name || "", // Add initial value for name, empty string if null
+      phone: (session?.user as { phone?: string } | undefined)?.phone || "", // Add initial value for phone
       csrfToken: "", // Initialize with empty string
     },
   });
 
   // Runs once after initial render: The effect runs only once, after the component has rendered for the first time.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     void (async () => {
       const token = await getCsrfToken();
@@ -69,7 +69,34 @@ export function AccountForm() {
         form.setValue("csrfToken", token); // Update form's csrfToken value
       }
     })();
-  }, []);
+  }, [form]);
+
+  // Fetch user data from database to populate form fields, especially phone number
+  useEffect(() => {
+    void (async () => {
+      if (email) {
+        console.log("Initial fetch: Getting user data for email:", email);
+        const userData = await getUser(email);
+        console.log("Initial fetch: Got user data:", userData);
+        if (userData) {
+          // Update form fields with database data
+          if (userData.phone) {
+            console.log("Initial fetch: Setting phone to:", userData.phone);
+            form.setValue("phone", userData.phone);
+            setStoredPhoneNumber(userData.phone);
+          }
+          if (userData.name) {
+            form.setValue("name", userData.name);
+          }
+          console.log(
+            "Initial fetch: phoneVerified status:",
+            userData.phoneVerified,
+          );
+          setPhoneVerified(!!userData.phoneVerified);
+        }
+      }
+    })();
+  }, [email, form]);
 
   if (email === "" && typeof window !== "undefined") {
     const searchParams = new URLSearchParams(window.location.search);
@@ -81,6 +108,40 @@ export function AccountForm() {
   const [passwordConfirmationError, setPasswordConfirmationError] = useState<
     string | null
   >(null);
+  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState<boolean>(false);
+  const [storedPhoneNumber, setStoredPhoneNumber] = useState<string>("");
+
+  // Function to refresh user data from database
+  const refreshUserData = useCallback(async () => {
+    if (email) {
+      console.log("refreshUserData: Fetching user data for email:", email);
+      const userData = await getUser(email);
+      console.log("refreshUserData: Got user data:", userData);
+      if (userData) {
+        // Update form fields with latest database data
+        if (userData.phone) {
+          form.setValue("phone", userData.phone);
+          setStoredPhoneNumber(userData.phone);
+        }
+        if (userData.name) {
+          form.setValue("name", userData.name);
+        }
+        // Update session with latest phone verification status
+        console.log(
+          "refreshUserData: Updating session with phone_verified:",
+          !!userData.phoneVerified,
+        );
+        setPhoneVerified(!!userData.phoneVerified);
+        await update({
+          user: {
+            phone: userData.phone,
+            phone_verified: !!userData.phoneVerified,
+          },
+        });
+      }
+    }
+  }, [email, form, update]);
 
   const validateEmail = useCallback((email: string): boolean => {
     if (email === "") {
@@ -162,28 +223,69 @@ export function AccountForm() {
     field.onChange(e); // Update the form state
   };
 
-  const router = useRouter();
+  const handlePhoneChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: ControllerRenderProps<AccountFormValues, "phone">,
+  ) => {
+    const newPhone = e.target.value;
+    console.log("handlePhoneChange: phone:", newPhone);
+    field.onChange(e); // Update the form state
+
+    // Force form to update immediately
+    form.setValue("phone", newPhone);
+
+    // Show verification if user enters a different phone number
+    const trimmedPhone = newPhone.trim();
+    if (trimmedPhone && trimmedPhone !== storedPhoneNumber) {
+      setShowPhoneVerification(true);
+      setPhoneVerified(false); // New number needs verification
+    } else if (trimmedPhone === storedPhoneNumber) {
+      setShowPhoneVerification(false);
+      setPhoneVerified(true); // Same as stored verified number
+    } else {
+      setShowPhoneVerification(false);
+      setPhoneVerified(false); // Empty field
+    }
+  };
 
   const onSubmit = async (data: AccountFormValues) => {
     console.log("onSubmit called with data:", data);
-    const host = window.location.host;
 
-    const result = await newUser(data, host);
-    console.log(`newUser status result ${result.status}`);
+    try {
+      const result = await updateUser(data);
+      console.log(`updateUser status result ${result.status}`);
 
-    if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
-      const linkBackURL = result.linkBackURL;
-      // Store the linkBackURL in local storage for testing purposes
-      if (typeof window !== "undefined") {
-        localStorage.setItem("linkBackURL", linkBackURL);
+      if (result.status === "success") {
+        // Update the session to reflect the changes
+        await update({
+          user: {
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+          },
+        });
+
+        // Show success message (you can add a toast notification here)
+        console.log("Account updated successfully");
+
+        // Optionally redirect to the main page or stay on settings
+        // router.push("/");
       } else {
-        console.log(
-          "onSubmit(): window is undefined, cannot store linkBackURL for playwright tests",
-        );
+        // Handle error case
+        console.error("Update failed:", result.message);
+        // You can set form errors here if needed
+        form.setError("root", {
+          type: "manual",
+          message: result.message,
+        });
       }
+    } catch (error) {
+      console.error("Error during account update:", error);
+      form.setError("root", {
+        type: "manual",
+        message: "An unexpected error occurred. Please try again.",
+      });
     }
-
-    router.push(`/auth/verify-request?email=${data.email}`);
   };
 
   console.log("SignInPage(): csrfToken: %s", _crsfToken);
@@ -251,7 +353,7 @@ export function AccountForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>EMail</FormLabel>
-              <FormControl>
+              <FormControl className="mt-[1px]">
                 <Input
                   type="email"
                   placeholder="person@example.com"
@@ -278,7 +380,7 @@ export function AccountForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Password</FormLabel>
-              <FormControl>
+              <FormControl className="mt-[1px]">
                 <PasswordInput
                   id="password"
                   placeholder="password"
@@ -303,7 +405,7 @@ export function AccountForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Confirm Password</FormLabel>
-              <FormControl>
+              <FormControl className="mt-[1px]">
                 <PasswordInput
                   id="password_confirmation"
                   placeholder="repeat password"
@@ -328,7 +430,7 @@ export function AccountForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Name</FormLabel>
-              <FormControl>
+              <FormControl className="mt-[1px]">
                 <Input
                   placeholder="Your name"
                   {...field}
@@ -340,6 +442,90 @@ export function AccountForm() {
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>
+                Phone Number (Optional, for SMS verification)
+              </FormLabel>
+              <FormControl className="mt-[1px]">
+                <Input
+                  type="tel"
+                  placeholder="+1 (555) 123-4567"
+                  {...field}
+                  onChange={(e) => handlePhoneChange(e, field)}
+                  data-testid="user_phone"
+                />
+              </FormControl>
+              <FormMessage />
+              {phoneVerified && form.watch("phone") && (
+                <p className="text-sm text-green-600">
+                  ✓ Phone number verified - SMS password reset available
+                </p>
+              )}
+              {field.value && !phoneVerified && (
+                <p className="text-sm text-yellow-600">
+                  Phone number not verified. SMS password reset will not be
+                  available.
+                </p>
+              )}
+            </FormItem>
+          )}
+        />
+
+        {/* Phone Verification Section - Only show when user enters a different number */}
+        {showPhoneVerification && form.watch("phone") && (
+          <div className="space-y-4 border rounded-lg p-4 bg-muted/5">
+            <h3 className="text-sm font-medium">Verify New Phone Number</h3>
+            <p className="text-sm text-muted-foreground">
+              You've entered a new phone number. Please verify it to enable SMS
+              password reset.
+            </p>
+            {(() => {
+              const currentPhone = form.watch("phone");
+              console.log(
+                "SMSVerificationOption receiving initialPhone:",
+                currentPhone,
+              );
+              return null;
+            })()}
+            <SMSVerificationOption
+              initialPhone={form.watch("phone")}
+              userEmail={session?.user?.email || ""}
+              onVerificationSuccess={(phone) => {
+                console.log("New phone verified:", phone);
+                setShowPhoneVerification(false);
+                form.setValue("phone", phone);
+                setStoredPhoneNumber(phone);
+                setPhoneVerified(true);
+                // Refresh user data to get updated phone data
+                void refreshUserData();
+              }}
+              onError={(error) => {
+                console.error("Phone verification error:", error);
+              }}
+              buttonText="Send Verification Code"
+              description="We'll send a verification code to confirm your new phone number"
+              isSignup={false}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowPhoneVerification(false);
+                // Reset to stored phone number
+                form.setValue("phone", storedPhoneNumber);
+                setPhoneVerified(!!storedPhoneNumber);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+
         <Button
           type="submit"
           variant="secondary"

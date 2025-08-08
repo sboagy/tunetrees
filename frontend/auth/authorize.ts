@@ -63,7 +63,7 @@ export const BASE_PATH = "/auth";
  * If any of the above checks fail, an `InvalidLoginError` is thrown with an appropriate message.
  */
 export async function authorize(
-  credentials: Partial<Record<"email" | "password", unknown>>,
+  credentials: Partial<Record<"email" | "password" | "smsVerified", unknown>>,
   request: Request,
 ) {
   console.log("===> auth/index.ts:99 ~ authorize: ", logObject(request, false));
@@ -80,6 +80,22 @@ export async function authorize(
   // debugger;
   if (user) {
     console.log("===> auth/index.ts:176 ~ authorize -- user found");
+
+    // Check if this is an SMS-verified login (skip password check)
+    if (credentials.smsVerified === "true") {
+      console.log(
+        "===> auth/index.ts ~ SMS verified login, skipping password check",
+      );
+      // Verify the user is actually SMS verified in the database
+      if (user.phoneVerified) {
+        console.log(
+          "===> auth/index.ts ~ User has verified phone, allowing login",
+        );
+        return user;
+      }
+      throw new InvalidLoginError("SMS verification required");
+    }
+
     if (!credentials.password) {
       throw new InvalidLoginError("Empty Password");
     }

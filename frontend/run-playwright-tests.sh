@@ -2,6 +2,16 @@
 
 # Enhanced script to load .env.local and run playwright tests with organized output
 
+# Record the start time (epoch seconds)
+SCRIPT_START_TIME=$(date +%s)
+
+# Function to print elapsed time
+print_elapsed_time() {
+  SCRIPT_END_TIME=$(date +%s)
+  ELAPSED=$((SCRIPT_END_TIME - SCRIPT_START_TIME))
+  printf "⏱️  Script running time: %02d:%02d:%02d\n" $((ELAPSED/3600)) $(( (ELAPSED%3600)/60 )) $((ELAPSED%60))
+}
+
 # Get the absolute path of this script
 THIS_SCRIPT_ABS_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 echo "Running script: $THIS_SCRIPT_ABS_PATH"
@@ -34,6 +44,7 @@ cleanup() {
   # Don't kill all node playwright processes - they might be the test runner
   
   echo "🧹 Cleanup complete"
+  print_elapsed_time
   exit 1
 }
 
@@ -108,10 +119,14 @@ unset NEXTAUTH_SECRET
 # npx dotenv -f -e .env.local -- bash -c 'echo "NEXTAUTH_SECRET after unset, with dotenv: $NEXTAUTH_SECRET"'
 
 # Run Playwright tests with environment variables loaded
+# Make sure we're not running in NODE_ENV=production and that we have mock email confirmation enabled
 cd "$FRONTEND_DIR_ABS_PATH"
-npx dotenv -f .env.local -- \
-npx playwright test $REPORTER_ARG $TEST_FILE_ARG $PLAYWRIGHT_ARGS \
-| tee "$OUTPUT_DIR/playwright.log"
+npx dotenv -f .env.local -- bash -c '
+NODE_ENV=development \
+NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION=true \
+npx playwright test '"$REPORTER_ARG"' '"$TEST_FILE_ARG"' '"$PLAYWRIGHT_ARGS"' \
+| tee "'"$OUTPUT_DIR"'/playwright.log"
+'
 
 # Capture the exit code from playwright
 PLAYWRIGHT_EXIT_CODE=$?
@@ -137,6 +152,8 @@ echo "🔍 To view traces: npx playwright show-trace $OUTPUT_DIR/test-results/*/
 echo "� Frontend logs: $OUTPUT_DIR/test-results/frontend.log"
 echo "📋 Backend logs: $OUTPUT_DIR/test-results/fastapi.log"
 echo "�💡 For HTML report: add --reporter=html to command"
+
+print_elapsed_time
 
 # Exit with the same code as playwright
 exit $PLAYWRIGHT_EXIT_CODE

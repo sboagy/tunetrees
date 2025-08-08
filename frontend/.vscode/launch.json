@@ -15,7 +15,12 @@
       "skipFiles": [
         "<node_internals>/**"
       ],
-      "type": "node"
+      "type": "node",
+      "envFile": "${workspaceFolder}/.env.local",
+      "env": {
+        "NODE_ENV": "development",
+        "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION": "false"
+      }
     },
     {
       "type": "chrome",

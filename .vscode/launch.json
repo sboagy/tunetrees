@@ -39,7 +39,8 @@
             "envFile": "${workspaceFolder}/.env",
             "env": {
                 "TUNETREES_DB": "${workspaceFolder}/tunetrees_test.sqlite3",
-                "TUNETREES_DEPLOY_BASE_DIR": "${workspaceFolder}"
+                "TUNETREES_DEPLOY_BASE_DIR": "${workspaceFolder}",
+                "NODE_ENV": "production"
             },
             "args": [
                 "tunetrees.api.main:app",

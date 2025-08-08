@@ -80,6 +80,11 @@ test("test-notes-1", async ({ page }) => {
   await saveEditButtonLocator.click();
   await responsePromise;
 
+  // Wait for the DOM to calm down by ensuring no network activity and a short pause
+  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("domcontentloaded");
+  await page.waitForTimeout(500);
+
   console.log("===> test-notes.ts:38 ~ exit test-notes-1");
 
   const notesContentLocator2 = page.getByTestId("tt-notes-content");
