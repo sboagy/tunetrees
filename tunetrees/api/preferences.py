@@ -61,8 +61,12 @@ preferences_router = APIRouter(prefix="/preferences", tags=["preferences"])
     status_code=status.HTTP_200_OK,
 )
 def get_prefs_spaced_repetition(
-    alg_type: Optional[str] = Query(None, description="The algorithm type (e.g., SM2, FSRS)"),
-    sr_alg_type: Optional[str] = Query(None, description="Alias for alg_type (legacy front-end param)"),
+    alg_type: Optional[str] = Query(
+        None, description="The algorithm type (e.g., SM2, FSRS)"
+    ),
+    sr_alg_type: Optional[str] = Query(
+        None, description="Alias for alg_type (legacy front-end param)"
+    ),
     user_id: int = Query(..., description="The user ID"),
 ):
     # Accept legacy param name sr_alg_type
@@ -84,6 +88,7 @@ def get_prefs_spaced_repetition(
             try:
                 from fsrs import Scheduler as FSRSDefault
                 import json as _json
+
                 scheduler = FSRSDefault()
                 preference = PrefsSpacedRepetition(
                     alg_type=alg_type,
@@ -204,8 +209,8 @@ def get_prefs_scheduling_options(
                 min_reviews_per_day=0,
                 max_reviews_per_day=0,
                 days_per_week=7,
-                weekly_rules='{}',
-                exceptions='[]',
+                weekly_rules="{}",
+                exceptions="[]",
             )
             db.add(prefs)
             db.commit()
@@ -258,8 +263,8 @@ def update_prefs_scheduling_options(
                 min_reviews_per_day=0,
                 max_reviews_per_day=0,
                 days_per_week=7,
-                weekly_rules='{}',
-                exceptions='[]',
+                weekly_rules="{}",
+                exceptions="[]",
             )
             db.add(db_prefs)
         # Apply updates
