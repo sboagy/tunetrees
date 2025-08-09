@@ -15,6 +15,13 @@ import type {
 // Provide a test-friendly fallback so server components don't hard-crash (500) when
 // the variable isn't injected (Playwright env sometimes omits it when booting fast).
 // Backend default port is 8000; adjust if central config changes.
+// Runtime tripwire: warn if this server module is ever executed in a client context.
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  console.warn(
+    "[Tripwire] practice/settings.ts executed in a client environment. This should only be imported via server actions.",
+  );
+}
+
 const TT_API_BASE_URL = process.env.TT_API_BASE_URL ?? "http://localhost:8000";
 if (!process.env.TT_API_BASE_URL) {
   console.warn(

@@ -35,30 +35,46 @@ export type IPrefsSchedulingOptionsCreate = IPrefsSchedulingOptionsBase;
 export type IPrefsSchedulingOptionsUpdate =
   Partial<IPrefsSchedulingOptionsBase>;
 
+// Calls now proxied through Next.js API route at /api/preferences/prefs_scheduling_options
+
 async function getPrefsSchedulingOptions(
   user_id: number,
 ): Promise<IPrefsSchedulingOptionsResponse | null> {
   const params = new URLSearchParams();
   params.append("user_id", String(user_id));
-  const resp = await fetch(
-    `/api/preferences/prefs_scheduling_options?${params.toString()}`,
-  );
-  if (resp.status === 404) return null;
-  if (!resp.ok)
-    throw new Error(`Failed to fetch scheduling options: ${resp.statusText}`);
+  const url = `/api/preferences/prefs_scheduling_options?${params.toString()}`;
+  const resp = await fetch(url, { cache: "no-store" });
+  if (resp.status === 404) return null; // true 404 from backend means no record yet
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(
+      `Failed to fetch scheduling options (status ${resp.status}): ${resp.statusText} body=${body.slice(
+        0,
+        200,
+      )}`,
+    );
+  }
   return (await resp.json()) as IPrefsSchedulingOptionsResponse;
 }
 
 async function createPrefsSchedulingOptions(
   prefs: IPrefsSchedulingOptionsCreate,
 ): Promise<IPrefsSchedulingOptionsResponse> {
-  const resp = await fetch("/api/preferences/prefs_scheduling_options", {
+  const url = "/api/preferences/prefs_scheduling_options";
+  const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(prefs),
   });
-  if (!resp.ok)
-    throw new Error(`Failed to create scheduling options: ${resp.statusText}`);
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(
+      `Failed to create scheduling options (status ${resp.status}): ${resp.statusText} body=${body.slice(
+        0,
+        200,
+      )}`,
+    );
+  }
   return (await resp.json()) as IPrefsSchedulingOptionsResponse;
 }
 
@@ -68,16 +84,21 @@ async function updatePrefsSchedulingOptions(
 ): Promise<IPrefsSchedulingOptionsResponse> {
   const params = new URLSearchParams();
   params.append("user_id", String(user_id));
-  const resp = await fetch(
-    `/api/preferences/prefs_scheduling_options?${params.toString()}`,
-    {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(prefs),
-    },
-  );
-  if (!resp.ok)
-    throw new Error(`Failed to update scheduling options: ${resp.statusText}`);
+  const url = `/api/preferences/prefs_scheduling_options?${params.toString()}`;
+  const resp = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(prefs),
+  });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(
+      `Failed to update scheduling options (status ${resp.status}): ${resp.statusText} body=${body.slice(
+        0,
+        200,
+      )}`,
+    );
+  }
   return (await resp.json()) as IPrefsSchedulingOptionsResponse;
 }
 
