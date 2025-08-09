@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, status
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 
 from tunetrees.app.database import (
@@ -104,7 +104,7 @@ def create_prefs_spaced_repetition(prefs: PrefsSpacedRepetitionModelPartial):
 def update_prefs_spaced_repetition(
     alg_type: str = Query(..., description="The algorithm type (e.g., SM2, FSRS)"),
     user_id: int = Query(..., description="The user ID"),
-    prefs: PrefsSpacedRepetitionModelPartial = Query(...),
+    prefs: Optional[PrefsSpacedRepetitionModelPartial] = None,
 ):
     with SessionLocal() as db:
         db_prefs = (
@@ -117,8 +117,9 @@ def update_prefs_spaced_repetition(
         )
         if not db_prefs:
             raise HTTPException(status_code=404, detail="Preference not found")
-        for key, value in prefs.model_dump(exclude_unset=True).items():
-            setattr(db_prefs, key, value)
+        if prefs:
+            for key, value in prefs.model_dump(exclude_unset=True).items():
+                setattr(db_prefs, key, value)
         db.commit()
         db.refresh(db_prefs)
         return db_prefs
@@ -202,16 +203,18 @@ def create_prefs_scheduling_options(prefs: PrefsSchedulingOptionsModel):
 )
 def update_prefs_scheduling_options(
     user_id: int = Query(..., description="The user ID"),
-    prefs: PrefsSchedulingOptionsModelPartial = Query(...),
+    prefs: Optional[PrefsSchedulingOptionsModelPartial] = None,
 ):
     with SessionLocal() as db:
         db_prefs = db.get(PrefsSchedulingOptions, user_id)
         if not db_prefs:
             raise HTTPException(status_code=404, detail="Scheduling options not found")
         # Apply updates
-        updates = prefs.model_dump(exclude_unset=True)
-        for key, value in updates.items():
-            setattr(db_prefs, key, value)
+        updates = {}
+        if prefs:
+            updates = prefs.model_dump(exclude_unset=True)
+            for key, value in updates.items():
+                setattr(db_prefs, key, value)
 
         # Mirror acceptable_delinquency_window to user if present
         if (
