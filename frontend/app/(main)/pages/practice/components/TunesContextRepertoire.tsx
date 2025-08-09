@@ -10,7 +10,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { getRepertoireTunesOverview } from "../queries";
+import { getRepertoireTunesOverviewAction } from "../actions/practice-actions";
 import { getTableStateTable } from "../settings";
 import type { ITuneOverview } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
@@ -72,7 +72,7 @@ export const TunesProviderRepertoire = ({
         sortingState =
           (tableStateTable?.settings as TableState)?.sorting ?? null;
       }
-      const result = await getRepertoireTunesOverview(
+      const result = await getRepertoireTunesOverviewAction(
         userId,
         playlistId,
         showDeleted,

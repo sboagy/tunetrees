@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import type { JSX } from "react";
-import { createEmptyTune } from "../queries";
+import { createEmptyTuneAction } from "../actions/practice-actions";
 import type { ITuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -47,7 +47,7 @@ export default function NewTuneButton({
       recall_eval: null,
       notes: null,
     };
-    createEmptyTune(newTune, Number(playlistId))
+    createEmptyTuneAction(newTune, Number(playlistId))
       .then((result) => {
         const tune = result as ITuneOverview;
         console.log(

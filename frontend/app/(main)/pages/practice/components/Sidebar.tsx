@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { getPlaylistTuneOverview } from "../queries";
+import { getPlaylistTuneOverviewAction } from "../actions/practice-actions";
 import type { ITuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -32,7 +32,11 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
           "Sidebar ===> Sidebar.tsx:30 ~ useEffect triggered by currentTuneUpdate",
         );
       }
-      const tune = getPlaylistTuneOverview(userId, playlistId, currentTune);
+      const tune = getPlaylistTuneOverviewAction(
+        userId,
+        playlistId,
+        currentTune,
+      );
       tune
         .then((result: ITuneOverview | { detail: string }) => {
           const tuneBare = result as ITuneOverview;

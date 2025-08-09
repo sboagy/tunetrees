@@ -19,7 +19,7 @@ import type {
 } from "@tanstack/react-table";
 import { BetweenHorizontalEnd } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
-import { getRepertoireTunesOverview } from "../queries";
+import { getRepertoireTunesOverviewAction } from "../actions/practice-actions";
 import {
   fetchFilterFromDB,
   getTableStateTable,
@@ -120,7 +120,7 @@ export default function TunesGridRepertoire({
           sortingState =
             (tableStateTable?.settings as TableState)?.sorting ?? null;
         }
-        const result: ITuneOverview[] = await getRepertoireTunesOverview(
+        const result: ITuneOverview[] = await getRepertoireTunesOverviewAction(
           userId,
           playlistId,
           showDeleted,
