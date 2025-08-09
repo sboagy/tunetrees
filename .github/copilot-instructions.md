@@ -155,6 +155,7 @@ npm run type-check  # TypeScript strict checking
 npm run test:unit        # Jest unit tests ONLY (password utils, etc.)
 npm run test            # All tests including E2E (not recommended for development)
 npm run test:ui        # Run Playwright UI tests in headless mode
+npm run test:ui:single        # Run a single Playwright UI test in headless mode
 
 # For more playwright test control for E2E tests - use environment setup script
 ./run-playwright-tests.sh [test-file-pattern]  # Properly sets up environment and database
@@ -517,14 +518,21 @@ practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
 
 #### 1. **Running Tests**: Environment Setup Script
 
-For Playwright tests,EITHER use the npm script:
+For Playwright tests use the npm script (headless):
 
 ```bash
 cd frontend
-npm run test:ui [test-file-pattern]
+npm run test:ui
 ```
 
-which will run the tests in headless mode (preferred), OR, for more control over the test execution:
+OR (headless)
+
+```bash
+cd frontend
+npm run test:ui:single [test-file-pattern]
+```
+
+OR
 
 ```bash
 cd frontend
