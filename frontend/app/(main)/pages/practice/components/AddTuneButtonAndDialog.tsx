@@ -27,14 +27,14 @@ import {
   scrapeIrishTuneInfoTune,
 } from "../import-utils";
 import {
-  createEmptyTune,
-  createReference,
-  getInstrumentById,
-  getPlaylistById,
-  getPlaylistTuneOverview,
-  queryReferences,
-  searchTunesByTitle,
-} from "../queries";
+  createEmptyTuneAction,
+  createReferenceAction,
+  getInstrumentByIdAction,
+  getPlaylistByIdAction,
+  getPlaylistTuneOverviewAction,
+  queryReferencesAction,
+  searchTunesByTitleAction,
+} from "../actions/practice-actions";
 import { updateCurrentTuneInDb } from "../settings";
 import type {
   IExtractedTuneInfo,
@@ -42,6 +42,8 @@ import type {
   ITheSessionTuneSummary,
   ITune,
   ITuneOverview,
+  IPlaylist,
+  IInstrument,
 } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
@@ -163,7 +165,7 @@ export default function AddTuneButtonAndDialog({
       deleted: false,
       isNew: true,
     };
-    createReference(referenceData)
+    createReferenceAction(referenceData)
       .then((refData: IReferenceData) => {
         if (refData.tune_ref !== undefined) {
           setCurrentTune(refData.tune_ref);
@@ -171,7 +173,7 @@ export default function AddTuneButtonAndDialog({
           setCurrentView("edit");
         }
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error("Error creating reference:", error);
       });
   }
@@ -181,8 +183,8 @@ export default function AddTuneButtonAndDialog({
     importURL: string | null,
     secondaryURL?: string | null,
   ): void {
-    createEmptyTune(data, Number(playlistId))
-      .then((result) => {
+    createEmptyTuneAction(data, Number(playlistId))
+      .then((result: unknown) => {
         const tune = result as ITuneOverview;
         if (tune?.id === undefined) {
           console.error("Error creating tune: tune.id is undefined");
@@ -211,7 +213,7 @@ export default function AddTuneButtonAndDialog({
           );
         }
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error("Error creating reference:", error);
       });
   }
@@ -463,7 +465,7 @@ export default function AddTuneButtonAndDialog({
   async function findExistingMatches(url: string, title: string, type: string) {
     const existingMatches: ITune[] = [];
 
-    const refs = await queryReferences(url);
+    const refs = await queryReferencesAction(url);
 
     const userId = session?.user?.id ? Number.parseInt(session?.user?.id) : -1;
 
@@ -474,7 +476,7 @@ export default function AddTuneButtonAndDialog({
         //         This will ensure we get tune override data, which may or may
         //         not be what we want.
         const existingTune: ITuneOverview | { detail: string } =
-          await getPlaylistTuneOverview(userId, currentPlaylist, tuneRef);
+          await getPlaylistTuneOverviewAction(userId, currentPlaylist, tuneRef);
         if ("detail" in existingTune) {
           throw new Error(`Existing tune not found: ${existingTune.detail}`);
         }
@@ -486,7 +488,7 @@ export default function AddTuneButtonAndDialog({
     }
 
     if (title) {
-      const matches = await searchTunesByTitle(title);
+      const matches = await searchTunesByTitleAction(title);
       for (const match of matches) {
         if (match.type === type) {
           existingMatches.push(match);
@@ -692,8 +694,8 @@ export default function AddTuneButtonAndDialog({
 
   useEffect(() => {
     if (playlistId && playlistId > 0) {
-      getPlaylistById(playlistId)
-        .then((playlist) => {
+      getPlaylistByIdAction(playlistId)
+        .then((playlist: IPlaylist | { detail: string }) => {
           console.log("Fetched playlist:", playlist);
           // setCurrentPlaylist(playlist);
           if (!playlist || "detail" in playlist) {
@@ -701,8 +703,8 @@ export default function AddTuneButtonAndDialog({
             return;
           }
           if (playlist.instrument_ref) {
-            getInstrumentById(playlist.instrument_ref)
-              .then((instrument) => {
+            getInstrumentByIdAction(playlist.instrument_ref)
+              .then((instrument: IInstrument | { detail: string }) => {
                 console.log("Fetched instrument:", instrument);
                 if (!instrument || "detail" in instrument) {
                   console.error("Instrument not found");
@@ -712,12 +714,12 @@ export default function AddTuneButtonAndDialog({
                 // setGenreDefault(instrument.genre_default ?? null);
                 setCurrentGenre(instrument.genre_default ?? null);
               })
-              .catch((error) => {
+              .catch((error: unknown) => {
                 console.error("Error fetching instrument:", error);
               });
           }
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           console.error("Error fetching playlist:", error);
         });
     }

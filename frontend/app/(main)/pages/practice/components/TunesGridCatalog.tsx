@@ -14,10 +14,10 @@ import type {
 } from "@tanstack/react-table";
 import { BetweenHorizontalEnd } from "lucide-react";
 import {
-  createPlaylistTune,
-  getTunesOnlyIntoOverview,
-  intersectPlaylistTunes,
-} from "../queries";
+  createPlaylistTuneAction,
+  getTunesOnlyIntoOverviewAction,
+  intersectPlaylistTunesAction,
+} from "../actions/practice-actions";
 import { fetchFilterFromDB, updateTableStateInDb } from "../settings";
 import type { IPlaylistTune, ITuneOverview } from "../types";
 import AddTuneButtonAndDialog from "./AddTuneButtonAndDialog";
@@ -85,7 +85,7 @@ export default function TunesGridCatalog({
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
         const result: ITuneOverview[] =
-          await getTunesOnlyIntoOverview(showDeleted);
+          await getTunesOnlyIntoOverviewAction(showDeleted);
         setTunes(result);
         setTunesRefreshId(refreshId);
         console.log(`LF1 AllGrid setTunesRefreshId(${refreshId})`);
@@ -193,7 +193,7 @@ export default function TunesGridCatalog({
     const selectedTuneIds = selectedTunes.map((tune) => tune.id ?? -1);
     console.log("Selected tune IDs:", selectedTuneIds);
 
-    const alreadyInRepertoire = await intersectPlaylistTunes(
+    const alreadyInRepertoire = await intersectPlaylistTunesAction(
       selectedTuneIds,
       playlistId,
     );
@@ -234,7 +234,7 @@ export default function TunesGridCatalog({
         learned: new Date().toISOString().replace("T", " ").slice(0, 19),
         deleted: false,
       };
-      createPlaylistTune(playlistTune)
+      createPlaylistTuneAction(playlistTune)
         .then((result) => {
           console.log("Added tune to repertoire:", result);
         })

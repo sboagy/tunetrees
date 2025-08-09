@@ -22,7 +22,12 @@ import {
   XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createNote, deleteNote, getNotes, updateNote } from "../queries";
+import {
+  createNoteAction,
+  deleteNoteAction,
+  getNotesAction,
+  updateNoteAction,
+} from "../actions/practice-actions";
 import { type INote, UpdateActionType } from "../types";
 
 interface INoteCardProps {
@@ -288,7 +293,12 @@ export default function NoteCards({
   useEffect(() => {
     const fetchNotes = async () => {
       try {
-        const fetchedNotes = await getNotes(tuneRef, 1, userRef, displayPublic);
+        const fetchedNotes = await getNotesAction(
+          tuneRef,
+          1,
+          userRef,
+          displayPublic,
+        );
         setNotes(fetchedNotes);
       } catch (error) {
         console.error("Failed to fetch notes:", error);
@@ -310,7 +320,7 @@ export default function NoteCards({
       setNotes((prevNotes) =>
         prevNotes.filter((note) => note.id !== updatedNote.id),
       );
-      deleteNote(updatedNote.id ?? 0)
+      deleteNoteAction(updatedNote.id ?? 0)
         .then(() => {
           console.log("Note deleted successfully");
         })
@@ -321,7 +331,7 @@ export default function NoteCards({
     } else if (action === UpdateActionType.CREATE) {
       // Logic to create a new reference entry
       console.log("Creating new reference entry...");
-      createNote(updatedNote)
+      createNoteAction(updatedNote)
         .then((result: INote) => {
           console.log("Reference updated successfully");
           // Need to update the note with the new ID
@@ -342,7 +352,7 @@ export default function NoteCards({
           note.id === updatedNote.id ? updatedNote : note,
         ),
       );
-      updateNote(updatedNote.id ?? 0, updatedNote)
+      updateNoteAction(updatedNote.id ?? 0, updatedNote)
         .then(() => {
           console.log("Reference updated successfully");
         })

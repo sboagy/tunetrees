@@ -24,16 +24,16 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { ERROR_PLAYLIST_TUNE } from "../mocks";
 import {
-  createPlaylistTune,
-  createPracticeRecord,
-  deleteTune,
-  getAllGenres,
-  getPlaylistTuneOverview,
-  getTuneTypesByGenre,
-  updatePlaylistTunes,
-  updatePracticeRecord,
-  updateTuneInPlaylistFromTuneOverview,
-} from "../queries";
+  createPlaylistTuneAction,
+  createPracticeRecordAction,
+  deleteTuneAction,
+  getAllGenresAction,
+  getPlaylistTuneOverviewAction,
+  getTuneTypesByGenreAction,
+  updatePlaylistTunesAction,
+  updatePracticeRecordAction,
+  updateTuneInPlaylistFromTuneOverviewAction,
+} from "../actions/practice-actions";
 import { updateCurrentTuneInDb } from "../settings";
 import type {
   IGenre,
@@ -220,7 +220,7 @@ export default function TuneEditor({
   useEffect(() => {
     const fetchGenres = async () => {
       try {
-        const genresData = await getAllGenres();
+        const genresData = await getAllGenresAction();
         if (Array.isArray(genresData)) {
           setGenres(genresData);
         } else {
@@ -240,13 +240,13 @@ export default function TuneEditor({
 
   useEffect(() => {
     const fetchTune = () => {
-      getPlaylistTuneOverview(userId, playlistId, tuneId)
+      getPlaylistTuneOverviewAction(userId, playlistId, tuneId)
         .then((tuneData: ITuneOverview | { detail: string }) => {
           if (tuneData && (tuneData as ITuneOverview).id !== undefined) {
             const tuneOverview = tuneData as ITuneOverview;
             setTune(tuneOverview);
             if (tuneOverview.genre) {
-              getTuneTypesByGenre(tuneOverview.genre)
+              getTuneTypesByGenreAction(tuneOverview.genre)
                 .then((types) => {
                   setTuneTypeList(types);
                 })
@@ -314,7 +314,7 @@ export default function TuneEditor({
     const playlistTune: Partial<IPlaylistTune> = {
       learned: data.learned ?? "",
     };
-    const responsePlaylistUpdate = await updatePlaylistTunes(
+    const responsePlaylistUpdate = await updatePlaylistTunesAction(
       [tuneId],
       playlistId,
       playlistTune,
@@ -328,7 +328,8 @@ export default function TuneEditor({
         learned: data.learned ?? "",
         deleted: false,
       };
-      const responsePlaylistUpdate2 = await createPlaylistTune(playlistTune2);
+      const responsePlaylistUpdate2 =
+        await createPlaylistTuneAction(playlistTune2);
       if ("detail" in responsePlaylistUpdate2) {
         console.error("Failed to update tune:", responsePlaylistUpdate2.detail);
         handleError(
@@ -365,7 +366,7 @@ export default function TuneEditor({
     };
 
     // Try to update the latest practice record first
-    const responsePracticeRecordUpdate = await updatePracticeRecord(
+    const responsePracticeRecordUpdate = await updatePracticeRecordAction(
       tuneId,
       playlistId,
       practiceRecord,
@@ -388,7 +389,7 @@ export default function TuneEditor({
         repetitions: data.latest_repetitions ?? 0,
         review_date: data.review_date ?? "",
       };
-      const responsePracticeRecordUpdate2 = await createPracticeRecord(
+      const responsePracticeRecordUpdate2 = await createPracticeRecordAction(
         tuneId,
         playlistId,
         practiceRecord2,
@@ -524,7 +525,7 @@ export default function TuneEditor({
       review_date: reviewDateUtc,
     };
 
-    const result = await updateTuneInPlaylistFromTuneOverview(
+    const result = await updateTuneInPlaylistFromTuneOverviewAction(
       userId,
       playlistId,
       tuneId,
@@ -581,7 +582,7 @@ export default function TuneEditor({
     // tune.deleted = true indicates this is a new tune, so it's
     // safe and proper to delete on cancel.
     if (tune?.deleted === true) {
-      const response = await deleteTune(tuneId);
+      const response = await deleteTuneAction(tuneId);
       if (response && "detail" in response) {
         console.error("Failed to delete tune:", response.detail);
         handleError(`Failed to delete tune: ${response.detail}`);
@@ -683,7 +684,7 @@ export default function TuneEditor({
     field.onChange(genreId);
 
     try {
-      const types = await getTuneTypesByGenre(genreId);
+      const types = await getTuneTypesByGenreAction(genreId);
       setTuneTypeList(types);
     } catch (error) {
       const errorMessage = `Error fetching tune types for genre ${genreId}: ${String(error)}`;

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { NextRequest } from "next/server";
 import type { JSX } from "react";
 import * as z from "zod";
-import { getTuneStaged } from "../queries";
+import { getTuneStagedAction } from "../actions/practice-actions";
 
 const formSchema = z.object({
   title: z.string().min(1, { message: "Title is required" }),
@@ -43,7 +43,7 @@ export default async function TuneEditor({
   tuneId,
   returnUrl,
 }: ITuneEditorProps & { returnUrl: string }): Promise<JSX.Element> {
-  const tuneData = await getTuneStaged(userId, playlistId, tuneId);
+  const tuneData = await getTuneStagedAction(userId, playlistId, tuneId);
   if (tuneData.length > 1) {
     return <div>Error: multiple tunes found that match ID {tuneId}</div>;
   }

@@ -18,7 +18,7 @@ export default function SettingsAccountPage() {
         </p>
       </div>
       <Separator />
-      <AccountForm />
+      <AccountForm showProfile showPassword={false} showPhone={false} />
     </div>
   );
 }

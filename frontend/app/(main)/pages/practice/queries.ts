@@ -37,6 +37,14 @@ import { formatTypeScriptDateToPythonUTCString } from "@/lib/date-utils";
 //   }
 // }
 
+// Runtime tripwire: warn if this server module is ever executed in a client context.
+// Heuristic: window is defined OR document is defined OR a known client-only global
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  console.warn(
+    "[Tripwire] practice/queries.ts executed in a client environment. This should only be imported via server actions.",
+  );
+}
+
 const TT_API_BASE_URL = process.env.TT_API_BASE_URL;
 
 if (!TT_API_BASE_URL) {

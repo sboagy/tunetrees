@@ -60,6 +60,7 @@ export default function UserButton() {
           <Button
             variant="ghost"
             className={`${styles.dropDownMenuTriggerInnerButton}`}
+            data-testid="tt-user-menu-trigger"
           >
             <div className="flex items-center space-x-3 ">
               <span className="hidden text-sm sm:inline-flex">

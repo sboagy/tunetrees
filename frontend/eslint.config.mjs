@@ -236,6 +236,31 @@ export default [
       ],
     },
   },
+  {
+    files: [
+      "app/(main)/pages/practice/components/**/*.tsx",
+      "app/(main)/pages/practice/components/**/*.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/app/(main)/pages/practice/queries",
+              message:
+                "Do not import 'queries' directly in client components. Use actions/practice-actions.ts wrappers.",
+            },
+          ],
+          patterns: [
+            "../queries",
+            "../../queries",
+            "**/pages/practice/queries",
+          ],
+        },
+      ],
+    },
+  },
   // Configuration for Jest configuration files
   {
     files: ["jest.config.{js,cjs}", "jest.setup.{js,cjs}"],

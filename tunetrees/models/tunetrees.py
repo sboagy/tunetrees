@@ -159,6 +159,9 @@ class User(Base):
     prefs_spaced_repetition: Mapped[List["PrefsSpacedRepetition"]] = relationship(
         "PrefsSpacedRepetition", uselist=True, back_populates="user"
     )
+    prefs_scheduling_options: Mapped[List["PrefsSchedulingOptions"]] = relationship(
+        "PrefsSchedulingOptions", uselist=True, back_populates="user"
+    )
     session: Mapped[List["Session"]] = relationship(
         "Session", uselist=True, back_populates="user"
     )
@@ -292,6 +295,22 @@ class PrefsSpacedRepetition(Base):
 
     user: Mapped[Optional["User"]] = relationship(
         "User", back_populates="prefs_spaced_repetition"
+    )
+
+
+class PrefsSchedulingOptions(Base):
+    __tablename__ = "prefs_scheduling_options"
+
+    user_id = mapped_column(ForeignKey("user.id"), primary_key=True)
+    acceptable_delinquency_window = mapped_column(Integer, server_default=text("21"))
+    min_reviews_per_day = mapped_column(Integer)
+    max_reviews_per_day = mapped_column(Integer)
+    days_per_week = mapped_column(Integer)
+    weekly_rules = mapped_column(Text)
+    exceptions = mapped_column(Text)
+
+    user: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="prefs_scheduling_options"
     )
 
 

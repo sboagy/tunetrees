@@ -1,11 +1,11 @@
 "use client";
 
 import {
-  createReference,
-  deleteReference,
-  getReferences,
-  updateReference,
-} from "@/app/(main)/pages/practice/queries";
+  createReferenceAction,
+  deleteReferenceAction,
+  getReferencesAction,
+  updateReferenceAction,
+} from "../actions/practice-actions";
 import AutoResizingRichTextarea from "@/components/AutoResizingRichTextarea";
 import AutoResizingTextarea from "@/components/AutoResizingTextarea";
 import { Button } from "@/components/ui/button";
@@ -368,7 +368,7 @@ export default function ReferenceCards({
 
   useEffect(() => {
     const fetchReferences = async () => {
-      const data = await getReferences(tuneRef, userRef);
+      const data = await getReferencesAction(tuneRef, userRef);
       console.log(`setting references... ${tuneRef} ${userRef}`);
       setReferences(data);
     };
@@ -404,7 +404,7 @@ export default function ReferenceCards({
           (reference) => reference.id !== updatedReference.id,
         ),
       );
-      deleteReference(updatedReference.id ?? 0)
+      deleteReferenceAction(updatedReference.id ?? 0)
         .then(() => {
           console.log("Reference deleted successfully");
         })
@@ -426,7 +426,7 @@ export default function ReferenceCards({
         prevReferences.filter((reference) => reference.id !== id),
       );
 
-      createReference(referenceToUpdate2)
+      createReferenceAction(referenceToUpdate2)
         .then((result: IReferenceData) => {
           console.log("Reference updated successfully");
           // Need to update the note with the new ID
@@ -444,7 +444,7 @@ export default function ReferenceCards({
           reference.id === updatedReference.id ? updatedReference : reference,
         ),
       );
-      updateReference(updatedReference.id ?? 0, updatedReference)
+      updateReferenceAction(updatedReference.id ?? 0, updatedReference)
         .then(() => {
           console.log("Reference updated successfully");
         })

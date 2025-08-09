@@ -38,7 +38,17 @@ import {
 //   // dob: new Date("2023-01-23"),
 // };
 
-export function AccountForm() {
+interface IAccountFormProps {
+  showProfile?: boolean; // email + name
+  showPassword?: boolean;
+  showPhone?: boolean;
+}
+
+export function AccountForm({
+  showProfile = true,
+  showPassword = true,
+  showPhone = true,
+}: IAccountFormProps) {
   const { data: session, update } = useSession();
   let email = session?.user?.email;
 
@@ -298,6 +308,41 @@ export function AccountForm() {
   //   }
   // };
 
+  // Track form state for dirty/submitting states
+  const { isDirty, isSubmitting } = form.formState;
+
+  // Compute submit disabled state based on visible sections and dirty state
+  const isSubmitDisabled = (): boolean => {
+    if (!_crsfToken) return true;
+    if (!isDirty) return true; // Disable until something changes
+    if (isSubmitting) return true;
+
+    // If profile fields are shown, require valid email and name
+    if (showProfile) {
+      if (emailError) return true;
+      const emailVal = form.getValues("email");
+      const nameVal = form.getValues("name");
+      if (!emailVal || !nameVal) return true;
+    }
+
+    // If password fields are shown, require both present and match
+    if (showPassword) {
+      if (!!passwordError || !!passwordConfirmationError) return true;
+      const pw = form.getValues("password");
+      const pwc = form.getValues("password_confirmation");
+      if (!pw || !pwc) return true;
+    }
+
+    // Phone section has no hard requirements for submission
+    return false;
+  };
+
+  const getSubmitLabel = (): string => {
+    if (showPassword && !showProfile && !showPhone) return "Change password";
+    if (showPhone && !showProfile && !showPassword) return "Update phone";
+    return "Update account";
+  };
+
   return (
     <Form {...form}>
       <form
@@ -347,136 +392,150 @@ export function AccountForm() {
             </FormItem>
           )}
         /> */}
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>EMail</FormLabel>
-              <FormControl className="mt-[1px]">
-                <Input
-                  type="email"
-                  placeholder="person@example.com"
-                  {...field}
-                  onChange={(e) => void handleEmailChange(e, field)}
-                  required
-                  className={emailError ? "border-red-500" : ""}
-                  autoFocus
-                  data-testid="user_email"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        {emailError && (
-          <p className="text-red-500 text-sm" role="alert">
-            {emailError}
-          </p>
-        )}
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Password</FormLabel>
-              <FormControl className="mt-[1px]">
-                <PasswordInput
-                  id="password"
-                  placeholder="password"
-                  autoComplete="new-password"
-                  {...field}
-                  onChange={(e) => handlePasswordChange(e, field)}
-                  data-testid="user_password"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        {passwordError && (
-          <p className="text-red-500 text-sm" role="alert">
-            {passwordError}
-          </p>
-        )}
-        <FormField
-          control={form.control}
-          name="password_confirmation"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Confirm Password</FormLabel>
-              <FormControl className="mt-[1px]">
-                <PasswordInput
-                  id="password_confirmation"
-                  placeholder="repeat password"
-                  autoComplete="new-password"
-                  {...field}
-                  onChange={(e) => handlePasswordConfirmationChange(e, field)}
-                  data-testid="user_password_verification"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        {passwordConfirmationError && (
-          <p className="text-red-500 text-sm" role="alert">
-            {passwordConfirmationError}
-          </p>
-        )}
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name</FormLabel>
-              <FormControl className="mt-[1px]">
-                <Input
-                  placeholder="Your name"
-                  {...field}
-                  onChange={(e) => handleUserNameChange(e, field)}
-                  data-testid="user_name"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Phone Number (Optional, for SMS verification)
-              </FormLabel>
-              <FormControl className="mt-[1px]">
-                <Input
-                  type="tel"
-                  placeholder="+1 (555) 123-4567"
-                  {...field}
-                  onChange={(e) => handlePhoneChange(e, field)}
-                  data-testid="user_phone"
-                />
-              </FormControl>
-              <FormMessage />
-              {phoneVerified && form.watch("phone") && (
-                <p className="text-sm text-green-600">
-                  ✓ Phone number verified - SMS password reset available
-                </p>
+        {showProfile && (
+          <>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl className="mt-[1px]">
+                    <Input
+                      type="email"
+                      placeholder="person@example.com"
+                      {...field}
+                      onChange={(e) => void handleEmailChange(e, field)}
+                      required
+                      className={emailError ? "border-red-500" : ""}
+                      autoFocus
+                      data-testid="user_email"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-              {field.value && !phoneVerified && (
-                <p className="text-sm text-yellow-600">
-                  Phone number not verified. SMS password reset will not be
-                  available.
-                </p>
+            />
+            {emailError && (
+              <p className="text-red-500 text-sm" role="alert">
+                {emailError}
+              </p>
+            )}
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl className="mt-[1px]">
+                    <Input
+                      placeholder="Your name"
+                      {...field}
+                      onChange={(e) => handleUserNameChange(e, field)}
+                      data-testid="user_name"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-            </FormItem>
-          )}
-        />
+            />
+          </>
+        )}
+
+        {showPassword && (
+          <>
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl className="mt-[1px]">
+                    <PasswordInput
+                      id="password"
+                      placeholder="password"
+                      autoComplete="new-password"
+                      {...field}
+                      onChange={(e) => handlePasswordChange(e, field)}
+                      data-testid="user_password"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {passwordError && (
+              <p className="text-red-500 text-sm" role="alert">
+                {passwordError}
+              </p>
+            )}
+            <FormField
+              control={form.control}
+              name="password_confirmation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm Password</FormLabel>
+                  <FormControl className="mt-[1px]">
+                    <PasswordInput
+                      id="password_confirmation"
+                      placeholder="repeat password"
+                      autoComplete="new-password"
+                      {...field}
+                      onChange={(e) =>
+                        handlePasswordConfirmationChange(e, field)
+                      }
+                      data-testid="user_password_verification"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {passwordConfirmationError && (
+              <p className="text-red-500 text-sm" role="alert">
+                {passwordConfirmationError}
+              </p>
+            )}
+          </>
+        )}
+
+        {showPhone && (
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Phone Number (Optional, for SMS verification)
+                </FormLabel>
+                <FormControl className="mt-[1px]">
+                  <Input
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
+                    {...field}
+                    onChange={(e) => handlePhoneChange(e, field)}
+                    data-testid="user_phone"
+                  />
+                </FormControl>
+                <FormMessage />
+                {phoneVerified && form.watch("phone") && (
+                  <p className="text-sm text-green-600">
+                    ✓ Phone number verified - SMS password reset available
+                  </p>
+                )}
+                {field.value && !phoneVerified && (
+                  <p className="text-sm text-yellow-600">
+                    Phone number not verified. SMS password reset will not be
+                    available.
+                  </p>
+                )}
+              </FormItem>
+            )}
+          />
+        )}
 
         {/* Phone Verification Section - Only show when user enters a different number */}
-        {showPhoneVerification && form.watch("phone") && (
+        {showPhone && showPhoneVerification && form.watch("phone") && (
           <div className="space-y-4 border rounded-lg p-4 bg-muted/5">
             <h3 className="text-sm font-medium">Verify New Phone Number</h3>
             <p className="text-sm text-muted-foreground">
@@ -529,19 +588,10 @@ export function AccountForm() {
         <Button
           type="submit"
           variant="secondary"
-          disabled={
-            !_crsfToken ||
-            !!emailError ||
-            !!passwordError ||
-            !!passwordConfirmationError ||
-            !form.getValues("password") ||
-            !form.getValues("password_confirmation") ||
-            !form.getValues("email") ||
-            !form.getValues("name")
-          }
+          disabled={isSubmitDisabled()}
           className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
         >
-          Update account
+          {getSubmitLabel()}
         </Button>
       </form>
       {/* <div className="flex gap-2 items-center ml-12 mr-12 mt-6 -mb-2">
