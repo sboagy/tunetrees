@@ -47,6 +47,10 @@ export class TuneTreesPageObject {
   readonly catalogTab;
   readonly tableStatus;
   readonly toast;
+  // Spaced Repetition settings locators
+  readonly spacedRepUpdateButton: Locator;
+  readonly optimizeParamsInlineButton: Locator;
+  readonly optimizeParamsMainButton: Locator;
 
   // Password Reset locators
   readonly passwordResetPasswordInput: Locator;
@@ -160,6 +164,15 @@ export class TuneTreesPageObject {
 
     this.tableStatus = this.page.getByText(" row(s) selected.");
     this.toast = this.page.getByTestId("shadcn-toast");
+
+    // Spaced Repetition locators
+    this.spacedRepUpdateButton = page.getByTestId("spaced-rep-update-button");
+    this.optimizeParamsInlineButton = page.getByTestId(
+      "optimize-params-inline-button",
+    );
+    this.optimizeParamsMainButton = page.getByTestId(
+      "optimize-params-main-button",
+    );
 
     // Password Reset locators
     this.passwordResetPasswordInput = page.getByTestId(

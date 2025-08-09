@@ -61,9 +61,15 @@ preferences_router = APIRouter(prefix="/preferences", tags=["preferences"])
     status_code=status.HTTP_200_OK,
 )
 def get_prefs_spaced_repetition(
-    alg_type: str = Query(..., description="The algorithm type (e.g., SM2, FSRS)"),
+    alg_type: Optional[str] = Query(None, description="The algorithm type (e.g., SM2, FSRS)"),
+    sr_alg_type: Optional[str] = Query(None, description="Alias for alg_type (legacy front-end param)"),
     user_id: int = Query(..., description="The user ID"),
 ):
+    # Accept legacy param name sr_alg_type
+    if alg_type is None and sr_alg_type is not None:
+        alg_type = sr_alg_type
+    if alg_type is None:
+        alg_type = "FSRS"
     with SessionLocal() as db:
         preference = (
             db.query(PrefsSpacedRepetition)
@@ -74,7 +80,33 @@ def get_prefs_spaced_repetition(
             .first()
         )
         if not preference:
-            raise HTTPException(status_code=404, detail="Preference not found")
+            # Auto-create default using FSRS Scheduler defaults (even for SM2 for now)
+            try:
+                from fsrs import Scheduler as FSRSDefault
+                import json as _json
+                scheduler = FSRSDefault()
+                preference = PrefsSpacedRepetition(
+                    alg_type=alg_type,
+                    user_id=user_id,
+                    fsrs_weights=_json.dumps(scheduler.parameters),
+                    request_retention=scheduler.desired_retention,
+                    maximum_interval=scheduler.maximum_interval,
+                    learning_steps=_json.dumps(
+                        [td.total_seconds() for td in scheduler.learning_steps]
+                    ),
+                    relearning_steps=_json.dumps(
+                        [td.total_seconds() for td in scheduler.relearning_steps]
+                    ),
+                    enable_fuzzing=int(bool(scheduler.enable_fuzzing)),
+                )
+                db.add(preference)
+                db.commit()
+                db.refresh(preference)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to auto-create spaced repetition preference: {e}",
+                )
         return preference
 
 
@@ -165,7 +197,19 @@ def get_prefs_scheduling_options(
     with SessionLocal() as db:
         prefs = db.get(PrefsSchedulingOptions, user_id)
         if not prefs:
-            raise HTTPException(status_code=404, detail="Scheduling options not found")
+            # Auto-create with sensible defaults derived from model defaults
+            # Acceptable delinquency window default handled by DB server_default
+            prefs = PrefsSchedulingOptions(
+                user_id=user_id,
+                min_reviews_per_day=0,
+                max_reviews_per_day=0,
+                days_per_week=7,
+                weekly_rules='{}',
+                exceptions='[]',
+            )
+            db.add(prefs)
+            db.commit()
+            db.refresh(prefs)
         return prefs
 
 
@@ -208,7 +252,16 @@ def update_prefs_scheduling_options(
     with SessionLocal() as db:
         db_prefs = db.get(PrefsSchedulingOptions, user_id)
         if not db_prefs:
-            raise HTTPException(status_code=404, detail="Scheduling options not found")
+            # Create new row if missing before applying updates
+            db_prefs = PrefsSchedulingOptions(
+                user_id=user_id,
+                min_reviews_per_day=0,
+                max_reviews_per_day=0,
+                days_per_week=7,
+                weekly_rules='{}',
+                exceptions='[]',
+            )
+            db.add(db_prefs)
         # Apply updates
         updates = {}
         if prefs:

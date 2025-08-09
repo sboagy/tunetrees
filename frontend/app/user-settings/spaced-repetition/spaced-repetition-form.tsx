@@ -254,6 +254,7 @@ const SpacedRepetitionForm = () => {
                         disabled={isOptimizing || !session?.user?.id}
                         onClick={() => void handleOptimizeParams()}
                         className="mt-2"
+                        data-testid="optimize-params-inline-button"
                       >
                         {isOptimizing
                           ? "Optimizing..."
@@ -301,6 +302,7 @@ const SpacedRepetitionForm = () => {
                 variant="outline"
                 disabled={isOptimizing}
                 className="w-full h-12"
+                data-testid="optimize-params-main-button"
               >
                 {isOptimizing ? "Optimizing..." : "Optimize FSRS Parameters"}
               </Button>
@@ -317,6 +319,7 @@ const SpacedRepetitionForm = () => {
               !form.getValues("maximum_interval")
             }
             className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
+            data-testid="spaced-rep-update-button"
           >
             Update
           </Button>
