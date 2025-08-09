@@ -170,16 +170,31 @@ def register_levenshtein(
     logging.getLogger().info("Registered levenshtein function")
 
 
-# Force the journal mode to DELETE to prevent database file corruption
-# @event.listens_for(Engine, "connect")
-# def set_sqlite_pragma(
-#     dbapi_connection: SAConnection, connection_record: ConnectionPoolEntry
-# ):
-#     assert connection_record is not None
-#     if isinstance(dbapi_connection, sqlite3.Connection):
-#         cursor = dbapi_connection.cursor()
-#         cursor.execute("PRAGMA journal_mode=DELETE")
-#         cursor.close()
+###############################################################################
+# Optional: force journal_mode=DELETE (disable WAL) to mitigate intermittent
+# SQLite locking/read-only issues during rapid test DB cloning. Enabled ONLY when
+# environment variable TT_ENABLE_SQLITE_DELETE_JOURNAL=1.
+#
+# DELETE mode helps ensure a clean state after file copy at the cost of reduced
+# concurrency. synchronous=FULL favors durability over speed (acceptable in tests).
+# If the flag is unset, default SQLite/WAL behavior is preserved.
+###############################################################################
+ENABLE_DELETE_JOURNAL = os.environ.get("TT_ENABLE_SQLITE_DELETE_JOURNAL", "1") == "1"
+
+if ENABLE_DELETE_JOURNAL:
+
+    @event.listens_for(Engine, "connect")
+    def set_sqlite_pragma(
+        dbapi_connection: SAConnection, connection_record: ConnectionPoolEntry
+    ) -> None:  # pragma: no cover - side-effect hook
+        assert connection_record is not None
+        if isinstance(dbapi_connection, sqlite3.Connection):
+            cursor = dbapi_connection.cursor()
+            try:
+                cursor.execute("PRAGMA journal_mode=DELETE")
+                cursor.execute("PRAGMA synchronous=FULL")
+            finally:
+                cursor.close()
 
 
 # Base = declarative_base()
@@ -188,8 +203,10 @@ with sqlalchemy_database_engine.connect() as connection:
     result = connection.execute(text("PRAGMA journal_mode;"))
     journal_mode = result.scalar()
     logger.info(f"Current journal mode: {journal_mode}")
-    if journal_mode != "delete":
-        logger.warning("The journal mode is not set to DELETE, issues may occur")
+    if ENABLE_DELETE_JOURNAL and journal_mode != "delete":
+        logger.warning(
+            "TT_ENABLE_SQLITE_DELETE_JOURNAL=1 but journal mode is not DELETE; issues may occur"
+        )
     result = connection.execute(text("PRAGMA integrity_check;"))
     integrity_check = result.scalar()
     logger.info(f"Integrity check result: {integrity_check}")
