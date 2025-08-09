@@ -38,6 +38,7 @@ TuneTrees is a spaced repetition learning app for musical tunes built with FastA
 - **Prettier formatting**: ALWAYS run prettier on code before committing - use `npx prettier --write <files>`
 - **Automatic formatting**: Use prettier for consistent code style - it handles indentation, spacing, line breaks, and semicolons
 - **ESLint compliance**: All ESLint rules must pass without warnings after prettier formatting
+- **Biome lint compliance**: All Biome lint rules must pass without warnings after prettier formatting
 - **Interface naming**: Use `I` prefix for all TypeScript interfaces
 
 ### Database Layer (SQLAlchemy 2.0.35)
@@ -147,13 +148,15 @@ npm run dev  # Next.js dev server on port 3000
 npm run build
 npm run start  # Production build
 npm run lint  # Must pass without warnings
+npm run biome_lint  # Must pass without warnings
 npm run type-check  # TypeScript strict checking
 
 # Run frontend tests
-npm test:unit        # Jest unit tests ONLY (password utils, etc.)
-npm test            # All tests including E2E (not recommended for development)
+npm run test:unit        # Jest unit tests ONLY (password utils, etc.)
+npm run test            # All tests including E2E (not recommended for development)
+npm run test:ui        # Run Playwright UI tests in headless mode
 
-# Run E2E tests - MUST use the environment setup script
+# For more playwright test control for E2E tests - use environment setup script
 ./run-playwright-tests.sh [test-file-pattern]  # Properly sets up environment and database
 # Do NOT use: npx playwright test directly - it lacks proper environment setup
 ```
@@ -514,7 +517,14 @@ practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
 
 #### 1. **Running Tests**: Environment Setup Script
 
-ALWAYS use the environment setup script:
+For Playwright tests,EITHER use the npm script:
+
+```bash
+cd frontend
+npm run test:ui [test-file-pattern]
+```
+
+which will run the tests in headless mode (preferred), OR, for more control over the test execution:
 
 ```bash
 cd frontend
