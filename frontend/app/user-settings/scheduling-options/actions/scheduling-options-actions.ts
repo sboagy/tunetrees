@@ -10,7 +10,7 @@ import {
   type IPrefsSchedulingOptionsCreate,
   type IPrefsSchedulingOptionsUpdate,
   type IPrefsSchedulingOptionsResponse,
-} from "../queries";
+} from "../queries-scheduling-options";
 
 export async function getSchedulingOptionsAction(userId: number) {
   return getSchedulingOptions(userId);

@@ -1,6 +1,6 @@
 import { Separator } from "@/components/ui/separator";
 import SchedulingOptionsForm from "./scheduling-options-form";
-import { getSchedulingOptions } from "./queries";
+import { getSchedulingOptions } from "./queries-scheduling-options";
 import { auth } from "@/auth";
 
 export default async function SchedulingOptionsPage() {
