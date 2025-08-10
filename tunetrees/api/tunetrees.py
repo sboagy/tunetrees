@@ -114,8 +114,8 @@ async def get_scheduled_tunes_overview(
     sitdown_date: datetime = Query(
         ..., description="Review sitdown date (timezone-aware, UTC recommended)"
     ),
-    acceptable_delinquency_window: int = Query(
-        7, description="Acceptable delinquency window in days"
+    acceptable_delinquency_window: Optional[int] = Query(
+        None, description="Acceptable delinquency window in days"
     ),
 ) -> List[PlaylistTuneJoinedModel]:
     """

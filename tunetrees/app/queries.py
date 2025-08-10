@@ -11,8 +11,78 @@ from tunetrees.models.tunetrees import (
     Playlist,
     PracticeRecord,
     Tune,
+    PrefsSchedulingOptions,
     t_practice_list_staged,
 )
+
+# ---------------------------------------------------------------------------
+# Scheduling Options Preferences Helpers
+# ---------------------------------------------------------------------------
+# These defaults mirror the auto-create logic in preferences API endpoints.
+DEFAULT_ACCEPTABLE_DELINQUENCY_WINDOW = 21  # Matches server_default on model
+DEFAULT_MIN_REVIEWS_PER_DAY = 0
+DEFAULT_MAX_REVIEWS_PER_DAY = 0
+DEFAULT_DAYS_PER_WEEK = 7
+DEFAULT_WEEKLY_RULES = "{}"  # JSON object string placeholder
+DEFAULT_EXCEPTIONS = "[]"  # JSON array string placeholder
+
+
+def get_prefs_scheduling_options_or_defaults(
+    db: Session, user_ref: int, persist_if_missing: bool = True
+) -> PrefsSchedulingOptions:
+    """Fetch a user's scheduling options preferences, creating defaults if absent.
+
+    This mirrors the behaviour of the REST endpoint /prefs_scheduling_options but is
+    available internally so other backend logic (e.g. scheduling queries) can rely
+    on consistent preference retrieval without an HTTP round trip.
+
+    Args:
+        db (Session): Active SQLAlchemy session.
+        user_ref (int): The user id.
+        persist_if_missing (bool): If True (default) a new row is inserted when
+            none exists; otherwise an unsaved transient instance is returned.
+
+    Returns:
+        PrefsSchedulingOptions: The existing or default (possibly newly persisted) row.
+    """
+    prefs = db.get(PrefsSchedulingOptions, user_ref)
+    if prefs is None:
+        prefs = PrefsSchedulingOptions(
+            user_id=user_ref,
+            acceptable_delinquency_window=DEFAULT_ACCEPTABLE_DELINQUENCY_WINDOW,
+            min_reviews_per_day=DEFAULT_MIN_REVIEWS_PER_DAY,
+            max_reviews_per_day=DEFAULT_MAX_REVIEWS_PER_DAY,
+            days_per_week=DEFAULT_DAYS_PER_WEEK,
+            weekly_rules=DEFAULT_WEEKLY_RULES,
+            exceptions=DEFAULT_EXCEPTIONS,
+        )
+        if persist_if_missing:
+            db.add(prefs)
+            # Flush to obtain defaults (though acceptable_delinquency_window already set)
+            try:
+                db.flush()
+            except Exception as e:  # pragma: no cover - defensive logging
+                logging.getLogger().error(
+                    "Error persisting default PrefsSchedulingOptions for user %s: %s",
+                    user_ref,
+                    e,
+                )
+                raise
+    else:
+        # Backfill any NULL legacy columns with in-memory defaults (do not persist silently)
+        if prefs.acceptable_delinquency_window is None:
+            prefs.acceptable_delinquency_window = DEFAULT_ACCEPTABLE_DELINQUENCY_WINDOW
+        if prefs.min_reviews_per_day is None:
+            prefs.min_reviews_per_day = DEFAULT_MIN_REVIEWS_PER_DAY
+        if prefs.max_reviews_per_day is None:
+            prefs.max_reviews_per_day = DEFAULT_MAX_REVIEWS_PER_DAY
+        if prefs.days_per_week is None:
+            prefs.days_per_week = DEFAULT_DAYS_PER_WEEK
+        if prefs.weekly_rules is None:
+            prefs.weekly_rules = DEFAULT_WEEKLY_RULES
+        if prefs.exceptions is None:
+            prefs.exceptions = DEFAULT_EXCEPTIONS
+    return prefs
 
 
 def query_result_to_diagnostic_dict(
@@ -99,7 +169,7 @@ def query_practice_list_scheduled(
     limit: int = 16,
     print_table=False,
     review_sitdown_date: Optional[datetime] = None,
-    acceptable_delinquency_window=7,
+    acceptable_delinquency_window: Optional[int] = None,
     playlist_ref=1,
     user_ref=1,
     show_deleted=True,
@@ -144,9 +214,16 @@ def query_practice_list_scheduled(
     # review_sitdown_date = review_sitdown_date + timedelta(days=1)
     print("review_sitdown_date: ", review_sitdown_date)
 
-    lower_bound_date = review_sitdown_date - timedelta(
-        days=acceptable_delinquency_window
+    prefs_scheduling_options = get_prefs_scheduling_options_or_defaults(
+        db, user_ref, persist_if_missing=False
     )
+    effective_window = (
+        acceptable_delinquency_window
+        if acceptable_delinquency_window is not None
+        else prefs_scheduling_options.acceptable_delinquency_window
+        or DEFAULT_ACCEPTABLE_DELINQUENCY_WINDOW
+    )
+    lower_bound_date = review_sitdown_date - timedelta(days=effective_window)
 
     # Create the query - FIXED: Use scheduled column with fallback to latest_review_date
     # This handles the transition period where scheduled column may be null

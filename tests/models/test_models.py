@@ -1,6 +1,5 @@
 # moved from test/test_models.py
 from typing import Any, List
-from datetime import datetime
 import os
 import sqlite3
 from sqlalchemy.engine.row import Row

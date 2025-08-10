@@ -75,7 +75,7 @@ export async function getScheduledTunesOverview(
   playlistId: number,
   sitdownDate: Date,
   showDeleted = false,
-  acceptable_delinquency_window = 7,
+  acceptable_delinquency_window: number | null = null,
 ): Promise<ITuneOverviewScheduled[]> {
   if (
     !sitdownDate ||

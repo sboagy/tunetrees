@@ -35,7 +35,7 @@ import {
 } from "./SitdownDateProvider";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
-import TunesGrid, { acceptableDelinquencyWindow } from "./TunesGrid";
+import TunesGrid from "./TunesGrid";
 
 type RepertoireGridProps = {
   userId: number;
@@ -103,7 +103,7 @@ export default function TunesGridRepertoire({
   // I tried to use refreshTunes from
   // app/[main]/pages/practice/components/TunesContextRepertoire.tsx
   // but things don't work right then.  It's possible that I may be doing
-  // some double refreshes, but I'm not sure.
+  // some double refreshs, but I'm not sure.
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
@@ -306,6 +306,46 @@ export default function TunesGridRepertoire({
   };
 
   const { sitDownDate } = useSitDownDate();
+  const [acceptableDelinquencyWindow, setAcceptableDelinquencyWindow] =
+    useState<number>(21);
+
+  useEffect(() => {
+    async function loadSchedulingPrefs() {
+      try {
+        const baseUrl =
+          process.env.NEXT_PUBLIC_TT_API_BASE_URL ||
+          process.env.TT_API_BASE_URL;
+        if (!baseUrl) {
+          console.warn(
+            "TT API base URL not set; using default value for acceptableDelinquencyWindow",
+          );
+          return;
+        }
+        const resp = await fetch(
+          `${baseUrl}/tunetrees/prefs_scheduling_options?user_id=${userId}`,
+          {
+            method: "GET",
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+          },
+        );
+        if (!resp.ok) {
+          console.warn(
+            "Failed to fetch prefs_scheduling_options, status",
+            resp.status,
+          );
+          return;
+        }
+        const data = await resp.json();
+        if (data && typeof data.acceptable_delinquency_window === "number") {
+          setAcceptableDelinquencyWindow(data.acceptable_delinquency_window);
+        }
+      } catch (error) {
+        console.error("Error loading prefs_scheduling_options", error);
+      }
+    }
+    void loadSchedulingPrefs();
+  }, [userId]);
 
   const getStyleForSchedulingState = (
     scheduledDateString: string | null,
