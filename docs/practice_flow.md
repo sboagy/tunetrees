@@ -9,12 +9,55 @@ End-to-end path for a practice submission:
    - Determine algorithm + technique.
    - If goal = recall: run FSRS/SM2 scheduler to get next review.
    - Else: run goal-specific heuristic `_process_non_recall_goal()`.
-   - Insert new `PracticeRecord` (append-only) + update `playlist_tune.scheduled` with next review date (if available).
-5. Commit transaction (all tunes atomically). On success the frontend triggers a refresh.
-6. Refetch uses `getScheduledTunesOverviewAction()` which calls backend `/scheduled_tunes_overview/...` that internally invokes `query_practice_list_scheduled()` to assemble the scheduled list (using `playlist_tune.scheduled` with fallback to historical review data).
-7. Updated grid renders with cleared feedback inputs and new scheduling states.
+   - Insert new `PracticeRecord` + update `playlist_tune.scheduled` (next review date) when available.
+5. Commit transaction (atomic). Frontend triggers refresh.
+6. Refetch uses `getScheduledTunesOverviewAction()` -> `/scheduled_tunes_overview/...` -> `query_practice_list_scheduled()` selecting tunes due within delinquency window.
+7. Grid re-renders with updated schedule state.
 
-This document below expands each stage, including data structures, edge cases, and a sequence diagram.
+### High-Level Sequence Diagram
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as User
+  participant C as Client UI<br/>TunesGridScheduled
+  participant SA as Server Function<br/>submitPracticeFeedbacks
+  participant API as FastAPI Route
+  participant SCH as schedule.py Logic
+  participant Q as query_practice_list_scheduled
+  participant DB as Database
+
+  U->>C: Provide feedback (quality + goal)
+  C->>C: Build updates map {tune_id:{feedback,goal}}
+  C->>SA: submitPracticeFeedbacks(playlistId, updates, sitdownDate)
+  SA->>API: POST /practice/submit_feedbacks/{playlist}?sitdown_date=...
+  API->>SCH: update_practice_feedbacks(updates, playlist, sitdownDate)
+  loop Each tune
+    SCH->>SCH: _process_single_tune_feedback(goal, quality)
+    alt goal == recall
+      SCH->>SCH: FSRS/SM2 scheduler.review()/first_review()
+    else goal != recall
+      SCH->>SCH: _process_non_recall_goal()
+    end
+    SCH->>DB: INSERT PracticeRecord
+    SCH->>DB: UPDATE playlist_tune.scheduled (next review)
+  end
+  SCH-->>API: Commit transaction
+  API-->>SA: 302 status
+  SA-->>C: Promise resolved
+  C->>C: triggerRefresh()
+  C->>SA: getScheduledTunesOverviewAction()
+  SA->>API: GET /scheduled_tunes_overview/{user}/{playlist}
+  API->>Q: query_practice_list_scheduled(...)
+  Q->>DB: SELECT staged view (COALESCE scheduled, latest_review_date)
+  DB-->>Q: Rows
+  Q-->>API: Tune rows
+  API-->>SA: JSON list
+  SA-->>C: Scheduled tunes
+  C-->>U: Updated grid rendered
+```
+
+This document below expands each stage, including data structures, edge cases.
 
 ## Practice Feedback -> Scheduling Flow
 
@@ -30,7 +73,7 @@ Steps:
 
 1. Iterate over current `tunes` array (from `useScheduledTunes()` context).
 2. For each tune, read the row from the TanStack table and extract `recall_eval` (feedback) and `goal`.
-3. Build `updates: { [tuneId]: { feedback, goal } }` (only include tunes with a feedback value).
+3. Build `updates: { [tuneId: { feedback, goal } }` (only include tunes with a feedback value).
 4. Clear current tune selection (and persist that cleared state) if the currently focused tune is being submitted.
 5. Read `sitdownDate` from `getSitdownDateFromBrowser()` (must be client supplied for correct temporal anchoring).
 6. Call server function `submitPracticeFeedbacks({ playlistId, updates, sitdownDate })` (in `commands.ts`).
@@ -162,46 +205,7 @@ Data Fallback Behavior:
 5. API responds with updated schedule including any newly scheduled tunes or changed intervals.
 6. State updated → table re-renders with cleared `recall_eval` and updated scheduling info.
 
-### 9. Sequence Diagram
-
-```mermaid
-sequenceDiagram
-  participant U as User (Browser)
-  participant C as Client Component<br/>TunesGridScheduled
-  participant S as Server Action / commands.ts
-  participant API as FastAPI Router
-  participant SCH as schedule.py Logic
-  participant DB as Database
-
-  U->>C: Click "Submit Practiced Tunes"
-  C->>C: Build updates {tune_id: {feedback, goal}}
-  C->>S: submitPracticeFeedbacks(playlistId, updates, sitdownDate)
-  S->>API: POST /practice/submit_feedbacks/{playlistId}?sitdown_date=...
-  API->>SCH: update_practice_feedbacks(tune_updates, playlist)
-  loop Each tune_id
-    SCH->>SCH: _process_single_tune_feedback()
-    alt goal == recall
-      SCH->>SCH: FSRS/SM2 scheduler.review()/first_review()
-    else goal != recall
-      SCH->>SCH: _process_non_recall_goal()
-    end
-    SCH->>DB: INSERT PracticeRecord
-    SCH->>DB: UPDATE playlist_tune.scheduled
-  end
-  SCH-->>API: Commit transaction
-  API-->>S: 302 (success)
-  S-->>C: Resolve promise
-  C->>C: triggerRefresh()
-  C->>S: getScheduledTunesOverviewAction()
-  S->>API: GET /scheduled_tunes_overview/{user}/{playlist}
-  API->>DB: SELECT scheduled tunes
-  DB-->>API: Rows
-  API-->>S: JSON scheduled tunes
-  S-->>C: Tunes array
-  C-->>U: Updated grid / flashcard view
-```
-
-### 10. Key Data Structures
+### 9. Key Data Structures
 
 Practice Feedback Update (frontend to backend):
 
@@ -231,7 +235,7 @@ PracticeRecord(
 )
 ```
 
-### 11. Edge Cases & Validation
+### 10. Edge Cases & Validation
 
 1. Missing or invalid `sitdownDate` → client throws before POST.
 2. Naive (timezone-less) `sitdown_date` query param → server upgrades to UTC.
@@ -240,7 +244,7 @@ PracticeRecord(
 5. Non-recall scheduling uses heuristic arrays; may revisit for adaptive intervals.
 6. Race condition (duplicate submissions) could attempt identical `(tune_ref, playlist_ref, practiced)`; mitigated by single-click + client state clear.
 
-### 12. Future Improvements (Optional)
+### 11. Future Improvements (Optional)
 
 - Store next review date directly in PracticeRecord (separate column) to reduce dual-source complexity during migration.
 - Add explicit server response payload (e.g., list of updated tune IDs + next review dates) to allow optimistic UI without full refetch.
