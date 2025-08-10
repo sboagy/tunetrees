@@ -1,7 +1,12 @@
 import { Separator } from "@/components/ui/separator";
-import SchedulingOptionsForm2 from "./scheduling-options-form2";
+import SchedulingOptionsForm from "./scheduling-options-form";
+import { getSchedulingOptions } from "./queries";
+import { auth } from "@/auth";
 
-export default function SchedulingOptionsPage() {
+export default async function SchedulingOptionsPage() {
+  const session = await auth();
+  const userId = session?.user?.id ? Number.parseInt(session.user.id) : -1;
+  const initialPrefs = userId > 0 ? await getSchedulingOptions(userId) : null;
   return (
     <div className="space-y-6">
       <div>
@@ -11,7 +16,7 @@ export default function SchedulingOptionsPage() {
         </p>
       </div>
       <Separator />
-      <SchedulingOptionsForm2 />
+      <SchedulingOptionsForm initialPrefs={initialPrefs} />
     </div>
   );
 }
