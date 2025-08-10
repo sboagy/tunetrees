@@ -1,3 +1,21 @@
+# Practice Scheduling Flow (High-Level Overview)
+
+End-to-end path for a practice submission:
+
+1. User selects feedback (quality + optional goal) for one or more tunes in `TunesGridScheduled`.
+2. Client builds `updates` map and calls server function `submitPracticeFeedbacks()` with `playlistId`, updates, and a browser-derived `sitdownDate`.
+3. FastAPI endpoint `/practice/submit_feedbacks/{playlist_id}` receives POST, normalizes `sitdown_date` to UTC, and calls `update_practice_feedbacks()`.
+4. For each tune:
+   - Determine algorithm + technique.
+   - If goal = recall: run FSRS/SM2 scheduler to get next review.
+   - Else: run goal-specific heuristic `_process_non_recall_goal()`.
+   - Insert new `PracticeRecord` (append-only) + update `playlist_tune.scheduled` with next review date (if available).
+5. Commit transaction (all tunes atomically). On success the frontend triggers a refresh.
+6. Refetch uses `getScheduledTunesOverviewAction()` which calls backend `/scheduled_tunes_overview/...` that internally invokes `query_practice_list_scheduled()` to assemble the scheduled list (using `playlist_tune.scheduled` with fallback to historical review data).
+7. Updated grid renders with cleared feedback inputs and new scheduling states.
+
+This document below expands each stage, including data structures, edge cases, and a sequence diagram.
+
 ## Practice Feedback -> Scheduling Flow
 
 This document describes the end-to-end flow from the user submitting practice feedback in the frontend to the scheduling data being persisted and re-fetched for display. It covers both recall (FSRS/SM2 spaced repetition) and non-recall goal-specific paths.
@@ -9,6 +27,7 @@ File: `frontend/app/(main)/pages/practice/components/TunesGridScheduled.tsx`
 Key function: `submitPracticeFeedbacksHandler()`
 
 Steps:
+
 1. Iterate over current `tunes` array (from `useScheduledTunes()` context).
 2. For each tune, read the row from the TanStack table and extract `recall_eval` (feedback) and `goal`.
 3. Build `updates: { [tuneId]: { feedback, goal } }` (only include tunes with a feedback value).
@@ -25,15 +44,20 @@ File: `frontend/app/(main)/pages/practice/commands.ts`
 Function: `submitPracticeFeedbacks()`
 
 Steps:
+
 1. Validate presence and validity of `sitdownDate` (must be a Date object, non-NaN).
 2. POST JSON body `updates` to: `POST {TT_API_BASE_URL}/tunetrees/practice/submit_feedbacks/{playlistId}?sitdown_date=<UTC_ISO>`.
 3. `sitdown_date` is converted to Python-compatible UTC string (`convertToPythonUTCString`).
 4. Returns HTTP 302 (FastAPI status code constant) or propagates an error message.
 
 Payload Shape (per tune):
+
 ```json
 {
-  "<tune_id>": { "feedback": "good|again|easy|...", "goal": "recall|fluency|initial_learn|..." }
+  "<tune_id>": {
+    "feedback": "good|again|easy|...",
+    "goal": "recall|fluency|initial_learn|..."
+  }
 }
 ```
 
@@ -42,12 +66,14 @@ Payload Shape (per tune):
 File: `tunetrees/api/tunetrees.py`
 
 Endpoint:
+
 ```python
 @router.post("/practice/submit_feedbacks/{playlist_id}")
 async def submit_feedbacks(playlist_id: str, tune_updates: Dict[str, TuneFeedbackUpdate], sitdown_date: datetime = Query(...))
 ```
 
 Steps:
+
 1. Ensure `sitdown_date` is timezone-aware; if naive, patch UTC tzinfo.
 2. Call `update_practice_feedbacks(tune_updates, playlist_id, review_sitdown_date=sitdown_date)`.
 3. Return 302 on success or raise HTTP 500 with detail on failure.
@@ -59,6 +85,7 @@ File: `tunetrees/app/schedule.py`
 Function: `update_practice_feedbacks()`
 
 Steps:
+
 1. Resolve `user_ref` from `playlist_ref` (playlist ownership) via DB.
 2. Determine algorithm type preference (`fetch_algorithm_type`).
 3. Loop each `(tune_id, tune_update)`:
@@ -70,6 +97,7 @@ Steps:
 Function: `_process_single_tune_feedback()` (same file)
 
 Steps (recall goal):
+
 1. Validate UTC timezone of `sitdown_date`.
 2. Load latest practice record for reference (historical continuity) but always create a NEW record.
 3. Extract `quality_int` via `validate_and_get_quality()`; skip if quality is placeholder.
@@ -91,6 +119,7 @@ Steps (recall goal):
 Function: `_process_non_recall_goal()`
 
 Differences:
+
 1. Goal-specific intervals chosen from preset arrays (e.g., `initial_learn`, `fluency`, `session_ready`, `performance_polish`).
 2. Adjust step based on prior repetitions and current quality.
 3. Derive next review date via `_calculate_goal_specific_review_date()` (technique modifiers: `daily_practice`, `motor_skills`, `metronome`).
@@ -99,6 +128,30 @@ Differences:
 ### 7. Data Persistence & Uniqueness
 
 `PracticeRecord` uniqueness relies on distinct `(tune_ref, playlist_ref, practiced)` timestamps. Each submission uses the exact `sitdown_date` down to minute precision (seconds zeroed earlier in pipeline when parsed); multiple updates in the same minute for the same tune would violate uniqueness—frontend avoids rapid duplicate submissions per tune in a single session scope.
+
+### 7b. Scheduled Tunes Query (Backend Selection Logic)
+
+Core selector: `query_practice_list_scheduled(db, ...)` in `tunetrees/app/queries.py`.
+
+Responsibilities:
+
+- Accepts `review_sitdown_date` (UTC) + `acceptable_delinquency_window` to define a sliding window: `(sitdown_date - window_days, sitdown_date]`.
+- Filters rows from `t_practice_list_staged` for the current user + playlist.
+- Uses `COALESCE(playlist_tune.scheduled, latest_review_date)` so new playlist-based scheduling supersedes legacy practice record scheduling but still works during migration.
+- Excludes deleted tunes / deleted playlists unless flags set.
+- Orders by (coalesced) scheduled/review date descending, then performs a secondary in-memory sort by tune type for stable UI grouping.
+- Returns rows consumed by `/scheduled_tunes_overview/{user}/{playlist}` endpoint which the frontend calls via `getScheduledTunesOverviewAction()`.
+
+Why it matters:
+
+- Central place where the migration from historical `PracticeRecord.review_date` to `playlist_tune.scheduled` is abstracted away.
+- Ensures users see both slightly delinquent (within window) and due-today tunes in one list.
+- Prevents N+1 queries by operating entirely in a single SELECT over the staged view.
+
+Data Fallback Behavior:
+
+- If `playlist_tune.scheduled` is NULL (older entries), the previous `latest_review_date` (from practice history) still governs visibility.
+- Once a tune receives new feedback under the new system, `playlist_tune.scheduled` is populated, taking precedence.
 
 ### 8. Refresh Cycle Back to UI
 
@@ -151,12 +204,17 @@ sequenceDiagram
 ### 10. Key Data Structures
 
 Practice Feedback Update (frontend to backend):
+
 ```ts
-interface ITuneUpdate { feedback: string; goal?: string | null }
-type UpdatesPayload = { [tuneId: string]: ITuneUpdate }
+interface ITuneUpdate {
+  feedback: string;
+  goal?: string | null;
+}
+type UpdatesPayload = { [tuneId: string]: ITuneUpdate };
 ```
 
 PracticeRecord (subset of fields relevant here):
+
 ```python
 PracticeRecord(
   tune_ref: int,
@@ -184,11 +242,11 @@ PracticeRecord(
 
 ### 12. Future Improvements (Optional)
 
-* Store next review date directly in PracticeRecord (separate column) to reduce dual-source complexity during migration.
-* Add explicit server response payload (e.g., list of updated tune IDs + next review dates) to allow optimistic UI without full refetch.
-* Batch fetch of prefs/technique outside per-tune loop (already done for algorithm/prefs; good practice maintained).
-* Add idempotency key or server-side de-duplication for rapid double submissions.
-* Consolidate NEW/RESCHEDULED markers into a typed enum returned from frontend UI rather than raw strings.
+- Store next review date directly in PracticeRecord (separate column) to reduce dual-source complexity during migration.
+- Add explicit server response payload (e.g., list of updated tune IDs + next review dates) to allow optimistic UI without full refetch.
+- Batch fetch of prefs/technique outside per-tune loop (already done for algorithm/prefs; good practice maintained).
+- Add idempotency key or server-side de-duplication for rapid double submissions.
+- Consolidate NEW/RESCHEDULED markers into a typed enum returned from frontend UI rather than raw strings.
 
 ---
 
