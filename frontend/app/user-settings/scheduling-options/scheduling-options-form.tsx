@@ -108,10 +108,9 @@ export default function SchedulingOptionsForm({
     },
   });
 
-  const { isSubmitting, isValid, errors } =
-    form.formState as typeof form.formState & {
-      errors: Record<string, unknown>;
-    };
+  const { isSubmitting, errors } = form.formState as typeof form.formState & {
+    errors: Record<string, unknown>;
+  };
   // Workaround: Playwright test observed RHF isDirty not transitioning to true reliably after field edits
   // for this form (likely due to reset timing). We track a simple touched flag once any user change occurs.
   const [touched, setTouched] = useState(false);
