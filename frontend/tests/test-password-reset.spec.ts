@@ -147,6 +147,8 @@ test.describe("Password Reset Request Flow", () => {
     // Fill with valid email
     await emailInput.fill("test@example.com");
     await submitButton.click();
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(100);
 
     // Should show success message (regardless of whether email exists)
     await expect(
