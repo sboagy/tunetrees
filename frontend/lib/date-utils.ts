@@ -78,7 +78,7 @@ export function formatTypeScriptDateToPythonUTCString(date: Date): string {
   const minutes = date.getUTCMinutes().toString().padStart(2, "0");
   const seconds = date.getUTCSeconds().toString().padStart(2, "0");
 
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}+00:00`;
 }
 
 export function convertToPythonUTCString(dateString: string): string {
