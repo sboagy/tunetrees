@@ -164,6 +164,7 @@ export default function TunesGridScheduled({
     playlistId,
     setTunes,
     setTunesRefreshId,
+    acceptableDelinquencyWindow,
   ]);
 
   const handleRecallEvalChange = useCallback(
