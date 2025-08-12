@@ -11,7 +11,22 @@ import type { Row, Table as TanstackTable } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { getColorForEvaluation } from "../quality-list";
 import { updateCurrentTuneInDb } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
@@ -60,6 +75,71 @@ const TunesGrid = ({
   // useSaveTableState(table, userId, tablePurpose, playlistId);
 
   const tableBodyRef = useRef<HTMLDivElement>(null);
+
+  // DnD sensors for column drag
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+  );
+
+  const leafColumns = table.getVisibleLeafColumns();
+  const columnIds = useMemo(() => leafColumns.map((c) => c.id), [leafColumns]);
+  const [orderedColumnIds, setOrderedColumnIds] = useState<string[]>(columnIds);
+
+  useEffect(() => {
+    // Sync local state when table order changes elsewhere
+    setOrderedColumnIds(columnIds);
+  }, [columnIds]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = orderedColumnIds.indexOf(String(active.id));
+    const newIndex = orderedColumnIds.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newOrder = arrayMove(orderedColumnIds, oldIndex, newIndex);
+    setOrderedColumnIds(newOrder);
+    table.setColumnOrder(newOrder);
+  };
+
+  function SortableHeader({
+    columnId,
+    children,
+  }: {
+    columnId: string;
+    children: React.ReactNode;
+  }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: columnId });
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.6 : 1,
+    } as React.CSSProperties;
+    return (
+      <div ref={setNodeRef} style={style} className="flex items-center gap-2">
+        <span
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing inline-flex items-center justify-center text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 select-none"
+          data-testid={`col-${columnId}-drag-handle`}
+          aria-hidden="true"
+          tabIndex={-1}
+          style={{ width: 14 }}
+        >
+          ≡
+        </span>
+        <div className="flex-1 min-w-0">{children}</div>
+      </div>
+    );
+  }
 
   const handleRowClick = useCallback(
     (row: Row<ITuneOverview>) => {
@@ -240,107 +320,133 @@ const TunesGrid = ({
           style={{
             minHeight: "calc(104vh - 270px - 50x)",
             maxHeight: "calc(104vh - 270px - 50px)",
+            overflowX: "auto",
             WebkitOverflowScrolling: "touch",
           }}
         >
           <div style={{ height: `${totalSize}px`, position: "relative" }}>
-            <Table
-              data-testid="tunes-grid"
-              style={{
-                width: "100%",
-                height: "100%",
-              }}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              <TableHeader
-                id="tt-tunes-grid-header"
-                className="sticky block top-0 bg-white dark:bg-gray-800 z-10"
-              >
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow
-                    key={headerGroup.id}
-                    className="hide-scrollbar h-auto w-full flex flex-row overflow-clipped"
-                  >
-                    {headerGroup.headers.map((header) => (
-                      <TableHead
-                        key={header.id}
-                        // className="p-2 align-top"
-                        style={{ width: header.column.getSize() }}
-                      >
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody
+              <Table
+                data-testid="tunes-grid"
                 style={{
-                  display: "block",
-                  position: "relative",
-                  marginTop: "2px",
-                  height: `${totalSize}px`, // Set the total height for the body
+                  width: "100%",
+                  height: "100%",
                 }}
-                data-testid="tunes-grid-body"
               >
-                {virtualRows.map((virtualRow: VirtualItem) => {
-                  const row = table.getRowModel().rows[virtualRow.index];
-                  return (
-                    <TableRow
-                      key={row.id}
-                      ref={(el) => {
-                        if (row.original.id !== undefined) {
-                          rowRefs.current[row.original.id] = el;
-                        }
-                      }}
-                      style={{
-                        top: `${virtualRow.start - 1}px`, // Position the row based on virtual start
-                        height: `${virtualRow.size}px`, // Set the height of the row
-                      }}
-                      // className={`absolute h-16 cursor-pointer w-full ${
-                      //   currentTune === row.original.id
-                      //     ? "outline outline-2 outline-blue-500"
-                      //     : ""
-                      // } ${getColorForEvaluation(row.original.recall_eval || null)}`}
-                      // className={`absolute h-16 cursor-pointer w-full ${getColorForEvaluation(row.original.recall_eval || null)}`}
-                      className={`absolute cursor-pointer w-full 
+                <TableHeader
+                  id="tt-tunes-grid-header"
+                  className="sticky block top-0 bg-white dark:bg-gray-800 z-10"
+                >
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <SortableContext
+                      key={headerGroup.id}
+                      items={orderedColumnIds}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      <TableRow className="hide-scrollbar h-auto w-full flex flex-row overflow-clipped">
+                        {headerGroup.headers.map((header) => (
+                          <TableHead
+                            key={header.id}
+                            style={{
+                              width: header.column.getSize(),
+                              position: "relative",
+                              userSelect: header.column.getIsResizing()
+                                ? "none"
+                                : undefined,
+                            }}
+                          >
+                            {header.isPlaceholder ? null : (
+                              <SortableHeader columnId={header.column.id}>
+                                {flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext(),
+                                )}
+                              </SortableHeader>
+                            )}
+                            {/* Resizer */}
+                            {header.column.getCanResize() && (
+                              <div
+                                onMouseDown={header.getResizeHandler()}
+                                onTouchStart={header.getResizeHandler()}
+                                className={`absolute top-0 right-0 h-full w-1 cursor-col-resize select-none bg-transparent ${header.column.getIsResizing() ? "bg-blue-400" : "hover:bg-gray-300 dark:hover:bg-gray-600"}`}
+                                data-testid={`col-${header.column.id}-resize-handle`}
+                              />
+                            )}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </SortableContext>
+                  ))}
+                </TableHeader>
+                <TableBody
+                  style={{
+                    display: "block",
+                    position: "relative",
+                    marginTop: "2px",
+                    height: `${totalSize}px`, // Set the total height for the body
+                  }}
+                  data-testid="tunes-grid-body"
+                >
+                  {virtualRows.map((virtualRow: VirtualItem) => {
+                    const row = table.getRowModel().rows[virtualRow.index];
+                    return (
+                      <TableRow
+                        key={row.id}
+                        ref={(el) => {
+                          if (row.original.id !== undefined) {
+                            rowRefs.current[row.original.id] = el;
+                          }
+                        }}
+                        style={{
+                          top: `${virtualRow.start - 1}px`, // Position the row based on virtual start
+                          height: `${virtualRow.size}px`, // Set the height of the row
+                        }}
+                        // className={`absolute h-16 cursor-pointer w-full ${
+                        //   currentTune === row.original.id
+                        //     ? "outline outline-2 outline-blue-500"
+                        //     : ""
+                        // } ${getColorForEvaluation(row.original.recall_eval || null)}`}
+                        // className={`absolute h-16 cursor-pointer w-full ${getColorForEvaluation(row.original.recall_eval || null)}`}
+                        className={`absolute cursor-pointer w-full 
                         ${getStyleForSchedulingState ? getStyleForSchedulingState(row.original.scheduled || row.original.latest_review_date) : ""} 
                         ${
                           currentTune === row.original.id
                             ? "outline outline-blue-500"
                             : ""
                         } ${getColorForEvaluation(row.original.recall_eval || null, false)}`}
-                      onClick={handleRowClick.bind(null, row)}
-                      onDoubleClick={() => handleRowDoubleClick(row)}
-                      data-state={row.getIsSelected() && "selected"}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          data-testid={`${cell.id}`}
-                          style={{
-                            position: "absolute",
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            left: `${cell.column.getStart()}px`,
-                            width: cell.column.getSize(),
-                            // backgroundColor: "inherit",
-                          }}
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        onClick={handleRowClick.bind(null, row)}
+                        onDoubleClick={() => handleRowDoubleClick(row)}
+                        data-state={row.getIsSelected() && "selected"}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell
+                            key={cell.id}
+                            data-testid={`${cell.id}`}
+                            style={{
+                              position: "absolute",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              left: `${cell.column.getStart()}px`,
+                              width: cell.column.getSize(),
+                              // backgroundColor: "inherit",
+                            }}
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </DndContext>
           </div>
         </div>
         <Table className="hide-scrollbar ">
@@ -350,7 +456,10 @@ const TunesGrid = ({
                 colSpan={get_columns(userId, playlistId, tablePurpose).length}
                 className="h-12"
               >
-                <div className="flex-1 text-sm text-muted-foreground">
+                <div
+                  className="flex-1 text-sm text-muted-foreground"
+                  data-testid="tt-table-status"
+                >
                   {table.getFilteredSelectedRowModel().rows.length} of{" "}
                   {table.getFilteredRowModel().rows.length} row(s) selected.
                   {lapsedCount !== undefined && `, lapsed: ${lapsedCount}`}

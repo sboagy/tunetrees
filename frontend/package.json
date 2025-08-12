@@ -14,7 +14,8 @@
     "clean": "gts clean",
     "compile": "tsc",
     "fix": "gts fix",
-    "format": "npx prettier --write .",
+    "format": "prettier --write .",
+    "format:changed": "sh -c 'FILES=\"$(git diff --name-only --diff-filter=ACMRTUXB HEAD)\"; [ -z \"$FILES\" ] || ./node_modules/.bin/prettier --write $FILES'",
     "prepare": "npm run compile",
     "test": "npm run test:unit && npm run test:ui",
     "test:unit": "jest",
@@ -36,6 +37,9 @@
     "node": ">=v22.17.0"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^9.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "-": "^0.0.1",
     "@auth/unstorage-adapter": "^2.9.1",
     "@github/webauthn-json": "^2.1.1",
@@ -111,6 +115,7 @@
     "zod": "^3.25.56"
   },
   "devDependencies": {
+    "prettier": "^3.3.3",
     "@biomejs/biome": "1.9.4",
     "@eslint/compat": "^1.2.9",
     "@eslint/eslintrc": "^3.3.1",

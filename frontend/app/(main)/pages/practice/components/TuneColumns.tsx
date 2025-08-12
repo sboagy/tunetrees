@@ -131,6 +131,7 @@ function sortableHeader<TData, TValue>(
       <Button
         variant="ghost"
         className="p-1"
+        data-testid={`col-${column.id}-sort-button`}
         onClick={() => {
           rotateSorting(column, setTunesRefreshId);
           setRenderKey((prev) => prev + 1); // Force button re-render, special magic

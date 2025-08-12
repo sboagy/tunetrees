@@ -79,11 +79,8 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // ... inside your test:
     await clearExistingSorts(ttPO, page);
 
-    // Find the ID column header with sorting arrow
-    await expect(ttPO.idColumnHeader).toBeVisible({ timeout: 15000 });
-
-    // Find the sorting button within the ID column header
-    await expect(ttPO.idColumnHeaderSortButton).toBeVisible();
+    // Find the ID column sorting button (anchor by data-testid for robustness)
+    await expect(ttPO.idColumnHeaderSortButton).toBeVisible({ timeout: 15000 });
 
     // Verify the button shows the unsorted icon initially (ArrowUpDown)
     const unsortedIcon = ttPO.idColumnHeaderSortButton.locator("svg");
@@ -185,16 +182,21 @@ test.describe.serial("TuneGrid Regression Tests", () => {
 
     await clearExistingSorts(ttPO, page);
 
-    // Test sorting by Type column first using Page Object locators
-    await expect(ttPO.typeColumnHeader).toBeVisible({ timeout: 15000 });
-    await expect(ttPO.typeColumnHeaderSortButton).toBeVisible();
+    // Test sorting by Type column first using Page Object locators (button-based to avoid role brittleness)
+    // Ensure the Type header button is scrolled into view (header can be horizontally off-screen)
+    await ttPO.typeColumnHeaderSortButton.scrollIntoViewIfNeeded();
+    await expect(ttPO.typeColumnHeaderSortButton).toBeVisible({
+      timeout: 15000,
+    });
 
     await ttPO.typeColumnHeaderSortButton.click();
     await page.waitForTimeout(1000);
 
     // Then sort by Title while holding shift (multicolumn)
-    await expect(ttPO.titleColumnHeader).toBeVisible({ timeout: 15000 });
-    await expect(ttPO.titleColumnHeaderSortButton).toBeVisible();
+    await ttPO.titleColumnHeaderSortButton.scrollIntoViewIfNeeded();
+    await expect(ttPO.titleColumnHeaderSortButton).toBeVisible({
+      timeout: 15000,
+    });
 
     // Use keyboard modifier for multicolumn sorting
     await page.keyboard.down("Shift");
@@ -306,8 +308,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     await expect(tunesGrid).toBeVisible({ timeout: 15000 });
 
     // Sort by ID column
-    const idSortButton = ttPO.idColumnHeader.locator('button[title*="sort"]');
-    await idSortButton.click();
+    await ttPO.idColumnHeaderSortButton.click();
     await page.waitForTimeout(1000);
 
     // Get the first row ID after sorting
@@ -324,8 +325,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // TODO: Add proper navigation testing when we have the functions available
 
     // Verify that sorting is currently applied by checking the sorted state
-    const sortButton = ttPO.idColumnHeader.locator('button[title*="sort"]');
-    const sortIcon = sortButton.locator("svg");
+    const sortIcon = ttPO.idColumnHeaderSortButton.locator("svg");
     await expect(sortIcon).toBeVisible();
 
     console.log("✅ Sorting persistence test completed (limited scope)");

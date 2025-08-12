@@ -122,36 +122,35 @@ export class TuneTreesPageObject {
     this.addtuneButtonNew = page.getByTestId("addtune-button-new");
     this.addtuneButtonImport = page.getByTestId("addtune-button-import");
 
+    // Prefer robust header targeting by anchoring to sort-button testids
+    this.idColumnHeaderSortButton = page.getByTestId("col-id-sort-button");
     this.idColumnHeader = page
-      .getByRole("cell", { name: "Id", exact: true })
-      .locator("div");
-    this.idColumnHeaderSortButton = page
-      .getByRole("cell", { name: "Id", exact: true })
-      .getByRole("button");
+      .getByRole("columnheader")
+      .filter({ has: this.idColumnHeaderSortButton });
+
+    this.scheduledColumnHeaderSortButton = page.getByTestId(
+      "col-scheduled-sort-button",
+    );
     this.scheduledColumnHeader = page
-      .getByRole("cell", { name: "Scheduled", exact: true })
-      .locator("div");
-    this.scheduledColumnHeaderSortButton = page
-      .getByRole("cell", { name: "Scheduled", exact: true })
-      .getByRole("button");
+      .getByRole("columnheader")
+      .filter({ has: this.scheduledColumnHeaderSortButton });
+
+    this.LatestReviewColumnHeaderSortButton = page.getByTestId(
+      "col-latest_review_date-sort-button",
+    );
     this.LatestReviewColumnHeader = page
-      .getByRole("cell", { name: "SR Scheduled", exact: true })
-      .locator("div");
-    this.LatestReviewColumnHeaderSortButton = page
-      .getByRole("cell", { name: "SR Scheduled", exact: true })
-      .getByRole("button");
+      .getByRole("columnheader")
+      .filter({ has: this.LatestReviewColumnHeaderSortButton });
+    this.typeColumnHeaderSortButton = page.getByTestId("col-type-sort-button");
     this.typeColumnHeader = page
-      .getByRole("cell", { name: "Type", exact: true })
-      .locator("div");
-    this.typeColumnHeaderSortButton = page
-      .getByRole("cell", { name: "Type", exact: true })
-      .getByRole("button");
+      .getByRole("columnheader")
+      .filter({ has: this.typeColumnHeaderSortButton });
+    this.titleColumnHeaderSortButton = page.getByTestId(
+      "col-title-sort-button",
+    );
     this.titleColumnHeader = page
-      .getByRole("cell", { name: "Title", exact: true })
-      .locator("div");
-    this.titleColumnHeaderSortButton = page
-      .getByRole("cell", { name: "Title", exact: true })
-      .getByRole("button");
+      .getByRole("columnheader")
+      .filter({ has: this.titleColumnHeaderSortButton });
 
     this.selectSettingButton = page.getByTestId("tt-select-setting");
 
@@ -162,7 +161,7 @@ export class TuneTreesPageObject {
       "tt-tune-editor-cancel-button",
     );
 
-    this.tableStatus = this.page.getByText(" row(s) selected.");
+    this.tableStatus = this.page.getByTestId("tt-table-status");
     this.toast = this.page.getByTestId("shadcn-toast");
 
     // Spaced Repetition locators

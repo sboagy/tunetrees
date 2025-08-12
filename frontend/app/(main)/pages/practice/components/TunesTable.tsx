@@ -1,6 +1,8 @@
 "use client";
 
 import type {
+  ColumnSizingInfoState,
+  ColumnSizingState,
   RowSelectionState,
   TableState,
   Table as TanstackTable,
@@ -26,6 +28,13 @@ import { useTune } from "./CurrentTuneContext";
 import { get_columns } from "./TuneColumns";
 
 export const globalFlagManualSorting = false;
+
+// Extend TanStack TableState with column sizing and order (intersection type avoids structural conflicts)
+type ITableStateExtended = TableState & {
+  columnSizing?: ColumnSizingState;
+  columnSizingInfo?: ColumnSizingInfoState;
+  columnOrder?: string[];
+};
 
 export interface IScheduledTunesType {
   tunes: ITuneOverview[];
@@ -106,7 +115,7 @@ export function TunesTableComponent({
   );
 
   const [tableStateFromDb, setTableStateFromDb] =
-    React.useState<TableState | null>(null);
+    React.useState<ITableStateExtended | null>(null);
 
   const [sorting, setSorting] = React.useState<SortingState>(
     tableStateFromDb ? tableStateFromDb.sorting : [],
@@ -168,6 +177,21 @@ export function TunesTableComponent({
   );
   const originalSetRowSelectionRef = React.useRef(setRowSelection);
 
+  // Column sizing + ordering state
+  const [columnSizing, setColumnSizing] = React.useState<ColumnSizingState>(
+    tableStateFromDb?.columnSizing ?? {},
+  );
+  const [columnSizingInfo, setColumnSizingInfo] =
+    React.useState<ColumnSizingInfoState>(
+      (tableStateFromDb?.columnSizingInfo as ColumnSizingInfoState) ??
+        ({} as ColumnSizingInfoState),
+    );
+  const [columnOrder, setColumnOrder] = React.useState<string[]>(
+    Array.isArray(tableStateFromDb?.columnOrder)
+      ? tableStateFromDb?.columnOrder
+      : [],
+  );
+
   const interceptedRowSelectionChange = (
     newRowSelectionState:
       | RowSelectionState
@@ -212,6 +236,30 @@ export function TunesTableComponent({
       `LF7 TunesTableComponent (interceptedOnColumnFiltersChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
     void saveTableState(table, userId, tablePurpose, playlistId);
+  };
+
+  const interceptedSetColumnOrder = (
+    newOrder: string[] | ((state: string[]) => string[]),
+  ): void => {
+    const resolvedOrder =
+      newOrder instanceof Function ? newOrder(columnOrder) : newOrder;
+    setColumnOrder(resolvedOrder);
+    // Persist order change
+    void saveTableState(table, userId, tablePurpose, playlistId);
+  };
+
+  const interceptedSetColumnSizingInfo = (
+    newInfo:
+      | ColumnSizingInfoState
+      | ((state: ColumnSizingInfoState) => ColumnSizingInfoState),
+  ): void => {
+    const resolvedInfo =
+      newInfo instanceof Function ? newInfo(columnSizingInfo) : newInfo;
+    setColumnSizingInfo(resolvedInfo);
+    // Persist only when resize interaction ends (less chatty)
+    if (!resolvedInfo.isResizingColumn) {
+      void saveTableState(table, userId, tablePurpose, playlistId);
+    }
   };
 
   const interceptedSetSorting = (
@@ -302,6 +350,11 @@ export function TunesTableComponent({
     manualSorting: globalFlagManualSorting,
     onSortingChange: (newSorting) => interceptedSetSorting(newSorting),
     onColumnFiltersChange: interceptedOnColumnFiltersChange,
+    // Column sizing + ordering
+    columnResizeMode: "onChange",
+    onColumnSizingChange: setColumnSizing,
+    onColumnSizingInfoChange: interceptedSetColumnSizingInfo,
+    onColumnOrderChange: interceptedSetColumnOrder,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -313,12 +366,19 @@ export function TunesTableComponent({
       rowSelection,
       columnVisibility,
       globalFilter,
+      columnSizing,
+      columnSizingInfo,
+      columnOrder,
     },
     getRowId: (
       originalRow: ITuneOverview,
       // index: number,
       // parent?: Row<ITuneOverview>,
     ) => (originalRow.id ?? 0).toString(),
+    defaultColumn: {
+      size: 140,
+      minSize: 60,
+    },
   });
 
   // (property) getRowId?: ((originalRow: ITuneOverview, index: number, parent?: Row<ITuneOverview> | undefined) => string) | undefined
@@ -372,6 +432,15 @@ export function TunesTableComponent({
             table.setColumnVisibility(tableStateFromDb.columnVisibility);
             table.setColumnFilters(tableStateFromDb.columnFilters);
             table.setSorting(tableStateFromDb.sorting);
+            if (tableStateFromDb?.columnOrder) {
+              table.setColumnOrder(tableStateFromDb.columnOrder);
+            }
+            if (tableStateFromDb?.columnSizing) {
+              table.setColumnSizing(tableStateFromDb.columnSizing);
+            }
+            if (tableStateFromDb?.columnSizingInfo) {
+              table.setColumnSizingInfo(tableStateFromDb.columnSizingInfo);
+            }
             if (filterStringCallback) {
               filterStringCallback(tableStateFromDb.globalFilter);
             }
