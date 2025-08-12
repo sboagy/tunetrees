@@ -58,47 +58,6 @@ export default function TunesGridScheduled({
     `LF1 render ScheduledTunesGrid: playlistId=${playlistId}, userId=${userId}`,
   );
 
-  const [acceptableDelinquencyWindow, setAcceptableDelinquencyWindow] =
-    useState<number>(21);
-
-  useEffect(() => {
-    async function loadSchedulingPrefs() {
-      try {
-        const baseUrl =
-          process.env.NEXT_PUBLIC_TT_API_BASE_URL ||
-          process.env.TT_API_BASE_URL;
-        if (!baseUrl) {
-          console.warn(
-            "TT API base URL not set; using default value for acceptableDelinquencyWindow",
-          );
-          return;
-        }
-        const resp = await fetch(
-          `${baseUrl}/tunetrees/prefs_scheduling_options?user_id=${userId}`,
-          {
-            method: "GET",
-            headers: { Accept: "application/json" },
-            cache: "no-store",
-          },
-        );
-        if (!resp.ok) {
-          console.warn(
-            "Failed to fetch prefs_scheduling_options, status",
-            resp.status,
-          );
-          return;
-        }
-        const data = await resp.json();
-        if (data && typeof data.acceptable_delinquency_window === "number") {
-          setAcceptableDelinquencyWindow(data.acceptable_delinquency_window);
-        }
-      } catch (error) {
-        console.error("Error loading prefs_scheduling_options", error);
-      }
-    }
-    void loadSchedulingPrefs();
-  }, [userId]);
-
   // useEffect(() => {
   //   console.log(
   //     `LF6 ScheduledTunesGrid (useEffect[currentTune, userId]) calling updateCurrentTuneInDb, currentTune=${currentTune}`,
@@ -132,7 +91,6 @@ export default function TunesGridScheduled({
             playlistId,
             sitdownDate ? new Date(sitdownDate) : null,
             showDeleted,
-            acceptableDelinquencyWindow,
           );
           if (!cancelled) {
             setTunes(result);
@@ -164,7 +122,6 @@ export default function TunesGridScheduled({
     playlistId,
     setTunes,
     setTunesRefreshId,
-    acceptableDelinquencyWindow,
   ]);
 
   const handleRecallEvalChange = useCallback(

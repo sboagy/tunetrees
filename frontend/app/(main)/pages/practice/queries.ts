@@ -23,7 +23,7 @@ import type {
   ITuneType,
   IViewPlaylistJoined,
 } from "./types";
-import { formatTypeScriptDateToPythonUTCString } from "@/lib/date-utils";
+import { formatDateToIso8601UtcString } from "@/lib/date-utils";
 
 // function isValidUTF8(str: string): boolean {
 //   try {
@@ -75,7 +75,6 @@ export async function getScheduledTunesOverview(
   playlistId: number,
   sitdownDate: Date,
   showDeleted = false,
-  acceptable_delinquency_window: number | null = null,
 ): Promise<ITuneOverviewScheduled[]> {
   if (
     !sitdownDate ||
@@ -93,15 +92,17 @@ export async function getScheduledTunesOverview(
       client.getUri(),
     );
     console.log("user_id: %s, playlist_id: %s", userId, playlistId);
-    const sitdownDateUtcString =
-      formatTypeScriptDateToPythonUTCString(sitdownDate);
+    const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
+    // Convert JS getTimezoneOffset (minutes behind UTC, positive for West) to desired sign convention (offset relative to UTC)
+    // Example: EST (UTC-5) -> getTimezoneOffset() = 300, we want -300
+    const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
     const response = await client.get<ITuneOverviewScheduled[]>(
       `/scheduled_tunes_overview/${userId}/${playlistId}`,
       {
         params: {
           show_playlist_deleted: showDeleted,
           sitdown_date: sitdownDateUtcString,
-          acceptable_delinquency_window: acceptable_delinquency_window,
+          local_tz_offset_minutes: localTzOffsetMinutes,
         },
       },
     );

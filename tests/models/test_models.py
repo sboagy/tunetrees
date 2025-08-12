@@ -86,8 +86,6 @@ def test_practice_list_joined():
         review_sitdown_date = naive_dt.astimezone(pytz.utc)
         tunes: List[Row[Any]] = query_practice_list_scheduled(
             db,
-            limit=1000,
-            print_table=True,
             review_sitdown_date=review_sitdown_date,
         )
         filtered = list(filter(lambda tune: tune.id == 1081, tunes))

@@ -70,16 +70,7 @@ export function formatDateForEmailVerification(dateObject: Date): string {
   return dateString;
 }
 
-export function formatTypeScriptDateToPythonUTCString(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const day = date.getUTCDate().toString().padStart(2, "0");
-  const hours = date.getUTCHours().toString().padStart(2, "0");
-  const minutes = date.getUTCMinutes().toString().padStart(2, "0");
-  const seconds = date.getUTCSeconds().toString().padStart(2, "0");
-
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}+00:00`;
-}
+// (removed older variant to avoid duplicate export; see strict ISO 8601 version below)
 
 export function convertToPythonUTCString(dateString: string): string {
   // Attempt to parse the string as a Date.
@@ -110,14 +101,34 @@ export function convertToPythonUTCString(dateString: string): string {
   return dateString;
 }
 
-export function formatDateToPythonUTCString(date: string | Date): string {
-  if (typeof date === "string") {
-    return convertToPythonUTCString(date);
-  }
-  if (date instanceof Date) {
-    return formatTypeScriptDateToPythonUTCString(date);
-  }
-  throw new TypeError("Invalid date type. Expected string or Date.");
+/**
+ * Formats a Date into a UTC-based ISO 8601 datetime string.
+ * Example: 2024-07-08T12:27:08Z
+ *
+ * Notes:
+ * - Uses UTC components and includes the 'Z' suffix to explicitly indicate UTC.
+ * - This format is the most reliable for consistent handling across client/server timezones.
+ */
+export function formatDateToIso8601UtcString(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hours = String(date.getUTCHours()).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
+
+  // The 'Z' suffix indicates UTC time
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}Z`;
+}
+
+/**
+ * Formats a Date into an ISO UTC string without milliseconds.
+ * Example: 2024-12-31T16:47:57Z
+ */
+export function formatDateToIsoUtcString(date: Date): string {
+  const iso = date.toISOString();
+  // Drop milliseconds to reduce ambiguity if backend rejects them
+  return iso.replace(/\.(\d{3})Z$/, "Z");
 }
 
 export function convertToIsoUTCString(dateString: string): string {

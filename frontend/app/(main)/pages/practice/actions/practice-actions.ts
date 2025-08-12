@@ -201,14 +201,12 @@ export async function getScheduledTunesOverviewAction(
   playlistId: number,
   sitdownDate: Date | null,
   showDeleted: boolean,
-  acceptableDelinquencyWindow: number | null = null,
 ) {
   return getScheduledTunesOverview(
     userId,
     playlistId,
     sitdownDate ?? new Date(0),
     showDeleted,
-    acceptableDelinquencyWindow,
   );
 }
 
