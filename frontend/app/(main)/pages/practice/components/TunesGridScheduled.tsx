@@ -391,7 +391,7 @@ export default function TunesGridScheduled({
             <TunesGrid
               table={table}
               userId={userId}
-              playlistId={userId}
+              playlistId={playlistId}
               tablePurpose={"practice"}
               onRowClickCallback={onRowClickCallback}
             />

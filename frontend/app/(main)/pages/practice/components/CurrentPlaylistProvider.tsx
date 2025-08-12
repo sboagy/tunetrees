@@ -16,7 +16,9 @@ export const CurrentPlaylistProvider = ({
 }: {
   children: ReactNode;
 }) => {
-  const [currentPlaylist, setCurrentPlaylist] = useState<number>(-1);
+  // Default to playlist 1 so main grids can render promptly after auth;
+  // PlaylistChooser will override this from server state shortly after mount.
+  const [currentPlaylist, setCurrentPlaylist] = useState<number>(1);
   return (
     <CurrentPlaylistContext.Provider
       value={{
