@@ -71,6 +71,9 @@ const TunesGrid = ({
   const { setCurrentView } = useMainPaneView();
   const rowRefs = useRef<{ [key: number]: HTMLTableRowElement | null }>({});
 
+  // Local tick to force re-render during active column resize without triggering data fetch
+  const [, setResizeTick] = useState(0);
+
   // Invoke useEffect hook for the table state
   // useSaveTableState(table, userId, tablePurpose, playlistId);
 
@@ -101,6 +104,29 @@ const TunesGrid = ({
     const newOrder = arrayMove(orderedColumnIds, oldIndex, newIndex);
     setOrderedColumnIds(newOrder);
     table.setColumnOrder(newOrder);
+  };
+
+  // Wrap TanStack resize handler to force lightweight re-renders during drag
+  const makeEnhancedResizeHandler = (handler: (e: unknown) => void) => {
+    return (e: React.MouseEvent | React.TouchEvent) => {
+      handler(e);
+      const onMove = () => setResizeTick((t) => t + 1);
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener(
+          "touchmove",
+          onMove as unknown as EventListener,
+        );
+        window.removeEventListener("mouseup", onUp);
+        window.removeEventListener("touchend", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("touchmove", onMove as unknown as EventListener, {
+        passive: true,
+      });
+      window.addEventListener("mouseup", onUp, { once: true });
+      window.addEventListener("touchend", onUp, { once: true });
+    };
   };
 
   function SortableHeader({
@@ -367,8 +393,12 @@ const TunesGrid = ({
                             {/* Resizer */}
                             {header.column.getCanResize() && (
                               <div
-                                onMouseDown={header.getResizeHandler()}
-                                onTouchStart={header.getResizeHandler()}
+                                onMouseDown={makeEnhancedResizeHandler(
+                                  header.getResizeHandler(),
+                                )}
+                                onTouchStart={makeEnhancedResizeHandler(
+                                  header.getResizeHandler(),
+                                )}
                                 className={`absolute top-0 right-0 h-full w-1 cursor-col-resize select-none bg-transparent ${header.column.getIsResizing() ? "bg-blue-400" : "hover:bg-gray-300 dark:hover:bg-gray-600"}`}
                                 data-testid={`col-${header.column.id}-resize-handle`}
                               />
