@@ -374,7 +374,7 @@ export function TunesTableComponent({
     onColumnFiltersChange: interceptedOnColumnFiltersChange,
     // Column sizing + ordering
     columnResizeMode: "onChange",
-  onColumnSizingChange: interceptedSetColumnSizing,
+    onColumnSizingChange: interceptedSetColumnSizing,
     onColumnSizingInfoChange: interceptedSetColumnSizingInfo,
     onColumnOrderChange: interceptedSetColumnOrder,
     getCoreRowModel: getCoreRowModel(),
