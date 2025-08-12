@@ -246,6 +246,24 @@ export function TunesTableComponent({
     setColumnOrder(resolvedOrder);
     // Persist order change
     void saveTableState(table, userId, tablePurpose, playlistId);
+    // Trigger a lightweight UI re-render for grids relying on table sizing/positions
+    if (setTunesRefreshId) {
+      setTunesRefreshId(Date.now());
+    }
+  };
+
+  // Live sizing change: update local state and trigger a re-render so cells recompute positions/widths
+  const interceptedSetColumnSizing = (
+    newSizing:
+      | ColumnSizingState
+      | ((state: ColumnSizingState) => ColumnSizingState),
+  ): void => {
+    const resolvedSizing =
+      newSizing instanceof Function ? newSizing(columnSizing) : newSizing;
+    setColumnSizing(resolvedSizing);
+    if (setTunesRefreshId) {
+      setTunesRefreshId(Date.now());
+    }
   };
 
   const interceptedSetColumnSizingInfo = (
@@ -259,6 +277,10 @@ export function TunesTableComponent({
     // Persist only when resize interaction ends (less chatty)
     if (!resolvedInfo.isResizingColumn) {
       void saveTableState(table, userId, tablePurpose, playlistId);
+    }
+    // Also bump a render on info updates to ensure header/body reflect sizing during drag
+    if (setTunesRefreshId) {
+      setTunesRefreshId(Date.now());
     }
   };
 
@@ -352,7 +374,7 @@ export function TunesTableComponent({
     onColumnFiltersChange: interceptedOnColumnFiltersChange,
     // Column sizing + ordering
     columnResizeMode: "onChange",
-    onColumnSizingChange: setColumnSizing,
+  onColumnSizingChange: interceptedSetColumnSizing,
     onColumnSizingInfoChange: interceptedSetColumnSizingInfo,
     onColumnOrderChange: interceptedSetColumnOrder,
     getCoreRowModel: getCoreRowModel(),

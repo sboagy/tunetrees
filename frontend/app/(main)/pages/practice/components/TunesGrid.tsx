@@ -124,19 +124,16 @@ const TunesGrid = ({
       opacity: isDragging ? 0.6 : 1,
     } as React.CSSProperties;
     return (
-      <div ref={setNodeRef} style={style} className="flex items-center gap-2">
-        <span
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing inline-flex items-center justify-center text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 select-none"
-          data-testid={`col-${columnId}-drag-handle`}
-          aria-hidden="true"
-          tabIndex={-1}
-          style={{ width: 14 }}
-        >
-          ≡
-        </span>
-        <div className="flex-1 min-w-0">{children}</div>
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="flex items-center gap-2"
+        {...attributes}
+        {...listeners}
+      >
+        <div className="flex-1 min-w-0 select-none cursor-grab active:cursor-grabbing">
+          {children}
+        </div>
       </div>
     );
   }
