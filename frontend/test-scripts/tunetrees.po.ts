@@ -420,8 +420,9 @@ export class TuneTreesPageObject {
     await this.page.evaluate((tuneId: number) => {
       window.scrollToTuneById?.(tuneId);
     }, Number(tuneId));
+    // Scope to the recall-eval cell by test id to avoid strict mode violations
     const qualityButton = this.page
-      .getByRole("row", { name: `${tuneId} ` })
+      .getByTestId(`${tuneId}_recall_eval`)
       .getByTestId("tt-recal-eval-popover-trigger");
     await expect(qualityButton).toBeVisible({ timeout: 60000 });
     await expect(qualityButton).toBeEnabled({ timeout: 60000 });

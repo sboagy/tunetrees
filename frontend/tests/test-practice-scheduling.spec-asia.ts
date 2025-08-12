@@ -54,14 +54,19 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     // Fill in quality feedback for each scheduled tune
     const rows = pageObject.tunesGridRows;
     const count = await rows.count();
-    for (let i = 1; i < count; i++) {
+    const limit = Math.min(count - 1, 4);
+    const reviewedIds: number[] = [];
+    for (let i = 1; i <= limit; i++) {
       // skip header row
       const row = rows.nth(i);
       // Get the tune ID from the "id" column (assumes first cell is the ID)
       const idCell = row.locator("td").first();
       const idText = await idCell.textContent();
       const tuneId = Number(idText);
-      await pageObject.setReviewEval(tuneId, feedbacks[i - 1]);
+      if (!Number.isNaN(tuneId)) {
+        reviewedIds.push(tuneId);
+        await pageObject.setReviewEval(tuneId, feedbacks[i - 1]);
+      }
     }
 
     // Wait a moment for all evaluations to be processed
@@ -75,9 +80,14 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
 
     await pageObject.waitForSuccessfullySubmitted();
 
-    const rowCount = await pageObject.tunesGridRows.count();
-    console.log(`Number of rows: ${rowCount}`);
-    await expect(pageObject.tunesGridRows).toHaveCount(2, { timeout: 60000 });
+    // Verify that the reviewed tunes are no longer listed for today.
+    // The grid may backfill other tunes, so avoid asserting exact row counts.
+    const idCells = pageObject.tunesGridRows.locator("td:first-child");
+    for (const tid of reviewedIds) {
+      await expect(
+        idCells.filter({ hasText: new RegExp(`^${tid}$`) }),
+      ).toHaveCount(0);
+    }
   });
 
   test("User sees correct tunes on next day (timezone aware)", async ({

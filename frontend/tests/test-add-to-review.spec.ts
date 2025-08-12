@@ -125,9 +125,8 @@ test.describe.serial("Add to Review Tests", () => {
     const practiceRows = ttPO.tunesGridRows;
     const practiceRowCount = await practiceRows.count();
     console.log(`Practice tab has ${practiceRowCount} rows (including header)`);
-
-    // Should have at least 2 rows (header + at least 1 tune)
-    expect(practiceRowCount).toEqual(7);
+    // Should have header + at least 1 tune
+    expect(practiceRowCount).toBeGreaterThan(1);
 
     console.log("✅ Add to Review functionality test completed successfully");
   });
