@@ -21,7 +21,14 @@ from contextlib import contextmanager
 logger = logging.getLogger(__name__)
 
 
+ENABLE_INTEGRITY_CHECKS = (
+    os.environ.get("TT_ENABLE_SQLITE_INTEGRITY_CHECKS", "1") == "1"
+)
+
+
 def check_integrity(db: Session, context_string: Optional[str] = "") -> None:
+    if not ENABLE_INTEGRITY_CHECKS:
+        return
     try:
         result = db.execute(text("PRAGMA integrity_check;"))
         integrity_check = result.scalar()
@@ -38,6 +45,8 @@ def check_integrity(db: Session, context_string: Optional[str] = "") -> None:
 
 
 def wait_for_integrity(db: Session):
+    if not ENABLE_INTEGRITY_CHECKS:
+        return
     # But just implementing this makes the error go away.
     # I'm going to leave it in place for now, but TODO.
     loops = 6
@@ -207,6 +216,7 @@ with sqlalchemy_database_engine.connect() as connection:
         logger.warning(
             "TT_ENABLE_SQLITE_DELETE_JOURNAL=1 but journal mode is not DELETE; issues may occur"
         )
-    result = connection.execute(text("PRAGMA integrity_check;"))
-    integrity_check = result.scalar()
-    logger.info(f"Integrity check result: {integrity_check}")
+    if ENABLE_INTEGRITY_CHECKS:
+        result = connection.execute(text("PRAGMA integrity_check;"))
+        integrity_check = result.scalar()
+        logger.info(f"Integrity check result: {integrity_check}")
