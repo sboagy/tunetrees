@@ -345,6 +345,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 80,
+      meta: { headerLabel: "Id" },
     },
     "practice" === purpose
       ? {
@@ -365,6 +366,7 @@ export function get_columns(
           ),
           accessorFn: (row) => row.recall_eval,
           size: 284,
+          meta: { headerLabel: "Evaluation" },
         }
       : {
           accessorKey: "select",
@@ -397,6 +399,7 @@ export function get_columns(
       enableHiding: true,
       enableResizing: true,
       size: 160,
+      meta: { headerLabel: "Title" },
     },
     ...(purpose === "practice"
       ? [
@@ -412,6 +415,7 @@ export function get_columns(
             },
             accessorFn: (row: ITuneOverview) => row.goal,
             size: 150,
+            meta: { headerLabel: "Goal" },
           },
         ]
       : []),
@@ -435,6 +439,7 @@ export function get_columns(
             ),
             accessorFn: (row: ITuneOverview) => row.goal,
             size: 150,
+            meta: { headerLabel: "Goal" },
           },
         ]
       : []),
@@ -447,6 +452,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 100,
+      meta: { headerLabel: "Type" },
     },
     {
       accessorKey: "structure",
@@ -458,6 +464,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 145,
+      meta: { headerLabel: "Structure" },
     },
     {
       accessorKey: "mode",
@@ -468,6 +475,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 100,
+      meta: { headerLabel: "Mode" },
     },
     {
       accessorKey: "incipit",
@@ -479,6 +487,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 200,
+      meta: { headerLabel: "Incipit" },
     },
     {
       accessorKey: "genre",
@@ -490,6 +499,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 200,
+      meta: { headerLabel: "Genre" },
     },
     {
       accessorKey: "deleted",
@@ -498,6 +508,7 @@ export function get_columns(
       cell: (info) => {
         return info.getValue() ? "Yes" : "No";
       },
+      meta: { headerLabel: "Deleted?" },
     },
   ];
 
@@ -517,6 +528,7 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         sortingFn: datetimeTextSortingFn,
+        meta: { headerLabel: "Scheduled" },
       },
       {
         accessorKey: "learned",
@@ -529,6 +541,7 @@ export function get_columns(
         enableHiding: true,
         sortingFn: datetimeTextSortingFn,
         size: 120,
+        meta: { headerLabel: "Learned" },
       },
       {
         accessorKey: "latest_practiced",
@@ -541,6 +554,7 @@ export function get_columns(
         enableHiding: true,
         sortingFn: datetimeTextSortingFn,
         size: 120,
+        meta: { headerLabel: "Practiced" },
       },
       {
         accessorKey: "latest_goal",
@@ -551,6 +565,7 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        meta: { headerLabel: "Prev Goal" },
       },
       {
         accessorKey: "latest_technique",
@@ -561,6 +576,7 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        meta: { headerLabel: "Prev Alg" },
       },
       {
         accessorKey: "latest_quality",
@@ -572,6 +588,7 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 12 * 9, // Approximate width for 11 characters
+        meta: { headerLabel: "Prev Qual" },
       },
       {
         accessorKey: "latest_easiness",
@@ -584,6 +601,7 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 14 * 8, // Approximate width for 11 characters
+        meta: { headerLabel: "Easiness" },
       },
       {
         accessorKey: "latest_interval",
@@ -595,6 +613,7 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 13 * 8, // Approximate width for 11 characters
+        meta: { headerLabel: "Interval" },
       },
       {
         accessorKey: "latest_repetitions",
@@ -606,6 +625,7 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 16 * 8, // Approximate width for 11 characters
+        meta: { headerLabel: "Repetitions" },
       },
       {
         accessorKey: "latest_review_date",
@@ -617,6 +637,7 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         sortingFn: datetimeTextSortingFn,
+        meta: { headerLabel: "SR Scheduled" },
       },
       // {
       //   accessorKey: "backup_practiced",
@@ -660,6 +681,7 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        meta: { headerLabel: "External Ref" },
       },
       // {
       //   accessorKey: "note_private",
@@ -688,6 +710,7 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        meta: { headerLabel: "Tags" },
       },
       {
         accessorKey: "notes",
@@ -702,6 +725,7 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        meta: { headerLabel: "Notes" },
       },
       {
         accessorKey: "playlist_deleted",
