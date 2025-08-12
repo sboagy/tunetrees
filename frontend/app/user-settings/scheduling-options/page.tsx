@@ -3,9 +3,12 @@ import SchedulingOptionsForm from "./scheduling-options-form";
 import { getSchedulingOptions } from "./queries-scheduling-options";
 import { auth } from "@/auth";
 
+export const dynamic = "force-dynamic";
+
 export default async function SchedulingOptionsPage() {
   const session = await auth();
   const userId = session?.user?.id ? Number.parseInt(session.user.id) : -1;
+  // Read prefs only when userId is valid at request time; this avoids build-time env reads.
   const initialPrefs = userId > 0 ? await getSchedulingOptions(userId) : null;
   return (
     <div className="space-y-6">

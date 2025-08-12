@@ -1,7 +1,7 @@
 "use server";
 
-// Server-side queries module for Scheduling Options, mirroring practice/queries.ts style.
-// Provides unified technique: server-only module that the page can import.
+// Server-side queries module for Scheduling Options.
+// IMPORTANT: Read TT_API_BASE_URL lazily at call time to avoid throwing during build/import.
 
 import axios from "axios";
 
@@ -20,26 +20,21 @@ export type IPrefsSchedulingOptionsCreate = IPrefsSchedulingOptionsBase;
 export type IPrefsSchedulingOptionsUpdate =
   Partial<IPrefsSchedulingOptionsBase>;
 
-const TT_API_BASE_URL = process.env.TT_API_BASE_URL;
-if (!TT_API_BASE_URL) {
-  console.error(
-    "TT_API_BASE_URL env var not set in scheduling-options/queries.ts",
-  );
-  throw new Error("TT_API_BASE_URL environment variable is not set");
+function getClient() {
+  const base = process.env.TT_API_BASE_URL;
+  if (!base) {
+    // Defer the failure to call time so Next build doesn’t break on import.
+    throw new Error("TT_API_BASE_URL environment variable is not set");
+  }
+  // NOTE: Preferences endpoints live at /preferences (root), NOT under /tunetrees.
+  return axios.create({ baseURL: base });
 }
-
-// NOTE: Preferences endpoints live at /preferences (root), NOT under /tunetrees.
-// Other feature query modules may use `${TT_API_BASE_URL}/tunetrees` but
-// here we must point directly at the API root to avoid 404s like
-// /tunetrees/preferences/prefs_scheduling_options.
-const client = axios.create({
-  baseURL: `${TT_API_BASE_URL}`,
-});
 
 export async function getSchedulingOptions(
   userId: number,
 ): Promise<IPrefsSchedulingOptionsResponse | null> {
   try {
+    const client = getClient();
     const resp = await client.get<IPrefsSchedulingOptionsResponse>(
       "/preferences/prefs_scheduling_options",
       { params: { user_id: userId } },
@@ -61,6 +56,7 @@ export async function updateSchedulingOptions(
   prefs: IPrefsSchedulingOptionsUpdate,
 ): Promise<IPrefsSchedulingOptionsResponse> {
   try {
+    const client = getClient();
     const resp = await client.put<IPrefsSchedulingOptionsResponse>(
       "/preferences/prefs_scheduling_options",
       prefs,
