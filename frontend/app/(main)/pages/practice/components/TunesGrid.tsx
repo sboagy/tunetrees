@@ -83,9 +83,10 @@ const TunesGrid = ({
 
   // Listen for explicit sorting change events to ensure the virtualizer resets consistently
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<unknown>).detail;
-      console.warn("TunesGrid event tt-sorting-changed", detail);
+      // const detail = (e as CustomEvent<unknown>).detail;
+      // console.warn("TunesGrid event tt-sorting-changed", detail);
       const el = tableBodyRef.current;
       if (el) el.scrollTop = 0;
       setTableStateTick((t) => t + 1);

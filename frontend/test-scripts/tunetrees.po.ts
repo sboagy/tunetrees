@@ -318,7 +318,10 @@ export class TuneTreesPageObject {
 
   async navigateToPracticeTab() {
     await this.gotoMainPage();
+    await this.navigateToPracticeTabDirectly();
+  }
 
+  async navigateToPracticeTabDirectly() {
     await this.mainTabGroup.waitFor({ state: "visible" });
 
     await this.practiceTabTrigger.waitFor({
@@ -405,14 +408,23 @@ export class TuneTreesPageObject {
     }
   }
 
-  async clickWithTimeAfter(locator: Locator, timeout = 9000) {
-    await locator.waitFor({ state: "attached", timeout: timeout });
-    await locator.waitFor({ state: "visible", timeout: timeout });
-    await expect(locator).toBeAttached({ timeout: timeout });
-    await expect(locator).toBeVisible({ timeout: timeout });
-    await expect(locator).toBeEnabled({ timeout: timeout });
-    // await locator.click({ trial: true });
-    await locator.click({ timeout: timeout });
+  async clickWithTimeAfter(
+    locator: Locator,
+    timeout = Number.NaN,
+    timeAfter = 100,
+  ) {
+    if (Number.isNaN(timeout)) {
+      await expect(locator).toBeAttached();
+      await expect(locator).toBeVisible();
+      await expect(locator).toBeEnabled();
+      await locator.click();
+    } else {
+      await expect(locator).toBeAttached({ timeout: timeout });
+      await expect(locator).toBeVisible({ timeout: timeout });
+      await expect(locator).toBeEnabled({ timeout: timeout });
+      await locator.click({ timeout: timeout });
+    }
+    await this.page.waitForTimeout(timeAfter); // Allow time for any post-click actions
   }
 
   async setReviewEval(tuneId: number, evalType: string) {
@@ -437,7 +449,9 @@ export class TuneTreesPageObject {
     );
     await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
     await expect(responseRecalledButton).toBeEnabled({ timeout: 60000 });
+    await this.page.waitForTimeout(100);
     await this.clickWithTimeAfter(responseRecalledButton);
+    await this.page.waitForTimeout(100);
     await this.page
       .getByTestId("tt-recal-eval-popover-content")
       .waitFor({ state: "detached", timeout: 60000 });

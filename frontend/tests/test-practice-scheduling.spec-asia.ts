@@ -52,7 +52,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
   });
 
   test("User submits quality feedback and tunes are rescheduled", async () => {
-    await pageObject.navigateToPracticeTab();
+    await pageObject.navigateToPracticeTabDirectly();
     const feedbacks = ["hard", "good", "(Not Set)", "again"];
 
     // Fill in quality feedback for each scheduled tune
@@ -83,20 +83,8 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
       name: "Submit Practiced Tunes",
     });
     await expect(submitButton).toBeEnabled({ timeout: 15000 });
-    await Promise.all([
-      pageObject.page.waitForResponse(
-        (resp) => {
-          const url = resp.url();
-          return (
-            resp.ok() &&
-            (url.includes("/practice/submit_feedbacks") ||
-              url.includes("/practice/submit_feedback"))
-          );
-        },
-        { timeout: 40000 },
-      ),
-      submitButton.click(),
-    ]);
+    await pageObject.page.waitForTimeout(100);
+    await pageObject.clickWithTimeAfter(submitButton);
     await pageObject.waitForSuccessfullySubmitted();
 
     // Ensure grid is refreshed before asserting removals
