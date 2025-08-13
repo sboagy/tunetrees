@@ -137,7 +137,9 @@ test.describe.serial("TuneGrid Regression Tests", () => {
         else {
           await page.waitForTimeout(200);
           // Nudge scroll to force virtualizer refresh
-          await scrollContainer1.evaluate((el) => (el.scrollTop = 0));
+          await scrollContainer1.evaluate((el) => {
+            el.scrollTop = 0;
+          });
         }
         attempts++;
       }
@@ -182,7 +184,9 @@ test.describe.serial("TuneGrid Regression Tests", () => {
         if (a >= b && a > 0 && b > 0) ok = true;
         else {
           await page.waitForTimeout(200);
-          await scrollContainer.evaluate((el) => (el.scrollTop = 0));
+          await scrollContainer.evaluate((el) => {
+            el.scrollTop = 0;
+          });
         }
         attempts++;
       }
