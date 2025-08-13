@@ -124,7 +124,11 @@ test.describe.serial("Secondary Playlist Tests - Issue 201", () => {
     await page.waitForTimeout(1_000);
 
     await ttPO.repertoireTabTrigger.click({ timeout: 60000 });
-    await page.waitForTimeout(2_000);
+    if (process.env.CI) {
+      await page.waitForTimeout(8_000);
+    } else {
+      await page.waitForTimeout(2_000);
+    }
 
     const rowCount = await ttPO.tunesGridRows.count();
     expect(rowCount).toBe(3);

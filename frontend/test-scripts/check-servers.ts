@@ -30,7 +30,7 @@ export const checkFrontend = async (): Promise<boolean> => {
 export const checkHealth = async (): Promise<void> => {
   // Probably not needed any more, but just in case one of the servers is slow to
   // start, we'll try a few times.
-  const nRetries = 5;
+  const nRetries = process.env.CI ? 10 : 5;
   for (let attempt = 1; attempt <= nRetries; attempt++) {
     const backendOk = await checkBackend();
     const frontendOk = await checkFrontend();
@@ -39,7 +39,8 @@ export const checkHealth = async (): Promise<void> => {
     }
     if (attempt < nRetries) {
       console.log(`Attempt ${attempt} failed. Retrying in 1000ms...`);
-      await new Promise((res) => setTimeout(res, 1000));
+      const waitMs = process.env.CI ? 2000 : 1000;
+      await new Promise((res) => setTimeout(res, waitMs));
     } else {
       console.error(`Failed to check health after ${nRetries} attempts.`);
       throw new Error(

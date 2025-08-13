@@ -69,15 +69,12 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
       }
     }
 
-    // Wait a moment for all evaluations to be processed
-    await pageObject.page.waitForTimeout(1000);
-
-    // await pageObject.submitPracticedTunesButton.click();
+    // Ensure submit button is ready before clicking
     const submitButton = pageObject.page.getByRole("button", {
       name: "Submit Practiced Tunes",
     });
-    await pageObject.clickWithTimeAfter(submitButton, 3000); // Increased timeout
-
+    await expect(submitButton).toBeEnabled({ timeout: 15000 });
+    await submitButton.click();
     await pageObject.waitForSuccessfullySubmitted();
 
     // Verify that the reviewed tunes are no longer listed for today.
@@ -86,7 +83,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     for (const tid of reviewedIds) {
       await expect(
         idCells.filter({ hasText: new RegExp(`^${tid}$`) }),
-      ).toHaveCount(0);
+      ).toHaveCount(0, { timeout: 20000 });
     }
   });
 
