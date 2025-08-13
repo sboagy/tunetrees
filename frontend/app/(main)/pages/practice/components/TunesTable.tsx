@@ -63,13 +63,28 @@ export const useTableContext = () => {
   return context;
 };
 
+// Persist table state, with optional overrides for keys that just changed (prevents stale saves)
 export const saveTableState = async (
   table: TanstackTable<ITuneOverview>,
   userId: number,
   tablePurpose: TablePurpose,
   playlistId: number,
+  overrides?: Partial<ITableStateExtended>,
 ): Promise<number> => {
-  const tableState: TableState = table.getState();
+  const baseState = table.getState() as unknown as ITableStateExtended;
+  // Merge only provided overrides (ignore undefined)
+  const mergedState: ITableStateExtended = { ...baseState };
+  if (overrides) {
+    for (const [key, value] of Object.entries(overrides) as [
+      keyof ITableStateExtended,
+      unknown,
+    ][]) {
+      if (value !== undefined) {
+        (mergedState as unknown as Record<string, unknown>)[key as string] =
+          value;
+      }
+    }
+  }
 
   console.log(
     `LF7 saveTableState calling updateTableStateInDb: tablePurpose=${tablePurpose}`,
@@ -79,20 +94,9 @@ export const saveTableState = async (
     "full",
     tablePurpose,
     playlistId,
-    tableState,
+    mergedState as unknown as TableState,
   );
   return status;
-  // .then((result) => {
-  //   console.log(
-  //     "LF1 saveTableState: result=",
-  //     result ? "success" : "empty result",
-  //   );
-  //   return result;
-  // })
-  // .catch((error) => {
-  //   console.error("LF1 saveTableState Error calling server function:", error);
-  //   throw error;
-  // });
 };
 
 export function TunesTableComponent({
@@ -208,8 +212,10 @@ export function TunesTableComponent({
       `LF7 ==>TunesTableComponent<== (interceptedRowSelectionChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}, ${JSON.stringify(newRowSelectionState)}}`,
     );
 
-    // Save the table state (fire and forget for now to avoid blocking the UI)
-    void saveTableState(table, userId, tablePurpose, playlistId);
+    // Save with precise overrides to avoid stale persistence
+    void saveTableState(table, userId, tablePurpose, playlistId, {
+      rowSelection: resolvedRowSelectionState,
+    });
 
     if (selectionChangedCallback) {
       console.log(
@@ -235,7 +241,9 @@ export function TunesTableComponent({
     console.log(
       `LF7 TunesTableComponent (interceptedOnColumnFiltersChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose, playlistId);
+    void saveTableState(table, userId, tablePurpose, playlistId, {
+      columnFilters: resolvedColumnFiltersState,
+    });
   };
 
   const interceptedSetColumnOrder = (
@@ -244,8 +252,10 @@ export function TunesTableComponent({
     const resolvedOrder =
       newOrder instanceof Function ? newOrder(columnOrder) : newOrder;
     setColumnOrder(resolvedOrder);
-    // Persist order change
-    void saveTableState(table, userId, tablePurpose, playlistId);
+    // Persist order change with override
+    void saveTableState(table, userId, tablePurpose, playlistId, {
+      columnOrder: resolvedOrder,
+    });
   };
 
   // Live sizing change: update local state and trigger a re-render so cells recompute positions/widths
@@ -269,7 +279,10 @@ export function TunesTableComponent({
     setColumnSizingInfo(resolvedInfo);
     // Persist only when resize interaction ends (less chatty)
     if (!resolvedInfo.isResizingColumn) {
-      void saveTableState(table, userId, tablePurpose, playlistId);
+      void saveTableState(table, userId, tablePurpose, playlistId, {
+        columnSizingInfo: resolvedInfo,
+        columnSizing,
+      });
     }
   };
 
@@ -301,8 +314,10 @@ export function TunesTableComponent({
     } catch {
       // window may be undefined in SSR; ignore
     }
-    // Persist sorting change without mutating table state in place
-    void saveTableState(table, userId, tablePurpose, playlistId);
+    // Persist sorting change with override to avoid stale saves
+    void saveTableState(table, userId, tablePurpose, playlistId, {
+      sorting: resolvedSorting,
+    });
   };
 
   const interceptedSetColumnVisibility = (
@@ -324,7 +339,9 @@ export function TunesTableComponent({
     console.log(
       `LF7 TunesTableComponent (interceptedSetColumnVisibility) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose, playlistId);
+    void saveTableState(table, userId, tablePurpose, playlistId, {
+      columnVisibility: resolvedVisibilityState,
+    });
   };
 
   // React.useEffect(() => {
