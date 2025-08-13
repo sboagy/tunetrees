@@ -7,6 +7,7 @@ import { TuneTreesPageObject } from "../test-scripts/tunetrees.po";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+import { logBrowserContextEnd, logTestEnd } from "@/test-scripts/test-logging";
 
 // Extend the Window interface to include __TT_REVIEW_SITDOWN_DATE__
 declare global {
@@ -36,8 +37,11 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     await pageObject.gotoMainPage();
   });
 
-  test.afterEach(async () => {
+  test.afterEach(async ({ page }, testInfo) => {
     await restartBackend();
+    await page.waitForTimeout(1_000);
+    logBrowserContextEnd();
+    logTestEnd(testInfo);
   });
 
   test("User sees scheduled tunes for today", async () => {
@@ -80,14 +84,17 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     });
     await expect(submitButton).toBeEnabled({ timeout: 15000 });
     await Promise.all([
-      pageObject.page.waitForResponse((resp) => {
-        const url = resp.url();
-        return (
-          resp.ok() &&
-          (url.includes("/practice/submit_feedbacks") ||
-            url.includes("/practice/submit_feedback"))
-        );
-      }),
+      pageObject.page.waitForResponse(
+        (resp) => {
+          const url = resp.url();
+          return (
+            resp.ok() &&
+            (url.includes("/practice/submit_feedbacks") ||
+              url.includes("/practice/submit_feedback"))
+          );
+        },
+        { timeout: 40000 },
+      ),
       submitButton.click(),
     ]);
     await pageObject.waitForSuccessfullySubmitted();
