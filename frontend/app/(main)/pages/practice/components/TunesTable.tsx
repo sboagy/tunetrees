@@ -291,32 +291,18 @@ export function TunesTableComponent({
     console.log(
       `LF7 TunesTableComponent (interceptedSetSorting) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    const tableState = table.getState();
-    if (
-      tableState.sorting &&
-      resolvedSorting &&
-      JSON.stringify(tableState.sorting) !== JSON.stringify(resolvedSorting)
-    ) {
-      console.log(
-        `LF1 interceptedSetSorting ===> TunesTable.tsx:338 ~  <=== resolvedSorting=${JSON.stringify(resolvedSorting)} tableState.sorting=${JSON.stringify(tableState.sorting)}`,
+    // Proactively notify any listeners (e.g., virtualized grid) that sorting changed
+    try {
+      window.dispatchEvent(
+        new CustomEvent("tt-sorting-changed", {
+          detail: { sorting: resolvedSorting },
+        }),
       );
-      tableState.sorting = resolvedSorting;
-      updateTableStateInDb(userId, "full", tablePurpose, playlistId, tableState)
-        .then((result) => {
-          console.log(
-            `LF1 interceptedSetSorting ===> TunesTable.tsx:344 ~ result: ${result ? "success" : "empty result"} <=== ${JSON.stringify(resolvedSorting)}`,
-          );
-          return result;
-        })
-        .catch((error) => {
-          console.error(
-            "LF1 interceptedSetSorting Error calling updateTableStateInDb:",
-            error,
-          );
-        });
+    } catch {
+      // window may be undefined in SSR; ignore
     }
-
-    // void saveTableState(table, userId, tablePurpose, playlistId);
+    // Persist sorting change without mutating table state in place
+    void saveTableState(table, userId, tablePurpose, playlistId);
   };
 
   const interceptedSetColumnVisibility = (

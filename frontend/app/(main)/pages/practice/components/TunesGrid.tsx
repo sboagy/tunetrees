@@ -73,11 +73,81 @@ const TunesGrid = ({
 
   // Local tick to force re-render during active column resize without triggering data fetch
   const [, setResizeTick] = useState(0);
+  // Local tick to force re-render when table state (e.g., sorting) changes
+  const [tableStateTick, setTableStateTick] = useState(0);
 
   // Invoke useEffect hook for the table state
   // useSaveTableState(table, userId, tablePurpose, playlistId);
 
   const tableBodyRef = useRef<HTMLDivElement>(null);
+
+  // Listen for explicit sorting change events to ensure the virtualizer resets consistently
+  useEffect(() => {
+    const handler = (e: Event) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const detail = (e as CustomEvent<any>).detail;
+      console.warn("TunesGrid event tt-sorting-changed", detail);
+      const el = tableBodyRef.current;
+      if (el) el.scrollTop = 0;
+      setTableStateTick((t) => t + 1);
+    };
+    window.addEventListener("tt-sorting-changed", handler as EventListener);
+    return () => {
+      window.removeEventListener(
+        "tt-sorting-changed",
+        handler as EventListener,
+      );
+    };
+  }, []);
+
+  // Subscribe to table state changes to trigger a lightweight re-render when sorting/order/filters update
+  useEffect(() => {
+    if (!table || typeof table.setOptions !== "function") return;
+
+    // Preserve any existing onStateChange handler
+    const previousOnStateChange = table.options.onStateChange;
+    const prevSortingRef = {
+      current: JSON.stringify(table.getState().sorting ?? []),
+    };
+
+  table.setOptions((opts) => ({
+      ...opts,
+      onStateChange: (updater) => {
+        // Call through to any existing handler first
+        if (previousOnStateChange) {
+          previousOnStateChange(updater);
+        }
+        // If sorting changed, scroll to top to ensure viewport displays first rows in new order
+        try {
+          const curr = JSON.stringify(table.getState().sorting ?? []);
+          if (curr !== prevSortingRef.current) {
+            prevSortingRef.current = curr;
+            // Debug visibility for tests: log sorting changes as a warning so Playwright captures it
+            console.warn(`TunesGrid onStateChange sorting=${curr}`);
+            // Scroll container to top; the test also does this, but keep UI consistent
+            const el = tableBodyRef.current;
+            if (el) el.scrollTop = 0;
+          }
+        } catch {
+          // ignore
+        }
+        // Bump a tick to re-render this grid so virtual rows and headers reflect new state immediately
+        setTableStateTick((t) => t + 1);
+      },
+    }));
+
+    // Cleanup: restore previous handler to avoid stacking handlers across mounts
+    return () => {
+      try {
+        table.setOptions((opts) => ({
+          ...opts,
+          onStateChange: previousOnStateChange,
+        }));
+      } catch {
+        // no-op: table may be unmounted
+      }
+    };
+  }, [table]);
 
   // DnD sensors for column drag
   const sensors = useSensors(
@@ -244,6 +314,23 @@ const TunesGrid = ({
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
 
+  // When sorting changes (detected via options.onStateChange above), also ensure virtualizer shows top
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Intentionally depend on tableStateTick to re-run after sort state changes
+  useEffect(() => {
+    // small debounce via requestAnimationFrame to let layout settle
+    let id = 0;
+    try {
+      id = requestAnimationFrame(() =>
+        rowVirtualizer.scrollToIndex(0, { align: "start" }),
+      );
+    } catch {
+      // ignore
+    }
+    return () => {
+      if (id) cancelAnimationFrame(id);
+    };
+  }, [tableStateTick, rowVirtualizer]);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: Only need or want this to execute if current tune changes.
   useEffect(() => {
     if (currentTablePurpose !== tablePurpose) {
@@ -346,6 +433,7 @@ const TunesGrid = ({
             overflowX: "auto",
             WebkitOverflowScrolling: "touch",
           }}
+          data-testid="tunes-grid-scroll-container"
         >
           <div style={{ height: `${totalSize}px`, position: "relative" }}>
             <DndContext
@@ -432,6 +520,7 @@ const TunesGrid = ({
                           top: `${virtualRow.start - 1}px`, // Position the row based on virtual start
                           height: `${virtualRow.size}px`, // Set the height of the row
                         }}
+                        data-row-id={row.original.id}
                         // className={`absolute h-16 cursor-pointer w-full ${
                         //   currentTune === row.original.id
                         //     ? "outline outline-2 outline-blue-500"
@@ -453,6 +542,7 @@ const TunesGrid = ({
                           <TableCell
                             key={cell.id}
                             data-testid={`${cell.id}`}
+                            data-col-id={cell.column.id}
                             style={{
                               position: "absolute",
                               top: "50%",
