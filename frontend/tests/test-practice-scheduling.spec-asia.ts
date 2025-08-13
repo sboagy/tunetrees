@@ -64,8 +64,13 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
       const idText = await idCell.textContent();
       const tuneId = Number(idText);
       if (!Number.isNaN(tuneId)) {
-        reviewedIds.push(tuneId);
-        await pageObject.setReviewEval(tuneId, feedbacks[i - 1]);
+        const evalType = feedbacks[i - 1];
+        if (evalType !== "(Not Set)") {
+          await pageObject.setReviewEval(tuneId, evalType);
+        }
+        if (evalType !== "(Not Set)" && evalType !== "again") {
+          reviewedIds.push(tuneId);
+        }
       }
     }
 
@@ -74,8 +79,21 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
       name: "Submit Practiced Tunes",
     });
     await expect(submitButton).toBeEnabled({ timeout: 15000 });
-    await submitButton.click();
+    await Promise.all([
+      pageObject.page.waitForResponse((resp) => {
+        const url = resp.url();
+        return (
+          resp.ok() &&
+          (url.includes("/practice/submit_feedbacks") ||
+            url.includes("/practice/submit_feedback"))
+        );
+      }),
+      submitButton.click(),
+    ]);
     await pageObject.waitForSuccessfullySubmitted();
+
+    // Ensure grid is refreshed before asserting removals
+    await pageObject.navigateToPracticeTab();
 
     // Verify that the reviewed tunes are no longer listed for today.
     // The grid may backfill other tunes, so avoid asserting exact row counts.
