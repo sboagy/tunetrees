@@ -34,6 +34,8 @@ type ITableStateExtended = TableState & {
   columnSizing?: ColumnSizingState;
   columnSizingInfo?: ColumnSizingInfoState;
   columnOrder?: string[];
+  // Custom persisted scroll position for the main virtualized grid scroll container
+  scrollTop?: number;
 };
 
 export interface IScheduledTunesType {
@@ -454,6 +456,35 @@ export function TunesTableComponent({
             }
             if (tableStateFromDb?.columnSizingInfo) {
               table.setColumnSizingInfo(tableStateFromDb.columnSizingInfo);
+            }
+            // Dispatch an event so the grid can restore prior scroll position after it mounts
+            try {
+              if (typeof window !== "undefined") {
+                // Store scroll position in a global cache to allow late subscribers (grids mounting after event) to restore
+                try {
+                  const key = `${tablePurpose}|${playlistId}`;
+                  const w = window as unknown as {
+                    __ttScrollLast?: Record<string, number>;
+                  };
+                  w.__ttScrollLast = w.__ttScrollLast || {};
+                  w.__ttScrollLast[key] =
+                    (tableStateFromDb as ITableStateExtended).scrollTop ?? 0;
+                } catch {
+                  // ignore
+                }
+                window.dispatchEvent(
+                  new CustomEvent("tt-scroll-restore", {
+                    detail: {
+                      scrollTop: (tableStateFromDb as ITableStateExtended)
+                        .scrollTop,
+                      tablePurpose,
+                      playlistId,
+                    },
+                  }),
+                );
+              }
+            } catch {
+              // ignore
             }
             if (filterStringCallback) {
               filterStringCallback(tableStateFromDb.globalFilter);

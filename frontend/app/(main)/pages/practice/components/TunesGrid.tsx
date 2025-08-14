@@ -33,7 +33,7 @@ import type { ITuneOverview, TablePurpose } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
-import { tableContext } from "./TunesTable";
+import { tableContext, saveTableState } from "./TunesTable";
 
 type Props = {
   table: TanstackTable<ITuneOverview>;
@@ -81,6 +81,8 @@ const TunesGrid = ({
 
   const tableBodyRef = useRef<HTMLDivElement>(null);
 
+  // (Moved scroll persistence below after rowVirtualizer declaration)
+
   // Listen for explicit sorting change events to ensure the virtualizer resets consistently
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -88,7 +90,29 @@ const TunesGrid = ({
       // const detail = (e as CustomEvent<unknown>).detail;
       // console.warn("TunesGrid event tt-sorting-changed", detail);
       const el = tableBodyRef.current;
-      if (el) el.scrollTop = 0;
+      // Suppress auto scroll-to-top if a restore just occurred
+      try {
+        const w = window as unknown as { __ttScrollLastRestore?: number };
+        if (
+          w.__ttScrollLastRestore &&
+          Date.now() - w.__ttScrollLastRestore < 1200
+        ) {
+          return;
+        }
+      } catch {
+        // ignore
+      }
+      if (el) {
+        try {
+          const w = window as unknown as {
+            __ttScrollProgrammaticTs?: number;
+          };
+          w.__ttScrollProgrammaticTs = Date.now();
+        } catch {
+          // ignore
+        }
+        el.scrollTop = 0;
+      }
       setTableStateTick((t) => t + 1);
     };
     window.addEventListener("tt-sorting-changed", handler as EventListener);
@@ -126,7 +150,27 @@ const TunesGrid = ({
             console.warn(`TunesGrid onStateChange sorting=${curr}`);
             // Scroll container to top; the test also does this, but keep UI consistent
             const el = tableBodyRef.current;
-            if (el) el.scrollTop = 0;
+            try {
+              const w = window as unknown as { __ttScrollLastRestore?: number };
+              if (
+                w.__ttScrollLastRestore &&
+                Date.now() - w.__ttScrollLastRestore < 1200
+              ) {
+                // Skip forced top scroll – recent restore should win
+              } else if (el) {
+                try {
+                  const w2 = window as unknown as {
+                    __ttScrollProgrammaticTs?: number;
+                  };
+                  w2.__ttScrollProgrammaticTs = Date.now();
+                } catch {
+                  // ignore
+                }
+                el.scrollTop = 0;
+              }
+            } catch {
+              if (el) el.scrollTop = 0;
+            }
           }
         } catch {
           // ignore
@@ -311,6 +355,133 @@ const TunesGrid = ({
       useScrollendEvent: true,
     });
 
+  // Persist scroll position (debounced) into table state so it can be restored after tab/navigation
+  useEffect(() => {
+    const el = tableBodyRef.current;
+    if (!el) return;
+    let timeout: number | null = null;
+    let lastSaved = -1;
+    const handler = () => {
+      if (timeout) window.clearTimeout(timeout);
+      timeout = window.setTimeout(() => {
+        if (!tableBodyRef.current) return;
+        const current = tableBodyRef.current.scrollTop;
+        if (Math.abs(current - lastSaved) < 16) return; // ignore tiny diffs
+        try {
+          const w = window as unknown as {
+            __ttScrollLastRestore?: number;
+            __ttScrollProgrammaticTs?: number;
+          };
+          // Skip saving a programmatic top reset that fires right after restore or programmatic scroll
+          if (
+            current <= 4 &&
+            ((w.__ttScrollLastRestore &&
+              Date.now() - w.__ttScrollLastRestore < 1500) ||
+              (w.__ttScrollProgrammaticTs &&
+                Date.now() - w.__ttScrollProgrammaticTs < 400))
+          ) {
+            return;
+          }
+        } catch {
+          // ignore
+        }
+        lastSaved = current;
+        void saveTableState(table, userId, tablePurpose, playlistId, {
+          scrollTop: current,
+        });
+      }, 250);
+    };
+    el.addEventListener("scroll", handler, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", handler);
+      if (timeout) window.clearTimeout(timeout);
+    };
+  }, [table, userId, playlistId, tablePurpose]);
+
+  // Listen for scroll restoration event triggered after table state loads
+  useEffect(() => {
+    let lastRestoreTs = 0;
+    const restore = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        scrollTop?: number;
+        tablePurpose?: string;
+        playlistId?: number;
+      } | null;
+      if (!detail) return;
+      if (
+        detail.tablePurpose !== tablePurpose ||
+        detail.playlistId !== playlistId
+      ) {
+        return;
+      }
+      if (typeof detail.scrollTop === "number" && tableBodyRef.current) {
+        requestAnimationFrame(() => {
+          if (!tableBodyRef.current) return;
+          tableBodyRef.current.scrollTop = detail.scrollTop ?? 0;
+          try {
+            rowVirtualizer.scrollToOffset(detail.scrollTop ?? 0);
+          } catch {
+            // ignore
+          }
+          lastRestoreTs = Date.now();
+          try {
+            const w = window as unknown as {
+              __ttScrollLastRestore?: number;
+              __ttScrollLast?: Record<string, number>;
+            };
+            w.__ttScrollLastRestore = lastRestoreTs;
+            const key = `${tablePurpose}|${playlistId}`;
+            if (!w.__ttScrollLast) w.__ttScrollLast = {};
+            w.__ttScrollLast[key] = detail.scrollTop ?? 0;
+          } catch {
+            // ignore
+          }
+        });
+      }
+    };
+    window.addEventListener("tt-scroll-restore", restore as EventListener);
+
+    // Fallback: if we never got an event in 400ms, attempt restore from global cache
+    const fallbackTimer = setTimeout(() => {
+      if (!tableBodyRef.current) return;
+      if (lastRestoreTs !== 0) return; // already restored
+      try {
+        const w = window as unknown as {
+          __ttScrollLast?: Record<string, number>;
+        };
+        const key = `${tablePurpose}|${playlistId}`;
+        const cached = w.__ttScrollLast?.[key];
+        if (typeof cached === "number") {
+          tableBodyRef.current.scrollTop = cached;
+          try {
+            rowVirtualizer.scrollToOffset(cached);
+          } catch {
+            // ignore
+          }
+          lastRestoreTs = Date.now();
+          try {
+            const w2 = window as unknown as {
+              __ttScrollLastRestore?: number;
+              __ttScrollLast?: Record<string, number>;
+            };
+            w2.__ttScrollLastRestore = lastRestoreTs;
+            const key2 = `${tablePurpose}|${playlistId}`;
+            if (!w2.__ttScrollLast) w2.__ttScrollLast = {};
+            w2.__ttScrollLast[key2] = cached;
+          } catch {
+            // ignore
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }, 400);
+    return () => {
+      window.removeEventListener("tt-scroll-restore", restore as EventListener);
+      clearTimeout(fallbackTimer);
+    };
+  }, [tablePurpose, playlistId, rowVirtualizer]);
+
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
 
@@ -320,9 +491,17 @@ const TunesGrid = ({
     // small debounce via requestAnimationFrame to let layout settle
     let id = 0;
     try {
-      id = requestAnimationFrame(() =>
-        rowVirtualizer.scrollToIndex(0, { align: "start" }),
-      );
+      id = requestAnimationFrame(() => {
+        // If a restoration just happened in last 750ms, skip auto scroll-to-top to preserve user context
+        const w = window as unknown as { __ttScrollLastRestore?: number };
+        if (
+          w.__ttScrollLastRestore &&
+          Date.now() - w.__ttScrollLastRestore < 1200
+        ) {
+          return;
+        }
+        rowVirtualizer.scrollToIndex(0, { align: "start" });
+      });
     } catch {
       // ignore
     }
