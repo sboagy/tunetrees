@@ -71,7 +71,7 @@ const TunesGrid = ({
   const { setCurrentView } = useMainPaneView();
   const rowRefs = useRef<{ [key: number]: HTMLTableRowElement | null }>({});
 
-  // Local tick to force re-render during active column resize without triggering data fetch
+  // Local tick to force re-render during active column resize without triggering data fetch (rAF throttled)
   const [, setResizeTick] = useState(0);
   // Local tick to force re-render when table state (e.g., sorting) changes
   const [tableStateTick, setTableStateTick] = useState(0);
@@ -220,11 +220,25 @@ const TunesGrid = ({
     table.setColumnOrder(newOrder);
   };
 
-  // Wrap TanStack resize handler to force lightweight re-renders during drag
+  // Wrap TanStack resize handler with requestAnimationFrame throttling.
+  // Rationale: The raw handler fires on every mouse/touch move and internally updates column sizing
+  // state which re-renders the table. Without throttling this produced rapid state churn that, in
+  // combination with other effects, previously manifested as a "Maximum update depth exceeded" error.
+  // The rAF gate batches visual updates to once per frame. If modifying this logic, preserve a guard
+  // against unbounded synchronous setState calls during active drags.
   const makeEnhancedResizeHandler = (handler: (e: unknown) => void) => {
     return (e: React.MouseEvent | React.TouchEvent) => {
       handler(e);
-      const onMove = () => setResizeTick((t) => t + 1);
+      let frame: number | null = null;
+      const tick = () => {
+        frame = null;
+        setResizeTick((t) => t + 1);
+      };
+      const onMove = () => {
+        if (frame === null) {
+          frame = requestAnimationFrame(tick);
+        }
+      };
       const onUp = () => {
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener(
@@ -233,6 +247,7 @@ const TunesGrid = ({
         );
         window.removeEventListener("mouseup", onUp);
         window.removeEventListener("touchend", onUp);
+        if (frame !== null) cancelAnimationFrame(frame);
       };
       window.addEventListener("mousemove", onMove);
       window.addEventListener("touchmove", onMove as unknown as EventListener, {

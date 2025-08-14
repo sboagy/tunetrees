@@ -338,6 +338,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 80,
+      minSize: 80,
       meta: { headerLabel: "Id" },
     },
     "practice" === purpose
@@ -359,6 +360,7 @@ export function get_columns(
           ),
           accessorFn: (row) => row.recall_eval,
           size: 284,
+          minSize: 260,
           meta: { headerLabel: "Evaluation" },
         }
       : {
@@ -390,7 +392,8 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       enableResizing: true,
-      size: 160,
+      size: 180,
+      minSize: 120,
       meta: { headerLabel: "Title" },
     },
     ...(purpose === "practice"
@@ -412,6 +415,7 @@ export function get_columns(
             },
             accessorFn: (row: ITuneOverview) => row.goal,
             size: 150,
+            minSize: 90,
             meta: { headerLabel: "Goal" },
           },
         ]
@@ -441,6 +445,7 @@ export function get_columns(
             ),
             accessorFn: (row: ITuneOverview) => row.goal,
             size: 150,
+            minSize: 90,
             meta: { headerLabel: "Goal" },
           },
         ]
@@ -454,6 +459,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 100,
+      minSize: 90,
       meta: { headerLabel: "Type" },
     },
     {
@@ -465,6 +471,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 145,
+      minSize: 120,
       meta: { headerLabel: "Structure" },
     },
     {
@@ -476,6 +483,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 100,
+      minSize: 80,
       meta: { headerLabel: "Mode" },
     },
     {
@@ -487,6 +495,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 200,
+      minSize: 140,
       meta: { headerLabel: "Incipit" },
     },
     {
@@ -498,6 +507,7 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       size: 200,
+      minSize: 140,
       meta: { headerLabel: "Genre" },
     },
     {
@@ -529,6 +539,8 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        size: 140,
+        minSize: 130,
         sortingFn: datetimeTextSortingFn,
         meta: { headerLabel: "Scheduled" },
       },
@@ -546,7 +558,8 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         sortingFn: datetimeTextSortingFn,
-        size: 120,
+        size: 140,
+        minSize: 130,
         meta: { headerLabel: "Learned" },
       },
       {
@@ -563,7 +576,8 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         sortingFn: datetimeTextSortingFn,
-        size: 120,
+        size: 140,
+        minSize: 130,
         meta: { headerLabel: "Practiced" },
       },
       {
@@ -580,6 +594,8 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         meta: { headerLabel: "Prev Goal" },
+        size: 130,
+        minSize: 110,
       },
       {
         accessorKey: "latest_technique",
@@ -595,6 +611,8 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         meta: { headerLabel: "Prev Alg" },
+        size: 130,
+        minSize: 110,
       },
       {
         accessorKey: "latest_quality",
@@ -610,6 +628,7 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 12 * 9, // Approximate width for 11 characters
+        minSize: 90,
         meta: { headerLabel: "Prev Qual" },
       },
       {
@@ -627,6 +646,7 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 14 * 8, // Approximate width for 11 characters
+        minSize: 90,
         meta: { headerLabel: "Easiness" },
       },
       {
@@ -643,6 +663,7 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 13 * 8, // Approximate width for 11 characters
+        minSize: 90,
         meta: { headerLabel: "Interval" },
       },
       {
@@ -659,6 +680,7 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 16 * 8, // Approximate width for 11 characters
+        minSize: 100,
         meta: { headerLabel: "Repetitions" },
       },
       {
@@ -674,6 +696,8 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        size: 160,
+        minSize: 150,
         sortingFn: datetimeTextSortingFn,
         meta: { headerLabel: "SR Scheduled" },
       },
@@ -724,6 +748,8 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         meta: { headerLabel: "External Ref" },
+        size: 220,
+        minSize: 160,
       },
       // {
       //   accessorKey: "note_private",
@@ -757,6 +783,8 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         meta: { headerLabel: "Tags" },
+        size: 140,
+        minSize: 110,
       },
       {
         accessorKey: "notes",
@@ -776,6 +804,8 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         meta: { headerLabel: "Notes" },
+        size: 200,
+        minSize: 140,
       },
       {
         accessorKey: "playlist_deleted",

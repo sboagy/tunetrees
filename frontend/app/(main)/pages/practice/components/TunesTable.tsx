@@ -393,7 +393,8 @@ export function TunesTableComponent({
     ) => (originalRow.id ?? 0).toString(),
     defaultColumn: {
       size: 140,
-      minSize: 60,
+      // Raised baseline min size (was 60) to keep headers legible with padding + sort icon
+      minSize: 90,
     },
   });
 
@@ -401,116 +402,114 @@ export function TunesTableComponent({
 
   const [isLoading, setLoading] = React.useState<boolean>(true);
 
+  // Mount + playlist/user change loader.
+  // IMPORTANT: This effect intentionally depends only on `isLoading` (and static params via closure)
+  // to avoid the previous infinite/"Maximum update depth exceeded" loop that occurred when
+  // it ran every render and then mutated table state (sorting / sizing / visibility) which
+  // immediately triggered another render + effect. Do NOT add `table` or rapidly changing
+  // state objects to this dependency list without reworking the logic to guard re-entry.
   React.useEffect(() => {
-    if (isLoading) {
-      // On initial render effect, load table state from the database
-      const fetchTableState = async () => {
-        try {
-          console.log(
-            `useEffect ===> TunesTable.tsx:205 ~ (no actual dependencies) fetchTableState calling getTableStateTable(${userId}, 'full', tablePurpose=${tablePurpose} playlistId=${playlistId}`,
-          );
-          let tableStateTable = await getTableStateTable(
+    if (!isLoading) return;
+    const fetchTableState = async () => {
+      try {
+        console.log(
+          `useEffect TunesTable.tsx fetchTableState userId=${userId} tablePurpose=${tablePurpose} playlistId=${playlistId}`,
+        );
+        let tableStateTable = await getTableStateTable(
+          userId,
+          "full",
+          tablePurpose,
+          playlistId,
+        );
+        if (!tableStateTable) {
+          console.log("LF7 TunesTableComponent: no table state found in db");
+          tableStateTable = await createOrUpdateTableState(
             userId,
             "full",
             tablePurpose,
             playlistId,
+            table.getState(),
+            currentTune,
           );
-          if (!tableStateTable) {
-            console.log("LF7 TunesTableComponent: no table state found in db");
-            tableStateTable = await createOrUpdateTableState(
-              userId,
-              "full",
-              tablePurpose,
-              playlistId,
-              table.getState(),
-              currentTune,
-            );
-          }
-          const tableStateFromDb = tableStateTable?.settings as TableState;
-          if (tableStateFromDb) {
-            setTableStateFromDb(tableStateFromDb);
-            const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
-            console.log(
-              `LF6 TunesTableComponent: currentTuneState=${currentTuneState}`,
-            );
-            if (currentTuneState > 0) {
-              setCurrentTune(currentTuneState);
-            } else {
-              setCurrentTune(null);
-            }
-            setCurrentTablePurpose(tablePurpose);
-            console.log(
-              `LF7 TunesTableComponent: setting rowSelection db: ${JSON.stringify(
-                tableStateFromDb.rowSelection,
-              )}`,
-            );
-            table.setRowSelection(tableStateFromDb.rowSelection);
-            table.setColumnVisibility(tableStateFromDb.columnVisibility);
-            table.setColumnFilters(tableStateFromDb.columnFilters);
-            table.setSorting(tableStateFromDb.sorting);
-            if (tableStateFromDb?.columnOrder) {
-              table.setColumnOrder(tableStateFromDb.columnOrder);
-            }
-            if (tableStateFromDb?.columnSizing) {
-              table.setColumnSizing(tableStateFromDb.columnSizing);
-            }
-            if (tableStateFromDb?.columnSizingInfo) {
-              table.setColumnSizingInfo(tableStateFromDb.columnSizingInfo);
-            }
-            // Dispatch an event so the grid can restore prior scroll position after it mounts
-            try {
-              if (typeof window !== "undefined") {
-                // Store scroll position in a global cache to allow late subscribers (grids mounting after event) to restore
-                try {
-                  const key = `${tablePurpose}|${playlistId}`;
-                  const w = window as unknown as {
-                    __ttScrollLast?: Record<string, number>;
-                  };
-                  w.__ttScrollLast = w.__ttScrollLast || {};
-                  w.__ttScrollLast[key] =
-                    (tableStateFromDb as ITableStateExtended).scrollTop ?? 0;
-                } catch {
-                  // ignore
-                }
-                window.dispatchEvent(
-                  new CustomEvent("tt-scroll-restore", {
-                    detail: {
-                      scrollTop: (tableStateFromDb as ITableStateExtended)
-                        .scrollTop,
-                      tablePurpose,
-                      playlistId,
-                    },
-                  }),
-                );
-              }
-            } catch {
-              // ignore
-            }
-            if (filterStringCallback) {
-              filterStringCallback(tableStateFromDb.globalFilter);
-            }
-            table.setPagination(tableStateFromDb.pagination);
-          } else
-            console.log("LF1 TunesTableComponent: no table state found in db");
-        } catch (error) {
-          console.error(error);
-          throw error;
-        } finally {
-          setLoading(false);
-          if (onTableCreated) onTableCreated(table);
         }
-      };
-
-      if (playlistId !== undefined && playlistId > 0) {
-        console.log("LF1 TunesTableComponent: calling fetchTableState");
-        void fetchTableState();
-      } else {
-        console.log(
-          "LF1 TunesTableComponent: playlistId not set, skipping table state fetch",
-        );
+        const tableStateFromDb = tableStateTable?.settings as TableState;
+        if (tableStateFromDb) {
+          setTableStateFromDb(tableStateFromDb);
+          const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
+          if (currentTuneState > 0) setCurrentTune(currentTuneState);
+          else setCurrentTune(null);
+          setCurrentTablePurpose(tablePurpose);
+          table.setRowSelection(tableStateFromDb.rowSelection);
+          table.setColumnVisibility(tableStateFromDb.columnVisibility);
+          table.setColumnFilters(tableStateFromDb.columnFilters);
+          table.setSorting(tableStateFromDb.sorting);
+          if (tableStateFromDb?.columnOrder)
+            table.setColumnOrder(tableStateFromDb.columnOrder);
+          if (tableStateFromDb?.columnSizing)
+            table.setColumnSizing(tableStateFromDb.columnSizing);
+          if (tableStateFromDb?.columnSizingInfo)
+            table.setColumnSizingInfo(tableStateFromDb.columnSizingInfo);
+          try {
+            if (typeof window !== "undefined") {
+              try {
+                const key = `${tablePurpose}|${playlistId}`;
+                const w = window as unknown as {
+                  __ttScrollLast?: Record<string, number>;
+                };
+                w.__ttScrollLast = w.__ttScrollLast || {};
+                w.__ttScrollLast[key] =
+                  (tableStateFromDb as ITableStateExtended).scrollTop ?? 0;
+              } catch {
+                // ignore
+              }
+              window.dispatchEvent(
+                new CustomEvent("tt-scroll-restore", {
+                  detail: {
+                    scrollTop: (tableStateFromDb as ITableStateExtended)
+                      .scrollTop,
+                    tablePurpose,
+                    playlistId,
+                  },
+                }),
+              );
+            }
+          } catch {
+            // ignore
+          }
+          if (filterStringCallback)
+            filterStringCallback(tableStateFromDb.globalFilter);
+          table.setPagination(tableStateFromDb.pagination);
+        } else {
+          console.log("LF1 TunesTableComponent: no table state found in db");
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+        if (onTableCreated) onTableCreated(table);
       }
+    };
+    if (playlistId && playlistId > 0) {
+      void fetchTableState();
+    } else {
+      console.log(
+        "LF1 TunesTableComponent: playlistId not set, skipping table state fetch",
+      );
+      setLoading(false);
+      if (onTableCreated) onTableCreated(table);
     }
-  }); // don't add dependencies here!
+  }, [
+    isLoading,
+    userId,
+    tablePurpose,
+    playlistId,
+    table,
+    currentTune,
+    setCurrentTune,
+    setCurrentTablePurpose,
+    onTableCreated,
+    filterStringCallback,
+  ]);
 
   React.useEffect(() => {
     if (onTableCreated) {
