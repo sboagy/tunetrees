@@ -15,12 +15,24 @@ const sidebarNavItems = [
   //   href: "/user-settings",
   // },
   {
+    title: "Scheduling Options",
+    href: "/user-settings/scheduling-options",
+  },
+  {
+    title: "Spaced Repetition",
+    href: "/user-settings/spaced-repetition",
+  },
+  {
     title: "Account",
     href: "/user-settings/account",
   },
   {
-    title: "Scheduling Options",
-    href: "/user-settings/scheduling-options",
+    title: "Password",
+    href: "/user-settings/password",
+  },
+  {
+    title: "Phone",
+    href: "/user-settings/phone",
   },
 ];
 

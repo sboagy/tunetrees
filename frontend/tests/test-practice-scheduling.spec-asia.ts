@@ -7,6 +7,7 @@ import { TuneTreesPageObject } from "../test-scripts/tunetrees.po";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+import { logBrowserContextEnd, logTestEnd } from "@/test-scripts/test-logging";
 
 // Extend the Window interface to include __TT_REVIEW_SITDOWN_DATE__
 declare global {
@@ -36,8 +37,11 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     await pageObject.gotoMainPage();
   });
 
-  test.afterEach(async () => {
+  test.afterEach(async ({ page }, testInfo) => {
     await restartBackend();
+    await page.waitForTimeout(1_000);
+    logBrowserContextEnd();
+    logTestEnd(testInfo);
   });
 
   test("User sees scheduled tunes for today", async () => {
@@ -48,36 +52,52 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
   });
 
   test("User submits quality feedback and tunes are rescheduled", async () => {
-    await pageObject.navigateToPracticeTab();
+    await pageObject.navigateToPracticeTabDirectly();
     const feedbacks = ["hard", "good", "(Not Set)", "again"];
 
     // Fill in quality feedback for each scheduled tune
     const rows = pageObject.tunesGridRows;
     const count = await rows.count();
-    for (let i = 1; i < count; i++) {
+    const limit = Math.min(count - 1, 4);
+    const reviewedIds: number[] = [];
+    for (let i = 1; i <= limit; i++) {
       // skip header row
       const row = rows.nth(i);
       // Get the tune ID from the "id" column (assumes first cell is the ID)
       const idCell = row.locator("td").first();
       const idText = await idCell.textContent();
       const tuneId = Number(idText);
-      await pageObject.setReviewEval(tuneId, feedbacks[i - 1]);
+      if (!Number.isNaN(tuneId)) {
+        const evalType = feedbacks[i - 1];
+        if (evalType !== "(Not Set)") {
+          await pageObject.setReviewEval(tuneId, evalType);
+        }
+        if (evalType !== "(Not Set)" && evalType !== "again") {
+          reviewedIds.push(tuneId);
+        }
+      }
     }
 
-    // Wait a moment for all evaluations to be processed
-    await pageObject.page.waitForTimeout(1000);
-
-    // await pageObject.submitPracticedTunesButton.click();
+    // Ensure submit button is ready before clicking
     const submitButton = pageObject.page.getByRole("button", {
       name: "Submit Practiced Tunes",
     });
-    await pageObject.clickWithTimeAfter(submitButton, 3000); // Increased timeout
-
+    await expect(submitButton).toBeEnabled({ timeout: 15000 });
+    await pageObject.page.waitForTimeout(100);
+    await pageObject.clickWithTimeAfter(submitButton);
     await pageObject.waitForSuccessfullySubmitted();
 
-    const rowCount = await pageObject.tunesGridRows.count();
-    console.log(`Number of rows: ${rowCount}`);
-    await expect(pageObject.tunesGridRows).toHaveCount(2, { timeout: 60000 });
+    // Ensure grid is refreshed before asserting removals
+    await pageObject.navigateToPracticeTab();
+
+    // Verify that the reviewed tunes are no longer listed for today.
+    // The grid may backfill other tunes, so avoid asserting exact row counts.
+    const idCells = pageObject.tunesGridRows.locator("td:first-child");
+    for (const tid of reviewedIds) {
+      await expect(
+        idCells.filter({ hasText: new RegExp(`^${tid}$`) }),
+      ).toHaveCount(0, { timeout: 20000 });
+    }
   });
 
   test("User sees correct tunes on next day (timezone aware)", async ({

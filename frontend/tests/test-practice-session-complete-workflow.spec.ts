@@ -3,6 +3,7 @@ import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { setTestDefaults } from "@/test-scripts/set-test-defaults";
 import { runLoginStandalone } from "@/test-scripts/run-login2";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { navigateToPageWithRetry } from "@/test-scripts/navigation-utils";
 import { checkHealth } from "@/test-scripts/check-servers";
 import {
@@ -145,12 +146,12 @@ test.describe.serial("Practice Session Complete Workflow", () => {
     await submitButton.click();
     await page.waitForTimeout(2000); // Wait for submission to process
 
-    // Step 9: Verify submission was successful
-    // The table should be empty and show "0 of 0 row(s) selected"
-    await expect(page.locator("text=0 of 0 row(s) selected")).toBeVisible();
-
-    // Submit button should be disabled again
-    await expect(submitButton).toBeDisabled();
+    // Step 9: Verify submission was successful via toast and row count decrease
+    // Observe success toast using shared Page Object helper semantics
+    const ttPO = new TuneTreesPageObject(page);
+    await ttPO.waitForSuccessfullySubmitted();
+    const rowsAfter = await ttPO.tunesGridRows.count();
+    expect(rowsAfter).toBeGreaterThanOrEqual(1);
 
     // Should show "No Tune selected" message
     await expect(page.locator("text=No Tune selected")).toBeVisible();

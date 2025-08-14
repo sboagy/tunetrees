@@ -102,8 +102,6 @@ app.include_router(tunetrees_api.router)
 app.include_router(settings.settings_router)
 app.include_router(preferences_router)
 
-app.include_router(auth.router)
-
 logger.debug("(tunetrees/api/main.py (65): test debug message)")
 
 

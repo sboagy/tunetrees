@@ -79,11 +79,8 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // ... inside your test:
     await clearExistingSorts(ttPO, page);
 
-    // Find the ID column header with sorting arrow
-    await expect(ttPO.idColumnHeader).toBeVisible({ timeout: 15000 });
-
-    // Find the sorting button within the ID column header
-    await expect(ttPO.idColumnHeaderSortButton).toBeVisible();
+    // Find the ID column sorting button (anchor by data-testid for robustness)
+    await expect(ttPO.idColumnHeaderSortButton).toBeVisible({ timeout: 15000 });
 
     // Verify the button shows the unsorted icon initially (ArrowUpDown)
     const unsortedIcon = ttPO.idColumnHeaderSortButton.locator("svg");
@@ -92,7 +89,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // Get initial data to compare before and after sorting
     const initialFirstRow = page.getByRole("row").nth(1);
     const initialFirstRowIdCell = initialFirstRow
-      .locator('[data-testid*="id"]')
+      .locator('[data-col-id="id"]')
       .first();
     await expect(initialFirstRowIdCell).toBeVisible();
     const initialFirstId = await initialFirstRowIdCell.textContent();
@@ -103,64 +100,98 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     await ttPO.idColumnHeaderSortButton.click();
     await page.waitForTimeout(500); // Wait for sorting to complete
 
-    // Verify the sort arrow changed to ascending (ArrowUp)
+    // Verify the sort changed to ascending
     const ascendingIcon = ttPO.idColumnHeaderSortButton.locator("svg");
     await expect(ascendingIcon).toBeVisible();
+    await expect(ttPO.idColumnHeaderSortButton).toHaveAttribute(
+      "title",
+      /Ascending column sort/,
+    );
 
-    // Check if sorting changed the order
-    const afterSortFirstRowIdCell = page
-      .getByRole("row")
-      .nth(1)
-      .locator('[data-testid*="id"]')
-      .first();
-    const afterSortFirstId = await afterSortFirstRowIdCell.textContent();
+    // Ensure we're reading from the top of the virtualized viewport
+    const scrollContainer1 = page.getByTestId("tunes-grid-scroll-container");
+    await scrollContainer1.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await page.waitForTimeout(200);
 
-    console.log("After ascending sort first row ID:", afterSortFirstId);
-
-    // The IDs should be different if sorting worked (unless it was already sorted)
-    // For a more reliable test, check if the first ID is smaller than a later ID
-    const thirdRowIdCell = page
-      .getByRole("row")
-      .nth(3)
-      .locator('[data-testid*="id"]')
-      .first();
-    const thirdRowId = await thirdRowIdCell.textContent();
-
-    console.log("Third row ID after ascending sort:", thirdRowId);
-
-    // In ascending numeric sort, first ID should be <= third ID
-    const firstIdNum = Number.parseInt(afterSortFirstId || "0");
-    const thirdIdNum = Number.parseInt(thirdRowId || "0");
-    expect(firstIdNum).toBeLessThanOrEqual(thirdIdNum);
+    // Poll until ascending order is reflected in the virtualized viewport
+    {
+      let attempts = 0;
+      let ok = false;
+      while (attempts < 20 && !ok) {
+        const firstCell = page
+          .getByRole("row")
+          .nth(1)
+          .locator('[data-col-id="id"]')
+          .first();
+        const thirdCell = page
+          .getByRole("row")
+          .nth(3)
+          .locator('[data-col-id="id"]')
+          .first();
+        const a = Number.parseInt((await firstCell.textContent()) || "0");
+        const b = Number.parseInt((await thirdCell.textContent()) || "0");
+        console.log(`Asc check attempt ${attempts}: first=${a}, third=${b}`);
+        if (a <= b && a > 0 && b > 0) ok = true;
+        else {
+          await page.waitForTimeout(200);
+          // Nudge scroll to force virtualizer refresh
+          await scrollContainer1.evaluate((el) => {
+            el.scrollTop = 0;
+          });
+        }
+        attempts++;
+      }
+      expect(ok).toBeTruthy();
+    }
 
     // Click again to sort descending
     await ttPO.idColumnHeaderSortButton.click();
     await page.waitForTimeout(500);
 
-    // Verify the sort arrow changed to descending (ArrowDown)
+    // Verify the sort changed to descending
     const descendingIcon = ttPO.idColumnHeaderSortButton.locator("svg");
     await expect(descendingIcon).toBeVisible();
-
-    const descendingFirstRowIdCell = page
-      .getByRole("row")
-      .nth(1)
-      .locator('[data-testid*="id"]')
-      .first();
-    const descendingFirstId = await descendingFirstRowIdCell.textContent();
-    const descendingThirdRowIdCell = page
-      .getByRole("row")
-      .nth(3)
-      .locator('[data-testid*="id"]')
-      .first();
-    const descendingThirdId = await descendingThirdRowIdCell.textContent();
-
-    console.log("After descending sort first row ID:", descendingFirstId);
-    console.log("After descending sort third row ID:", descendingThirdId);
-
-    // In descending numeric sort, first ID should be >= third ID
-    const descFirstIdNum = Number.parseInt(descendingFirstId || "0");
-    const descThirdIdNum = Number.parseInt(descendingThirdId || "0");
-    expect(descFirstIdNum).toBeGreaterThanOrEqual(descThirdIdNum);
+    await expect(ttPO.idColumnHeaderSortButton).toHaveAttribute(
+      "title",
+      /Descending column sort/,
+    );
+    // Ensure we're reading from the top of the virtualized viewport
+    const scrollContainer = page.getByTestId("tunes-grid-scroll-container");
+    await scrollContainer.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await page.waitForTimeout(200);
+    // Poll until descending order is reflected in the virtualized viewport
+    {
+      let attempts = 0;
+      let ok = false;
+      while (attempts < 20 && !ok) {
+        const firstCell = page
+          .getByRole("row")
+          .nth(1)
+          .locator('[data-col-id="id"]')
+          .first();
+        const thirdCell = page
+          .getByRole("row")
+          .nth(3)
+          .locator('[data-col-id="id"]')
+          .first();
+        const a = Number.parseInt((await firstCell.textContent()) || "0");
+        const b = Number.parseInt((await thirdCell.textContent()) || "0");
+        console.log(`Desc check attempt ${attempts}: first=${a}, third=${b}`);
+        if (a >= b && a > 0 && b > 0) ok = true;
+        else {
+          await page.waitForTimeout(200);
+          await scrollContainer.evaluate((el) => {
+            el.scrollTop = 0;
+          });
+        }
+        attempts++;
+      }
+      expect(ok).toBeTruthy();
+    }
 
     // Click again to clear sorting
     await ttPO.idColumnHeaderSortButton.click();
@@ -185,16 +216,21 @@ test.describe.serial("TuneGrid Regression Tests", () => {
 
     await clearExistingSorts(ttPO, page);
 
-    // Test sorting by Type column first using Page Object locators
-    await expect(ttPO.typeColumnHeader).toBeVisible({ timeout: 15000 });
-    await expect(ttPO.typeColumnHeaderSortButton).toBeVisible();
+    // Test sorting by Type column first using Page Object locators (button-based to avoid role brittleness)
+    // Ensure the Type header button is scrolled into view (header can be horizontally off-screen)
+    await ttPO.typeColumnHeaderSortButton.scrollIntoViewIfNeeded();
+    await expect(ttPO.typeColumnHeaderSortButton).toBeVisible({
+      timeout: 15000,
+    });
 
     await ttPO.typeColumnHeaderSortButton.click();
     await page.waitForTimeout(1000);
 
     // Then sort by Title while holding shift (multicolumn)
-    await expect(ttPO.titleColumnHeader).toBeVisible({ timeout: 15000 });
-    await expect(ttPO.titleColumnHeaderSortButton).toBeVisible();
+    await ttPO.titleColumnHeaderSortButton.scrollIntoViewIfNeeded();
+    await expect(ttPO.titleColumnHeaderSortButton).toBeVisible({
+      timeout: 15000,
+    });
 
     // Use keyboard modifier for multicolumn sorting
     await page.keyboard.down("Shift");
@@ -306,8 +342,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     await expect(tunesGrid).toBeVisible({ timeout: 15000 });
 
     // Sort by ID column
-    const idSortButton = ttPO.idColumnHeader.locator('button[title*="sort"]');
-    await idSortButton.click();
+    await ttPO.idColumnHeaderSortButton.click();
     await page.waitForTimeout(1000);
 
     // Get the first row ID after sorting
@@ -324,8 +359,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // TODO: Add proper navigation testing when we have the functions available
 
     // Verify that sorting is currently applied by checking the sorted state
-    const sortButton = ttPO.idColumnHeader.locator('button[title*="sort"]');
-    const sortIcon = sortButton.locator("svg");
+    const sortIcon = ttPO.idColumnHeaderSortButton.locator("svg");
     await expect(sortIcon).toBeVisible();
 
     console.log("✅ Sorting persistence test completed (limited scope)");

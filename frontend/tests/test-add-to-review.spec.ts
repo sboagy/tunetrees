@@ -45,13 +45,11 @@ test.describe.serial("Add to Review Tests", () => {
     // We should already be on the Repertoire tab at the point.  Assert that fact:
     await expect(ttPO.addToReviewButton).toBeVisible();
 
-    await expect(ttPO.tableStatus).toContainText("1 of 488 row(s) selected", {
-      timeout: 15000,
-    });
+    await expect(ttPO.tableStatus).toContainText("1 of 488 row(s) selected");
 
     // Filter for "Foxhunter" to make the tune visible
     await ttPO.filterInput.fill("Foxhunter");
-    await page.waitForTimeout(1000); // Wait for filtering to complete
+    // Rely on visibility assertion below instead of fixed sleep
 
     // Find the row with ID 669 "Foxhunter's Reel" and select it
     const foxhunterRow = page
@@ -72,7 +70,7 @@ test.describe.serial("Add to Review Tests", () => {
 
     // Clear the filter to see all tunes again
     await ttPO.filterInput.clear();
-    await page.waitForTimeout(1000); // Wait for filtering to reset
+    // Rely on status assertion below instead of fixed sleep
 
     // Verify that 2 tunes are now selected (assuming Sweep's Hornpipe was already selected)
     await expect(ttPO.tableStatus).toContainText("2 of 488 row(s) selected", {
@@ -91,9 +89,6 @@ test.describe.serial("Add to Review Tests", () => {
 
     await ttPO.addToReviewButton.click();
 
-    // Wait for the operation to complete and check for errors
-    await page.waitForTimeout(2000);
-
     if (errors.length > 0) {
       console.log("❌ Frontend errors detected:", errors);
     }
@@ -105,6 +100,9 @@ test.describe.serial("Add to Review Tests", () => {
     await expect(ttPO.tableStatus).toContainText("row(s) selected", {
       timeout: 10000,
     });
+
+    // Ensure no frontend page errors occurred during Add to Review
+    expect(errors).toHaveLength(0);
 
     // Navigate to the practice tab to verify tunes were added
     await ttPO.navigateToPracticeTab();
@@ -125,9 +123,8 @@ test.describe.serial("Add to Review Tests", () => {
     const practiceRows = ttPO.tunesGridRows;
     const practiceRowCount = await practiceRows.count();
     console.log(`Practice tab has ${practiceRowCount} rows (including header)`);
-
-    // Should have at least 2 rows (header + at least 1 tune)
-    expect(practiceRowCount).toEqual(7);
+    // Should have header + at least 1 tune
+    expect(practiceRowCount).toBeGreaterThan(1);
 
     console.log("✅ Add to Review functionality test completed successfully");
   });

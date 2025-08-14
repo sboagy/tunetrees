@@ -23,7 +23,7 @@ import type {
   ITuneType,
   IViewPlaylistJoined,
 } from "./types";
-import { formatTypeScriptDateToPythonUTCString } from "@/lib/date-utils";
+import { formatDateToIso8601UtcString } from "@/lib/date-utils";
 
 // function isValidUTF8(str: string): boolean {
 //   try {
@@ -36,6 +36,14 @@ import { formatTypeScriptDateToPythonUTCString } from "@/lib/date-utils";
 //     return false;
 //   }
 // }
+
+// Runtime tripwire: warn if this server module is ever executed in a client context.
+// Heuristic: window is defined OR document is defined OR a known client-only global
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  console.warn(
+    "[Tripwire] practice/queries.ts executed in a client environment. This should only be imported via server actions.",
+  );
+}
 
 const TT_API_BASE_URL = process.env.TT_API_BASE_URL;
 
@@ -67,7 +75,6 @@ export async function getScheduledTunesOverview(
   playlistId: number,
   sitdownDate: Date,
   showDeleted = false,
-  acceptable_delinquency_window = 7,
 ): Promise<ITuneOverviewScheduled[]> {
   if (
     !sitdownDate ||
@@ -85,15 +92,17 @@ export async function getScheduledTunesOverview(
       client.getUri(),
     );
     console.log("user_id: %s, playlist_id: %s", userId, playlistId);
-    const sitdownDateUtcString =
-      formatTypeScriptDateToPythonUTCString(sitdownDate);
+    const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
+    // Convert JS getTimezoneOffset (minutes behind UTC, positive for West) to desired sign convention (offset relative to UTC)
+    // Example: EST (UTC-5) -> getTimezoneOffset() = 300, we want -300
+    const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
     const response = await client.get<ITuneOverviewScheduled[]>(
       `/scheduled_tunes_overview/${userId}/${playlistId}`,
       {
         params: {
           show_playlist_deleted: showDeleted,
           sitdown_date: sitdownDateUtcString,
-          acceptable_delinquency_window: acceptable_delinquency_window,
+          local_tz_offset_minutes: localTzOffsetMinutes,
         },
       },
     );

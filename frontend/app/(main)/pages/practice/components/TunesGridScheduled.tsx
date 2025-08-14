@@ -7,7 +7,7 @@ import type { RowSelectionState } from "@tanstack/react-table";
 import { Upload } from "lucide-react";
 import { type JSX, useCallback, useEffect, useState } from "react";
 import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
-import { getScheduledTunesOverview } from "../queries";
+import { getScheduledTunesOverviewAction } from "../actions/practice-actions";
 import {
   deleteTableTransientData,
   updateCurrentTuneInDb,
@@ -20,7 +20,7 @@ import { useTune } from "./CurrentTuneContext";
 import FlashcardPanel from "./FlashcardPanel";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useScheduledTunes } from "./TunesContextScheduled";
-import TunesGrid, { acceptableDelinquencyWindow } from "./TunesGrid";
+import TunesGrid from "./TunesGrid";
 import { useTunesTable } from "./TunesTable";
 import { useToast } from "@/hooks/use-toast";
 import { getSitdownDateFromBrowser } from "./SitdownDateProvider";
@@ -86,12 +86,11 @@ export default function TunesGridScheduled({
         try {
           const sitdownDate = getSitdownDateFromBrowser();
 
-          const result = await getScheduledTunesOverview(
+          const result = await getScheduledTunesOverviewAction(
             userId,
             playlistId,
-            sitdownDate,
+            sitdownDate ? new Date(sitdownDate) : null,
             showDeleted,
-            acceptableDelinquencyWindow,
           );
           if (!cancelled) {
             setTunes(result);
@@ -392,7 +391,7 @@ export default function TunesGridScheduled({
             <TunesGrid
               table={table}
               userId={userId}
-              playlistId={userId}
+              playlistId={playlistId}
               tablePurpose={"practice"}
               onRowClickCallback={onRowClickCallback}
             />

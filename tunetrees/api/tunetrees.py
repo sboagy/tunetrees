@@ -23,6 +23,7 @@ from starlette import status as status
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
     query_practice_list_scheduled,
+    # query_practice_list_scheduled_original,
 )
 from tunetrees.app.schedule import (
     TuneFeedbackUpdate,
@@ -114,8 +115,9 @@ async def get_scheduled_tunes_overview(
     sitdown_date: datetime = Query(
         ..., description="Review sitdown date (timezone-aware, UTC recommended)"
     ),
-    acceptable_delinquency_window: int = Query(
-        7, description="Acceptable delinquency window in days"
+    local_tz_offset_minutes: Optional[int] = Query(
+        None,
+        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5). Used for local-day interval classification.",
     ),
 ) -> List[PlaylistTuneJoinedModel]:
     """
@@ -135,13 +137,12 @@ async def get_scheduled_tunes_overview(
                 time.sleep(DEBUG_SLOWDOWN)
             tunes_scheduled = query_practice_list_scheduled(
                 db,
-                limit=10,
                 user_ref=user_id,
                 playlist_ref=playlist_ref,
                 show_deleted=show_deleted,
                 show_playlist_deleted=show_playlist_deleted,
                 review_sitdown_date=sitdown_date,
-                acceptable_delinquency_window=acceptable_delinquency_window,
+                local_tz_offset_minutes=local_tz_offset_minutes,
             )
             validated_tune_list = [
                 PlaylistTuneJoinedModel.model_validate(tune) for tune in tunes_scheduled

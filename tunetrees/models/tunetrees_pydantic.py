@@ -723,6 +723,48 @@ class UserModelPartial(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PrefsSchedulingOptionsModel(BaseModel):
+    user_id: int
+    acceptable_delinquency_window: Optional[int] = Field(default=21)
+    min_reviews_per_day: Optional[int] = None
+    max_reviews_per_day: Optional[int] = None
+    days_per_week: Optional[int] = None
+    weekly_rules: Optional[str] = None  # JSON string
+    exceptions: Optional[str] = None  # JSON string
+
+    @field_validator("acceptable_delinquency_window")
+    def validate_adw(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and (v < 0 or v > 365):
+            raise ValueError("acceptable_delinquency_window must be between 0 and 365")
+        return v
+
+    @field_validator("min_reviews_per_day", "max_reviews_per_day")
+    def validate_reviews(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and (v < 0 or v > 10000):
+            raise ValueError("reviews per day must be between 0 and 10000")
+        return v
+
+    @field_validator("days_per_week")
+    def validate_days_per_week(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and (v < 0 or v > 7):
+            raise ValueError("days_per_week must be between 0 and 7")
+        return v
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PrefsSchedulingOptionsModelPartial(BaseModel):
+    user_id: Optional[int] = None
+    acceptable_delinquency_window: Optional[int] = None
+    min_reviews_per_day: Optional[int] = None
+    max_reviews_per_day: Optional[int] = None
+    days_per_week: Optional[int] = None
+    weekly_rules: Optional[str] = None  # JSON string
+    exceptions: Optional[str] = None  # JSON string
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # {
 #     "expires": "Tue Sep 03 2024 23:45:08 GMT-0400 (Eastern Daylight Time)",
 #     "sessionToken": "098af529-f6dd-42c8-b7ea-7d79f5bf582f",

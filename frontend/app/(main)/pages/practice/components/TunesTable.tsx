@@ -1,6 +1,8 @@
 "use client";
 
 import type {
+  ColumnSizingInfoState,
+  ColumnSizingState,
   RowSelectionState,
   TableState,
   Table as TanstackTable,
@@ -26,6 +28,15 @@ import { useTune } from "./CurrentTuneContext";
 import { get_columns } from "./TuneColumns";
 
 export const globalFlagManualSorting = false;
+
+// Extend TanStack TableState with column sizing and order (intersection type avoids structural conflicts)
+type ITableStateExtended = TableState & {
+  columnSizing?: ColumnSizingState;
+  columnSizingInfo?: ColumnSizingInfoState;
+  columnOrder?: string[];
+  // Custom persisted scroll position for the main virtualized grid scroll container
+  scrollTop?: number;
+};
 
 export interface IScheduledTunesType {
   tunes: ITuneOverview[];
@@ -54,13 +65,28 @@ export const useTableContext = () => {
   return context;
 };
 
+// Persist table state, with optional overrides for keys that just changed (prevents stale saves)
 export const saveTableState = async (
   table: TanstackTable<ITuneOverview>,
   userId: number,
   tablePurpose: TablePurpose,
   playlistId: number,
+  overrides?: Partial<ITableStateExtended>,
 ): Promise<number> => {
-  const tableState: TableState = table.getState();
+  const baseState = table.getState() as unknown as ITableStateExtended;
+  // Merge only provided overrides (ignore undefined)
+  const mergedState: ITableStateExtended = { ...baseState };
+  if (overrides) {
+    for (const [key, value] of Object.entries(overrides) as [
+      keyof ITableStateExtended,
+      unknown,
+    ][]) {
+      if (value !== undefined) {
+        (mergedState as unknown as Record<string, unknown>)[key as string] =
+          value;
+      }
+    }
+  }
 
   console.log(
     `LF7 saveTableState calling updateTableStateInDb: tablePurpose=${tablePurpose}`,
@@ -70,20 +96,9 @@ export const saveTableState = async (
     "full",
     tablePurpose,
     playlistId,
-    tableState,
+    mergedState as unknown as TableState,
   );
   return status;
-  // .then((result) => {
-  //   console.log(
-  //     "LF1 saveTableState: result=",
-  //     result ? "success" : "empty result",
-  //   );
-  //   return result;
-  // })
-  // .catch((error) => {
-  //   console.error("LF1 saveTableState Error calling server function:", error);
-  //   throw error;
-  // });
 };
 
 export function TunesTableComponent({
@@ -106,7 +121,7 @@ export function TunesTableComponent({
   );
 
   const [tableStateFromDb, setTableStateFromDb] =
-    React.useState<TableState | null>(null);
+    React.useState<ITableStateExtended | null>(null);
 
   const [sorting, setSorting] = React.useState<SortingState>(
     tableStateFromDb ? tableStateFromDb.sorting : [],
@@ -168,6 +183,21 @@ export function TunesTableComponent({
   );
   const originalSetRowSelectionRef = React.useRef(setRowSelection);
 
+  // Column sizing + ordering state
+  const [columnSizing, setColumnSizing] = React.useState<ColumnSizingState>(
+    tableStateFromDb?.columnSizing ?? {},
+  );
+  const [columnSizingInfo, setColumnSizingInfo] =
+    React.useState<ColumnSizingInfoState>(
+      (tableStateFromDb?.columnSizingInfo as ColumnSizingInfoState) ??
+        ({} as ColumnSizingInfoState),
+    );
+  const [columnOrder, setColumnOrder] = React.useState<string[]>(
+    Array.isArray(tableStateFromDb?.columnOrder)
+      ? tableStateFromDb?.columnOrder
+      : [],
+  );
+
   const interceptedRowSelectionChange = (
     newRowSelectionState:
       | RowSelectionState
@@ -184,8 +214,10 @@ export function TunesTableComponent({
       `LF7 ==>TunesTableComponent<== (interceptedRowSelectionChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}, ${JSON.stringify(newRowSelectionState)}}`,
     );
 
-    // Save the table state (fire and forget for now to avoid blocking the UI)
-    void saveTableState(table, userId, tablePurpose, playlistId);
+    // Save with precise overrides to avoid stale persistence
+    void saveTableState(table, userId, tablePurpose, playlistId, {
+      rowSelection: resolvedRowSelectionState,
+    });
 
     if (selectionChangedCallback) {
       console.log(
@@ -211,7 +243,49 @@ export function TunesTableComponent({
     console.log(
       `LF7 TunesTableComponent (interceptedOnColumnFiltersChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose, playlistId);
+    void saveTableState(table, userId, tablePurpose, playlistId, {
+      columnFilters: resolvedColumnFiltersState,
+    });
+  };
+
+  const interceptedSetColumnOrder = (
+    newOrder: string[] | ((state: string[]) => string[]),
+  ): void => {
+    const resolvedOrder =
+      newOrder instanceof Function ? newOrder(columnOrder) : newOrder;
+    setColumnOrder(resolvedOrder);
+    // Persist order change with override
+    void saveTableState(table, userId, tablePurpose, playlistId, {
+      columnOrder: resolvedOrder,
+    });
+  };
+
+  // Live sizing change: update local state and trigger a re-render so cells recompute positions/widths
+  const interceptedSetColumnSizing = (
+    newSizing:
+      | ColumnSizingState
+      | ((state: ColumnSizingState) => ColumnSizingState),
+  ): void => {
+    const resolvedSizing =
+      newSizing instanceof Function ? newSizing(columnSizing) : newSizing;
+    setColumnSizing(resolvedSizing);
+  };
+
+  const interceptedSetColumnSizingInfo = (
+    newInfo:
+      | ColumnSizingInfoState
+      | ((state: ColumnSizingInfoState) => ColumnSizingInfoState),
+  ): void => {
+    const resolvedInfo =
+      newInfo instanceof Function ? newInfo(columnSizingInfo) : newInfo;
+    setColumnSizingInfo(resolvedInfo);
+    // Persist only when resize interaction ends (less chatty)
+    if (!resolvedInfo.isResizingColumn) {
+      void saveTableState(table, userId, tablePurpose, playlistId, {
+        columnSizingInfo: resolvedInfo,
+        columnSizing,
+      });
+    }
   };
 
   const interceptedSetSorting = (
@@ -232,32 +306,20 @@ export function TunesTableComponent({
     console.log(
       `LF7 TunesTableComponent (interceptedSetSorting) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    const tableState = table.getState();
-    if (
-      tableState.sorting &&
-      resolvedSorting &&
-      JSON.stringify(tableState.sorting) !== JSON.stringify(resolvedSorting)
-    ) {
-      console.log(
-        `LF1 interceptedSetSorting ===> TunesTable.tsx:338 ~  <=== resolvedSorting=${JSON.stringify(resolvedSorting)} tableState.sorting=${JSON.stringify(tableState.sorting)}`,
+    // Proactively notify any listeners (e.g., virtualized grid) that sorting changed
+    try {
+      window.dispatchEvent(
+        new CustomEvent("tt-sorting-changed", {
+          detail: { sorting: resolvedSorting },
+        }),
       );
-      tableState.sorting = resolvedSorting;
-      updateTableStateInDb(userId, "full", tablePurpose, playlistId, tableState)
-        .then((result) => {
-          console.log(
-            `LF1 interceptedSetSorting ===> TunesTable.tsx:344 ~ result: ${result ? "success" : "empty result"} <=== ${JSON.stringify(resolvedSorting)}`,
-          );
-          return result;
-        })
-        .catch((error) => {
-          console.error(
-            "LF1 interceptedSetSorting Error calling updateTableStateInDb:",
-            error,
-          );
-        });
+    } catch {
+      // window may be undefined in SSR; ignore
     }
-
-    // void saveTableState(table, userId, tablePurpose, playlistId);
+    // Persist sorting change with override to avoid stale saves
+    void saveTableState(table, userId, tablePurpose, playlistId, {
+      sorting: resolvedSorting,
+    });
   };
 
   const interceptedSetColumnVisibility = (
@@ -279,7 +341,9 @@ export function TunesTableComponent({
     console.log(
       `LF7 TunesTableComponent (interceptedSetColumnVisibility) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
-    void saveTableState(table, userId, tablePurpose, playlistId);
+    void saveTableState(table, userId, tablePurpose, playlistId, {
+      columnVisibility: resolvedVisibilityState,
+    });
   };
 
   // React.useEffect(() => {
@@ -302,6 +366,11 @@ export function TunesTableComponent({
     manualSorting: globalFlagManualSorting,
     onSortingChange: (newSorting) => interceptedSetSorting(newSorting),
     onColumnFiltersChange: interceptedOnColumnFiltersChange,
+    // Column sizing + ordering
+    columnResizeMode: "onChange",
+    onColumnSizingChange: interceptedSetColumnSizing,
+    onColumnSizingInfoChange: interceptedSetColumnSizingInfo,
+    onColumnOrderChange: interceptedSetColumnOrder,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -313,90 +382,134 @@ export function TunesTableComponent({
       rowSelection,
       columnVisibility,
       globalFilter,
+      columnSizing,
+      columnSizingInfo,
+      columnOrder,
     },
     getRowId: (
       originalRow: ITuneOverview,
       // index: number,
       // parent?: Row<ITuneOverview>,
     ) => (originalRow.id ?? 0).toString(),
+    defaultColumn: {
+      size: 140,
+      // Raised baseline min size (was 60) to keep headers legible with padding + sort icon
+      minSize: 90,
+    },
   });
 
   // (property) getRowId?: ((originalRow: ITuneOverview, index: number, parent?: Row<ITuneOverview> | undefined) => string) | undefined
 
   const [isLoading, setLoading] = React.useState<boolean>(true);
 
+  // Mount + playlist/user change loader.
+  // IMPORTANT: This effect intentionally depends only on `isLoading` (and static params via closure)
+  // to avoid the previous infinite/"Maximum update depth exceeded" loop that occurred when
+  // it ran every render and then mutated table state (sorting / sizing / visibility) which
+  // immediately triggered another render + effect. Do NOT add `table` or rapidly changing
+  // state objects to this dependency list without reworking the logic to guard re-entry.
   React.useEffect(() => {
-    if (isLoading) {
-      // On initial render effect, load table state from the database
-      const fetchTableState = async () => {
-        try {
-          console.log(
-            `useEffect ===> TunesTable.tsx:205 ~ (no actual dependencies) fetchTableState calling getTableStateTable(${userId}, 'full', tablePurpose=${tablePurpose} playlistId=${playlistId}`,
-          );
-          let tableStateTable = await getTableStateTable(
+    if (!isLoading) return;
+    const fetchTableState = async () => {
+      try {
+        console.log(
+          `useEffect TunesTable.tsx fetchTableState userId=${userId} tablePurpose=${tablePurpose} playlistId=${playlistId}`,
+        );
+        let tableStateTable = await getTableStateTable(
+          userId,
+          "full",
+          tablePurpose,
+          playlistId,
+        );
+        if (!tableStateTable) {
+          console.log("LF7 TunesTableComponent: no table state found in db");
+          tableStateTable = await createOrUpdateTableState(
             userId,
             "full",
             tablePurpose,
             playlistId,
+            table.getState(),
+            currentTune,
           );
-          if (!tableStateTable) {
-            console.log("LF7 TunesTableComponent: no table state found in db");
-            tableStateTable = await createOrUpdateTableState(
-              userId,
-              "full",
-              tablePurpose,
-              playlistId,
-              table.getState(),
-              currentTune,
-            );
-          }
-          const tableStateFromDb = tableStateTable?.settings as TableState;
-          if (tableStateFromDb) {
-            setTableStateFromDb(tableStateFromDb);
-            const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
-            console.log(
-              `LF6 TunesTableComponent: currentTuneState=${currentTuneState}`,
-            );
-            if (currentTuneState > 0) {
-              setCurrentTune(currentTuneState);
-            } else {
-              setCurrentTune(null);
-            }
-            setCurrentTablePurpose(tablePurpose);
-            console.log(
-              `LF7 TunesTableComponent: setting rowSelection db: ${JSON.stringify(
-                tableStateFromDb.rowSelection,
-              )}`,
-            );
-            table.setRowSelection(tableStateFromDb.rowSelection);
-            table.setColumnVisibility(tableStateFromDb.columnVisibility);
-            table.setColumnFilters(tableStateFromDb.columnFilters);
-            table.setSorting(tableStateFromDb.sorting);
-            if (filterStringCallback) {
-              filterStringCallback(tableStateFromDb.globalFilter);
-            }
-            table.setPagination(tableStateFromDb.pagination);
-          } else
-            console.log("LF1 TunesTableComponent: no table state found in db");
-        } catch (error) {
-          console.error(error);
-          throw error;
-        } finally {
-          setLoading(false);
-          if (onTableCreated) onTableCreated(table);
         }
-      };
-
-      if (playlistId !== undefined && playlistId > 0) {
-        console.log("LF1 TunesTableComponent: calling fetchTableState");
-        void fetchTableState();
-      } else {
-        console.log(
-          "LF1 TunesTableComponent: playlistId not set, skipping table state fetch",
-        );
+        const tableStateFromDb = tableStateTable?.settings as TableState;
+        if (tableStateFromDb) {
+          setTableStateFromDb(tableStateFromDb);
+          const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
+          if (currentTuneState > 0) setCurrentTune(currentTuneState);
+          else setCurrentTune(null);
+          setCurrentTablePurpose(tablePurpose);
+          table.setRowSelection(tableStateFromDb.rowSelection);
+          table.setColumnVisibility(tableStateFromDb.columnVisibility);
+          table.setColumnFilters(tableStateFromDb.columnFilters);
+          table.setSorting(tableStateFromDb.sorting);
+          if (tableStateFromDb?.columnOrder)
+            table.setColumnOrder(tableStateFromDb.columnOrder);
+          if (tableStateFromDb?.columnSizing)
+            table.setColumnSizing(tableStateFromDb.columnSizing);
+          if (tableStateFromDb?.columnSizingInfo)
+            table.setColumnSizingInfo(tableStateFromDb.columnSizingInfo);
+          try {
+            if (typeof window !== "undefined") {
+              try {
+                const key = `${tablePurpose}|${playlistId}`;
+                const w = window as unknown as {
+                  __ttScrollLast?: Record<string, number>;
+                };
+                w.__ttScrollLast = w.__ttScrollLast || {};
+                w.__ttScrollLast[key] =
+                  (tableStateFromDb as ITableStateExtended).scrollTop ?? 0;
+              } catch {
+                // ignore
+              }
+              window.dispatchEvent(
+                new CustomEvent("tt-scroll-restore", {
+                  detail: {
+                    scrollTop: (tableStateFromDb as ITableStateExtended)
+                      .scrollTop,
+                    tablePurpose,
+                    playlistId,
+                  },
+                }),
+              );
+            }
+          } catch {
+            // ignore
+          }
+          if (filterStringCallback)
+            filterStringCallback(tableStateFromDb.globalFilter);
+          table.setPagination(tableStateFromDb.pagination);
+        } else {
+          console.log("LF1 TunesTableComponent: no table state found in db");
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+        if (onTableCreated) onTableCreated(table);
       }
+    };
+    if (playlistId && playlistId > 0) {
+      void fetchTableState();
+    } else {
+      console.log(
+        "LF1 TunesTableComponent: playlistId not set, skipping table state fetch",
+      );
+      setLoading(false);
+      if (onTableCreated) onTableCreated(table);
     }
-  }); // don't add dependencies here!
+  }, [
+    isLoading,
+    userId,
+    tablePurpose,
+    playlistId,
+    table,
+    currentTune,
+    setCurrentTune,
+    setCurrentTablePurpose,
+    onTableCreated,
+    filterStringCallback,
+  ]);
 
   React.useEffect(() => {
     if (onTableCreated) {

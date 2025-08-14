@@ -47,19 +47,19 @@ test.describe.serial("Signup Tests", () => {
         "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, checking localStorage",
       );
 
-      // Wait a bit for the localStorage to be set
-      await page.waitForTimeout(2000);
+      // Poll for localStorage linkBackURL to be set (avoid fixed sleep timing flakes)
+      const linkBackHandle = await ttPO.page.waitForFunction(
+        () => {
+          const stored = window.localStorage.getItem("linkBackURL");
+          return stored && stored.length > 0 ? stored : undefined;
+        },
+        { timeout: 15000 },
+      );
 
-      const linkBackURL = await ttPO.page.evaluate(() => {
-        console.log("Checking localStorage for linkBackURL...");
-        const stored = window.localStorage.getItem("linkBackURL");
-        console.log("Found in localStorage:", stored);
-        return stored;
-      });
+      const linkBackURLValue = (await linkBackHandle.jsonValue()) as string;
+      console.log("Retrieved linkBackURL from localStorage:", linkBackURLValue);
 
-      console.log("Retrieved linkBackURL from localStorage:", linkBackURL);
-
-      if (!linkBackURL) {
+      if (!linkBackURLValue) {
         // Let's check what's actually in localStorage
         const allLocalStorage = await ttPO.page.evaluate(() => {
           const items: Record<string, string | null> = {};
@@ -75,7 +75,7 @@ test.describe.serial("Signup Tests", () => {
         throw new Error("No linkBackURL found in localStorage");
       }
 
-      await page.goto(linkBackURL, {
+      await page.goto(linkBackURLValue, {
         timeout: initialPageLoadTimeout,
         waitUntil: "domcontentloaded", // More reliable than networkidle in CI
       });

@@ -2,7 +2,10 @@ import { Button } from "@/components/ui/button";
 import type { Table as TanstackTable } from "@tanstack/react-table";
 import { TrashIcon } from "lucide-react";
 import type { JSX } from "react";
-import { updatePlaylistTunes, updateTunes } from "../queries";
+import {
+  updatePlaylistTunesAction,
+  updateTunesAction,
+} from "../actions/practice-actions";
 import type { ITuneOverview } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -76,7 +79,7 @@ export default function DeleteTuneButton({
       ) {
         return;
       }
-      updatePlaylistTunes(selectedTuneIds, playlistId, {
+      updatePlaylistTunesAction(selectedTuneIds, playlistId, {
         deleted: true,
       })
         .then((result) => {
@@ -94,7 +97,7 @@ export default function DeleteTuneButton({
       ) {
         return;
       }
-      updateTunes(selectedTuneIds, { deleted: true })
+      updateTunesAction(selectedTuneIds, { deleted: true })
         .then((result) => {
           console.log("Tunes deleted successfully:", result);
           resetCurrentTuneAndView();

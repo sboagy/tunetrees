@@ -98,30 +98,12 @@ const numericSortingFn: SortingFn<ITuneOverview> = (
   return numA < numB ? -1 : numA > numB ? 1 : 0;
 };
 
-function rotateSorting<TData, TValue>(
-  column: Column<TData, TValue>,
-  setTunesRefreshId?: (newRefreshId: number) => void,
-) {
-  if (column.getIsSorted() === "desc") {
-    column.clearSorting();
-  } else if (column.getIsSorted() === "asc") {
-    column.toggleSorting(true, true);
-  } else {
-    column.toggleSorting(false, true);
-  }
-  console.log("column.getIsSorted(): ", column.getIsSorted());
+// Note: rely on TanStack's column.getToggleSortingHandler for sorting behavior.
 
-  if (setTunesRefreshId) {
-    setTunesRefreshId(-1);
-  }
-
-  // column.toggleSorting(column.getIsSorted() === "asc");
-}
-
-function sortableHeader<TData, TValue>(
-  column: Column<TData, TValue>,
+function sortableHeader(
+  column: Column<ITuneOverview, unknown>,
+  table: TanstackTable<ITuneOverview>,
   title: string,
-  setTunesRefreshId?: (newRefreshId: number) => void,
 ) {
   const [, setRenderKey] = useState(0);
 
@@ -131,8 +113,32 @@ function sortableHeader<TData, TValue>(
       <Button
         variant="ghost"
         className="p-1"
-        onClick={() => {
-          rotateSorting(column, setTunesRefreshId);
+        data-testid={`col-${column.id}-sort-button`}
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          // Determine current sort state for this column from table state
+          const currentEntry = (table.getState().sorting || []).find(
+            (s) => s.id === column.id,
+          );
+          const current: "none" | "asc" | "desc" = currentEntry
+            ? currentEntry.desc
+              ? "desc"
+              : "asc"
+            : "none";
+          const next: "none" | "asc" | "desc" =
+            current === "none" ? "asc" : current === "asc" ? "desc" : "none";
+          // Debug log to help diagnose headless behavior
+          console.log(
+            `sortableHeader click: column=${column.id} current=${current} -> next=${next}`,
+          );
+          if (next === "none") {
+            column.clearSorting();
+          } else {
+            // Use TanStack's API to update sorting for this column deterministically
+            column.toggleSorting(next === "desc", false);
+          }
           setRenderKey((prev) => prev + 1); // Force button re-render, special magic
         }}
         title={
@@ -322,35 +328,24 @@ export function get_columns(
   >[] = [
     {
       id: "id",
-      // header: ({ column }) => sortableHeader(column, "Id"),
-      header: ({ column }) => sortableHeader(column, "Id", setTunesRefreshId),
+      header: ({ column, table }) => sortableHeader(column, table, "Id"),
       cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
         return info.getValue();
-        // if (!info.row.original?.external_ref) {
-        //   return (
-        //     <a
-        //       href={`https://www.irishtune.info/tune/${info.row.original.id}/`}
-        //       target="_blank"
-        //       rel="noopener noreferrer"
-        //       className="text-blue-500 underline"
-        //     >
-        //       {info.row.original.id}
-        //     </a>
-        //   );
-        // }
-        // return <span>{info.row.original.id}</span>;
       },
       accessorFn: (row) => row.id,
       sortingFn: numericSortingFn,
+      sortDescFirst: false,
       enableSorting: true,
       enableHiding: true,
       size: 80,
+      minSize: 80,
+      meta: { headerLabel: "Id" },
     },
     "practice" === purpose
       ? {
           accessorKey: "recall_eval",
-          header: ({ column }) =>
-            sortableHeader(column, "Evaluation", setTunesRefreshId),
+          header: ({ column, table }) =>
+            sortableHeader(column, table, "Evaluation"),
           enableHiding: false,
           cell: (
             info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
@@ -365,6 +360,8 @@ export function get_columns(
           ),
           accessorFn: (row) => row.recall_eval,
           size: 284,
+          minSize: 260,
+          meta: { headerLabel: "Evaluation" },
         }
       : {
           accessorKey: "select",
@@ -381,8 +378,7 @@ export function get_columns(
         },
     {
       accessorKey: "title",
-      header: ({ column }) =>
-        sortableHeader(column, "Title", setTunesRefreshId),
+      header: ({ column, table }) => sortableHeader(column, table, "Title"),
       cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
         const favoriteUrl = info.row.original.favorite_url;
         return favoriteUrl ? (
@@ -396,14 +392,21 @@ export function get_columns(
       enableSorting: true,
       enableHiding: true,
       enableResizing: true,
-      size: 160,
+      size: 180,
+      minSize: 120,
+      meta: { headerLabel: "Title" },
     },
     ...(purpose === "practice"
       ? [
           {
             accessorKey: "goal",
-            header: ({ column }: { column: Column<ITuneOverview, unknown> }) =>
-              sortableHeader(column, "Goal", setTunesRefreshId),
+            header: ({
+              column,
+              table,
+            }: {
+              column: Column<ITuneOverview, unknown>;
+              table: TanstackTable<ITuneOverview>;
+            }) => sortableHeader(column, table, "Goal"),
             enableHiding: true,
             cell: (
               info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
@@ -412,6 +415,8 @@ export function get_columns(
             },
             accessorFn: (row: ITuneOverview) => row.goal,
             size: 150,
+            minSize: 90,
+            meta: { headerLabel: "Goal" },
           },
         ]
       : []),
@@ -419,8 +424,13 @@ export function get_columns(
       ? [
           {
             accessorKey: "goal",
-            header: ({ column }: { column: Column<ITuneOverview, unknown> }) =>
-              sortableHeader(column, "Goal", setTunesRefreshId),
+            header: ({
+              column,
+              table,
+            }: {
+              column: Column<ITuneOverview, unknown>;
+              table: TanstackTable<ITuneOverview>;
+            }) => sortableHeader(column, table, "Goal"),
             enableHiding: true,
             cell: (
               info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
@@ -435,69 +445,78 @@ export function get_columns(
             ),
             accessorFn: (row: ITuneOverview) => row.goal,
             size: 150,
+            minSize: 90,
+            meta: { headerLabel: "Goal" },
           },
         ]
       : []),
     {
       accessorKey: "type",
-      header: ({ column }) => sortableHeader(column, "Type", setTunesRefreshId),
+      header: ({ column, table }) => sortableHeader(column, table, "Type"),
       cell: (info) => {
         return info.getValue();
       },
       enableSorting: true,
       enableHiding: true,
       size: 100,
+      minSize: 90,
+      meta: { headerLabel: "Type" },
     },
     {
       accessorKey: "structure",
-      header: ({ column }) =>
-        sortableHeader(column, "Structure", setTunesRefreshId),
+      header: ({ column, table }) => sortableHeader(column, table, "Structure"),
       cell: (info) => {
         return info.getValue();
       },
       enableSorting: true,
       enableHiding: true,
       size: 145,
+      minSize: 120,
+      meta: { headerLabel: "Structure" },
     },
     {
       accessorKey: "mode",
-      header: ({ column }) => sortableHeader(column, "Mode", setTunesRefreshId),
+      header: ({ column, table }) => sortableHeader(column, table, "Mode"),
       cell: (info) => {
         return info.getValue();
       },
       enableSorting: true,
       enableHiding: true,
       size: 100,
+      minSize: 80,
+      meta: { headerLabel: "Mode" },
     },
     {
       accessorKey: "incipit",
-      header: ({ column }) =>
-        sortableHeader(column, "Incipit", setTunesRefreshId),
+      header: ({ column, table }) => sortableHeader(column, table, "Incipit"),
       cell: (info) => {
         return info.getValue();
       },
       enableSorting: true,
       enableHiding: true,
       size: 200,
+      minSize: 140,
+      meta: { headerLabel: "Incipit" },
     },
     {
       accessorKey: "genre",
-      header: ({ column }) =>
-        sortableHeader(column, "Genre", setTunesRefreshId),
+      header: ({ column, table }) => sortableHeader(column, table, "Genre"),
       cell: (info) => {
         return info.getValue();
       },
       enableSorting: true,
       enableHiding: true,
       size: 200,
+      minSize: 140,
+      meta: { headerLabel: "Genre" },
     },
     {
       accessorKey: "deleted",
-      header: ({ column }) =>
-        sortableHeader(column, "Deleted?", setTunesRefreshId),
+      header: ({ column, table }) => sortableHeader(column, table, "Deleted?"),
       cell: (info) => {
         return info.getValue() ? "Yes" : "No";
       },
+      meta: { headerLabel: "Deleted?" },
     },
   ];
 
@@ -509,74 +528,117 @@ export function get_columns(
       {
         id: "scheduled",
         accessorFn: (row) => row.scheduled || row.latest_review_date || "",
-        header: ({ column }) =>
-          sortableHeader(column, "Scheduled", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Scheduled",
+          ),
         cell: (info) => {
           return transformToDatetimeLocalForDisplay(info.getValue() as string);
         },
         enableSorting: true,
         enableHiding: true,
+        size: 140,
+        minSize: 130,
         sortingFn: datetimeTextSortingFn,
+        meta: { headerLabel: "Scheduled" },
       },
       {
         accessorKey: "learned",
-        header: ({ column }) =>
-          sortableHeader(column, "Learned", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Learned",
+          ),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
         sortingFn: datetimeTextSortingFn,
-        size: 120,
+        size: 140,
+        minSize: 130,
+        meta: { headerLabel: "Learned" },
       },
       {
         accessorKey: "latest_practiced",
-        header: ({ column }) =>
-          sortableHeader(column, "Practiced", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Practiced",
+          ),
         cell: (info) => {
           return transformToDatetimeLocalForDisplay(info.getValue() as string);
         },
         enableSorting: true,
         enableHiding: true,
         sortingFn: datetimeTextSortingFn,
-        size: 120,
+        size: 140,
+        minSize: 130,
+        meta: { headerLabel: "Practiced" },
       },
       {
         accessorKey: "latest_goal",
-        header: ({ column }) =>
-          sortableHeader(column, "Prev Goal", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Prev Goal",
+          ),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
+        meta: { headerLabel: "Prev Goal" },
+        size: 130,
+        minSize: 110,
       },
       {
         accessorKey: "latest_technique",
-        header: ({ column }) =>
-          sortableHeader(column, "Prev Alg", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Prev Alg",
+          ),
         cell: (info) => {
           return info.getValue() ?? "sm2";
         },
         enableSorting: true,
         enableHiding: true,
+        meta: { headerLabel: "Prev Alg" },
+        size: 130,
+        minSize: 110,
       },
       {
         accessorKey: "latest_quality",
-        header: ({ column }) =>
-          sortableHeader(column, "Prev Qual", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Prev Qual",
+          ),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
         size: 12 * 9, // Approximate width for 11 characters
+        minSize: 90,
+        meta: { headerLabel: "Prev Qual" },
       },
       {
         accessorKey: "latest_easiness",
-        header: ({ column }) =>
-          sortableHeader(column, "Easiness", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Easiness",
+          ),
         cell: (info) => {
           const value = info.getValue() as number | null;
           return value ? value.toFixed(2) : "";
@@ -584,39 +646,60 @@ export function get_columns(
         enableSorting: true,
         enableHiding: true,
         size: 14 * 8, // Approximate width for 11 characters
+        minSize: 90,
+        meta: { headerLabel: "Easiness" },
       },
       {
         accessorKey: "latest_interval",
-        header: ({ column }) =>
-          sortableHeader(column, "Interval", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Interval",
+          ),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
         size: 13 * 8, // Approximate width for 11 characters
+        minSize: 90,
+        meta: { headerLabel: "Interval" },
       },
       {
         accessorKey: "latest_repetitions",
-        header: ({ column }) =>
-          sortableHeader(column, "Repetitions", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Repetitions",
+          ),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
         size: 16 * 8, // Approximate width for 11 characters
+        minSize: 100,
+        meta: { headerLabel: "Repetitions" },
       },
       {
         accessorKey: "latest_review_date",
-        header: ({ column }) =>
-          sortableHeader(column, "SR Scheduled", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "SR Scheduled",
+          ),
         cell: (info) => {
           return transformToDatetimeLocalForDisplay(info.getValue() as string);
         },
         enableSorting: true,
         enableHiding: true,
+        size: 160,
+        minSize: 150,
         sortingFn: datetimeTextSortingFn,
+        meta: { headerLabel: "SR Scheduled" },
       },
       // {
       //   accessorKey: "backup_practiced",
@@ -629,8 +712,12 @@ export function get_columns(
       // },
       {
         accessorKey: "external_ref",
-        header: ({ column }) =>
-          sortableHeader(column, "External Ref", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "External Ref",
+          ),
         cell: (
           info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
         ) => {
@@ -660,6 +747,9 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        meta: { headerLabel: "External Ref" },
+        size: 220,
+        minSize: 160,
       },
       // {
       //   accessorKey: "note_private",
@@ -681,18 +771,29 @@ export function get_columns(
       // },
       {
         accessorKey: "tags",
-        header: ({ column }) =>
-          sortableHeader(column, "Tags", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Tags",
+          ),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
+        meta: { headerLabel: "Tags" },
+        size: 140,
+        minSize: 110,
       },
       {
         accessorKey: "notes",
-        header: ({ column }) =>
-          sortableHeader(column, "Notes", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Notes",
+          ),
         cell: (info) => {
           return (
             <div className="truncate" style={{ maxWidth: "30ch" }}>
@@ -702,11 +803,18 @@ export function get_columns(
         },
         enableSorting: true,
         enableHiding: true,
+        meta: { headerLabel: "Notes" },
+        size: 200,
+        minSize: 140,
       },
       {
         accessorKey: "playlist_deleted",
-        header: ({ column }) =>
-          sortableHeader(column, "Deleted in Repertoire?", setTunesRefreshId),
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            "Deleted in Repertoire?",
+          ),
         meta: {
           headerLabel: "Deleted in Repertoire?", // Store headerLabel in meta
         },

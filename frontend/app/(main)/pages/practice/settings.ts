@@ -12,14 +12,23 @@ import type {
   TablePurpose,
 } from "./types";
 
-const TT_API_BASE_URL = process.env.TT_API_BASE_URL;
-console.log("TT_API_BASE_URL env var:", TT_API_BASE_URL);
-console.log("Using TT_API_BASE_URL:", TT_API_BASE_URL);
-
-if (!TT_API_BASE_URL) {
-  console.error("TT_API_BASE_URL environment variable is not set!");
-  throw new Error("TT_API_BASE_URL environment variable is not set");
+// Provide a test-friendly fallback so server components don't hard-crash (500) when
+// the variable isn't injected (Playwright env sometimes omits it when booting fast).
+// Backend default port is 8000; adjust if central config changes.
+// Runtime tripwire: warn if this server module is ever executed in a client context.
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  console.warn(
+    "[Tripwire] practice/settings.ts executed in a client environment. This should only be imported via server actions.",
+  );
 }
+
+const TT_API_BASE_URL = process.env.TT_API_BASE_URL ?? "http://localhost:8000";
+if (!process.env.TT_API_BASE_URL) {
+  console.warn(
+    "TT_API_BASE_URL not set in env; falling back to http://localhost:8000 for tests",
+  );
+}
+console.log("TT_API_BASE_URL resolved:", TT_API_BASE_URL);
 
 // Settings API is at /settings/ from the base URL
 const baseURL = `${TT_API_BASE_URL}/settings`;

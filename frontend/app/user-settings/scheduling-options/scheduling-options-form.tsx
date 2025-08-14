@@ -3,8 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEffect, useState, useCallback } from "react";
-
+import { useEffect, useMemo, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import {
   Form,
   FormControl,
@@ -14,322 +14,324 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { getPrefsSpacedRepetitionForUser } from "@/app/(main)/pages/practice/preferences";
 import { useSession } from "next-auth/react";
+import {
+  updateSchedulingOptionsAction,
+  type IPrefsSchedulingOptionsUpdate,
+  type IPrefsSchedulingOptionsResponse,
+} from "./actions/scheduling-options-actions";
 
-const spacedRepetitionSchema = z.object({
-  alg_type: z.enum(["SM2", "FSRS"], {
-    required_error: "Algorithm type is required.",
-  }),
-  fsrs_weights: z.string().optional(),
-  request_retention: z
-    .number()
-    .min(0, "Retention rate must be at least 0")
-    .max(1, "Retention rate must not exceed 1")
-    .optional(),
-  maximum_interval: z
-    .number()
-    .int("Maximum interval must be a whole number")
-    .positive("Maximum interval must be positive")
-    .optional(),
-});
-
-type SpacedRepetitionFormValues = z.infer<typeof spacedRepetitionSchema>;
-
-// Default values from database or API
-const staticDefaultValues: Partial<SpacedRepetitionFormValues> = {
-  alg_type: "FSRS",
-  fsrs_weights:
-    "0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621",
-  request_retention: 0.9,
-  maximum_interval: 365,
-};
-
-const SchedulingOptionsForm = () => {
-  const [defaultValues, setDefaultValues] =
-    useState<Partial<SpacedRepetitionFormValues>>(staticDefaultValues);
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const { toast } = useToast();
-
-  const logAndToastError = useCallback(
-    (error: unknown, toastMessage: string) => {
-      console.error(toastMessage, error);
-      toast({
-        title: "Error",
-        description: toastMessage,
-      });
+// Helpers for validating optional JSON strings
+const optionalJsonObjectString = z
+  .string()
+  .optional()
+  .refine(
+    (s) => {
+      const str = (s ?? "").trim();
+      if (str === "") return true;
+      try {
+        const parsed = JSON.parse(str);
+        return (
+          parsed !== null &&
+          typeof parsed === "object" &&
+          !Array.isArray(parsed)
+        );
+      } catch {
+        return false;
+      }
     },
-    [toast],
+    { message: "Must be valid JSON object (or leave blank)" },
   );
 
-  const { data: session } = useSession();
-  const userId = session?.user?.id ? Number.parseInt(session?.user?.id) : -1;
-
-  useEffect(() => {
-    const fetchPreferences = async () => {
+const optionalJsonArrayString = z
+  .string()
+  .optional()
+  .refine(
+    (s) => {
+      const str = (s ?? "").trim();
+      if (str === "") return true;
       try {
-        const prefs = await getPrefsSpacedRepetitionForUser(userId);
-        if (prefs.length > 0) {
-          const {
-            algorithm: algType,
-            fsrs_weights: fsrsWeights,
-            request_retention: requestRetention,
-            maximum_interval: maximumInterval,
-          } = prefs[0];
-          setDefaultValues({
-            alg_type: algType,
-            fsrs_weights: fsrsWeights,
-            request_retention: requestRetention,
-            maximum_interval: maximumInterval,
-          });
-        }
-      } catch (error) {
-        logAndToastError(
-          error,
-          "Failed to fetch preferences. Using static defaults.",
-        );
+        const parsed = JSON.parse(str);
+        return Array.isArray(parsed);
+      } catch {
+        return false;
       }
-    };
+    },
+    { message: "Must be valid JSON array (or leave blank)" },
+  );
 
-    fetchPreferences().catch((error) => {
-      logAndToastError(
-        error,
-        "An unexpected error occurred while fetching preferences.",
-      );
-    });
-  }, [logAndToastError, userId]); // Updated dependency array
+const schema = z.object({
+  acceptable_delinquency_window: z.number().min(0).max(365).optional(),
+  min_reviews_per_day: z.number().min(0).max(10000).optional(),
+  max_reviews_per_day: z.number().min(0).max(10000).optional(),
+  days_per_week: z.number().min(0).max(7).optional(),
+  weekly_rules: optionalJsonObjectString,
+  exceptions: optionalJsonArrayString,
+});
 
-  const form = useForm<SpacedRepetitionFormValues>({
-    resolver: zodResolver(spacedRepetitionSchema),
-    defaultValues,
+type FormValues = z.infer<typeof schema>;
+
+interface ISchedulingOptionsFormProps {
+  initialPrefs: IPrefsSchedulingOptionsResponse | null;
+}
+
+export default function SchedulingOptionsForm({
+  initialPrefs,
+}: ISchedulingOptionsFormProps) {
+  const { toast } = useToast();
+  const { data: session } = useSession();
+  const userId = useMemo(
+    () => (session?.user?.id ? Number.parseInt(session.user.id) : -1),
+    [session?.user?.id],
+  );
+
+  const parseIntOrUndefined = (value: string): number | undefined => {
+    if (value === "" || value === null || value === undefined) return undefined;
+    const n = Number.parseInt(value, 10);
+    return Number.isNaN(n) ? undefined : n;
+  };
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    mode: "onChange",
+    reValidateMode: "onChange",
+    defaultValues: {
+      acceptable_delinquency_window: 21,
+      min_reviews_per_day: undefined,
+      max_reviews_per_day: undefined,
+      days_per_week: undefined,
+      weekly_rules: "",
+      exceptions: "",
+    },
   });
 
-  function onSubmit(data: SpacedRepetitionFormValues) {
-    toast({
-      title: "Saved spaced repetition preferences:",
-      description: (
-        <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
-          <code className="text-white">{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
-  }
+  const { isSubmitting, errors } = form.formState as typeof form.formState & {
+    errors: Record<string, unknown>;
+  };
+  // Workaround: Playwright test observed RHF isDirty not transitioning to true reliably after field edits
+  // for this form (likely due to reset timing). We track a simple touched flag once any user change occurs.
+  const [touched, setTouched] = useState(false);
+  const markTouched = () => {
+    if (!touched) setTouched(true);
+  };
 
-  const handleOptimizeParams = async () => {
-    if (!session?.user?.id) {
-      toast({
-        title: "Error",
-        description: "User not authenticated",
+  useEffect(() => {
+    if (initialPrefs) {
+      form.reset({
+        acceptable_delinquency_window:
+          initialPrefs.acceptable_delinquency_window,
+        min_reviews_per_day: initialPrefs.min_reviews_per_day,
+        max_reviews_per_day: initialPrefs.max_reviews_per_day,
+        days_per_week: initialPrefs.days_per_week,
+        weekly_rules: initialPrefs.weekly_rules ?? "",
+        exceptions: initialPrefs.exceptions ?? "",
       });
+    }
+  }, [form, initialPrefs]);
+
+  async function onSubmit(values: FormValues) {
+    if (userId <= 0) {
+      toast({ title: "Error", description: "User not authenticated" });
       return;
     }
-
-    setIsOptimizing(true);
     try {
-      const response = await fetch(
-        `/api/preferences/optimize_fsrs?user_id=${userId}&alg_type=FSRS&force_optimization=true`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      // Update the form with optimized parameters
-      form.setValue("fsrs_weights", result.optimized_parameters.join(", "));
-
+      const payload: IPrefsSchedulingOptionsUpdate = { ...values };
+      const result = await updateSchedulingOptionsAction(userId, {
+        user_id: userId,
+        ...payload,
+      });
       toast({
-        title: "Success",
-        description: `FSRS parameters optimized! Used ${result.review_count} review records. Loss: ${result.loss.toFixed(
-          4,
-        )}`,
+        title: "Saved",
+        description: `Scheduling options updated for user ${result.user_id}`,
       });
     } catch (error) {
-      logAndToastError(error, "Failed to optimize FSRS parameters");
-    } finally {
-      setIsOptimizing(false);
+      console.error(error);
+      toast({
+        title: "Error",
+        description: "Unable to save scheduling options",
+      });
     }
-  };
+  }
 
   return (
     <Form {...form}>
-      <form onSubmit={void form.handleSubmit(onSubmit)} className="space-y-8">
-        <div className="space-y-6">
+      <form
+        data-testid="sched-options-form"
+        onSubmit={(e) => {
+          void form.handleSubmit(onSubmit)(e);
+        }}
+        className="space-y-6"
+      >
+        <FormField
+          control={form.control}
+          name="acceptable_delinquency_window"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Acceptable Delinquency Window (days)</FormLabel>
+              <FormDescription>
+                How many days late a review can be without penalty.
+              </FormDescription>
+              <FormControl>
+                <Input
+                  type="number"
+                  placeholder="21"
+                  data-testid="sched-acceptable-delinquency-input"
+                  {...field}
+                  value={field.value ?? ""}
+                  onChange={(e) => {
+                    markTouched();
+                    field.onChange(parseIntOrUndefined(e.target.value));
+                  }}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="maximum_interval"
+            name="min_reviews_per_day"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Maximum Interval (days)</FormLabel>
-                <FormDescription>
-                  Maximum number of days between reviews
-                </FormDescription>
+                <FormLabel>Min Reviews Per Day</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
-                    placeholder="365"
+                    placeholder="e.g. 10"
+                    data-testid="sched-min-per-day-input"
                     {...field}
-                    onChange={(e) =>
-                      field.onChange(Number.parseInt(e.target.value))
-                    }
+                    value={field.value ?? ""}
+                    onChange={(e) => {
+                      markTouched();
+                      field.onChange(parseIntOrUndefined(e.target.value));
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-
           <FormField
             control={form.control}
-            name="alg_type"
+            name="max_reviews_per_day"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Algorithm Type</FormLabel>
-                <FormDescription>
-                  Choose your preferred spaced repetition algorithm
-                </FormDescription>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select algorithm type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="SM2">SM2</SelectItem>
-                    <SelectItem value="FSRS">FSRS</SelectItem>
-                  </SelectContent>
-                </Select>
+                <FormLabel>Max Reviews Per Day</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 50"
+                    data-testid="sched-max-per-day-input"
+                    {...field}
+                    value={field.value ?? ""}
+                    onChange={(e) => {
+                      markTouched();
+                      field.onChange(parseIntOrUndefined(e.target.value));
+                    }}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-
-          {form.watch("alg_type") === "FSRS" && (
-            <>
-              <FormField
-                control={form.control}
-                name="fsrs_weights"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>FSRS Initial Weights</FormLabel>
-                    <FormDescription>
-                      Custom weights for FSRS algorithm (comma-separated
-                      values). The algorithm will adjust these significantly
-                      based on your actual performance. The initial weights
-                      influence how quickly stability increases and how
-                      intervals are initially set.
-                    </FormDescription>
-                    <FormControl>
-                      <Textarea
-                        placeholder="e.g., 0.40255, 1.18385, 3.173, 15.69105, ..."
-                        {...field}
-                        className="min-h-[60px] max-h-[200px]"
-                        style={{ resize: "vertical" }}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={isOptimizing || !session?.user?.id}
-                        onClick={() => void handleOptimizeParams()}
-                        className="mt-2"
-                      >
-                        {isOptimizing
-                          ? "Optimizing..."
-                          : "Auto-Optimize Parameters"}
-                      </Button>
-                      <span className="ml-2 text-sm">
-                        Automatically optimize weights based on your practice
-                        history
-                      </span>
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="request_retention"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Target Retention Rate</FormLabel>
-                    <FormDescription>
-                      Your desired memory retention rate (0-1)
-                    </FormDescription>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="1"
-                        placeholder="0.9"
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(Number.parseFloat(e.target.value))
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <Button
-                onClick={() => void handleOptimizeParams()}
-                variant="outline"
-                disabled={isOptimizing}
-                className="w-full h-12"
-              >
-                {isOptimizing ? "Optimizing..." : "Optimize FSRS Parameters"}
-              </Button>
-            </>
-          )}
-
-          {/* <Button type="submit">Save preferences</Button> */}
-          <Button
-            type="submit"
-            variant="secondary"
-            disabled={
-              // !!emailError ||
-              // !!passwordError ||
-              // !!passwordConfirmationError ||
-              !form.getValues("alg_type") ||
-              !form.getValues("fsrs_weights") ||
-              !form.getValues("request_retention") ||
-              !form.getValues("maximum_interval")
-            }
-            className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
-          >
-            Update account
-          </Button>
         </div>
+
+        <FormField
+          control={form.control}
+          name="days_per_week"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Days per Week</FormLabel>
+              <FormDescription>
+                How many days you aim to practice each week.
+              </FormDescription>
+              <FormControl>
+                <Input
+                  type="number"
+                  placeholder="e.g. 5"
+                  data-testid="sched-days-per-week-input"
+                  {...field}
+                  value={field.value ?? ""}
+                  onChange={(e) => {
+                    markTouched();
+                    field.onChange(parseIntOrUndefined(e.target.value));
+                  }}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="weekly_rules"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Weekly Rules (JSON)</FormLabel>
+              <FormDescription>
+                Describe weekly practice rules (e.g., which weekdays to
+                practice).
+              </FormDescription>
+              <FormControl>
+                <Textarea
+                  placeholder='{"mon": true, "wed": true, "fri": true}'
+                  data-testid="sched-weekly-rules-input"
+                  {...field}
+                  className="min-h-[60px]"
+                  onChange={(e) => {
+                    markTouched();
+                    field.onChange(e.target.value);
+                  }}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="exceptions"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Exceptions (JSON)</FormLabel>
+              <FormDescription>
+                Specific date overrides (YYYY-MM-DD).
+              </FormDescription>
+              <FormControl>
+                <Textarea
+                  placeholder='["2025-08-15", "2025-08-22"]'
+                  data-testid="sched-exceptions-input"
+                  {...field}
+                  className="min-h-[60px]"
+                  onChange={(e) => {
+                    markTouched();
+                    field.onChange(e.target.value);
+                  }}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button
+          type="submit"
+          data-testid="sched-submit-button"
+          variant="secondary"
+          className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
+          // Enable when user touched something AND there are no validation errors
+          disabled={!touched || isSubmitting || Object.keys(errors).length > 0}
+        >
+          {isSubmitting ? "Saving..." : "Update scheduling options"}
+        </Button>
       </form>
     </Form>
   );
-};
-
-export default SchedulingOptionsForm;
+}

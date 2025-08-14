@@ -19,7 +19,7 @@ import type {
 } from "@tanstack/react-table";
 import { BetweenHorizontalEnd } from "lucide-react";
 import { submitPracticeFeedbacks } from "../commands";
-import { getRepertoireTunesOverview } from "../queries";
+import { getRepertoireTunesOverviewAction } from "../actions/practice-actions";
 import {
   fetchFilterFromDB,
   getTableStateTable,
@@ -35,7 +35,8 @@ import {
 } from "./SitdownDateProvider";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
-import TunesGrid, { acceptableDelinquencyWindow } from "./TunesGrid";
+import TunesGrid from "./TunesGrid";
+import { getSchedulingOptionsAction } from "@/app/user-settings/scheduling-options/actions/scheduling-options-actions";
 
 type RepertoireGridProps = {
   userId: number;
@@ -103,7 +104,7 @@ export default function TunesGridRepertoire({
   // I tried to use refreshTunes from
   // app/[main]/pages/practice/components/TunesContextRepertoire.tsx
   // but things don't work right then.  It's possible that I may be doing
-  // some double refreshes, but I'm not sure.
+  // some double refreshs, but I'm not sure.
   const refreshTunes = useCallback(
     async (userId: number, playlistId: number, refreshId: number) => {
       try {
@@ -120,7 +121,7 @@ export default function TunesGridRepertoire({
           sortingState =
             (tableStateTable?.settings as TableState)?.sorting ?? null;
         }
-        const result: ITuneOverview[] = await getRepertoireTunesOverview(
+        const result: ITuneOverview[] = await getRepertoireTunesOverviewAction(
           userId,
           playlistId,
           showDeleted,
@@ -306,6 +307,22 @@ export default function TunesGridRepertoire({
   };
 
   const { sitDownDate } = useSitDownDate();
+  const [acceptableDelinquencyWindow, setAcceptableDelinquencyWindow] =
+    useState<number>(21);
+
+  useEffect(() => {
+    async function loadSchedulingPrefs() {
+      try {
+        const data = await getSchedulingOptionsAction(userId);
+        if (data && typeof data.acceptable_delinquency_window === "number") {
+          setAcceptableDelinquencyWindow(data.acceptable_delinquency_window);
+        }
+      } catch (error) {
+        console.error("Error loading prefs_scheduling_options", error);
+      }
+    }
+    void loadSchedulingPrefs();
+  }, [userId]);
 
   const getStyleForSchedulingState = (
     scheduledDateString: string | null,

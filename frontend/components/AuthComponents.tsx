@@ -104,9 +104,15 @@ export function UserSettingsMenuItem(
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <Button variant="ghost" {...props}>
+      <Button
+        variant="ghost"
+        data-testid="tt-user-settings-menu-item"
+        {...props}
+      >
         User Settings
       </Button>
     </form>
   );
 }
+
+// Dedicated user menu trigger for tests (stable selector)

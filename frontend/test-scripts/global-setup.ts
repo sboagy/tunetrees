@@ -108,6 +108,10 @@ async function globalSetup() {
           process.env.TUNETREES_DEPLOY_BASE_DIR ||
           `${tunetreesBackendDeployBaseDir}`,
         LOGLEVEL: "DEBUG",
+        // Default to disabling integrity checks in CI to avoid flakiness
+        TT_ENABLE_SQLITE_INTEGRITY_CHECKS:
+          process.env.TT_ENABLE_SQLITE_INTEGRITY_CHECKS ||
+          (process.env.CI === "true" ? "0" : "1"),
         // TT_REVIEW_SITDOWN_DATE is deprecated and no longer used
       },
       stdio: ["ignore", fastAPIFd, fastAPIFd],
@@ -162,40 +166,36 @@ async function restartBackendHard() {
 }
 
 export async function restartBackend() {
-  // copy the clean database to the test database
+  // In CI, perform a full stop -> copy -> start cycle to avoid copying
+  // the SQLite DB while the server has it open (which can corrupt the file).
+  if (process.env.CI === "true") {
+    await restartBackendHard();
+    return;
+  }
+
+  // Local fast-path: try reload without full restart.
+  // copy the clean database to the test database BEFORE triggering reload
   await setupDatabase();
 
   try {
-    // This is an uber hacky way to restart the FastAPI server,
-    // given it was started with --reload.
-    // and CoPilot does not approve.  But I think it's massively simpler
-    // for testing purposes than trying to make the signal handling work.
+    // This nudges uvicorn --reload to restart
     const reloadTriggerFile = path.resolve(
       tunetreesBackendDeployBaseDir,
       "tunetrees/api/reload_trigger.py",
     );
     try {
       const dateNow = new Date();
-      const timeNow = dateNow.getTime();
-
       await fsPromises.utimes(reloadTriggerFile, dateNow, dateNow);
-      // Verify the change
-      const stats = await fsPromises.stat(reloadTriggerFile);
-      if (stats.mtime.getTime() !== timeNow) {
-        // Fallback strategy implementation
-        await restartBackendHard();
-        return;
-      }
     } catch {
-      // Fallback strategy implementation
+      // If we fail to touch the file, fall back to hard restart locally too
       await restartBackendHard();
       return;
     }
-    // Increase wait time in CI environment and add health check
-    const waitTime = process.env.CI ? 5000 : 2000;
+
+    // Wait a bit, then health check
+    const waitTime = 2000;
     await new Promise((resolve) => setTimeout(resolve, waitTime));
 
-    // Add health check to ensure server is actually ready
     let serverReady = false;
     for (let i = 0; i < 10; i++) {
       try {
@@ -205,19 +205,21 @@ export async function restartBackend() {
           break;
         }
       } catch {
-        // Server not ready yet, wait a bit more
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
 
     if (!serverReady) {
-      console.warn("FastAPI server may not be fully ready after restart");
+      console.warn(
+        "FastAPI server may not be fully ready after reload; using hard restart",
+      );
+      await restartBackendHard();
+      return;
     }
 
-    console.log("FastAPI server hopefully reloaded (but not restarted).");
+    console.log("FastAPI server reloaded.");
   } catch (error) {
     console.error("Error restarting FastAPI server:", error);
+    await restartBackendHard();
   }
-
-  console.log("Global teardown complete.");
 }

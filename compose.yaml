@@ -37,13 +37,11 @@ services:
       NODE_ENV: production
       # NEXT_PUBLIC_TT_BASE_URL: ${NEXT_PUBLIC_TT_BASE_URL}
       NEXT_BASE_URL: "http://server:8000"
-      NEXT_PUBLIC_TT_BASE_URL: "http://server:8000"
+      # Removed unused NEXT_PUBLIC_TT_BASE_URL (no runtime references remain)
       TT_API_BASE_URL: "http://server:8000"
       NEXTAUTH_URL: https://tunetrees.com
       # NEXT_PUBLIC_TT_BASE_URL: https://tunetrees.com
       NEXTAUTH_URL_INTERNAL: http://frontend:3000
-      # AUTH_TRUST_HOST: ${AUTH_TRUST_HOST}
-      NEXT_PUBLIC_ACCEPTABLE_DELINQUENCY_WINDOW: 21
     ports:
       - 3000:3000
     networks:

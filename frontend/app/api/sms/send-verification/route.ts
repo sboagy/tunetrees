@@ -19,7 +19,10 @@ export async function POST(request: Request) {
       ? "/sms/send-verification-signup"
       : "/sms/send-verification";
 
-    const response = await fetch(`${process.env.TT_API_BASE_URL}${endpoint}`, {
+    // Ensure we always call the FastAPI backend; default to local dev URL if unset
+    const apiBase = process.env.TT_API_BASE_URL || "http://localhost:8000";
+
+    const response = await fetch(`${apiBase}${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -361,3 +361,5 @@ migration_temp/target_playlist_tune_columns.txt
 migration_temp/target_practice_record_columns.txt
 migration_temp/target_schema.sql
 migration_temp/tunetrees_migrated.sqlite3
+server-action-refactor-plan.md
+tunetrees_test.sqlite3-journal

@@ -5,6 +5,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const nextConfig = {
+  reactStrictMode: true,
   output: "standalone",
   compiler: {
     styledComponents: true,
@@ -33,7 +34,6 @@ const nextConfig = {
     config.resolve.alias["@"] = path.resolve(__dirname, "./");
     config.resolve.alias.auth = path.resolve(__dirname, "./auth");
     config.resolve.alias.components = path.resolve(__dirname, "./components");
-    config.resolve.alias.components = path.resolve(__dirname, "./public");
 
     return config;
   },

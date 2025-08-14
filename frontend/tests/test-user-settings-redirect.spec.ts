@@ -1,0 +1,68 @@
+import { test, expect } from "@playwright/test";
+
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
+import { applyNetworkThrottle } from "../test-scripts/network-utils";
+import { checkHealth } from "../test-scripts/check-servers";
+import { navigateToPageWithRetry } from "../test-scripts/navigation-utils";
+import { runLoginWithCookieSave } from "@/test-scripts/run-login2";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
+import {
+  logTestStart,
+  logTestEnd,
+  logBrowserContextStart,
+  logBrowserContextEnd,
+} from "../test-scripts/test-logging";
+
+test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
+  await setTestDefaults(page);
+  await applyNetworkThrottle(page);
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  // tiny pause to ensure logs flush
+  await page.waitForTimeout(10);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
+});
+
+test("user-settings redirects to account and button is disabled until dirty", async ({
+  page,
+}) => {
+  await checkHealth();
+
+  // Login first
+  await navigateToPageWithRetry(page, "https://localhost:3000");
+  if (process.env.SAVE_COOKIES === "true") {
+    await runLoginWithCookieSave(
+      page,
+      process.env.TEST1_LOGIN_USER_EMAIL,
+      process.env.TEST1_LOGIN_USER_PASSWORD,
+    );
+  } else {
+    const ttPO = new TuneTreesPageObject(page);
+    await ttPO.runLogin(
+      process.env.TEST1_LOGIN_USER_EMAIL,
+      process.env.TEST1_LOGIN_USER_PASSWORD,
+    );
+  }
+
+  // Navigate to /user-settings and verify redirect to /user-settings/account
+  await page.goto("https://localhost:3000/user-settings", {
+    waitUntil: "domcontentloaded",
+  });
+  await page.waitForLoadState("domcontentloaded");
+
+  await expect(page).toHaveURL(/\/user-settings\/account$/);
+
+  // Verify the submit button label and disabled state until a change is made
+  const submitButton = page.getByRole("button", { name: "Update account" });
+  await expect(submitButton).toBeVisible();
+  await expect(submitButton).toBeDisabled();
+
+  // Make a small change to enable the button
+  const nameInput = page.getByTestId("user_name");
+  await nameInput.fill("Temp Name");
+  await expect(submitButton).toBeEnabled();
+});

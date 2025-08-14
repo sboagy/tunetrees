@@ -11,8 +11,138 @@ from tunetrees.models.tunetrees import (
     Playlist,
     PracticeRecord,
     Tune,
+    PrefsSchedulingOptions,
     t_practice_list_staged,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _build_base_filters(
+    user_ref: int, playlist_ref: int, show_deleted: bool, show_playlist_deleted: bool
+):
+    filters: list[Any] = [
+        t_practice_list_staged.c.user_ref == user_ref,
+        t_practice_list_staged.c.playlist_id == playlist_ref,
+    ]
+    if not show_deleted:
+        filters.append(t_practice_list_staged.c.deleted.is_(False))
+    if not show_playlist_deleted:
+        filters.append(t_practice_list_staged.c.playlist_deleted.is_(False))
+    return filters
+
+
+def _run_phase_query(
+    db: Session,
+    base_filters: list[Any],
+    extra_filters: list[Any],
+    order_by: Any,  # Accept SQLAlchemy order by expression
+    limit_remaining: Optional[int],
+    skip: int,
+) -> List[Row[Any]]:
+    q = db.query(t_practice_list_staged).filter(and_(*(*base_filters, *extra_filters)))
+    q = q.order_by(order_by)
+    if limit_remaining is not None and limit_remaining > 0:
+        q = q.limit(limit_remaining)
+    if skip:
+        q = q.offset(skip)
+    return q.all()
+
+
+def _append_rows_dedup(
+    rows: List[Row[Any]],
+    results: List[Row[Any]],
+    seen_ids: set[Any],
+    max_reviews: int,
+) -> None:
+    def _get_row_id(row: Row[Any]) -> Any:
+        # Prefer attribute lookup by common keys; fall back to first column index
+        for key in ("id", "tune_id", "tune_ref"):
+            try:
+                val = getattr(row, key)
+                if val is not None:
+                    return val
+            except Exception:
+                continue
+        return row[0]
+
+    for r in rows:
+        if max_reviews != 0 and len(results) >= max_reviews:
+            break
+        tune_id = _get_row_id(r)
+        if tune_id not in seen_ids:
+            seen_ids.add(tune_id)
+            results.append(r)
+
+
+# ---------------------------------------------------------------------------
+# Scheduling Options Preferences Helpers
+# ---------------------------------------------------------------------------
+# These defaults mirror the auto-create logic in preferences API endpoints.
+DEFAULT_ACCEPTABLE_DELINQUENCY_WINDOW = 7  # Matches server_default on model
+DEFAULT_MIN_REVIEWS_PER_DAY = 3
+DEFAULT_MAX_REVIEWS_PER_DAY = 10
+DEFAULT_DAYS_PER_WEEK = 7
+DEFAULT_WEEKLY_RULES = "{}"  # JSON object string placeholder
+DEFAULT_EXCEPTIONS = "[]"  # JSON array string placeholder
+
+
+def get_prefs_scheduling_options_or_defaults(
+    db: Session, user_ref: int, persist_if_missing: bool = True
+) -> PrefsSchedulingOptions:
+    """Fetch a user's scheduling options preferences, creating defaults if absent.
+
+    This mirrors the behaviour of the REST endpoint /prefs_scheduling_options but is
+    available internally so other backend logic (e.g. scheduling queries) can rely
+    on consistent preference retrieval without an HTTP round trip.
+
+    Args:
+        db (Session): Active SQLAlchemy session.
+        user_ref (int): The user id.
+        persist_if_missing (bool): If True (default) a new row is inserted when
+            none exists; otherwise an unsaved transient instance is returned.
+
+    Returns:
+        PrefsSchedulingOptions: The existing or default (possibly newly persisted) row.
+    """
+    prefs = db.get(PrefsSchedulingOptions, user_ref)
+    if prefs is None:
+        prefs = PrefsSchedulingOptions(
+            user_id=user_ref,
+            acceptable_delinquency_window=DEFAULT_ACCEPTABLE_DELINQUENCY_WINDOW,
+            min_reviews_per_day=DEFAULT_MIN_REVIEWS_PER_DAY,
+            max_reviews_per_day=DEFAULT_MAX_REVIEWS_PER_DAY,
+            days_per_week=DEFAULT_DAYS_PER_WEEK,
+            weekly_rules=DEFAULT_WEEKLY_RULES,
+            exceptions=DEFAULT_EXCEPTIONS,
+        )
+        if persist_if_missing:
+            db.add(prefs)
+            # Flush to obtain defaults (though acceptable_delinquency_window already set)
+            try:
+                db.flush()
+            except Exception as e:  # pragma: no cover - defensive logging
+                logging.getLogger().error(
+                    "Error persisting default PrefsSchedulingOptions for user %s: %s",
+                    user_ref,
+                    e,
+                )
+                raise
+    else:
+        # Backfill any NULL legacy columns with in-memory defaults (do not persist silently)
+        if prefs.acceptable_delinquency_window is None:
+            prefs.acceptable_delinquency_window = DEFAULT_ACCEPTABLE_DELINQUENCY_WINDOW
+        if prefs.min_reviews_per_day is None:
+            prefs.min_reviews_per_day = DEFAULT_MIN_REVIEWS_PER_DAY
+        if prefs.max_reviews_per_day is None:
+            prefs.max_reviews_per_day = DEFAULT_MAX_REVIEWS_PER_DAY
+        if prefs.days_per_week is None:
+            prefs.days_per_week = DEFAULT_DAYS_PER_WEEK
+        if prefs.weekly_rules is None:
+            prefs.weekly_rules = DEFAULT_WEEKLY_RULES
+        if prefs.exceptions is None:
+            prefs.exceptions = DEFAULT_EXCEPTIONS
+    return prefs
 
 
 def query_result_to_diagnostic_dict(
@@ -93,13 +223,317 @@ def find_dict_index(data: list[Any], key: str, value: Any) -> int:
     return -1
 
 
-def query_practice_list_scheduled(
+def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolerated during debug
+    db: Session,
+    skip: int = 0,
+    review_sitdown_date: Optional[datetime] = None,
+    playlist_ref: int = 1,
+    user_ref: int = 1,
+    show_deleted: bool = True,
+    show_playlist_deleted: bool = False,
+    local_tz_offset_minutes: Optional[int] = None,
+) -> List[Row[Any]]:
+    """Daily practice list: three-phase interval-based scheduling algorithm.
+
+    PURPOSE
+    =======
+    Selects a user's tunes for a practice sit‑down using an override‑aware,
+    interval (time range) based algorithm with three chronologically ordered
+    buckets (Q1/Q2/Q3). It respects user preferences for minimum and maximum
+    daily reviews and an acceptable delinquency window that defines how far
+    back we treat recently missed ("lapsed") items before resorting to older
+    backlog material.
+
+    HIGH-LEVEL FLOW
+    ---------------
+    1. Determine the effective "local day" boundaries for the practice session.
+    - If the client supplies a timezone offset (``local_tz_offset_minutes``),
+         convert the UTC sit‑down instant into that local zone, truncate to
+         local midnight, then transform back to UTC to obtain ``start_of_day_utc``.
+    - Else, treat the UTC calendar date of the sit‑down timestamp as the day.
+    2. Construct three half‑open UTC intervals:
+    Today (Q1):       [start_of_day_utc, end_of_day_utc)
+    Lapsed window:    [window_floor_utc, start_of_day_utc)
+    Older backlog:    (< window_floor_utc)
+    where::
+    end_of_day_utc     = start_of_day_utc + 1 day
+    window_floor_utc   = start_of_day_utc - acceptable_delinquency_window days
+    3. Execute phases in order (Q1 -> Q2 -> Q3) while enforcing capacity rules
+    and deduplicating tunes.
+
+    KEY CONCEPTS
+    ------------
+    Override vs Fallback:
+    - ``scheduled`` (explicit future/target review time) acts as an override.
+    - If ``scheduled`` is NULL we fall back to ``latest_review_date`` for both
+    classification AND ordering.
+    - Conceptually we operate on COALESCE(scheduled, latest_review_date).
+
+    Buckets / Phases (detailed)
+    ---------------------------
+    Q1 (Due Today / On-schedule):
+    Include any tune whose override or fallback timestamp lies within
+    [start_of_day_utc, end_of_day_utc). These are today's due (or newly
+    reviewed but still within the day) items. Order ASCENDING by the
+    coalesced timestamp so earlier due items appear first.
+
+    Q2 (Recently Lapsed):
+    If capacity remains (haven't met max; still below min), include items
+    whose coalesced timestamp is in the lapsed interval
+    [window_floor_utc, start_of_day_utc). These were missed in the recent
+    acceptable delinquency window. Order DESCENDING (most recently missed
+    first) to promote catch-up while still leaning toward recency.
+
+    Q3 (Older Backfill):
+    Only if the minimum daily requirement is still unmet after Q1 & Q2.
+    Pull tunes whose coalesced timestamp < window_floor_utc. Order DESCENDING
+    (less old first) to avoid surfacing the stalest material before moderately
+    stale items. Limit strictly to the number needed to reach the minimum (or
+    remaining headroom before max, if there is a max).
+
+    CAPACITY RULES
+    --------------
+    - ``min_reviews_per_day`` (min_reviews): Attempt to reach at least this many
+    total tunes (across all phases). If 0, no minimum.
+    - ``max_reviews_per_day`` (max_reviews): Hard cap; 0 means uncapped.
+    - After each phase:
+         * If max (non-zero) reached: return immediately.
+         * After Q2, if min reached (or exceeded): return without Q3.
+
+    DEDUPLICATION STRATEGY
+    ----------------------
+    - Maintain a set of tune identifiers (preferring id, then tune_id, then
+    tune_ref). A tune selected in an earlier bucket is never added again.
+
+    ORDERING RATIONALE
+    ------------------
+    - Q1 ascending: Aligns with "do earliest due first" principle.
+    - Q2 & Q3 descending: Favors more recently missed/less stale material.
+
+    PERFORMANCE NOTES
+    -----------------
+    - Each phase is a single filtered SELECT referencing the same staged view.
+    - Early exit reduces unnecessary queries when max is already satisfied.
+
+    FUTURE EXTENSIONS
+    -----------------
+    - Weekly rules / days_per_week could pre-populate future ``scheduled`` values
+    powering Q1 instead of relying solely on historical latest_review_date.
+    - A later refactor might merge the phase queries into a window function +
+    single pass ranking, though current clarity is prioritized.
+
+    PARAMETERS (selected)
+    ---------------------
+    review_sitdown_date : datetime | None
+    Anchor timestamp for this session (defaults to now UTC if None).
+    local_tz_offset_minutes : int | None
+    Client's local offset minutes relative to UTC (e.g. -300 for UTC-5).
+    Presence activates local-day mapping; absence uses UTC calendar day.
+
+    RETURNS
+    -------
+    list[Row]
+    Ordered merged list: Q1 (asc) + Q2 (desc) + Q3 (desc) subject to
+    min/max constraints and deduplication.
+
+    INVARIANTS / GUARANTEES
+    -----------------------
+    - No duplicate tunes in the result.
+    - Never exceeds ``max_reviews`` when non-zero.
+    - If possible, reaches ``min_reviews`` by combining phases; if content is
+    insufficient overall, returns all available prior to exceeding caps.
+    - Lexicographical string comparison safe because timestamps formatted as
+    YYYY-MM-DD HH:MM:SS.
+    """
+    # --- Initialization & Preferences ---
+    if review_sitdown_date is None:
+        review_sitdown_date = datetime.now(timezone.utc)
+        logger.debug(
+            "review_sitdown_date defaulted to now UTC: %s", review_sitdown_date
+        )
+    assert isinstance(review_sitdown_date, datetime)
+
+    prefs_scheduling_options = get_prefs_scheduling_options_or_defaults(
+        db, user_ref, persist_if_missing=False
+    )
+    acceptable_delinquency_window = (
+        prefs_scheduling_options.acceptable_delinquency_window
+    )
+    min_reviews = prefs_scheduling_options.min_reviews_per_day or 0
+    max_reviews = prefs_scheduling_options.max_reviews_per_day or 0  # 0 => uncapped
+
+    # --- Time Boundaries (Option B interval: precise UTC ranges derived from local offset) ---
+    sitdown_utc = review_sitdown_date.astimezone(timezone.utc)
+    if local_tz_offset_minutes is not None:
+        offset = timedelta(minutes=local_tz_offset_minutes)
+        local_dt = sitdown_utc + offset  # convert to local
+        local_start = datetime(local_dt.year, local_dt.month, local_dt.day)
+        start_of_day_utc = (local_start - offset).replace(tzinfo=timezone.utc)
+    else:
+        start_of_day_utc = datetime(
+            sitdown_utc.year, sitdown_utc.month, sitdown_utc.day, tzinfo=timezone.utc
+        )
+    end_of_day_utc = start_of_day_utc + timedelta(days=1)
+    window_floor_utc = start_of_day_utc - timedelta(days=acceptable_delinquency_window)
+
+    fmt = "%Y-%m-%d %H:%M:%S"
+    start_ts = start_of_day_utc.strftime(fmt)
+    end_ts = end_of_day_utc.strftime(fmt)
+    window_floor_ts = window_floor_utc.strftime(fmt)
+
+    logger.debug(
+        "Scheduling intervals local/utc: start=%s end=%s window_floor=%s offset_minutes=%s",
+        start_of_day_utc,
+        end_of_day_utc,
+        window_floor_utc,
+        local_tz_offset_minutes,
+    )
+
+    # --- Column references ---
+    scheduled_ts_col = t_practice_list_staged.c.scheduled
+    latest_ts_col = t_practice_list_staged.c.latest_review_date
+    coalesced_col = func.coalesce(scheduled_ts_col, latest_ts_col)
+
+    base_filters = _build_base_filters(
+        user_ref, playlist_ref, show_deleted, show_playlist_deleted
+    )
+
+    results: List[Row[Any]] = []
+    seen_ids: set[Any] = set()
+
+    # --- Q1 (Today Local) ---
+    q1_filters = [
+        and_(
+            scheduled_ts_col.isnot(None),
+            scheduled_ts_col >= start_ts,
+            scheduled_ts_col < end_ts,
+        )
+        | and_(
+            scheduled_ts_col.is_(None),
+            latest_ts_col >= start_ts,
+            latest_ts_col < end_ts,
+        )
+    ]
+    q1_limit = None if max_reviews == 0 else max_reviews
+    q1_rows = _run_phase_query(
+        db, base_filters, q1_filters, coalesced_col.asc(), q1_limit, skip
+    )
+    if q1_rows:
+        sample = []
+        for r in q1_rows[:5]:
+            sample.append(
+                (
+                    getattr(r, "scheduled", None)
+                    or getattr(r, "latest_review_date", None)
+                    or ""
+                )[:19]
+            )
+        logger.debug(
+            "Q1(today) count=%d interval=[%s,%s) sample=%s",
+            len(q1_rows),
+            start_ts,
+            end_ts,
+            sample,
+        )
+    _append_rows_dedup(q1_rows, results, seen_ids, max_reviews)
+    if max_reviews != 0 and len(results) >= max_reviews:
+        return results
+
+    # --- Q2 (Lapsed Window) ---
+    remaining_capacity = None if max_reviews == 0 else max_reviews - len(results)
+    q2_filters = [
+        and_(
+            scheduled_ts_col.isnot(None),
+            scheduled_ts_col >= window_floor_ts,
+            scheduled_ts_col < start_ts,
+        )
+        | and_(
+            scheduled_ts_col.is_(None),
+            latest_ts_col >= window_floor_ts,
+            latest_ts_col < start_ts,
+        )
+    ]
+    q2_rows = _run_phase_query(
+        db, base_filters, q2_filters, coalesced_col.desc(), remaining_capacity, skip
+    )
+    if q2_rows:
+        sample = []
+        for r in q2_rows[:5]:
+            sample.append(
+                (
+                    getattr(r, "scheduled", None)
+                    or getattr(r, "latest_review_date", None)
+                    or ""
+                )[:19]
+            )
+        logger.debug(
+            "Q2(lapsed-window) count=%d window=[%s,%s) sample=%s",
+            len(q2_rows),
+            window_floor_ts,
+            start_ts,
+            sample,
+        )
+    _append_rows_dedup(q2_rows, results, seen_ids, max_reviews)
+    if (min_reviews == 0 or len(results) >= min_reviews) or (
+        max_reviews != 0 and len(results) >= max_reviews
+    ):
+        return results
+
+    # --- Q3 (Backfill Older) ---
+    if min_reviews > 0 and len(results) < min_reviews:
+        remaining_needed = min_reviews - len(results)
+        backfill_cap = (
+            remaining_needed
+            if max_reviews == 0
+            else min(remaining_needed, max_reviews - len(results))
+        )
+        if backfill_cap > 0:
+            q3_filters = [
+                and_(
+                    scheduled_ts_col.isnot(None),
+                    scheduled_ts_col < window_floor_ts,
+                )
+                | and_(
+                    scheduled_ts_col.is_(None),
+                    latest_ts_col < window_floor_ts,
+                )
+            ]
+            q3_rows = _run_phase_query(
+                db,
+                base_filters,
+                q3_filters,
+                coalesced_col.desc(),
+                backfill_cap,
+                skip,
+            )
+            if q3_rows:
+                sample = []
+                for r in q3_rows[:5]:
+                    sample.append(
+                        (
+                            getattr(r, "scheduled", None)
+                            or getattr(r, "latest_review_date", None)
+                            or ""
+                        )[:19]
+                    )
+                logger.debug(
+                    "Q3(backfill) count=%d older_than<%s sample=%s",
+                    len(q3_rows),
+                    window_floor_ts,
+                    sample,
+                )
+            _append_rows_dedup(q3_rows, results, seen_ids, max_reviews)
+
+    return results
+
+
+def query_practice_list_scheduled_original(
     db: Session,
     skip: int = 0,
     limit: int = 16,
     print_table=False,
     review_sitdown_date: Optional[datetime] = None,
-    acceptable_delinquency_window=7,
+    acceptable_delinquency_window: Optional[int] = None,
     playlist_ref=1,
     user_ref=1,
     show_deleted=True,
@@ -144,9 +578,16 @@ def query_practice_list_scheduled(
     # review_sitdown_date = review_sitdown_date + timedelta(days=1)
     print("review_sitdown_date: ", review_sitdown_date)
 
-    lower_bound_date = review_sitdown_date - timedelta(
-        days=acceptable_delinquency_window
+    prefs_scheduling_options = get_prefs_scheduling_options_or_defaults(
+        db, user_ref, persist_if_missing=False
     )
+    effective_window = (
+        acceptable_delinquency_window
+        if acceptable_delinquency_window is not None
+        else prefs_scheduling_options.acceptable_delinquency_window
+        or DEFAULT_ACCEPTABLE_DELINQUENCY_WINDOW
+    )
+    lower_bound_date = review_sitdown_date - timedelta(days=effective_window)
 
     # Create the query - FIXED: Use scheduled column with fallback to latest_review_date
     # This handles the transition period where scheduled column may be null

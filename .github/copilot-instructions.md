@@ -1,5 +1,41 @@
 # GitHub Copilot Instructions
 
+## Quick Start (AI Agent 40-line Core Guide)
+
+Architecture: FastAPI backend (`tunetrees/app`) + Next.js App Router frontend (`frontend/app`). Core spaced repetition algorithms (FSRS + SM2) live in `tunetrees/app/schedule.py`; practice data persists via SQLAlchemy models in `tunetrees/app/models.py` with critical uniqueness on `(tune_ref, playlist_ref, practiced)` for historical records.
+
+Frontend Pattern: Server Components fetch data + pass to thin Client Components (forms). New settings pages follow pattern: `page.tsx` (server, does `auth()` + server-side fetch via queries) -> client form component calling Server Actions -> queries module (axios to API). Reference: `frontend/app/user-settings/scheduling-options/` (queries.ts, actions/, form, page.tsx) as canonical.
+
+Server Actions & Queries: Keep external calls inside server-only queries (axios base URL from `TT_API_BASE_URL`, no extra path segment). Server Actions wrap queries for mutation. Avoid client-side fetch in forms except optimistic UI.
+
+Spaced Repetition Flow: User review submission -> `update_practice_feedbacks()` -> `_process_single_tune_feedback()` -> preference lookup (`get_prefs_spaced_repetition()`) -> schedule calc (FSRS/SM2) -> write new `PracticeRecord` row (ensuring unique `practiced` timestamp) -> optional FSRS parameter optimization every 50 reviews.
+
+Key Backend Files: `main.py` (FastAPI app + CORS + router registration), `schedule.py` (≈850 lines algorithms), `models.py` (SQLAlchemy 2.0 style), `database.py` (session mgmt), `routers/` (feature endpoints). Always use 2.0 query style (`select(Model).where(...)`). Rollback on exception.
+
+Frontend Conventions: Strict TS (no `any`), all interfaces prefixed with `I`. Tailwind + Headless UI. Shared UI patterns enforced by `frontend/UI_STYLE_GUIDE2.md` and `.github/instructions/ui-development.instructions.md`. Use `data-testid` attributes for new interactive elements; update page objects in Playwright tests.
+
+Testing: Playwright E2E in `frontend/tests/`. Always run via provided scripts (`npm run test:ui` or `./run-playwright-tests.sh pattern`) not raw `npx playwright test`. Use storage state auth helpers. Page Objects: `frontend/test-scripts/tunetrees.po.ts` etc. For backend logic add/modify pytest tests in `tests/` (root) mirroring module paths.
+
+Quality Gates: Before commits run (frontend): `npm run lint && npm run biome_lint && npm run type-check && npx prettier --write <changed files>`. Backend: `python -m ruff check tunetrees/ && python -m ruff format tunetrees/` plus pytest if logic changed. No warnings permitted. Never commit unformatted code.
+
+Commit Rules: Start message with 1–3 gitmojis (impact order). Split unrelated concerns (e.g., refactor vs tests vs dependency bump). Example: `:recycle:💄 Refactor scheduling options page: server-side hydration` followed by `:sparkles::fire: Add scheduling options queries/actions & tests; remove obsolete form2` (real recent pattern). Ask for confirmation before pushing.
+
+Branching: `feat/`, `fix/`, `refactor/`, etc. Keep names short; add issue number suffix when relevant (e.g., `feat/enhance-user-settings-235`).
+
+Data Integrity Gotcha: Creating a new `PracticeRecord` must not duplicate `(tune_ref, playlist_ref, practiced)`; rely on helper that stamps current timestamp—do not manually reuse timestamps.
+
+Scheduling Options Form Pattern: Uses touched flag instead of React Hook Form `isDirty` (edge case after reset). If replicating, prefer `touched && Object.keys(errors).length===0` gating submit.
+
+When Extending Algorithms: Add new enum value(s), implement rating mapping, update optimization trigger, and extend tests. Keep FSRS weight serialization JSON-compatible.
+
+Danger Zones: Avoid direct DB writes bypassing model helpers; ensure server actions not imported into client-only bundles; maintain strict interface prefixes; do not add unauthorized external state libs.
+
+Performance Considerations: Batch DB queries with `select().where(Model.field.in_(...))`. Avoid N+1 inside review loop—gather needed rows up front.
+
+If Unsure: Search existing scheduling or user-settings patterns first; mirror structure; keep surface area minimal; propose delta before large refactor.
+
+---
+
 ## Tone & Style
 
 You are an impartial and objective analyst. Your task is to review the provided information and present your findings directly and concisely. You should avoid using phrases that affirm or praise my input, such as 'You're absolutely right!', 'Excellent!', or similar expressions. Focus purely on the content, presenting facts and analysis without any subjective commentary or conversational filler. Your response should be professional and to the point.
@@ -38,6 +74,7 @@ TuneTrees is a spaced repetition learning app for musical tunes built with FastA
 - **Prettier formatting**: ALWAYS run prettier on code before committing - use `npx prettier --write <files>`
 - **Automatic formatting**: Use prettier for consistent code style - it handles indentation, spacing, line breaks, and semicolons
 - **ESLint compliance**: All ESLint rules must pass without warnings after prettier formatting
+- **Biome lint compliance**: All Biome lint rules must pass without warnings after prettier formatting
 - **Interface naming**: Use `I` prefix for all TypeScript interfaces
 
 ### Database Layer (SQLAlchemy 2.0.35)
@@ -147,13 +184,16 @@ npm run dev  # Next.js dev server on port 3000
 npm run build
 npm run start  # Production build
 npm run lint  # Must pass without warnings
+npm run biome_lint  # Must pass without warnings
 npm run type-check  # TypeScript strict checking
 
 # Run frontend tests
-npm test:unit        # Jest unit tests ONLY (password utils, etc.)
-npm test            # All tests including E2E (not recommended for development)
+npm run test:unit        # Jest unit tests ONLY (password utils, etc.)
+npm run test            # All tests including E2E (not recommended for development)
+npm run test:ui        # Run Playwright UI tests in headless mode
+npm run test:ui:single        # Run a single Playwright UI test in headless mode
 
-# Run E2E tests - MUST use the environment setup script
+# For more playwright test control for E2E tests - use environment setup script
 ./run-playwright-tests.sh [test-file-pattern]  # Properly sets up environment and database
 # Do NOT use: npx playwright test directly - it lacks proper environment setup
 ```
@@ -514,7 +554,21 @@ practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
 
 #### 1. **Running Tests**: Environment Setup Script
 
-ALWAYS use the environment setup script:
+For Playwright tests use the npm script (headless):
+
+```bash
+cd frontend
+npm run test:ui
+```
+
+OR (headless)
+
+```bash
+cd frontend
+npm run test:ui:single [test-file-pattern]
+```
+
+OR
 
 ```bash
 cd frontend

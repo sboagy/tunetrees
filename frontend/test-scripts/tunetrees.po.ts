@@ -47,6 +47,10 @@ export class TuneTreesPageObject {
   readonly catalogTab;
   readonly tableStatus;
   readonly toast;
+  // Spaced Repetition settings locators
+  readonly spacedRepUpdateButton: Locator;
+  readonly optimizeParamsInlineButton: Locator;
+  readonly optimizeParamsMainButton: Locator;
 
   // Password Reset locators
   readonly passwordResetPasswordInput: Locator;
@@ -118,36 +122,35 @@ export class TuneTreesPageObject {
     this.addtuneButtonNew = page.getByTestId("addtune-button-new");
     this.addtuneButtonImport = page.getByTestId("addtune-button-import");
 
+    // Prefer robust header targeting by anchoring to sort-button testids
+    this.idColumnHeaderSortButton = page.getByTestId("col-id-sort-button");
     this.idColumnHeader = page
-      .getByRole("cell", { name: "Id", exact: true })
-      .locator("div");
-    this.idColumnHeaderSortButton = page
-      .getByRole("cell", { name: "Id", exact: true })
-      .getByRole("button");
+      .getByRole("columnheader")
+      .filter({ has: this.idColumnHeaderSortButton });
+
+    this.scheduledColumnHeaderSortButton = page.getByTestId(
+      "col-scheduled-sort-button",
+    );
     this.scheduledColumnHeader = page
-      .getByRole("cell", { name: "Scheduled", exact: true })
-      .locator("div");
-    this.scheduledColumnHeaderSortButton = page
-      .getByRole("cell", { name: "Scheduled", exact: true })
-      .getByRole("button");
+      .getByRole("columnheader")
+      .filter({ has: this.scheduledColumnHeaderSortButton });
+
+    this.LatestReviewColumnHeaderSortButton = page.getByTestId(
+      "col-latest_review_date-sort-button",
+    );
     this.LatestReviewColumnHeader = page
-      .getByRole("cell", { name: "SR Scheduled", exact: true })
-      .locator("div");
-    this.LatestReviewColumnHeaderSortButton = page
-      .getByRole("cell", { name: "SR Scheduled", exact: true })
-      .getByRole("button");
+      .getByRole("columnheader")
+      .filter({ has: this.LatestReviewColumnHeaderSortButton });
+    this.typeColumnHeaderSortButton = page.getByTestId("col-type-sort-button");
     this.typeColumnHeader = page
-      .getByRole("cell", { name: "Type", exact: true })
-      .locator("div");
-    this.typeColumnHeaderSortButton = page
-      .getByRole("cell", { name: "Type", exact: true })
-      .getByRole("button");
+      .getByRole("columnheader")
+      .filter({ has: this.typeColumnHeaderSortButton });
+    this.titleColumnHeaderSortButton = page.getByTestId(
+      "col-title-sort-button",
+    );
     this.titleColumnHeader = page
-      .getByRole("cell", { name: "Title", exact: true })
-      .locator("div");
-    this.titleColumnHeaderSortButton = page
-      .getByRole("cell", { name: "Title", exact: true })
-      .getByRole("button");
+      .getByRole("columnheader")
+      .filter({ has: this.titleColumnHeaderSortButton });
 
     this.selectSettingButton = page.getByTestId("tt-select-setting");
 
@@ -158,8 +161,17 @@ export class TuneTreesPageObject {
       "tt-tune-editor-cancel-button",
     );
 
-    this.tableStatus = this.page.getByText(" row(s) selected.");
+    this.tableStatus = this.page.getByTestId("tt-table-status");
     this.toast = this.page.getByTestId("shadcn-toast");
+
+    // Spaced Repetition locators
+    this.spacedRepUpdateButton = page.getByTestId("spaced-rep-update-button");
+    this.optimizeParamsInlineButton = page.getByTestId(
+      "optimize-params-inline-button",
+    );
+    this.optimizeParamsMainButton = page.getByTestId(
+      "optimize-params-main-button",
+    );
 
     // Password Reset locators
     this.passwordResetPasswordInput = page.getByTestId(
@@ -234,7 +246,8 @@ export class TuneTreesPageObject {
     let rowCount = await this.tunesGridRows.count();
     let iterations = 0;
 
-    const maxIterations = 14; // 14 seconds max wait time
+    // Accept at least 1 populated data row to proceed; some practice scenarios start with a single row
+    const maxIterations = 20; // up to ~20s (still under typical test timeout) giving slower CI more time
     while (rowCount < 2 && iterations < maxIterations) {
       await this.page.waitForTimeout(1000); // wait for 1 second before checking again
       rowCount = await this.tunesGridRows.count();
@@ -273,6 +286,7 @@ export class TuneTreesPageObject {
 
     const tuneRow = this.page.getByRole("row").nth(1);
     await tuneRow.click();
+    await this.page.waitForTimeout(100);
     // await this.page.getByRole("row", { name: tuneTitle }).click();
   }
 
@@ -280,52 +294,45 @@ export class TuneTreesPageObject {
     await this.gotoMainPage();
 
     await this.mainTabGroup.waitFor({ state: "visible" });
-    await this.repertoireTab.waitFor({ state: "visible" });
-
-    await this.currentTuneTitle.waitFor({ state: "visible" });
-
+    // Click the Repertoire tab trigger first, then wait for the panel to be visible
     await this.repertoireTabTrigger.waitFor({
       state: "attached",
-      timeout: 5000,
+      timeout: 10000,
     });
     await this.repertoireTabTrigger.waitFor({
       state: "visible",
-      timeout: 5000,
+      timeout: 10000,
     });
-
     const isEnabled = await this.repertoireTabTrigger.isEnabled();
-    console.log("===> test-practice-1.ts:52 ~ isEnabled", isEnabled);
-    await this.repertoireTabTrigger.click({ trial: true, timeout: 60000 });
+    console.log("===> navigateToRepertoireTab ~ trigger enabled:", isEnabled);
     await this.repertoireTabTrigger.click({ timeout: 60000 });
 
-    // Make sure the "Add To Review" button is visible
-    await this.addToReviewButton.waitFor({ state: "visible" });
+    await this.repertoireTab.waitFor({ state: "attached", timeout: 60000 });
+    await this.repertoireTab.waitFor({ state: "visible", timeout: 60000 });
+
+    // Make sure the "Add To Review" button is visible which indicates grid is rendered
+    await this.addToReviewButton.waitFor({ state: "visible", timeout: 60000 });
     await this.waitForTablePopulationToStart();
     await this.page.waitForTimeout(pauseSecondsAfter * 1000);
   }
 
   async navigateToPracticeTab() {
     await this.gotoMainPage();
+    await this.navigateToPracticeTabDirectly();
+  }
 
+  async navigateToPracticeTabDirectly() {
     await this.mainTabGroup.waitFor({ state: "visible" });
-    await this.repertoireTab.waitFor({ state: "visible" });
 
-    await this.addToReviewButton.waitFor({ state: "visible", timeout: 60000 });
-
-    await this.currentTuneTitle.waitFor({ state: "visible" });
-
-    await this.practiceTabTrigger.waitFor({ state: "attached", timeout: 5000 });
-    await this.practiceTabTrigger.waitFor({ state: "visible", timeout: 5000 });
-
+    await this.practiceTabTrigger.waitFor({
+      state: "attached",
+      timeout: 10000,
+    });
+    await this.practiceTabTrigger.waitFor({ state: "visible", timeout: 10000 });
     const isEnabled = await this.practiceTabTrigger.isEnabled();
-    console.log("===> test-practice-1.ts:52 ~ isEnabled", isEnabled);
-    await this.practiceTabTrigger.click({ trial: true, timeout: 60000 });
+    console.log("===> navigateToPracticeTab ~ trigger enabled:", isEnabled);
 
-    const responsePromise = this.page.waitForResponse(
-      "https://localhost:3000/home",
-    );
     await this.practiceTabTrigger.click({ timeout: 60000 });
-    await responsePromise;
 
     await this.practiceTab.waitFor({ state: "attached", timeout: 60000 });
     await this.practiceTab.waitFor({ state: "visible", timeout: 60000 });
@@ -334,6 +341,9 @@ export class TuneTreesPageObject {
     await this.submitPracticedTunesButton.isVisible({ timeout: 60000 });
 
     await this.waitForTablePopulationToStart();
+
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(1000);
 
     // Hmmm, not sure what this is/was for.
     // const ttPracticeTab2 = page
@@ -398,22 +408,38 @@ export class TuneTreesPageObject {
     }
   }
 
-  async clickWithTimeAfter(locator: Locator, timeout = 9000) {
-    await locator.waitFor({ state: "attached", timeout: timeout });
-    await locator.waitFor({ state: "visible", timeout: timeout });
-    await expect(locator).toBeAttached({ timeout: timeout });
-    await expect(locator).toBeVisible({ timeout: timeout });
-    await expect(locator).toBeEnabled({ timeout: timeout });
-    // await locator.click({ trial: true });
-    await locator.click({ timeout: timeout });
+  async clickWithTimeAfter(
+    locator: Locator,
+    timeout = Number.NaN,
+    timeAfter = 100,
+  ) {
+    if (Number.isNaN(timeout)) {
+      await expect(locator).toBeAttached();
+      await expect(locator).toBeVisible();
+      await expect(locator).toBeEnabled();
+      await locator.click();
+    } else {
+      await expect(locator).toBeAttached({ timeout: timeout });
+      await expect(locator).toBeVisible({ timeout: timeout });
+      await expect(locator).toBeEnabled({ timeout: timeout });
+      await locator.click({ timeout: timeout });
+    }
+    await this.page.waitForTimeout(timeAfter); // Allow time for any post-click actions
   }
 
   async setReviewEval(tuneId: number, evalType: string) {
+    await this.page.evaluate((tuneId: number) => {
+      window.scrollToTuneById?.(tuneId);
+    }, Number(tuneId));
+    // Scope to the recall-eval cell by test id to avoid strict mode violations
     const qualityButton = this.page
-      .getByRole("row", { name: `${tuneId} ` })
+      .getByTestId(`${tuneId}_recall_eval`)
       .getByTestId("tt-recal-eval-popover-trigger");
     await expect(qualityButton).toBeVisible({ timeout: 60000 });
     await expect(qualityButton).toBeEnabled({ timeout: 60000 });
+    await this.page.waitForTimeout(500);
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(100);
     await this.clickWithTimeAfter(qualityButton);
     await this.page
       .getByTestId("tt-recal-eval-group-menu")
@@ -423,7 +449,9 @@ export class TuneTreesPageObject {
     );
     await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
     await expect(responseRecalledButton).toBeEnabled({ timeout: 60000 });
+    await this.page.waitForTimeout(100);
     await this.clickWithTimeAfter(responseRecalledButton);
+    await this.page.waitForTimeout(100);
     await this.page
       .getByTestId("tt-recal-eval-popover-content")
       .waitFor({ state: "detached", timeout: 60000 });

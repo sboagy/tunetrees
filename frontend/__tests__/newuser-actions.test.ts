@@ -157,6 +157,10 @@ describe("newUser function - Bug #3 fix", () => {
         new Error("Database error"),
       );
 
+      const errorSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
       // Act & Assert: Should throw error when delete fails
       await expect(newUser(mockFormData, mockHost)).rejects.toThrow(
         "Unable to complete signup. Please contact support if this issue persists.",
@@ -165,6 +169,12 @@ describe("newUser function - Bug #3 fix", () => {
       // Verify: Should attempt to delete but not create new user
       expect(ttHttpAdapter.deleteUser).toHaveBeenCalledWith("user-456");
       expect(ttHttpAdapter.createUser).not.toHaveBeenCalled();
+
+      // Verify error logging happened with expected message, while suppressing console noise
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to delete unverified user"),
+      );
+      errorSpy.mockRestore();
     });
 
     it("should handle case where deleteUser function is undefined", async () => {
@@ -240,6 +250,10 @@ describe("newUser function - Bug #3 fix", () => {
         text: jest.fn().mockResolvedValue("SMS service unavailable"),
       });
 
+      const errorSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
       // Act & Assert: Should throw error when SMS fails and no email backup
       await expect(newUser(mockFormData, mockHost)).rejects.toThrow(
         "SMS verification failed and no email backup was prepared. Please try again.",
@@ -248,6 +262,17 @@ describe("newUser function - Bug #3 fix", () => {
       // Verify: Should not send email when SMS-only flow fails
       expect(ttHttpAdapter.createVerificationToken).not.toHaveBeenCalled();
       expect(sendGrid).not.toHaveBeenCalled();
+
+      // Verify expected error logs occurred
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to send SMS verification"),
+        expect.any(String),
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("SMS verification error:"),
+        expect.anything(),
+      );
+      errorSpy.mockRestore();
     });
   });
 
