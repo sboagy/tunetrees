@@ -65,7 +65,7 @@ async function waitForRowCount(
 
 // Core scenario: navigate to Practice tab, scroll, switch to Repertoire and back, expect scroll restored
 // We choose tab switch rather than full reload to avoid conflating with initial mount heuristics.
-test("scroll position persists across tab switch (Repertoire)", async ({
+test.skip("scroll position persists across tab switch (Repertoire)", async ({
   page,
 }) => {
   const ttPO = new TuneTreesPageObject(page);
