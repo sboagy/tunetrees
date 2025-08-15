@@ -818,3 +818,63 @@ class GenreTuneTypeModelPartial(BaseModel):
     tune_type_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DailyPracticeQueueModel(BaseModel):
+    """Snapshot of a tune selected for a user's daily (or rolling) practice window.
+
+    Fields ending with `_snapshot` capture the scheduling state at generation time so later
+    mutations to underlying scheduling data (e.g., new reviews) don't retroactively change
+    the frozen queue ordering. `bucket` + `order_index` deterministically order the queue.
+    `completed_at` is null until the user practices the tune within the window.
+    """
+
+    id: int
+    user_ref: int
+    playlist_ref: int
+    mode: Optional[str] = None  # e.g., 'per_day' or 'rolling'
+    queue_date: Optional[str] = None  # For per_day mode (local date as string)
+    window_start_utc: str
+    window_end_utc: str
+    tune_ref: int
+    bucket: int  # 1=today due, 2=recently lapsed, 3=backfill (see design #237)
+    order_index: int
+    snapshot_coalesced_ts: str
+    scheduled_snapshot: Optional[str] = None
+    latest_review_date_snapshot: Optional[str] = None
+    acceptable_delinquency_window_snapshot: Optional[int] = None
+    tz_offset_minutes_snapshot: Optional[int] = None
+    generated_at: str
+    completed_at: Optional[str] = None
+    exposures_required: Optional[int] = None
+    exposures_completed: Optional[int] = 0
+    outcome: Optional[str] = None  # Future: practice outcome summary / qualitative tag
+    active: Optional[bool] = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DailyPracticeQueueModelPartial(BaseModel):
+    id: Optional[int] = None
+    user_ref: Optional[int] = None
+    playlist_ref: Optional[int] = None
+    mode: Optional[str] = None
+    queue_date: Optional[str] = None
+    window_start_utc: Optional[str] = None
+    window_end_utc: Optional[str] = None
+    tune_ref: Optional[int] = None
+    bucket: Optional[int] = None
+    order_index: Optional[int] = None
+    snapshot_coalesced_ts: Optional[str] = None
+    scheduled_snapshot: Optional[str] = None
+    latest_review_date_snapshot: Optional[str] = None
+    acceptable_delinquency_window_snapshot: Optional[int] = None
+    tz_offset_minutes_snapshot: Optional[int] = None
+    generated_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    exposures_required: Optional[int] = None
+    exposures_completed: Optional[int] = None
+    outcome: Optional[str] = None
+    active: Optional[bool] = None
+
+    model_config = ConfigDict(from_attributes=True)
