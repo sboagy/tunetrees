@@ -26,6 +26,7 @@ from tunetrees.app.queries import (
     # query_practice_list_scheduled_original,
     generate_or_get_practice_queue,
     refill_practice_queue,
+    add_tunes_to_practice_queue,
 )
 from tunetrees.app.schedule import (
     TuneFeedbackUpdate,
@@ -180,6 +181,48 @@ async def refill_practice_queue_endpoint(
         logger.error(f"Unable to refill practice queue: {e}")
         raise HTTPException(
             status_code=500, detail=f"Unable to refill practice queue: {e}"
+        )
+
+
+@router.post(
+    "/practice-queue/{user_id}/{playlist_ref}/add",
+    summary="Manually add tunes to active daily practice queue (priority)",
+    description=(
+        "Explicitly add selected repertoire tunes into today's active practice queue. "
+        "Tunes already present are skipped (no-op). New tunes are scheduled for the sitdown timestamp, "
+        "inserted at the front (priority) and classified bucket=1 via timestamp. Exceeds max reviews if necessary."
+    ),
+)
+async def add_practice_queue_tunes_endpoint(
+    user_id: int = Path(..., description="User identifier"),
+    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+    tune_ids: List[int] = Body(..., embed=True, description="List of tune ids to add"),
+    sitdown_date: datetime = Query(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Practice sitdown timestamp anchoring the active window.",
+    ),
+    local_tz_offset_minutes: Optional[int] = Query(
+        None,
+        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5).",
+    ),
+):
+    try:
+        if sitdown_date.tzinfo is None:
+            sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
+        with SessionLocal() as db:
+            result = add_tunes_to_practice_queue(
+                db=db,
+                user_ref=user_id,
+                playlist_ref=playlist_ref,
+                tune_ids=tune_ids,
+                review_sitdown_date=sitdown_date,
+                local_tz_offset_minutes=local_tz_offset_minutes,
+            )
+            return result
+    except Exception as e:  # pragma: no cover
+        logger.error(f"Unable to add tunes to practice queue: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to add tunes to practice queue: {e}"
         )
 
 

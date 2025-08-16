@@ -1080,6 +1080,180 @@ def refill_practice_queue(
     return _serialize_queue_rows(persisted)
 
 
+# ---------------------------------------------------------------------------
+# Explicit Add (manual override) from Repertoire into active queue
+# ---------------------------------------------------------------------------
+def add_tunes_to_practice_queue(  # noqa: C901 - complexity accepted for now (mirrors other scheduling helpers)
+    db: Session,
+    user_ref: int,
+    playlist_ref: int,
+    tune_ids: list[int],
+    review_sitdown_date: Optional[datetime] = None,
+    local_tz_offset_minutes: Optional[int] = None,
+) -> dict[str, Any]:
+    """Manually add (or surface) specific tunes into today's active practice queue.
+
+    Behaviour (agreed specification):
+      * Always set PlaylistTune.scheduled to the sitdown moment for tunes NOT already present
+        in the active queue (priority explicit override) regardless of previous value.
+      * Do NOT modify scheduled for tunes already present in the queue (idempotent no-op).
+      * Insert new queue rows with bucket derived from the scheduled timestamp (will be 1)
+        and priority ordering (appear before existing rows). Existing rows have their
+        order_index shifted uniformly to preserve relative order.
+      * Exceeding max_reviews_per_day preference is allowed (user explicit override).
+      * Skips deleted / missing PlaylistTune rows silently.
+
+    Returns structure with bookkeeping for client toast / UX:
+        {
+          'added': [<serialized_new_queue_rows>],
+          'skipped_existing': [tune_id...],  # already in queue
+          'missing': [tune_id...],           # no playlist_tune row or deleted
+          'duplicate_request_ignored': [tune_id...],  # duplicates inside payload
+        }
+    """
+    if not tune_ids:
+        return {
+            "added": [],
+            "skipped_existing": [],
+            "missing": [],
+            "duplicate_request_ignored": [],
+        }
+    if review_sitdown_date is None:
+        review_sitdown_date = datetime.now(timezone.utc)
+
+    # Deduplicate input while preserving order
+    seen_in_payload: set[int] = set()
+    deduped: list[int] = []
+    dup_ignored: list[int] = []
+    for tid in tune_ids:
+        if tid in seen_in_payload:
+            dup_ignored.append(tid)
+            continue
+        seen_in_payload.add(tid)
+        deduped.append(tid)
+
+    prefs = get_prefs_scheduling_options_or_defaults(
+        db, user_ref, persist_if_missing=False
+    )
+    windows = compute_scheduling_windows(
+        review_sitdown_date,
+        acceptable_delinquency_window=prefs.acceptable_delinquency_window,
+        local_tz_offset_minutes=local_tz_offset_minutes,
+    )
+    window_start_key = windows.start_ts
+
+    existing_active = _fetch_existing_active_queue(
+        db,
+        user_ref=user_ref,
+        playlist_ref=playlist_ref,
+        window_start_key=window_start_key,
+    )
+
+    # If no active queue yet, generate a base snapshot (without backfill) so priority insert semantics are consistent.
+    if not existing_active:
+        generate_or_get_practice_queue(
+            db,
+            user_ref=user_ref,
+            playlist_ref=playlist_ref,
+            review_sitdown_date=review_sitdown_date,
+            local_tz_offset_minutes=local_tz_offset_minutes,
+            force_regen=False,
+        )
+        # Refetch as model instances
+        existing_active = _fetch_existing_active_queue(
+            db,
+            user_ref=user_ref,
+            playlist_ref=playlist_ref,
+            window_start_key=window_start_key,
+        )
+
+    existing_tune_ids = {r.tune_ref for r in existing_active}
+
+    from tunetrees.models.tunetrees import (
+        PlaylistTune,
+        DailyPracticeQueue,
+    )  # local import to avoid cycle
+
+    fmt = "%Y-%m-%d %H:%M:%S"
+    scheduled_override = review_sitdown_date.astimezone(timezone.utc).strftime(fmt)
+
+    skipped_existing: list[int] = []
+    missing: list[int] = []
+    to_add: list[int] = []
+
+    # Collect playlist_tune rows to update scheduled (only for those not already in queue)
+    for tid in deduped:
+        if tid in existing_tune_ids:
+            skipped_existing.append(tid)
+            continue
+        pt = (
+            db.query(PlaylistTune)
+            .filter(
+                PlaylistTune.playlist_ref == playlist_ref,
+                PlaylistTune.tune_ref == tid,
+                PlaylistTune.deleted.is_(False),
+            )
+            .first()
+        )
+        if not pt:
+            missing.append(tid)
+            continue
+        # Set scheduled override (unconditional for new additions)
+        pt.scheduled = scheduled_override
+        to_add.append(tid)
+
+    # Shift existing order_index upward to make room for priority insert (maintain relative ordering)
+    if to_add and existing_active:
+        shift = len(to_add)
+        for row in existing_active:
+            row.order_index = row.order_index + shift
+
+    # Build new queue rows
+    new_queue_rows: list[DailyPracticeQueue] = []
+    for idx, tid in enumerate(to_add):
+        bucket = _classify_queue_bucket(scheduled_override, windows)
+        new_queue_rows.append(
+            DailyPracticeQueue(
+                user_ref=user_ref,
+                playlist_ref=playlist_ref,
+                window_start_utc=windows.start_ts,
+                window_end_utc=windows.end_ts,
+                tune_ref=tid,
+                bucket=bucket,
+                order_index=idx,  # priority at front
+                snapshot_coalesced_ts=scheduled_override,
+                generated_at=scheduled_override,  # reuse timestamp; acceptable for diagnostics
+                mode="per_day",
+                queue_date=windows.start_ts[:10],
+                scheduled_snapshot=scheduled_override,
+                latest_review_date_snapshot=None,
+                acceptable_delinquency_window_snapshot=prefs.acceptable_delinquency_window,
+                tz_offset_minutes_snapshot=local_tz_offset_minutes,
+                completed_at=None,
+                exposures_required=None,
+                exposures_completed=0,
+                outcome=None,
+                active=True,
+            )
+        )
+        db.add(new_queue_rows[-1])
+
+    # Persist
+    try:
+        db.commit()
+    except Exception:  # pragma: no cover - defensive
+        db.rollback()
+        raise
+
+    serialized_new = _serialize_queue_rows(new_queue_rows) if new_queue_rows else []
+    return {
+        "added": serialized_new,
+        "skipped_existing": skipped_existing,
+        "missing": missing,
+        "duplicate_request_ignored": dup_ignored,
+    }
+
+
 def query_practice_list_scheduled_original(
     db: Session,
     skip: int = 0,

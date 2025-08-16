@@ -18,8 +18,8 @@ import type {
   Table as TanstackTable,
 } from "@tanstack/react-table";
 import { BetweenHorizontalEnd } from "lucide-react";
-import { submitPracticeFeedbacks } from "../commands";
 import { getRepertoireTunesOverviewAction } from "../actions/practice-actions";
+import { addTunesToPracticeQueueAction } from "../actions/practice-actions";
 import {
   fetchFilterFromDB,
   getTableStateTable,
@@ -242,69 +242,72 @@ export default function TunesGridRepertoire({
   //   // Implement preset logic here
   // };
 
+  interface IAddResult {
+    added_tune_ids: number[];
+    skipped_tune_ids: number[];
+    new_entries: unknown[]; // not needed here, so keep broad
+  }
   const addToReviewQueue = () => {
-    console.log("addToReviewQueue!");
+    console.log("addToReviewQueue (priority manual add) invoked");
     if (table === null) {
       console.log("addToReviewQueue: table is null");
       return;
     }
     const selectedTunes = table
       .getSelectedRowModel()
-      .rows.map((row) => row.original);
-    const updates: { [key: string]: { feedback: string } } = {};
-
-    for (const tune of selectedTunes) {
-      const idString = `${tune.id}`;
-      updates[idString] = { feedback: "rescheduled" };
-    }
-    console.log("updates", updates);
+      .rows.map((row) => row.original)
+      .filter((t) => typeof t.id === "number");
+    if (selectedTunes.length === 0) return;
 
     const sitdownDate = getSitdownDateFromBrowser();
-    const promiseResult = submitPracticeFeedbacks({
-      playlistId,
-      updates,
-      sitdownDate,
-    });
-    promiseResult
-      .then((result) => {
-        console.log("submit_practice_feedbacks_result result:", result);
-        if (table !== null) {
+    const tuneIds = selectedTunes
+      .map((t) => t.id)
+      .filter((id): id is number => typeof id === "number");
+
+    // Call new server action hitting /practice-queue/.../add
+    addTunesToPracticeQueueAction(userId, playlistId, tuneIds, sitdownDate)
+      .then((result: IAddResult) => {
+        console.log("addTunesToPracticeQueueAction result", result);
+        if (table) {
           table.resetRowSelection();
+          const tableState: TableState = table.getState();
+          // clear selection before persisting state
+          tableState.rowSelection = {};
+          table.setState(tableState);
+          void saveTableState(table, userId, "repertoire", playlistId);
         }
+        // Refresh snapshot styling + repertoire listing
         triggerRefresh();
 
-        const tableState: TableState = table.getState();
-        tableState.rowSelection = {};
-        table.setState(tableState);
-        void saveTableState(table, userId, "repertoire", playlistId);
-
-        // Show success toast notification
-        const tuneCount = selectedTunes.length;
-        const tuneIds = selectedTunes
-          .map((tune) => tune.id)
-          .filter((id) => id !== undefined);
-
-        const toastTitle = `${tuneCount} tune${tuneCount === 1 ? "" : "s"} added to review queue`;
-        let toastDescription = "";
-
-        if (tuneCount <= 10 && tuneIds.length > 0) {
-          toastDescription = `Tune IDs: ${tuneIds.join(", ")}`;
-        } else if (tuneCount > 10) {
-          toastDescription = "Too many tunes to list individually";
+        const added = result?.added_tune_ids?.length ?? 0;
+        const skipped = result?.skipped_tune_ids?.length ?? 0;
+        const titleParts: string[] = [];
+        if (added > 0) titleParts.push(`${added} added`);
+        if (skipped > 0) titleParts.push(`${skipped} skipped`);
+        const title =
+          titleParts.length > 0 ? titleParts.join(", ") : "No changes";
+        let description = "";
+        if (added > 0 && result?.added_tune_ids) {
+          if (added <= 10)
+            description = `Added: ${result.added_tune_ids.join(", ")}`;
+          else description = `Added ${added} tunes.`;
         }
-
-        toast({
-          title: toastTitle,
-          description: toastDescription,
-          variant: "default",
-        });
+        if (skipped > 0 && result?.skipped_tune_ids) {
+          description += description ? " " : "";
+          if (skipped <= 10)
+            description += `Skipped: ${result.skipped_tune_ids.join(", ")}`;
+          else description += `Skipped ${skipped} already present.`;
+        }
+        toast({ title, description: description || undefined });
       })
-      .catch((error) => {
-        console.error("Error submit_practice_feedbacks_result:", error);
-        throw error;
+      .catch((error: unknown) => {
+        console.error("Error addTunesToPracticeQueueAction:", error);
+        toast({
+          title: "Add to review failed",
+          description: String(error),
+          variant: "destructive",
+        });
       });
-
-    // const updates: { [key: string]: TuneUpdate } = {};
   };
 
   const { sitDownDate } = useSitDownDate();

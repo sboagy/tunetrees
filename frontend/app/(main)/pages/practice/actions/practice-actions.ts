@@ -36,6 +36,7 @@ import {
   // getTuneStaged NOT wrapped (server component uses it directly)
   getPracticeQueue,
   refillPracticeQueue,
+  addTunesToPracticeQueue,
 } from "../queries";
 import type {
   IReferenceData,
@@ -266,6 +267,21 @@ export async function refillPracticeQueueAction(
 ) {
   // count kept small & validated server-side (1..50)
   return await refillPracticeQueue(userId, playlistId, sitdownDate, count);
+}
+
+// Priority manual add of tunes into daily snapshot (bypasses max, idempotent)
+export async function addTunesToPracticeQueueAction(
+  userId: number,
+  playlistId: number,
+  tuneIds: number[],
+  sitdownDate: Date,
+) {
+  return await addTunesToPracticeQueue(
+    userId,
+    playlistId,
+    tuneIds,
+    sitdownDate,
+  );
 }
 
 export async function getTuneStagedAction(

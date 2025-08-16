@@ -198,6 +198,47 @@ export async function refillPracticeQueue(
   }
 }
 
+/**
+ * Manually (priority) add selected tunes to today's practice queue snapshot.
+ * Returns structure with added_tune_ids, skipped_tune_ids, and enriched new_entries (queue rows added).
+ */
+export async function addTunesToPracticeQueue(
+  userId: number,
+  playlistId: number,
+  tuneIds: number[],
+  sitdownDate: Date,
+): Promise<{
+  added_tune_ids: number[];
+  skipped_tune_ids: number[];
+  new_entries: IPracticeQueueEntry[];
+}> {
+  if (!sitdownDate || Number.isNaN(sitdownDate.getTime())) {
+    throw new Error("sitdownDate (Date) required for practice queue add");
+  }
+  const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
+  const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
+  try {
+    const response = await client.post(
+      `/practice-queue/${userId}/${playlistId}/add`,
+      { tune_ids: tuneIds },
+      {
+        params: {
+          sitdown_date: sitdownDateUtcString,
+          local_tz_offset_minutes: localTzOffsetMinutes,
+        },
+      },
+    );
+    return response.data as {
+      added_tune_ids: number[];
+      skipped_tune_ids: number[];
+      new_entries: IPracticeQueueEntry[];
+    };
+  } catch (error) {
+    console.error("Error in addTunesToPracticeQueue: ", error);
+    return { added_tune_ids: [], skipped_tune_ids: [], new_entries: [] };
+  }
+}
+
 export async function getRepertoireTunesOverview(
   userId: number,
   playlistId: number,
