@@ -63,7 +63,16 @@ export default function PracticeQueueClient({ queue }: IProps) {
         data-testid={`practice-queue-item-${e.tune_ref}`}
       >
         <span>
-          Tune #{e.tune_ref}
+          {e.tune_title ? (
+            <>
+              <span className="font-medium">{e.tune_title}</span>
+              <span className="ml-2 text-xs text-slate-500">
+                # {e.tune_ref}
+              </span>
+            </>
+          ) : (
+            <>Tune #{e.tune_ref}</>
+          )}
           <span className="ml-2 text-xs text-slate-500">
             (order {e.order_index})
           </span>

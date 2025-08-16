@@ -34,6 +34,7 @@ import {
   getScheduledTunesOverview,
   getTuneStaged,
   // getTuneStaged NOT wrapped (server component uses it directly)
+  getPracticeQueue,
 } from "../queries";
 import type {
   IReferenceData,
@@ -202,12 +203,55 @@ export async function getScheduledTunesOverviewAction(
   sitdownDate: Date | null,
   showDeleted: boolean,
 ) {
-  return getScheduledTunesOverview(
+  // Intentionally do NOT fallback; caller must supply browser-derived date.
+  if (!sitdownDate) {
+    console.warn(
+      "[ScheduledFetch][Action] sitdownDate was null; throwing to avoid unintended fallback",
+    );
+    throw new Error("sitdownDate required for scheduled tunes overview");
+  }
+  console.log(
+    "[ScheduledFetch][Action] getScheduledTunesOverviewAction params",
+    JSON.stringify({
+      userId,
+      playlistId,
+      sitdownDate: sitdownDate.toISOString(),
+      showDeleted,
+    }),
+  );
+  const data = await getScheduledTunesOverview(
     userId,
     playlistId,
-    sitdownDate ?? new Date(0),
+    sitdownDate,
     showDeleted,
   );
+  try {
+    interface ISchedSample {
+      id: number | null | undefined;
+      bucket?: number | null;
+    }
+    const sample: ISchedSample[] = data.slice(0, 5).map((t: unknown) => {
+      const obj = t as { id?: number; bucket?: number | null };
+      return { id: obj.id, bucket: obj.bucket ?? null };
+    });
+    console.log(
+      "[ScheduledFetch][Action] returning scheduled overview",
+      JSON.stringify({ length: data.length, sample }),
+    );
+  } catch {
+    /* ignore */
+  }
+  return data;
+}
+
+// Daily Practice Queue snapshot wrapper (authoritative styling + review flow)
+export async function getPracticeQueueAction(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  forceRegen = false,
+) {
+  return getPracticeQueue(userId, playlistId, sitdownDate, forceRegen);
 }
 
 export async function getTuneStagedAction(

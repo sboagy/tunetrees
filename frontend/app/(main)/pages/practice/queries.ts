@@ -108,6 +108,18 @@ export async function getScheduledTunesOverview(
         },
       },
     );
+    try {
+      const sample = response.data.slice(0, 5).map((t) => ({
+        id: (t as unknown as { id?: number }).id ?? null,
+        bucket: (t as unknown as { bucket?: number | null }).bucket ?? null,
+      }));
+      console.log(
+        "[ScheduledFetch][Query] axios response",
+        JSON.stringify({ length: response.data.length, sample }),
+      );
+    } catch {
+      // ignore logging error
+    }
     return response.data;
   } catch (error) {
     console.error("Error in getPracticeListScheduled: ", error);
@@ -147,8 +159,9 @@ export async function getPracticeQueue(
     // We do a secondary fetch of scheduled tunes (no deleted) and count bucket 1 missing from snapshot.
     // This is a best-effort; if it fails, we still return the snapshot.
     let newTunesDueCount = 0;
+    let scheduled: ITuneOverviewScheduled[] = [];
     try {
-      const scheduled = await getScheduledTunesOverview(
+      scheduled = await getScheduledTunesOverview(
         userId,
         playlistId,
         sitdownDate,
@@ -170,6 +183,30 @@ export async function getPracticeQueue(
       }
     } catch (error) {
       console.warn("Unable to compute newTunesDueCount:", error);
+    }
+    // Build a map of tune id -> title/name
+    try {
+      if (scheduled && scheduled.length > 0) {
+        const nameMap = new Map<number, string | null>();
+        for (const s of scheduled) {
+          if (s.id !== null && s.id !== undefined) {
+            // Attempt to use 'title' or 'name' property depending on model shape
+            // @ts-expect-error dynamic field access fallback
+            const title = s.title || s.name || null;
+            nameMap.set(s.id, title);
+          }
+        }
+        for (const e of entries) {
+          if (nameMap.has(e.tune_ref)) {
+            e.tune_title = nameMap.get(e.tune_ref) || null;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "Unable to enrich practice queue entries with titles:",
+        error,
+      );
     }
     return { entries, new_tunes_due_count: newTunesDueCount };
   } catch (error) {

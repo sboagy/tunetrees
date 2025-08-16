@@ -204,6 +204,10 @@ export interface IPracticeRecord {
 
 export interface ITuneOverviewScheduled extends ITuneOverview {
   recall_eval?: string | null;
+  // Practice bucket classification supplied directly by backend (Aug 2025 refactor):
+  // 1 = Due Today, 2 = Recently Lapsed, 3 = Backfill (older). Future/null = not in current snapshot.
+  // Former client-side PracticeBucketContext + snapshot merge removed; UI now relies solely on this field.
+  bucket?: number | null;
 }
 
 export interface IPlaylistTune {
@@ -279,6 +283,7 @@ export interface IPracticeQueueEntry {
   exposures_completed?: number | null;
   outcome?: string | null;
   active?: boolean | null;
+  tune_title?: string | null; // added client-enriched field for display
 }
 
 export interface IPracticeQueueWithMeta {
