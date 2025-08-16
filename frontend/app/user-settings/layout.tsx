@@ -62,20 +62,7 @@ export default function SettingsLayout({ children }: ISettingsLayoutProps) {
           className="hidden dark:block"
         />
       </div>
-      <div className="hidden space-y-6 p-10 pb-16 md:block relative">
-        <div className="absolute top-6 right-6">
-          <Link href="/" aria-label="Close settings and return to home">
-            <Button
-              variant="ghost"
-              size="icon"
-              data-testid="user-settings-close"
-              className="h-8 w-8"
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </Button>
-          </Link>
-        </div>
+      <div className="hidden space-y-6 p-10 pb-16 md:block">
         <div className="space-y-0.5">
           <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
           <p className="text-muted-foreground">
@@ -87,7 +74,22 @@ export default function SettingsLayout({ children }: ISettingsLayoutProps) {
           <aside className="mx-2 lg:w-1/5">
             <SidebarNav items={sidebarNavItems} />
           </aside>
-          <div className="flex-1 lg:max-w-2xl">{children}</div>
+          <div className="flex-1 lg:max-w-2xl">
+            <div className="flex items-start justify-end mb-4">
+              <Link href="/" aria-label="Close settings and return to home">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  data-testid="user-settings-close"
+                  className="h-8 w-8"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close</span>
+                </Button>
+              </Link>
+            </div>
+            {children}
+          </div>
         </div>
       </div>
     </>
