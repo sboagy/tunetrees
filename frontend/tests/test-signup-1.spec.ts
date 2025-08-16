@@ -148,6 +148,7 @@ test.describe.serial("Signup Tests", () => {
     await page.waitForTimeout(4_000);
 
     await processPlaylistDialog(page);
+    await page.waitForTimeout(500);
 
     // Not sure why the following doesn't work.
     // await this.addToRepertoireButton.waitFor({
@@ -156,7 +157,7 @@ test.describe.serial("Signup Tests", () => {
     // });
     //
     // instead, we'll wait for the tableStatus to be visible.
-    await ttPO.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
+    await ttPO.tableStatus.waitFor({ state: "visible" });
 
     // console.log("===> run-login2.ts:50 ~ ", "Login completed");
     // // await page.waitForTimeout(1000 * 3);
