@@ -200,7 +200,7 @@ export class TuneTreesPageObject {
     throw exception;
   };
 
-  async gotoMainPage() {
+  async gotoMainPage(waitForTableStatus = true) {
     await checkHealth();
 
     // Set up error and network monitoring before navigation
@@ -219,25 +219,25 @@ export class TuneTreesPageObject {
     console.log("Page content after goto:", pageContent.slice(0, 500)); // Log first 500 chars for inspection
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForTimeout(1000);
+    if (waitForTableStatus) {
+      const tableStatusTimeout = process.env.CI ? 120_000 : 25_000;
+      await this.tableStatus.waitFor({
+        state: "visible",
+        timeout: tableStatusTimeout,
+      });
 
-    // Use CI-aware timeout: longer in CI environment for reliability
-    const tableStatusTimeout = process.env.CI ? 120_000 : 25_000;
-    await this.tableStatus.waitFor({
-      state: "visible",
-      timeout: tableStatusTimeout,
-    });
-
-    // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
-    //   timeout: 60000,
-    // });
-    const tableStatusText = (await this.tableStatus.textContent()) as string;
-    console.log(
-      "===> tunetrees.po.ts:99 ~ done with gotoMainPage: ",
-      tableStatusText,
-    );
-    await this.waitForTablePopulationToStart();
-    await this.page.waitForLoadState("domcontentloaded");
-    await this.page.waitForTimeout(1000);
+      // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
+      //   timeout: 60000,
+      // });
+      const tableStatusText = (await this.tableStatus.textContent()) as string;
+      console.log(
+        "===> tunetrees.po.ts:99 ~ done with gotoMainPage: ",
+        tableStatusText,
+      );
+      await this.waitForTablePopulationToStart();
+      await this.page.waitForLoadState("domcontentloaded");
+      await this.page.waitForTimeout(1000);
+    }
   }
 
   async waitForTablePopulationToStart() {

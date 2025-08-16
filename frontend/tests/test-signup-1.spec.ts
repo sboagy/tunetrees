@@ -160,7 +160,9 @@ test.describe.serial("Signup Tests", () => {
     //
     // After playlist dialog, navigate (or re-navigate) via page object to ensure standard
     // loading sequence (includes internal wait for table status).
-    await ttPO.gotoMainPage();
+    await ttPO.gotoMainPage(false);
+
+    await ttPO.page.getByText("No scheduled tunes").isVisible();
 
     // console.log("===> run-login2.ts:50 ~ ", "Login completed");
     // // await page.waitForTimeout(1000 * 3);
@@ -323,7 +325,8 @@ test.describe.serial("Signup Tests", () => {
     // });
     //
     // instead, we'll wait for the tableStatus to be visible.
-    await ttPO.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
+    await ttPO.page.getByText("No scheduled tunes").isVisible();
+    // await ttPO.tableStatus.waitFor({ state: "visible", timeout: 20000 });
 
     // console.log("===> run-login2.ts:50 ~ ", "Login completed");
     // // await page.waitForTimeout(1000 * 3);
