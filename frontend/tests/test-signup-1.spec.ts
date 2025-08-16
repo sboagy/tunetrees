@@ -148,7 +148,7 @@ test.describe.serial("Signup Tests", () => {
     await page.waitForTimeout(4_000);
 
     await processPlaylistDialog(page);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(2000);
 
     // Not sure why the following doesn't work.
     // await this.addToRepertoireButton.waitFor({
@@ -714,6 +714,7 @@ async function processPlaylistDialog(page: Page) {
   const submitButton = page.getByTestId("submit-button");
   await submitButton.waitFor({ state: "visible" });
   await expect(submitButton).toBeEnabled();
+  await page.waitForTimeout(500);
   await submitButton.click();
 }
 
