@@ -332,12 +332,27 @@ export default function TunesGridRepertoire({
             sitDownDate,
             false,
           );
-          const map = new Map<number, number>();
-          interface IQueueEntryWithBucket {
-            tune_ref: number;
-            bucket?: number;
+          // Normalise response shape: backend now returns raw list[list[QueueEntry]] (no entries wrapper)
+          // but keep backward compatibility if an object { entries: [...] } reappears.
+          type QueueEntry = { tune_ref: number; bucket?: number | null };
+          let entries: QueueEntry[] = [];
+          if (Array.isArray(snapshot)) {
+            entries = snapshot as QueueEntry[];
+          } else if (
+            snapshot &&
+            typeof snapshot === "object" &&
+            Array.isArray((snapshot as { entries?: unknown[] }).entries)
+          ) {
+            entries = (snapshot as { entries: QueueEntry[] }).entries;
+          } else {
+            console.warn(
+              "[RepertoireBucketStyling] Unexpected snapshot shape; no entries parsed",
+              snapshot,
+            );
           }
-          for (const e of snapshot.entries as IQueueEntryWithBucket[]) {
+          const map = new Map<number, number>();
+          // Populate bucket map from authoritative snapshot rows
+          for (const e of entries) {
             if (
               typeof e.tune_ref === "number" &&
               typeof e.bucket === "number"
@@ -348,7 +363,7 @@ export default function TunesGridRepertoire({
           setBucketMap(map);
           console.log(
             "[RepertoireBucketStyling] Loaded practice queue snapshot entries=%d bucketMapSize=%d sample=%o",
-            snapshot.entries.length,
+            entries.length,
             map.size,
             [...map.entries()].slice(0, 6),
           );
