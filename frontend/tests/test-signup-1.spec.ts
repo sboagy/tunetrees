@@ -158,8 +158,9 @@ test.describe.serial("Signup Tests", () => {
     //   timeout: 30_000,
     // });
     //
-    // instead, we'll wait for the tableStatus to be visible.
-    await ttPO.tableStatus.waitFor({ state: "visible" });
+    // After playlist dialog, navigate (or re-navigate) via page object to ensure standard
+    // loading sequence (includes internal wait for table status).
+    await ttPO.gotoMainPage();
 
     // console.log("===> run-login2.ts:50 ~ ", "Login completed");
     // // await page.waitForTimeout(1000 * 3);
