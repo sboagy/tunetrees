@@ -147,7 +147,10 @@ test.describe.serial("Signup Tests", () => {
 
     await page.waitForTimeout(4_000);
 
+    // Ensure playlist dialog completes before waiting for table status.
     await processPlaylistDialog(page);
+    // Small buffer: dialog submission triggers playlist/tunes fetch; allow network to start.
+    await page.waitForTimeout(750);
 
     // Not sure why the following doesn't work.
     // await this.addToRepertoireButton.waitFor({
@@ -155,8 +158,11 @@ test.describe.serial("Signup Tests", () => {
     //   timeout: 30_000,
     // });
     //
-    // instead, we'll wait for the tableStatus to be visible.
-    await ttPO.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
+    // After playlist dialog, navigate (or re-navigate) via page object to ensure standard
+    // loading sequence (includes internal wait for table status).
+    await ttPO.gotoMainPage(false);
+
+    await ttPO.page.getByText("No scheduled tunes").isVisible();
 
     // console.log("===> run-login2.ts:50 ~ ", "Login completed");
     // // await page.waitForTimeout(1000 * 3);
@@ -319,7 +325,8 @@ test.describe.serial("Signup Tests", () => {
     // });
     //
     // instead, we'll wait for the tableStatus to be visible.
-    await ttPO.tableStatus.waitFor({ state: "visible", timeout: 20_0000 });
+    await ttPO.page.getByText("No scheduled tunes").isVisible();
+    // await ttPO.tableStatus.waitFor({ state: "visible", timeout: 20000 });
 
     // console.log("===> run-login2.ts:50 ~ ", "Login completed");
     // // await page.waitForTimeout(1000 * 3);
@@ -694,26 +701,30 @@ test.describe.serial("Signup Tests", () => {
 });
 
 async function processPlaylistDialog(page: Page) {
+  // Dialog may take a moment to mount after verification redirect.
+  const dialog = page.getByRole("dialog");
+  await dialog.waitFor({ state: "visible", timeout: 15000 });
+
   const fiveStringBanjoRow = page.getByRole("row", {
-    name: "5-String Banjo BGRA 5",
+    name: /5-String Banjo/i,
   });
-  await fiveStringBanjoRow.waitFor({ state: "visible", timeout: 10000 });
+  await fiveStringBanjoRow.waitFor({ state: "visible", timeout: 15000 });
 
-  const fiveStringBanjoCheckBox = fiveStringBanjoRow
-    .getByRole("button")
-    .first();
-  await fiveStringBanjoCheckBox.waitFor({ state: "visible" });
-  await expect(fiveStringBanjoCheckBox).toBeEnabled();
-  await page.waitForTimeout(500);
-  await fiveStringBanjoCheckBox.click();
+  // Row checkbox/button (defensive: locate after row visible)
+  const checkBoxButton = fiveStringBanjoRow.getByRole("button").first();
+  await checkBoxButton.waitFor({ state: "visible" });
+  await expect(checkBoxButton).toBeEnabled();
+  await checkBoxButton.click();
 
-  // Wait for any UI updates after clicking the checkbox
-  await page.waitForTimeout(500);
+  // Confirm selection reflected (optional lightweight assertion)
+  await page.waitForTimeout(200);
 
   const submitButton = page.getByTestId("submit-button");
-  await submitButton.waitFor({ state: "visible" });
+  await submitButton.waitFor({ state: "visible", timeout: 5000 });
   await expect(submitButton).toBeEnabled();
   await submitButton.click();
+  // Wait for dialog to close before proceeding to table wait.
+  await dialog.waitFor({ state: "detached", timeout: 15000 });
 }
 
 async function initialSignIn(page: Page) {

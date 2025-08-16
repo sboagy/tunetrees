@@ -37,6 +37,7 @@ import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
 import { getSchedulingOptionsAction } from "@/app/user-settings/scheduling-options/actions/scheduling-options-actions";
+import { getPracticeQueueAction } from "../actions/practice-actions";
 
 type RepertoireGridProps = {
   userId: number;
@@ -309,9 +310,11 @@ export default function TunesGridRepertoire({
   const { sitDownDate } = useSitDownDate();
   const [acceptableDelinquencyWindow, setAcceptableDelinquencyWindow] =
     useState<number>(21);
+  // Authoritative bucket map from active practice queue snapshot (tune_ref -> bucket)
+  const [bucketMap, setBucketMap] = useState<Map<number, number> | null>(null);
 
   useEffect(() => {
-    async function loadSchedulingPrefs() {
+    async function loadSchedulingPrefsAndSnapshot() {
       try {
         const data = await getSchedulingOptionsAction(userId);
         if (data && typeof data.acceptable_delinquency_window === "number") {
@@ -320,39 +323,97 @@ export default function TunesGridRepertoire({
       } catch (error) {
         console.error("Error loading prefs_scheduling_options", error);
       }
+      // Fetch the existing practice queue snapshot for styling parity (no force regen)
+      try {
+        if (sitDownDate && playlistId > 0) {
+          const snapshot = await getPracticeQueueAction(
+            userId,
+            playlistId,
+            sitDownDate,
+            false,
+          );
+          const map = new Map<number, number>();
+          interface IQueueEntryWithBucket {
+            tune_ref: number;
+            bucket?: number;
+          }
+          for (const e of snapshot.entries as IQueueEntryWithBucket[]) {
+            if (
+              typeof e.tune_ref === "number" &&
+              typeof e.bucket === "number"
+            ) {
+              map.set(e.tune_ref, e.bucket);
+            }
+          }
+          setBucketMap(map);
+          console.log(
+            "[RepertoireBucketStyling] Loaded practice queue snapshot entries=%d bucketMapSize=%d sample=%o",
+            snapshot.entries.length,
+            map.size,
+            [...map.entries()].slice(0, 6),
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "Unable to load practice queue snapshot for repertoire styling parity",
+          error,
+        );
+      }
     }
-    void loadSchedulingPrefs();
-  }, [userId]);
+    void loadSchedulingPrefsAndSnapshot();
+  }, [userId, playlistId, sitDownDate]);
 
   const getStyleForSchedulingState = (
     scheduledDateString: string | null,
+    tuneId?: number,
   ): string => {
-    if (!scheduledDateString) {
-      return "underline"; // Return underline to signify new tune, has not been scheduled
+    // If no snapshot yet, do not apply any styling (avoid heuristic noise until authoritative data loads)
+    if (!bucketMap) return "";
+
+    // Snapshot present: bucket-based styling for tunes included in snapshot
+    if (tuneId && bucketMap.has(tuneId)) {
+      const b = bucketMap.get(tuneId);
+      // console.log("[RepertoireBucketStyling] tuneId=%d bucket=%d", tuneId, b);
+      if (b === 1) return "font-extrabold"; // Due today (bucket 1)
+      if (b === 2) return "underline text-amber-300"; // Recently lapsed (bucket 2)
+      if (b === 3) return "underline text-gray-300"; // Older backfill (bucket 3)
+      return ""; // Unknown bucket => no styling
     }
+    // console.log(
+    //   "[RepertoireBucketStyling] tuneId not found in bucketMap:",
+    //   tuneId,
+    // );
+
+    // Tune not in snapshot: we can still signal future / lapsed context using date heuristics.
+    if (!scheduledDateString) return ""; // New unscheduled tune: leave plain when snapshot exists
 
     const scheduledDate = new Date(scheduledDateString);
-    if (Number.isNaN(scheduledDate.getTime())) {
-      return "outline-red-500"; // Outline in red to show date is invalid (i.e. error state)
-    }
+    if (Number.isNaN(scheduledDate.getTime())) return "";
+    if (!sitDownDate) return "";
 
-    // reviewSitdownDateNoHours has to go to the server, thus is set by useEffect.
-    if (sitDownDate) {
-      const lowerBoundReviewSitdownDate = new Date(sitDownDate);
-      lowerBoundReviewSitdownDate.setDate(
-        sitDownDate.getDate() - acceptableDelinquencyWindow,
-      );
-      if (scheduledDate < lowerBoundReviewSitdownDate) {
-        return "underline text-gray-300";
-      }
-      if (
-        scheduledDate > lowerBoundReviewSitdownDate &&
-        scheduledDate <= sitDownDate
-      ) {
-        return "font-extrabold";
-      }
-      return "italic text-green-300";
-    }
+    const lowerBound = new Date(sitDownDate);
+    lowerBound.setDate(sitDownDate.getDate() - acceptableDelinquencyWindow);
+    const startOfSitdownDay = new Date(sitDownDate);
+    startOfSitdownDay.setHours(0, 0, 0, 0);
+    const startOfNextDay = new Date(startOfSitdownDay);
+    startOfNextDay.setDate(startOfNextDay.getDate() + 1);
+
+    // const sameLocalDay = (a: Date, b: Date) =>
+    //   a.getFullYear() === b.getFullYear() &&
+    //   a.getMonth() === b.getMonth() &&
+    //   a.getDate() === b.getDate();
+
+    // Future scheduled (not yet in snapshot) -> italic green
+    if (scheduledDate >= startOfNextDay) return "italic text-green-300";
+
+    // Lapsed window (recent) -> underline amber
+    if (scheduledDate >= lowerBound && scheduledDate < startOfSitdownDay)
+      return "italic text-blue-300";
+
+    // Older beyond window -> subtle gray underline
+    if (scheduledDate < lowerBound) return "italic text-gray-300";
+    // // Same day but not in snapshot (edge / just-generated) -> treat as due today
+    // if (sameLocalDay(scheduledDate, sitDownDate)) return "font-extrabold";
     return "";
   };
 

@@ -23,6 +23,44 @@ Base = declarative_base()
 metadata = Base.metadata
 
 
+class DailyPracticeQueue(Base):
+    __tablename__ = "daily_practice_queue"
+    __table_args__ = (
+        UniqueConstraint("user_ref", "playlist_ref", "window_start_utc", "tune_ref"),
+        Index("idx_queue_generated_at", "generated_at"),
+        Index("idx_queue_user_playlist_active", "user_ref", "playlist_ref", "active"),
+        Index("idx_queue_user_playlist_bucket", "user_ref", "playlist_ref", "bucket"),
+        Index(
+            "idx_queue_user_playlist_window",
+            "user_ref",
+            "playlist_ref",
+            "window_start_utc",
+        ),
+    )
+
+    user_ref = mapped_column(Integer, nullable=False)
+    playlist_ref = mapped_column(Integer, nullable=False)
+    window_start_utc = mapped_column(Text, nullable=False)
+    window_end_utc = mapped_column(Text, nullable=False)
+    tune_ref = mapped_column(Integer, nullable=False)
+    bucket = mapped_column(Integer, nullable=False)
+    order_index = mapped_column(Integer, nullable=False)
+    snapshot_coalesced_ts = mapped_column(Text, nullable=False)
+    generated_at = mapped_column(Text, nullable=False)
+    id = mapped_column(Integer, primary_key=True)
+    mode = mapped_column(Text)
+    queue_date = mapped_column(Text)
+    scheduled_snapshot = mapped_column(Text)
+    latest_review_date_snapshot = mapped_column(Text)
+    acceptable_delinquency_window_snapshot = mapped_column(Integer)
+    tz_offset_minutes_snapshot = mapped_column(Integer)
+    completed_at = mapped_column(Text)
+    exposures_required = mapped_column(Integer)
+    exposures_completed = mapped_column(Integer, server_default=text("0"))
+    outcome = mapped_column(Text)
+    active = mapped_column(Boolean, server_default=text("1"))
+
+
 class Genre(Base):
     __tablename__ = "genre"
 
@@ -159,9 +197,6 @@ class User(Base):
     prefs_spaced_repetition: Mapped[List["PrefsSpacedRepetition"]] = relationship(
         "PrefsSpacedRepetition", uselist=True, back_populates="user"
     )
-    prefs_scheduling_options: Mapped[List["PrefsSchedulingOptions"]] = relationship(
-        "PrefsSchedulingOptions", uselist=True, back_populates="user"
-    )
     session: Mapped[List["Session"]] = relationship(
         "Session", uselist=True, back_populates="user"
     )
@@ -281,6 +316,20 @@ class Playlist(Base):
     )
 
 
+class PrefsSchedulingOptions(User):
+    __tablename__ = "prefs_scheduling_options"
+
+    acceptable_delinquency_window = mapped_column(
+        Integer, nullable=False, server_default=text("21")
+    )
+    user_id = mapped_column(ForeignKey("user.id"), primary_key=True)
+    min_reviews_per_day = mapped_column(Integer)
+    max_reviews_per_day = mapped_column(Integer)
+    days_per_week = mapped_column(Integer)
+    weekly_rules = mapped_column(Text)
+    exceptions = mapped_column(Text)
+
+
 class PrefsSpacedRepetition(Base):
     __tablename__ = "prefs_spaced_repetition"
 
@@ -295,22 +344,6 @@ class PrefsSpacedRepetition(Base):
 
     user: Mapped[Optional["User"]] = relationship(
         "User", back_populates="prefs_spaced_repetition"
-    )
-
-
-class PrefsSchedulingOptions(Base):
-    __tablename__ = "prefs_scheduling_options"
-
-    user_id = mapped_column(ForeignKey("user.id"), primary_key=True)
-    acceptable_delinquency_window = mapped_column(Integer, server_default=text("21"))
-    min_reviews_per_day = mapped_column(Integer)
-    max_reviews_per_day = mapped_column(Integer)
-    days_per_week = mapped_column(Integer)
-    weekly_rules = mapped_column(Text)
-    exceptions = mapped_column(Text)
-
-    user: Mapped[Optional["User"]] = relationship(
-        "User", back_populates="prefs_scheduling_options"
     )
 
 

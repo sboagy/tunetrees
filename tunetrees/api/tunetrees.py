@@ -24,6 +24,7 @@ from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
     query_practice_list_scheduled,
     # query_practice_list_scheduled_original,
+    generate_or_get_practice_queue,
 )
 from tunetrees.app.schedule import (
     TuneFeedbackUpdate,
@@ -31,6 +32,8 @@ from tunetrees.app.schedule import (
     update_practice_feedbacks,
     update_practice_schedules,
 )
+from sqlalchemy import update as sql_update
+from tunetrees.models.tunetrees import DailyPracticeQueue
 from tunetrees.models.tunetrees import (
     Genre,
     Instrument,
@@ -79,6 +82,7 @@ from tunetrees.models.tunetrees_pydantic import (
     TuneTypeModel,
     TuneTypeModelPartial,
     ViewPlaylistJoinedModel,
+    DailyPracticeQueueModel,
 )
 
 logger = logging.getLogger("tunetrees.api")
@@ -94,20 +98,62 @@ DEBUG_SLOWDOWN = int(environ.get("DEBUG_SLOWDOWN", 0))
 
 
 @router.get(
+    "/practice-queue/{user_id}/{playlist_ref}",
+    response_model=list[DailyPracticeQueueModel],
+    summary="Get or Generate Daily Practice Queue",
+    description=(
+        "Return the frozen daily (or rolling) practice queue snapshot. Generates a new snapshot if none exists "
+        "for the current window. Buckets: 1=due today, 2=recently lapsed, 3=backfill."
+    ),
+)
+async def get_practice_queue(
+    user_id: int = Path(..., description="User identifier"),
+    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+    sitdown_date: datetime = Query(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Practice sitdown timestamp (UTC recommended).",
+    ),
+    local_tz_offset_minutes: Optional[int] = Query(
+        None,
+        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5).",
+    ),
+    force_regen: bool = Query(
+        False, description="Force regeneration even if an active snapshot exists."
+    ),
+) -> List[DailyPracticeQueueModel]:
+    try:
+        if sitdown_date.tzinfo is None:
+            sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
+        with SessionLocal() as db:
+            rows = generate_or_get_practice_queue(
+                db=db,
+                user_ref=user_id,
+                playlist_ref=playlist_ref,
+                review_sitdown_date=sitdown_date,
+                local_tz_offset_minutes=local_tz_offset_minutes,
+                force_regen=force_regen,
+            )
+            # Validate into Pydantic models
+            return [DailyPracticeQueueModel.model_validate(r) for r in rows]
+    except Exception as e:
+        logger.error(f"Unable to fetch practice queue: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to fetch practice queue: {e}"
+        )
+
+
+@router.get(
     "/scheduled_tunes_overview/{user_id}/{playlist_ref}",
     response_model=List[PlaylistTuneJoinedModel],
     summary="Get Scheduled Tunes Overview",
     description=(
         "Retrieve an overview of scheduled tunes for a specific user and playlist. "
-        "Returns a list of scheduled tunes, including their joined playlist information, "
-        "for the given user and playlist reference. Supports filtering for deleted tunes and playlists, "
-        "and requires a review sitdown date to determine scheduling. The acceptable delinquency window "
-        "can be customized to adjust which tunes are considered delinquent."
+        "Returns a list of scheduled tunes including playlist join info and bucket classification."
     ),
 )
-async def get_scheduled_tunes_overview(
-    user_id: int = Path(..., description="User identifier"),
-    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+def get_scheduled_tunes_overview(
+    user_id: int,
+    playlist_ref: int,
     show_deleted: bool = Query(False, description="Include deleted tunes"),
     show_playlist_deleted: bool = Query(
         False, description="Include tunes from deleted playlists"
@@ -117,25 +163,16 @@ async def get_scheduled_tunes_overview(
     ),
     local_tz_offset_minutes: Optional[int] = Query(
         None,
-        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5). Used for local-day interval classification.",
+        description="Client local timezone offset minutes (e.g. -300 for UTC-5).",
     ),
 ) -> List[PlaylistTuneJoinedModel]:
-    """
-    Retrieve an overview of scheduled tunes for a specific user and playlist.
-
-    Returns a list of scheduled tunes, including their joined playlist information,
-    for the given user and playlist reference. Supports filtering for deleted tunes and playlists,
-    and requires a review sitdown date to determine scheduling. The acceptable delinquency window
-    can be customized to adjust which tunes are considered delinquent.
-    """
     try:
-        # FSRS requires dates to be timezoned, so ensure sitdown_date has a UTC timezone.
         if sitdown_date.tzinfo is None:
             sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
         with SessionLocal() as db:
             if DEBUG_SLOWDOWN > 0:
                 time.sleep(DEBUG_SLOWDOWN)
-            tunes_scheduled = query_practice_list_scheduled(
+            tunes_with_bucket = query_practice_list_scheduled(
                 db,
                 user_ref=user_id,
                 playlist_ref=playlist_ref,
@@ -144,10 +181,9 @@ async def get_scheduled_tunes_overview(
                 review_sitdown_date=sitdown_date,
                 local_tz_offset_minutes=local_tz_offset_minutes,
             )
-            validated_tune_list = [
-                PlaylistTuneJoinedModel.model_validate(tune) for tune in tunes_scheduled
-            ]
-            return validated_tune_list
+            # Already PlaylistTuneJoinedModel instances with bucket populated.
+            # (Defensive cast in case of mixed return types.)
+            return tunes_with_bucket
     except Exception as e:
         logger.error(f"Unable to fetch scheduled practice list: {e}")
         if isinstance(e, HTTPException):
@@ -281,6 +317,31 @@ async def submit_feedbacks(
             playlist_id,
             review_sitdown_date=sitdown_date,
         )
+
+        # Mark queue rows completed where applicable (best-effort; ignore absent rows)
+        try:
+            tune_ids = [int(k) for k in tune_updates.keys() if k.isdigit()]
+        except ValueError:
+            tune_ids = []
+        if tune_ids:
+            with SessionLocal() as db_mark:
+                now_ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                stmt = (
+                    sql_update(DailyPracticeQueue)
+                    .where(
+                        DailyPracticeQueue.playlist_ref == int(playlist_id),
+                        DailyPracticeQueue.tune_ref.in_(tune_ids),
+                        DailyPracticeQueue.completed_at.is_(None),
+                        DailyPracticeQueue.active.is_(True),
+                    )
+                    .values(completed_at=now_ts)
+                )
+                try:
+                    db_mark.execute(stmt)
+                    db_mark.commit()
+                except Exception as e2:  # pragma: no cover - defensive
+                    db_mark.rollback()
+                    logger.error(f"Failed marking queue completion: {e2}")
 
         return status.HTTP_302_FOUND
     except Exception as e:

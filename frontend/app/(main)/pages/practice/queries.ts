@@ -22,6 +22,8 @@ import type {
   ITuneOverviewScheduled,
   ITuneType,
   IViewPlaylistJoined,
+  IPracticeQueueEntry,
+  IPracticeQueueWithMeta,
 } from "./types";
 import { formatDateToIso8601UtcString } from "@/lib/date-utils";
 
@@ -106,11 +108,110 @@ export async function getScheduledTunesOverview(
         },
       },
     );
+    try {
+      const sample = response.data.slice(0, 5).map((t) => ({
+        id: (t as unknown as { id?: number }).id ?? null,
+        bucket: (t as unknown as { bucket?: number | null }).bucket ?? null,
+      }));
+      console.log(
+        "[ScheduledFetch][Query] axios response",
+        JSON.stringify({ length: response.data.length, sample }),
+      );
+    } catch {
+      // ignore logging error
+    }
     return response.data;
   } catch (error) {
     console.error("Error in getPracticeListScheduled: ", error);
     // Return a dummy Tune object to avoid breaking the UI
     return ERROR_TUNE;
+  }
+}
+
+/**
+ * Fetch (or generate) the frozen daily practice queue snapshot for a user/playlist.
+ * Returns entries plus a derived count of newly-due tunes not in the snapshot (bucket 1 gap).
+ */
+export async function getPracticeQueue(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  forceRegen = false,
+): Promise<IPracticeQueueWithMeta> {
+  if (!sitdownDate || Number.isNaN(sitdownDate.getTime())) {
+    throw new Error("sitdownDate (Date) required for practice queue fetch");
+  }
+  const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
+  const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
+  try {
+    const response = await client.get<IPracticeQueueEntry[]>(
+      `/practice-queue/${userId}/${playlistId}`,
+      {
+        params: {
+          sitdown_date: sitdownDateUtcString,
+          local_tz_offset_minutes: localTzOffsetMinutes,
+          force_regen: forceRegen,
+        },
+      },
+    );
+    const entries = response.data;
+    // Derive new tunes due count by comparing scheduled overview bucket 1 set.
+    // We do a secondary fetch of scheduled tunes (no deleted) and count bucket 1 missing from snapshot.
+    // This is a best-effort; if it fails, we still return the snapshot.
+    let newTunesDueCount = 0;
+    let scheduled: ITuneOverviewScheduled[] = [];
+    try {
+      scheduled = await getScheduledTunesOverview(
+        userId,
+        playlistId,
+        sitdownDate,
+        false,
+      );
+      const snapshotTuneIds = new Set(entries.map((e) => e.tune_ref));
+      // Bucket 1 detection: scheduled date inside current local day boundary -> we reuse backend windows logic heuristically here.
+      // Simplify: treat any scheduled date (scheduled field) that shares the same YYYY-MM-DD with sitdown local day as bucket 1.
+      const localDay = sitdownDate.toISOString().slice(0, 10);
+      for (const t of scheduled) {
+        const tuneId = t.id; // may be undefined; skip if so
+        if (
+          t.scheduled?.startsWith(localDay) &&
+          tuneId &&
+          !snapshotTuneIds.has(tuneId)
+        ) {
+          newTunesDueCount += 1;
+        }
+      }
+    } catch (error) {
+      console.warn("Unable to compute newTunesDueCount:", error);
+    }
+    // Build a map of tune id -> title/name
+    try {
+      if (scheduled && scheduled.length > 0) {
+        const nameMap = new Map<number, string | null>();
+        for (const s of scheduled) {
+          if (s.id !== null && s.id !== undefined) {
+            // Attempt to use 'title' or 'name' property depending on model shape
+            // @ts-expect-error dynamic field access fallback
+            const title = s.title || s.name || null;
+            nameMap.set(s.id, title);
+          }
+        }
+        for (const e of entries) {
+          if (nameMap.has(e.tune_ref)) {
+            e.tune_title = nameMap.get(e.tune_ref) || null;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "Unable to enrich practice queue entries with titles:",
+        error,
+      );
+    }
+    return { entries, new_tunes_due_count: newTunesDueCount };
+  } catch (error) {
+    console.error("Error in getPracticeQueue: ", error);
+    return { entries: [], new_tunes_due_count: 0 };
   }
 }
 

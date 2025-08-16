@@ -322,10 +322,19 @@ export function get_columns(
     );
   }
 
+  // Map bucket numeric value to user-friendly label
+  const bucketLabel = (bucket?: number | null): string => {
+    if (bucket === 1) return "Due Today";
+    if (bucket === 2) return "Recently Lapsed";
+    if (bucket === 3) return "Backfill";
+    return ""; // Future / not in snapshot
+  };
+
   const columns: ExtendedColumnDef<
     ITuneOverview,
     TunesGridColumnGeneralType
   >[] = [
+    // Selection or evaluation column handled later; Bucket column placed early for practice mode
     {
       id: "id",
       header: ({ column, table }) => sortableHeader(column, table, "Id"),
@@ -341,6 +350,45 @@ export function get_columns(
       minSize: 80,
       meta: { headerLabel: "Id" },
     },
+    ...(purpose === "practice"
+      ? [
+          {
+            id: "bucket",
+            accessorKey: "bucket",
+            header: ({ column, table }) => (
+              <div
+                className="flex items-center"
+                data-testid="col-bucket-header"
+              >
+                {sortableHeader(
+                  column as Column<ITuneOverview, unknown>,
+                  table,
+                  "Bucket",
+                )}
+              </div>
+            ),
+            cell: ({ row }) => {
+              const b = (row.original as unknown as { bucket?: number | null })
+                .bucket;
+              const label = bucketLabel(b);
+              return (
+                <div
+                  className="truncate max-w-[10rem]"
+                  title={label}
+                  data-testid={`cell-bucket-${row.original.id}`}
+                >
+                  {label}
+                </div>
+              );
+            },
+            enableSorting: true,
+            sortingFn: numericSortingFn,
+            size: 140,
+            minSize: 110,
+            meta: { headerLabel: "Bucket" },
+          } as ColumnDef<ITuneOverview, TunesGridColumnGeneralType>,
+        ]
+      : []),
     "practice" === purpose
       ? {
           accessorKey: "recall_eval",

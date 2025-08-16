@@ -88,6 +88,29 @@ export const saveTableState = async (
     }
   }
 
+  // Regression fix: scrollTop was being lost on saves that did not explicitly include it (e.g., sorting/filter changes).
+  // Because TanStack's table.getState() does not contain our custom scrollTop field, any save without overrides.scrollTop
+  // would drop the previously persisted scrollTop, causing subsequent remounts to restore to 0.
+  if (mergedState.scrollTop === undefined) {
+    try {
+      const w = window as unknown as {
+        __ttScrollLast?: Record<string, number>;
+      };
+      const key = `${tablePurpose}|${playlistId}`;
+      const cached = w.__ttScrollLast?.[key];
+      if (typeof cached === "number") {
+        mergedState.scrollTop = cached;
+        // Debug log to verify preservation path
+        console.log(
+          "[ScrollPersist] Preserving existing scrollTop=%d on state save (no explicit override)",
+          cached,
+        );
+      }
+    } catch {
+      // ignore – window not available (SSR) or structure missing
+    }
+  }
+
   console.log(
     `LF7 saveTableState calling updateTableStateInDb: tablePurpose=${tablePurpose}`,
   );
