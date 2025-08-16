@@ -120,7 +120,7 @@ async def get_practice_queue(
     force_regen: bool = Query(
         False, description="Force regeneration even if an active snapshot exists."
     ),
-):
+) -> List[DailyPracticeQueueModel]:
     try:
         if sitdown_date.tzinfo is None:
             sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
@@ -148,15 +148,12 @@ async def get_practice_queue(
     summary="Get Scheduled Tunes Overview",
     description=(
         "Retrieve an overview of scheduled tunes for a specific user and playlist. "
-        "Returns a list of scheduled tunes, including their joined playlist information, "
-        "for the given user and playlist reference. Supports filtering for deleted tunes and playlists, "
-        "and requires a review sitdown date to determine scheduling. The acceptable delinquency window "
-        "can be customized to adjust which tunes are considered delinquent."
+        "Returns a list of scheduled tunes including playlist join info and bucket classification."
     ),
 )
-async def get_scheduled_tunes_overview(
-    user_id: int = Path(..., description="User identifier"),
-    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+def get_scheduled_tunes_overview(
+    user_id: int,
+    playlist_ref: int,
     show_deleted: bool = Query(False, description="Include deleted tunes"),
     show_playlist_deleted: bool = Query(
         False, description="Include tunes from deleted playlists"
@@ -166,25 +163,16 @@ async def get_scheduled_tunes_overview(
     ),
     local_tz_offset_minutes: Optional[int] = Query(
         None,
-        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5). Used for local-day interval classification.",
+        description="Client local timezone offset minutes (e.g. -300 for UTC-5).",
     ),
 ) -> List[PlaylistTuneJoinedModel]:
-    """
-    Retrieve an overview of scheduled tunes for a specific user and playlist.
-
-    Returns a list of scheduled tunes, including their joined playlist information,
-    for the given user and playlist reference. Supports filtering for deleted tunes and playlists,
-    and requires a review sitdown date to determine scheduling. The acceptable delinquency window
-    can be customized to adjust which tunes are considered delinquent.
-    """
     try:
-        # FSRS requires dates to be timezoned, so ensure sitdown_date has a UTC timezone.
         if sitdown_date.tzinfo is None:
             sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
         with SessionLocal() as db:
             if DEBUG_SLOWDOWN > 0:
                 time.sleep(DEBUG_SLOWDOWN)
-            tunes_scheduled = query_practice_list_scheduled(
+            tunes_with_bucket = query_practice_list_scheduled(
                 db,
                 user_ref=user_id,
                 playlist_ref=playlist_ref,
@@ -193,10 +181,9 @@ async def get_scheduled_tunes_overview(
                 review_sitdown_date=sitdown_date,
                 local_tz_offset_minutes=local_tz_offset_minutes,
             )
-            validated_tune_list = [
-                PlaylistTuneJoinedModel.model_validate(tune) for tune in tunes_scheduled
-            ]
-            return validated_tune_list
+            # Already PlaylistTuneJoinedModel instances with bucket populated.
+            # (Defensive cast in case of mixed return types.)
+            return tunes_with_bucket
     except Exception as e:
         logger.error(f"Unable to fetch scheduled practice list: {e}")
         if isinstance(e, HTTPException):

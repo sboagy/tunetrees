@@ -580,6 +580,9 @@ class PlaylistTuneJoinedModel(BaseModel):
     favorite_url: Optional[str] = None
     playlist_deleted: Optional[bool] = None
     has_override: Optional[bool] = None
+    bucket: Optional[int] = (
+        None  # Daily practice classification (1=due today,2=recently lapsed,3=backfill)
+    )
 
     model_config = ConfigDict(from_attributes=True)
 

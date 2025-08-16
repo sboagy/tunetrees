@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, NamedTuple
+from tunetrees.models.tunetrees_pydantic import PlaylistTuneJoinedModel
 
 from sqlalchemy import and_, desc, func
 from sqlalchemy.engine.row import Row
@@ -292,7 +293,7 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
     show_deleted: bool = True,
     show_playlist_deleted: bool = False,
     local_tz_offset_minutes: Optional[int] = None,
-) -> List[Row[Any]]:
+) -> List["PlaylistTuneJoinedModel"]:
     """Daily practice list: three-phase interval-based scheduling algorithm.
 
     PURPOSE
@@ -392,9 +393,11 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
 
     RETURNS
     -------
-    list[Row]
-    Ordered merged list: Q1 (asc) + Q2 (desc) + Q3 (desc) subject to
-    min/max constraints and deduplication.
+    list[PlaylistTuneJoinedModel]
+        Ordered merged list: Q1 (asc) + Q2 (desc) + Q3 (desc) subject to
+        min/max constraints and deduplication. Each model is annotated with
+        a computed ``bucket`` classification (1=due today, 2=recently lapsed,
+        3=backfill) using the same window logic as the practice queue.
 
     INVARIANTS / GUARANTEES
     -----------------------
@@ -497,7 +500,23 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
         )
     _append_rows_dedup(q1_rows, results, seen_ids, max_reviews)
     if max_reviews != 0 and len(results) >= max_reviews:
-        return results
+        # Early exit; convert accumulated rows to models with bucket
+        windows = compute_scheduling_windows(
+            review_sitdown_date,
+            acceptable_delinquency_window=prefs_scheduling_options.acceptable_delinquency_window,
+            local_tz_offset_minutes=local_tz_offset_minutes,
+        )
+        annotated: List[PlaylistTuneJoinedModel] = []
+        for r in results:
+            m = PlaylistTuneJoinedModel.model_validate(r)
+            coalesced_raw = (
+                getattr(r, "scheduled", None)
+                or getattr(r, "latest_review_date", None)
+                or windows.start_ts
+            )
+            m.bucket = _classify_queue_bucket(coalesced_raw, windows)
+            annotated.append(m)
+        return annotated
 
     # --- Q2 (Lapsed Window) ---
     remaining_capacity = None if max_reviews == 0 else max_reviews - len(results)
@@ -537,7 +556,22 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
     if (min_reviews == 0 or len(results) >= min_reviews) or (
         max_reviews != 0 and len(results) >= max_reviews
     ):
-        return results
+        windows = compute_scheduling_windows(
+            review_sitdown_date,
+            acceptable_delinquency_window=prefs_scheduling_options.acceptable_delinquency_window,
+            local_tz_offset_minutes=local_tz_offset_minutes,
+        )
+        annotated: List[PlaylistTuneJoinedModel] = []
+        for r in results:
+            m = PlaylistTuneJoinedModel.model_validate(r)
+            coalesced_raw = (
+                getattr(r, "scheduled", None)
+                or getattr(r, "latest_review_date", None)
+                or windows.start_ts
+            )
+            m.bucket = _classify_queue_bucket(coalesced_raw, windows)
+            annotated.append(m)
+        return annotated
 
     # --- Q3 (Backfill Older) ---
     if min_reviews > 0 and len(results) < min_reviews:
@@ -584,7 +618,192 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
                 )
             _append_rows_dedup(q3_rows, results, seen_ids, max_reviews)
 
+    windows = compute_scheduling_windows(
+        review_sitdown_date,
+        acceptable_delinquency_window=prefs_scheduling_options.acceptable_delinquency_window,
+        local_tz_offset_minutes=local_tz_offset_minutes,
+    )
+    annotated_final: List[PlaylistTuneJoinedModel] = []
+    for r in results:
+        m = PlaylistTuneJoinedModel.model_validate(r)
+        coalesced_raw = (
+            getattr(r, "scheduled", None)
+            or getattr(r, "latest_review_date", None)
+            or windows.start_ts
+        )
+        m.bucket = _classify_queue_bucket(coalesced_raw, windows)
+        annotated_final.append(m)
+    return annotated_final
+
+
+## ---------------------------------------------------------------------------
+## Daily Practice Queue helpers (extracted to reduce complexity)
+## ---------------------------------------------------------------------------
+
+
+def _classify_queue_bucket(
+    coalesced_raw: Optional[str], windows: SchedulingWindows
+) -> int:
+    """Classify timestamp vs window boundaries (robust parsing).
+
+    See detailed rationale in previous inline docstring: we avoid lexicographic
+    comparison pitfalls ("T" vs space) by parsing to ``datetime`` then comparing.
+    Any parse failure returns bucket 1 (lenient default).
+    """
+    if not coalesced_raw:
+        return 1
+    raw = coalesced_raw.strip()
+    norm = raw.replace("T", " ")
+    norm_19 = norm[:19] if len(norm) >= 19 else norm
+    dt: Optional[datetime]
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except Exception:
+        try:
+            dt = datetime.strptime(norm_19, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return 1
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    if windows.start_of_day_utc <= dt < windows.end_of_day_utc:
+        return 1
+    if windows.window_floor_utc <= dt < windows.start_of_day_utc:
+        return 2
+    return 3
+
+
+def _fetch_existing_active_queue(
+    db: Session,
+    user_ref: int,
+    playlist_ref: int,
+    window_start_key: str,
+) -> list[
+    Any
+]:  # list[DailyPracticeQueue]; typed loosely to avoid circular import hints
+    from sqlalchemy import select
+    from tunetrees.models.tunetrees import DailyPracticeQueue
+
+    return list(
+        db.execute(
+            select(DailyPracticeQueue).where(
+                DailyPracticeQueue.user_ref == user_ref,
+                DailyPracticeQueue.playlist_ref == playlist_ref,
+                DailyPracticeQueue.window_start_utc == window_start_key,
+                DailyPracticeQueue.active.is_(True),
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": r.id,
+            "user_ref": r.user_ref,
+            "playlist_ref": r.playlist_ref,
+            "mode": r.mode,
+            "queue_date": r.queue_date,
+            "window_start_utc": r.window_start_utc,
+            "window_end_utc": r.window_end_utc,
+            "tune_ref": r.tune_ref,
+            "bucket": r.bucket,
+            "order_index": r.order_index,
+            "snapshot_coalesced_ts": r.snapshot_coalesced_ts,
+            "scheduled_snapshot": r.scheduled_snapshot,
+            "latest_review_date_snapshot": r.latest_review_date_snapshot,
+            "acceptable_delinquency_window_snapshot": r.acceptable_delinquency_window_snapshot,
+            "tz_offset_minutes_snapshot": r.tz_offset_minutes_snapshot,
+            "generated_at": r.generated_at,
+            "completed_at": r.completed_at,
+            "exposures_required": r.exposures_required,
+            "exposures_completed": r.exposures_completed,
+            "outcome": r.outcome,
+            "active": r.active,
+        }
+        for r in rows
+    ]
+
+
+def _build_queue_rows(
+    rows: list[Any],
+    windows: SchedulingWindows,
+    prefs: Any,
+    user_ref: int,
+    playlist_ref: int,
+    mode: str,
+    local_tz_offset_minutes: Optional[int],
+) -> list[Any]:
+    from tunetrees.models.tunetrees import DailyPracticeQueue
+
+    results: list[DailyPracticeQueue] = []
+    fmt = "%Y-%m-%d %H:%M:%S"
+    for order_index, row in enumerate(rows):
+        scheduled_val = getattr(row, "scheduled", None)
+        latest_val = getattr(row, "latest_review_date", None)
+        coalesced_raw = scheduled_val or latest_val or windows.start_ts
+        bucket = _classify_queue_bucket(coalesced_raw, windows)
+        results.append(
+            DailyPracticeQueue(
+                user_ref=user_ref,
+                playlist_ref=playlist_ref,
+                mode=mode,
+                queue_date=windows.start_ts[:10] if mode == "per_day" else None,
+                window_start_utc=windows.start_ts,
+                window_end_utc=windows.end_ts,
+                tune_ref=getattr(row, "id", None) or getattr(row, "tune_ref", None),
+                bucket=bucket,
+                order_index=order_index,
+                snapshot_coalesced_ts=coalesced_raw,
+                scheduled_snapshot=scheduled_val,
+                latest_review_date_snapshot=latest_val,
+                acceptable_delinquency_window_snapshot=prefs.acceptable_delinquency_window,
+                tz_offset_minutes_snapshot=local_tz_offset_minutes,
+                generated_at=datetime.now(timezone.utc).strftime(fmt),
+                exposures_required=None,
+                exposures_completed=0,
+                outcome=None,
+                active=True,
+            )
+        )
     return results
+
+
+def _persist_queue_rows(
+    db: Session,
+    rows: list[Any],
+    user_ref: int,
+    playlist_ref: int,
+    windows: SchedulingWindows,
+) -> list[Any]:
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy import select
+    from tunetrees.models.tunetrees import DailyPracticeQueue as DPQ
+
+    for r in rows:
+        db.add(r)
+    try:
+        db.commit()
+        return rows
+    except Exception as e:  # pragma: no cover
+        db.rollback()
+        if isinstance(e, IntegrityError):
+            return list(
+                db.execute(
+                    select(DPQ).where(
+                        DPQ.user_ref == user_ref,
+                        DPQ.playlist_ref == playlist_ref,
+                        DPQ.window_start_utc == windows.start_ts,
+                        DPQ.active.is_(True),
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -599,34 +818,11 @@ def generate_or_get_practice_queue(
     mode: str = "per_day",
     force_regen: bool = False,
 ) -> list[dict[str, Any]]:
-    """Generate (or fetch existing active) daily practice queue snapshot.
+    """Generate (or fetch existing active) daily practice queue snapshot."""
 
-    CURRENT SCOPE (Phase 1)
-    -----------------------
-    - Reads existing active rows for the (user, playlist, window_start) and returns
-      them if present and not force_regen.
-    - Otherwise invokes the three‑phase scheduling query to obtain candidate rows
-      and persists them into ``daily_practice_queue`` with bucket/order assignment.
-    - Uses COALESCE(scheduled, latest_review_date) timestamp snapshots to freeze
-      ordering. Learning exposures / mid‑day append of new tunes / rolling window
-      semantics are deferred to later phases.
-    # DESIGN REF: Scheduling refinement plan (Issue #237 / feat/sched-ref-237)
-    # Future phases: learning exposures, mid-day new tune append, rolling window mode.
-
-    RETURNS
-    -------
-    List of dictionaries (minimal DTO) for now; later wired to Pydantic model.
-    """
-    from sqlalchemy import select
-    from tunetrees.models.tunetrees import (
-        DailyPracticeQueue,
-    )  # local import to avoid cycles
-
-    # Determine sitdown timestamp
     if review_sitdown_date is None:
         review_sitdown_date = datetime.now(timezone.utc)
 
-    # Preferences (needed for window computation & min/max for bucket decisions if extended)
     prefs = get_prefs_scheduling_options_or_defaults(
         db, user_ref, persist_if_missing=False
     )
@@ -635,110 +831,70 @@ def generate_or_get_practice_queue(
         acceptable_delinquency_window=prefs.acceptable_delinquency_window,
         local_tz_offset_minutes=local_tz_offset_minutes,
     )
+    window_start_key = windows.start_ts
 
-    window_start_key = (
-        windows.start_ts
-    )  # normalized string used in uniqueness constraint
-
-    # Attempt fetch existing queue (active)
-    existing = (
-        db.execute(
-            select(DailyPracticeQueue).where(
-                DailyPracticeQueue.user_ref == user_ref,
-                DailyPracticeQueue.playlist_ref == playlist_ref,
-                DailyPracticeQueue.window_start_utc == window_start_key,
-                DailyPracticeQueue.active.is_(True),
-            )
-        )
-        .scalars()
-        .all()
+    existing = _fetch_existing_active_queue(
+        db,
+        user_ref=user_ref,
+        playlist_ref=playlist_ref,
+        window_start_key=window_start_key,
     )
     if existing and not force_regen:
-        return [
-            {
-                "id": r.id,
-                "tune_ref": r.tune_ref,
-                "bucket": r.bucket,
-                "order_index": r.order_index,
-                "snapshot_coalesced_ts": r.snapshot_coalesced_ts,
-                "scheduled_snapshot": r.scheduled_snapshot,
-                "latest_review_date_snapshot": r.latest_review_date_snapshot,
-                "completed_at": r.completed_at,
-            }
-            for r in existing
-        ]
+        return _serialize_queue_rows(existing)
 
-    # Generate fresh list using existing scheduling algorithm
-    rows = query_practice_list_scheduled(
+    if force_regen and existing:
+        # deactivate before regenerating
+        for r in existing:
+            r.active = False
+        try:
+            db.flush()
+        except Exception:  # pragma: no cover
+            db.rollback()
+            raise
+
+    scheduled_rows = query_practice_list_scheduled(
         db,
         review_sitdown_date=review_sitdown_date,
         playlist_ref=playlist_ref,
         user_ref=user_ref,
         local_tz_offset_minutes=local_tz_offset_minutes,
     )
+    built = _build_queue_rows(
+        scheduled_rows,
+        windows,
+        prefs,
+        user_ref,
+        playlist_ref,
+        mode,
+        local_tz_offset_minutes,
+    )
+    persisted = _persist_queue_rows(db, built, user_ref, playlist_ref, windows)
+    return _serialize_queue_rows(persisted)
 
-    # Classify into buckets mirroring internal logic (recompute coalesced timestamp)
-    results: list[DailyPracticeQueue] = []
-    fmt = "%Y-%m-%d %H:%M:%S"
-    for order_index, row in enumerate(rows):
-        scheduled_val = getattr(row, "scheduled", None)
-        latest_val = getattr(row, "latest_review_date", None)
-        coalesced = scheduled_val or latest_val or windows.start_ts
-        # Determine bucket by comparing coalesced to window strings (lexicographical safe)
-        if windows.start_ts <= coalesced < windows.end_ts:
-            bucket = 1
-        elif windows.window_floor_ts <= coalesced < windows.start_ts:
-            bucket = 2
-        else:
-            bucket = 3
-        dpq = DailyPracticeQueue(
-            user_ref=user_ref,
-            playlist_ref=playlist_ref,
-            mode=mode,
-            queue_date=windows.start_ts[:10] if mode == "per_day" else None,
-            window_start_utc=windows.start_ts,
-            window_end_utc=windows.end_ts,
-            tune_ref=getattr(row, "id", None) or getattr(row, "tune_ref", None),
-            bucket=bucket,
-            order_index=order_index,
-            snapshot_coalesced_ts=coalesced,
-            scheduled_snapshot=scheduled_val,
-            latest_review_date_snapshot=latest_val,
-            acceptable_delinquency_window_snapshot=prefs.acceptable_delinquency_window,
-            tz_offset_minutes_snapshot=local_tz_offset_minutes,
-            generated_at=datetime.now(timezone.utc).strftime(fmt),
-            exposures_required=None,
-            exposures_completed=0,
-            outcome=None,
-            active=True,
+
+def get_active_practice_queue_bucket_counts(
+    db: Session, user_ref: int, playlist_ref: int, window_start_utc: str
+) -> dict[int, int]:
+    """Return counts per bucket for the active queue window (diagnostic)."""
+    from sqlalchemy import select
+    from tunetrees.models.tunetrees import DailyPracticeQueue
+
+    rows = (
+        db.execute(
+            select(DailyPracticeQueue.bucket).where(
+                DailyPracticeQueue.user_ref == user_ref,
+                DailyPracticeQueue.playlist_ref == playlist_ref,
+                DailyPracticeQueue.window_start_utc == window_start_utc,
+                DailyPracticeQueue.active.is_(True),
+            )
         )
-        results.append(dpq)
-
-    # Persist: deactivate any previous active rows for same window (defensive)
-    if existing:
-        for r in existing:
-            r.active = False
-    for r in results:
-        db.add(r)
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-
-    return [
-        {
-            "id": r.id,
-            "tune_ref": r.tune_ref,
-            "bucket": r.bucket,
-            "order_index": r.order_index,
-            "snapshot_coalesced_ts": r.snapshot_coalesced_ts,
-            "scheduled_snapshot": r.scheduled_snapshot,
-            "latest_review_date_snapshot": r.latest_review_date_snapshot,
-            "completed_at": r.completed_at,
-        }
-        for r in results
-    ]
+        .scalars()
+        .all()
+    )
+    counts: dict[int, int] = {1: 0, 2: 0, 3: 0}
+    for b in rows:
+        counts[b] = counts.get(b, 0) + 1
+    return counts
 
 
 def query_practice_list_scheduled_original(
