@@ -62,34 +62,36 @@ export default function SettingsLayout({ children }: ISettingsLayoutProps) {
           className="hidden dark:block"
         />
       </div>
-      <div className="hidden space-y-6 p-10 pb-16 md:block">
-        <div className="space-y-0.5 pr-4">
-          <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
-          <p className="text-muted-foreground">
-            Manage your account settings and set scheduling preferences.
-          </p>
+      <div className="hidden space-y-6 p-10 pb-16 md:block relative">
+        <div className="flex items-start justify-between pr-4">
+          <div className="space-y-0.5">
+            <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
+            <p className="text-muted-foreground">
+              Manage your account settings and set scheduling preferences.
+            </p>
+          </div>
+          <Link
+            href="/"
+            aria-label="Close settings and return to home"
+            className="pt-1"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              data-testid="user-settings-close"
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+          </Link>
         </div>
-        <Separator className="my-6" />
+        <Separator className="my-4" />
         <div className="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
           <aside className="mx-2 lg:w-1/5">
             <SidebarNav items={sidebarNavItems} />
           </aside>
-          <div className="flex-1 lg:max-w-2xl relative">
-            <div className="absolute top-0 right-0 translate-y-[-4px]">
-              <Link href="/" aria-label="Close settings and return to home">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  data-testid="user-settings-close"
-                  className="h-8 w-8"
-                >
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Close</span>
-                </Button>
-              </Link>
-            </div>
-            {children}
-          </div>
+          <div className="flex-1 lg:max-w-2xl">{children}</div>
         </div>
       </div>
     </>
