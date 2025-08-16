@@ -75,7 +75,7 @@ export default function SettingsLayout({ children }: ISettingsLayoutProps) {
             <SidebarNav items={sidebarNavItems} />
           </aside>
           <div className="flex-1 lg:max-w-2xl relative">
-            <div className="absolute -top-2 right-0">
+            <div className="absolute top-0 right-0 translate-y-[-4px]">
               <Link href="/" aria-label="Close settings and return to home">
                 <Button
                   variant="ghost"
