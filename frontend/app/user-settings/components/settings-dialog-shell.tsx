@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
   Dialog,
@@ -36,11 +36,18 @@ export function SettingsDialogShell({
     router.push("/");
   }, [router]);
 
+  const [open, setOpen] = useState(true);
+
   return (
     <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) handleClose();
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          setOpen(false);
+          handleClose();
+        } else {
+          setOpen(true);
+        }
       }}
     >
       <DialogContent
