@@ -25,6 +25,7 @@ from tunetrees.app.queries import (
     query_practice_list_scheduled,
     # query_practice_list_scheduled_original,
     generate_or_get_practice_queue,
+    refill_practice_queue,
 )
 from tunetrees.app.schedule import (
     TuneFeedbackUpdate,
@@ -82,7 +83,6 @@ from tunetrees.models.tunetrees_pydantic import (
     TuneTypeModel,
     TuneTypeModelPartial,
     ViewPlaylistJoinedModel,
-    DailyPracticeQueueModel,
 )
 
 logger = logging.getLogger("tunetrees.api")
@@ -99,10 +99,10 @@ DEBUG_SLOWDOWN = int(environ.get("DEBUG_SLOWDOWN", 0))
 
 @router.get(
     "/practice-queue/{user_id}/{playlist_ref}",
-    response_model=list[DailyPracticeQueueModel],
+    # NOTE: returning raw enriched dicts (queue row + tune metadata). Pydantic model would drop extra tune fields.
     summary="Get or Generate Daily Practice Queue",
     description=(
-        "Return the frozen daily (or rolling) practice queue snapshot. Generates a new snapshot if none exists "
+        "Return the frozen daily (or rolling) practice queue snapshot (enriched with tune metadata). Generates a new snapshot if none exists "
         "for the current window. Buckets: 1=due today, 2=recently lapsed, 3=backfill."
     ),
 )
@@ -120,7 +120,7 @@ async def get_practice_queue(
     force_regen: bool = Query(
         False, description="Force regeneration even if an active snapshot exists."
     ),
-) -> List[DailyPracticeQueueModel]:
+):
     try:
         if sitdown_date.tzinfo is None:
             sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
@@ -133,12 +133,53 @@ async def get_practice_queue(
                 local_tz_offset_minutes=local_tz_offset_minutes,
                 force_regen=force_regen,
             )
-            # Validate into Pydantic models
-            return [DailyPracticeQueueModel.model_validate(r) for r in rows]
+            # rows are already dicts (enriched) at this point; return directly
+            return rows
     except Exception as e:
         logger.error(f"Unable to fetch practice queue: {e}")
         raise HTTPException(
             status_code=500, detail=f"Unable to fetch practice queue: {e}"
+        )
+
+
+@router.post(
+    "/practice-queue/{user_id}/{playlist_ref}/refill",
+    summary="Refill (Backfill) Daily Practice Queue",
+    description=(
+        "Append additional older/backlog tunes to the active daily practice queue (enriched rows). Replaces automatic Q3. "
+        "Returns ONLY the newly appended queue rows (not the full queue)."
+    ),
+)
+async def refill_practice_queue_endpoint(
+    user_id: int = Path(..., description="User identifier"),
+    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+    count: int = Query(5, ge=1, le=50, description="Number of backlog tunes to append"),
+    sitdown_date: datetime = Query(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Practice sitdown timestamp anchoring the active window.",
+    ),
+    local_tz_offset_minutes: Optional[int] = Query(
+        None,
+        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5).",
+    ),
+):
+    try:
+        if sitdown_date.tzinfo is None:
+            sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
+        with SessionLocal() as db:
+            rows = refill_practice_queue(
+                db=db,
+                user_ref=user_id,
+                playlist_ref=playlist_ref,
+                review_sitdown_date=sitdown_date,
+                local_tz_offset_minutes=local_tz_offset_minutes,
+                count=count,
+            )
+            return rows
+    except Exception as e:
+        logger.error(f"Unable to refill practice queue: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to refill practice queue: {e}"
         )
 
 
@@ -165,6 +206,10 @@ def get_scheduled_tunes_overview(
         None,
         description="Client local timezone offset minutes (e.g. -300 for UTC-5).",
     ),
+    enable_backfill: bool = Query(
+        False,
+        description="If true, include optional backfill (older backlog) tunes when min not met.",
+    ),
 ) -> List[PlaylistTuneJoinedModel]:
     try:
         if sitdown_date.tzinfo is None:
@@ -180,6 +225,7 @@ def get_scheduled_tunes_overview(
                 show_playlist_deleted=show_playlist_deleted,
                 review_sitdown_date=sitdown_date,
                 local_tz_offset_minutes=local_tz_offset_minutes,
+                enable_backfill=enable_backfill,
             )
             # Already PlaylistTuneJoinedModel instances with bucket populated.
             # (Defensive cast in case of mixed return types.)

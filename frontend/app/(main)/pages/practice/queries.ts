@@ -77,6 +77,7 @@ export async function getScheduledTunesOverview(
   playlistId: number,
   sitdownDate: Date,
   showDeleted = false,
+  enableBackfill = false,
 ): Promise<ITuneOverviewScheduled[]> {
   if (
     !sitdownDate ||
@@ -105,6 +106,7 @@ export async function getScheduledTunesOverview(
           show_playlist_deleted: showDeleted,
           sitdown_date: sitdownDateUtcString,
           local_tz_offset_minutes: localTzOffsetMinutes,
+          enable_backfill: enableBackfill,
         },
       },
     );
@@ -144,7 +146,7 @@ export async function getPracticeQueue(
   const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
   const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
   try {
-    const response = await client.get<IPracticeQueueEntry[]>(
+    const response = await client.get<IPracticeQueueWithMeta>(
       `/practice-queue/${userId}/${playlistId}`,
       {
         params: {
@@ -154,64 +156,45 @@ export async function getPracticeQueue(
         },
       },
     );
-    const entries = response.data;
-    // Derive new tunes due count by comparing scheduled overview bucket 1 set.
-    // We do a secondary fetch of scheduled tunes (no deleted) and count bucket 1 missing from snapshot.
-    // This is a best-effort; if it fails, we still return the snapshot.
-    let newTunesDueCount = 0;
-    let scheduled: ITuneOverviewScheduled[] = [];
-    try {
-      scheduled = await getScheduledTunesOverview(
-        userId,
-        playlistId,
-        sitdownDate,
-        false,
-      );
-      const snapshotTuneIds = new Set(entries.map((e) => e.tune_ref));
-      // Bucket 1 detection: scheduled date inside current local day boundary -> we reuse backend windows logic heuristically here.
-      // Simplify: treat any scheduled date (scheduled field) that shares the same YYYY-MM-DD with sitdown local day as bucket 1.
-      const localDay = sitdownDate.toISOString().slice(0, 10);
-      for (const t of scheduled) {
-        const tuneId = t.id; // may be undefined; skip if so
-        if (
-          t.scheduled?.startsWith(localDay) &&
-          tuneId &&
-          !snapshotTuneIds.has(tuneId)
-        ) {
-          newTunesDueCount += 1;
-        }
-      }
-    } catch (error) {
-      console.warn("Unable to compute newTunesDueCount:", error);
-    }
-    // Build a map of tune id -> title/name
-    try {
-      if (scheduled && scheduled.length > 0) {
-        const nameMap = new Map<number, string | null>();
-        for (const s of scheduled) {
-          if (s.id !== null && s.id !== undefined) {
-            // Attempt to use 'title' or 'name' property depending on model shape
-            // @ts-expect-error dynamic field access fallback
-            const title = s.title || s.name || null;
-            nameMap.set(s.id, title);
-          }
-        }
-        for (const e of entries) {
-          if (nameMap.has(e.tune_ref)) {
-            e.tune_title = nameMap.get(e.tune_ref) || null;
-          }
-        }
-      }
-    } catch (error) {
-      console.warn(
-        "Unable to enrich practice queue entries with titles:",
-        error,
-      );
-    }
-    return { entries, new_tunes_due_count: newTunesDueCount };
+    // Backend now returns entries already enriched with tune metadata AND computed new_tunes_due_count.
+    return response.data;
   } catch (error) {
     console.error("Error in getPracticeQueue: ", error);
     return { entries: [], new_tunes_due_count: 0 };
+  }
+}
+
+/**
+ * Request additional backlog tunes (explicit backfill) appended to active daily queue.
+ * Returns ONLY newly appended queue entries (can be empty if none eligible).
+ */
+export async function refillPracticeQueue(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  count = 5,
+): Promise<IPracticeQueueEntry[]> {
+  if (!sitdownDate || Number.isNaN(sitdownDate.getTime())) {
+    throw new Error("sitdownDate (Date) required for practice queue refill");
+  }
+  const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
+  const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
+  try {
+    const response = await client.post<IPracticeQueueEntry[]>(
+      `/practice-queue/${userId}/${playlistId}/refill`,
+      null,
+      {
+        params: {
+          sitdown_date: sitdownDateUtcString,
+          local_tz_offset_minutes: localTzOffsetMinutes,
+          count,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in refillPracticeQueue: ", error);
+    return [];
   }
 }
 

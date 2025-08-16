@@ -7,7 +7,10 @@ import type { RowSelectionState } from "@tanstack/react-table";
 import { Upload } from "lucide-react";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
-import { getScheduledTunesOverviewAction } from "../actions/practice-actions";
+import {
+  getPracticeQueueAction,
+  refillPracticeQueueAction,
+} from "../actions/practice-actions";
 import {
   deleteTableTransientData,
   updateCurrentTuneInDb,
@@ -30,6 +33,33 @@ interface IScheduledTunesGridProps {
   userId: number;
 }
 
+// Type-only interface reflecting backend-enriched practice queue entry shape we consume.
+// This does NOT introduce new columns; it mirrors existing fields we already map.
+interface IPracticeQueueRowInternal {
+  id: number;
+  title: string | null; // backend tune_title (may be null)
+  name: string | null; // legacy alias used elsewhere in table code
+  type?: string | null;
+  structure?: string | null;
+  learned?: string | null;
+  scheduled?: string | null;
+  latest_practiced?: string | null;
+  latest_review_date?: string | null;
+  bucket: number | null;
+  recall_eval: string | null; // user-entered during session (not from backend snapshot)
+  goal: string | null; // user-entered (session-only for now)
+  latest_quality: number | null;
+  latest_easiness: number | null;
+  latest_interval: number | null;
+  latest_goal?: string | null;
+  latest_repetitions?: number | null;
+  latest_technique?: string | null;
+  latest_due_date?: string | null; // reserved
+  next_review_date?: string | null; // reserved
+  practice_state?: string | null; // reserved
+  playlist_deleted: boolean;
+}
+
 export default function TunesGridScheduled({
   userId,
 }: IScheduledTunesGridProps): JSX.Element {
@@ -38,12 +68,17 @@ export default function TunesGridScheduled({
   const { triggerRefresh, refreshId } = useTuneDataRefresh();
   const { currentPlaylist: playlistId } = usePlaylist();
   const { currentTune, setCurrentTune } = useTune();
-  // bucket now provided directly by scheduled overview endpoint
+  // bucket now provided by practice queue snapshot entries (mapped into tunes state)
 
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const showDeleted = false;
+  const [isRefilling, setIsRefilling] = useState(false);
   const [mode, setMode] = useState<ReviewMode>("grid");
+  // Track IDs of tunes that received an evaluation this session (for potential future toggles)
+  // Track of evaluated tune ids (reserved for future UI toggles). Currently unused directly in render.
+  const [, setCompletedTuneIds] = useState<Set<number>>(new Set());
+  // hasPending removed: we now permit backlog only when queue empty (button shown only then)
+  const defaultMaxReviews = 10; // mirrors backend default when prefs not fetched client-side
 
   const handleError = useCallback(
     (message: string) => {
@@ -53,8 +88,8 @@ export default function TunesGridScheduled({
   );
 
   useEffect(() => {
-    const hasNonEmptyRecallEval = tunes.some((t) => t.recall_eval);
-    setIsSubmitEnabled(hasNonEmptyRecallEval);
+    const anyEvaluated = tunes.some((t) => t.recall_eval);
+    setIsSubmitEnabled(anyEvaluated);
   }, [tunes]);
 
   const lastFetchedRefreshId = useRef<number | null>(null);
@@ -63,125 +98,109 @@ export default function TunesGridScheduled({
   const fetchSeq = useRef(0);
   useEffect(() => {
     if (playlistId <= 0) return;
-    // Skip if we've already fetched for this (playlistId, refreshId) combo
     if (
       lastFetchedPlaylistId.current === playlistId &&
       lastFetchedRefreshId.current === refreshId
     ) {
-      return;
+      return; // snapshot already loaded for this refresh cycle
     }
-    if (inFlight.current) return; // avoid overlapping requests
-    async function fetchData() {
+    if (inFlight.current) return;
+    async function fetchSnapshot() {
       inFlight.current = true;
-      const seq = ++fetchSeq.current;
+      ++fetchSeq.current;
       setIsLoading(true);
       try {
         const sitdownDate = getSitdownDateFromBrowser();
-        console.log(
-          "[ScheduledFetch] starting fetch",
-          JSON.stringify({
-            playlistId,
-            refreshId,
-            lastFetchedRefreshId: lastFetchedRefreshId.current,
-            lastFetchedPlaylistId: lastFetchedPlaylistId.current,
-            tunesLength: tunes.length,
-            sitdownDate: sitdownDate.toISOString(),
-            seq,
-          }),
-        );
-        const overview = await getScheduledTunesOverviewAction(
+        const raw = await getPracticeQueueAction(
           userId,
           playlistId,
-          sitdownDate ? new Date(sitdownDate) : null,
-          showDeleted,
+          new Date(sitdownDate),
+          false,
         );
-        setTunes(overview);
-        // Immediate diagnostic after state update enqueue
-        console.log(
-          "[ScheduledFetch][PostSet] setTunes called with length=",
-          overview.length,
-        );
-        // Microtask check for state visibility
-        queueMicrotask(() => {
-          try {
-            interface IDebugWin extends Window {
-              __ttScheduledTunes?: unknown[];
-            }
-            const w = window as unknown as IDebugWin;
-            console.log(
-              "[ScheduledFetch][Microtask] tunes length now=",
-              w.__ttScheduledTunes?.length,
-            );
-          } catch {
-            /* ignore */
-          }
-        });
+        // Backend currently returns a list (array) of rows (response_model=list[DailyPracticeQueueModel])
+        // but types for action assume an object with entries. Normalize here defensively.
+        type RawEntry = {
+          tune_ref: number;
+          tune_title?: string | null;
+          bucket?: number | null;
+          type?: string | null;
+          structure?: string | null;
+          learned?: string | null;
+          scheduled?: string | null;
+          latest_practiced?: string | null;
+          latest_review_date?: string | null;
+          latest_quality?: number | null;
+          latest_easiness?: number | null;
+          latest_interval?: number | null;
+          latest_goal?: string | null;
+          latest_repetitions?: number | null;
+          latest_technique?: string | null;
+        };
+        function isRawEntryArray(arr: unknown[]): arr is RawEntry[] {
+          return arr.every(
+            (o) =>
+              !!o && typeof (o as { tune_ref?: unknown }).tune_ref === "number",
+          );
+        }
+        let snapshotEntriesUnknown: unknown[] = [];
+        if (Array.isArray(raw)) snapshotEntriesUnknown = raw;
+        else if (
+          raw &&
+          typeof raw === "object" &&
+          Array.isArray((raw as { entries?: unknown[] }).entries)
+        )
+          snapshotEntriesUnknown = (raw as { entries: unknown[] }).entries;
+        const snapshotEntries: RawEntry[] = isRawEntryArray(
+          snapshotEntriesUnknown,
+        )
+          ? snapshotEntriesUnknown
+          : [];
+        // Exclude tunes already marked completed server-side so they don't reappear after tab switches
+        const mapped: IPracticeQueueRowInternal[] = snapshotEntries
+          .filter((e) => {
+            const ce = e as unknown as { completed_at?: string | null };
+            return !ce.completed_at;
+          })
+          .map((e) => ({
+            id: e.tune_ref,
+            title: e.tune_title || null,
+            name: e.tune_title || null,
+            type: e.type ?? null,
+            structure: e.structure ?? null,
+            learned: e.learned ?? null,
+            scheduled: e.scheduled ?? null,
+            latest_practiced: e.latest_practiced ?? null,
+            latest_review_date: e.latest_review_date ?? null,
+            bucket: (e.bucket as number | null) ?? null,
+            recall_eval: null,
+            goal: null,
+            latest_quality: e.latest_quality ?? null,
+            latest_easiness: e.latest_easiness ?? null,
+            latest_interval: e.latest_interval ?? null,
+            latest_goal: e.latest_goal ?? null,
+            latest_repetitions: e.latest_repetitions ?? null,
+            latest_technique: e.latest_technique ?? null,
+            latest_due_date: null,
+            next_review_date: null,
+            practice_state: null,
+            playlist_deleted: false,
+          }));
+        setTunes(mapped as unknown as never);
         setTunesRefreshId(refreshId);
         lastFetchedRefreshId.current = refreshId;
         lastFetchedPlaylistId.current = playlistId;
-        const sample = overview.slice(0, 3).map((t) => ({
-          id: t.id,
-          bucket: (t as unknown as { bucket?: number | null }).bucket ?? null,
-        }));
-        console.log(
-          "[ScheduledFetch] fetched tunes",
-          JSON.stringify({ length: overview.length, seq, sample }),
-        );
-        try {
-          interface IDebugWin2 extends Window {
-            __ttScheduledTunes?: typeof overview;
-            dumpScheduledTunes?: () => void;
-          }
-          const w = window as unknown as IDebugWin2;
-          w.__ttScheduledTunes = overview;
-          w.dumpScheduledTunes = () => {
-            console.log("[ScheduledFetch][Dump]", overview.length, overview);
-          };
-        } catch {
-          /* ignore */
-        }
       } catch (error) {
-        console.error(
-          "[ScheduledFetch] error (preserving previous tunes):",
-          error,
-        );
-        handleError("Failed to load scheduled tunes.");
+        console.error("[PracticeQueueFetch] error", error);
+        handleError("Failed to load practice queue.");
       } finally {
         setIsLoading(false);
-        console.log(
-          "[ScheduledFetch] finished",
-          JSON.stringify({ seq, tunesLengthAfter: tunes.length }),
-        );
         inFlight.current = false;
       }
     }
-    void fetchData();
-    return () => {
-      const seqAtUnmount = fetchSeq.current;
-      console.log(
-        "[ScheduledFetch] effect cleanup (unmount or deps change)",
-        JSON.stringify({ seqAtUnmount }),
-      );
-    };
-  }, [
-    playlistId,
-    refreshId,
-    userId,
-    setTunes,
-    setTunesRefreshId,
-    handleError,
-    tunes.length,
-  ]);
+    void fetchSnapshot();
+  }, [playlistId, refreshId, userId, setTunes, setTunesRefreshId, handleError]);
 
-  // Instrumentation: log whenever tunes array changes length
-  useEffect(() => {
-    console.log(
-      "[ScheduledGrid][Render] tunes length=",
-      tunes.length,
-      "ids sample=",
-      tunes.slice(0, 5).map((t) => t.id),
-    );
-  }, [tunes, tunes.length]);
+  // (Optional) could add lightweight debug here; removed verbose scheduled logs.
 
   const handleRecallEvalChange = useCallback(
     (tuneId: number, newValue: string): void => {
@@ -190,6 +209,16 @@ export default function TunesGridScheduled({
           t.id === tuneId ? { ...t, recall_eval: newValue } : t,
         ),
       );
+      if (newValue) {
+        setCompletedTuneIds((prev) => new Set(prev).add(tuneId));
+      } else {
+        // If user clears evaluation (possible with UI changes) remove from completed set
+        setCompletedTuneIds((prev) => {
+          const next = new Set(prev);
+          next.delete(tuneId);
+          return next;
+        });
+      }
     },
     [setTunes],
   );
@@ -254,10 +283,28 @@ export default function TunesGridScheduled({
     const sitdownDate = getSitdownDateFromBrowser();
     submitPracticeFeedbacks({ playlistId, updates, sitdownDate })
       .then(() => {
-        triggerRefresh();
+        // Remove only tunes that were actually submitted (had a recall_eval); keep others in the grid.
+        // Remove only tunes that were practiced (present in updates) keeping others intact
+        const practicedIds = new Set(
+          Object.keys(updates).map((k) => Number(k)),
+        );
+        setTunes((prev) =>
+          prev.filter((t) =>
+            t.id !== null && t.id !== undefined
+              ? !practicedIds.has(t.id)
+              : true,
+          ),
+        );
+        setCompletedTuneIds((prev) => {
+          const next = new Set(prev);
+          for (const id of practicedIds) {
+            next.delete(id);
+          }
+          return next;
+        });
         toast({
           title: "Success",
-          description: "Practice successfully submitted",
+          description: "Submitted evaluated tunes.",
         });
       })
       .catch((error) => {
@@ -294,32 +341,7 @@ export default function TunesGridScheduled({
 
   return (
     <div className="w-full h-full">
-      {(() => {
-        try {
-          console.log(
-            "[ScheduledGrid][RenderDecision] playlistId=%d isLoading=%s hasTable=%s tunesLength=%d refreshId=%s lastFetchedPlaylistId=%s lastFetchedRefreshId=%s",
-            playlistId,
-            isLoading,
-            Boolean(table),
-            tunes.length,
-            refreshId,
-            lastFetchedPlaylistId.current,
-            lastFetchedRefreshId.current,
-          );
-          if (tunes.length > 0) {
-            const firstBucket = (
-              tunes[0] as unknown as { bucket?: number | null }
-            ).bucket;
-            console.log(
-              "[ScheduledGrid][FirstTune]",
-              JSON.stringify({ id: tunes[0].id, bucket: firstBucket ?? null }),
-            );
-          }
-        } catch {
-          /* ignore */
-        }
-        return null; // satisfy ReactNode requirement
-      })()}
+      {/* Diagnostic render log removed for snapshot-based grid */}
       {tableComponent}
       {playlistId <= 0 ? (
         <div className="w-full h-full flex items-center justify-center">
@@ -333,8 +355,109 @@ export default function TunesGridScheduled({
         <div className="w-full h-full flex flex-col items-center justify-center gap-2">
           <p className="text-lg font-semibold">No scheduled tunes</p>
           <p className="text-sm text-muted-foreground">
-            Add tunes or submit practice to generate scheduling.
+            Add tunes from backlog.
           </p>
+          <Button
+            variant="outline"
+            disabled={
+              playlistId <= 0 ||
+              isRefilling ||
+              tunes.length >= defaultMaxReviews
+            }
+            data-testid="practice-queue-refill"
+            onClick={() => {
+              const sitdownDate = getSitdownDateFromBrowser();
+              setIsRefilling(true);
+              refillPracticeQueueAction(
+                userId,
+                playlistId,
+                new Date(sitdownDate),
+                5,
+              )
+                .then((newRows) => {
+                  if (newRows.length === 0) {
+                    toast({
+                      title: "No backlog tunes",
+                      description: "There are no additional tunes to backfill.",
+                    });
+                  } else {
+                    setTunes((prev) => {
+                      return [
+                        ...prev,
+                        ...newRows
+                          .filter((e) => {
+                            const ce = e as unknown as {
+                              completed_at?: string | null;
+                            };
+                            return !ce.completed_at;
+                          })
+                          .map((e) => {
+                            const enriched = e as unknown as {
+                              tune_ref: number;
+                              tune_title?: string | null;
+                              type?: string | null;
+                              structure?: string | null;
+                              learned?: string | null;
+                              scheduled?: string | null;
+                              latest_practiced?: string | null;
+                              latest_review_date?: string | null;
+                              latest_quality?: number | null;
+                              latest_easiness?: number | null;
+                              latest_interval?: number | null;
+                              latest_goal?: string | null;
+                              latest_repetitions?: number | null;
+                              latest_technique?: string | null;
+                              bucket?: number | null;
+                            };
+                            const row: IPracticeQueueRowInternal = {
+                              id: enriched.tune_ref,
+                              title: enriched.tune_title || null,
+                              name: enriched.tune_title || null,
+                              type: enriched.type ?? null,
+                              structure: enriched.structure ?? null,
+                              learned: enriched.learned ?? null,
+                              scheduled: enriched.scheduled ?? null,
+                              latest_practiced:
+                                enriched.latest_practiced ?? null,
+                              latest_review_date:
+                                enriched.latest_review_date ?? null,
+                              bucket:
+                                (enriched.bucket as number | null) ?? null,
+                              recall_eval: null,
+                              goal: null,
+                              latest_quality: enriched.latest_quality ?? null,
+                              latest_easiness: enriched.latest_easiness ?? null,
+                              latest_interval: enriched.latest_interval ?? null,
+                              latest_goal: enriched.latest_goal ?? null,
+                              latest_repetitions:
+                                enriched.latest_repetitions ?? null,
+                              latest_technique:
+                                enriched.latest_technique ?? null,
+                              latest_due_date: null,
+                              next_review_date: null,
+                              practice_state: null,
+                              playlist_deleted: false,
+                            };
+                            return row;
+                          }),
+                      ] as unknown as never;
+                    });
+                    toast({
+                      title: "Backlog refilled",
+                      description: `${newRows.length} tune(s) added from backlog`,
+                    });
+                  }
+                })
+                .catch((error) => {
+                  console.error("[RefillBacklog] error", error);
+                  handleError("Failed to refill backlog.");
+                })
+                .finally(() => setIsRefilling(false));
+            }}
+            title="Refill backlog tunes into the practice queue"
+          >
+            {isRefilling ? "Adding..." : "Add from Backlog"}
+          </Button>
         </div>
       ) : (
         <>
@@ -355,6 +478,7 @@ export default function TunesGridScheduled({
                   ? ""
                   : " Submit Practiced Tunes"}
               </Button>
+              {/* Inline Add from Backlog button removed: shown only in empty-state panel now */}
             </div>
             <div className="flex items-center space-x-4">
               <Label htmlFor="flashcard-mode">Flashcard Mode</Label>

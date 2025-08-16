@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { IPracticeQueueWithMeta, IPracticeQueueEntry } from "./types";
+import { refillPracticeQueue } from "./queries";
 
 interface IProps {
   queue: IPracticeQueueWithMeta;
@@ -20,9 +21,11 @@ function groupByBucket(
 
 export default function PracticeQueueClient({ queue }: IProps) {
   const [showCompleted, setShowCompleted] = useState(true);
-  const grouped = useMemo(() => groupByBucket(queue.entries), [queue.entries]);
+  const [entries, setEntries] = useState<IPracticeQueueEntry[]>(queue.entries);
+  const grouped = useMemo(() => groupByBucket(entries), [entries]);
   const router = useRouter();
   const params = useSearchParams();
+  const [refillLoading, setRefillLoading] = useState(false);
 
   const handleForceRefresh = () => {
     const newParams = new URLSearchParams(params.toString());
@@ -51,6 +54,36 @@ export default function PracticeQueueClient({ queue }: IProps) {
       description: "Older backlog beyond window",
       color: "border-slate-500",
     },
+  };
+
+  const handleRefill = async (): Promise<void> => {
+    if (refillLoading) return;
+    try {
+      setRefillLoading(true);
+      // Derive sitdown date from window_start_utc first entry (fallback now)
+      const first = entries[0];
+      const sitdownIso = first?.window_start_utc || new Date().toISOString();
+      const sitdownDate = new Date(sitdownIso);
+      const userId = first?.user_ref;
+      const playlistId = first?.playlist_ref;
+      if (!userId || !playlistId) {
+        console.warn("Refill skipped: missing user or playlist id");
+        return;
+      }
+      const newRows = await refillPracticeQueue(
+        userId,
+        playlistId,
+        sitdownDate,
+        5,
+      );
+      if (newRows.length > 0) {
+        setEntries((prev) =>
+          [...prev, ...newRows].sort((a, b) => a.order_index - b.order_index),
+        );
+      }
+    } finally {
+      setRefillLoading(false);
+    }
   };
 
   const renderEntry = (e: IPracticeQueueEntry) => {
@@ -94,7 +127,7 @@ export default function PracticeQueueClient({ queue }: IProps) {
   return (
     <div className="space-y-6" data-testid="practice-queue-root">
       <div className="flex items-center gap-4">
-        <div>
+        <div className="flex items-center gap-2">
           <span className="font-medium">New tunes due since snapshot:</span>{" "}
           <span data-testid="practice-queue-new-count">
             {queue.new_tunes_due_count}
@@ -115,6 +148,18 @@ export default function PracticeQueueClient({ queue }: IProps) {
           data-testid="practice-queue-toggle-completed"
         >
           {showCompleted ? "Hide Completed" : "Show Completed"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            // Fire and forget; internal state handles loading
+            void handleRefill();
+          }}
+          disabled={refillLoading}
+          className="rounded bg-amber-100 px-2 py-1 text-xs hover:bg-amber-200 disabled:opacity-50"
+          data-testid="practice-queue-refill"
+        >
+          {refillLoading ? "Refilling..." : "Refill Backlog"}
         </button>
       </div>
       {[1, 2, 3].map((bucket) => {

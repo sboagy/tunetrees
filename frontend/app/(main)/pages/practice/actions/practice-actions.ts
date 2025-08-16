@@ -35,6 +35,7 @@ import {
   getTuneStaged,
   // getTuneStaged NOT wrapped (server component uses it directly)
   getPracticeQueue,
+  refillPracticeQueue,
 } from "../queries";
 import type {
   IReferenceData,
@@ -202,6 +203,7 @@ export async function getScheduledTunesOverviewAction(
   playlistId: number,
   sitdownDate: Date | null,
   showDeleted: boolean,
+  enableBackfill = false,
 ) {
   // Intentionally do NOT fallback; caller must supply browser-derived date.
   if (!sitdownDate) {
@@ -224,6 +226,7 @@ export async function getScheduledTunesOverviewAction(
     playlistId,
     sitdownDate,
     showDeleted,
+    enableBackfill,
   );
   try {
     interface ISchedSample {
@@ -252,6 +255,17 @@ export async function getPracticeQueueAction(
   forceRegen = false,
 ) {
   return getPracticeQueue(userId, playlistId, sitdownDate, forceRegen);
+}
+
+// Append backlog tunes to existing daily snapshot (returns only new rows)
+export async function refillPracticeQueueAction(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  count = 5,
+) {
+  // count kept small & validated server-side (1..50)
+  return await refillPracticeQueue(userId, playlistId, sitdownDate, count);
 }
 
 export async function getTuneStagedAction(

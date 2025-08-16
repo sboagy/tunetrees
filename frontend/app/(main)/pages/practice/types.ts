@@ -284,6 +284,23 @@ export interface IPracticeQueueEntry {
   outcome?: string | null;
   active?: boolean | null;
   tune_title?: string | null; // added client-enriched field for display
+  // Enriched tune metadata (optional)
+  type?: string | null;
+  structure?: string | null;
+  learned?: string | null;
+  scheduled?: string | null;
+  latest_practiced?: string | null;
+  latest_review_date?: string | null;
+  latest_quality?: number | null;
+  latest_easiness?: number | null;
+  latest_interval?: number | null;
+  latest_repetitions?: number | null;
+  latest_difficulty?: number | null;
+  latest_step?: number | null;
+  latest_goal?: string | null;
+  latest_technique?: string | null;
+  tags?: string | null;
+  notes?: string | null;
 }
 
 export interface IPracticeQueueWithMeta {

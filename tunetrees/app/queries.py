@@ -293,6 +293,7 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
     show_deleted: bool = True,
     show_playlist_deleted: bool = False,
     local_tz_offset_minutes: Optional[int] = None,
+    enable_backfill: bool = False,
 ) -> List["PlaylistTuneJoinedModel"]:
     """Daily practice list: three-phase interval-based scheduling algorithm.
 
@@ -573,8 +574,8 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
             annotated.append(m)
         return annotated
 
-    # --- Q3 (Backfill Older) ---
-    if min_reviews > 0 and len(results) < min_reviews:
+    # --- Q3 (Backfill Older) --- (now opt-in via enable_backfill)
+    if enable_backfill and min_reviews > 0 and len(results) < min_reviews:
         remaining_needed = min_reviews - len(results)
         backfill_cap = (
             remaining_needed
@@ -611,7 +612,7 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
                         )[:19]
                     )
                 logger.debug(
-                    "Q3(backfill) count=%d older_than<%s sample=%s",
+                    "Q3(backfill,opt-in) count=%d older_than<%s sample=%s",
                     len(q3_rows),
                     window_floor_ts,
                     sample,
@@ -700,8 +701,40 @@ def _fetch_existing_active_queue(
 
 
 def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
-    return [
-        {
+    # Enrich with joined tune fields (title, type, structure, learned, goal, scheduled, latest_* etc.)
+    from sqlalchemy import select
+    from tunetrees.models.tunetrees import t_practice_list_joined
+
+    if not rows:
+        return []
+
+    # Build map keyed by tune id for fast merge
+    tune_ids = {r.tune_ref for r in rows if getattr(r, "tune_ref", None) is not None}
+    # Attempt single query; tolerate failure (returns base fields only)
+    joined_map: dict[int, Any] = {}
+    try:  # pragma: no cover - defensive
+        from tunetrees.app.database import SessionLocal
+
+        with SessionLocal() as _db:  # lightweight new session
+            joined_rows = (
+                _db.execute(
+                    select(t_practice_list_joined).where(
+                        t_practice_list_joined.c.id.in_(tune_ids)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            for jr in joined_rows:
+                tid = jr.get("id")
+                if tid is not None:
+                    joined_map[int(tid)] = jr
+    except Exception:  # pragma: no cover
+        joined_map = {}
+
+    enriched: list[dict[str, Any]] = []
+    for r in rows:
+        base = {
             "id": r.id,
             "user_ref": r.user_ref,
             "playlist_ref": r.playlist_ref,
@@ -724,8 +757,43 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
             "outcome": r.outcome,
             "active": r.active,
         }
-        for r in rows
-    ]
+        jr = joined_map.get(r.tune_ref) or {}
+
+        # Stable, explicit fields the frontend expects (provide None fallback if absent)
+        # Prefix tune_* only where needed to avoid colliding with queue fields.
+        base["tune_title"] = jr.get("title") if jr else None
+        base["type"] = jr.get("type") if jr else None
+        base["structure"] = jr.get("structure") if jr else None
+        base["mode_key"] = (
+            jr.get("mode") if jr else None
+        )  # avoid clobbering mode (queue mode)
+        base["incipit"] = jr.get("incipit") if jr else None
+        base["genre"] = jr.get("genre") if jr else None
+        base["learned"] = jr.get("learned") if jr else None
+        base["goal"] = jr.get("goal") if jr else None
+        base["scheduled"] = jr.get("scheduled") if jr else None
+        base["latest_practiced"] = jr.get("latest_practiced") if jr else None
+        base["latest_quality"] = jr.get("latest_quality") if jr else None
+        base["latest_easiness"] = jr.get("latest_easiness") if jr else None
+        base["latest_difficulty"] = jr.get("latest_difficulty") if jr else None
+        base["latest_interval"] = jr.get("latest_interval") if jr else None
+        base["latest_step"] = jr.get("latest_step") if jr else None
+        base["latest_repetitions"] = jr.get("latest_repetitions") if jr else None
+        base["latest_review_date"] = jr.get("latest_review_date") if jr else None
+        base["latest_goal"] = jr.get("latest_goal") if jr else None
+        base["latest_technique"] = jr.get("latest_technique") if jr else None
+        base["tags"] = jr.get("tags") if jr else None
+        base["playlist_deleted"] = jr.get("playlist_deleted") if jr else None
+        base["notes"] = jr.get("notes") if jr else None
+        base["favorite_url"] = jr.get("favorite_url") if jr else None
+        base["has_override"] = jr.get("has_override") if jr else None
+        base["deleted"] = jr.get("deleted") if jr else None
+        base["private_for"] = jr.get("private_for") if jr else None
+        # Provide tune_id separate from queue row id for clarity
+        if "id" in jr:
+            base["tune_id"] = jr.get("id")
+        enriched.append(base)
+    return enriched
 
 
 def _build_queue_rows(
@@ -852,12 +920,16 @@ def generate_or_get_practice_queue(
             db.rollback()
             raise
 
+    # NOTE: Automatic backfill (legacy Q3) disabled for initial snapshot to keep
+    # the daily queue focused on due + recently lapsed material. Users can
+    # explicitly request more via the refill endpoint.
     scheduled_rows = query_practice_list_scheduled(
         db,
         review_sitdown_date=review_sitdown_date,
         playlist_ref=playlist_ref,
         user_ref=user_ref,
         local_tz_offset_minutes=local_tz_offset_minutes,
+        enable_backfill=False,
     )
     built = _build_queue_rows(
         scheduled_rows,
@@ -895,6 +967,117 @@ def get_active_practice_queue_bucket_counts(
     for b in rows:
         counts[b] = counts.get(b, 0) + 1
     return counts
+
+
+# ---------------------------------------------------------------------------
+# Explicit Backfill / Refill Support (user-triggered)
+# ---------------------------------------------------------------------------
+def refill_practice_queue(
+    db: Session,
+    user_ref: int,
+    playlist_ref: int,
+    review_sitdown_date: Optional[datetime] = None,
+    local_tz_offset_minutes: Optional[int] = None,
+    count: int = 5,
+) -> list[dict[str, Any]]:
+    """Append additional older (backfill) tunes to an existing active queue snapshot.
+
+    This replaces the previous automatic Q3 behaviour with a deliberate user action.
+    Only rows whose coalesced timestamp (scheduled OR latest_review_date) lies strictly
+    before the lapsed window floor (older backlog) and which are not already present
+    in the active queue are eligible.
+
+    Args:
+        db: Session
+        user_ref: user id
+        playlist_ref: playlist id
+        review_sitdown_date: anchor sit‑down (defaults to now UTC)
+        local_tz_offset_minutes: optional client offset
+        count: number of additional backlog tunes to append (capped >=1)
+
+    Returns:
+        list[dict[str, Any]]: Serialized newly appended queue rows (NOT the full queue).
+    """
+    if count <= 0:
+        return []
+    if review_sitdown_date is None:
+        review_sitdown_date = datetime.now(timezone.utc)
+
+    prefs = get_prefs_scheduling_options_or_defaults(
+        db, user_ref, persist_if_missing=False
+    )
+    windows = compute_scheduling_windows(
+        review_sitdown_date,
+        acceptable_delinquency_window=prefs.acceptable_delinquency_window,
+        local_tz_offset_minutes=local_tz_offset_minutes,
+    )
+    window_start_key = windows.start_ts
+
+    existing = _fetch_existing_active_queue(
+        db,
+        user_ref=user_ref,
+        playlist_ref=playlist_ref,
+        window_start_key=window_start_key,
+    )
+    if not existing:
+        # No active queue to refill.
+        return []
+
+    existing_tune_ids = {r.tune_ref for r in existing}
+    scheduled_ts_col = t_practice_list_staged.c.scheduled
+    latest_ts_col = t_practice_list_staged.c.latest_review_date
+    coalesced_col = func.coalesce(scheduled_ts_col, latest_ts_col)
+
+    # Older-than backlog filter (legacy Q3 definition)
+    backlog_filters = [
+        and_(
+            scheduled_ts_col.isnot(None),
+            scheduled_ts_col < windows.window_floor_ts,
+        )
+        | and_(
+            scheduled_ts_col.is_(None),
+            latest_ts_col < windows.window_floor_ts,
+        )
+    ]
+    base_filters = _build_base_filters(
+        user_ref=user_ref,
+        playlist_ref=playlist_ref,
+        show_deleted=True,
+        show_playlist_deleted=False,
+    )
+    backlog_rows = _run_phase_query(
+        db, base_filters, backlog_filters, coalesced_col.desc(), None, 0
+    )
+    # Filter out tunes already present & cap to count
+    new_rows_raw: list[Any] = []
+    for r in backlog_rows:
+        tune_id = getattr(r, "id", None) or getattr(r, "tune_ref", None)
+        if tune_id in existing_tune_ids:
+            continue
+        new_rows_raw.append(r)
+        if len(new_rows_raw) >= count:
+            break
+
+    if not new_rows_raw:
+        return []
+
+    # Determine next order_index start
+    max_order = max((r.order_index for r in existing), default=-1)
+    built = _build_queue_rows(
+        new_rows_raw,
+        windows,
+        prefs,
+        user_ref,
+        playlist_ref,
+        mode="per_day",
+        local_tz_offset_minutes=local_tz_offset_minutes,
+    )
+    # Adjust order indices to append sequentially
+    for offset, row in enumerate(built):
+        row.order_index = max_order + 1 + offset
+
+    persisted = _persist_queue_rows(db, built, user_ref, playlist_ref, windows)
+    return _serialize_queue_rows(persisted)
 
 
 def query_practice_list_scheduled_original(
