@@ -310,6 +310,16 @@ export default function TunesGridScheduled({
           title: "Success",
           description: "Submitted evaluated tunes.",
         });
+        // Trigger global tune data refresh so Repertoire grid reflects new practice metadata
+        try {
+          triggerRefresh();
+        } catch (error) {
+          // Non-fatal; log to console only
+          console.error(
+            "Failed to trigger global tune refresh after submit",
+            error,
+          );
+        }
       })
       .catch((error) => {
         handleError(
