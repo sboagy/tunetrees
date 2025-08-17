@@ -30,6 +30,39 @@ log = logging.getLogger(__name__)
 
 TT_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+"""Scheduling Semantics (Aug 2025 refactor)
+=================================================
+Core Fields:
+    PracticeRecord.practiced
+        Timestamp the review actually occurred (event time).
+
+    PracticeRecord.review_date
+        Immutable snapshot of the NEXT due timestamp produced by the scheduler (FSRS/SM2 or
+        goal-specific heuristic) at the moment the practice event was processed. Each new
+        evaluation appends a row with a fresh snapshot. (Historical name retained; conceptually
+        this is next_due_snapshot.)
+
+    PlaylistTune.scheduled
+        Transient manual override of the next due date. After the scheduler processes a new
+        evaluation we record the next due in PracticeRecord.review_date and CLEAR this field
+        so downstream COALESCE(scheduled, latest_review_date) falls back to the canonical snapshot.
+        A future manual override feature may set this field; it is always cleared on the next
+        evaluation to avoid stale pinning.
+
+Effective Due Computation (queries layer):
+    effective_due = COALESCE(playlist_tune.scheduled, latest PracticeRecord.review_date)
+
+Rationale:
+    - Keeps historical trail of every scheduling decision (auditable, optimizable).
+    - Prevents accidental long-term pinning by manual overrides.
+    - Simplifies migration: removing a manual override requires only clearing scheduled.
+
+Implementation Notes:
+    - schedule.py creates PracticeRecord rows with review_date set to the *next* due (not practiced).
+    - After recording an evaluation it invokes clear_playlist_tune_scheduled().
+    - Legacy code update_playlist_tune_scheduled() retained temporarily for reference; avoid new uses.
+"""
+
 
 def backup_practiced_dates():  # sourcery skip: extract-method
     with SessionLocal() as db:
@@ -387,6 +420,40 @@ def update_playlist_tune_scheduled(
         raise
 
 
+def clear_playlist_tune_scheduled(
+    db: Session,
+    tune_id: str,
+    playlist_ref: int,
+) -> None:
+    """Clear (NULL) the playlist_tune.scheduled field.
+
+    New semantics (Aug 2025 refactor):
+      - PracticeRecord.review_date now stores the NEXT due timestamp produced by the scheduler at
+        the moment of evaluation.
+      - playlist_tune.scheduled is no longer the persistent authoritative next due; we clear it
+        after using any manual override so that queries fall back to the latest PracticeRecord.review_date.
+      - Manual override feature (future) will temporarily set scheduled; upon next evaluation we
+        apply scheduler result to PracticeRecord and clear the override here.
+    """
+    try:
+        stmt = select(PlaylistTune).where(
+            and_(
+                PlaylistTune.tune_ref == int(tune_id),
+                PlaylistTune.playlist_ref == playlist_ref,
+                PlaylistTune.deleted.is_(False),
+            )
+        )
+        playlist_tune = db.execute(stmt).scalar_one_or_none()
+        if playlist_tune:
+            playlist_tune.scheduled = None  # type: ignore
+            log.debug(
+                f"Cleared playlist_tune.scheduled for tune {tune_id}, playlist {playlist_ref}"
+            )
+    except Exception as e:
+        log.error(f"Error clearing playlist_tune.scheduled: {e}")
+        raise
+
+
 def validate_and_get_quality(
     tune_update: TuneFeedbackUpdate, tune_id: str
 ) -> int | None:
@@ -558,26 +625,25 @@ def _process_non_recall_goal(
     # Create new practice record with goal-specific scheduling
     practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
 
+    next_due_str = next_review_date.strftime(TT_DATE_FORMAT)
     new_practice_record = PracticeRecord(
         id=None,
         tune_ref=tune_id,
         playlist_ref=playlist_ref,
         quality=quality_int,
         practiced=practiced_str,
-        review_date=practiced_str,  # FIXED: Record actual review date, not next review date
+        review_date=next_due_str,  # Store NEXT due (goal-specific scheduler output)
         backup_practiced=practiced_str,
         goal=goal,
         technique=technique,
-        # Set basic interval/repetition tracking
         interval=max(1, (next_review_date - sitdown_date).days),
         repetitions=(
             (latest_practice_record.repetitions + 1) if latest_practice_record else 1
         ),
-        # Keep FSRS fields for future integration
         easiness=latest_practice_record.easiness if latest_practice_record else 2.5,
         stability=latest_practice_record.stability if latest_practice_record else 1.0,
         difficulty=latest_practice_record.difficulty if latest_practice_record else 0.5,
-        state=1,  # Learning state for non-recall goals
+        state=1,
         step=0,
         elapsed_days=0,
         lapses=latest_practice_record.lapses if latest_practice_record else 0,
@@ -590,8 +656,8 @@ def _process_non_recall_goal(
     )
 
     # Step 2: Also update playlist_tune.scheduled with the same review date
-    review_date_str = next_review_date.strftime(TT_DATE_FORMAT)
-    update_playlist_tune_scheduled(db, tune_id, playlist_ref, review_date_str)
+    # Clear any manual override now that we've captured scheduler output in PracticeRecord
+    clear_playlist_tune_scheduled(db, tune_id, playlist_ref)
 
 
 def _calculate_goal_specific_review_date(
@@ -788,7 +854,8 @@ def _process_single_tune_feedback(
         interval=review_result_dict.get("interval"),
         step=review_result_dict.get("step"),
         repetitions=review_result_dict.get("repetitions"),
-        review_date=practiced_str,  # FIXED: Record actual review date, not next review date
+        review_date=review_date_str
+        or practiced_str,  # Store NEXT due; fallback to practiced timestamp if missing
         quality=quality_int,
         practiced=practiced_str,
         goal=goal,
@@ -799,8 +866,8 @@ def _process_single_tune_feedback(
     db.add(new_practice_record)
 
     # Step 2: Also update playlist_tune.scheduled with the same review date
-    if review_date_str:  # Only update if we have a valid review date
-        update_playlist_tune_scheduled(db, tune_id, playlist_ref, review_date_str)
+    # Clear any existing scheduled override so COALESCE falls back to latest PracticeRecord.review_date
+    clear_playlist_tune_scheduled(db, tune_id, playlist_ref)
 
 
 class TuneScheduleUpdate(TypedDict):

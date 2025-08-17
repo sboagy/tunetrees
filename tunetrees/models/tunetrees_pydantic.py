@@ -407,7 +407,9 @@ class PracticeRecordModel(BaseModel):
     easiness: Optional[float]
     interval: Optional[int]
     repetitions: Optional[int]
-    review_date: Optional[str]
+    review_date: Optional[
+        str
+    ]  # NEXT due snapshot (immutable) written at evaluation time
     backup_practiced: Optional[str]
     stability: Optional[float]
     elapsed_days: Optional[int]
@@ -430,7 +432,7 @@ class PracticeRecordModelPartial(BaseModel):
     easiness: Optional[float] = None
     interval: Optional[int] = None
     repetitions: Optional[int] = None
-    review_date: Optional[str] = None
+    review_date: Optional[str] = None  # NEXT due snapshot (immutable)
     backup_practiced: Optional[str] = None
     stability: Optional[float] = None
     elapsed_days: Optional[int] = None
@@ -562,7 +564,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     learned: Optional[str] = None
     goal: Optional[str] = None
     scheduled: Optional[str] = (
-        None  # Next review date for this tune from playlist_tune table
+        None  # Transient manual override of next due (cleared on evaluation)
     )
     latest_practiced: Optional[str] = None
     latest_quality: Optional[int] = None
@@ -599,7 +601,7 @@ class PracticeListStagedModel(BaseModel):
     deleted: Optional[bool] = None
     learned: Optional[str] = None
     goal: Optional[str] = None
-    scheduled: Optional[str] = None  # Next review date for this tune in this playlist
+    scheduled: Optional[str] = None  # Transient manual override (may be cleared)
     user_ref: Optional[int] = None
     playlist_id: Optional[int] = None
     instrument: Optional[str] = None
@@ -611,7 +613,9 @@ class PracticeListStagedModel(BaseModel):
     latest_interval: Optional[int] = None
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
-    latest_review_date: Optional[str] = None
+    latest_review_date: Optional[str] = (
+        None  # Canonical next due snapshot from last PracticeRecord
+    )
     latest_backup_practiced: Optional[str] = None
     latest_technique: Optional[str] = None
     latest_goal: Optional[str] = None

@@ -537,7 +537,8 @@ export class TuneTreesPageObject {
 
   async waitForSuccessfullySubmitted(): Promise<void> {
     await expect(this.toast.last()).toContainText(
-      "Practice successfully submitted",
+      // "Practice successfully submitted",
+      "Submitted evaluated tunes.",
       { timeout: 60000 },
     );
   }
