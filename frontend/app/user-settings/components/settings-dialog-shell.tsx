@@ -37,6 +37,8 @@ export function SettingsDialogShell({
   }, [router]);
 
   const [open, setOpen] = useState(true);
+  // Simpler approach: rely on CSS calc to constrain height within viewport minus header/footer allowance.
+  // Adjust the rem values if outer layout header/footer heights change.
 
   return (
     <Dialog
@@ -51,16 +53,18 @@ export function SettingsDialogShell({
       }}
     >
       <DialogContent
-        // Wider than default dialog; responsive full-screen on small devices
-        className="w-full max-w-6xl md:max-h-[85vh] overflow-hidden p-0"
+        // Anchor near top; horizontally centered, adjustable height. (Revised bottom margin reduction.)
+        className="max-w-6xl w-[calc(100%-2rem)] sm:w-full overflow-hidden p-0 top-8 left-1/2 -translate-x-1/2 translate-y-0 h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] max-h-[calc(100vh-7rem)] md:max-h-[calc(100vh-8rem)] flex flex-col"
         hideCloseButton
         data-testid="user-settings-dialog"
       >
-        <div className="flex flex-col h-full">
-          <DialogHeader className="px-6 pt-6 pb-2 text-left">
+        <div className="flex flex-col h-full min-h-0">
+          <DialogHeader className="px-5 pt-4 pb-1 text-left">
             <div className="flex items-start justify-between">
-              <div className="space-y-0.5 pr-4">
-                <DialogTitle className="text-2xl">Settings</DialogTitle>
+              <div className="space-y-0 pr-3">
+                <DialogTitle className="text-2xl leading-snug">
+                  Settings
+                </DialogTitle>
                 <DialogDescription>
                   Manage your account settings and set scheduling preferences.
                 </DialogDescription>
@@ -86,18 +90,21 @@ export function SettingsDialogShell({
             </div>
           </DialogHeader>
           <Separator />
-          <div className="flex-1 flex flex-col lg:flex-row lg:space-x-8 overflow-hidden">
+          <div className="flex-1 flex flex-col lg:flex-row lg:space-x-6 overflow-hidden min-h-0">
             <aside
-              className="px-6 py-4 border-b lg:border-b-0 lg:border-r w-full lg:w-1/4 overflow-y-auto"
+              className="px-5 py-3 border-b lg:border-b-0 lg:border-r w-full lg:w-1/4 overflow-y-auto"
               data-testid="user-settings-sidebar"
             >
               <SidebarNav items={items} />
             </aside>
-            <div
-              className="flex-1 min-w-0 overflow-y-auto px-6 py-6"
-              data-testid="user-settings-content"
-            >
-              {children}
+            {/* Scroll container ensures header remains fixed while form/content scroll within available height */}
+            <div className="flex-1 min-w-0 flex flex-col overflow-hidden min-h-0">
+              <div
+                className="flex-1 overflow-y-auto px-5 py-4"
+                data-testid="user-settings-content"
+              >
+                {children}
+              </div>
             </div>
           </div>
         </div>
