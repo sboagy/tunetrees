@@ -703,19 +703,21 @@ def _fetch_existing_active_queue(
 def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
     # Enrich with joined tune fields (title, type, structure, learned, goal, scheduled, latest_* etc.)
     from sqlalchemy import select
-    from tunetrees.models.tunetrees import t_practice_list_joined
+    from tunetrees.models.tunetrees import t_practice_list_joined, TableTransientData
 
     if not rows:
         return []
 
-    # Build map keyed by tune id for fast merge
+    # Build map keyed by tune id for fast merge (tune metadata + transient recall_eval)
     tune_ids = {r.tune_ref for r in rows if getattr(r, "tune_ref", None) is not None}
-    # Attempt single query; tolerate failure (returns base fields only)
     joined_map: dict[int, Any] = {}
-    try:  # pragma: no cover - defensive
+    transient_map: dict[tuple[int, int, int], str | None] = {}
+    try:  # pragma: no cover - defensive, never fail whole serialization
         from tunetrees.app.database import SessionLocal
+        from sqlalchemy import and_
 
         with SessionLocal() as _db:  # lightweight new session
+            # 1. Tune metadata (existing behavior)
             joined_rows = (
                 _db.execute(
                     select(t_practice_list_joined).where(
@@ -729,8 +731,39 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
                 tid = jr.get("id")
                 if tid is not None:
                     joined_map[int(tid)] = jr
+
+            # 2. Transient recall evaluations (purpose='practice') keyed by (user_id, playlist_id, tune_id)
+            # We only fetch rows relevant to current queue entries to minimize overhead.
+            keys = {(r.user_ref, r.playlist_ref, r.tune_ref) for r in rows if r.tune_ref is not None}
+            if keys:
+                # Break out the individual id sets to use IN filters (SQLAlchemy can't IN on tuples portably across all dbs)
+                user_ids = {k[0] for k in keys}
+                playlist_ids = {k[1] for k in keys}
+                tune_ids_local = {k[2] for k in keys}
+                transient_rows = (
+                    _db.execute(
+                        select(
+                            TableTransientData.user_id,
+                            TableTransientData.playlist_id,
+                            TableTransientData.tune_id,
+                            TableTransientData.recall_eval,
+                        ).where(
+                            and_(
+                                TableTransientData.user_id.in_(user_ids),
+                                TableTransientData.playlist_id.in_(playlist_ids),
+                                TableTransientData.tune_id.in_(tune_ids_local),
+                                TableTransientData.purpose == "practice",
+                            )
+                        )
+                    )
+                    .mappings()
+                    .all()
+                )
+                for tr in transient_rows:
+                    transient_map[(tr["user_id"], tr["playlist_id"], tr["tune_id"])] = tr.get("recall_eval")
     except Exception:  # pragma: no cover
         joined_map = {}
+        transient_map = {}
 
     enriched: list[dict[str, Any]] = []
     for r in rows:
@@ -792,6 +825,13 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
         # Provide tune_id separate from queue row id for clarity
         if "id" in jr:
             base["tune_id"] = jr.get("id")
+        # Attach transient recall evaluation if present
+        recall_key = (r.user_ref, r.playlist_ref, r.tune_ref)
+        if recall_key in transient_map:
+            base["recall_eval"] = transient_map[recall_key]
+        else:
+            base["recall_eval"] = None
+
         enriched.append(base)
     return enriched
 
