@@ -172,7 +172,11 @@ export default function TunesGridScheduled({
             latest_practiced: e.latest_practiced ?? null,
             latest_review_date: e.latest_review_date ?? null,
             bucket: (e.bucket as number | null) ?? null,
-            recall_eval: null,
+            // Preserve any staged recall evaluation coming from backend enrichment (transient table)
+            // If backend omitted field, default to null to maintain existing behaviour.
+            recall_eval:
+              (e as unknown as { recall_eval?: string | null }).recall_eval ??
+              null,
             goal: null,
             latest_quality: e.latest_quality ?? null,
             latest_easiness: e.latest_easiness ?? null,
