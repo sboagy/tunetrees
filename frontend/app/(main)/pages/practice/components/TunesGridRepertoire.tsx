@@ -181,6 +181,12 @@ export default function TunesGridRepertoire({
     tablePurpose: "repertoire",
     globalFilter: globalFilter,
     onRecallEvalChange: undefined, // not needed for repertoire
+    // Wire goal change handler so edits in Goal column update local state like in practice grid
+    onGoalChange: (tuneId: number, newValue: string | null) => {
+      setTunes((prev) =>
+        prev.map((t) => (t.id === tuneId ? { ...t, goal: newValue } : t)),
+      );
+    },
     selectionChangedCallback,
     setTunesRefreshId,
   });
