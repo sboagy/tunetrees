@@ -8,6 +8,7 @@ import { useSession, getSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import { usePlaylist } from "./CurrentPlaylistProvider";
+import { logVerbose } from "@/lib/logging";
 import { useTune } from "./CurrentTuneContext";
 import "./MainPanel.css";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -24,7 +25,7 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
   const { currentTune } = useTune();
   const sidebarRef = useRef<ImperativePanelHandle>(null);
   const { currentPlaylist: currentPlaylistId } = usePlaylist();
-  console.log(
+  logVerbose(
     `LF1 render MainPanel: playlistId=${currentPlaylistId}, userId=${userId}`,
   );
 
@@ -39,18 +40,18 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
   };
 
   const { status } = useSession();
-  console.log("MainPanel ===> MainPanel.tsx:53 ~ status", status);
+  logVerbose("MainPanel status", status);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const refreshSession = async () => {
       if (status === "unauthenticated") {
-        console.log("MainPanel ===> Forcing session refresh...");
+        logVerbose("MainPanel forcing session refresh...");
         setIsRefreshing(true); // Indicate that the session is being refreshed
         try {
           const newSession = await getSession();
           if (newSession) {
-            console.log("MainPanel ===> Session refreshed:", newSession);
+            logVerbose("MainPanel session refreshed", newSession);
           } else {
             console.error("MainPanel ===> Failed to refresh session.");
           }
