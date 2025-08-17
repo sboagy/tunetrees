@@ -734,7 +734,11 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
 
             # 2. Transient recall evaluations (purpose='practice') keyed by (user_id, playlist_id, tune_id)
             # We only fetch rows relevant to current queue entries to minimize overhead.
-            keys = {(r.user_ref, r.playlist_ref, r.tune_ref) for r in rows if r.tune_ref is not None}
+            keys = {
+                (r.user_ref, r.playlist_ref, r.tune_ref)
+                for r in rows
+                if r.tune_ref is not None
+            }
             if keys:
                 # Break out the individual id sets to use IN filters (SQLAlchemy can't IN on tuples portably across all dbs)
                 user_ids = {k[0] for k in keys}
@@ -760,7 +764,9 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
                     .all()
                 )
                 for tr in transient_rows:
-                    transient_map[(tr["user_id"], tr["playlist_id"], tr["tune_id"])] = tr.get("recall_eval")
+                    transient_map[(tr["user_id"], tr["playlist_id"], tr["tune_id"])] = (
+                        tr.get("recall_eval")
+                    )
     except Exception:  # pragma: no cover
         joined_map = {}
         transient_map = {}
