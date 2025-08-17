@@ -22,6 +22,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { logVerbose } from "@/lib/logging";
 import {
   createNoteAction,
   deleteNoteAction,
@@ -305,24 +306,24 @@ export default function NoteCards({
       }
     };
 
-    console.log(
+    logVerbose(
       `Fetching notes for tune ${tuneRef} ${userRef} ${displayPublic}`,
     );
     fetchNotes()
-      .then(() => console.log("fetched notes"))
+      .then(() => logVerbose("fetched notes"))
       .catch((error) => console.error("Error fetching notes:", error));
   }, [tuneRef, userRef, displayPublic]);
 
   const handleUpdateNote = (updatedNote: INote, action: UpdateActionType) => {
     if (action === UpdateActionType.DELETE) {
       // Logic to delete the reference entry
-      console.log("Deleting reference entry...");
+      logVerbose("Deleting reference entry...");
       setNotes((prevNotes) =>
         prevNotes.filter((note) => note.id !== updatedNote.id),
       );
       deleteNoteAction(updatedNote.id ?? 0)
         .then(() => {
-          console.log("Note deleted successfully");
+          logVerbose("Note deleted successfully");
         })
         .catch((error) => {
           console.error("Error deleting note:", error);
@@ -330,10 +331,10 @@ export default function NoteCards({
         });
     } else if (action === UpdateActionType.CREATE) {
       // Logic to create a new reference entry
-      console.log("Creating new reference entry...");
+      logVerbose("Creating new reference entry...");
       createNoteAction(updatedNote)
         .then((result: INote) => {
-          console.log("Reference updated successfully");
+          logVerbose("Reference updated successfully");
           // Need to update the note with the new ID
           setNotes((prevNotes) => [
             result,
@@ -354,7 +355,7 @@ export default function NoteCards({
       );
       updateNoteAction(updatedNote.id ?? 0, updatedNote)
         .then(() => {
-          console.log("Reference updated successfully");
+          logVerbose("Reference updated successfully");
         })
         .catch((error) => {
           console.error("Error updating reference:", error);
@@ -410,9 +411,9 @@ export default function NoteCards({
       <CollapsibleContent data-testid="tt-notes-content">
         {notes.map((note) => {
           const duplicate = notes.filter((n) => n.id === note.id).length > 1;
-          console.log(`Checking for duplicate id: ${note.id}`);
+          logVerbose(`Checking for duplicate id: ${note.id}`);
           if (duplicate) {
-            console.log(`Duplicate id found: ${note.id}`);
+            logVerbose(`Duplicate id found: ${note.id}`);
           }
           return (
             <NoteCard key={note.id} note={note} onUpdate={handleUpdateNote} />

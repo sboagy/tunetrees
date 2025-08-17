@@ -82,7 +82,7 @@ function ensureController(): IExtendedLoggingController | null {
       },
       toggle: () => {
         const next = !isExtendedLoggingEnabled();
-        anyWin.__TT_LOGGING__!.set(next);
+        anyWin.__TT_LOGGING__?.set(next);
         return next;
       },
       info: () => {

@@ -20,6 +20,7 @@ import { Import } from "lucide-react";
 import { useSession } from "next-auth/react";
 import type { JSX } from "react";
 import { useEffect, useState } from "react";
+import { logVerbose } from "@/lib/logging";
 import type { ITheSessionTune } from "../import-the-session-schemas";
 import {
   fetchTheSessionURLsFromTitle,
@@ -190,7 +191,7 @@ export default function AddTuneButtonAndDialog({
           console.error("Error creating tune: tune.id is undefined");
           return;
         }
-        console.log(
+        logVerbose(
           `Tune created successfully /pages/tune-edit?userId=${userId}&playlistId=${playlistId}&tuneId=${tune.id}`,
         );
         const purpose = tabIdToPurpose(activeTab);
@@ -626,8 +627,8 @@ export default function AddTuneButtonAndDialog({
     }
     importTune(importUrl)
       .then(([scrapedTune, existingMatches, secondaryURL]) => {
-        console.log("===> ImportButton.tsx:62 ~ scrapedTune", scrapedTune);
-        console.log(
+        logVerbose("===> ImportButton.tsx:62 ~ scrapedTune", scrapedTune);
+        logVerbose(
           "===> ImportButton.tsx:63 ~ existingMatches",
           existingMatches,
         );
@@ -696,7 +697,7 @@ export default function AddTuneButtonAndDialog({
     if (playlistId && playlistId > 0) {
       getPlaylistByIdAction(playlistId)
         .then((playlist: IPlaylist | { detail: string }) => {
-          console.log("Fetched playlist:", playlist);
+          logVerbose("Fetched playlist:", playlist);
           // setCurrentPlaylist(playlist);
           if (!playlist || "detail" in playlist) {
             console.error("Playlist not found");
@@ -705,7 +706,7 @@ export default function AddTuneButtonAndDialog({
           if (playlist.instrument_ref) {
             getInstrumentByIdAction(playlist.instrument_ref)
               .then((instrument: IInstrument | { detail: string }) => {
-                console.log("Fetched instrument:", instrument);
+                logVerbose("Fetched instrument:", instrument);
                 if (!instrument || "detail" in instrument) {
                   console.error("Instrument not found");
                   return;

@@ -31,6 +31,7 @@ import {
 import { useEffect, useState } from "react";
 import { type IReferenceData, UpdateActionType } from "../types";
 import "./ReferenceCards.css"; // Import the CSS file
+import { logVerbose } from "@/lib/logging";
 
 interface IReferenceCardProps {
   reference: IReferenceData;
@@ -369,12 +370,12 @@ export default function ReferenceCards({
   useEffect(() => {
     const fetchReferences = async () => {
       const data = await getReferencesAction(tuneRef, userRef);
-      console.log(`setting references... ${tuneRef} ${userRef}`);
+      logVerbose(`setting references... ${tuneRef} ${userRef}`);
       setReferences(data);
     };
-    console.log(`fetching references... ${tuneRef} ${userRef}`);
+    logVerbose(`fetching references... ${tuneRef} ${userRef}`);
     fetchReferences()
-      .then(() => console.log("fetched references"))
+      .then(() => logVerbose("fetched references"))
       .catch((error) => console.error("Error fetching references:", error));
   }, [tuneRef, userRef]);
 
@@ -397,7 +398,7 @@ export default function ReferenceCards({
   ) => {
     if (action === UpdateActionType.DELETE) {
       // Logic to delete the reference entry
-      console.log("Deleting reference entry...");
+      logVerbose("Deleting reference entry...");
       // Need to update the note with the new ID
       setReferences((prevReferences) =>
         prevReferences.filter(
@@ -406,7 +407,7 @@ export default function ReferenceCards({
       );
       deleteReferenceAction(updatedReference.id ?? 0)
         .then(() => {
-          console.log("Reference deleted successfully");
+          logVerbose("Reference deleted successfully");
         })
         .catch((error) => {
           console.error("Error deleting reference:", error);
@@ -420,7 +421,7 @@ export default function ReferenceCards({
     const { isNew, ...referenceToUpdate } = updatedReference;
     if (action === UpdateActionType.CREATE || isNew) {
       // Logic to create a new reference entry
-      console.log("Creating new reference entry...");
+      logVerbose("Creating new reference entry...");
       const { id, ...referenceToUpdate2 } = referenceToUpdate;
       setReferences((prevReferences) =>
         prevReferences.filter((reference) => reference.id !== id),
@@ -428,7 +429,7 @@ export default function ReferenceCards({
 
       createReferenceAction(referenceToUpdate2)
         .then((result: IReferenceData) => {
-          console.log("Reference updated successfully");
+          logVerbose("Reference updated successfully");
           // Need to update the note with the new ID
           setReferences((prevReferences) => [...prevReferences, result]);
         })
@@ -446,7 +447,7 @@ export default function ReferenceCards({
       );
       updateReferenceAction(updatedReference.id ?? 0, updatedReference)
         .then(() => {
-          console.log("Reference updated successfully");
+          logVerbose("Reference updated successfully");
         })
         .catch((error) => {
           console.error("Error updating reference:", error);

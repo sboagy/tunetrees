@@ -38,6 +38,7 @@ import { useRepertoireTunes } from "./TunesContextRepertoire";
 import TunesGrid from "./TunesGrid";
 import { getSchedulingOptionsAction } from "@/app/user-settings/scheduling-options/actions/scheduling-options-actions";
 import { getPracticeQueueAction } from "../actions/practice-actions";
+import { logVerbose } from "@/lib/logging";
 
 type RepertoireGridProps = {
   userId: number;
@@ -62,8 +63,9 @@ export default function TunesGridRepertoire({
     rowSelectionState: RowSelectionState,
   ): void => {
     const selectedRowsCount = Object.keys(rowSelectionState).length;
-    console.log(
-      `LF7: selectionChangedCallback rowSelectionState=${JSON.stringify(rowSelectionState)}, selectedRowsCount:${selectedRowsCount}`,
+    logVerbose(
+      () =>
+        `LF7: selectionChangedCallback rowSelectionState=${JSON.stringify(rowSelectionState)}, selectedRowsCount:${selectedRowsCount}`,
     );
     setIsRowsSelected(selectedRowsCount > 0);
   };
@@ -72,7 +74,7 @@ export default function TunesGridRepertoire({
   const { currentPlaylist: playlistId } = usePlaylist();
   const showDeleted = false; // Should become a state variable at some point
 
-  console.log(
+  logVerbose(
     `LF1 render RepertoireTunesGrid: playlistId=${playlistId}, userId=${userId}`,
   );
 
@@ -130,7 +132,7 @@ export default function TunesGridRepertoire({
         );
         setTunesRefreshId(refreshId);
         setTunes(result);
-        console.log(`LF1 RepertoireGrid setTunesRefreshId(${refreshId})`);
+        logVerbose(`LF1 RepertoireGrid setTunesRefreshId(${refreshId})`);
         return result;
       } catch (error) {
         console.error("LF1 Error refreshing tunes:", error);
@@ -148,14 +150,14 @@ export default function TunesGridRepertoire({
       tunesRefreshId !== refreshId &&
       !isRefreshing.current
     ) {
-      console.log(
+      logVerbose(
         `useEffect ===> TunesGridRepertoire.tsx:127 ~ call refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
       );
       isRefreshing.current = true;
       refreshTunes(userId, playlistId, refreshId)
         .then((result: ITuneOverview[]) => {
-          console.log(`LF1 RepertoireGrid number tunes: ${result.length}`);
-          console.log(
+          logVerbose(`LF1 RepertoireGrid number tunes: ${result.length}`);
+          logVerbose(
             `LF1 RepertoireGrid back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
           );
         })
@@ -167,7 +169,7 @@ export default function TunesGridRepertoire({
           isRefreshing.current = false;
         });
     } else {
-      console.log(
+      logVerbose(
         `useEffect ===> TunesGridRepertoire.tsx:146 ~ SKIPPING refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
       );
     }
@@ -196,7 +198,7 @@ export default function TunesGridRepertoire({
         });
     };
 
-    console.log(
+    logVerbose(
       `useEffect ===> TunesGridRepertoire.tsx:173 ~ [userId=${userId}, playlistId=${playlistId}]`,
     );
     getFilter();
@@ -206,7 +208,7 @@ export default function TunesGridRepertoire({
     const value = e.target.value;
     setGlobalFilter(value);
     if (table !== null) {
-      console.log("LF7: Saving table state on filter change: ", value);
+      logVerbose("LF7: Saving table state on filter change: ", value);
       // If I try to go through `table.setGlobalFilter(value)`, and then
       // `saveTableState(table, userId, "repertoire", playlistId)`, it doesn't work
       // so well, always being one character behind, presumably because it feeds through
@@ -248,9 +250,9 @@ export default function TunesGridRepertoire({
     new_entries: unknown[]; // not needed here, so keep broad
   }
   const addToReviewQueue = () => {
-    console.log("addToReviewQueue (priority manual add) invoked");
+    logVerbose("addToReviewQueue (priority manual add) invoked");
     if (table === null) {
-      console.log("addToReviewQueue: table is null");
+      logVerbose("addToReviewQueue: table is null");
       return;
     }
     const selectedTunes = table
@@ -267,7 +269,7 @@ export default function TunesGridRepertoire({
     // Call new server action hitting /practice-queue/.../add
     addTunesToPracticeQueueAction(userId, playlistId, tuneIds, sitdownDate)
       .then((result: IAddResult) => {
-        console.log("addTunesToPracticeQueueAction result", result);
+        logVerbose("addTunesToPracticeQueueAction result", result);
         if (table) {
           table.resetRowSelection();
           const tableState: TableState = table.getState();

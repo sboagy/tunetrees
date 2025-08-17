@@ -13,6 +13,7 @@ import {
 import type { CellContext } from "@tanstack/react-table";
 import { Check, ChevronDownIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { logVerbose } from "@/lib/logging";
 import {
   getColorForEvaluation,
   getQualityListForGoalAndTechnique,
@@ -99,7 +100,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
       // but I don't think it's ever undefined in this case?
       // But, keep an eye on it.
       if (changed_value) {
-        console.log(
+        logVerbose(
           "===> RowRecallEvalComboBox.tsx:103 ~ saveData - changed_value",
           changed_value,
         );
@@ -112,11 +113,11 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
           null,
           changed_value,
         );
-        console.log(
+        logVerbose(
           `LF17 State saved: ${changed_value} for ${info.row.original.id}`,
         );
       } else {
-        console.log(
+        logVerbose(
           "===> RowRecallEvalComboBox.tsx:121 ~ saveData calling deleteTableTransientData",
         );
         await deleteTableTransientData(
@@ -125,7 +126,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
           playlistId,
           purpose,
         );
-        console.log(`LF17 State deleted for ${info.row.original.id}`);
+        logVerbose(`LF17 State deleted for ${info.row.original.id}`);
       }
     } catch (error) {
       console.error("LF17 Failed to save state:", error);
@@ -195,7 +196,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                   data-testid={`tt-recal-eval-${qualityFeedbackItem.value}`}
                   value={qualityFeedbackItem.value}
                   onSelect={(currentValue) => {
-                    console.log(
+                    logVerbose(
                       "===> RowRecallEvalComboBox.tsx:171 ~ onSelect - currentValue: ",
                       currentValue,
                     );
@@ -207,7 +208,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                           ? ""
                           : currentValue;
 
-                    console.log(
+                    logVerbose(
                       "===> RowRecallEvalComboBox.tsx:183 ~ onSelect - newValue: ",
                       newValue,
                     );
@@ -219,7 +220,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                     setSelectedQuality(newValue);
                     info.row.original.recall_eval = newValue;
 
-                    console.log(
+                    logVerbose(
                       `===> RowRecallEvalComboBox.tsx:206 ~ calling saveDate(${newValue})`,
                     );
 

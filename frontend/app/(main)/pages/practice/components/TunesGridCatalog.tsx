@@ -6,6 +6,7 @@ import { useTunesTable, saveTableState } from "./TunesTable"; // Add this import
 
 import { Input } from "@/components/ui/input";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
+import { logVerbose } from "@/lib/logging";
 
 import type {
   RowSelectionState,
@@ -58,7 +59,7 @@ export default function TunesGridCatalog({
   const { setTunesRefreshId: setRepertoireTunesRefreshId } =
     useRepertoireTunes();
 
-  console.log(
+  logVerbose(
     `LF1 render TunesGridAll: playlistId=${playlistId}, userId=${userId}`,
   );
 
@@ -88,7 +89,7 @@ export default function TunesGridCatalog({
           await getTunesOnlyIntoOverviewAction(showDeleted);
         setTunes(result);
         setTunesRefreshId(refreshId);
-        console.log(`LF1 AllGrid setTunesRefreshId(${refreshId})`);
+        logVerbose(`LF1 AllGrid setTunesRefreshId(${refreshId})`);
         return result;
       } catch (error) {
         console.error("LF1 Error refreshing tunes:", error);
@@ -102,14 +103,14 @@ export default function TunesGridCatalog({
 
   useEffect(() => {
     if (tunesRefreshId !== refreshId && !isRefreshing.current) {
-      console.log(
+      logVerbose(
         `useEffect ===> TunesGridCatalog.tsx:108 ~ [refreshId=${refreshId}, tunesRefreshId=${tunesRefreshId}, userId=${userId}, playlist=${playlistId}, refreshTunes(callback)]`,
       );
       isRefreshing.current = true;
       refreshTunes(userId, playlistId, refreshId)
         .then((result: ITuneOverview[]) => {
-          console.log(`LF1 TunesGridCatalog number tunes: ${result.length}`);
-          console.log(
+          logVerbose(`LF1 TunesGridCatalog number tunes: ${result.length}`);
+          logVerbose(
             `LF1 TunesGridCatalog back from refreshTunes refreshId: ${refreshId} tunesRefreshId: ${tunesRefreshId} isRefreshing: ${isRefreshing.current}`,
           );
         })
@@ -120,7 +121,7 @@ export default function TunesGridCatalog({
           isRefreshing.current = false;
         });
     } else {
-      console.log(
+      logVerbose(
         `useEffect ===> TunesGridCatalog.tsx:127 ~ SKIPPING [refreshId=${refreshId}, tunesRefreshId=${tunesRefreshId}, userId=${userId}, playlist=${playlistId}, refreshTunes(callback)]`,
       );
     }
@@ -149,7 +150,7 @@ export default function TunesGridCatalog({
         });
     };
 
-    console.log(
+    logVerbose(
       `useEffect ===> TunesGridCatalog.tsx:156 ~ [userId=${userId}}, playlistId=${playlistId}]`,
     );
     getFilter();
@@ -159,7 +160,7 @@ export default function TunesGridCatalog({
     const value = e.target.value;
     setGlobalFilter(value);
     if (table !== null) {
-      console.log("LF7: Saving table state on filter change: ", value);
+      logVerbose("LF7: Saving table state on filter change: ", value);
       // (See comment in TunesGridRepertoire.tsx handleGlobalFilterChange)
       const tableState: TableState = table.getState();
       tableState.globalFilter = value;
@@ -181,9 +182,9 @@ export default function TunesGridCatalog({
   // };
 
   const addToRepertoire = async () => {
-    console.log("addToRepertoire!");
+    logVerbose("addToRepertoire!");
     if (table === null) {
-      console.log("addToRepertoire: table is null");
+      logVerbose("addToRepertoire: table is null");
       return;
     }
     const selectedTunes = table
@@ -191,7 +192,7 @@ export default function TunesGridCatalog({
       .rows.map((row) => row.original);
 
     const selectedTuneIds = selectedTunes.map((tune) => tune.id ?? -1);
-    console.log("Selected tune IDs:", selectedTuneIds);
+    logVerbose("Selected tune IDs:", selectedTuneIds);
 
     const alreadyInRepertoire = await intersectPlaylistTunesAction(
       selectedTuneIds,
@@ -222,7 +223,7 @@ export default function TunesGridCatalog({
     }
 
     if (!userConfirmed) {
-      console.log("User canceled adding tunes to repertoire.");
+      logVerbose("User canceled adding tunes to repertoire.");
       return;
     }
 
@@ -236,7 +237,7 @@ export default function TunesGridCatalog({
       };
       createPlaylistTuneAction(playlistTune)
         .then((result) => {
-          console.log("Added tune to repertoire:", result);
+          logVerbose("Added tune to repertoire:", result);
         })
         .catch((error) => {
           console.error("Error adding tune to repertoire:", error);
@@ -253,11 +254,11 @@ export default function TunesGridCatalog({
     // Save the table state with cleared selections
     try {
       const status = await saveTableState(table, userId, "catalog", playlistId);
-      console.log("saveTableState status:", status);
+      logVerbose("saveTableState status:", status);
 
       // Check for HTTP success status codes (200-299)
       if (status >= 200 && status < 300) {
-        console.log("Table state saved successfully with cleared selections");
+        logVerbose("Table state saved successfully with cleared selections");
       } else {
         console.warn(
           `Table state save returned status: ${status}, but continuing...`,

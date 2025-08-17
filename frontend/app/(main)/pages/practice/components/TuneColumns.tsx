@@ -25,6 +25,7 @@ import type {
 } from "../types";
 import "./TuneColumns.css";
 import { saveTableState } from "./TunesTable";
+import { logVerbose } from "@/lib/logging";
 
 // =================================================================================================
 // For now, I'm going to feature-down the column control menu, as it's going to be more complex than
@@ -130,7 +131,7 @@ function sortableHeader(
           const next: "none" | "asc" | "desc" =
             current === "none" ? "asc" : current === "asc" ? "desc" : "none";
           // Debug log to help diagnose headless behavior
-          console.log(
+          logVerbose(
             `sortableHeader click: column=${column.id} current=${current} -> next=${next}`,
           );
           if (next === "none") {
@@ -195,7 +196,7 @@ export function get_columns(
         ? false
         : "indeterminate";
 
-    console.log(
+    logVerbose(
       `LF6: selectionHeader->determineHeaderCheckedState: selectedCount=${selectedCount}, ` +
         `rowCount=${rowCount} noneSelected=${noneSelected}, allSelected=${allSelected}, ` +
         `checkedState=${checkedState}`,

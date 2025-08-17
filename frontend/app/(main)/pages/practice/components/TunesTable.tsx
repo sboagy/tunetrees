@@ -26,6 +26,7 @@ import type { ITuneOverview, TablePurpose } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
 import { get_columns } from "./TuneColumns";
+import { logVerbose } from "@/lib/logging";
 
 export const globalFlagManualSorting = false;
 
@@ -101,7 +102,7 @@ export const saveTableState = async (
       if (typeof cached === "number") {
         mergedState.scrollTop = cached;
         // Debug log to verify preservation path
-        console.log(
+        logVerbose(
           "[ScrollPersist] Preserving existing scrollTop=%d on state save (no explicit override)",
           cached,
         );
@@ -111,7 +112,7 @@ export const saveTableState = async (
     }
   }
 
-  console.log(
+  logVerbose(
     `LF7 saveTableState calling updateTableStateInDb: tablePurpose=${tablePurpose}`,
   );
   const status = await updateTableStateInDb(
@@ -139,7 +140,7 @@ export function TunesTableComponent({
 }: IScheduledTunesType): null {
   const { currentTune, setCurrentTune, setCurrentTablePurpose } = useTune();
   const { currentPlaylist: playlistId } = usePlaylist();
-  console.log(
+  logVerbose(
     `LF1 render TunesTableComponent: playlistId=${playlistId}, userId=${userId}`,
   );
 
@@ -233,8 +234,9 @@ export function TunesTableComponent({
 
     originalSetRowSelectionRef.current(resolvedRowSelectionState);
 
-    console.log(
-      `LF7 ==>TunesTableComponent<== (interceptedRowSelectionChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}, ${JSON.stringify(newRowSelectionState)}}`,
+    logVerbose(
+      () =>
+        `LF7 ==>TunesTableComponent<== (interceptedRowSelectionChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}, ${JSON.stringify(newRowSelectionState)}}`,
     );
 
     // Save with precise overrides to avoid stale persistence
@@ -243,7 +245,7 @@ export function TunesTableComponent({
     });
 
     if (selectionChangedCallback) {
-      console.log(
+      logVerbose(
         "LF7 TunesTableComponent: calling selectionChangedCallback",
         table,
         resolvedRowSelectionState,
@@ -263,7 +265,7 @@ export function TunesTableComponent({
         : newColumnFiltersState;
 
     originalColumnFiltersRef.current(resolvedColumnFiltersState);
-    console.log(
+    logVerbose(
       `LF7 TunesTableComponent (interceptedOnColumnFiltersChange) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
     void saveTableState(table, userId, tablePurpose, playlistId, {
@@ -320,13 +322,13 @@ export function TunesTableComponent({
     const resolvedSorting: SortingState =
       newSorting instanceof Function ? newSorting(sorting) : newSorting;
 
-    console.log(
+    logVerbose(
       "interceptedSetSorting ===> TunesTable.tsx:318 ~ resolvedSorting",
       resolvedSorting,
     );
 
     originalSetSortingRef.current(resolvedSorting);
-    console.log(
+    logVerbose(
       `LF7 TunesTableComponent (interceptedSetSorting) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
     // Proactively notify any listeners (e.g., virtualized grid) that sorting changed
@@ -355,13 +357,13 @@ export function TunesTableComponent({
         ? newVisibilityState(columnVisibility)
         : newVisibilityState;
 
-    console.log(
+    logVerbose(
       "LF1 interceptedSetColumnVisibility: resolvedVisibilityState=",
       resolvedVisibilityState,
     );
 
     originalSetColumnVisibilityRef.current(resolvedVisibilityState);
-    console.log(
+    logVerbose(
       `LF7 TunesTableComponent (interceptedSetColumnVisibility) calling saveTableState: tablePurpose=${tablePurpose} currentTune=${currentTune}`,
     );
     void saveTableState(table, userId, tablePurpose, playlistId, {
@@ -435,7 +437,7 @@ export function TunesTableComponent({
     if (!isLoading) return;
     const fetchTableState = async () => {
       try {
-        console.log(
+        logVerbose(
           `useEffect TunesTable.tsx fetchTableState userId=${userId} tablePurpose=${tablePurpose} playlistId=${playlistId}`,
         );
         let tableStateTable = await getTableStateTable(
@@ -445,7 +447,7 @@ export function TunesTableComponent({
           playlistId,
         );
         if (!tableStateTable) {
-          console.log("LF7 TunesTableComponent: no table state found in db");
+          logVerbose("LF7 TunesTableComponent: no table state found in db");
           tableStateTable = await createOrUpdateTableState(
             userId,
             "full",
@@ -503,7 +505,7 @@ export function TunesTableComponent({
             filterStringCallback(tableStateFromDb.globalFilter);
           table.setPagination(tableStateFromDb.pagination);
         } else {
-          console.log("LF1 TunesTableComponent: no table state found in db");
+          logVerbose("LF1 TunesTableComponent: no table state found in db");
         }
       } catch (error) {
         console.error(error);
@@ -515,7 +517,7 @@ export function TunesTableComponent({
     if (playlistId && playlistId > 0) {
       void fetchTableState();
     } else {
-      console.log(
+      logVerbose(
         "LF1 TunesTableComponent: playlistId not set, skipping table state fetch",
       );
       setLoading(false);
@@ -536,7 +538,7 @@ export function TunesTableComponent({
 
   React.useEffect(() => {
     if (onTableCreated) {
-      console.log(
+      logVerbose(
         `useEffect ===> TunesTable.tsx:388 ~ tablePurpose=${tablePurpose} [table=(table), onTableCreated=(callback)]`,
       );
       onTableCreated(table);
@@ -566,12 +568,12 @@ export function useTunesTable(
       {...props}
       onTableCreated={(newTable) => {
         if (table !== newTable) {
-          console.log(
+          logVerbose(
             `useEffect ===> TunesTable.tsx:418 ~ Table created/updated with ${props.tunes.length} tunes`,
           );
           setTable(newTable);
         } else {
-          console.log(
+          logVerbose(
             `useEffect ===> TunesTable.tsx:423 ~ SKIPPING Table already created with ${props.tunes.length} tunes`,
           );
         }

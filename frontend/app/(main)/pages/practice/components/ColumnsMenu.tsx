@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Table, TableState } from "@tanstack/react-table";
 import { useEffect, useState } from "react";
+import { logVerbose } from "@/lib/logging";
 import { updateTableStateInDb } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
 import type { IColumnMeta } from "./TuneColumns";
@@ -47,12 +48,12 @@ const ColumnsMenu = ({
 
   function handleCheckedChange(columnId: string) {
     return (value: boolean) => {
-      console.log("toggleVisibility (requested)", value);
+      logVerbose("toggleVisibility (requested)", value);
       const column = table.getColumn(columnId);
       if (column) {
-        console.log("toggleVisibility (before)", column.getIsVisible());
+        logVerbose("toggleVisibility (before)", column.getIsVisible());
         column.toggleVisibility(value);
-        console.log("LF7: Saving table state on filter change: ", value);
+        logVerbose("LF7: Saving table state on filter change: ", value);
         // (See comment in TunesGridRepertoire.tsx handleGlobalFilterChange)
         const tableState: TableState = table.getState();
         tableState.columnVisibility[columnId] = value;
@@ -66,7 +67,7 @@ const ColumnsMenu = ({
 
         triggerRefresh();
       } else {
-        console.log("column not found", columnId);
+        logVerbose("column not found", columnId);
       }
     };
   }
