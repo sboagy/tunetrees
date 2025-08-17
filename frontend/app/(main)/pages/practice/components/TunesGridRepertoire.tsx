@@ -284,10 +284,21 @@ export default function TunesGridRepertoire({
         const added = result?.added_tune_ids?.length ?? 0;
         const skipped = result?.skipped_tune_ids?.length ?? 0;
         const titleParts: string[] = [];
-        if (added > 0) titleParts.push(`${added} added`);
-        if (skipped > 0) titleParts.push(`${skipped} skipped`);
+        if (added > 0) {
+          titleParts.push(`${added} ${added === 1 ? "tune" : "tunes"} added`);
+        }
+        if (skipped > 0) {
+          titleParts.push(
+            `${skipped} ${skipped === 1 ? "tune" : "tunes"} skipped`,
+          );
+        }
         const title =
-          titleParts.length > 0 ? titleParts.join(", ") : "No changes";
+          titleParts.length > 0
+            ? titleParts.join(", ")
+            : tuneIds.length > 0
+              ? // We requested additions but backend reported none; likely all were missing or duplicates.
+                "No eligible tunes"
+              : "No changes";
         let description = "";
         if (added > 0 && result?.added_tune_ids) {
           if (added <= 10)
@@ -297,7 +308,7 @@ export default function TunesGridRepertoire({
         if (skipped > 0 && result?.skipped_tune_ids) {
           description += description ? " " : "";
           if (skipped <= 10)
-            description += `Skipped: ${result.skipped_tune_ids.join(", ")}`;
+            description += `Skipped (already in queue): ${result.skipped_tune_ids.join(", ")}`;
           else description += `Skipped ${skipped} already present.`;
         }
         toast({ title, description: description || undefined });
@@ -350,9 +361,9 @@ export default function TunesGridRepertoire({
           ) {
             entries = (snapshot as { entries: QueueEntry[] }).entries;
           } else {
-            console.warn(
-              "[RepertoireBucketStyling] Unexpected snapshot shape; no entries parsed",
-              snapshot,
+            logVerbose(
+              () =>
+                `[RepertoireBucketStyling] Unexpected snapshot shape; no entries parsed snapshot=${JSON.stringify(snapshot)}`,
             );
           }
           const map = new Map<number, number>();

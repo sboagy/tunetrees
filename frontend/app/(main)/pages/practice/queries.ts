@@ -228,10 +228,49 @@ export async function addTunesToPracticeQueue(
         },
       },
     );
-    return response.data as {
-      added_tune_ids: number[];
-      skipped_tune_ids: number[];
-      new_entries: IPracticeQueueEntry[];
+    /**
+     * Backend (add_practice_queue_tunes_endpoint) returns shape:
+     *   {
+     *     added: [<serialized queue rows>],
+     *     skipped_existing: number[],
+     *     missing: number[],
+     *     duplicate_request_ignored: number[]
+     *   }
+     * Frontend historically expected { added_tune_ids, skipped_tune_ids, new_entries }.
+     * To avoid a broader refactor we adapt here.
+     */
+    const backend = response.data as unknown as {
+      added?: Array<
+        Partial<IPracticeQueueEntry> & {
+          tune_ref?: number;
+          tune_id?: number;
+          id?: number;
+        }
+      >;
+      skipped_existing?: number[];
+      missing?: number[];
+      duplicate_request_ignored?: number[];
+    };
+    const addedTuneIds: number[] = Array.isArray(backend.added)
+      ? backend.added
+          .map((r) => {
+            if (typeof r.tune_ref === "number") return r.tune_ref;
+            if (typeof r.tune_id === "number") return r.tune_id;
+            if (typeof r.id === "number") return r.id;
+            return undefined;
+          })
+          .filter((v): v is number => typeof v === "number")
+      : [];
+    const skippedTuneIds: number[] = Array.isArray(backend.skipped_existing)
+      ? backend.skipped_existing
+      : [];
+    const newEntries: IPracticeQueueEntry[] = Array.isArray(backend.added)
+      ? (backend.added as IPracticeQueueEntry[])
+      : [];
+    return {
+      added_tune_ids: addedTuneIds,
+      skipped_tune_ids: skippedTuneIds,
+      new_entries: newEntries,
     };
   } catch (error) {
     console.error("Error in addTunesToPracticeQueue: ", error);
