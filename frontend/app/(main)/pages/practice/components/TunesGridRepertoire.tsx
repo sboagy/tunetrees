@@ -20,6 +20,7 @@ import type {
 import { BetweenHorizontalEnd } from "lucide-react";
 import { getRepertoireTunesOverviewAction } from "../actions/practice-actions";
 import { addTunesToPracticeQueueAction } from "../actions/practice-actions";
+import { updatePlaylistTunesAction } from "../actions/practice-actions";
 import {
   fetchFilterFromDB,
   getTableStateTable,
@@ -181,11 +182,35 @@ export default function TunesGridRepertoire({
     tablePurpose: "repertoire",
     globalFilter: globalFilter,
     onRecallEvalChange: undefined, // not needed for repertoire
-    // Wire goal change handler so edits in Goal column update local state like in practice grid
+    // Persist goal edits immediately (optimistic) to PlaylistTune via PATCH /playlist_tunes
     onGoalChange: (tuneId: number, newValue: string | null) => {
+      if (!playlistId || playlistId <= 0) return;
+      const goalBefore = tunes.find((t) => t.id === tuneId)?.goal ?? null;
+      // Optimistic update
       setTunes((prev) =>
         prev.map((t) => (t.id === tuneId ? { ...t, goal: newValue } : t)),
       );
+      updatePlaylistTunesAction([tuneId], playlistId, {
+        goal: newValue || undefined,
+      })
+        .then(() => {
+          logVerbose(
+            () =>
+              `[GoalPersist][Repertoire] Updated goal tuneId=${tuneId} playlistId=${playlistId} value=${newValue}`,
+          );
+        })
+        .catch((error: unknown) => {
+          console.error("[GoalPersist][Repertoire] error", error);
+          // Rollback on error
+          setTunes((prev) =>
+            prev.map((t) => (t.id === tuneId ? { ...t, goal: goalBefore } : t)),
+          );
+          toast({
+            title: "Goal update failed",
+            description: String((error as Error)?.message || error),
+            variant: "destructive",
+          });
+        });
     },
     selectionChangedCallback,
     setTunesRefreshId,

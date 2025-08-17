@@ -216,6 +216,7 @@ export interface IPlaylistTune {
   current: string;
   learned: string;
   deleted?: boolean | null;
+  goal?: string | null; // playlist-level goal (practice target)
 }
 
 export interface IPlaylist {
