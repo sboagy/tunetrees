@@ -16,6 +16,8 @@ from tunetrees.models.tunetrees import (
     t_practice_list_staged,
 )
 
+from sqlalchemy import or_
+
 logger = logging.getLogger(__name__)
 
 
@@ -702,27 +704,28 @@ def _fetch_existing_active_queue(
 
 def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
     # Enrich with joined tune fields (title, type, structure, learned, goal, scheduled, latest_* etc.)
+    # NOTE: Fields like favorite_url, recall_eval, has_staged are sourced dynamically from the
+    # staged overlay view (t_practice_list_staged). They are intentionally not persisted in the
+    # DailyPracticeQueue snapshot rows to avoid duplication and potential drift; instead we rely
+    # on this enrichment step so the API can return a composite PracticeQueueEntryModel.
     from sqlalchemy import select
-    from tunetrees.models.tunetrees import t_practice_list_joined, TableTransientData
+    from tunetrees.models.tunetrees import (
+        t_practice_list_staged as _t_view_staged,
+    )
 
     if not rows:
         return []
 
-    # Build map keyed by tune id for fast merge (tune metadata + transient recall_eval)
+    # Build map keyed by tune id using staged overlay view (already includes staged latest_* + recall_eval)
     tune_ids = {r.tune_ref for r in rows if getattr(r, "tune_ref", None) is not None}
     joined_map: dict[int, Any] = {}
-    transient_map: dict[tuple[int, int, int], str | None] = {}
     try:  # pragma: no cover - defensive, never fail whole serialization
         from tunetrees.app.database import SessionLocal
-        from sqlalchemy import and_
 
         with SessionLocal() as _db:  # lightweight new session
-            # 1. Tune metadata (existing behavior)
             joined_rows = (
                 _db.execute(
-                    select(t_practice_list_joined).where(
-                        t_practice_list_joined.c.id.in_(tune_ids)
-                    )
+                    select(_t_view_staged).where(_t_view_staged.c.id.in_(tune_ids))
                 )
                 .mappings()
                 .all()
@@ -731,45 +734,8 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
                 tid = jr.get("id")
                 if tid is not None:
                     joined_map[int(tid)] = jr
-
-            # 2. Transient recall evaluations (purpose='practice') keyed by (user_id, playlist_id, tune_id)
-            # We only fetch rows relevant to current queue entries to minimize overhead.
-            keys = {
-                (r.user_ref, r.playlist_ref, r.tune_ref)
-                for r in rows
-                if r.tune_ref is not None
-            }
-            if keys:
-                # Break out the individual id sets to use IN filters (SQLAlchemy can't IN on tuples portably across all dbs)
-                user_ids = {k[0] for k in keys}
-                playlist_ids = {k[1] for k in keys}
-                tune_ids_local = {k[2] for k in keys}
-                transient_rows = (
-                    _db.execute(
-                        select(
-                            TableTransientData.user_id,
-                            TableTransientData.playlist_id,
-                            TableTransientData.tune_id,
-                            TableTransientData.recall_eval,
-                        ).where(
-                            and_(
-                                TableTransientData.user_id.in_(user_ids),
-                                TableTransientData.playlist_id.in_(playlist_ids),
-                                TableTransientData.tune_id.in_(tune_ids_local),
-                                TableTransientData.purpose == "practice",
-                            )
-                        )
-                    )
-                    .mappings()
-                    .all()
-                )
-                for tr in transient_rows:
-                    transient_map[(tr["user_id"], tr["playlist_id"], tr["tune_id"])] = (
-                        tr.get("recall_eval")
-                    )
     except Exception:  # pragma: no cover
         joined_map = {}
-        transient_map = {}
 
     enriched: list[dict[str, Any]] = []
     for r in rows:
@@ -831,12 +797,9 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
         # Provide tune_id separate from queue row id for clarity
         if "id" in jr:
             base["tune_id"] = jr.get("id")
-        # Attach transient recall evaluation if present
-        recall_key = (r.user_ref, r.playlist_ref, r.tune_ref)
-        if recall_key in transient_map:
-            base["recall_eval"] = transient_map[recall_key]
-        else:
-            base["recall_eval"] = None
+        # recall_eval & has_staged from staged view
+        base["recall_eval"] = jr.get("recall_eval") if jr else None
+        base["has_staged"] = jr.get("has_staged") if jr else None
 
         enriched.append(base)
     return enriched
@@ -1365,19 +1328,38 @@ def query_practice_list_scheduled_original(
     # Create the query - FIXED: Use scheduled column with fallback to latest_review_date
     # This handles the transition period where scheduled column may be null
     try:
+        # Base time column used for inclusion window (scheduled date or latest/next review date)
+        base_time_col = func.coalesce(
+            t_practice_list_staged.c.scheduled,
+            t_practice_list_staged.c.latest_review_date,
+        )
+
+        # We normally include tunes whose (scheduled OR latest_review_date) fall inside the window.
+        # However, when a tune is "staged" we have already computed a *future* next review date and
+        # overlaid it into latest_review_date. That would prematurely exclude the row from the
+        # current practice list after a refresh (user complaint: rows disappear immediately after staging).
+        # Fix: add an OR branch that keeps staged rows visible based on their practiced timestamp
+        # (which represents the current sitdown) even if the newly staged next review date is in the future.
+        # This preserves visibility until the user commits (or clears) the staged feedback.
+
+        staged_visibility_predicate = and_(
+            t_practice_list_staged.c.has_staged == 1,
+            # latest_practiced is overlaid with the sitdown_date when staging.
+            t_practice_list_staged.c.latest_practiced
+            <= review_sitdown_date.strftime("%Y-%m-%d %H:%M:%S"),
+            t_practice_list_staged.c.latest_practiced
+            > lower_bound_date.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+        window_predicate = and_(
+            base_time_col > lower_bound_date.strftime("%Y-%m-%d %H:%M:%S"),
+            base_time_col <= review_sitdown_date.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
         filters = [
             t_practice_list_staged.c.user_ref == user_ref,
             t_practice_list_staged.c.playlist_id == playlist_ref,
-            func.coalesce(
-                t_practice_list_staged.c.scheduled,
-                t_practice_list_staged.c.latest_review_date,
-            )
-            > lower_bound_date.strftime("%Y-%m-%d %H:%M:%S"),
-            func.coalesce(
-                t_practice_list_staged.c.scheduled,
-                t_practice_list_staged.c.latest_review_date,
-            )
-            <= review_sitdown_date.strftime("%Y-%m-%d %H:%M:%S"),
+            or_(window_predicate, staged_visibility_predicate),
         ]
         if not show_deleted:
             filters.append(t_practice_list_staged.c.deleted.is_(False))
