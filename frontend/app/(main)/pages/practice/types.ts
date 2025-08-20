@@ -177,6 +177,8 @@ export interface ITuneOverview extends ITune {
   latest_technique?: string | null;
   // Latest goal from practice record (read-only display)
   latest_goal?: string | null;
+  // Staging indicator (transient overlay present in practice_list_staged view)
+  has_staged?: boolean | null;
 }
 
 export interface ITuneOverviewImported extends ITuneOverview {
@@ -302,6 +304,7 @@ export interface IPracticeQueueEntry {
   latest_technique?: string | null;
   tags?: string | null;
   notes?: string | null;
+  has_staged?: boolean | null;
 }
 
 export interface IPracticeQueueWithMeta {

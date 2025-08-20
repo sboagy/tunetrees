@@ -430,13 +430,14 @@ export function get_columns(
       header: ({ column, table }) => sortableHeader(column, table, "Title"),
       cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
         const favoriteUrl = info.row.original.favorite_url;
-        return favoriteUrl ? (
+        const cellValue = favoriteUrl ? (
           <a href={favoriteUrl} target="_blank" rel="noopener noreferrer">
             {info.getValue()}
           </a>
         ) : (
           info.getValue()
         );
+        return cellValue;
       },
       enableSorting: true,
       enableHiding: true,

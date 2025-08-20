@@ -18,10 +18,15 @@ import {
   getColorForEvaluation,
   getQualityListForGoalAndTechnique,
 } from "../quality-lists";
+// Staging now uses scheduling-aware practice feedback path (stage=true) so
+// we intentionally stop using the generic transient settings helpers that
+// only persisted recall_eval. This ensures algorithm-derived fields (quality,
+// interval, etc.) are populated in table_transient_data and surfaced via the
+// practice_list_staged view.
 import {
-  createOrUpdateTableTransientData,
-  deleteTableTransientData,
-} from "../settings";
+  stagePracticeFeedback,
+  clearStagedPracticeFeedback,
+} from "../commands";
 import type {
   ITuneOverview,
   TablePurpose,
@@ -47,7 +52,7 @@ type RecallEvalComboBoxProps = {
 
 export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const { info, userId, playlistId, purpose, onRecallEvalChange } = props;
+  const { info, playlistId, onRecallEvalChange } = props;
 
   useEffect(() => {
     setIsMounted(true);
@@ -95,42 +100,40 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
   );
 
   const saveData = async (changed_value: string) => {
+    if (!changed_value) {
+      // Attempt backend clear if available; ignore failure (local state already cleared).
+      void clearStagedPracticeFeedback(playlistId, info.row.original.id ?? 0);
+      return;
+    }
     try {
-      // In the following, id may be omitted in the case of a new tune,
-      // but I don't think it's ever undefined in this case?
-      // But, keep an eye on it.
-      if (changed_value) {
-        logVerbose(
-          "===> RowRecallEvalComboBox.tsx:103 ~ saveData - changed_value",
-          changed_value,
-        );
-        await createOrUpdateTableTransientData(
-          userId,
-          info.row.original.id ?? 0,
-          playlistId,
-          purpose,
-          null,
-          null,
-          changed_value,
-        );
-        logVerbose(
-          `LF17 State saved: ${changed_value} for ${info.row.original.id}`,
-        );
-      } else {
-        logVerbose(
-          "===> RowRecallEvalComboBox.tsx:121 ~ saveData calling deleteTableTransientData",
-        );
-        await deleteTableTransientData(
-          userId,
-          info.row.original.id ?? 0,
-          playlistId,
-          purpose,
-        );
-        logVerbose(`LF17 State deleted for ${info.row.original.id}`);
+      // Map recall_eval selection directly to feedback string expected by
+      // stagePracticeFeedback. (Values already aligned: 0-5 quality labels.)
+      // Retrieve or derive sitdown date. We prefer a data attribute on body
+      // (set by parent container). Fallback: now UTC.
+      let sitdownDate: Date | null = null;
+      const attr = document.body.getAttribute("data-sitdown-iso");
+      if (attr) {
+        const d = new Date(attr);
+        if (!Number.isNaN(d.getTime())) sitdownDate = d;
       }
+      if (!sitdownDate) sitdownDate = new Date();
+
+      const success = await stagePracticeFeedback(
+        playlistId,
+        info.row.original.id ?? 0,
+        changed_value,
+        sitdownDate,
+        info.row.original.goal ?? null,
+      );
+      if (!success) {
+        throw new Error("stagePracticeFeedback returned false");
+      }
+      logVerbose(
+        `Staged practice feedback '${changed_value}' for tune ${info.row.original.id}`,
+      );
     } catch (error) {
-      console.error("LF17 Failed to save state:", error);
-      alert("Failed to save state. Please try again.");
+      console.error("RecallEval staging failure:", error);
+      alert("Failed to stage practice feedback. Please retry.");
     }
   };
 

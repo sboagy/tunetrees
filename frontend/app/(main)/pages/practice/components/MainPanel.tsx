@@ -92,7 +92,9 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
           className={"sidebar flex flex-col overflow-y-auto"} // Add overflow-y-auto for vertical scrolling
           collapsedSize={0} // Set collapsed size to 0
           collapsible={true} // Enable collapsing
-          defaultSize={25} // Use current width
+          // NOTE: Keep sidebar at 24% so remaining panel can naturally flex to ~76%.
+          // We removed explicit 100% default on the content panel below to avoid layout total > 100% warnings.
+          defaultSize={24}
           minSize={12} // Adjust minimum size based on collapsed state
           // maxSize={35} // Adjust maximum size based on collapsed state
         >
@@ -108,10 +110,11 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
         />
         <ResizablePanel
           className="content-panel flex-grow"
-          collapsedSize={0} // Set collapsed size to 0
-          collapsible={true} // Enable collapsing
-          defaultSize={100} // Use current width
-          minSize={65}
+          collapsedSize={0}
+          collapsible={true}
+          // Removed explicit defaultSize (previously 100) so library can auto-calc remaining space.
+          // Setting minSize ensures it won't collapse too small when sidebar is expanded.
+          minSize={70}
         >
           <div className="flex flex-col h-full">
             {currentView === "tabs" ? (

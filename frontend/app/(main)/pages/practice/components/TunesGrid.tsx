@@ -716,6 +716,11 @@ const TunesGrid = ({
                           height: `${virtualRow.size}px`, // Set the height of the row
                         }}
                         data-row-id={row.original.id}
+                        data-testid={
+                          row.original.has_staged
+                            ? `staged-row-${row.original.id}`
+                            : undefined
+                        }
                         // className={`absolute h-16 cursor-pointer w-full ${
                         //   currentTune === row.original.id
                         //     ? "outline outline-2 outline-blue-500"
@@ -728,7 +733,7 @@ const TunesGrid = ({
                           currentTune === row.original.id
                             ? "outline outline-blue-500"
                             : ""
-                        } ${getColorForEvaluation(row.original.recall_eval || null, false)}`}
+                        } ${getColorForEvaluation(row.original.recall_eval || null, false)} ${row.original.has_staged ? "ring-1 ring-amber-400/70 bg-amber-50 dark:bg-amber-900/20" : ""}`}
                         onClick={handleRowClick.bind(null, row)}
                         onDoubleClick={() => handleRowDoubleClick(row)}
                         data-state={row.getIsSelected() && "selected"}

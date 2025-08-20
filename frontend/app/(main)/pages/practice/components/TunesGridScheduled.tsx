@@ -6,7 +6,11 @@ import { Switch } from "@/components/ui/switch";
 import type { RowSelectionState } from "@tanstack/react-table";
 import { Upload } from "lucide-react";
 import { type JSX, useCallback, useEffect, useRef, useState } from "react";
-import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
+import {
+  type ITuneUpdate,
+  submitPracticeFeedbacks,
+  stagePracticeFeedback,
+} from "../commands";
 import {
   getPracticeQueueAction,
   refillPracticeQueueAction,
@@ -39,6 +43,7 @@ interface IPracticeQueueRowInternal {
   id: number;
   title: string | null; // backend tune_title (may be null)
   name: string | null; // legacy alias used elsewhere in table code
+  favorite_url?: string | null; // surfaced from backend enrichment (not stored in practice record/queue table)
   type?: string | null;
   structure?: string | null;
   learned?: string | null;
@@ -58,6 +63,7 @@ interface IPracticeQueueRowInternal {
   next_review_date?: string | null; // reserved
   practice_state?: string | null; // reserved
   playlist_deleted: boolean;
+  has_staged?: boolean | null;
 }
 
 export default function TunesGridScheduled({
@@ -74,6 +80,7 @@ export default function TunesGridScheduled({
   const [isLoading, setIsLoading] = useState(true);
   const [isRefilling, setIsRefilling] = useState(false);
   const [mode, setMode] = useState<ReviewMode>("grid");
+  // Removed explicit commit action; submission finalizes staged reviews.
   // Track IDs of tunes that received an evaluation this session (for potential future toggles)
   // Track of evaluated tune ids (reserved for future UI toggles). Currently unused directly in render.
   const [, setCompletedTuneIds] = useState<Set<number>>(new Set());
@@ -91,6 +98,7 @@ export default function TunesGridScheduled({
     const anyEvaluated = tunes.some((t) => t.recall_eval);
     setIsSubmitEnabled(anyEvaluated);
   }, [tunes]);
+  const anyStaged = tunes.some((t) => t.has_staged);
 
   const lastFetchedRefreshId = useRef<number | null>(null);
   const lastFetchedPlaylistId = useRef<number | null>(null);
@@ -135,6 +143,7 @@ export default function TunesGridScheduled({
           latest_goal?: string | null;
           latest_repetitions?: number | null;
           latest_technique?: string | null;
+          favorite_url?: string | null;
         };
         function isRawEntryArray(arr: unknown[]): arr is RawEntry[] {
           return arr.every(
@@ -164,6 +173,7 @@ export default function TunesGridScheduled({
           .map((e) => ({
             id: e.tune_ref,
             title: e.tune_title || null,
+            favorite_url: e.favorite_url || null,
             name: e.tune_title || null,
             type: e.type ?? null,
             structure: e.structure ?? null,
@@ -188,6 +198,9 @@ export default function TunesGridScheduled({
             next_review_date: null,
             practice_state: null,
             playlist_deleted: false,
+            has_staged:
+              (e as unknown as { has_staged?: boolean | null }).has_staged ??
+              null,
           }));
         setTunes(mapped as unknown as never);
         setTunesRefreshId(refreshId);
@@ -216,15 +229,136 @@ export default function TunesGridScheduled({
       if (newValue) {
         setCompletedTuneIds((prev) => new Set(prev).add(tuneId));
       } else {
-        // If user clears evaluation (possible with UI changes) remove from completed set
         setCompletedTuneIds((prev) => {
           const next = new Set(prev);
           next.delete(tuneId);
           return next;
         });
+        // Clearing value should also clear staged flag locally
+        setTunes((prev) =>
+          prev.map((t) => (t.id === tuneId ? { ...t, has_staged: false } : t)),
+        );
+      }
+      try {
+        const sitdownDate = getSitdownDateFromBrowser();
+        if (newValue) {
+          void stagePracticeFeedback(
+            playlistId,
+            tuneId,
+            newValue,
+            new Date(sitdownDate),
+          ).then((ok) => {
+            if (!ok) return;
+            setTunes((prev) =>
+              prev.map((t) =>
+                t.id === tuneId ? { ...t, has_staged: true } : t,
+              ),
+            );
+            // Lightweight per-row refresh: fetch snapshot silently and merge updated metrics for this tune only
+            void (async () => {
+              try {
+                const raw = await getPracticeQueueAction(
+                  userId,
+                  playlistId,
+                  new Date(sitdownDate),
+                  false,
+                );
+                if (Array.isArray(raw)) {
+                  type UpdatedRow = {
+                    tune_ref: number;
+                    latest_quality?: number | null;
+                    latest_easiness?: number | null;
+                    latest_interval?: number | null;
+                    latest_review_date?: string | null;
+                    scheduled?: string | null;
+                  };
+                  const updated = raw.find(
+                    (r: unknown): r is UpdatedRow =>
+                      !!r && (r as { tune_ref?: number }).tune_ref === tuneId,
+                  );
+                  if (updated) {
+                    setTunes((prev) =>
+                      prev.map((t) => {
+                        if (t.id !== tuneId) return t;
+                        return {
+                          ...t,
+                          latest_quality:
+                            updated.latest_quality ?? t.latest_quality,
+                          latest_easiness:
+                            updated.latest_easiness ?? t.latest_easiness,
+                          latest_interval:
+                            updated.latest_interval ?? t.latest_interval,
+                          latest_review_date:
+                            updated.latest_review_date ?? t.latest_review_date,
+                          scheduled: updated.scheduled ?? t.scheduled,
+                        };
+                      }),
+                    );
+                  }
+                }
+              } catch (error) {
+                console.warn("Per-row refresh failed", error);
+              }
+            })();
+          });
+        } else {
+          // Clear path: attempt backend clear already triggered by combo box helper.
+          // Perform lightweight per-row refresh to sync derived metrics (latest_* revert to committed values).
+          void (async () => {
+            try {
+              const raw = await getPracticeQueueAction(
+                userId,
+                playlistId,
+                new Date(sitdownDate),
+                false,
+              );
+              if (Array.isArray(raw)) {
+                type UpdatedRow = {
+                  tune_ref: number;
+                  latest_quality?: number | null;
+                  latest_easiness?: number | null;
+                  latest_interval?: number | null;
+                  latest_review_date?: string | null;
+                  scheduled?: string | null;
+                  recall_eval?: string | null;
+                  has_staged?: boolean | null;
+                };
+                const updated = raw.find(
+                  (r: unknown): r is UpdatedRow =>
+                    !!r && (r as { tune_ref?: number }).tune_ref === tuneId,
+                );
+                if (updated) {
+                  setTunes((prev) =>
+                    prev.map((t) => {
+                      if (t.id !== tuneId) return t;
+                      return {
+                        ...t,
+                        latest_quality:
+                          updated.latest_quality ?? t.latest_quality,
+                        latest_easiness:
+                          updated.latest_easiness ?? t.latest_easiness,
+                        latest_interval:
+                          updated.latest_interval ?? t.latest_interval,
+                        latest_review_date:
+                          updated.latest_review_date ?? t.latest_review_date,
+                        scheduled: updated.scheduled ?? t.scheduled,
+                        recall_eval: updated.recall_eval ?? null,
+                        has_staged: updated.has_staged ?? false,
+                      };
+                    }),
+                  );
+                }
+              }
+            } catch (error) {
+              console.warn("Per-row refresh after clear failed", error);
+            }
+          })();
+        }
+      } catch (error) {
+        console.error("stage submit failed", error);
       }
     },
-    [setTunes],
+    [setTunes, playlistId, userId],
   );
 
   const handleGoalChange = useCallback(
@@ -335,6 +469,8 @@ export default function TunesGridScheduled({
     );
   };
 
+  // commitStagedHandler removed (commit via Submit Practiced Tunes only).
+
   const handleModeChange = () =>
     setMode((m) => (m === "grid" ? "flashcard" : "grid"));
 
@@ -356,6 +492,7 @@ export default function TunesGridScheduled({
   return (
     <div className="w-full h-full">
       {/* Diagnostic render log removed for snapshot-based grid */}
+      {/* Commit Staged button removed per user feedback; rely solely on submit pathway */}
       {tableComponent}
       {playlistId <= 0 ? (
         <div className="w-full h-full flex items-center justify-center">
@@ -479,7 +616,7 @@ export default function TunesGridScheduled({
             id="tt-scheduled-tunes-header"
             className="flex items-center justify-between py-4"
           >
-            <div className="flex-row items-center">
+            <div className="flex-row items-center flex gap-3">
               <Button
                 type="submit"
                 variant="outline"
@@ -492,7 +629,14 @@ export default function TunesGridScheduled({
                   ? ""
                   : " Submit Practiced Tunes"}
               </Button>
-              {/* Inline Add from Backlog button removed: shown only in empty-state panel now */}
+              {anyStaged && (
+                <span
+                  className="text-xs text-amber-500 whitespace-nowrap"
+                  data-testid="staged-indicator-inline"
+                >
+                  Staged changes pending submit
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-4">
               <Label htmlFor="flashcard-mode">Flashcard Mode</Label>
