@@ -134,17 +134,17 @@ t_practice_list_staged = Table(
     Column("playlist_id", Integer),
     Column("instrument", Text),
     Column("playlist_deleted", Boolean),
-    Column("latest_practiced", Text),
-    Column("latest_quality", Integer),
-    Column("latest_easiness", Float),
-    Column("latest_difficulty", Float),
-    Column("latest_interval", Integer),
-    Column("latest_step", Integer),
-    Column("latest_repetitions", Integer),
-    Column("latest_review_date", Text),
-    Column("latest_backup_practiced", Text),
-    Column("latest_goal", Text),
-    Column("latest_technique", Text),
+    Column("latest_practiced", NullType),
+    Column("latest_quality", NullType),
+    Column("latest_easiness", NullType),
+    Column("latest_difficulty", NullType),
+    Column("latest_interval", NullType),
+    Column("latest_step", NullType),
+    Column("latest_repetitions", NullType),
+    Column("latest_review_date", NullType),
+    Column("latest_backup_practiced", NullType),
+    Column("latest_goal", NullType),
+    Column("latest_technique", NullType),
     Column("tags", NullType),
     Column("purpose", Text),
     Column("note_private", Text),
@@ -152,6 +152,7 @@ t_practice_list_staged = Table(
     Column("recall_eval", Text),
     Column("notes", NullType),
     Column("favorite_url", Text),
+    Column("has_staged", NullType),
     Column("has_override", NullType),
 )
 
@@ -559,6 +560,18 @@ class TableTransientData(Base):
     note_private = mapped_column(Text)
     note_public = mapped_column(Text)
     recall_eval = mapped_column(Text)
+    practiced = mapped_column(Text)
+    quality = mapped_column(Integer)
+    easiness = mapped_column(Float)
+    difficulty = mapped_column(Float)
+    interval = mapped_column(Integer)
+    step = mapped_column(Integer)
+    repetitions = mapped_column(Integer)
+    review_date = mapped_column(Text)
+    backup_practiced = mapped_column(Text)
+    goal = mapped_column(Text)
+    technique = mapped_column(Text)
+    stability = mapped_column(Float)
 
     playlist: Mapped[Optional["Playlist"]] = relationship(
         "Playlist", back_populates="table_transient_data"
