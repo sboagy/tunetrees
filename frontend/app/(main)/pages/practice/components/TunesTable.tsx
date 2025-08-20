@@ -382,6 +382,8 @@ export function TunesTableComponent({
     onRecallEvalChange,
     setTunesRefreshId,
     onGoalChange,
+    // Pass current playlist SR algorithm (may be null until loaded)
+    usePlaylist()?.srAlgType ?? null,
   );
 
   const table: TanstackTable<ITuneOverview> = useReactTable({

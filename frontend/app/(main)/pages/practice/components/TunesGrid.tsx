@@ -12,6 +12,7 @@ import { flexRender } from "@tanstack/react-table";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 import {
   DndContext,
   PointerSensor,
@@ -770,7 +771,17 @@ const TunesGrid = ({
           <TableFooter className="sticky bottom-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar">
             <TableRow id="tt-tunes-grid-footer">
               <TableCell
-                colSpan={get_columns(userId, playlistId, tablePurpose).length}
+                colSpan={
+                  get_columns(
+                    userId,
+                    playlistId,
+                    tablePurpose,
+                    undefined,
+                    undefined,
+                    undefined,
+                    usePlaylist()?.srAlgType ?? null,
+                  ).length
+                }
                 className="h-12"
               >
                 <div

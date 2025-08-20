@@ -20,6 +20,7 @@ import { Toaster } from "./ui/toaster";
 // import Header from "./Header";
 
 import { useEffect } from "react";
+import { useSession } from "next-auth/react";
 
 const fetchWithTimeout = (url: string, options = {}, timeout = 3000) => {
   const controller = new AbortController();
@@ -65,12 +66,16 @@ const loadTestBrowserProperties = () => {
 };
 
 const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
+  const { data: session } = useSession();
+  const userId = session?.user?.id
+    ? Number.parseInt(session.user.id)
+    : undefined;
   useEffect(() => {
     loadTestBrowserProperties();
   }, []);
   return (
     <SitDownDateProvider>
-      <CurrentPlaylistProvider>
+      <CurrentPlaylistProvider userId={userId}>
         <MainPaneViewProvider>
           <TuneDataRefreshProvider>
             <CurrentTuneProvider>

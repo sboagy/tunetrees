@@ -180,6 +180,7 @@ export function get_columns(
   onRecallEvalChange?: (tuneId: number, newValue: string) => void,
   setTunesRefreshId?: (newRefreshId: number) => void,
   onGoalChange?: (tuneId: number, newValue: string | null) => void,
+  srAlgType?: "FSRS" | "SM2" | null,
 ): ColumnDef<ITuneOverview, TunesGridColumnGeneralType>[] {
   const determineHeaderCheckedState = (
     table: TanstackTable<ITuneOverview>,
@@ -682,22 +683,33 @@ export function get_columns(
         meta: { headerLabel: "Prev Qual" },
       },
       {
+        // Adaptive column: shows Difficulty for FSRS playlists, Easiness for SM2 playlists (re-uses persisted id 'latest_easiness')
         accessorKey: "latest_easiness",
         header: ({ column, table }) =>
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Easiness",
+            srAlgType === "FSRS" ? "Difficulty" : "Easiness",
           ),
         cell: (info) => {
-          const value = info.getValue() as number | null;
-          return value ? value.toFixed(2) : "";
+          const original = info.row.original;
+          const rawValue =
+            srAlgType === "FSRS"
+              ? original.latest_difficulty
+              : original.latest_easiness;
+          return rawValue !== null && rawValue !== undefined
+            ? rawValue.toFixed(2)
+            : "";
         },
         enableSorting: true,
         enableHiding: true,
+        sortingFn: numericSortingFn,
         size: 14 * 8, // Approximate width for 11 characters
         minSize: 90,
-        meta: { headerLabel: "Easiness" },
+        meta: {
+          headerLabel: srAlgType === "FSRS" ? "Difficulty" : "Easiness",
+          type: srAlgType === "FSRS" ? "difficulty" : "easiness",
+        },
       },
       {
         accessorKey: "latest_interval",

@@ -306,7 +306,7 @@ export default function TunesGridScheduled({
                             updated.latest_interval ?? t.latest_interval,
                           latest_review_date:
                             updated.latest_review_date ?? t.latest_review_date,
-                          scheduled: updated.scheduled ?? t.scheduled,
+                          scheduled: null, //updated.scheduled ?? t.scheduled, // I think we want this null always for staging?
                           latest_difficulty:
                             updated.latest_difficulty ?? t.latest_difficulty,
                           latest_step: updated.latest_step ?? t.latest_step,
