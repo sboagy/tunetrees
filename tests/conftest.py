@@ -1,10 +1,11 @@
+import os
 import shutil
 import sqlite3
-import pytest
-import gc
 import threading
-import os
+import time
 from pathlib import Path
+
+import pytest
 
 # Set test database environment variable BEFORE any imports that use the database
 os.environ["TUNETREES_DB"] = "tunetrees_test.sqlite3"
@@ -15,16 +16,68 @@ os.environ.setdefault("TT_ENABLE_SQLITE_INTEGRITY_CHECKS", "0")
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+# --- Python 3.13 dummy thread finalizer workaround ---------------------------------
+# In Python 3.13 a regression (see bpo discussions around dummy threads & shutdown)
+# can surface as: TypeError: 'NoneType' object does not support the context manager protocol
+# inside threading._DeleteDummyThreadOnDel.__del__ when interpreter globals are torn
+# down before all dummy thread objects are finalized. This causes noisy test teardown
+# output but does not impact correctness. We defensively monkeypatch the __del__ to
+# guard against a cleared lock object. Remove once upstream fix is released.
+try:  # pragma: no cover - environment specific
+    import threading as _tt
+
+    _delete_cls = getattr(_tt, "_DeleteDummyThreadOnDel", None)  # type: ignore[attr-defined]
+    if _delete_cls is not None:  # pragma: no branch
+        _orig_del = getattr(_delete_cls, "__del__", None)
+        if _orig_del:
+
+            def _safe_del(self):  # type: ignore[no-redef]
+                lock = getattr(self, "_lock", None)
+                if lock is None:
+                    return
+                try:
+                    _orig_del(self)  # type: ignore[misc]
+                except TypeError:
+                    return
+                except Exception:
+                    return
+
+            try:
+                _delete_cls.__del__ = _safe_del  # type: ignore[assignment]
+            except Exception:
+                pass
+except Exception:
+    pass
+# -------------------------------------------------------------------------------
+
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
-    """Clean up resources after all tests are done."""
-    # Force garbage collection to clean up any remaining objects
-    gc.collect()
+    """Clean up resources after all tests are done.
 
-    # Give threads a moment to clean up
-    threading_active = threading.active_count()
-    if threading_active > 1:  # Main thread + any others
-        print(f"Active threads at session end: {threading_active}")
+    NOTE (Python 3.13): Explicit GC at interpreter shutdown can interact badly
+    with the new threading finalizer path, triggering:
+        TypeError: 'NoneType' object does not support the context manager protocol
+    in _DeleteDummyThreadOnDel.__del__ when dummy thread objects are collected
+    after runtime globals (like locks) are already cleared. Removing the eager
+    gc.collect() here avoids that race. We only emit a lightweight diagnostic
+    about leftover threads instead of forcing collection.
+    """
+    try:
+        # Avoid gc.collect(); let interpreter manage final collection to prevent
+        # _DeleteDummyThreadOnDel races under Python 3.13+.
+        threading_active = threading.active_count()
+        if threading_active > 1:  # Main thread + any others
+            # List non-daemon alive threads for debugging (best‑effort)
+            leftover = [
+                t.name
+                for t in threading.enumerate()
+                if t.is_alive() and t.name != "MainThread"
+            ]
+            print(
+                f"Active threads at session end (not joined): {threading_active - 1} -> {leftover}"
+            )
+    except Exception as e:  # pragma: no cover - defensive
+        print(f"pytest_sessionfinish diagnostic failed: {e}")
 
 
 def _setup_environment_variables(dst_path: Path) -> None:
@@ -57,6 +110,7 @@ def _verify_source_database(src_path: Path) -> None:
 def _reload_database_engine() -> None:
     """Reload SQLAlchemy database engine with current environment variables."""
     import os
+
     from tunetrees.app import database
 
     # Clear existing engine
@@ -150,6 +204,7 @@ def reset_test_db():
     except Exception as e:
         print(f"Warning: Could not reload database configuration: {e}")
 
+    time.sleep(0.5)
     _verify_destination_database(dst_path)
 
 

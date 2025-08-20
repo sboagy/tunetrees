@@ -27,7 +27,7 @@ def setup_test_database():
 class TestGoalTechniqueStorage:
     """Test goal and technique column functionality."""
 
-    def test_goal_technique_storage_recall_goal(self):
+    def test_goal_technique_storage_recall_goal(self, reset_test_db: None):
         """Test that goal and technique values are properly stored for recall goal."""
         # Test data with recall goal (should use FSRS scheduling)
         test_tune_updates = {
@@ -63,7 +63,7 @@ class TestGoalTechniqueStorage:
                 f"Expected quality 2 (good), got {latest_record.quality}"
             )
 
-    def test_goal_technique_storage_non_recall_goal(self):
+    def test_goal_technique_storage_non_recall_goal(self, reset_test_db: None):
         """Test that goal and technique values are properly stored for non-recall goals."""
         # Test data with non-recall goal (should use goal-specific scheduling)
         test_tune_updates = {
@@ -99,7 +99,7 @@ class TestGoalTechniqueStorage:
                 f"Expected quality 3 (easy), got {latest_record.quality}"
             )
 
-    def test_goal_technique_defaults(self):
+    def test_goal_technique_defaults(self, reset_test_db: None):
         """Test default values for goal and technique when not provided."""
         # Test data without explicit goal/technique
         test_tune_updates = {
@@ -137,7 +137,7 @@ class TestGoalTechniqueStorage:
                 f"Expected default goal 'recall', got '{latest_record.goal}'"
             )
 
-    def test_multiple_tunes_different_goals(self):
+    def test_multiple_tunes_different_goals(self, reset_test_db: None):
         """Test storing multiple tunes with different goals and techniques."""
         # Test data with multiple tunes and different goals
         test_tune_updates = {
