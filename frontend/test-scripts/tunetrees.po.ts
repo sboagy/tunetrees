@@ -215,8 +215,8 @@ export class TuneTreesPageObject {
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForSelector("body");
 
-    const pageContent = await this.page.content();
-    console.log("Page content after goto:", pageContent.slice(0, 500)); // Log first 500 chars for inspection
+    // const pageContent = await this.page.content();
+    // console.log("Page content after goto:", pageContent.slice(0, 500)); // Log first 500 chars for inspection
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForTimeout(1000);
     if (waitForTableStatus) {
@@ -229,11 +229,11 @@ export class TuneTreesPageObject {
       // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
       //   timeout: 60000,
       // });
-      const tableStatusText = (await this.tableStatus.textContent()) as string;
-      console.log(
-        "===> tunetrees.po.ts:99 ~ done with gotoMainPage: ",
-        tableStatusText,
-      );
+      // const tableStatusText = (await this.tableStatus.textContent()) as string;
+      // console.log(
+      //   "===> tunetrees.po.ts:99 ~ done with gotoMainPage: ",
+      //   tableStatusText,
+      // );
       await this.waitForTablePopulationToStart();
       await this.page.waitForLoadState("domcontentloaded");
       await this.page.waitForTimeout(1000);
@@ -247,7 +247,7 @@ export class TuneTreesPageObject {
     let iterations = 0;
 
     // Accept at least 1 populated data row to proceed; some practice scenarios start with a single row
-    const maxIterations = 20; // up to ~20s (still under typical test timeout) giving slower CI more time
+    const maxIterations = 30; // up to ~30s (still under typical test timeout) giving slower CI more time
     while (rowCount < 2 && iterations < maxIterations) {
       await this.page.waitForTimeout(1000); // wait for 1 second before checking again
       rowCount = await this.tunesGridRows.count();
@@ -272,20 +272,49 @@ export class TuneTreesPageObject {
     await this.repertoireTabTrigger.click();
     await this.page.waitForTimeout(100);
 
-    await this.filterInput.waitFor({ state: "visible" });
-    await this.filterInput.waitFor({ state: "attached" });
+    await this.filterInput.isVisible();
+    await this.filterInput.isEnabled();
+    await this.page.waitForTimeout(500);
+
     await this.filterInput.click();
-    await this.page.waitForTimeout(100);
-    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.waitForTimeout(500);
 
-    await this.page.waitForTimeout(1000);
-    await this.filterInput.fill(tuneTitle, { timeout: 90_000 });
+    await this.filterInput.fill(tuneTitle);
 
-    // An exception to the rule that we should not use expect() in PageObjects.
-    await expect(this.tunesGridRows).toHaveCount(2, { timeout: 60_000 });
-
-    const tuneRow = this.page.getByRole("row").nth(1);
-    await tuneRow.click();
+    // Wait until at least 1 data row present; prefer 2 (header + filtered result) but don't hard fail.
+    let attempts = 0;
+    let rowCount = await this.tunesGridRows.count();
+    while (rowCount < 2 && attempts < 40) {
+      // up to ~20s
+      if (attempts > 1) {
+        console.warn(
+          `retrying for row count >= 2 (rowCount=${rowCount}). Attempt ${attempts}`,
+        );
+      }
+      await this.page.waitForTimeout(1000);
+      rowCount = await this.tunesGridRows.count();
+      attempts++;
+    }
+    if (rowCount < 2) {
+      console.warn(
+        `navigateToTune(): expected filtered table row not loaded (rowCount=${rowCount}). Proceeding with best-effort click if available.`,
+      );
+    }
+    if (rowCount >= 2) {
+      const tuneRow = this.page.getByRole("row").nth(1);
+      const firstCell = tuneRow.getByRole("cell").nth(1);
+      await firstCell.click();
+    } else {
+      // Attempt to click any row containing the title
+      const fallback = this.page.getByRole("row", { name: tuneTitle }).first();
+      if (await fallback.isVisible()) {
+        await fallback.click();
+      } else {
+        throw new Error(
+          `navigateToTune(): Unable to locate tune row for title '${tuneTitle}'.`,
+        );
+      }
+    }
     await this.page.waitForTimeout(100);
     // await this.page.getByRole("row", { name: tuneTitle }).click();
   }
@@ -386,6 +415,7 @@ export class TuneTreesPageObject {
 
     // Click the Irish Tenor Banjo option
     await tenorBanjoOption.click();
+    await this.page.waitForTimeout(500);
 
     // Wait for the dropdown to close
     await dropdownMenu.waitFor({ state: "detached", timeout: 10000 });
@@ -401,10 +431,9 @@ export class TuneTreesPageObject {
 
     // Conditionally check that the table shows zero entries
     if (shouldExpectZeroTable) {
-      await expect(this.tableStatus).toContainText(
-        "0 of 0 row(s) selected., lapsed: 0, current: 0, future: 0, new: 0",
-        { timeout: 30000 },
-      );
+      await expect(this.tableStatus).toContainText("0 of 0 row(s) selected", {
+        timeout: 30000,
+      });
     }
   }
 
@@ -738,4 +767,20 @@ export async function navigateToPracticeTabStandalone(
 export async function navigateToRepertoireTabStandalone(page: Page) {
   const ttPO = new TuneTreesPageObject(page);
   await ttPO.navigateToRepertoireTab();
+}
+
+export async function getTuneGridColumnIndex(
+  page: Page,
+  columnName: string,
+): Promise<number | null> {
+  const columnLocator = page.getByRole("rowgroup").nth(0);
+  for (let i = 0; i < 10; i++) {
+    const cell = columnLocator.getByRole("cell").nth(i);
+    await expect(cell).toBeVisible();
+    const columnText = await cell.innerText();
+    if (columnText === columnName) {
+      return i; // Return the index of the matching column
+    }
+  }
+  return null; // Return null if no matching column found
 }

@@ -8,10 +8,12 @@ from pathlib import Path
 
 # Set test database environment variable BEFORE any imports that use the database
 os.environ["TUNETREES_DB"] = "tunetrees_test.sqlite3"
+# Disable aggressive journal mode tweaking & integrity checks if desired to reduce locking
+os.environ.setdefault("TT_ENABLE_SQLITE_DELETE_JOURNAL", "0")
+os.environ.setdefault("TT_ENABLE_SQLITE_INTEGRITY_CHECKS", "0")
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from tunetrees.api.tunetrees import router
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -120,11 +122,28 @@ def reset_test_db():
     src_path = repo_root / "tunetrees_test_clean.sqlite3"
     dst_path = repo_root / "tunetrees_test.sqlite3"
 
+    from tunetrees.app import database  # local import to access engine
+
     _setup_environment_variables(dst_path)
     _verify_source_database(src_path)
 
+    # Dispose existing engine BEFORE copying to release locks
+    if hasattr(database, "sqlalchemy_database_engine"):
+        try:
+            database.sqlalchemy_database_engine.dispose()
+        except Exception:
+            pass
+
+    if dst_path.exists():
+        try:
+            dst_path.unlink()
+        except Exception:
+            pass
+
     print(f"Copying test DB from {src_path} to {dst_path}")
     shutil.copyfile(src_path, dst_path)
+
+    # Removed automatic migration invocation: schema migrations are now forbidden in tests.
 
     try:
         _reload_database_engine()
@@ -137,6 +156,8 @@ def reset_test_db():
 @pytest.fixture(scope="session")
 def api_client():
     """Create a FastAPI TestClient for API testing."""
+    from tunetrees.api.tunetrees import router  # delayed import to avoid locking
+
     app = FastAPI()
     app.include_router(router, prefix="")
     client = TestClient(app)

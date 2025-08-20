@@ -9,6 +9,8 @@ from tunetrees.models.tunetrees import Tune
 import pytz
 from dateutil import parser
 
+# Removed dynamic migration logic; schema assumed current in clean test DB.
+
 
 def test_basic_connect_and_read():
     db_url = os.environ.get("DATABASE_URL")

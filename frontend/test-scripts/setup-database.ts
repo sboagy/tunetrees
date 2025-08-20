@@ -17,7 +17,11 @@ export async function setupDatabase(): Promise<void> {
       "===> setup-database.ts:29 ~ testDatabasePath: ",
       testDatabasePath,
     );
+    function sleep(ms: number): Promise<void> {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
     await fs.copyFile(cleanDatabasePath, testDatabasePath);
+    await sleep(3000);
 
     // Verify the copy by checking the file stats
     const srcStats = await fs.stat(cleanDatabasePath);
@@ -32,11 +36,7 @@ export async function setupDatabase(): Promise<void> {
       );
     }
 
-    function sleep(ms: number): Promise<void> {
-      return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-
-    await sleep(2000);
+    await sleep(3000);
     console.log("Database setup complete.");
   } catch (error) {
     console.error("Error setting up database:", error);

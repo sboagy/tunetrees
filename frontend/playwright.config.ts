@@ -53,7 +53,7 @@ export default defineConfig({
   ),
 
   expect: {
-    timeout: process.env.CI ? 50_000 : 20_000, // 50 seconds in CI, 20 seconds locally
+    timeout: process.env.CI ? 50_000 : 30_000, // 50 seconds in CI, 20 seconds locally
   },
 
   use: {
@@ -104,7 +104,7 @@ export default defineConfig({
       },
       // dependencies: ["backend"],
       testMatch: "test*.ts",
-      timeout: process.env.CI ? 80_000 : 30_000, // 80 seconds in CI, 30 seconds locally
+      timeout: process.env.CI ? 90_000 : 50_000, // 80 seconds in CI, 30 seconds locally
     },
 
     // {

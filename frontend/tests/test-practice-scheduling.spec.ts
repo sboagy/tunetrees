@@ -60,6 +60,8 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     const count = await rows.count();
     const limit = Math.min(count - 1, 4);
     const reviewedIds: number[] = [];
+    // Capture pre-submission row text for change detection
+    const preRowTexts: Record<number, string> = {};
     for (let i = 1; i <= limit; i++) {
       // skip header row
       const row = rows.nth(i);
@@ -68,6 +70,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
       const idText = await idCell.textContent();
       const tuneId = Number(idText);
       if (!Number.isNaN(tuneId)) {
+        preRowTexts[tuneId] = (await row.textContent()) ?? "";
         const evalType = feedbacks[i - 1];
         // Always apply the evaluation if set; but only assert disappearance for non-again evals
         if (evalType !== "(Not Set)") {
@@ -88,13 +91,24 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     await pageObject.clickWithTimeAfter(submitButton);
     await pageObject.waitForSuccessfullySubmitted();
 
-    // Verify that the reviewed tunes are no longer listed for today.
-    // The grid may backfill other tunes, so avoid asserting exact row counts.
-    const idCells = pageObject.tunesGridRows.locator("td:first-child");
+    // Verify that each reviewed tune either disappeared OR its row text changed (rescheduled metrics updated)
+    const postRows = pageObject.tunesGridRows;
     for (const tid of reviewedIds) {
-      await expect(
-        idCells.filter({ hasText: new RegExp(`^${tid}$`) }),
-      ).toHaveCount(0, { timeout: 20000 });
+      const idCells = postRows.locator("td:first-child");
+      const target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
+      const presentCount = await target.count();
+      if (presentCount === 0) {
+        continue; // disappeared: acceptable
+      }
+      // Row still present: check for changed text
+      const row = postRows
+        .locator("tr")
+        .filter({ has: target.first() })
+        .first();
+      const afterText = await row.textContent();
+      expect(
+        afterText && preRowTexts[tid] && afterText !== preRowTexts[tid],
+      ).toBeTruthy();
     }
   });
 

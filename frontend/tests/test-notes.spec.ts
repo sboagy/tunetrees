@@ -32,7 +32,11 @@ test("test-notes-1", async ({ page }) => {
 
   await page.getByPlaceholder("Filter").click();
   await page.getByPlaceholder("Filter").fill("Peacock's Feather");
-  await page.getByRole("row", { name: "4377 Peacock's Feather Hpipe" }).click();
+  await page
+    .getByRole("row", { name: "4377 Peacock's Feather Hpipe" })
+    .getByRole("cell")
+    .nth(1)
+    .click();
 
   await page.waitForSelector("#current-tune-title", {
     state: "visible",
