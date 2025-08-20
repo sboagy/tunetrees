@@ -362,26 +362,11 @@ Since SQLite can't directly have descriptions for the fields, this is arguably t
 
 ##### practice_record
 
-This associates the current state of practice, unique to tune/playlist/user.
+See the [Practice Record Schema](docs/practice_flow.md#practice-record-schema-reference) in `docs/practice_flow.md`.
 
-| Type    | Name             | Description                                                                                             |
-| ------- | ---------------- | ------------------------------------------------------------------------------------------------------- |
-| INTEGER | id               | Primary key, autoincrement                                                                              |
-| INTEGER | playlist_ref     | References the playlist (`playlist.playlist_id`)                                                        |
-| INTEGER | tune_ref         | References the tune (`tune.id`)                                                                         |
-| TEXT    | practiced        | Date/time or string indicating when the practice occurred                                               |
-| INTEGER | quality          | Quality rating of the practice session                                                                  |
-| REAL    | easiness         | Easiness factor for spaced repetition, when using SM2                                                   |
-| INTEGER | interval         | Interval (days) until next review                                                                       |
-| INTEGER | repetitions      | Number of times this tune has been reviewed                                                             |
-| TEXT    | review_date      | Scheduled date for next review (maybe should be called Due)                                             |
-| TEXT    | backup_practiced | Backup of practice date/time or notes (deprecated, not needed given `practice_history` table)           |
-| REAL    | stability        | Stability metric for spaced repetition, when using FSRS                                                 |
-| INTEGER | elapsed_days     | Days elapsed since last review                                                                          |
-| INTEGER | lapses           | Number of times the tune was forgotten                                                                  |
-| INTEGER | state            | Enum representing the learning state (one of Learning = 1, Review = 2, Relearning = 3, or null/0 = NEW) |
-| REAL    | difficulty       | Difficulty metric for the tune, when using FSRS                                                         |
-| INTEGER | step             | Current learning or relearning step or None if the tune is in the Review state                          |
+##### daily_practice_queue
+
+See the [Daily Practice Queue Schema Reference](docs/practice_flow.md#daily-practice-queue-schema-reference) in `docs/practice_flow.md`.
 
 ### 1.6. Alternatives or Potential Technology Evolution
 
