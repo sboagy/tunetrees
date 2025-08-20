@@ -1,5 +1,5 @@
 CREATE VIEW
-	practice_list_staged as
+	practice_list_staged AS
 SELECT
 	tune.id AS id,
 	COALESCE(tune_override.title, tune.title) AS title,
@@ -11,19 +11,23 @@ SELECT
 	tune.private_for,
 	tune.deleted,
 	playlist_tune.learned,
+	COALESCE(td.goal, COALESCE(pr.goal, 'recall')) AS goal,
+	playlist_tune.scheduled AS scheduled,
 	playlist.user_ref AS user_ref,
 	playlist.playlist_id AS playlist_id,
 	instrument.instrument AS instrument,
-	playlist_tune.deleted as playlist_deleted,
-	practice_record.practiced,
-	practice_record.quality,
-	practice_record.easiness,
-	practice_record.difficulty,
-	practice_record.interval,
-	practice_record.step,
-	practice_record.repetitions,
-	practice_record.review_date,
-	practice_record.backup_practiced,
+	playlist_tune.deleted AS playlist_deleted,
+	COALESCE(td.practiced, pr.practiced) AS latest_practiced,
+	COALESCE(td.quality, pr.quality) AS latest_quality,
+	COALESCE(td.easiness, pr.easiness) AS latest_easiness,
+	COALESCE(td.difficulty, pr.difficulty) AS latest_difficulty,
+	COALESCE(td.interval, pr.interval) AS latest_interval,
+	COALESCE(td.step, pr.step) AS latest_step,
+	COALESCE(td.repetitions, pr.repetitions) AS latest_repetitions,
+	COALESCE(td.review_date, pr.review_date) AS latest_review_date,
+	COALESCE(td.backup_practiced, pr.backup_practiced) AS latest_backup_practiced,
+	COALESCE(td.goal, pr.goal) AS latest_goal,
+	COALESCE(td.technique, pr.technique) AS latest_technique,
 	(
 		SELECT
 			group_concat (tag.tag_text, ' ')
@@ -61,7 +65,22 @@ SELECT
 	CASE
 		WHEN tune_override.user_ref = playlist.user_ref THEN 1
 		ELSE 0
-	END AS has_override
+	END AS has_override,
+	CASE
+		WHEN td.practiced IS NOT NULL
+		OR td.quality IS NOT NULL
+		OR td.easiness IS NOT NULL
+		OR td.difficulty IS NOT NULL
+		OR td.interval IS NOT NULL
+		OR td.step IS NOT NULL
+		OR td.repetitions IS NOT NULL
+		OR td.review_date IS NOT NULL
+		OR td.backup_practiced IS NOT NULL
+		OR td.goal IS NOT NULL
+		OR td.technique IS NOT NULL
+		OR td.stability IS NOT NULL THEN 1
+		ELSE 0
+	END AS has_staged
 FROM
 	tune
 	LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
@@ -77,7 +96,7 @@ FROM
 				SELECT
 					tune_ref,
 					playlist_ref,
-					MAX(id) as max_id
+					MAX(id) AS max_id
 				FROM
 					practice_record
 				GROUP BY
@@ -86,8 +105,8 @@ FROM
 			) latest ON pr.tune_ref = latest.tune_ref
 			AND pr.playlist_ref = latest.playlist_ref
 			AND pr.id = latest.max_id
-	) practice_record ON practice_record.tune_ref = tune.id
-	AND practice_record.playlist_ref = playlist_tune.playlist_ref
+	) pr ON pr.tune_ref = tune.id
+	AND pr.playlist_ref = playlist_tune.playlist_ref
 	LEFT JOIN tag ON tag.tune_ref = tune.id
 	LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 	AND td.playlist_id = playlist_tune.playlist_ref
