@@ -11,7 +11,7 @@ This document describes the current (snapshot-based) practice scheduling and dis
 5. User may explicitly append backlog or priority tunes into the snapshot via dedicated actions (these return only the new snapshot entries to merge client-side).
 6. A gap counter reflects tunes that became newly due (bucket 1) after snapshot creation (e.g., manual schedule adjustments); optional force regeneration can create a fresh snapshot (rare path).
 
-### Updated Sequence Diagram
+### Sequence Diagram
 
 ```mermaid
 sequenceDiagram
@@ -33,20 +33,50 @@ sequenceDiagram
   API-->>C: Snapshot JSON
   C-->>U: Render queue
 
-  U->>C: Enter feedback
-  C->>SA: submitPracticeFeedbacks
-  SA->>API: POST submit_feedbacks
+  %% Staging (preview) path for the FIRST tune the user touches this session
+  U->>C: Select recall evaluation (Tune X)
+  C->>SA: stagePracticeFeedback (tune_id, feedback, goal)
+  SA->>API: POST submit_feedbacks?stage=true
+  API->>SCH: _stage_practice_feedbacks
+  SCH->>DB: UPSERT table_transient_data (preview metrics)
+  DB-->>SCH: OK
+  SCH-->>API: {status:ok, staged:1, count:1, preview:*}
+  API-->>SA: JSON
+  SA-->>C: Merge preview metrics
+  C->>C: Update row (recall_eval + latest_* preview)
+
+  %% Subsequent staging events. This can be either:
+  %%  a) Selecting a recall evaluation for a DIFFERENT tune (Tune Y, Z...)
+  %%  b) Adjusting the evaluation for a tune already staged (overwriting preview)
+  loop Additional tune selections or adjustments
+    U->>C: Select/adjust recall evaluation (Tune Y or restage Tune X)
+    C->>SA: stagePracticeFeedback
+    SA->>API: POST submit_feedbacks?stage=true
+    API->>SCH: _stage_practice_feedbacks
+    SCH->>DB: UPSERT transient row
+    SCH-->>API: {status:ok, staged:1, count:1}
+    API-->>SA: JSON
+    SA-->>C: Update row preview
+  end
+
+  %% Final commit of all staged feedbacks
+  U->>C: Submit practice batch
+  C->>SA: submitPracticeFeedbacks (multi-tune)
+  SA->>API: POST submit_feedbacks?stage=false
   API->>SCH: update_practice_feedbacks
   loop Each tune
     SCH->>SCH: _process_single_tune_feedback
     SCH->>DB: INSERT PracticeRecord
     SCH->>DB: UPDATE playlist_tune.scheduled
   end
-  SCH-->>API: Commit
-  API-->>SA: 302
-  SA-->>C: Ack
-  C->>C: Clear transient feedback
+  SCH-->>API: {status:ok, staged:false, count:n}
+  API-->>SA: JSON
+  SA-->>C: Ack (count + timings)
+  C->>API: DELETE /table_transient_data (bulk clear)
+  API-->>C: 204
+  C->>C: Clear local staged state
 
+  %% Append flows
   U->>C: Append backlog tunes
   C->>API: POST /practice_queue_snapshot/append_backlog
   API->>SNAP: append_backlog
@@ -65,6 +95,8 @@ sequenceDiagram
   API-->>C: New snapshot entries
   C-->>U: Merge + render new tunes
 ```
+
+Clarification: The first staging event ("Select recall evaluation (Tune X)") represents the user choosing a rating for the first tune they interact with during the session. The loop labeled "Additional tune selections or adjustments" covers BOTH (a) picking evaluations for new, previously untouched tunes and (b) changing (restaging) the evaluation for a tune already staged—each triggers the same `stagePracticeFeedback` call and overwrites the transient preview row for that tune.
 
 ## Core Entities & Fields
 
@@ -276,6 +308,70 @@ Combining concerns would either (a) bloat historical rows with ephemeral per-day
 
 If future performance profiling shows regeneration is trivial and daily UX demands more real-time adaptability, a _materialized view_ or _on-demand generated cache_ could replace the physical snapshot table—retaining `practice_record` as the only persisted source. Current choice balances development velocity with UX stability.
 
+## Transient Feedback Staging (`table_transient_data`)
+
+Purpose: Provide **per-row, pre-submission persistence plus preview scheduler metrics** (interval, easiness, repetitions, difficulty, stability, step) for an in‑progress recall evaluation so that refresh/navigation does not lose intent and the user can see projected results before committing historical `PracticeRecord` entries.
+
+### When It Is Used
+
+1. User selects a recall evaluation (Again/Hard/Good/Easy...) in grid or flashcard mode.
+2. UI updates row locally (optimistic) then calls server action `stagePracticeFeedback()` which sends a single‑tune POST: `/practice/submit_feedbacks/{playlist_id}?stage=true&sitdown_date=...` with body `{ "<tuneId>": { "feedback": "good", "goal": "recall" } }`.
+3. Backend `_stage_practice_feedbacks` computes scheduler preview and UPSERTs row into `table_transient_data` (purpose='practice').
+4. Optional lightweight refetch of snapshot merges new preview metrics for that tune (latest\_\* fields) into UI.
+5. User can change the evaluation again; each change overwrites the transient row with new preview metrics.
+6. Batch submit (`submitPracticeFeedbacks` with `stage=false`) creates real `PracticeRecord` rows, marks snapshot queue rows completed, then client bulk clears staging rows (DELETE legacy `/table_transient_data/{userId}/-1/{playlistId}/practice`).
+
+### Data Model Subset
+
+Request payload (staging single tune):
+
+```json
+{
+  "123": { "feedback": "good", "goal": "recall" }
+}
+```
+
+Stored transient columns used now: `recall_eval`, `practiced`, `quality`, `easiness`, `difficulty`, `interval`, `step`, `repetitions`, `review_date`, `goal`, `technique`, `stability` (notes fields currently unused in staging path).
+
+### Lifecycle Summary
+
+| Phase                    | Action                                                       | Persistence Effect                                              |
+| ------------------------ | ------------------------------------------------------------ | --------------------------------------------------------------- |
+| Row edit (optimistic)    | Local state updated (`recall_eval`)                          | None (client memory)                                            |
+| Stage call               | POST submit_feedbacks?stage=true                             | UPSERT preview metrics into `table_transient_data`              |
+| Subsequent edits         | Repeat stage call                                            | Overwrite transient row                                         |
+| Optional per-row preview | Lightweight refetch merges updated latest\_\* preview fields | UI shows predicted interval/easiness/etc.                       |
+| Batch submission         | POST submit_feedbacks?stage=false (multi-tune body)          | PracticeRecords appended; snapshot rows `completed_at` set      |
+| Post-submit clean        | DELETE /table_transient_data (bulk clear)                    | Remove transient rows (history now solely in `practice_record`) |
+
+### Why Not Only Client Memory?
+
+1. **Resilience**: Browser refresh / tab crash does not force re-selection of dozens of pending evaluations.
+2. **Cross-device continuity (future)**: Could allow starting on one device, finishing on another before submit.
+3. **Explicit Intent Tracking**: Distinguishes _pending_ evaluations (staged) from _completed_ (historical PracticeRecords) without altering snapshot ordering.
+
+### Interaction With Snapshot
+
+`table_transient_data` does **not** influence daily snapshot generation or bucket ordering. It is purely a scratch layer. Snapshot rows remain stable; staging only pre-populates what the user _plans_ to submit. If a user stages a value but never submits before day rollover, that staged row can be pruned (future housekeeping) without affecting scheduling correctness.
+
+### Cleanup & Pruning
+
+Currently cleanup is manual (client DELETE post-submit). A future cron / background task could prune:
+
+- Staged rows older than N hours with no corresponding `PracticeRecord` on the same (tune, playlist, user).
+- Rows whose tunes left the playlist or were deleted.
+
+### Potential Extensions
+
+1. Store _predicted next interval_ so UI can preview effect before commit.
+2. Support staging of multi-exposure counts (previewing partial completions).
+3. Encrypt / redact private notes client-side before staging for privacy.
+
+### Trade-offs
+
+- Added write per row edit (small overhead) vs zero-loss UX for longer selection sessions.
+- Requires disciplined bulk delete post-submit to prevent stale residue; mitigated by potential TTL pruning.
+
 ## Future Improvements
 
 1. Include per-row completion state in snapshot to eliminate client transient flag after practicing.
@@ -321,7 +417,7 @@ Steps:
 1. Validate presence and validity of `sitdownDate` (must be a Date object, non-NaN).
 2. POST JSON body `updates` to: `POST {TT_API_BASE_URL}/tunetrees/practice/submit_feedbacks/{playlistId}?sitdown_date=<UTC_ISO>`.
 3. `sitdown_date` is converted to Python-compatible UTC string (`convertToPythonUTCString`).
-4. Returns HTTP 302 (FastAPI status code constant) or propagates an error message.
+4. Returns JSON `{ "status": "ok", "staged": false, "count": <n> }` (or `staged: true` for staging calls with `?stage=true`).
 
 Payload Shape (per tune):
 
@@ -348,8 +444,9 @@ async def submit_feedbacks(playlist_id: str, tune_updates: Dict[str, TuneFeedbac
 Steps:
 
 1. Ensure `sitdown_date` is timezone-aware; if naive, patch UTC tzinfo.
-2. Call `update_practice_feedbacks(tune_updates, playlist_id, review_sitdown_date=sitdown_date)`.
-3. Return 302 on success or raise HTTP 500 with detail on failure.
+2. If `stage=true`: call `_stage_practice_feedbacks()` which computes preview scheduling metrics and UPSERTs `table_transient_data`; respond with JSON including `staged: true` and count.
+3. If commit (`stage=false` or absent): call `update_practice_feedbacks(tune_updates, playlist_id, review_sitdown_date=sitdown_date)` writing `PracticeRecord` rows and updating `playlist_tune.scheduled`.
+4. Return JSON `{status, staged:false, count}` (or raise HTTP 500 with detail on failure).
 
 ### 4. Core Scheduling Orchestration
 
