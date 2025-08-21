@@ -36,7 +36,8 @@ const loadTestBrowserProperties = () => {
     fetchWithTimeout("/test-browser.properties", {}, 600000)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch test-browser.properties");
-        return res.text();
+        const text = res.text();
+        return text;
       })
       .then((text) => {
         const lines = text.split("\n");
@@ -49,9 +50,14 @@ const loadTestBrowserProperties = () => {
             if (typeof window.__TT_REVIEW_SITDOWN_DATE__ === "undefined") {
               window.__TT_REVIEW_SITDOWN_DATE__ = value;
             }
-            if (!window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE")) {
-              window.localStorage.setItem("TT_REVIEW_SITDOWN_DATE", value);
-            }
+            window.localStorage.setItem("TT_REVIEW_SITDOWN_DATE", value);
+            console.assert(
+              window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE") === value,
+              "TT_REVIEW_SITDOWN_DATE in localStorage does not match the expected value",
+            );
+            // if (!window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE")) {
+            //   window.localStorage.setItem("TT_REVIEW_SITDOWN_DATE", value);
+            // }
           }
           // Add more keys as needed
         }

@@ -146,6 +146,13 @@ interface IPracticeFeedbacksProps {
   sitdownDate: Date;
 }
 
+interface ISubmitFeedbacksResponse {
+  status: string;
+  staged?: boolean;
+  count?: number;
+  [k: string]: unknown;
+}
+
 export const submitPracticeFeedbacks = async (
   props: IPracticeFeedbacksProps,
 ): Promise<string> => {
@@ -183,8 +190,13 @@ export const submitPracticeFeedbacks = async (
         "Content-Type": "application/json",
       },
     });
-    console.log("Feedbacks submitted successfully:", response.data);
-    return response.data as string;
+    const data = response.data as ISubmitFeedbacksResponse | string;
+    if (typeof data === "string") {
+      console.log("Feedbacks submitted (string response):", data);
+      return data;
+    }
+    console.log("Feedbacks submitted successfully:", data);
+    return data.status || "ok";
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error("Axios error:", error.response?.data || error.message);

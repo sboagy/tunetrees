@@ -637,14 +637,14 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Prev Goal",
+            "Goal",
           ),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
-        meta: { headerLabel: "Prev Goal" },
+        meta: { headerLabel: "Goal" },
         size: 130,
         minSize: 110,
       },
@@ -654,14 +654,14 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Prev Alg",
+            "Alg",
           ),
         cell: (info) => {
           return info.getValue() ?? "sm2";
         },
         enableSorting: true,
         enableHiding: true,
-        meta: { headerLabel: "Prev Alg" },
+        meta: { headerLabel: "Alg" },
         size: 130,
         minSize: 110,
       },
@@ -671,7 +671,7 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Prev Qual",
+            "Qual",
           ),
         cell: (info) => {
           return info.getValue();
@@ -680,7 +680,7 @@ export function get_columns(
         enableHiding: true,
         size: 12 * 9, // Approximate width for 11 characters
         minSize: 90,
-        meta: { headerLabel: "Prev Qual" },
+        meta: { headerLabel: "Qual" },
       },
       {
         // Adaptive column: shows Difficulty for FSRS playlists, Easiness for SM2 playlists (re-uses persisted id 'latest_easiness')

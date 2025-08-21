@@ -389,7 +389,8 @@ async def submit_schedules(
 
     update_practice_schedules(tune_updates, playlist_id)
 
-    return status.HTTP_302_FOUND
+    # Return explicit JSON success payload (avoid misleading 302 redirect status)
+    return {"status": "ok", "action": "submit_schedules"}
 
 
 @router.post("/practice/submit_feedbacks/{playlist_id}")
@@ -401,7 +402,7 @@ async def submit_feedbacks(
         False,
         description="If true, compute and stage results in transient table instead of creating PracticeRecords",
     ),
-):
+) -> dict[str, Any]:
     logger.debug(f"{tune_updates=}")
     try:
         # Ensure sitdown_date has a UTC timezone.
@@ -446,8 +447,7 @@ async def submit_feedbacks(
                     except Exception as e2:  # pragma: no cover - defensive
                         db_mark.rollback()
                         logger.error(f"Failed marking queue completion: {e2}")
-
-        return status.HTTP_302_FOUND
+        return {"status": "ok", "staged": bool(stage), "count": len(tune_updates)}
     except Exception as e:  # pragma: no cover - defensive
         logger.error(f"Error in submit_feedbacks: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -568,7 +568,7 @@ def _stage_single_tune(
             quality_text=quality_str,
         )
     else:
-        last_review_str = latest_pr.review_date
+        last_review_str = latest_pr.practiced if latest_pr else None
         if last_review_str:
             try:
                 last_review = datetime.strptime(

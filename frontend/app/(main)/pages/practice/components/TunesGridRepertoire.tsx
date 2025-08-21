@@ -468,9 +468,9 @@ export default function TunesGridRepertoire({
     // Future scheduled (not yet in snapshot) -> italic green
     if (scheduledDate >= startOfNextDay) return "italic text-green-300";
 
-    // Lapsed window (recent) -> underline amber
-    if (scheduledDate >= lowerBound && scheduledDate < startOfSitdownDay)
-      return "italic text-blue-300";
+    // Not sure why this doesn't seem to be quite right...
+    // if (scheduledDate >= lowerBound && scheduledDate < startOfSitdownDay)
+    //   return "italic text-blue-300";
 
     // Older beyond window -> subtle gray underline
     if (scheduledDate < lowerBound) return "italic text-gray-300";

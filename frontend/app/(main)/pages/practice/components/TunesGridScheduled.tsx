@@ -256,80 +256,89 @@ export default function TunesGridScheduled({
             tuneId,
             newValue,
             new Date(sitdownDate),
-          ).then((ok) => {
-            if (!ok) return;
-            setTunes((prev) =>
-              prev.map((t) =>
-                t.id === tuneId ? { ...t, has_staged: true } : t,
-              ),
-            );
-            // Lightweight per-row refresh: fetch snapshot silently and merge updated metrics for this tune only
-            void (async () => {
-              try {
-                const raw = await getPracticeQueueAction(
-                  userId,
-                  playlistId,
-                  new Date(sitdownDate),
-                  false,
-                );
-                if (Array.isArray(raw)) {
-                  type UpdatedRow = {
-                    tune_ref: number;
-                    latest_quality?: number | null;
-                    latest_easiness?: number | null;
-                    latest_interval?: number | null;
-                    latest_review_date?: string | null;
-                    scheduled?: string | null;
-                    latest_difficulty?: number | null;
-                    latest_step?: number | null;
-                    latest_repetitions?: number | null;
-                    latest_goal?: string | null;
-                    latest_technique?: string | null;
-                    latest_practiced?: string | null;
-                    latest_backup_practiced?: string | null;
-                  };
-                  const updated = raw.find(
-                    (r: unknown): r is UpdatedRow =>
-                      !!r && (r as { tune_ref?: number }).tune_ref === tuneId,
+          )
+            .then((ok) => {
+              if (!ok) return;
+              setTunes((prev) =>
+                prev.map((t) =>
+                  t.id === tuneId ? { ...t, has_staged: true } : t,
+                ),
+              );
+              // Lightweight per-row refresh: fetch snapshot silently and merge updated metrics for this tune only
+              void (async () => {
+                try {
+                  const raw = await getPracticeQueueAction(
+                    userId,
+                    playlistId,
+                    new Date(sitdownDate),
+                    false,
                   );
-                  if (updated) {
-                    setTunes((prev) =>
-                      prev.map((t) => {
-                        if (t.id !== tuneId) return t;
-                        return {
-                          ...t,
-                          latest_quality:
-                            updated.latest_quality ?? t.latest_quality,
-                          latest_easiness:
-                            updated.latest_easiness ?? t.latest_easiness,
-                          latest_interval:
-                            updated.latest_interval ?? t.latest_interval,
-                          latest_review_date:
-                            updated.latest_review_date ?? t.latest_review_date,
-                          scheduled: null, //updated.scheduled ?? t.scheduled, // I think we want this null always for staging?
-                          latest_difficulty:
-                            updated.latest_difficulty ?? t.latest_difficulty,
-                          latest_step: updated.latest_step ?? t.latest_step,
-                          latest_repetitions:
-                            updated.latest_repetitions ?? t.latest_repetitions,
-                          latest_goal: updated.latest_goal ?? t.latest_goal,
-                          latest_technique:
-                            updated.latest_technique ?? t.latest_technique,
-                          latest_practiced:
-                            updated.latest_practiced ?? t.latest_practiced,
-                          latest_backup_practiced:
-                            updated.latest_backup_practiced ??
-                            t.latest_backup_practiced,
-                        };
-                      }),
+                  if (Array.isArray(raw)) {
+                    type UpdatedRow = {
+                      tune_ref: number;
+                      latest_quality?: number | null;
+                      latest_easiness?: number | null;
+                      latest_interval?: number | null;
+                      latest_review_date?: string | null;
+                      scheduled?: string | null;
+                      latest_difficulty?: number | null;
+                      latest_step?: number | null;
+                      latest_repetitions?: number | null;
+                      latest_goal?: string | null;
+                      latest_technique?: string | null;
+                      latest_practiced?: string | null;
+                      latest_backup_practiced?: string | null;
+                    };
+                    const updated = raw.find(
+                      (r: unknown): r is UpdatedRow =>
+                        !!r && (r as { tune_ref?: number }).tune_ref === tuneId,
                     );
+                    if (updated) {
+                      setTunes((prev) =>
+                        prev.map((t) => {
+                          if (t.id !== tuneId) return t;
+                          return {
+                            ...t,
+                            latest_quality:
+                              updated.latest_quality ?? t.latest_quality,
+                            latest_easiness:
+                              updated.latest_easiness ?? t.latest_easiness,
+                            latest_interval:
+                              updated.latest_interval ?? t.latest_interval,
+                            latest_review_date:
+                              updated.latest_review_date ??
+                              t.latest_review_date,
+                            scheduled: null, //updated.scheduled ?? t.scheduled, // I think we want this null always for staging?
+                            latest_difficulty:
+                              updated.latest_difficulty ?? t.latest_difficulty,
+                            latest_step: updated.latest_step ?? t.latest_step,
+                            latest_repetitions:
+                              updated.latest_repetitions ??
+                              t.latest_repetitions,
+                            latest_goal: updated.latest_goal ?? t.latest_goal,
+                            latest_technique:
+                              updated.latest_technique ?? t.latest_technique,
+                            latest_practiced:
+                              updated.latest_practiced ?? t.latest_practiced,
+                            latest_backup_practiced:
+                              updated.latest_backup_practiced ??
+                              t.latest_backup_practiced,
+                          };
+                        }),
+                      );
+                    }
                   }
+                } catch (error) {
+                  console.warn("Per-row refresh failed", error);
                 }
-              } catch (error) {
-                console.warn("Per-row refresh failed", error);
-              }
-            })();
-          });
+              })();
+            })
+            .catch((error) => {
+              console.error("stagePracticeFeedback error", error);
+              handleError(
+                "Failed to stage practice feedback. Please try again.",
+              );
+            });
         } else {
           // Clear path: attempt backend clear already triggered by combo box helper.
           // Perform lightweight per-row refresh to sync derived metrics (latest_* revert to committed values).
@@ -407,7 +416,7 @@ export default function TunesGridScheduled({
         console.error("stage submit failed", error);
       }
     },
-    [setTunes, playlistId, userId],
+    [setTunes, playlistId, userId, handleError],
   );
 
   const handleGoalChange = useCallback(
