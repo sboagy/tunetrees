@@ -499,8 +499,8 @@ export class TuneTreesPageObject {
       .getByTestId(`${tuneId}_recall_eval`)
       .getByTestId("tt-recal-eval-popover-trigger");
 
-  // Make sure the button is genuinely clickable before clicking
-  await this.ensureClickable(qualityButton, 15000);
+    // Make sure the button is genuinely clickable before clicking
+    await this.ensureClickable(qualityButton, 15000);
 
     // --- Robust Replacement ---
     // Action: Click the button
@@ -515,8 +515,8 @@ export class TuneTreesPageObject {
     const responseRecalledButton = this.page.getByTestId(
       `tt-recal-eval-${evalType}`,
     );
-  await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
-  await this.ensureClickable(responseRecalledButton, 15000);
+    await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
+    await this.ensureClickable(responseRecalledButton, 15000);
 
     // --- Robust Replacement ---
     // Action: Click the evaluation button

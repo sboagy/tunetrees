@@ -87,9 +87,15 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
       name: "Submit Practiced Tunes",
     });
     await expect(submitButton).toBeEnabled({ timeout: 15000 });
-    await pageObject.page.waitForTimeout(100);
-    await pageObject.clickWithTimeAfter(submitButton);
-    await pageObject.waitForSuccessfullySubmitted();
+    await Promise.all([
+      submitButton.click(),
+      pageObject.toast.last().waitFor({ state: "visible" }),
+    ]);
+    await expect(pageObject.toast.last()).toContainText(
+      // "Practice successfully submitted",
+      "Submitted evaluated tunes.",
+      { timeout: 60000 },
+    );
 
     // Verify that each reviewed tune either disappeared OR its row text changed (rescheduled metrics updated)
     const postRows = pageObject.tunesGridRows;
@@ -98,7 +104,8 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
       let target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
       let presentCount = await target.count();
       // Retry up to 10 times with a short delay until the ID appears
-      for (let attempt = 0; attempt < 10 && presentCount < 1; attempt++) {
+      let attempt = 0;
+      for (; attempt < 10 && presentCount < 1; attempt++) {
         await pageObject.page.waitForTimeout(200);
         target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
         presentCount = await target.count();
