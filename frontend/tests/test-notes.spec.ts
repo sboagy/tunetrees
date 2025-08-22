@@ -85,7 +85,7 @@ test("test-notes-1", async ({ page }) => {
   await responsePromise;
 
   // Wait for the DOM to calm down by ensuring no network activity and a short pause
-  await page.waitForLoadState("networkidle");
+  // await page.waitForLoadState("networkidle");
   await page.waitForLoadState("domcontentloaded");
   await page.waitForTimeout(500);
 
