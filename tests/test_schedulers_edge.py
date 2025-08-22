@@ -1,4 +1,5 @@
 from datetime import datetime
+from fsrs import Rating, State
 import pytest
 from fsrs.scheduler import DEFAULT_PARAMETERS
 from tunetrees.app.schedulers import SM2Scheduler, FSRScheduler
@@ -53,11 +54,44 @@ def test_fsrs_missing_optional_args():
         relearning_steps=prefs.relearning_steps,
         enable_fuzzing=prefs.enable_fuzzing,
     )
-    now = datetime.now()
-    # Should not raise
-    result = scheduler.review(4, 2.5, 1, 1, now)
+
+    # {
+    #   "id": 1755823658857,
+    #   "quality": "Good",
+    #   "easiness": 1.5717428232260808,
+    #   "state": "Review",
+    #   "step": null,
+    #   "stability": 13.630435348122646,
+    #   "difficulty": 7.961928825804394,
+    #   "review_datetime": "2025-09-06 00:47:38.859129+00:00",
+    #   "review_duration": null,
+    #   "repetitions": 10
+    # }
+    last_review = datetime.fromisoformat("2025-09-06 00:47:38.859129+00:00")
+
+    result = scheduler.review(
+        quality=2,
+        easiness=1.5717428232260808,
+        interval=1,
+        repetitions=10,
+        practiced=last_review,
+        stability=13.630435348122646,
+        difficulty=7.961928825804394,
+        step=None,
+        last_review=last_review,
+    )
     assert isinstance(result, dict)
     assert "easiness" in result
+    assert "state" in result
+    assert result.get("quality") == Rating.Good
+    assert result.get("stability") == 13.630435348122646
+    difficulty = result.get("difficulty", 0)
+    assert difficulty > 7 and difficulty < 8
+    assert result.get("step") is None
+    # Compare as ISO strings to avoid tzinfo or type mismatches
+    assert "2025-09-05" in result.get("review_datetime", "")
+    assert result.get("repetitions") == 11
+    assert result.get("state") == State.Review
 
 
 def test_sm2_missing_optional_args():
