@@ -61,8 +61,6 @@ test.afterEach(async ({ page }, testInfo) => {
   logBrowserContextEnd();
   logTestEnd(testInfo);
   await page.waitForTimeout(1_000);
-  await page.waitForLoadState("domcontentloaded");
-  await page.waitForTimeout(2_000);
 });
 
 test("should complete full practice session workflow with recall quality evaluations", async ({
@@ -92,10 +90,12 @@ test("should complete full practice session workflow with recall quality evaluat
   await expect(submitButton).toBeDisabled();
 
   // Step 4: Verify Goal and Technique columns are visible
-  const goalHeader = page.getByRole("cell", {
-    name: "Goal",
-    exact: true,
-  });
+  const goalHeader = page
+    .getByRole("cell", {
+      name: "Goal",
+      exact: true,
+    })
+    .first();
 
   await expect(goalHeader).toBeVisible();
   console.log("Goal column confirmed visible");
@@ -131,13 +131,12 @@ test("should complete full practice session workflow with recall quality evaluat
     const dropdown = recallDropdowns.nth(i);
 
     // Click to open dropdown
-    await dropdown.click();
-    await page.waitForTimeout(500); // Wait for dropdown to open
+    await ttPO.clickWithTimeAfter(dropdown, 1000);
 
     // Select the quality rating
     const rating = qualityRatings[i];
-    await page.getByTestId(rating.testId).click();
-    await page.waitForTimeout(1000); // Wait for selection to process
+    const ratingLocator = page.getByTestId(rating.testId);
+    await ttPO.clickWithTimeAfter(ratingLocator, 1000);
 
     console.log(`Selected rating for tune ${i + 1}: ${rating.description}`);
   }
