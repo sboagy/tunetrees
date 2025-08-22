@@ -456,34 +456,38 @@ export class TuneTreesPageObject {
     await this.page.waitForTimeout(timeAfter); // Allow time for any post-click actions
   }
 
+  // In tunetrees.po.ts
+
   async setReviewEval(tuneId: number, evalType: string) {
-    await this.page.evaluate((tuneId: number) => {
-      window.scrollToTuneById?.(tuneId);
-    }, Number(tuneId));
-    // Scope to the recall-eval cell by test id to avoid strict mode violations
+    // ... (locators setup) ...
     const qualityButton = this.page
       .getByTestId(`${tuneId}_recall_eval`)
       .getByTestId("tt-recal-eval-popover-trigger");
-    await expect(qualityButton).toBeVisible({ timeout: 60000 });
-    await expect(qualityButton).toBeEnabled({ timeout: 60000 });
-    await this.page.waitForTimeout(500);
-    await this.page.waitForLoadState("domcontentloaded");
-    await this.page.waitForTimeout(100);
-    await this.clickWithTimeAfter(qualityButton);
-    await this.page
-      .getByTestId("tt-recal-eval-group-menu")
-      .waitFor({ state: "visible", timeout: 60000 });
+
+    // --- Robust Replacement ---
+    // Action: Click the button
+    // Expected Outcome: The menu becomes visible
+    await Promise.all([
+      qualityButton.click(),
+      this.page
+        .getByTestId("tt-recal-eval-group-menu")
+        .waitFor({ state: "visible" }),
+    ]);
+
     const responseRecalledButton = this.page.getByTestId(
       `tt-recal-eval-${evalType}`,
     );
     await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
-    await expect(responseRecalledButton).toBeEnabled({ timeout: 60000 });
-    await this.page.waitForTimeout(100);
-    await this.clickWithTimeAfter(responseRecalledButton);
-    await this.page.waitForTimeout(100);
-    await this.page
-      .getByTestId("tt-recal-eval-popover-content")
-      .waitFor({ state: "detached", timeout: 60000 });
+
+    // --- Robust Replacement ---
+    // Action: Click the evaluation button
+    // Expected Outcome: The popover content disappears (is detached)
+    await Promise.all([
+      responseRecalledButton.click(),
+      this.page
+        .getByTestId("tt-recal-eval-popover-content")
+        .waitFor({ state: "detached" }),
+    ]);
   }
 
   async runLogin(

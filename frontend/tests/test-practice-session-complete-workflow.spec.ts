@@ -130,13 +130,21 @@ test("should complete full practice session workflow with recall quality evaluat
   for (let i = 0; i < Math.min(dropdownCount, qualityRatings.length); i++) {
     const dropdown = recallDropdowns.nth(i);
 
-    // Click to open dropdown
-    await ttPO.clickWithTimeAfter(dropdown, 1000);
+    // Open the dropdown and wait for the menu to be visible
+    await Promise.all([
+      dropdown.click(),
+      page
+        .getByTestId("tt-recal-eval-group-menu")
+        .waitFor({ state: "visible" }),
+    ]);
 
-    // Select the quality rating
+    // Select the quality rating and wait for the menu to close
     const rating = qualityRatings[i];
     const ratingLocator = page.getByTestId(rating.testId);
-    await ttPO.clickWithTimeAfter(ratingLocator, 1000);
+    await Promise.all([
+      ratingLocator.click(),
+  page.getByTestId("tt-recal-eval-group-menu").waitFor({ state: "hidden" }),
+    ]);
 
     console.log(`Selected rating for tune ${i + 1}: ${rating.description}`);
   }
