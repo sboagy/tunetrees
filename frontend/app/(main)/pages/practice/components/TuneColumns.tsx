@@ -712,21 +712,29 @@ export function get_columns(
         },
       },
       {
-        accessorKey: "latest_interval",
+        accessorKey:
+          srAlgType === "FSRS" ? "latest_stability" : "latest_interval",
         header: ({ column, table }) =>
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Interval",
+            srAlgType === "FSRS" ? "Stability" : "Interval",
           ),
         cell: (info) => {
-          return info.getValue();
+          const original = info.row.original;
+          const rawValue =
+            srAlgType === "FSRS"
+              ? original.latest_stability
+              : original.latest_interval;
+          return rawValue !== null && rawValue !== undefined
+            ? rawValue.toFixed(2)
+            : "";
         },
         enableSorting: true,
         enableHiding: true,
         size: 13 * 8, // Approximate width for 11 characters
         minSize: 90,
-        meta: { headerLabel: "Interval" },
+        meta: { headerLabel: srAlgType === "FSRS" ? "Stability" : "Interval" },
       },
       {
         accessorKey: "latest_repetitions",

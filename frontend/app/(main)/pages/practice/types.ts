@@ -158,6 +158,7 @@ export interface ITuneOverview extends ITune {
   latest_quality: number | null;
   latest_easiness: number | null;
   latest_difficulty: number | null;
+  latest_stability: number | null;
   latest_interval: number | null;
   latest_step: number | null;
   latest_repetitions: number | null;
@@ -299,6 +300,7 @@ export interface IPracticeQueueEntry {
   latest_interval?: number | null;
   latest_repetitions?: number | null;
   latest_difficulty?: number | null;
+  latest_stability?: number | null;
   latest_step?: number | null;
   latest_goal?: string | null;
   latest_technique?: string | null;

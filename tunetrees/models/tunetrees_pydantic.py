@@ -416,6 +416,7 @@ class PracticeRecordModel(BaseModel):
     lapses: Optional[int]
     state: Optional[int]
     difficulty: Optional[float]
+    stability: Optional[float]
     step: Optional[int]
     goal: Optional[str] = "recall"
     technique: Optional[str]
@@ -439,6 +440,7 @@ class PracticeRecordModelPartial(BaseModel):
     lapses: Optional[int] = None
     state: Optional[int] = None
     difficulty: Optional[float] = None
+    stability: Optional[float] = None
     step: Optional[int] = None
     goal: Optional[str] = "recall"
     technique: Optional[str] = None
@@ -459,6 +461,7 @@ class TableTransientDataModel(BaseModel):
     quality: Optional[int] = None
     easiness: Optional[float] = None
     difficulty: Optional[float] = None
+    stability: Optional[float] = None
     interval: Optional[int] = None
     step: Optional[int] = None
     repetitions: Optional[int] = None
@@ -483,6 +486,7 @@ class TableTransientDataModelPartial(BaseModel):
     quality: Optional[int] = None
     easiness: Optional[float] = None
     difficulty: Optional[float] = None
+    stability: Optional[float] = None
     interval: Optional[int] = None
     step: Optional[int] = None
     repetitions: Optional[int] = None
@@ -595,6 +599,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     latest_quality: Optional[int] = None
     latest_easiness: Optional[float] = None
     latest_difficulty: Optional[float] = None
+    latest_stability: Optional[float] = None
     latest_interval: Optional[int] = None
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
@@ -635,6 +640,7 @@ class PracticeListStagedModel(BaseModel):
     latest_quality: Optional[int] = None
     latest_easiness: Optional[float] = None
     latest_difficulty: Optional[float] = None
+    latest_stability: Optional[float] = None
     latest_interval: Optional[int] = None
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
@@ -974,6 +980,7 @@ class PracticeQueueEntryModel(BaseModel):
     latest_quality: Optional[int] = None
     latest_easiness: Optional[float] = None
     latest_difficulty: Optional[float] = None
+    latest_stability: Optional[float] = None
     latest_interval: Optional[int] = None
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None

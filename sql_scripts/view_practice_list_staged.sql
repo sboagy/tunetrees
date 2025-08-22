@@ -21,6 +21,7 @@ SELECT
 	COALESCE(td.quality, pr.quality) AS latest_quality,
 	COALESCE(td.easiness, pr.easiness) AS latest_easiness,
 	COALESCE(td.difficulty, pr.difficulty) AS latest_difficulty,
+	COALESCE(td.stability, pr.stability) AS latest_stability,
 	COALESCE(td.interval, pr.interval) AS latest_interval,
 	COALESCE(td.step, pr.step) AS latest_step,
 	COALESCE(td.repetitions, pr.repetitions) AS latest_repetitions,

@@ -100,6 +100,7 @@ t_practice_list_joined = Table(
     Column("latest_easiness", Float),
     Column("latest_difficulty", Float),
     Column("latest_interval", Integer),
+    Column("latest_stability", Float),
     Column("latest_step", Integer),
     Column("latest_repetitions", Integer),
     Column("latest_review_date", Text),
@@ -128,7 +129,7 @@ t_practice_list_staged = Table(
     Column("private_for", Integer),
     Column("deleted", Boolean),
     Column("learned", Text),
-    Column("goal", Text),
+    Column("goal", NullType),
     Column("scheduled", Text),
     Column("user_ref", Integer),
     Column("playlist_id", Integer),
@@ -138,6 +139,7 @@ t_practice_list_staged = Table(
     Column("latest_quality", NullType),
     Column("latest_easiness", NullType),
     Column("latest_difficulty", NullType),
+    Column("latest_stability", NullType),
     Column("latest_interval", NullType),
     Column("latest_step", NullType),
     Column("latest_repetitions", NullType),
@@ -152,8 +154,8 @@ t_practice_list_staged = Table(
     Column("recall_eval", Text),
     Column("notes", NullType),
     Column("favorite_url", Text),
-    Column("has_staged", NullType),
     Column("has_override", NullType),
+    Column("has_staged", NullType),
 )
 
 

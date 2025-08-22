@@ -717,23 +717,41 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
         return []
 
     # Build map keyed by tune id using staged overlay view (already includes staged latest_* + recall_eval)
-    tune_ids = {r.tune_ref for r in rows if getattr(r, "tune_ref", None) is not None}
-    joined_map: dict[int, Any] = {}
+    # Build composite keys to avoid cross‑playlist/user collisions when the same tune id exists in multiple contexts
+    # note: we don't need a separate tune_ids set because we join by composite key
+    combos = {
+        (int(r.tune_ref), int(r.user_ref), int(r.playlist_ref))
+        for r in rows
+        if getattr(r, "tune_ref", None) is not None
+        and getattr(r, "user_ref", None) is not None
+        and getattr(r, "playlist_ref", None) is not None
+    }
+    joined_map: dict[tuple[int, int, int], Any] = {}
     try:  # pragma: no cover - defensive, never fail whole serialization
         from tunetrees.app.database import SessionLocal
 
         with SessionLocal() as _db:  # lightweight new session
-            joined_rows = (
-                _db.execute(
-                    select(_t_view_staged).where(_t_view_staged.c.id.in_(tune_ids))
+            if combos:
+                # Build OR of (id,user_ref,playlist_id) tuples for precise matching
+                conditions = [
+                    and_(
+                        _t_view_staged.c.id == tid,
+                        _t_view_staged.c.user_ref == uref,
+                        _t_view_staged.c.playlist_id == pref,
+                    )
+                    for (tid, uref, pref) in combos
+                ]
+                joined_rows = (
+                    _db.execute(select(_t_view_staged).where(or_(*conditions)))
+                    .mappings()
+                    .all()
                 )
-                .mappings()
-                .all()
-            )
-            for jr in joined_rows:
-                tid = jr.get("id")
-                if tid is not None:
-                    joined_map[int(tid)] = jr
+                for jr in joined_rows:
+                    tid = jr.get("id")
+                    uref = jr.get("user_ref")
+                    pref = jr.get("playlist_id")
+                    if tid is not None and uref is not None and pref is not None:
+                        joined_map[(int(tid), int(uref), int(pref))] = jr
     except Exception:  # pragma: no cover
         joined_map = {}
 
@@ -762,7 +780,11 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
             "outcome": r.outcome,
             "active": r.active,
         }
-        jr = joined_map.get(r.tune_ref) or {}
+        jr = (
+            joined_map.get((int(r.tune_ref), int(r.user_ref), int(r.playlist_ref)))
+            if joined_map
+            else {}
+        )
 
         # Stable, explicit fields the frontend expects (provide None fallback if absent)
         # Prefix tune_* only where needed to avoid colliding with queue fields.
@@ -781,6 +803,7 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
         base["latest_quality"] = jr.get("latest_quality") if jr else None
         base["latest_easiness"] = jr.get("latest_easiness") if jr else None
         base["latest_difficulty"] = jr.get("latest_difficulty") if jr else None
+        base["latest_stability"] = jr.get("latest_stability") if jr else None
         base["latest_interval"] = jr.get("latest_interval") if jr else None
         base["latest_step"] = jr.get("latest_step") if jr else None
         base["latest_repetitions"] = jr.get("latest_repetitions") if jr else None
@@ -795,7 +818,7 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
         base["deleted"] = jr.get("deleted") if jr else None
         base["private_for"] = jr.get("private_for") if jr else None
         # Provide tune_id separate from queue row id for clarity
-        if "id" in jr:
+        if isinstance(jr, dict) and "id" in jr:
             base["tune_id"] = jr.get("id")
         # recall_eval & has_staged from staged view
         base["recall_eval"] = jr.get("recall_eval") if jr else None

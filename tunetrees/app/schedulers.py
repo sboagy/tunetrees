@@ -1,15 +1,14 @@
-from datetime import datetime
-from typing import Optional, Tuple, Dict, Any
-from fsrs import Card, Rating, State, Scheduler, ReviewLog
-from supermemo2 import sm_two
+import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional, Tuple
 
+from fsrs import Card, Rating, ReviewLog, Scheduler, State
+from rich.console import Console
+from rich.table import Table
+from supermemo2 import sm_two
 
 from tunetrees.models.quality import NEW, RESCHEDULED
 from tunetrees.models.tunetrees_pydantic import AlgorithmType
-from datetime import timedelta
-from rich.table import Table
-from rich.console import Console
-
 
 # For maximum compatibility with all type checkers, alias to Dict[str, Any]
 ReviewResultDict = Dict[str, Any]
@@ -101,6 +100,7 @@ class SM2Scheduler(SpacedRepetitionScheduler):
             "quality": quality,
             "easiness": result["easiness"],
             "difficulty": None,
+            "stability": None,
             "interval": result["interval"],
             "step": None,
             "repetitions": result["repetitions"],
@@ -215,6 +215,12 @@ class FSRScheduler(SpacedRepetitionScheduler):
     def log_future_reviews(
         self, card: Card, quality: int, num_simulations: int = 10
     ) -> None:
+        if os.environ.get("LOG_FUTURE_REVIEWS", "").lower() not in (
+            "1",
+            "true",
+            "yes",
+        ):
+            return
         card_simulated = Card(
             state=card.state,
             step=card.step,

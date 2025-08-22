@@ -21,8 +21,9 @@
             "module": "uvicorn",
             "envFile": "${workspaceFolder}/.env",
             "env": {
-                "TUNETREES_DB": "${workspaceFolder}/tunetrees.sqlite3",
-                "TUNETREES_DEPLOY_BASE_DIR": "${workspaceFolder}"
+                "TUNETREES_DB": "${workspaceFolder}/tunetrees_test.sqlite3",
+                "TUNETREES_DEPLOY_BASE_DIR": "${workspaceFolder}",
+                "LOG_FUTURE_REVIEWS": "true",
             },
             "args": [
                 "tunetrees.api.main:app",
@@ -40,7 +41,8 @@
             "env": {
                 "TUNETREES_DB": "${workspaceFolder}/tunetrees_test.sqlite3",
                 "TUNETREES_DEPLOY_BASE_DIR": "${workspaceFolder}",
-                "NODE_ENV": "production"
+                "LOG_FUTURE_REVIEWS": "true",
+                // "NODE_ENV": "production"
             },
             "args": [
                 "tunetrees.api.main:app",

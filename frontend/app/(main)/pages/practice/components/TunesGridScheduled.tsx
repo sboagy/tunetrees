@@ -60,6 +60,7 @@ interface IPracticeQueueRowInternal {
   latest_repetitions?: number | null;
   latest_technique?: string | null;
   latest_difficulty?: number | null; // newly exposed staged value
+  latest_stability?: number | null; // newly exposed staged value
   latest_step?: number | null; // newly exposed staged value
   latest_backup_practiced?: string | null; // newly exposed staged value
   practice_state?: string | null; // reserved
@@ -147,6 +148,7 @@ export default function TunesGridScheduled({
           latest_repetitions?: number | null;
           latest_technique?: string | null;
           latest_difficulty?: number | null;
+          latest_stability?: number | null;
           latest_step?: number | null;
           latest_backup_practiced?: string | null;
           favorite_url?: string | null;
@@ -201,6 +203,7 @@ export default function TunesGridScheduled({
             latest_repetitions: e.latest_repetitions ?? null,
             latest_technique: e.latest_technique ?? null,
             latest_difficulty: e.latest_difficulty ?? null,
+            latest_stability: e.latest_stability ?? null,
             latest_step: e.latest_step ?? null,
             latest_backup_practiced: e.latest_backup_practiced ?? null,
             latest_due_date: null,
@@ -282,6 +285,7 @@ export default function TunesGridScheduled({
                       latest_review_date?: string | null;
                       scheduled?: string | null;
                       latest_difficulty?: number | null;
+                      latest_stability?: number | null;
                       latest_step?: number | null;
                       latest_repetitions?: number | null;
                       latest_goal?: string | null;
@@ -311,6 +315,8 @@ export default function TunesGridScheduled({
                             scheduled: null, //updated.scheduled ?? t.scheduled, // I think we want this null always for staging?
                             latest_difficulty:
                               updated.latest_difficulty ?? t.latest_difficulty,
+                            latest_stability:
+                              updated.latest_stability ?? t.latest_stability,
                             latest_step: updated.latest_step ?? t.latest_step,
                             latest_repetitions:
                               updated.latest_repetitions ??
@@ -361,6 +367,7 @@ export default function TunesGridScheduled({
                   recall_eval?: string | null;
                   has_staged?: boolean | null;
                   latest_difficulty?: number | null;
+                  latest_stability?: number | null;
                   latest_step?: number | null;
                   latest_repetitions?: number | null;
                   latest_goal?: string | null;
@@ -391,6 +398,8 @@ export default function TunesGridScheduled({
                         has_staged: updated.has_staged ?? false,
                         latest_difficulty:
                           updated.latest_difficulty ?? t.latest_difficulty,
+                        latest_stability:
+                          updated.latest_stability ?? t.latest_stability,
                         latest_step: updated.latest_step ?? t.latest_step,
                         latest_repetitions:
                           updated.latest_repetitions ?? t.latest_repetitions,
@@ -617,6 +626,7 @@ export default function TunesGridScheduled({
                               latest_repetitions?: number | null;
                               latest_technique?: string | null;
                               latest_difficulty?: number | null;
+                              latest_stability?: number | null;
                               latest_step?: number | null;
                               latest_backup_practiced?: string | null;
                               bucket?: number | null;
@@ -647,6 +657,8 @@ export default function TunesGridScheduled({
                                 enriched.latest_technique ?? null,
                               latest_difficulty:
                                 enriched.latest_difficulty ?? null,
+                              latest_stability:
+                                enriched.latest_stability ?? null,
                               latest_step: enriched.latest_step ?? null,
                               latest_backup_practiced:
                                 enriched.latest_backup_practiced ?? null,
