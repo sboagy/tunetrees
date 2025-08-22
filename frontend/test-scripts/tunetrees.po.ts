@@ -456,6 +456,41 @@ export class TuneTreesPageObject {
     await this.page.waitForTimeout(timeAfter); // Allow time for any post-click actions
   }
 
+  // Ensures a locator is truly clickable: visible, attached, enabled, scrolled into view,
+  // and passes a Playwright trial click probe before performing a real click elsewhere.
+  async ensureClickable(locator: Locator, timeout = 10000): Promise<void> {
+    await locator.waitFor({ state: "visible", timeout });
+    await locator.waitFor({ state: "attached", timeout });
+    await expect(locator).toBeEnabled({ timeout });
+    // Make sure it is not offscreen/covered
+    await locator.scrollIntoViewIfNeeded();
+
+    // Use trial click probes in a short polling loop until Playwright agrees it's clickable
+    const start = Date.now();
+    let lastErr: unknown = null;
+    while (Date.now() - start < timeout) {
+      try {
+        await locator.click({ trial: true, timeout: Math.min(1000, timeout) });
+        return; // success
+      } catch (error) {
+        lastErr = error;
+        // Give layout a moment to settle (animations, overlays, etc.)
+        await this.page.waitForTimeout(100);
+      }
+    }
+    // One final attempt to surface a clear error
+    try {
+      await locator.click({ trial: true, timeout: 500 });
+    } catch (error) {
+      lastErr = error;
+    }
+    throw new Error(
+      `ensureClickable(): Locator did not become clickable within ${timeout}ms. Last error: ${String(
+        lastErr,
+      )}`,
+    );
+  }
+
   // In tunetrees.po.ts
 
   async setReviewEval(tuneId: number, evalType: string) {
@@ -463,6 +498,9 @@ export class TuneTreesPageObject {
     const qualityButton = this.page
       .getByTestId(`${tuneId}_recall_eval`)
       .getByTestId("tt-recal-eval-popover-trigger");
+
+  // Make sure the button is genuinely clickable before clicking
+  await this.ensureClickable(qualityButton, 15000);
 
     // --- Robust Replacement ---
     // Action: Click the button
@@ -477,7 +515,8 @@ export class TuneTreesPageObject {
     const responseRecalledButton = this.page.getByTestId(
       `tt-recal-eval-${evalType}`,
     );
-    await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
+  await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
+  await this.ensureClickable(responseRecalledButton, 15000);
 
     // --- Robust Replacement ---
     // Action: Click the evaluation button

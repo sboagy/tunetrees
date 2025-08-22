@@ -95,8 +95,14 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     const postRows = pageObject.tunesGridRows;
     for (const tid of reviewedIds) {
       const idCells = postRows.locator("td:first-child");
-      const target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
-      const presentCount = await target.count();
+      let target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
+      let presentCount = await target.count();
+      // Retry up to 10 times with a short delay until the ID appears
+      for (let attempt = 0; attempt < 10 && presentCount < 1; attempt++) {
+        await pageObject.page.waitForTimeout(200);
+        target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
+        presentCount = await target.count();
+      }
       if (presentCount === 0) {
         continue; // disappeared: acceptable
       }

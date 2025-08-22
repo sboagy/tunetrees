@@ -60,6 +60,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     const count = await rows.count();
     const limit = Math.min(count - 1, 4);
     const reviewedIds: number[] = [];
+    // Capture pre-submission row text for change detection
     const preRowTexts: Record<number, string> = {};
     for (let i = 1; i <= limit; i++) {
       // skip header row
@@ -71,6 +72,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
       if (!Number.isNaN(tuneId)) {
         preRowTexts[tuneId] = (await row.textContent()) ?? "";
         const evalType = feedbacks[i - 1];
+        // Always apply the evaluation if set; but only assert disappearance for non-again evals
         if (evalType !== "(Not Set)") {
           await pageObject.setReviewEval(tuneId, evalType);
         }
@@ -89,8 +91,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     await pageObject.clickWithTimeAfter(submitButton);
     await pageObject.waitForSuccessfullySubmitted();
 
-    // Refresh practice tab to reflect rescheduling
-    await pageObject.navigateToPracticeTab();
+    // Verify that each reviewed tune either disappeared OR its row text changed (rescheduled metrics updated)
     const postRows = pageObject.tunesGridRows;
     for (const tid of reviewedIds) {
       const idCells = postRows.locator("td:first-child");

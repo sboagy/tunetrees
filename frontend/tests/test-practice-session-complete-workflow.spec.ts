@@ -143,7 +143,7 @@ test("should complete full practice session workflow with recall quality evaluat
     const ratingLocator = page.getByTestId(rating.testId);
     await Promise.all([
       ratingLocator.click(),
-  page.getByTestId("tt-recal-eval-group-menu").waitFor({ state: "hidden" }),
+      page.getByTestId("tt-recal-eval-group-menu").waitFor({ state: "hidden" }),
     ]);
 
     console.log(`Selected rating for tune ${i + 1}: ${rating.description}`);
@@ -168,8 +168,16 @@ test("should complete full practice session workflow with recall quality evaluat
   // Step 9: Verify submission was successful via toast and row count decrease
   // Observe success toast using shared Page Object helper semantics
   // const ttPO = new TuneTreesPageObject(page);
-  await ttPO.waitForSuccessfullySubmitted();
-  const rowsAfter = await ttPO.tunesGridRows.count();
+  await expect(ttPO.toast.last()).toContainText("Submitted evaluated tunes.");
+
+  let rowsAfter = 0;
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    rowsAfter = await ttPO.tunesGridRows.count();
+    // console.log(`Attempt ${attempt}: rows after submission = ${rowsAfter}`);
+    if (rowsAfter >= 1) break;
+    await page.waitForTimeout(500);
+  }
+  // console.log(`Rows after submission: ${rowsAfter}`);
   expect(rowsAfter).toBeGreaterThanOrEqual(1);
 
   // Should show "No Tune selected" message
