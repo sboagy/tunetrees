@@ -2,7 +2,8 @@ import os
 import shutil
 import sqlite3
 import threading
-import time
+import tempfile
+import fcntl
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,7 @@ import pytest
 os.environ["TUNETREES_DB"] = "tunetrees_test.sqlite3"
 # Disable aggressive journal mode tweaking & integrity checks if desired to reduce locking
 os.environ.setdefault("TT_ENABLE_SQLITE_DELETE_JOURNAL", "0")
-os.environ.setdefault("TT_ENABLE_SQLITE_INTEGRITY_CHECKS", "0")
+os.environ.setdefault("TT_ENABLE_SQLITE_INTEGRITY_CHECKS", "1")
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -154,23 +155,42 @@ def _reload_database_engine() -> None:
 
 
 def _verify_destination_database(dst_path: Path) -> None:
-    """Verify destination database was created correctly."""
+    """Verify destination database was created correctly using a direct connection."""
     if not dst_path.exists():
         print(f"✗ Destination DB not found after copy: {dst_path}")
-        return
+        raise FileNotFoundError(f"Destination DB not found: {dst_path}")
 
     print(f"✓ Destination DB exists after copy: {dst_path}")
-    with sqlite3.connect(dst_path) as conn:
-        cursor = conn.execute("PRAGMA table_info(practice_record)")
-        cols = [row[1] for row in cursor.fetchall()]
-        if "difficulty" in cols:
-            print("✓ Destination DB has difficulty column in practice_record")
-        else:
-            print("✗ Destination DB missing difficulty column in practice_record")
+    # Tiny retry to avoid transient "unable to open database file" immediately after replace
+    last_err: Exception | None = None
+    for _ in range(5):
+        try:
+            with sqlite3.connect(str(dst_path)) as conn:
+                cursor = conn.execute("PRAGMA table_info(practice_record)")
+                cols = [row[1] for row in cursor.fetchall()]
+                if "difficulty" in cols:
+                    print("✓ Destination DB has difficulty column in practice_record")
+                else:
+                    print(
+                        "✗ Destination DB missing difficulty column in practice_record"
+                    )
+                return
+        except Exception as e:  # pragma: no cover - rare
+            last_err = e
+            import time
+
+            time.sleep(0.05)
+    # If still failing after retries, raise the last error
+    if last_err:
+        raise last_err
 
 
 @pytest.fixture(autouse=True, scope="function")
 def reset_test_db():
+    reset_test_db_function()
+
+
+def reset_test_db_function():
     """Automatically copy the clean test DB before each test."""
     repo_root = Path(__file__).parent.parent
     src_path = repo_root / "tunetrees_test_clean.sqlite3"
@@ -181,31 +201,60 @@ def reset_test_db():
     _setup_environment_variables(dst_path)
     _verify_source_database(src_path)
 
-    # Dispose existing engine BEFORE copying to release locks
-    if hasattr(database, "sqlalchemy_database_engine"):
+    # Serialize copy/replace with a file lock to prevent races
+    lock_path = repo_root / ".reset_test_db.lock"
+    lock_path.touch(exist_ok=True)
+
+    with open(lock_path, "r+") as lockf:
+        fcntl.flock(lockf, fcntl.LOCK_EX)
         try:
-            database.sqlalchemy_database_engine.dispose()
-        except Exception:
-            pass
+            # Dispose engine to release file handles
+            if hasattr(database, "sqlalchemy_database_engine"):
+                try:
+                    database.sqlalchemy_database_engine.dispose()
+                    print("Disposed existing SQLAlchemy engine")
+                except Exception:
+                    pass
 
-    if dst_path.exists():
-        try:
-            dst_path.unlink()
-        except Exception:
-            pass
+            # Clean up any leftover WAL/SHM files
+            wal_path = Path(f"{dst_path}-wal")
+            shm_path = Path(f"{dst_path}-shm")
+            for p in (wal_path, shm_path):
+                if p.exists():
+                    try:
+                        p.unlink()
+                        print(f"Removed leftover {p.name}")
+                    except Exception:
+                        pass
 
-    print(f"Copying test DB from {src_path} to {dst_path}")
-    shutil.copyfile(src_path, dst_path)
+            # Atomic replace: copy to a temp file then replace
+            with tempfile.NamedTemporaryFile(delete=False, dir=repo_root) as tmpf:
+                tmp_name = tmpf.name
+            try:
+                print(f"Copying test DB from {src_path} to temp {tmp_name}")
+                shutil.copyfile(src_path, tmp_name)
+                os.replace(tmp_name, dst_path)
+                print(f"Replaced {dst_path} atomically")
+            finally:
+                try:
+                    if os.path.exists(tmp_name):
+                        os.remove(tmp_name)
+                except Exception:
+                    pass
 
-    # Removed automatic migration invocation: schema migrations are now forbidden in tests.
+            # Verify destination using read-only connection before engine reload
+            _verify_destination_database(dst_path)
 
-    try:
-        _reload_database_engine()
-    except Exception as e:
-        print(f"Warning: Could not reload database configuration: {e}")
-
-    time.sleep(0.5)
-    _verify_destination_database(dst_path)
+            # Recreate engine bound to the fresh DB
+            try:
+                _reload_database_engine()
+            except Exception as e:
+                print(f"Warning: Could not reload database configuration: {e}")
+        finally:
+            try:
+                fcntl.flock(lockf, fcntl.LOCK_UN)
+            except Exception:
+                pass
 
 
 @pytest.fixture(scope="session")

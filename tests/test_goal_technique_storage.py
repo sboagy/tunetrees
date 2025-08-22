@@ -8,7 +8,9 @@ feedbacks are submitted.
 
 import os
 import pytest
-from datetime import datetime, timezone
+import threading
+from datetime import datetime
+from tests.conftest import reset_test_db_function
 from tunetrees.app.schedule import update_practice_feedbacks, TuneFeedbackUpdate
 from tunetrees.app.database import SessionLocal
 from tunetrees.models.tunetrees import PracticeRecord
@@ -24,18 +26,44 @@ def setup_test_database():
     # Clean up after tests if needed
 
 
+# Module-level semaphore to force tests in this module to run serially
+_module_semaphore = threading.Semaphore(1)
+
+
+@pytest.fixture(autouse=True)
+def _serial_test_lock():  # pyright: ignore[reportUnusedFunction]
+    """Acquire a semaphore for each test in this module to serialize execution.
+
+    This only serializes tests within the same Python process. If pytest-xdist
+    or another parallel runner is used, inter-process isolation must be
+    handled separately (for example, per-worker DB files).
+    """
+    _module_semaphore.acquire()
+    try:
+        print("Acquired serial test lock")
+        yield
+    finally:
+        try:
+            print("Released serial test lock")
+            _module_semaphore.release()
+        except Exception:
+            pass
+
+
 class TestGoalTechniqueStorage:
     """Test goal and technique column functionality."""
 
-    def test_goal_technique_storage_recall_goal(self, reset_test_db: None):
+    def test_goal_technique_storage_recall_goal(self):
         """Test that goal and technique values are properly stored for recall goal."""
+        reset_test_db_function()
+
         # Test data with recall goal (should use FSRS scheduling)
         test_tune_updates = {
             "634": TuneFeedbackUpdate({"feedback": "good", "goal": "recall"})
         }
 
         playlist_ref = 1  # Using known existing playlist
-        review_date = datetime.now(timezone.utc)
+        review_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
 
         # Submit the practice feedbacks
         update_practice_feedbacks(test_tune_updates, playlist_ref, review_date)
@@ -63,15 +91,17 @@ class TestGoalTechniqueStorage:
                 f"Expected quality 2 (good), got {latest_record.quality}"
             )
 
-    def test_goal_technique_storage_non_recall_goal(self, reset_test_db: None):
+    def test_goal_technique_storage_non_recall_goal(self):
         """Test that goal and technique values are properly stored for non-recall goals."""
+        reset_test_db_function()
+
         # Test data with non-recall goal (should use goal-specific scheduling)
         test_tune_updates = {
             "634": TuneFeedbackUpdate({"feedback": "easy", "goal": "fluency"})
         }
 
         playlist_ref = 1  # Using known existing playlist
-        review_date = datetime.now(timezone.utc)
+        review_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
 
         # Submit the practice feedbacks
         update_practice_feedbacks(test_tune_updates, playlist_ref, review_date)
@@ -98,9 +128,12 @@ class TestGoalTechniqueStorage:
             assert latest_record.quality == 3, (
                 f"Expected quality 3 (easy), got {latest_record.quality}"
             )
+            db.flush()  # Ensure changes are committed before next test
 
-    def test_goal_technique_defaults(self, reset_test_db: None):
+    def test_goal_technique_defaults(self):
         """Test default values for goal and technique when not provided."""
+        reset_test_db_function()
+
         # Test data without explicit goal/technique
         test_tune_updates = {
             "634": TuneFeedbackUpdate(
@@ -112,7 +145,7 @@ class TestGoalTechniqueStorage:
         }
 
         playlist_ref = 1  # Using known existing playlist
-        review_date = datetime.now(timezone.utc)
+        review_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
 
         # Submit the practice feedbacks
         update_practice_feedbacks(test_tune_updates, playlist_ref, review_date)
@@ -137,8 +170,10 @@ class TestGoalTechniqueStorage:
                 f"Expected default goal 'recall', got '{latest_record.goal}'"
             )
 
-    def test_multiple_tunes_different_goals(self, reset_test_db: None):
+    def test_multiple_tunes_different_goals(self):
         """Test storing multiple tunes with different goals and techniques."""
+        reset_test_db_function()
+
         # Test data with multiple tunes and different goals
         test_tune_updates = {
             "634": TuneFeedbackUpdate({"feedback": "good", "goal": "session_ready"}),
@@ -151,7 +186,7 @@ class TestGoalTechniqueStorage:
         }
 
         playlist_ref = 1  # Using known existing playlist
-        review_date = datetime.now(timezone.utc)
+        review_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
 
         # Submit the practice feedbacks
         update_practice_feedbacks(test_tune_updates, playlist_ref, review_date)
