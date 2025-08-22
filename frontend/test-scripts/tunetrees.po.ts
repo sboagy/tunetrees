@@ -494,33 +494,34 @@ export class TuneTreesPageObject {
   // In tunetrees.po.ts
 
   async setReviewEval(tuneId: number, evalType: string) {
-    // ... (locators setup) ...
-    const qualityButton = this.page
-      .getByTestId(`${tuneId}_recall_eval`)
-      .getByTestId("tt-recal-eval-popover-trigger");
+    // Find the table row by its first-cell ID text (more reliable than nested testid chains)
+    const idCells = this.tunesGridRows.locator("td:first-child");
+    const target = idCells.filter({ hasText: new RegExp(`^${tuneId}$`) });
+    await expect(target.first()).toBeVisible({ timeout: 60000 });
+    const row = this.tunesGridRows.filter({ has: target.first() }).first();
 
-    // Make sure the button is genuinely clickable before clicking
+    // Trigger inside this row
+    const qualityButton = row
+      .getByTestId("tt-recal-eval-popover-trigger")
+      .first();
+
+    // Ensure clickability
     await this.ensureClickable(qualityButton, 15000);
 
-    // --- Robust Replacement ---
-    // Action: Click the button
-    // Expected Outcome: The menu becomes visible
+    // Open and wait for popover content
     await Promise.all([
       qualityButton.click(),
       this.page
-        .getByTestId("tt-recal-eval-group-menu")
+        .getByTestId("tt-recal-eval-popover-content")
         .waitFor({ state: "visible" }),
     ]);
 
+    // Click the evaluation option and wait for popover to close
     const responseRecalledButton = this.page.getByTestId(
       `tt-recal-eval-${evalType}`,
     );
     await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
     await this.ensureClickable(responseRecalledButton, 15000);
-
-    // --- Robust Replacement ---
-    // Action: Click the evaluation button
-    // Expected Outcome: The popover content disappears (is detached)
     await Promise.all([
       responseRecalledButton.click(),
       this.page

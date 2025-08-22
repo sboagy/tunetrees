@@ -86,7 +86,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     const submitButton = pageObject.page.getByRole("button", {
       name: "Submit Practiced Tunes",
     });
-    await expect(submitButton).toBeEnabled({ timeout: 15000 });
+    await expect(submitButton).toBeEnabled();
     await Promise.all([
       submitButton.click(),
       pageObject.toast.last().waitFor({ state: "visible" }),
@@ -94,7 +94,6 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     await expect(pageObject.toast.last()).toContainText(
       // "Practice successfully submitted",
       "Submitted evaluated tunes.",
-      { timeout: 60000 },
     );
 
     // Verify that each reviewed tune either disappeared OR its row text changed (rescheduled metrics updated)
