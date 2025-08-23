@@ -465,8 +465,12 @@ export class TuneTreesPageObject {
 
     await this.page.waitForLoadState("domcontentloaded");
 
-    // Make sure it is not offscreen/covered
-    await locator.scrollIntoViewIfNeeded({ timeout: 2000 });
+    // Make sure it is not offscreen/covered (ignore detach during React re-render)
+    try {
+      await locator.scrollIntoViewIfNeeded({ timeout: 500 });
+    } catch {
+      // If it detached during re-render, we'll rely on the retry loop below
+    }
 
     // Use trial click probes in a short polling loop until Playwright agrees it's clickable
     const start = Date.now();
@@ -477,6 +481,12 @@ export class TuneTreesPageObject {
         return; // success
       } catch (error) {
         lastErr = error;
+        // If the element detached between checks, wait for it to reattach
+        try {
+          await locator.waitFor({ state: "attached", timeout: 500 });
+        } catch {
+          // ignore and continue
+        }
         // Give layout a moment to settle (animations, overlays, etc.)
         await this.page.waitForTimeout(100);
       }
