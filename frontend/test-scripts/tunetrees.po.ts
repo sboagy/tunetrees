@@ -466,7 +466,7 @@ export class TuneTreesPageObject {
     await this.page.waitForLoadState("domcontentloaded");
 
     // Make sure it is not offscreen/covered
-    // await locator.scrollIntoViewIfNeeded({ timeout: 1000 });
+    await locator.scrollIntoViewIfNeeded({ timeout: 2000 });
 
     // Use trial click probes in a short polling loop until Playwright agrees it's clickable
     const start = Date.now();
@@ -484,8 +484,8 @@ export class TuneTreesPageObject {
     // One final attempt to surface a clear error
     try {
       await locator.click({ trial: true, timeout: 500 });
-    } catch (error) {
-      lastErr = error;
+    } catch (_error) {
+      lastErr = _error;
     }
     throw new Error(
       `ensureClickable(): Locator did not become clickable within ${timeout}ms. Last error: ${String(
@@ -506,13 +506,31 @@ export class TuneTreesPageObject {
     // Use a helper to ensure the button is ready to be clicked
     await this.ensureClickable(qualityButton);
 
-    // Open the popover and wait for it to be visible
-    await Promise.all([
-      qualityButton.click(),
-      this.page
-        .getByTestId("tt-recal-eval-popover-content")
-        .waitFor({ state: "visible", timeout: 20000 }),
-    ]);
+    // Open the popover and wait for it to be visible (robust in headless)
+    const popoverContent = this.page.getByTestId(
+      "tt-recal-eval-popover-content",
+    );
+
+    // First attempt
+    await qualityButton.click();
+    // Wait for the content to at least attach to the DOM
+    try {
+      await popoverContent.waitFor({ state: "attached", timeout: 5_000 });
+    } catch {
+      // If it didn't attach quickly, try clicking again (headless can miss the first click)
+      await this.ensureClickable(qualityButton, 5_000);
+      await qualityButton.click();
+    }
+
+    // Now wait for visible with a generous timeout
+    try {
+      await popoverContent.waitFor({ state: "visible", timeout: 20_000 });
+    } catch {
+      // As a fallback, one more click in case the first closed it immediately or an animation hid it
+      await this.ensureClickable(qualityButton, 5_000);
+      await qualityButton.click();
+      await popoverContent.waitFor({ state: "visible", timeout: 10_000 });
+    }
 
     // Click the evaluation option and wait for popover to close
     const responseRecalledButton = this.page.getByTestId(
@@ -522,9 +540,7 @@ export class TuneTreesPageObject {
 
     await Promise.all([
       responseRecalledButton.click(),
-      this.page
-        .getByTestId("tt-recal-eval-popover-content")
-        .waitFor({ state: "hidden" }),
+      popoverContent.waitFor({ state: "hidden" }),
     ]);
   }
 
