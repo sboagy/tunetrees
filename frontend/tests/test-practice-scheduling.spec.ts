@@ -34,7 +34,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     await setTestDefaults(page);
     await applyNetworkThrottle(page);
     pageObject = new TuneTreesPageObject(page);
-    await pageObject.gotoMainPage();
+    // await pageObject.gotoMainPage();
   });
 
   test.afterEach(async ({ page }, testInfo) => {
@@ -52,6 +52,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
   });
 
   test("User submits quality feedback and tunes are rescheduled", async () => {
+    await pageObject.gotoMainPage();
     await pageObject.navigateToPracticeTabDirectly();
     const feedbacks = ["hard", "good", "(Not Set)", "again"];
 
@@ -138,7 +139,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
 
     pageObject = new TuneTreesPageObject(page);
     await pageObject.gotoMainPage();
-    await pageObject.navigateToPracticeTab();
+    await pageObject.navigateToPracticeTabDirectly();
     // Check that only tunes scheduled for the new day are shown
     const rowCount = await pageObject.tunesGridRows.count();
     expect(rowCount).toBeGreaterThan(1);
