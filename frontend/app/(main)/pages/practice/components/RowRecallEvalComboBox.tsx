@@ -65,33 +65,17 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
   const isOpen = openPopoverId === info.row.original.id;
 
   const popoverRef = useRef<HTMLDivElement>(null);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(
     info.row.original.recall_eval ?? null,
   );
 
-  // Debounced popover state change to prevent bouncing
-  const debouncedSetPopoverId = useCallback(
-    (id: number | null) => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-      debounceTimeoutRef.current = setTimeout(() => {
-        setOpenPopoverId(id);
-        debounceTimeoutRef.current = null;
-      }, 50); // 50ms debounce to prevent rapid state changes
+  // Directly control open state for predictability in tests and headless
+  const setOpenDirect = useCallback(
+    (open: boolean) => {
+      setOpenPopoverId(open ? (info.row.original.id ?? null) : null);
     },
-    [setOpenPopoverId],
+    [info.row.original.id, setOpenPopoverId],
   );
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Get appropriate quality list based on goal and technique
   const qualityList = getQualityListForGoalAndTechnique(
@@ -137,22 +121,13 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
     }
   };
 
-  const handleBlur = (event: React.FocusEvent<HTMLButtonElement>) => {
-    if (popoverRef.current === null) {
-      return;
-    }
-    if (!popoverRef.current.contains(event.relatedTarget as Node)) {
-      // Use debounced function to prevent rapid state changes
-      debouncedSetPopoverId(null);
-    }
-  };
+  // Avoid blur-driven close; let Radix onOpenChange manage lifecycle
+  const handleBlur = () => {};
 
   return (
     <Popover
       open={isOpen}
-      onOpenChange={(open) =>
-        debouncedSetPopoverId(open ? (info.row.original.id ?? null) : null)
-      }
+      onOpenChange={setOpenDirect}
       data-testid="tt-recal-eval-popover"
     >
       <PopoverTrigger
@@ -167,8 +142,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
         }}
         onClick={(event) => {
           event.stopPropagation(); // Prevents the click from reaching the TableRow
-          // Use debounced function to prevent rapid state changes
-          debouncedSetPopoverId(isOpen ? null : (info.row.original.id ?? null));
+          // Do not toggle here; Popover will call onOpenChange for us
         }}
         onBlur={handleBlur}
         disabled={isDisabled}
@@ -187,6 +161,8 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
         align="end"
         data-testid="tt-recal-eval-popover-content"
         ref={popoverRef}
+        // Prevent auto-focus bounce on open which can trigger immediate blur close
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <Command>
           <CommandList className="max-h-none">
