@@ -462,8 +462,11 @@ export class TuneTreesPageObject {
     await locator.waitFor({ state: "visible", timeout });
     await locator.waitFor({ state: "attached", timeout });
     await expect(locator).toBeEnabled({ timeout });
+
+    await this.page.waitForLoadState("domcontentloaded");
+
     // Make sure it is not offscreen/covered
-    await locator.scrollIntoViewIfNeeded();
+    // await locator.scrollIntoViewIfNeeded({ timeout: 1000 });
 
     // Use trial click probes in a short polling loop until Playwright agrees it's clickable
     const start = Date.now();
@@ -494,11 +497,16 @@ export class TuneTreesPageObject {
   // In tunetrees.po.ts
 
   async setReviewEval(tuneId: number, evalType: string) {
-    // Find the table row by its first-cell ID text (more reliable than nested testid chains)
-    const idCells = this.tunesGridRows.locator("td:first-child");
-    const target = idCells.filter({ hasText: new RegExp(`^${tuneId}$`) });
-    await expect(target.first()).toBeVisible({ timeout: 60000 });
-    const row = this.tunesGridRows.filter({ has: target.first() }).first();
+    // Find the table row by its ID column cell (data-col-id="id") to be robust against column reordering
+    const idCellMatcher = this.page
+      .locator('td[data-col-id="id"]')
+      .filter({ hasText: new RegExp(`^${tuneId}$`) });
+    // Ensure an ID cell exists for this tune
+    await expect(idCellMatcher.first()).toBeVisible({ timeout: 60000 });
+    // Scope to the row that contains this ID cell
+    const row = this.tunesGridRows
+      .filter({ has: idCellMatcher.first() })
+      .first();
 
     // Trigger inside this row
     const qualityButton = row
@@ -510,7 +518,7 @@ export class TuneTreesPageObject {
 
     // Open and wait for popover content
     await Promise.all([
-      qualityButton.click(),
+      qualityButton.click({ delay: 10 }),
       this.page
         .getByTestId("tt-recal-eval-popover-content")
         .waitFor({ state: "visible" }),
@@ -523,7 +531,7 @@ export class TuneTreesPageObject {
     await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
     await this.ensureClickable(responseRecalledButton, 15000);
     await Promise.all([
-      responseRecalledButton.click(),
+      responseRecalledButton.click({ delay: 10 }),
       this.page
         .getByTestId("tt-recal-eval-popover-content")
         .waitFor({ state: "detached" }),

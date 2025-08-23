@@ -86,18 +86,33 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     const submitButton = pageObject.page.getByRole("button", {
       name: "Submit Practiced Tunes",
     });
-    await expect(submitButton).toBeEnabled({ timeout: 15000 });
-    await pageObject.page.waitForTimeout(100);
-    await pageObject.clickWithTimeAfter(submitButton);
-    await pageObject.waitForSuccessfullySubmitted();
+    await expect(submitButton).toBeEnabled();
+    await Promise.all([
+      submitButton.click(),
+      pageObject.toast.last().waitFor({ state: "visible" }),
+    ]);
+    await expect(pageObject.toast.last()).toContainText(
+      // "Practice successfully submitted",
+      "Submitted evaluated tunes.",
+    );
 
     // Verify that each reviewed tune either disappeared OR its row text changed (rescheduled metrics updated)
     const postRows = pageObject.tunesGridRows;
     for (const tid of reviewedIds) {
       const idCells = postRows.locator("td:first-child");
-      const target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
-      const presentCount = await target.count();
-      if (presentCount === 0) continue; // disappeared
+      let target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
+      let presentCount = await target.count();
+      // Retry up to 10 times with a short delay until the ID appears
+      let attempt = 0;
+      for (; attempt < 10 && presentCount < 1; attempt++) {
+        await pageObject.page.waitForTimeout(200);
+        target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
+        presentCount = await target.count();
+      }
+      if (presentCount === 0) {
+        continue; // disappeared: acceptable
+      }
+      // Row still present: check for changed text
       const row = postRows
         .locator("tr")
         .filter({ has: target.first() })
