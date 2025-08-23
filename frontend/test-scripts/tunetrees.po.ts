@@ -511,7 +511,7 @@ export class TuneTreesPageObject {
       qualityButton.click(),
       this.page
         .getByTestId("tt-recal-eval-popover-content")
-        .waitFor({ state: "visible" }),
+        .waitFor({ state: "visible", timeout: 20000 }),
     ]);
 
     // Click the evaluation option and wait for popover to close

@@ -38,15 +38,21 @@ async function doEditAndButtonClick(
   });
   await formFieldTextBox.fill(modifiedText);
 
-  await ttPO.pressButton(buttonName);
+  // Click the button and, if saving, wait for the editor modal to close (submit button detached)
+  await Promise.all([
+    ttPO.pressButton(buttonName),
+    buttonName === "Save"
+      ? ttPO.tuneEditorSubmitButton.waitFor({
+          state: "detached",
+          timeout: 15000,
+        })
+      : Promise.resolve(),
+  ]);
 
-  // Wait for the response to the POST request, which will hopefully
-  // be the first response after the Save button is clicked?
-  const tuneTitle2 = await ttPO.currentTuneTitle.textContent();
-  console.log("===> test-edit-1.ts:158 ~ ", tuneTitle2);
+  // Now assert the current title reflects the change (or expected text)
   const expectedText2 = expectedText ?? modifiedText;
   await expect(ttPO.currentTuneTitle).toHaveText(expectedText2, {
-    timeout: 5_000 * 100,
+    timeout: 30000,
   });
 }
 

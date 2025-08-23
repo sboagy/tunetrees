@@ -124,11 +124,9 @@ test("test-secondary-playlist-add-to-repertoire", async ({ page }) => {
   await page.waitForTimeout(1_000);
 
   await ttPO.repertoireTabTrigger.click({ timeout: 60000 });
-  if (process.env.CI) {
-    await page.waitForTimeout(8_000);
-  } else {
-    await page.waitForTimeout(2_000);
-  }
+  // Ensure the repertoire panel and table are visible and populated before measuring rows
+  await ttPO.repertoireTab.waitFor({ state: "visible", timeout: 60000 });
+  await ttPO.waitForTablePopulationToStart();
 
   const rowCount = await ttPO.tunesGridRows.count();
   expect(rowCount).toBe(3);

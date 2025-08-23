@@ -195,13 +195,12 @@ test.describe.serial("TuneGrid Regression Tests", () => {
 
     // Click again to clear sorting
     await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForLoadState("networkidle");
 
-    // Verify the sort arrow is back to unsorted (ArrowUpDown)
-    const unsortedIconFinal = ttPO.idColumnHeaderSortButton.locator("svg");
-    await expect(unsortedIconFinal).toBeVisible();
-
-    console.log("✅ Column sorting arrows are working correctly!");
+    // Wait until the sort state is cleared (button title no longer matches ascending/descending)
+    await expect(ttPO.idColumnHeaderSortButton).not.toHaveAttribute(
+      "title",
+      /(Ascending|Descending) column sort/,
+    );
   });
 
   test("test-multicolumn-sorting", async ({ page }) => {
