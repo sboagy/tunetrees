@@ -195,7 +195,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
 
     // Click again to clear sorting
     await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState("networkidle");
 
     // Verify the sort arrow is back to unsorted (ArrowUpDown)
     const unsortedIconFinal = ttPO.idColumnHeaderSortButton.locator("svg");

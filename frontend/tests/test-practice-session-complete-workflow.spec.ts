@@ -3,10 +3,7 @@ import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { setTestDefaults } from "@/test-scripts/set-test-defaults";
 import { runLoginStandalone } from "@/test-scripts/run-login2";
-import {
-  getTuneGridColumnIndex,
-  TuneTreesPageObject,
-} from "@/test-scripts/tunetrees.po";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { navigateToPageWithRetry } from "@/test-scripts/navigation-utils";
 import { checkHealth } from "@/test-scripts/check-servers";
 import { navigateToPracticeTabStandalone } from "@/test-scripts/tunetrees.po";
@@ -162,12 +159,12 @@ test("should complete full practice session workflow with recall quality evaluat
   console.log("Submit button is now enabled after all evaluations selected");
 
   // Step 8: Submit the practice session
-  await submitButton.click();
-  await page.waitForTimeout(2000); // Wait for submission to process
+  await Promise.all([
+    submitButton.click(),
+    ttPO.toast.last().waitFor({ state: "visible" }),
+  ]);
 
   // Step 9: Verify submission was successful via toast and row count decrease
-  // Observe success toast using shared Page Object helper semantics
-  // const ttPO = new TuneTreesPageObject(page);
   await expect(ttPO.toast.last()).toContainText("Submitted evaluated tunes.");
 
   let rowsAfter = 0;
@@ -286,102 +283,56 @@ test("should show tune details when selecting different tunes", async ({
 
   if (dataRowCount >= 2) {
     try {
-      // Click on first data row
-      await dataRows.first().getByRole("cell").nth(0).click();
-      await page.waitForTimeout(500);
-
-      const titleColumnIndex = await getTuneGridColumnIndex(page, "Title");
-      if (titleColumnIndex === null) {
-        throw new Error(
-          "Could not find 'Title' column index in the tune grid.",
-        );
-      }
-
-      // Try to get the tune title from the Title column (should be column 5, index 4)
-      // Look for a link in the title cell as that's how tune titles appear
+      // --- Test selection of the first tune ---
       const firstTuneTitleCell = dataRows
         .first()
         .locator('[data-col-id="title"]');
-
       const firstTuneLink = firstTuneTitleCell.getByRole("link");
+      const firstTuneTitle = await firstTuneLink.textContent({ timeout: 2000 });
 
-      if (await firstTuneLink.isVisible({ timeout: 2000 })) {
-        const firstTuneTitle = await firstTuneLink.textContent({
+      if (!firstTuneTitle) {
+        throw new Error("Could not extract title for the first tune.");
+      }
+
+      // Click the first data row to select it
+      await dataRows.first().getByRole("cell").nth(0).click();
+
+      // Wait for the details panel to update with the correct title
+      const tuneDetailsTitle = page.getByTestId("current-tune-title");
+      await expect(tuneDetailsTitle).toContainText(firstTuneTitle, {
+        timeout: 15000,
+      });
+      console.log(`Successfully selected first tune: ${firstTuneTitle}`);
+
+      // --- Test selection of the second tune ---
+      if (dataRowCount >= 2) {
+        const secondTuneTitleCell = dataRows
+          .nth(1)
+          .locator('[data-col-id="title"]');
+        const secondTuneLink = secondTuneTitleCell.getByRole("link");
+        const secondTuneTitle = await secondTuneLink.textContent({
           timeout: 2000,
         });
 
-        if (firstTuneTitle) {
-          // Verify tune details panel shows this tune (with relaxed timeout)
-          // const tuneHeading = page.locator(
-          //   `heading:has-text("${firstTuneTitle}")`,
-          // );
-          const tuneHeading = page
-            .locator("div")
-            .filter({ hasText: new RegExp(`^${firstTuneTitle}$`) });
-          const isHeadingVisible = await tuneHeading.isVisible({
-            timeout: 3000,
-          });
-
-          if (isHeadingVisible) {
-            console.log(`Successfully selected tune: ${firstTuneTitle}`);
-
-            // Try second row if available
-            if (dataRowCount >= 2) {
-              await dataRows.nth(1).getByRole("cell").nth(0).click();
-              await page.waitForTimeout(500);
-
-              const firstTuneTitleCell = dataRows
-                .nth(1)
-                .locator('[data-col-id="title"]');
-
-              const secondTuneLink = firstTuneTitleCell.getByRole("link");
-
-              // const secondTuneLink = dataRows
-              //   .nth(1)
-              //   .locator("cell")
-              //   .nth(4)
-              //   .locator("link");
-              if (await secondTuneLink.isVisible({ timeout: 2000 })) {
-                const secondTuneTitle = await secondTuneLink.textContent({
-                  timeout: 2000,
-                });
-
-                if (secondTuneTitle && secondTuneTitle !== firstTuneTitle) {
-                  // const secondHeading = page.locator("div").filter({
-                  //   hasText: new RegExp(`^${secondTuneTitle}$`),
-                  // });
-                  const secondHeading = await page
-                    .getByTestId("current-tune-title")
-                    .innerText();
-
-                  const isSecondVisible =
-                    secondHeading.includes(secondTuneTitle);
-
-                  if (isSecondVisible) {
-                    console.log(
-                      `Successfully selected second tune: ${secondTuneTitle}`,
-                    );
-                  } else {
-                    throw new Error(
-                      `Second Tune selected but details panel not found for: ${secondTuneTitle}`,
-                    );
-                  }
-                }
-              }
-            }
-
-            console.log(
-              "Tune details panel correctly updates when selecting different tunes",
-            );
-          } else {
-            throw new Error(
-              `Tune selected but details panel not found for: ${firstTuneTitle}`,
-            );
-          }
+        if (!secondTuneTitle) {
+          throw new Error("Could not extract title for the second tune.");
         }
-      } else {
-        throw new Error("Could not find tune title link in expected location");
+
+        if (secondTuneTitle !== firstTuneTitle) {
+          // Click the second data row to select it
+          await dataRows.nth(1).getByRole("cell").nth(0).click();
+
+          // Wait for the details panel to update with the new title
+          await expect(tuneDetailsTitle).toContainText(secondTuneTitle, {
+            timeout: 15000,
+          });
+          console.log(`Successfully selected second tune: ${secondTuneTitle}`);
+        }
       }
+
+      console.log(
+        "Tune details panel correctly updates when selecting different tunes.",
+      );
     } catch (error) {
       throw new Error(`Test 4 raised an error: ${String(error)}`);
     }

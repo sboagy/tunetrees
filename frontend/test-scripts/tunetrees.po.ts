@@ -497,28 +497,18 @@ export class TuneTreesPageObject {
   // In tunetrees.po.ts
 
   async setReviewEval(tuneId: number, evalType: string) {
-    // Find the table row by its ID column cell (data-col-id="id") to be robust against column reordering
-    const idCellMatcher = this.page
-      .locator('td[data-col-id="id"]')
-      .filter({ hasText: new RegExp(`^${tuneId}$`) });
-    // Ensure an ID cell exists for this tune
-    await expect(idCellMatcher.first()).toBeVisible({ timeout: 60000 });
-    // Scope to the row that contains this ID cell
-    const row = this.tunesGridRows
-      .filter({ has: idCellMatcher.first() })
-      .first();
+    // Use a more specific locator to find the row, which is more robust
+    const row = this.page.locator(`[data-row-id="${tuneId}"]`);
+    await expect(row).toBeVisible({ timeout: 60000 });
 
-    // Trigger inside this row
-    const qualityButton = row
-      .getByTestId("tt-recal-eval-popover-trigger")
-      .first();
+    const qualityButton = row.getByTestId("tt-recal-eval-popover-trigger");
 
-    // Ensure clickability
-    await this.ensureClickable(qualityButton, 15000);
+    // Use a helper to ensure the button is ready to be clicked
+    await this.ensureClickable(qualityButton);
 
-    // Open and wait for popover content
+    // Open the popover and wait for it to be visible
     await Promise.all([
-      qualityButton.click({ delay: 10 }),
+      qualityButton.click(),
       this.page
         .getByTestId("tt-recal-eval-popover-content")
         .waitFor({ state: "visible" }),
@@ -528,13 +518,13 @@ export class TuneTreesPageObject {
     const responseRecalledButton = this.page.getByTestId(
       `tt-recal-eval-${evalType}`,
     );
-    await expect(responseRecalledButton).toBeVisible({ timeout: 60000 });
-    await this.ensureClickable(responseRecalledButton, 15000);
+    await this.ensureClickable(responseRecalledButton);
+
     await Promise.all([
-      responseRecalledButton.click({ delay: 10 }),
+      responseRecalledButton.click(),
       this.page
         .getByTestId("tt-recal-eval-popover-content")
-        .waitFor({ state: "detached" }),
+        .waitFor({ state: "hidden" }),
     ]);
   }
 
@@ -711,6 +701,16 @@ export class TuneTreesPageObject {
       if (msg.type() === "error") {
         const errorText = msg.text();
         const location = msg.location();
+
+        // Filter out the known 404 for user preferences to reduce log noise
+        if (
+          errorText.includes("Failed to load resource") &&
+          errorText.includes("404") &&
+          location.url.includes("/api/preferences/prefs_spaced_repetition")
+        ) {
+          return;
+        }
+
         const timestamp = new Date().toISOString();
 
         console.log(`[${timestamp}] Browser console error:`, errorText);
@@ -729,7 +729,12 @@ export class TuneTreesPageObject {
         }
       }
       if (msg.type() === "warning") {
-        console.log("Browser console warning:", msg.text());
+        const text = msg.text();
+        // Filter out the noisy CSS preload warning from Next.js
+        if (text.includes("was preloaded using link preload but not used")) {
+          return;
+        }
+        console.log("Browser console warning:", text);
       }
     });
   }
@@ -787,6 +792,15 @@ export class TuneTreesPageObject {
 
     // Listen for response errors (like 500 status codes)
     this.page.on("response", (response) => {
+      const url = response.url();
+      // Ignore the known 404 for user preferences as it has a graceful fallback
+      if (
+        response.status() === 404 &&
+        url.includes("/api/preferences/prefs_spaced_repetition")
+      ) {
+        return;
+      }
+
       if (response.status() >= 400) {
         const timestamp = new Date().toISOString();
         console.log(

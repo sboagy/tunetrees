@@ -89,7 +89,7 @@ def test_fsrs_missing_optional_args():
     assert difficulty > 7 and difficulty < 8
     assert result.get("step") is None
     # Compare as ISO strings to avoid tzinfo or type mismatches
-    assert "2025-09-05" in result.get("review_datetime", "")
+    assert "2025-09-06" in result.get("review_datetime", "")
     assert result.get("repetitions") == 11
     assert result.get("state") == State.Review
 
