@@ -25,6 +25,7 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
   const { currentTune } = useTune();
   const sidebarRef = useRef<ImperativePanelHandle>(null);
   const { currentPlaylist: currentPlaylistId } = usePlaylist();
+  const [isClient, setIsClient] = useState(false);
   logVerbose(
     `LF1 render MainPanel: playlistId=${currentPlaylistId}, userId=${userId}`,
   );
@@ -44,6 +45,7 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
     const refreshSession = async () => {
       if (status === "unauthenticated") {
         logVerbose("MainPanel forcing session refresh...");
@@ -82,6 +84,10 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
   // and it's a bug if they're not.
   if (status === "unauthenticated") {
     return <div>Not authenticated</div>;
+  }
+
+  if (!isClient) {
+    return <div>Loading...</div>;
   }
 
   return (

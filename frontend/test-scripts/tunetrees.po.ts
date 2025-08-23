@@ -642,7 +642,16 @@ export class TuneTreesPageObject {
 
   async navigateToCatalogTab(): Promise<void> {
     // Open the tabs menu to access Catalog
+    await this.ensureClickable(this.tabsMenuButton);
     await this.tabsMenuButton.click();
+
+    // Wait for the menu containing the catalog choice to be visible
+    await this.tabsMenuCatalogChoice.waitFor({
+      state: "visible",
+      timeout: 5000,
+    });
+
+    await this.ensureClickable(this.tabsMenuCatalogChoice);
     await this.tabsMenuCatalogChoice.click();
 
     await expect(this.catalogTab).toBeVisible();

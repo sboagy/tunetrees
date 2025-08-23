@@ -98,7 +98,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
 
     // Click the sort button to sort ascending
     await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForTimeout(500); // Wait for sorting to complete
+    await page.waitForTimeout(2000); // Wait for sorting to complete
 
     // Verify the sort changed to ascending
     const ascendingIcon = ttPO.idColumnHeaderSortButton.locator("svg");

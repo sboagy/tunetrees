@@ -65,11 +65,14 @@ test("test-notes-1", async ({ page }) => {
   await expect(noteEditBoxLocator).toBeVisible();
   await expect(noteEditBoxLocator).toBeEditable();
   await noteEditBoxLocator.click();
-  await ttPO.page.waitForTimeout(1000);
+
+  // Wait for things to calm down before typing into the editor.
+  await ttPO.page.waitForLoadState("domcontentloaded");
+  await page.waitForTimeout(2000);
 
   const newNoteText = "abcdef";
 
-  await noteEditBoxLocator.pressSequentially(newNoteText, { delay: 100 });
+  await noteEditBoxLocator.pressSequentially(newNoteText, { delay: 200 });
 
   const saveEditButtonLocator = page.getByTestId("tt-save-note");
   await expect(saveEditButtonLocator).toBeVisible();
