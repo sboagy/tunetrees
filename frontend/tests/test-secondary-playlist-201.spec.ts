@@ -11,6 +11,8 @@ import {
 } from "../test-scripts/test-logging";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 
+const expectTimeout = process.env.CI ? 30000 : 15000;
+
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
   trace: "retain-on-failure",
@@ -128,8 +130,7 @@ test("test-secondary-playlist-add-to-repertoire", async ({ page }) => {
   await ttPO.repertoireTab.waitFor({ state: "visible", timeout: 60000 });
   await ttPO.waitForTablePopulationToStart();
 
-  const rowCount = await ttPO.tunesGridRows.count();
-  expect(rowCount).toBe(3);
+  await expect(ttPO.tunesGridRows).toHaveCount(3, { timeout: expectTimeout });
 
   await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
   await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
@@ -164,8 +165,7 @@ test("test-secondary-playlist-add-to-review", async ({ page }) => {
   await ttPO.repertoireTabTrigger.click({ timeout: 60000 });
   await page.waitForTimeout(2_000);
 
-  const rowCount = await ttPO.tunesGridRows.count();
-  expect(rowCount).toBe(3);
+  await expect(ttPO.tunesGridRows).toHaveCount(3, { timeout: expectTimeout });
 
   await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
   await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");

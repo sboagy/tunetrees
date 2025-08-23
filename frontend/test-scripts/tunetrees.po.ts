@@ -718,7 +718,7 @@ export class TuneTreesPageObject {
     const isCheckedAfter = await tuneCheckbox.isChecked();
     console.log(`Tune ${tune_id} checkbox state after wait: ${isCheckedAfter}`);
 
-    await expect(tuneCheckbox).not.toBeChecked({ timeout: 100 });
+    await expect(tuneCheckbox).not.toBeChecked();
   }
 
   setupConsoleErrorHandling(): void {
