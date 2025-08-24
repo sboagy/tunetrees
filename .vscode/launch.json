@@ -51,6 +51,23 @@
             "jinja": true,
             "preLaunchTask": "clean_and_stop",
             "justMyCode": false
+        },
+        {
+            "name": "Python Debugger: Dump Practice Records",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/dump_practice_record_groups.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--limit",
+                "5"
+            ],
+            "env": {
+                "TUNETREES_DB": "${workspaceFolder}/tunetrees_production_manual.sqlite3",
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": true
         }
     ]
 }
