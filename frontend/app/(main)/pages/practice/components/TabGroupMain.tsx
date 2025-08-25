@@ -1,5 +1,6 @@
 "use client";
 import type { ITabSpec } from "@/app/(main)/pages/practice/tab-spec";
+import { logVerbose } from "@/lib/logging";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { JSX } from "react";
@@ -15,13 +16,13 @@ interface IPracticeProps {
 }
 
 export default function TabGroupMain({ userId }: IPracticeProps): JSX.Element {
-  console.log("LF1: TabGroupMain Rendering...");
+  logVerbose("LF1: TabGroupMain Rendering...");
 
   const { tabSpec, activeTab, tabsContextLoading, setActiveTab } =
     useTabsState(); // Use the context
 
   const changeActiveTab = (whichTag: string) => {
-    console.log("tabGroupMainState changeActiveTab:", whichTag);
+    logVerbose("tabGroupMainState changeActiveTab:", whichTag);
     setActiveTab(whichTag);
   };
 

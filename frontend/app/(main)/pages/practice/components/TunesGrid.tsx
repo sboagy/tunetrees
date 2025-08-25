@@ -12,6 +12,7 @@ import { flexRender } from "@tanstack/react-table";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 import {
   DndContext,
   PointerSensor,
@@ -43,6 +44,7 @@ type Props = {
   onRowClickCallback?: (newTune: number) => void;
   getStyleForSchedulingState?: (
     reviewDate: string | null,
+    tuneId?: number,
   ) => string | undefined;
   lapsedCount?: number | null;
   currentCount?: number | null;
@@ -715,6 +717,11 @@ const TunesGrid = ({
                           height: `${virtualRow.size}px`, // Set the height of the row
                         }}
                         data-row-id={row.original.id}
+                        data-testid={
+                          row.original.has_staged
+                            ? `staged-row-${row.original.id}`
+                            : undefined
+                        }
                         // className={`absolute h-16 cursor-pointer w-full ${
                         //   currentTune === row.original.id
                         //     ? "outline outline-2 outline-blue-500"
@@ -722,12 +729,12 @@ const TunesGrid = ({
                         // } ${getColorForEvaluation(row.original.recall_eval || null)}`}
                         // className={`absolute h-16 cursor-pointer w-full ${getColorForEvaluation(row.original.recall_eval || null)}`}
                         className={`absolute cursor-pointer w-full 
-                        ${getStyleForSchedulingState ? getStyleForSchedulingState(row.original.scheduled || row.original.latest_review_date) : ""} 
+                        ${getStyleForSchedulingState ? getStyleForSchedulingState(row.original.scheduled || row.original.latest_review_date, row.original.id) : ""} 
                         ${
                           currentTune === row.original.id
                             ? "outline outline-blue-500"
                             : ""
-                        } ${getColorForEvaluation(row.original.recall_eval || null, false)}`}
+                        } ${getColorForEvaluation(row.original.recall_eval || null, false)} ${row.original.has_staged ? "ring-1 ring-amber-400/70 bg-amber-50 dark:bg-amber-900/20" : ""}`}
                         onClick={handleRowClick.bind(null, row)}
                         onDoubleClick={() => handleRowDoubleClick(row)}
                         data-state={row.getIsSelected() && "selected"}
@@ -764,7 +771,17 @@ const TunesGrid = ({
           <TableFooter className="sticky bottom-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar">
             <TableRow id="tt-tunes-grid-footer">
               <TableCell
-                colSpan={get_columns(userId, playlistId, tablePurpose).length}
+                colSpan={
+                  get_columns(
+                    userId,
+                    playlistId,
+                    tablePurpose,
+                    undefined,
+                    undefined,
+                    undefined,
+                    usePlaylist()?.srAlgType ?? null,
+                  ).length
+                }
                 className="h-12"
               >
                 <div

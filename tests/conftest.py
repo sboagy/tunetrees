@@ -1,28 +1,84 @@
+import os
 import shutil
 import sqlite3
-import pytest
-import gc
 import threading
-import os
+import tempfile
+import fcntl
 from pathlib import Path
+
+import pytest
 
 # Set test database environment variable BEFORE any imports that use the database
 os.environ["TUNETREES_DB"] = "tunetrees_test.sqlite3"
+# Disable aggressive journal mode tweaking & integrity checks if desired to reduce locking
+os.environ.setdefault("TT_ENABLE_SQLITE_DELETE_JOURNAL", "0")
+os.environ.setdefault("TT_ENABLE_SQLITE_INTEGRITY_CHECKS", "1")
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from tunetrees.api.tunetrees import router
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+# --- Python 3.13 dummy thread finalizer workaround ---------------------------------
+# In Python 3.13 a regression (see bpo discussions around dummy threads & shutdown)
+# can surface as: TypeError: 'NoneType' object does not support the context manager protocol
+# inside threading._DeleteDummyThreadOnDel.__del__ when interpreter globals are torn
+# down before all dummy thread objects are finalized. This causes noisy test teardown
+# output but does not impact correctness. We defensively monkeypatch the __del__ to
+# guard against a cleared lock object. Remove once upstream fix is released.
+try:  # pragma: no cover - environment specific
+    import threading as _tt
+
+    _delete_cls = getattr(_tt, "_DeleteDummyThreadOnDel", None)  # type: ignore[attr-defined]
+    if _delete_cls is not None:  # pragma: no branch
+        _orig_del = getattr(_delete_cls, "__del__", None)
+        if _orig_del:
+
+            def _safe_del(self):  # type: ignore[no-redef]
+                lock = getattr(self, "_lock", None)
+                if lock is None:
+                    return
+                try:
+                    _orig_del(self)  # type: ignore[misc]
+                except TypeError:
+                    return
+                except Exception:
+                    return
+
+            try:
+                _delete_cls.__del__ = _safe_del  # type: ignore[assignment]
+            except Exception:
+                pass
+except Exception:
+    pass
+# -------------------------------------------------------------------------------
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
-    """Clean up resources after all tests are done."""
-    # Force garbage collection to clean up any remaining objects
-    gc.collect()
+    """Clean up resources after all tests are done.
 
-    # Give threads a moment to clean up
-    threading_active = threading.active_count()
-    if threading_active > 1:  # Main thread + any others
-        print(f"Active threads at session end: {threading_active}")
+    NOTE (Python 3.13): Explicit GC at interpreter shutdown can interact badly
+    with the new threading finalizer path, triggering:
+        TypeError: 'NoneType' object does not support the context manager protocol
+    in _DeleteDummyThreadOnDel.__del__ when dummy thread objects are collected
+    after runtime globals (like locks) are already cleared. Removing the eager
+    gc.collect() here avoids that race. We only emit a lightweight diagnostic
+    about leftover threads instead of forcing collection.
+    """
+    try:
+        # Avoid gc.collect(); let interpreter manage final collection to prevent
+        # _DeleteDummyThreadOnDel races under Python 3.13+.
+        threading_active = threading.active_count()
+        if threading_active > 1:  # Main thread + any others
+            # List non-daemon alive threads for debugging (best‑effort)
+            leftover = [
+                t.name
+                for t in threading.enumerate()
+                if t.is_alive() and t.name != "MainThread"
+            ]
+            print(
+                f"Active threads at session end (not joined): {threading_active - 1} -> {leftover}"
+            )
+    except Exception as e:  # pragma: no cover - defensive
+        print(f"pytest_sessionfinish diagnostic failed: {e}")
 
 
 def _setup_environment_variables(dst_path: Path) -> None:
@@ -55,6 +111,7 @@ def _verify_source_database(src_path: Path) -> None:
 def _reload_database_engine() -> None:
     """Reload SQLAlchemy database engine with current environment variables."""
     import os
+
     from tunetrees.app import database
 
     # Clear existing engine
@@ -98,45 +155,113 @@ def _reload_database_engine() -> None:
 
 
 def _verify_destination_database(dst_path: Path) -> None:
-    """Verify destination database was created correctly."""
+    """Verify destination database was created correctly using a direct connection."""
     if not dst_path.exists():
         print(f"✗ Destination DB not found after copy: {dst_path}")
-        return
+        raise FileNotFoundError(f"Destination DB not found: {dst_path}")
 
     print(f"✓ Destination DB exists after copy: {dst_path}")
-    with sqlite3.connect(dst_path) as conn:
-        cursor = conn.execute("PRAGMA table_info(practice_record)")
-        cols = [row[1] for row in cursor.fetchall()]
-        if "difficulty" in cols:
-            print("✓ Destination DB has difficulty column in practice_record")
-        else:
-            print("✗ Destination DB missing difficulty column in practice_record")
+    # Tiny retry to avoid transient "unable to open database file" immediately after replace
+    last_err: Exception | None = None
+    for _ in range(5):
+        try:
+            with sqlite3.connect(str(dst_path)) as conn:
+                cursor = conn.execute("PRAGMA table_info(practice_record)")
+                cols = [row[1] for row in cursor.fetchall()]
+                if "difficulty" in cols:
+                    print("✓ Destination DB has difficulty column in practice_record")
+                else:
+                    print(
+                        "✗ Destination DB missing difficulty column in practice_record"
+                    )
+                return
+        except Exception as e:  # pragma: no cover - rare
+            last_err = e
+            import time
+
+            time.sleep(0.05)
+    # If still failing after retries, raise the last error
+    if last_err:
+        raise last_err
 
 
 @pytest.fixture(autouse=True, scope="function")
 def reset_test_db():
+    reset_test_db_function()
+
+
+def reset_test_db_function():
     """Automatically copy the clean test DB before each test."""
     repo_root = Path(__file__).parent.parent
     src_path = repo_root / "tunetrees_test_clean.sqlite3"
     dst_path = repo_root / "tunetrees_test.sqlite3"
 
+    from tunetrees.app import database  # local import to access engine
+
     _setup_environment_variables(dst_path)
     _verify_source_database(src_path)
 
-    print(f"Copying test DB from {src_path} to {dst_path}")
-    shutil.copyfile(src_path, dst_path)
+    # Serialize copy/replace with a file lock to prevent races
+    lock_path = repo_root / ".reset_test_db.lock"
+    lock_path.touch(exist_ok=True)
 
-    try:
-        _reload_database_engine()
-    except Exception as e:
-        print(f"Warning: Could not reload database configuration: {e}")
+    with open(lock_path, "r+") as lockf:
+        fcntl.flock(lockf, fcntl.LOCK_EX)
+        try:
+            # Dispose engine to release file handles
+            if hasattr(database, "sqlalchemy_database_engine"):
+                try:
+                    database.sqlalchemy_database_engine.dispose()
+                    print("Disposed existing SQLAlchemy engine")
+                except Exception:
+                    pass
 
-    _verify_destination_database(dst_path)
+            # Clean up any leftover WAL/SHM files
+            wal_path = Path(f"{dst_path}-wal")
+            shm_path = Path(f"{dst_path}-shm")
+            for p in (wal_path, shm_path):
+                if p.exists():
+                    try:
+                        p.unlink()
+                        print(f"Removed leftover {p.name}")
+                    except Exception:
+                        pass
+
+            # Atomic replace: copy to a temp file then replace
+            with tempfile.NamedTemporaryFile(delete=False, dir=repo_root) as tmpf:
+                tmp_name = tmpf.name
+            try:
+                print(f"Copying test DB from {src_path} to temp {tmp_name}")
+                shutil.copyfile(src_path, tmp_name)
+                os.replace(tmp_name, dst_path)
+                print(f"Replaced {dst_path} atomically")
+            finally:
+                try:
+                    if os.path.exists(tmp_name):
+                        os.remove(tmp_name)
+                except Exception:
+                    pass
+
+            # Verify destination using read-only connection before engine reload
+            _verify_destination_database(dst_path)
+
+            # Recreate engine bound to the fresh DB
+            try:
+                _reload_database_engine()
+            except Exception as e:
+                print(f"Warning: Could not reload database configuration: {e}")
+        finally:
+            try:
+                fcntl.flock(lockf, fcntl.LOCK_UN)
+            except Exception:
+                pass
 
 
 @pytest.fixture(scope="session")
 def api_client():
     """Create a FastAPI TestClient for API testing."""
+    from tunetrees.api.tunetrees import router  # delayed import to avoid locking
+
     app = FastAPI()
     app.include_router(router, prefix="")
     client = TestClient(app)

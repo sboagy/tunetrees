@@ -5,6 +5,7 @@ import { Edit } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getPlaylistTuneOverviewAction } from "../actions/practice-actions";
 import type { ITuneOverview } from "../types";
+import { logVerbose } from "@/lib/logging";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import NoteCards from "./NoteCards";
@@ -18,7 +19,7 @@ interface ISidebarProps {
 
 const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
   const { setCurrentView } = useMainPaneView();
-  console.log(`Sidebar: userId=${userId}, playlistId=${playlistId}`);
+  logVerbose(`Sidebar: userId=${userId}, playlistId=${playlistId}`);
 
   const [tuneTitle, setTuneTitle] = useState<string | null>(null);
   const { currentTune, currentTuneUpdate } = useTune();
@@ -28,7 +29,7 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
     if (currentTune !== null) {
       if (prevCurrentTuneUpdate.current !== currentTuneUpdate) {
         // This is really here just so I don't hae to disable the variable with eslint.
-        console.log(
+        logVerbose(
           "Sidebar ===> Sidebar.tsx:30 ~ useEffect triggered by currentTuneUpdate",
         );
       }
@@ -52,9 +53,8 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
   }, [userId, playlistId, currentTune, currentTuneUpdate]);
 
   const handleTuneEditClick = (tuneId: number) => {
-    console.log(
-      "handleTuneEditClick (current tune should already be set): tuneId=",
-      tuneId,
+    logVerbose(
+      `handleTuneEditClick (current tune should already be set): tuneId=${tuneId}`,
     );
     setCurrentView("edit");
   };
@@ -81,7 +81,7 @@ const Sidebar = ({ userId, playlistId }: ISidebarProps) => {
             data-testid="tt-sidebar-edit-tune"
             disabled={currentView === "edit"}
             onClick={() => {
-              console.log("Edit button clicked");
+              logVerbose("Edit button clicked");
               handleTuneEditClick(currentTune);
             }}
           >

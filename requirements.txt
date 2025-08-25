@@ -61,3 +61,5 @@ iniconfig ~= 2.0.0        # Simple config-file reader
 mypy-extensions ~= 1.0.0  # Type system extensions for mypy
 typing_extensions ~= 4.12.2 # Backport of typing module enhancements
 idna ~= 3.10               # Internationalized Domain Names in Applications
+rich ~= 14.1.0             # Rich text and beautiful formatting in the terminal, 
+                           #   including progress bars and tables, for diagnostics

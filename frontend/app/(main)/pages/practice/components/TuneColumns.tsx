@@ -25,6 +25,7 @@ import type {
 } from "../types";
 import "./TuneColumns.css";
 import { saveTableState } from "./TunesTable";
+import { logVerbose } from "@/lib/logging";
 
 // =================================================================================================
 // For now, I'm going to feature-down the column control menu, as it's going to be more complex than
@@ -130,7 +131,7 @@ function sortableHeader(
           const next: "none" | "asc" | "desc" =
             current === "none" ? "asc" : current === "asc" ? "desc" : "none";
           // Debug log to help diagnose headless behavior
-          console.log(
+          logVerbose(
             `sortableHeader click: column=${column.id} current=${current} -> next=${next}`,
           );
           if (next === "none") {
@@ -179,6 +180,7 @@ export function get_columns(
   onRecallEvalChange?: (tuneId: number, newValue: string) => void,
   setTunesRefreshId?: (newRefreshId: number) => void,
   onGoalChange?: (tuneId: number, newValue: string | null) => void,
+  srAlgType?: "FSRS" | "SM2" | null,
 ): ColumnDef<ITuneOverview, TunesGridColumnGeneralType>[] {
   const determineHeaderCheckedState = (
     table: TanstackTable<ITuneOverview>,
@@ -195,7 +197,7 @@ export function get_columns(
         ? false
         : "indeterminate";
 
-    console.log(
+    logVerbose(
       `LF6: selectionHeader->determineHeaderCheckedState: selectedCount=${selectedCount}, ` +
         `rowCount=${rowCount} noneSelected=${noneSelected}, allSelected=${allSelected}, ` +
         `checkedState=${checkedState}`,
@@ -322,10 +324,19 @@ export function get_columns(
     );
   }
 
+  // Map bucket numeric value to user-friendly label
+  const bucketLabel = (bucket?: number | null): string => {
+    if (bucket === 1) return "Due Today";
+    if (bucket === 2) return "Recently Lapsed";
+    if (bucket === 3) return "Backfill";
+    return ""; // Future / not in snapshot
+  };
+
   const columns: ExtendedColumnDef<
     ITuneOverview,
     TunesGridColumnGeneralType
   >[] = [
+    // Selection or evaluation column handled later; Bucket column placed early for practice mode
     {
       id: "id",
       header: ({ column, table }) => sortableHeader(column, table, "Id"),
@@ -341,6 +352,45 @@ export function get_columns(
       minSize: 80,
       meta: { headerLabel: "Id" },
     },
+    ...(purpose === "practice"
+      ? [
+          {
+            id: "bucket",
+            accessorKey: "bucket",
+            header: ({ column, table }) => (
+              <div
+                className="flex items-center"
+                data-testid="col-bucket-header"
+              >
+                {sortableHeader(
+                  column as Column<ITuneOverview, unknown>,
+                  table,
+                  "Bucket",
+                )}
+              </div>
+            ),
+            cell: ({ row }) => {
+              const b = (row.original as unknown as { bucket?: number | null })
+                .bucket;
+              const label = bucketLabel(b);
+              return (
+                <div
+                  className="truncate max-w-[10rem]"
+                  title={label}
+                  data-testid={`cell-bucket-${row.original.id}`}
+                >
+                  {label}
+                </div>
+              );
+            },
+            enableSorting: true,
+            sortingFn: numericSortingFn,
+            size: 140,
+            minSize: 110,
+            meta: { headerLabel: "Bucket" },
+          } as ColumnDef<ITuneOverview, TunesGridColumnGeneralType>,
+        ]
+      : []),
     "practice" === purpose
       ? {
           accessorKey: "recall_eval",
@@ -381,13 +431,14 @@ export function get_columns(
       header: ({ column, table }) => sortableHeader(column, table, "Title"),
       cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
         const favoriteUrl = info.row.original.favorite_url;
-        return favoriteUrl ? (
+        const cellValue = favoriteUrl ? (
           <a href={favoriteUrl} target="_blank" rel="noopener noreferrer">
             {info.getValue()}
           </a>
         ) : (
           info.getValue()
         );
+        return cellValue;
       },
       enableSorting: true,
       enableHiding: true,
@@ -586,14 +637,14 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Prev Goal",
+            "Goal",
           ),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
-        meta: { headerLabel: "Prev Goal" },
+        meta: { headerLabel: "Goal" },
         size: 130,
         minSize: 110,
       },
@@ -603,14 +654,14 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Prev Alg",
+            "Alg",
           ),
         cell: (info) => {
           return info.getValue() ?? "sm2";
         },
         enableSorting: true,
         enableHiding: true,
-        meta: { headerLabel: "Prev Alg" },
+        meta: { headerLabel: "Alg" },
         size: 130,
         minSize: 110,
       },
@@ -620,7 +671,7 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Prev Qual",
+            "Qual",
           ),
         cell: (info) => {
           return info.getValue();
@@ -629,42 +680,61 @@ export function get_columns(
         enableHiding: true,
         size: 12 * 9, // Approximate width for 11 characters
         minSize: 90,
-        meta: { headerLabel: "Prev Qual" },
+        meta: { headerLabel: "Qual" },
       },
       {
+        // Adaptive column: shows Difficulty for FSRS playlists, Easiness for SM2 playlists (re-uses persisted id 'latest_easiness')
         accessorKey: "latest_easiness",
         header: ({ column, table }) =>
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Easiness",
+            srAlgType === "FSRS" ? "Difficulty" : "Easiness",
           ),
         cell: (info) => {
-          const value = info.getValue() as number | null;
-          return value ? value.toFixed(2) : "";
+          const original = info.row.original;
+          const rawValue =
+            srAlgType === "FSRS"
+              ? original.latest_difficulty
+              : original.latest_easiness;
+          return rawValue !== null && rawValue !== undefined
+            ? rawValue.toFixed(2)
+            : "";
         },
         enableSorting: true,
         enableHiding: true,
+        sortingFn: numericSortingFn,
         size: 14 * 8, // Approximate width for 11 characters
         minSize: 90,
-        meta: { headerLabel: "Easiness" },
+        meta: {
+          headerLabel: srAlgType === "FSRS" ? "Difficulty" : "Easiness",
+          type: srAlgType === "FSRS" ? "difficulty" : "easiness",
+        },
       },
       {
-        accessorKey: "latest_interval",
+        accessorKey:
+          srAlgType === "FSRS" ? "latest_stability" : "latest_interval",
         header: ({ column, table }) =>
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Interval",
+            srAlgType === "FSRS" ? "Stability" : "Interval",
           ),
         cell: (info) => {
-          return info.getValue();
+          const original = info.row.original;
+          const rawValue =
+            srAlgType === "FSRS"
+              ? original.latest_stability
+              : original.latest_interval;
+          return rawValue !== null && rawValue !== undefined
+            ? rawValue.toFixed(2)
+            : "";
         },
         enableSorting: true,
         enableHiding: true,
         size: 13 * 8, // Approximate width for 11 characters
         minSize: 90,
-        meta: { headerLabel: "Interval" },
+        meta: { headerLabel: srAlgType === "FSRS" ? "Stability" : "Interval" },
       },
       {
         accessorKey: "latest_repetitions",

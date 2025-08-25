@@ -1,4 +1,5 @@
 import ClientContextsWrapper from "@/components/ClientContextsWrapper";
+import LoggingBootstrap from "@/components/LoggingBootstrap";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeScript, ThemeScriptNoFlash } from "@/components/ThemeScript";
 import "@radix-ui/themes/styles.css";
@@ -40,6 +41,7 @@ export default async function RootLayout({
             refetchOnWindowFocus={false}
             refetchWhenOffline={false}
           >
+            <LoggingBootstrap />
             <ClientContextsWrapper>{children}</ClientContextsWrapper>
           </SessionProvider>
         </ThemeProvider>

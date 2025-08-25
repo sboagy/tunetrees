@@ -158,6 +158,7 @@ export interface ITuneOverview extends ITune {
   latest_quality: number | null;
   latest_easiness: number | null;
   latest_difficulty: number | null;
+  latest_stability: number | null;
   latest_interval: number | null;
   latest_step: number | null;
   latest_repetitions: number | null;
@@ -177,6 +178,8 @@ export interface ITuneOverview extends ITune {
   latest_technique?: string | null;
   // Latest goal from practice record (read-only display)
   latest_goal?: string | null;
+  // Staging indicator (transient overlay present in practice_list_staged view)
+  has_staged?: boolean | null;
 }
 
 export interface ITuneOverviewImported extends ITuneOverview {
@@ -204,6 +207,10 @@ export interface IPracticeRecord {
 
 export interface ITuneOverviewScheduled extends ITuneOverview {
   recall_eval?: string | null;
+  // Practice bucket classification supplied directly by backend (Aug 2025 refactor):
+  // 1 = Due Today, 2 = Recently Lapsed, 3 = Backfill (older). Future/null = not in current snapshot.
+  // Former client-side PracticeBucketContext + snapshot merge removed; UI now relies solely on this field.
+  bucket?: number | null;
 }
 
 export interface IPlaylistTune {
@@ -212,6 +219,7 @@ export interface IPlaylistTune {
   current: string;
   learned: string;
   deleted?: boolean | null;
+  goal?: string | null; // playlist-level goal (practice target)
 }
 
 export interface IPlaylist {
@@ -253,6 +261,58 @@ export interface IViewPlaylistJoined {
   description?: string;
   genre_default?: string;
   instrument_deleted?: boolean;
+}
+
+// Daily Practice Queue (Phase 1) -------------------------------------------------
+// Mirrors backend DailyPracticeQueueModel (fields kept optional where nullable)
+export interface IPracticeQueueEntry {
+  id: number;
+  user_ref: number;
+  playlist_ref: number;
+  mode?: string | null;
+  queue_date?: string | null;
+  window_start_utc: string;
+  window_end_utc: string;
+  tune_ref: number;
+  bucket: number; // 1=due today, 2=recently lapsed, 3=backfill
+  order_index: number;
+  snapshot_coalesced_ts: string;
+  scheduled_snapshot?: string | null;
+  latest_review_date_snapshot?: string | null;
+  acceptable_delinquency_window_snapshot?: number | null;
+  tz_offset_minutes_snapshot?: number | null;
+  generated_at: string;
+  completed_at?: string | null;
+  exposures_required?: number | null;
+  exposures_completed?: number | null;
+  outcome?: string | null;
+  active?: boolean | null;
+  tune_title?: string | null; // added client-enriched field for display
+  // Enriched tune metadata (optional)
+  type?: string | null;
+  structure?: string | null;
+  learned?: string | null;
+  scheduled?: string | null;
+  latest_practiced?: string | null;
+  latest_review_date?: string | null;
+  latest_quality?: number | null;
+  latest_easiness?: number | null;
+  latest_interval?: number | null;
+  latest_repetitions?: number | null;
+  latest_difficulty?: number | null;
+  latest_stability?: number | null;
+  latest_step?: number | null;
+  latest_goal?: string | null;
+  latest_technique?: string | null;
+  tags?: string | null;
+  notes?: string | null;
+  has_staged?: boolean | null;
+}
+
+export interface IPracticeQueueWithMeta {
+  entries: IPracticeQueueEntry[];
+  // Count of tunes currently due (bucket 1) that are not present in snapshot (new since snapshot)
+  new_tunes_due_count: number;
 }
 
 export interface IAccount {

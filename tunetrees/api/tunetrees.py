@@ -2,9 +2,9 @@ import json
 import logging
 import time
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from os import environ
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence as _Sequence
 
 import pydantic
 from fastapi import (
@@ -24,6 +24,9 @@ from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
     query_practice_list_scheduled,
     # query_practice_list_scheduled_original,
+    generate_or_get_practice_queue,
+    refill_practice_queue,
+    add_tunes_to_practice_queue,
 )
 from tunetrees.app.schedule import (
     TuneFeedbackUpdate,
@@ -31,6 +34,10 @@ from tunetrees.app.schedule import (
     update_practice_feedbacks,
     update_practice_schedules,
 )
+from tunetrees.models.tunetrees import TableTransientData
+from sqlalchemy import select as sql_select
+from sqlalchemy import update as sql_update
+from tunetrees.models.tunetrees import DailyPracticeQueue
 from tunetrees.models.tunetrees import (
     Genre,
     Instrument,
@@ -79,6 +86,7 @@ from tunetrees.models.tunetrees_pydantic import (
     TuneTypeModel,
     TuneTypeModelPartial,
     ViewPlaylistJoinedModel,
+    PracticeQueueEntryModel,
 )
 
 logger = logging.getLogger("tunetrees.api")
@@ -94,20 +102,146 @@ DEBUG_SLOWDOWN = int(environ.get("DEBUG_SLOWDOWN", 0))
 
 
 @router.get(
+    "/practice-queue/{user_id}/{playlist_ref}",
+    response_model=list[PracticeQueueEntryModel],
+    summary="Get or Generate Daily Practice Queue",
+    description=(
+        "Return the frozen daily (or rolling) practice queue snapshot (enriched with tune metadata). Generates a new snapshot if none exists "
+        "for the current window. Buckets: 1=due today, 2=recently lapsed, 3=backfill."
+    ),
+)
+async def get_practice_queue(
+    user_id: int = Path(..., description="User identifier"),
+    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+    sitdown_date: datetime = Query(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Practice sitdown timestamp (UTC recommended).",
+    ),
+    local_tz_offset_minutes: Optional[int] = Query(
+        None,
+        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5).",
+    ),
+    force_regen: bool = Query(
+        False, description="Force regeneration even if an active snapshot exists."
+    ),
+):
+    try:
+        if sitdown_date.tzinfo is None:
+            sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
+        with SessionLocal() as db:
+            rows = generate_or_get_practice_queue(
+                db=db,
+                user_ref=user_id,
+                playlist_ref=playlist_ref,
+                review_sitdown_date=sitdown_date,
+                local_tz_offset_minutes=local_tz_offset_minutes,
+                force_regen=force_regen,
+            )
+            # rows are already dicts (enriched) at this point; return directly
+            return rows
+    except Exception as e:
+        logger.error(f"Unable to fetch practice queue: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to fetch practice queue: {e}"
+        )
+
+
+@router.post(
+    "/practice-queue/{user_id}/{playlist_ref}/refill",
+    response_model=list[PracticeQueueEntryModel],
+    summary="Refill (Backfill) Daily Practice Queue",
+    description=(
+        "Append additional older/backlog tunes to the active daily practice queue (enriched rows). Replaces automatic Q3. "
+        "Returns ONLY the newly appended queue rows (not the full queue)."
+    ),
+)
+async def refill_practice_queue_endpoint(
+    user_id: int = Path(..., description="User identifier"),
+    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+    count: int = Query(5, ge=1, le=50, description="Number of backlog tunes to append"),
+    sitdown_date: datetime = Query(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Practice sitdown timestamp anchoring the active window.",
+    ),
+    local_tz_offset_minutes: Optional[int] = Query(
+        None,
+        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5).",
+    ),
+):
+    try:
+        if sitdown_date.tzinfo is None:
+            sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
+        with SessionLocal() as db:
+            rows = refill_practice_queue(
+                db=db,
+                user_ref=user_id,
+                playlist_ref=playlist_ref,
+                review_sitdown_date=sitdown_date,
+                local_tz_offset_minutes=local_tz_offset_minutes,
+                count=count,
+            )
+            return rows
+    except Exception as e:
+        logger.error(f"Unable to refill practice queue: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to refill practice queue: {e}"
+        )
+
+
+@router.post(
+    "/practice-queue/{user_id}/{playlist_ref}/add",
+    summary="Manually add tunes to active daily practice queue (priority)",
+    description=(
+        "Explicitly add selected repertoire tunes into today's active practice queue. "
+        "Tunes already present are skipped (no-op). New tunes are scheduled for the sitdown timestamp, "
+        "inserted at the front (priority) and classified bucket=1 via timestamp. Exceeds max reviews if necessary."
+    ),
+)
+async def add_practice_queue_tunes_endpoint(
+    user_id: int = Path(..., description="User identifier"),
+    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+    tune_ids: List[int] = Body(..., embed=True, description="List of tune ids to add"),
+    sitdown_date: datetime = Query(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Practice sitdown timestamp anchoring the active window.",
+    ),
+    local_tz_offset_minutes: Optional[int] = Query(
+        None,
+        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5).",
+    ),
+):
+    try:
+        if sitdown_date.tzinfo is None:
+            sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
+        with SessionLocal() as db:
+            result = add_tunes_to_practice_queue(
+                db=db,
+                user_ref=user_id,
+                playlist_ref=playlist_ref,
+                tune_ids=tune_ids,
+                review_sitdown_date=sitdown_date,
+                local_tz_offset_minutes=local_tz_offset_minutes,
+            )
+            return result
+    except Exception as e:  # pragma: no cover
+        logger.error(f"Unable to add tunes to practice queue: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to add tunes to practice queue: {e}"
+        )
+
+
+@router.get(
     "/scheduled_tunes_overview/{user_id}/{playlist_ref}",
     response_model=List[PlaylistTuneJoinedModel],
     summary="Get Scheduled Tunes Overview",
     description=(
         "Retrieve an overview of scheduled tunes for a specific user and playlist. "
-        "Returns a list of scheduled tunes, including their joined playlist information, "
-        "for the given user and playlist reference. Supports filtering for deleted tunes and playlists, "
-        "and requires a review sitdown date to determine scheduling. The acceptable delinquency window "
-        "can be customized to adjust which tunes are considered delinquent."
+        "Returns a list of scheduled tunes including playlist join info and bucket classification."
     ),
 )
-async def get_scheduled_tunes_overview(
-    user_id: int = Path(..., description="User identifier"),
-    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+def get_scheduled_tunes_overview(
+    user_id: int,
+    playlist_ref: int,
     show_deleted: bool = Query(False, description="Include deleted tunes"),
     show_playlist_deleted: bool = Query(
         False, description="Include tunes from deleted playlists"
@@ -117,25 +251,20 @@ async def get_scheduled_tunes_overview(
     ),
     local_tz_offset_minutes: Optional[int] = Query(
         None,
-        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5). Used for local-day interval classification.",
+        description="Client local timezone offset minutes (e.g. -300 for UTC-5).",
+    ),
+    enable_backfill: bool = Query(
+        False,
+        description="If true, include optional backfill (older backlog) tunes when min not met.",
     ),
 ) -> List[PlaylistTuneJoinedModel]:
-    """
-    Retrieve an overview of scheduled tunes for a specific user and playlist.
-
-    Returns a list of scheduled tunes, including their joined playlist information,
-    for the given user and playlist reference. Supports filtering for deleted tunes and playlists,
-    and requires a review sitdown date to determine scheduling. The acceptable delinquency window
-    can be customized to adjust which tunes are considered delinquent.
-    """
     try:
-        # FSRS requires dates to be timezoned, so ensure sitdown_date has a UTC timezone.
         if sitdown_date.tzinfo is None:
             sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
         with SessionLocal() as db:
             if DEBUG_SLOWDOWN > 0:
                 time.sleep(DEBUG_SLOWDOWN)
-            tunes_scheduled = query_practice_list_scheduled(
+            tunes_with_bucket = query_practice_list_scheduled(
                 db,
                 user_ref=user_id,
                 playlist_ref=playlist_ref,
@@ -143,11 +272,11 @@ async def get_scheduled_tunes_overview(
                 show_playlist_deleted=show_playlist_deleted,
                 review_sitdown_date=sitdown_date,
                 local_tz_offset_minutes=local_tz_offset_minutes,
+                enable_backfill=enable_backfill,
             )
-            validated_tune_list = [
-                PlaylistTuneJoinedModel.model_validate(tune) for tune in tunes_scheduled
-            ]
-            return validated_tune_list
+            # Already PlaylistTuneJoinedModel instances with bucket populated.
+            # (Defensive cast in case of mixed return types.)
+            return tunes_with_bucket
     except Exception as e:
         logger.error(f"Unable to fetch scheduled practice list: {e}")
         if isinstance(e, HTTPException):
@@ -260,7 +389,8 @@ async def submit_schedules(
 
     update_practice_schedules(tune_updates, playlist_id)
 
-    return status.HTTP_302_FOUND
+    # Return explicit JSON success payload (avoid misleading 302 redirect status)
+    return {"status": "ok", "action": "submit_schedules"}
 
 
 @router.post("/practice/submit_feedbacks/{playlist_id}")
@@ -268,25 +398,252 @@ async def submit_feedbacks(
     playlist_id: str,
     tune_updates: Dict[str, TuneFeedbackUpdate],
     sitdown_date: datetime = Query(...),
-):
+    stage: bool = Query(
+        False,
+        description="If true, compute and stage results in transient table instead of creating PracticeRecords",
+    ),
+) -> dict[str, Any]:
+    logger.debug(f"{tune_updates=}")
     try:
-        logger.debug(f"{tune_updates=}")
-
-        # FSRS requires dates to be timezoned, so ensure sitdown_date has a UTC timezone.
+        # Ensure sitdown_date has a UTC timezone.
         if sitdown_date.tzinfo is None:
             sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
 
-        update_practice_feedbacks(
-            tune_updates,
-            playlist_id,
-            review_sitdown_date=sitdown_date,
+        if stage:
+            _stage_practice_feedbacks(
+                playlist_id=playlist_id,
+                tune_updates=tune_updates,
+                sitdown_date=sitdown_date,
+            )
+        else:
+            update_practice_feedbacks(
+                tune_updates,
+                playlist_id,
+                review_sitdown_date=sitdown_date,
+            )
+
+        # Mark queue rows completed only for non-staged (committed) feedback so staged rows remain visible
+        if not stage:
+            try:
+                tune_ids = [int(k) for k in tune_updates.keys() if k.isdigit()]
+            except ValueError:
+                tune_ids = []
+            if tune_ids:
+                with SessionLocal() as db_mark:
+                    now_ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                    stmt = (
+                        sql_update(DailyPracticeQueue)
+                        .where(
+                            DailyPracticeQueue.playlist_ref == int(playlist_id),
+                            DailyPracticeQueue.tune_ref.in_(tune_ids),
+                            DailyPracticeQueue.completed_at.is_(None),
+                            DailyPracticeQueue.active.is_(True),
+                        )
+                        .values(completed_at=now_ts)
+                    )
+                    try:
+                        db_mark.execute(stmt)
+                        db_mark.commit()
+                    except Exception as e2:  # pragma: no cover - defensive
+                        db_mark.rollback()
+                        logger.error(f"Failed marking queue completion: {e2}")
+        return {"status": "ok", "staged": bool(stage), "count": len(tune_updates)}
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Error in submit_feedbacks: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+def _stage_practice_feedbacks(
+    playlist_id: str,
+    tune_updates: Dict[str, TuneFeedbackUpdate],
+    sitdown_date: datetime,
+) -> None:
+    """Compute scheduling results and upsert into TableTransientData without creating PracticeRecords.
+
+    NOTE: This is an interim implementation; later refactor to reuse core compute path.
+    """
+    from tunetrees.app.schedule import (
+        fetch_algorithm_type,
+        fetch_user_ref_from_playlist_ref,
+        get_prefs_spaced_repetition,
+        SpacedRepetitionScheduler,
+    )
+    import json as _json
+    from datetime import timedelta
+
+    with SessionLocal() as db_stage:
+        user_ref = fetch_user_ref_from_playlist_ref(db_stage, int(playlist_id))
+        alg_type = fetch_algorithm_type(db_stage, user_ref)
+        prefs = get_prefs_spaced_repetition(db_stage, user_ref, alg_type)
+        weights = _json.loads(prefs.fsrs_weights)
+        learning_steps = tuple(
+            timedelta(minutes=s) for s in _json.loads(prefs.learning_steps)
+        )
+        relearning_steps = tuple(
+            timedelta(minutes=s) for s in _json.loads(prefs.relearning_steps)
+        )
+        scheduler = SpacedRepetitionScheduler.factory(
+            alg_type=alg_type,
+            weights=weights,
+            desired_retention=prefs.request_retention,
+            maximum_interval=prefs.maximum_interval,
+            learning_steps=learning_steps,
+            relearning_steps=relearning_steps,
+            enable_fuzzing=prefs.enable_fuzzing,
         )
 
-        return status.HTTP_302_FOUND
-    except Exception as e:
-        logger.error(f"Error in submit_feedbacks: {e}")
-        # Return a proper HTTP error instead of letting it bubble up as a 500
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        for tune_id, tune_update in tune_updates.items():
+            _stage_single_tune(
+                db_stage=db_stage,
+                scheduler=scheduler,
+                playlist_id=playlist_id,
+                user_ref=user_ref,
+                sitdown_date=sitdown_date,
+                tune_id=tune_id,
+                tune_update=tune_update,
+            )
+        db_stage.commit()
+
+
+def _stage_single_tune(
+    db_stage: Session,
+    scheduler: Any,
+    playlist_id: str,
+    user_ref: str,
+    sitdown_date: datetime,
+    tune_id: str,
+    tune_update: TuneFeedbackUpdate,
+) -> None:
+    from tunetrees.app.schedule import (
+        get_latest_practice_record,
+        parse_review_date,
+        TT_DATE_FORMAT,
+    )
+    from tunetrees.models.quality import quality_lookup, NOT_SET, NEW, RESCHEDULED
+
+    quality_str = tune_update.get("feedback")
+    if not quality_str:
+        return
+    # Clear request
+    if quality_str in ("(Not Set)", NOT_SET):
+        existing = db_stage.execute(
+            sql_select(TableTransientData).where(
+                TableTransientData.user_id == user_ref,
+                TableTransientData.tune_id == int(tune_id),
+                TableTransientData.playlist_id == int(playlist_id),
+                TableTransientData.purpose == "practice",
+            )
+        ).scalar_one_or_none()
+        if existing:
+            for attr in [
+                "recall_eval",
+                "practiced",
+                "quality",
+                "easiness",
+                "difficulty",
+                "interval",
+                "step",
+                "repetitions",
+                "review_date",
+                "backup_practiced",
+                "goal",
+                "technique",
+                "stability",
+            ]:
+                setattr(existing, attr, None)  # type: ignore
+        return
+
+    quality_lookup_int = quality_lookup.get(quality_str, -2)
+    if quality_lookup_int == -2 or quality_str == NOT_SET:
+        return
+
+    latest_pr = get_latest_practice_record(db_stage, tune_id, int(playlist_id))
+    goal = tune_update.get("goal", "recall")
+    technique = getattr(scheduler, "technique", "fsrs")
+
+    if quality_str in (NEW, RESCHEDULED):
+        result = scheduler.first_review(
+            quality=quality_lookup_int,
+            practiced=sitdown_date,
+            quality_text=quality_str,
+        )
+    else:
+        last_review_str = latest_pr.practiced if latest_pr else None
+        if last_review_str:
+            try:
+                last_review = datetime.strptime(
+                    last_review_str, TT_DATE_FORMAT
+                ).replace(tzinfo=timezone.utc)
+            except ValueError:
+                last_review = None
+        else:
+            last_review = None
+        result = scheduler.review(
+            quality=quality_lookup_int,
+            easiness=latest_pr.easiness,
+            interval=latest_pr.interval,
+            repetitions=latest_pr.repetitions,
+            practiced=sitdown_date,
+            stability=getattr(latest_pr, "stability", None),
+            difficulty=getattr(latest_pr, "difficulty", None),
+            step=getattr(latest_pr, "step", None),
+            last_review=last_review,
+        )
+
+    review_dt = result.get("review_datetime")
+    review_date_str = (
+        parse_review_date(review_dt)
+        if review_dt
+        else datetime.strftime(sitdown_date, "%Y-%m-%d %H:%M:%S")
+    )
+    practiced_str = datetime.strftime(sitdown_date, "%Y-%m-%d %H:%M:%S")
+
+    existing = db_stage.execute(
+        sql_select(TableTransientData).where(
+            TableTransientData.user_id == user_ref,
+            TableTransientData.tune_id == int(tune_id),
+            TableTransientData.playlist_id == int(playlist_id),
+            TableTransientData.purpose == "practice",
+        )
+    ).scalar_one_or_none()
+    if existing:
+        existing.recall_eval = quality_str  # type: ignore
+        existing.practiced = practiced_str  # type: ignore
+        existing.quality = quality_lookup_int  # type: ignore
+        existing.easiness = result.get("easiness")  # type: ignore
+        existing.difficulty = result.get("difficulty")  # type: ignore
+        existing.interval = result.get("interval")  # type: ignore
+        existing.step = result.get("step")  # type: ignore
+        existing.repetitions = result.get("repetitions")  # type: ignore
+        existing.review_date = review_date_str  # type: ignore
+        existing.backup_practiced = None  # type: ignore
+        existing.goal = goal  # type: ignore
+        existing.technique = technique  # type: ignore
+        existing.stability = result.get("stability")  # type: ignore
+    else:
+        db_stage.add(
+            TableTransientData(
+                user_id=user_ref,
+                tune_id=int(tune_id),
+                playlist_id=int(playlist_id),
+                purpose="practice",
+                note_private=None,
+                note_public=None,
+                recall_eval=quality_str,
+                practiced=practiced_str,
+                quality=quality_lookup_int,
+                easiness=result.get("easiness"),
+                difficulty=result.get("difficulty"),
+                interval=result.get("interval"),
+                step=result.get("step"),
+                repetitions=result.get("repetitions"),
+                review_date=review_date_str,
+                backup_practiced=None,
+                goal=goal,
+                technique=technique,
+                stability=result.get("stability"),
+            )
+        )
 
 
 def update_table(
@@ -297,6 +654,178 @@ def update_table(
 ):
     stmt = table.update().where(*conditions).values(**values)
     db.execute(stmt)
+
+
+@router.post("/practice/commit_staged/{playlist_id}")
+async def commit_staged_practice(playlist_id: int) -> dict[str, int | str]:
+    """Persist all staged practice evaluations for the given playlist.
+
+    For each transient row with purpose='practice' and non-null practiced, insert a PracticeRecord
+    (respecting uniqueness of practiced timestamp) and then clear the staged columns.
+    """
+    try:
+        with SessionLocal() as db:
+            staged_rows = _fetch_staged_rows(db, playlist_id)
+            tune_ids_to_complete = _persist_staged_rows(db, playlist_id, staged_rows)
+            _mark_queue_completed(db, playlist_id, tune_ids_to_complete)
+            db.commit()
+            return {"status": "ok", "count": len(staged_rows)}
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Error committing staged practice: {e}")
+        raise HTTPException(status_code=500, detail=f"Commit failed: {e}")
+
+
+def _fetch_staged_rows(db: Session, playlist_id: int):
+    return (
+        db.execute(
+            sql_select(TableTransientData).where(
+                TableTransientData.playlist_id == playlist_id,
+                TableTransientData.purpose == "practice",
+                TableTransientData.practiced.is_not(None),
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _persist_staged_rows(
+    db: Session, playlist_id: int, staged_rows: _Sequence[Any]
+) -> list[int]:
+    tune_ids: list[int] = []
+    for row in staged_rows:
+        if row.tune_id is None or row.practiced is None or row.quality is None:
+            continue
+        _insert_practice_record_with_retry(db, playlist_id, row)
+        if row.tune_id is not None:
+            tune_ids.append(int(row.tune_id))
+        for attr in [
+            "practiced",
+            "quality",
+            "easiness",
+            "difficulty",
+            "interval",
+            "step",
+            "repetitions",
+            "review_date",
+            "backup_practiced",
+            "goal",
+            "technique",
+            "stability",
+        ]:
+            setattr(row, attr, None)  # type: ignore
+        row.recall_eval = None  # type: ignore
+    return tune_ids
+
+
+def _insert_practice_record_with_retry(db: Session, playlist_id: int, row: Any) -> None:
+    practiced_ts = row.practiced
+    collision_tries = 0
+    while True:
+        try:
+            pr = PracticeRecord(
+                playlist_ref=playlist_id,
+                tune_ref=row.tune_id,
+                practiced=practiced_ts,
+                quality=row.quality,
+                easiness=row.easiness,
+                interval=row.interval,
+                repetitions=row.repetitions,
+                review_date=row.review_date,
+                backup_practiced=row.backup_practiced,
+                stability=row.stability,
+                elapsed_days=None,
+                lapses=None,
+                state=None,
+                difficulty=row.difficulty,
+                step=row.step,
+                goal=row.goal or "recall",
+                technique=row.technique,
+            )
+            db.add(pr)
+            db.flush()
+            break
+        except Exception as e:  # Likely uniqueness collision
+            db.rollback()
+            if "UNIQUE constraint failed" in str(e) and collision_tries < 5:
+                try:
+                    dt = datetime.strptime(practiced_ts, "%Y-%m-%d %H:%M:%S")
+                    dt = dt + timedelta(seconds=collision_tries + 1)
+                    practiced_ts = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    collision_tries += 1
+                    continue
+                except Exception:  # pragma: no cover - fallback
+                    break
+            else:
+                logger.error(f"Failed inserting PracticeRecord: {e}")
+                break
+
+
+def _mark_queue_completed(db: Session, playlist_id: int, tune_ids: list[int]) -> None:
+    if not tune_ids:
+        return
+    try:
+        now_ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        from tunetrees.models.tunetrees import DailyPracticeQueue
+
+        stmt = (
+            sql_update(DailyPracticeQueue)
+            .where(
+                DailyPracticeQueue.playlist_ref == playlist_id,
+                DailyPracticeQueue.tune_ref.in_(tune_ids),
+                DailyPracticeQueue.completed_at.is_(None),
+                DailyPracticeQueue.active.is_(True),
+            )
+            .values(completed_at=now_ts)
+        )
+        db.execute(stmt)
+    except Exception as e2:  # pragma: no cover
+        logger.error(f"Failed marking queue rows on commit: {e2}")
+
+
+@router.delete(
+    "/practice/staged/{playlist_id}/{tune_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    description="Clear staged practice feedback (transient computed fields) for a single tune.",
+)
+async def clear_staged_practice_feedback(playlist_id: int, tune_id: int) -> None:
+    """Clear (nullify) staged practice feedback for a tune.
+
+    Sets all staging columns to NULL for the matching transient row (purpose='practice').
+    If no row exists, returns 204 (idempotent clear) instead of 404 to simplify client logic.
+    """
+    try:
+        with SessionLocal() as db:
+            existing = db.execute(
+                sql_select(TableTransientData).where(
+                    TableTransientData.playlist_id == playlist_id,
+                    TableTransientData.tune_id == tune_id,
+                    TableTransientData.purpose == "practice",
+                )
+            ).scalar_one_or_none()
+            if existing:
+                for attr in [
+                    "recall_eval",
+                    "practiced",
+                    "quality",
+                    "easiness",
+                    "difficulty",
+                    "interval",
+                    "step",
+                    "repetitions",
+                    "review_date",
+                    "backup_practiced",
+                    "goal",
+                    "technique",
+                    "stability",
+                ]:
+                    setattr(existing, attr, None)  # type: ignore
+                db.commit()
+            # Idempotent: if nothing found just return 204
+            return None
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Error clearing staged practice feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Clear failed: {e}")
 
 
 @router.get(

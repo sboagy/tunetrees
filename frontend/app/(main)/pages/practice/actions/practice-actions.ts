@@ -34,6 +34,9 @@ import {
   getScheduledTunesOverview,
   getTuneStaged,
   // getTuneStaged NOT wrapped (server component uses it directly)
+  getPracticeQueue,
+  refillPracticeQueue,
+  addTunesToPracticeQueue,
 } from "../queries";
 import type {
   IReferenceData,
@@ -201,12 +204,83 @@ export async function getScheduledTunesOverviewAction(
   playlistId: number,
   sitdownDate: Date | null,
   showDeleted: boolean,
+  enableBackfill = false,
 ) {
-  return getScheduledTunesOverview(
+  // Intentionally do NOT fallback; caller must supply browser-derived date.
+  if (!sitdownDate) {
+    console.warn(
+      "[ScheduledFetch][Action] sitdownDate was null; throwing to avoid unintended fallback",
+    );
+    throw new Error("sitdownDate required for scheduled tunes overview");
+  }
+  console.log(
+    "[ScheduledFetch][Action] getScheduledTunesOverviewAction params",
+    JSON.stringify({
+      userId,
+      playlistId,
+      sitdownDate: sitdownDate.toISOString(),
+      showDeleted,
+    }),
+  );
+  const data = await getScheduledTunesOverview(
     userId,
     playlistId,
-    sitdownDate ?? new Date(0),
+    sitdownDate,
     showDeleted,
+    enableBackfill,
+  );
+  try {
+    interface ISchedSample {
+      id: number | null | undefined;
+      bucket?: number | null;
+    }
+    const sample: ISchedSample[] = data.slice(0, 5).map((t: unknown) => {
+      const obj = t as { id?: number; bucket?: number | null };
+      return { id: obj.id, bucket: obj.bucket ?? null };
+    });
+    console.log(
+      "[ScheduledFetch][Action] returning scheduled overview",
+      JSON.stringify({ length: data.length, sample }),
+    );
+  } catch {
+    /* ignore */
+  }
+  return data;
+}
+
+// Daily Practice Queue snapshot wrapper (authoritative styling + review flow)
+export async function getPracticeQueueAction(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  forceRegen = false,
+) {
+  return getPracticeQueue(userId, playlistId, sitdownDate, forceRegen);
+}
+
+// Append backlog tunes to existing daily snapshot (returns only new rows)
+export async function refillPracticeQueueAction(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  count = 5,
+) {
+  // count kept small & validated server-side (1..50)
+  return await refillPracticeQueue(userId, playlistId, sitdownDate, count);
+}
+
+// Priority manual add of tunes into daily snapshot (bypasses max, idempotent)
+export async function addTunesToPracticeQueueAction(
+  userId: number,
+  playlistId: number,
+  tuneIds: number[],
+  sitdownDate: Date,
+) {
+  return await addTunesToPracticeQueue(
+    userId,
+    playlistId,
+    tuneIds,
+    sitdownDate,
   );
 }
 

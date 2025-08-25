@@ -325,6 +325,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
     await this.sidebarButton.isEnabled();
 
     await this.sidebarButton.click();
+    await this.page.waitForTimeout(100);
     await this.form.waitFor({ state: "visible" });
     await this.IdTitle.waitFor({ state: "visible" });
 
