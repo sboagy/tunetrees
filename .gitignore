@@ -365,3 +365,5 @@ server-action-refactor-plan.md
 tunetrees_test.sqlite3-journal
 .reset_test_db.lock
 frontend/playwright-reports-ci
+fsrs_fixup_report_apply.txt
+fsrs_fixup_report.txt

@@ -53,15 +53,19 @@
             "justMyCode": false
         },
         {
-            "name": "Python Debugger: Dump Practice Records",
+            "name": "Python Debugger: Fixup Practice Records (FSRS + reps)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/dump_practice_record_groups.py",
+            "program": "${workspaceFolder}/scripts/fixup_practice_record_groups.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "args": [
-                "--limit",
-                "5"
+                // "--output",
+                // "fsrs_fixup_report_apply.txt",
+                // "--limit",
+                // "5",
+                // "--apply"
+                "--nofixup"
             ],
             "env": {
                 "TUNETREES_DB": "${workspaceFolder}/tunetrees_production_manual.sqlite3",
