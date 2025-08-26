@@ -502,6 +502,7 @@ export default function PlaylistDialog({
       <Dialog open={true} modal={true}>
         <DialogPortal>
           <DialogOverlay className="bg-black/50 fixed inset-0" />
+          {/* biome-ignore lint/a11y/useSemanticElements: We intentionally set role for Playwright tests and Radix DialogContent */}
           <DialogContent
             role="dialog"
             ref={dialogRef}

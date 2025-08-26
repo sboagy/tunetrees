@@ -162,6 +162,8 @@ export interface ITuneOverview extends ITune {
   latest_interval: number | null;
   latest_step: number | null;
   latest_repetitions: number | null;
+  // FSRS state for latest practice record (enum-like integer)
+  latest_state?: number | null;
   latest_review_date: string | null; // Historical data - use scheduled for current scheduling
   latest_backup_practiced?: string | null;
   external_ref?: string | null;
