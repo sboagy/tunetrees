@@ -92,7 +92,6 @@ export default function TunesGridRepertoire({
     lapsedCount,
     currentCount,
     futureCount,
-    newCount,
   } = useRepertoireTunes();
 
   const { refreshId, triggerRefresh } = useTuneDataRefresh();
@@ -571,7 +570,6 @@ export default function TunesGridRepertoire({
             lapsedCount={lapsedCount}
             currentCount={currentCount}
             futureCount={futureCount}
-            newCount={newCount}
           />
         </>
       )}

@@ -106,7 +106,22 @@ export const TunesProviderRepertoire = ({
       return;
     }
     setCounts(tunes);
-  }, [sitDownDate]); // Don't include tunes in the dependency array
+  }, [sitDownDate, acceptableDelinquencyDays]); // Don't include tunes in the dependency array
+
+  // Parse DB-like timestamps robustly ("YYYY-MM-DD HH:mm:ss" and ISO)
+  function parseDbTimestamp(ts: string | null | undefined): Date | null {
+    if (!ts) return null;
+    const d = new Date(ts);
+    if (!Number.isNaN(d.getTime())) return d;
+    // Try replacing space with T
+    const t1 = ts.replace(" ", "T");
+    const d1 = new Date(t1);
+    if (!Number.isNaN(d1.getTime())) return d1;
+    // Append Z as last resort (treat as UTC)
+    const d2 = new Date(`${t1}Z`);
+    if (!Number.isNaN(d2.getTime())) return d2;
+    return null;
+  }
 
   function setCounts(tuneList: ITuneOverview[]) {
     if (!sitDownDate) {
@@ -121,11 +136,18 @@ export const TunesProviderRepertoire = ({
     let futureCounter = 0;
     let newCounter = 0;
     for (const tune of tuneList) {
-      if (!tune.scheduled) {
+      // Coalesce current scheduling date using scheduled first, then historical latest_review_date
+      const coalescedTs = tune.scheduled ?? tune.latest_review_date ?? null;
+      if (!coalescedTs) {
         newCounter += 1;
         continue;
       }
-      const scheduledDate = new Date(tune.scheduled);
+      const scheduledDate = parseDbTimestamp(coalescedTs);
+      if (!scheduledDate) {
+        // If unparsable, treat as new/unscheduled for safety
+        newCounter += 1;
+        continue;
+      }
       if (scheduledDate < lowerBoundReviewSitdownDate) {
         lapsedCounter += 1;
       } else if (
