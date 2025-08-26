@@ -53,7 +53,7 @@ export const CurrentPlaylistProvider = ({
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, srAlgType]);
 
   return (
     <CurrentPlaylistContext.Provider
