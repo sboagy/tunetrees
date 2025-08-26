@@ -503,6 +503,7 @@ export default function PlaylistDialog({
         <DialogPortal>
           <DialogOverlay className="bg-black/50 fixed inset-0" />
           <DialogContent
+            role="dialog"
             ref={dialogRef}
             tabIndex={-1}
             className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[60rem] p-6 bg-white dark:bg-background rounded-md shadow-2xl border-2 border-gray-400 dark:border-gray-600 focus:outline-none focus:ring-0"

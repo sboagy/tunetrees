@@ -122,6 +122,7 @@ unset NEXTAUTH_SECRET
 # Make sure we're not running in NODE_ENV=production and that we have mock email confirmation enabled
 cd "$FRONTEND_DIR_ABS_PATH"
 npx dotenv -f .env.local -- bash -c '
+PLAYWRIGHT_HEADLESS=true \
 NODE_ENV=development \
 NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION=true \
 npx playwright test '"$REPORTER_ARG"' '"$TEST_FILE_ARG"' '"$PLAYWRIGHT_ARGS"' \
