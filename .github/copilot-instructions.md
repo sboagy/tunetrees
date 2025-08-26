@@ -14,7 +14,7 @@ Key Backend Files: `main.py` (FastAPI app + CORS + router registration), `schedu
 
 Frontend Conventions: Strict TS (no `any`), all interfaces prefixed with `I`. Tailwind + Headless UI. Shared UI patterns enforced by `frontend/UI_STYLE_GUIDE2.md` and `.github/instructions/ui-development.instructions.md`. Use `data-testid` attributes for new interactive elements; update page objects in Playwright tests.
 
-Testing: Playwright E2E in `frontend/tests/`. Always run via provided scripts (`npm run test:ui` or `./run-playwright-tests.sh pattern`) not raw `npx playwright test`. Use storage state auth helpers. Page Objects: `frontend/test-scripts/tunetrees.po.ts` etc. For backend logic add/modify pytest tests in `tests/` (root) mirroring module paths.
+Testing: Playwright E2E in `frontend/tests/`. Always run via provided scripts (`npm run test:ui` or `npm run test:ui:single <test-file-pattern>`, avoid `./run-playwright-tests.sh [test-file-pattern]`) unless special circumstances arise, and not raw `npx playwright test` unless very special circumstances. Use storage state auth helpers. Page Objects: `frontend/test-scripts/tunetrees.po.ts` etc. For backend logic add/modify pytest tests in `tests/` (root) mirroring module paths.
 
 Quality Gates: Before commits run (frontend): `npm run lint && npm run biome_lint && npm run type-check && npx prettier --write <changed files>`. Backend: `python -m ruff check tunetrees/ && python -m ruff format tunetrees/` plus pytest if logic changed. No warnings permitted. Never commit unformatted code.
 
@@ -194,7 +194,7 @@ npm run test:ui        # Run Playwright UI tests in headless mode
 npm run test:ui:single        # Run a single Playwright UI test in headless mode
 
 # For more playwright test control for E2E tests - use environment setup script
-./run-playwright-tests.sh [test-file-pattern]  # Properly sets up environment and database
+`npm run test:ui:single <test-file-pattern>`  # Properly sets up environment and database
 # Do NOT use: npx playwright test directly - it lacks proper environment setup
 ```
 
@@ -568,7 +568,7 @@ cd frontend
 npm run test:ui:single [test-file-pattern]
 ```
 
-OR
+OR, for headed mode (but avoid this, use headless mode instead)
 
 ```bash
 cd frontend
