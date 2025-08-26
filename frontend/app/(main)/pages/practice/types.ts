@@ -167,6 +167,8 @@ export interface ITuneOverview extends ITune {
   external_ref?: string | null;
   tags?: string | null;
   recall_eval?: string | null;
+  // When present, indicates this tune has already been submitted (completed) in the current sitdown session
+  completed_at?: string | null;
   notes?: string | null;
   favorite_url?: string | null;
   playlist_deleted?: boolean | null;

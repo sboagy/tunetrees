@@ -2,6 +2,10 @@
 
 import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
 import RowGoalComboBox from "@/app/(main)/pages/practice/components/RowGoalComboBox";
+import {
+  getQualityListForGoalAndTechnique,
+  lookupQualityItem,
+} from "../quality-lists";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { transformToDatetimeLocalForDisplay } from "@/lib/date-utils";
@@ -399,15 +403,57 @@ export function get_columns(
           enableHiding: false,
           cell: (
             info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
-          ) => (
-            <RecallEvalComboBox
-              info={info}
-              userId={userId}
-              playlistId={playlistId}
-              purpose={purpose}
-              onRecallEvalChange={onRecallEvalChange}
-            />
-          ),
+          ) => {
+            const completed = Boolean(info.row.original.completed_at);
+            const qualityList = getQualityListForGoalAndTechnique(
+              info.row.original.goal,
+              info.row.original.latest_technique,
+            );
+            const stored = info.row.original.recall_eval;
+            let label = "(Not Set)";
+            if (stored) {
+              label =
+                qualityList.find((q) => q.value === stored)?.label2 ?? stored;
+            } else {
+              // Try numeric/latest fields (server-side submitted values)
+              const latestQuality = info.row.original.latest_quality;
+              const latestEasiness = info.row.original.latest_easiness;
+              if (latestQuality !== null && latestQuality !== undefined) {
+                const found = lookupQualityItem(latestQuality, qualityList);
+                if (found) label = found.label2;
+              } else if (
+                latestEasiness !== null &&
+                latestEasiness !== undefined
+              ) {
+                const rounded = Math.round(latestEasiness);
+                const found = lookupQualityItem(rounded, qualityList);
+                if (found) label = found.label2;
+              }
+            }
+
+            if (completed) {
+              return (
+                <div
+                  className="truncate"
+                  title={label}
+                  data-testid={`tt-recal-eval-static-${info.row.original.id}`}
+                >
+                  {label}
+                </div>
+              );
+            }
+
+            return (
+              <RecallEvalComboBox
+                info={info}
+                userId={userId}
+                playlistId={playlistId}
+                purpose={purpose}
+                onRecallEvalChange={onRecallEvalChange}
+                readOnly={Boolean(info.row.original.completed_at)}
+              />
+            );
+          },
           accessorFn: (row) => row.recall_eval,
           size: 284,
           minSize: 260,

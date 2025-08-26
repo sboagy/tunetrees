@@ -52,48 +52,61 @@ import type {
   ITuneType,
 } from "../types";
 
-export async function createReferenceAction(reference: IReferenceData) {
+export async function createReferenceAction(
+  reference: IReferenceData,
+): ReturnType<typeof createReference> {
   return createReference(reference);
 }
-export async function deleteReferenceAction(referenceId: number) {
+export async function deleteReferenceAction(
+  referenceId: number,
+): ReturnType<typeof deleteReference> {
   return deleteReference(referenceId);
 }
 export async function updateReferenceAction(
   referenceId: number,
   referenceUpdate: Partial<IReferenceData>,
-) {
+): ReturnType<typeof updateReference> {
   return updateReference(referenceId, referenceUpdate);
 }
 export async function getReferencesAction(
   tuneRef: number,
   userRef: number | null,
-) {
+): ReturnType<typeof getReferences> {
   return getReferences(tuneRef, userRef);
 }
 
 export async function createEmptyTuneAction(
   tune: Partial<ITuneOverview>,
   playlistRef?: number,
-) {
+): ReturnType<typeof createEmptyTune> {
   return createEmptyTune(tune, playlistRef);
 }
-export async function getInstrumentByIdAction(instrumentId: number) {
+export async function getInstrumentByIdAction(
+  instrumentId: number,
+): ReturnType<typeof getInstrumentById> {
   return getInstrumentById(instrumentId);
 }
-export async function getPlaylistByIdAction(playlistId: number) {
+export async function getPlaylistByIdAction(
+  playlistId: number,
+): ReturnType<typeof getPlaylistById> {
   return getPlaylistById(playlistId);
 }
 export async function getPlaylistTuneOverviewAction(
   userId: number,
   playlistId: number,
   tuneId: number,
-) {
+): ReturnType<typeof getPlaylistTuneOverview> {
   return getPlaylistTuneOverview(userId, playlistId, tuneId);
 }
-export async function queryReferencesAction(url: string) {
+export async function queryReferencesAction(
+  url: string,
+): ReturnType<typeof queryReferences> {
   return queryReferences(url);
 }
-export async function searchTunesByTitleAction(title: string, limit = 10) {
+export async function searchTunesByTitleAction(
+  title: string,
+  limit = 10,
+): ReturnType<typeof searchTunesByTitle> {
   return searchTunesByTitle(title, limit);
 }
 
@@ -105,20 +118,24 @@ export async function updatePlaylistTunesAction(
   tuneIds: number[],
   playlistId: number,
   update: Partial<IPlaylistTune>,
-) {
+): ReturnType<typeof updatePlaylistTunes> {
   return updatePlaylistTunes(tuneIds, playlistId, update);
 }
 export async function updateTunesAction(
   tuneIds: number[],
   update: Partial<ITuneOverview>,
-) {
+): ReturnType<typeof updateTunes> {
   return updateTunes(tuneIds, update);
 }
 
-export async function createNoteAction(note: INote) {
+export async function createNoteAction(
+  note: INote,
+): ReturnType<typeof createNote> {
   return createNote(note);
 }
-export async function deleteNoteAction(noteId: number) {
+export async function deleteNoteAction(
+  noteId: number,
+): ReturnType<typeof deleteNote> {
   return deleteNote(noteId);
 }
 export async function getNotesAction(
@@ -126,39 +143,46 @@ export async function getNotesAction(
   playlistRef: number,
   userRef: number,
   displayPublic: boolean,
-) {
+): ReturnType<typeof getNotes> {
   return getNotes(tuneRef, playlistRef, userRef, displayPublic);
 }
-export async function updateNoteAction(noteId: number, note: Partial<INote>) {
+export async function updateNoteAction(
+  noteId: number,
+  note: Partial<INote>,
+): ReturnType<typeof updateNote> {
   return updateNote(noteId, note);
 }
 
-export async function createPlaylistTuneAction(playlistTune: IPlaylistTune) {
+export async function createPlaylistTuneAction(
+  playlistTune: IPlaylistTune,
+): ReturnType<typeof createPlaylistTune> {
   return createPlaylistTune(playlistTune);
 }
 export async function createPracticeRecordAction(
   tuneId: number,
   playlistId: number,
   practiceRecord: Partial<IPracticeRecord>,
-) {
+): ReturnType<typeof createPracticeRecord> {
   return createPracticeRecord(tuneId, playlistId, practiceRecord);
 }
-export async function deleteTuneAction(tuneId: number) {
+export async function deleteTuneAction(
+  tuneId: number,
+): ReturnType<typeof deleteTune> {
   return deleteTune(tuneId);
 }
-export async function getAllGenresAction(): Promise<IGenre[]> {
+export async function getAllGenresAction(): ReturnType<typeof getAllGenres> {
   return getAllGenres();
 }
 export async function getTuneTypesByGenreAction(
   genreId: string,
-): Promise<ITuneType[]> {
+): ReturnType<typeof getTuneTypesByGenre> {
   return getTuneTypesByGenre(genreId);
 }
 export async function updatePracticeRecordAction(
   tuneId: number,
   playlistId: number,
   practiceRecord: Partial<IPracticeRecord>,
-) {
+): ReturnType<typeof updatePracticeRecord> {
   return updatePracticeRecord(tuneId, playlistId, practiceRecord);
 }
 export async function updateTuneInPlaylistFromTuneOverviewAction(
@@ -167,7 +191,7 @@ export async function updateTuneInPlaylistFromTuneOverviewAction(
   tuneId: number,
   saveAsOverride: boolean,
   dataLocal: Partial<ITuneOverview>,
-) {
+): ReturnType<typeof updateTuneInPlaylistFromTuneOverview> {
   return updateTuneInPlaylistFromTuneOverview(
     userId,
     playlistId,
@@ -177,13 +201,15 @@ export async function updateTuneInPlaylistFromTuneOverviewAction(
   );
 }
 
-export async function getTunesOnlyIntoOverviewAction(showDeleted: boolean) {
+export async function getTunesOnlyIntoOverviewAction(
+  showDeleted: boolean,
+): ReturnType<typeof getTunesOnlyIntoOverview> {
   return getTunesOnlyIntoOverview(showDeleted);
 }
 export async function intersectPlaylistTunesAction(
   tuneIds: number[],
   playlistId: number,
-) {
+): ReturnType<typeof intersectPlaylistTunes> {
   return intersectPlaylistTunes(tuneIds, playlistId);
 }
 export async function getRepertoireTunesOverviewAction(
@@ -191,7 +217,7 @@ export async function getRepertoireTunesOverviewAction(
   playlistId: number,
   showDeleted: boolean,
   sortingState: import("@tanstack/react-table").SortingState | null,
-) {
+): ReturnType<typeof getRepertoireTunesOverview> {
   return getRepertoireTunesOverview(
     userId,
     playlistId,
@@ -204,83 +230,12 @@ export async function getScheduledTunesOverviewAction(
   playlistId: number,
   sitdownDate: Date | null,
   showDeleted: boolean,
-  enableBackfill = false,
-) {
-  // Intentionally do NOT fallback; caller must supply browser-derived date.
-  if (!sitdownDate) {
-    console.warn(
-      "[ScheduledFetch][Action] sitdownDate was null; throwing to avoid unintended fallback",
-    );
-    throw new Error("sitdownDate required for scheduled tunes overview");
-  }
-  console.log(
-    "[ScheduledFetch][Action] getScheduledTunesOverviewAction params",
-    JSON.stringify({
-      userId,
-      playlistId,
-      sitdownDate: sitdownDate.toISOString(),
-      showDeleted,
-    }),
-  );
-  const data = await getScheduledTunesOverview(
+): ReturnType<typeof getScheduledTunesOverview> {
+  return getScheduledTunesOverview(
     userId,
     playlistId,
-    sitdownDate,
+    sitdownDate ?? new Date(0),
     showDeleted,
-    enableBackfill,
-  );
-  try {
-    interface ISchedSample {
-      id: number | null | undefined;
-      bucket?: number | null;
-    }
-    const sample: ISchedSample[] = data.slice(0, 5).map((t: unknown) => {
-      const obj = t as { id?: number; bucket?: number | null };
-      return { id: obj.id, bucket: obj.bucket ?? null };
-    });
-    console.log(
-      "[ScheduledFetch][Action] returning scheduled overview",
-      JSON.stringify({ length: data.length, sample }),
-    );
-  } catch {
-    /* ignore */
-  }
-  return data;
-}
-
-// Daily Practice Queue snapshot wrapper (authoritative styling + review flow)
-export async function getPracticeQueueAction(
-  userId: number,
-  playlistId: number,
-  sitdownDate: Date,
-  forceRegen = false,
-) {
-  return getPracticeQueue(userId, playlistId, sitdownDate, forceRegen);
-}
-
-// Append backlog tunes to existing daily snapshot (returns only new rows)
-export async function refillPracticeQueueAction(
-  userId: number,
-  playlistId: number,
-  sitdownDate: Date,
-  count = 5,
-) {
-  // count kept small & validated server-side (1..50)
-  return await refillPracticeQueue(userId, playlistId, sitdownDate, count);
-}
-
-// Priority manual add of tunes into daily snapshot (bypasses max, idempotent)
-export async function addTunesToPracticeQueueAction(
-  userId: number,
-  playlistId: number,
-  tuneIds: number[],
-  sitdownDate: Date,
-) {
-  return await addTunesToPracticeQueue(
-    userId,
-    playlistId,
-    tuneIds,
-    sitdownDate,
   );
 }
 
@@ -288,8 +243,35 @@ export async function getTuneStagedAction(
   userId: string | number,
   playlistId: string | number,
   tuneId: string | number,
-) {
+): ReturnType<typeof getTuneStaged> {
   return getTuneStaged(String(userId), String(playlistId), String(tuneId));
+}
+
+export async function getPracticeQueueAction(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  forceRegen = false,
+): ReturnType<typeof getPracticeQueue> {
+  return getPracticeQueue(userId, playlistId, sitdownDate, forceRegen);
+}
+
+export async function refillPracticeQueueAction(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  count = 5,
+): ReturnType<typeof refillPracticeQueue> {
+  return refillPracticeQueue(userId, playlistId, sitdownDate, count);
+}
+
+export async function addTunesToPracticeQueueAction(
+  userId: number,
+  playlistId: number,
+  tuneIds: number[],
+  sitdownDate: Date,
+): ReturnType<typeof addTunesToPracticeQueue> {
+  return addTunesToPracticeQueue(userId, playlistId, tuneIds, sitdownDate);
 }
 
 export type {

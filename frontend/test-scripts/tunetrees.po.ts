@@ -47,6 +47,12 @@ export class TuneTreesPageObject {
   readonly catalogTab;
   readonly tableStatus;
   readonly toast;
+  // Practice header controls
+  readonly showSubmittedToggle: Locator;
+  readonly addTunesButton: Locator;
+  readonly addTunesCountInput: Locator;
+  readonly addTunesConfirmButton: Locator;
+  readonly tableFooter: Locator;
   // Spaced Repetition settings locators
   readonly spacedRepUpdateButton: Locator;
   readonly optimizeParamsInlineButton: Locator;
@@ -163,6 +169,13 @@ export class TuneTreesPageObject {
 
     this.tableStatus = this.page.getByTestId("tt-table-status");
     this.toast = this.page.getByTestId("shadcn-toast");
+
+    // Practice header controls
+    this.showSubmittedToggle = page.getByTestId("toggle-show-submitted");
+    this.addTunesButton = page.getByTestId("practice-add-tunes-button");
+    this.addTunesCountInput = page.getByTestId("practice-add-count-input");
+    this.addTunesConfirmButton = page.getByTestId("practice-add-confirm");
+    this.tableFooter = page.getByTestId("tt-table-footer");
 
     // Spaced Repetition locators
     this.spacedRepUpdateButton = page.getByTestId("spaced-rep-update-button");
@@ -638,6 +651,14 @@ export class TuneTreesPageObject {
       "Submitted evaluated tunes.",
       { timeout: 60000 },
     );
+  }
+
+  async addTunesViaDialog(count: number): Promise<void> {
+    await this.ensureClickable(this.addTunesButton);
+    await this.addTunesButton.click();
+    await this.addTunesCountInput.waitFor({ state: "visible", timeout: 10000 });
+    await this.addTunesCountInput.fill(String(count));
+    await this.addTunesConfirmButton.click();
   }
 
   async navigateToCatalogTab(): Promise<void> {

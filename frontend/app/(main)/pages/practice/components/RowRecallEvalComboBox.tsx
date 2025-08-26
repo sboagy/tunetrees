@@ -48,17 +48,18 @@ type RecallEvalComboBoxProps = {
   playlistId: number;
   purpose: TablePurpose;
   onRecallEvalChange?: (tuneId: number, newValue: string) => void;
+  readOnly?: boolean;
 };
 
 export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const { info, playlistId, onRecallEvalChange } = props;
+  const { info, playlistId, onRecallEvalChange, readOnly } = props;
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  const isDisabled = onRecallEvalChange && !isMounted;
+  const isDisabled = !!readOnly || (!!onRecallEvalChange && !isMounted);
 
   // const [isOpen, setIsOpen] = useState(false);
   const { openPopoverId, setOpenPopoverId } = useRowRecallEvalPopoverContext();
@@ -126,8 +127,8 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
 
   return (
     <Popover
-      open={isOpen}
-      onOpenChange={setOpenDirect}
+      open={readOnly ? false : isOpen}
+      onOpenChange={readOnly ? undefined : setOpenDirect}
       data-testid="tt-recal-eval-popover"
     >
       <PopoverTrigger

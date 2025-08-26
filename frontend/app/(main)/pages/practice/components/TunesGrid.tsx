@@ -50,6 +50,10 @@ type Props = {
   currentCount?: number | null;
   futureCount?: number | null;
   newCount?: number | null;
+  onFooterDoubleClick?: () => void;
+  reviewedTodayCount?: number | null;
+  toBePracticedCount?: number | null;
+  reviewedCount?: number | null;
 };
 
 const TunesGrid = ({
@@ -63,6 +67,10 @@ const TunesGrid = ({
   currentCount,
   futureCount,
   newCount,
+  onFooterDoubleClick,
+  reviewedTodayCount,
+  toBePracticedCount,
+  reviewedCount,
 }: Props) => {
   const {
     currentTune,
@@ -720,7 +728,9 @@ const TunesGrid = ({
                         data-testid={
                           row.original.has_staged
                             ? `staged-row-${row.original.id}`
-                            : undefined
+                            : row.original.completed_at
+                              ? `completed-row-${row.original.id}`
+                              : undefined
                         }
                         // className={`absolute h-16 cursor-pointer w-full ${
                         //   currentTune === row.original.id
@@ -768,7 +778,11 @@ const TunesGrid = ({
           </div>
         </div>
         <Table className="hide-scrollbar ">
-          <TableFooter className="sticky bottom-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar">
+          <TableFooter
+            className="sticky bottom-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar"
+            onDoubleClick={() => onFooterDoubleClick?.()}
+            data-testid="tt-table-footer"
+          >
             <TableRow id="tt-tunes-grid-footer">
               <TableCell
                 colSpan={
@@ -791,9 +805,16 @@ const TunesGrid = ({
                   {table.getFilteredSelectedRowModel().rows.length} of{" "}
                   {table.getFilteredRowModel().rows.length} row(s) selected.
                   {lapsedCount !== undefined && `, lapsed: ${lapsedCount}`}
-                  {currentCount !== undefined && `, current: ${currentCount}`}
+                  {currentCount !== undefined && `, due: ${currentCount}`}
                   {futureCount !== undefined && `, future: ${futureCount}`}
-                  {newCount !== undefined && `, new: ${newCount}`}
+                  {/* Queue-specific metrics (present for Practice tab) */}
+                  {newCount !== undefined && `, queue size: ${newCount}`}
+                  {reviewedTodayCount !== undefined &&
+                    `, submitted: ${reviewedTodayCount}`}
+                  {reviewedCount !== undefined &&
+                    `, reviewed: ${reviewedCount}`}
+                  {toBePracticedCount !== undefined &&
+                    `, toPractice: ${toBePracticedCount}`}
                 </div>
               </TableCell>
             </TableRow>
