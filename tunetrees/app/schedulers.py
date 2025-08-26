@@ -207,7 +207,19 @@ class FSRScheduler(SpacedRepetitionScheduler):
 
     @staticmethod
     def _e_factor_to_difficulty(e_factor: float) -> float:
-        normalized_e = (e_factor - 1.3) / (2.5 - 1.3)
+        """
+        Transforms an SM-2 E-Factor to an FSRS Difficulty (D), handling out-of-range values.
+
+        Args:
+            e_factor: The E-Factor value from SM-2 (float).
+
+        Returns:
+            The corresponding Difficulty (D) value for FSRS (int between 1 and 10).
+        """
+        # Clip the e_factor to the valid range [1.3, 2.5]
+        clipped_e_factor = max(1.3, min(e_factor, 2.5))
+
+        normalized_e = (clipped_e_factor - 1.3) / (2.5 - 1.3)
         inverted_e = 1 - normalized_e
         d = 1 + inverted_e * 9
         return float(round(d))
