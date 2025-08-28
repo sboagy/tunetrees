@@ -328,6 +328,9 @@ class TabGroupMainStateModel(BaseModel):
     which_tab: WhichTabEnum
     playlist_id: int
     tab_spec: Optional[str] = None
+    # Newly persisted Practice tab UI flags
+    practice_show_submitted: Optional[bool] = False
+    practice_mode_flashcard: Optional[bool] = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -338,6 +341,8 @@ class TabGroupMainStateModelPartial(BaseModel):
     which_tab: Optional[WhichTabEnum] = None
     playlist_id: Optional[int] = None
     tab_spec: Optional[str] = None
+    practice_show_submitted: Optional[bool] = None
+    practice_mode_flashcard: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -470,6 +475,8 @@ class TableTransientDataModel(BaseModel):
     goal: Optional[str] = None
     technique: Optional[str] = None
     stability: Optional[float] = None
+    # FSRS/SM2 stage: transient state value (mirrors practice_record.state)
+    state: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -495,6 +502,7 @@ class TableTransientDataModelPartial(BaseModel):
     goal: Optional[str] = None
     technique: Optional[str] = None
     stability: Optional[float] = None
+    state: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -603,6 +611,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     latest_interval: Optional[int] = None
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
+    latest_state: Optional[int] = None
     latest_review_date: Optional[str] = None
     latest_technique: Optional[str] = None
     latest_goal: Optional[str] = None
@@ -644,6 +653,7 @@ class PracticeListStagedModel(BaseModel):
     latest_interval: Optional[int] = None
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
+    latest_state: Optional[int] = None
     latest_review_date: Optional[str] = (
         None  # Canonical next due snapshot from last PracticeRecord
     )

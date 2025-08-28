@@ -17,6 +17,7 @@ SELECT
 	playlist.playlist_id AS playlist_id,
 	instrument.instrument AS instrument,
 	playlist_tune.deleted AS playlist_deleted,
+	COALESCE(td.state, pr.state) AS latest_state,
 	COALESCE(td.practiced, pr.practiced) AS latest_practiced,
 	COALESCE(td.quality, pr.quality) AS latest_quality,
 	COALESCE(td.easiness, pr.easiness) AS latest_easiness,

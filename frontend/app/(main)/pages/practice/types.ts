@@ -59,6 +59,8 @@ export interface ITableTransientDataFields {
   note_private: string | null;
   note_public: string | null;
   recall_eval: string | null;
+  // Staged practice outcome (new)
+  state?: number | null;
 }
 
 // Define the type for the function parameters
@@ -184,6 +186,12 @@ export interface ITuneOverview extends ITune {
   latest_goal?: string | null;
   // Staging indicator (transient overlay present in practice_list_staged view)
   has_staged?: boolean | null;
+}
+
+// Practice tab UI preferences (persisted in tab_group_main_state)
+export interface IPracticeTabPrefs {
+  practice_show_submitted: boolean;
+  practice_mode_flashcard: boolean;
 }
 
 export interface ITuneOverviewImported extends ITuneOverview {

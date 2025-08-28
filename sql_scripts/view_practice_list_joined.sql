@@ -14,6 +14,7 @@ SELECT
     playlist_tune.learned AS learned,
     playlist_tune.goal,
     playlist_tune.scheduled,
+    practice_record.state AS latest_state,
     practice_record.practiced AS latest_practiced,
     practice_record.quality AS latest_quality,
     practice_record.easiness AS latest_easiness,

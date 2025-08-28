@@ -527,6 +527,9 @@ export interface ITabGroupMainStateModel {
   which_tab: string;
   playlist_id?: number;
   tab_spec?: string | ITabSpec[];
+  // Persisted practice tab UI prefs (DB-backed; 0/1 or boolean)
+  practice_show_submitted?: boolean | number | null;
+  practice_mode_flashcard?: boolean | number | null;
 }
 
 export async function getTabGroupMainState(
@@ -568,12 +571,18 @@ export async function getTabGroupMainState(
           throw new Error("Error creating tab group main state");
         }
       }
-      if (response.data.tab_spec !== null) {
-        response.data.tab_spec = JSON.parse(
-          response.data.tab_spec as string,
-        ) as ITabSpec[];
+      const data = response.data as ITabGroupMainStateModel | null;
+      if (data && data.tab_spec !== null) {
+        data.tab_spec = JSON.parse(data.tab_spec as string) as ITabSpec[];
       }
-      return response.data as ITabGroupMainStateModel;
+      // Coerce numeric flags to booleans if backend returns 0/1 integers
+      if (data) {
+        const coerceBool = (v: boolean | number | null | undefined) =>
+          typeof v === "number" ? v !== 0 : (v ?? false);
+        data.practice_show_submitted = coerceBool(data.practice_show_submitted);
+        data.practice_mode_flashcard = coerceBool(data.practice_mode_flashcard);
+      }
+      return data;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
         return null; // Return null for 404 status
@@ -592,6 +601,15 @@ export async function updateTabGroupMainState(
     try {
       if (tabGroupMainState.tab_spec !== null) {
         tabGroupMainState.tab_spec = JSON.stringify(tabGroupMainState.tab_spec);
+      }
+      // Ensure boolean flags serialize as strict booleans (not numbers)
+      if (typeof tabGroupMainState.practice_show_submitted === "number") {
+        tabGroupMainState.practice_show_submitted =
+          tabGroupMainState.practice_show_submitted !== 0;
+      }
+      if (typeof tabGroupMainState.practice_mode_flashcard === "number") {
+        tabGroupMainState.practice_mode_flashcard =
+          tabGroupMainState.practice_mode_flashcard !== 0;
       }
       const response = await client.patch(
         `/tab_group_main_state/${userId}`,
