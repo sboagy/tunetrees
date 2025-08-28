@@ -140,8 +140,9 @@ ENV NODE_ENV=production
 # in terminal. Maybe do this only in a dev container later.
 RUN apk --no-cache add curl
 
-# Create the cache directory with proper permissions before switching to node user
-RUN mkdir -p /usr/src/app/.next/cache && chown -R node:node /usr/src/app/.next/cache
+# Ensure the .next cache and images directories exist and have correct ownership.
+# Create after copying build artifacts as well to cover both build and runtime images.
+RUN mkdir -p /usr/src/app/.next/cache/images && chown -R node:node /usr/src/app/.next
 
 # Run the application as a non-root user.
 USER node
@@ -154,6 +155,9 @@ COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/.next ./.next
 COPY --from=build /usr/src/app/public ./public
 COPY --from=build /usr/src/app/src ./src
+
+# Ensure the images cache directory exists and is writable by the runtime user (node).
+RUN mkdir -p /usr/src/app/.next/cache/images && chown -R node:node /usr/src/app/.next/cache/images
 
 # Expose the port that the application listens on.
 EXPOSE 3000
