@@ -744,7 +744,7 @@ const TunesGrid = ({
                           currentTune === row.original.id
                             ? "outline outline-blue-500"
                             : ""
-                        } ${getColorForEvaluation(row.original.recall_eval || null, false)} ${row.original.has_staged ? "ring-1 ring-amber-400/70 bg-amber-50 dark:bg-amber-900/20" : ""}`}
+                        } ${getColorForEvaluation(row.original.recall_eval || null, false)} ${row.original.has_staged ? "ring-1 ring-amber-400/70 bg-amber-50 dark:bg-amber-900/20" : ""} ${row.original.completed_at ? "opacity-60" : ""}`}
                         onClick={handleRowClick.bind(null, row)}
                         onDoubleClick={() => handleRowDoubleClick(row)}
                         data-state={row.getIsSelected() && "selected"}

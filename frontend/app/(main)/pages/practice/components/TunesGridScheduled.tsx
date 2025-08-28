@@ -26,6 +26,8 @@ import {
   deleteTableTransientData,
   updateCurrentTuneInDb,
   updateTableStateInDb,
+  getTabGroupMainState,
+  updateTabGroupMainState,
 } from "../settings";
 import ColumnsMenu from "./ColumnsMenu";
 import { usePlaylist } from "./CurrentPlaylistProvider";
@@ -95,10 +97,12 @@ export default function TunesGridScheduled({
   // bucket now provided by practice queue snapshot entries (mapped into tunes state)
 
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   const [isRefilling, setIsRefilling] = useState(false);
   const [mode, setMode] = useState<ReviewMode>("grid");
   const [showSubmitted, setShowSubmitted] = useState<boolean>(false);
+  // Hydration flag for persisted Practice tab UI preferences
+  const [prefsLoaded, setPrefsLoaded] = useState<boolean>(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addCount, setAddCount] = useState<number>(5);
   // Removed explicit commit action; submission finalizes staged reviews.
@@ -142,8 +146,38 @@ export default function TunesGridScheduled({
   const lastFetchedShowSubmitted = useRef<boolean | null>(null);
   const inFlight = useRef(false);
   const fetchSeq = useRef(0);
+  // Hydrate persisted Practice tab UI preferences (Display Submitted, Flashcard Mode)
   useEffect(() => {
-    if (playlistId <= 0) return;
+    if (userId <= 0) return; // unauthenticated; skip persistence
+    if (playlistId <= 0) {
+      // Avoid blocking early app bootstrap when playlist isn't chosen yet
+      setPrefsLoaded(true);
+      return;
+    }
+    let canceled = false;
+    void (async () => {
+      try {
+        const state = await getTabGroupMainState(userId, playlistId);
+        if (!state || canceled) return;
+        if (typeof state.practice_show_submitted === "boolean") {
+          setShowSubmitted(state.practice_show_submitted);
+        }
+        if (typeof state.practice_mode_flashcard === "boolean") {
+          setMode(state.practice_mode_flashcard ? "flashcard" : "grid");
+        }
+      } catch (error) {
+        console.warn("Practice prefs hydration failed", error);
+      } finally {
+        if (!canceled) setPrefsLoaded(true);
+      }
+    })();
+    return () => {
+      canceled = true;
+    };
+  }, [userId, playlistId]);
+
+  useEffect(() => {
+    if (playlistId <= 0 || !prefsLoaded) return;
     // If we've already fetched this playlist/refresh combo with the same showSubmitted flag, skip
     if (
       lastFetchedPlaylistId.current === playlistId &&
@@ -155,6 +189,7 @@ export default function TunesGridScheduled({
     if (inFlight.current) return;
     async function fetchSnapshot() {
       inFlight.current = true;
+
       ++fetchSeq.current;
       setIsLoading(true);
       try {
@@ -278,6 +313,7 @@ export default function TunesGridScheduled({
     setTunesRefreshId,
     handleError,
     showSubmitted,
+    prefsLoaded,
   ]);
 
   // Compute repertoire-wide totals locally so Practice matches Repertoire exactly
@@ -768,8 +804,18 @@ export default function TunesGridScheduled({
 
   // commitStagedHandler removed (commit via Submit Practiced Tunes only).
 
-  const handleModeChange = () =>
-    setMode((m) => (m === "grid" ? "flashcard" : "grid"));
+  const handleModeChange = (checked: boolean) => {
+    setMode(checked ? "flashcard" : "grid");
+  };
+
+  // Persist Flashcard Mode changes after state updates (avoid side-effects during render)
+  useEffect(() => {
+    if (!prefsLoaded || userId <= 0) return;
+    void updateTabGroupMainState(userId, {
+      user_id: userId,
+      practice_mode_flashcard: mode === "flashcard",
+    });
+  }, [mode, prefsLoaded, userId]);
 
   const onRowClickCallback = (newTune: number): void => {
     if (!table) return;
@@ -795,7 +841,7 @@ export default function TunesGridScheduled({
         <div className="w-full h-full flex items-center justify-center">
           <p className="text-lg">No Playlist</p>
         </div>
-      ) : isLoading || !table ? (
+      ) : !table ? (
         <div className="w-full h-full flex items-center justify-center">
           <p className="text-lg">Loading...</p>
         </div>
@@ -831,7 +877,13 @@ export default function TunesGridScheduled({
                 <Switch
                   id="show-submitted"
                   checked={showSubmitted}
-                  onCheckedChange={(checked) => setShowSubmitted(checked)}
+                  onCheckedChange={(checked) => {
+                    setShowSubmitted(checked);
+                    void updateTabGroupMainState(userId, {
+                      user_id: userId,
+                      practice_show_submitted: checked,
+                    });
+                  }}
                   data-testid="toggle-show-submitted"
                 />
               </div>
