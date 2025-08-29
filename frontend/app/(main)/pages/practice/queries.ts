@@ -147,7 +147,7 @@ export async function getPracticeQueue(
   const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
   try {
     const response = await client.get<IPracticeQueueWithMeta>(
-      `/practice-queue/${userId}/${playlistId}`,
+      `/practice-queue/${userId}/${playlistId}/with-meta`,
       {
         params: {
           sitdown_date: sitdownDateUtcString,
@@ -156,11 +156,118 @@ export async function getPracticeQueue(
         },
       },
     );
-    // Backend now returns entries already enriched with tune metadata AND computed new_tunes_due_count.
-    return response.data;
+    // Contract (stable): this function ALWAYS returns a wrapper
+    //   { entries: IPracticeQueueEntry[], new_tunes_due_count: number }
+    // regardless of backend/raw shape.
+    // The backend currently returns a raw array for GET /practice-queue
+    // (response_model=list[PracticeQueueEntryModel]). We normalize here.
+    const dataAny: unknown = response.data;
+    let normalizedEntries: IPracticeQueueEntry[] = [];
+    let newTunesDueCount = 0;
+
+    if (Array.isArray(dataAny)) {
+      // Legacy/raw array fallback (older endpoint)
+      normalizedEntries = dataAny as IPracticeQueueEntry[];
+    } else if (dataAny && typeof dataAny === "object") {
+      // Wrapper-like shape from any caller/adapter that already wrapped it
+      const maybeWrapper = dataAny as {
+        entries?: unknown;
+        new_tunes_due_count?: unknown;
+      };
+      const { entries } = maybeWrapper;
+      if (Array.isArray(entries)) {
+        normalizedEntries = entries as IPracticeQueueEntry[];
+      } else if (entries && typeof entries === "object") {
+        // Occasionally an object-map keyed by tune id; convert to array
+        normalizedEntries = Object.values(
+          entries as Record<string, IPracticeQueueEntry>,
+        );
+      } else {
+        normalizedEntries = [];
+      }
+      if (typeof maybeWrapper.new_tunes_due_count === "number") {
+        newTunesDueCount = maybeWrapper.new_tunes_due_count;
+      }
+    }
+
+    const wrapped: IPracticeQueueWithMeta = {
+      entries: normalizedEntries,
+      new_tunes_due_count: newTunesDueCount,
+    };
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        const length = wrapped.entries.length;
+        const sample = wrapped.entries.slice(0, 3).map((e) => {
+          const row = e as Partial<IPracticeQueueEntry>;
+          return {
+            tune_ref: row.tune_ref,
+            completed_at: row.completed_at,
+            bucket: row.bucket as number | null | undefined,
+          };
+        });
+        console.debug("[PracticeQueue][Query] normalized", {
+          userId,
+          playlistId,
+          forceRegen,
+          entriesType: "array",
+          length,
+          new_tunes_due_count: wrapped.new_tunes_due_count,
+          sample,
+        });
+      } catch {
+        // ignore debug errors
+      }
+    }
+    return wrapped;
   } catch (error) {
     console.error("Error in getPracticeQueue: ", error);
     return { entries: [], new_tunes_due_count: 0 };
+  }
+}
+
+/**
+ * Entries-only variant of the practice queue fetch.
+ * Stable contract: returns IPracticeQueueEntry[] directly from backend /entries endpoint.
+ */
+export async function getPracticeQueueEntries(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  forceRegen = false,
+): Promise<IPracticeQueueEntry[]> {
+  if (!sitdownDate || Number.isNaN(sitdownDate.getTime())) {
+    throw new Error("sitdownDate (Date) required for practice queue fetch");
+  }
+  const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
+  const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
+  try {
+    const response = await client.get<IPracticeQueueEntry[]>(
+      `/practice-queue/${userId}/${playlistId}/entries`,
+      {
+        params: {
+          sitdown_date: sitdownDateUtcString,
+          local_tz_offset_minutes: localTzOffsetMinutes,
+          force_regen: forceRegen,
+        },
+      },
+    );
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    // Fallback: if the server returned wrapper or object-map by mistake
+    if (data && typeof data === "object") {
+      const maybeEntries = (data as unknown as { entries?: unknown }).entries;
+      if (Array.isArray(maybeEntries))
+        return maybeEntries as IPracticeQueueEntry[];
+      if (maybeEntries && typeof maybeEntries === "object") {
+        return Object.values(
+          maybeEntries as Record<string, IPracticeQueueEntry>,
+        );
+      }
+    }
+    return [];
+  } catch (error) {
+    console.error("Error in getPracticeQueueEntries: ", error);
+    return [];
   }
 }
 

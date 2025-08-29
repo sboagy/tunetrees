@@ -38,9 +38,10 @@ import { useScheduledTunes } from "./TunesContextScheduled";
 import TunesGrid from "./TunesGrid";
 import { useTunesTable } from "./TunesTable";
 import { useToast } from "@/hooks/use-toast";
+import type { ITuneOverviewScheduled } from "../types";
 import { getSitdownDateFromBrowser } from "./SitdownDateProvider";
 import {
-  getPracticeQueueAction,
+  getPracticeQueueEntriesAction,
   refillPracticeQueueAction,
 } from "../actions/practice-actions";
 import { getRepertoireTunesOverviewAction } from "../actions/practice-actions";
@@ -52,39 +53,8 @@ interface IScheduledTunesGridProps {
   userId: number;
 }
 
-// Type-only interface reflecting backend-enriched practice queue entry shape we consume.
-// This does NOT introduce new columns; it mirrors existing fields we already map.
-interface IPracticeQueueRowInternal {
-  id: number;
-  title: string | null; // backend tune_title (may be null)
-  name: string | null; // legacy alias used elsewhere in table code
-  favorite_url?: string | null; // surfaced from backend enrichment (not stored in practice record/queue table)
-  type?: string | null;
-  structure?: string | null;
-  learned?: string | null;
-  scheduled?: string | null;
-  latest_practiced?: string | null;
-  latest_review_date?: string | null;
-  bucket: number | null;
-  recall_eval: string | null; // user-entered during session (not from backend snapshot)
-  goal: string | null; // user-entered (session-only for now)
-  latest_quality: number | null;
-  latest_easiness: number | null;
-  latest_interval: number | null;
-  latest_goal?: string | null;
-  latest_repetitions?: number | null;
-  latest_technique?: string | null;
-  latest_difficulty?: number | null; // newly exposed staged value
-  latest_stability?: number | null; // newly exposed staged value
-  latest_step?: number | null; // newly exposed staged value
-  latest_backup_practiced?: string | null; // newly exposed staged value
-  practice_state?: string | null; // reserved
-  latest_due_date?: string | null; // reserved
-  next_review_date?: string | null; // reserved
-  playlist_deleted: boolean;
-  has_staged?: boolean | null;
-  completed_at?: string | null; // present when already submitted today
-}
+// Grid rows use the shared tune overview shape
+type IPracticeQueueRow = ITuneOverviewScheduled;
 
 export default function TunesGridScheduled({
   userId,
@@ -97,7 +67,9 @@ export default function TunesGridScheduled({
   // bucket now provided by practice queue snapshot entries (mapped into tunes state)
 
   const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
-  const [, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  // Dedicated snapshot loading flag to avoid flicker before data arrives
+  const [isSnapshotLoading, setIsSnapshotLoading] = useState(true);
   const [isRefilling, setIsRefilling] = useState(false);
   const [mode, setMode] = useState<ReviewMode>("grid");
   const [showSubmitted, setShowSubmitted] = useState<boolean>(false);
@@ -137,7 +109,7 @@ export default function TunesGridScheduled({
 
   // Maintain a full, unfiltered snapshot of the practice queue for accurate metrics
   const [fullQueueSnapshot, setFullQueueSnapshot] = useState<
-    IPracticeQueueRowInternal[]
+    IPracticeQueueRow[]
   >([]);
 
   const lastFetchedRefreshId = useRef<number | null>(null);
@@ -146,6 +118,8 @@ export default function TunesGridScheduled({
   const lastFetchedShowSubmitted = useRef<boolean | null>(null);
   const inFlight = useRef(false);
   const fetchSeq = useRef(0);
+
+  // Normalized action ensures we always receive IPracticeQueueEntry[]
   // Hydrate persisted Practice tab UI preferences (Display Submitted, Flashcard Mode)
   useEffect(() => {
     if (userId <= 0) return; // unauthenticated; skip persistence
@@ -192,106 +166,63 @@ export default function TunesGridScheduled({
 
       ++fetchSeq.current;
       setIsLoading(true);
+      setIsSnapshotLoading(true);
       try {
         const sitdownDate = getSitdownDateFromBrowser();
-        const raw = await getPracticeQueueAction(
+        const snapshotEntries = await getPracticeQueueEntriesAction(
           userId,
           playlistId,
           new Date(sitdownDate),
           false,
         );
-        // Backend currently returns a list (array) of rows (response_model=list[DailyPracticeQueueModel])
-        // but types for action assume an object with entries. Normalize here defensively.
-        type RawEntry = {
-          tune_ref: number;
-          tune_title?: string | null;
-          bucket?: number | null;
-          type?: string | null;
-          structure?: string | null;
-          learned?: string | null;
-          scheduled?: string | null;
-          latest_practiced?: string | null;
-          latest_review_date?: string | null;
-          latest_quality?: number | null;
-          latest_easiness?: number | null;
-          latest_interval?: number | null;
-          latest_goal?: string | null;
-          latest_repetitions?: number | null;
-          latest_technique?: string | null;
-          latest_difficulty?: number | null;
-          latest_stability?: number | null;
-          latest_step?: number | null;
-          latest_backup_practiced?: string | null;
-          favorite_url?: string | null;
-        };
-        function isRawEntryArray(arr: unknown[]): arr is RawEntry[] {
-          return arr.every(
-            (o) =>
-              !!o && typeof (o as { tune_ref?: unknown }).tune_ref === "number",
-          );
-        }
-        let snapshotEntriesUnknown: unknown[] = [];
-        if (Array.isArray(raw)) snapshotEntriesUnknown = raw;
-        else if (
-          raw &&
-          typeof raw === "object" &&
-          Array.isArray((raw as { entries?: unknown[] }).entries)
-        )
-          snapshotEntriesUnknown = (raw as { entries: unknown[] }).entries;
-        const snapshotEntries: RawEntry[] = isRawEntryArray(
-          snapshotEntriesUnknown,
-        )
-          ? snapshotEntriesUnknown
-          : [];
-        const mapped: IPracticeQueueRowInternal[] = snapshotEntries.map((e) => {
-          const completedAt = (
-            e as unknown as {
-              completed_at?: string | null;
-            }
-          ).completed_at;
-          return {
-            id: e.tune_ref,
-            title: e.tune_title || null,
-            favorite_url: e.favorite_url || null,
-            name: e.tune_title || null,
-            type: e.type ?? null,
-            structure: e.structure ?? null,
-            learned: e.learned ?? null,
-            scheduled: e.scheduled ?? null,
-            latest_practiced: e.latest_practiced ?? null,
-            latest_review_date: e.latest_review_date ?? null,
-            bucket: (e.bucket as number | null) ?? null,
-            recall_eval:
-              (e as unknown as { recall_eval?: string | null }).recall_eval ??
-              null,
-            goal: null,
-            latest_quality: e.latest_quality ?? null,
-            latest_easiness: e.latest_easiness ?? null,
-            latest_interval: e.latest_interval ?? null,
-            latest_goal: e.latest_goal ?? null,
-            latest_repetitions: e.latest_repetitions ?? null,
-            latest_technique: e.latest_technique ?? null,
-            latest_difficulty: e.latest_difficulty ?? null,
-            latest_stability: e.latest_stability ?? null,
-            latest_step: e.latest_step ?? null,
-            latest_backup_practiced: e.latest_backup_practiced ?? null,
-            latest_due_date: null,
-            next_review_date: null,
-            practice_state: null,
-            playlist_deleted: false,
-            has_staged:
-              (e as unknown as { has_staged?: boolean | null }).has_staged ??
-              null,
-            completed_at: completedAt ?? null,
-          };
-        });
+
+        const mapped: IPracticeQueueRow[] = snapshotEntries.map((e) => ({
+          id: e.tune_ref,
+          title: e.tune_title ?? null,
+          favorite_url: null,
+          type: e.type ?? null,
+          structure: e.structure ?? null,
+          learned: e.learned ?? null,
+          scheduled: e.scheduled ?? null,
+          latest_practiced: e.latest_practiced ?? null,
+          latest_review_date: e.latest_review_date ?? null,
+          bucket: (e.bucket as number | null) ?? null,
+          recall_eval: null,
+          goal: null,
+          latest_quality: e.latest_quality ?? null,
+          latest_easiness: e.latest_easiness ?? null,
+          latest_interval: e.latest_interval ?? null,
+          latest_goal: e.latest_goal ?? null,
+          latest_repetitions: e.latest_repetitions ?? null,
+          latest_technique: e.latest_technique ?? null,
+          latest_difficulty: e.latest_difficulty ?? null,
+          latest_stability: e.latest_stability ?? null,
+          latest_step: e.latest_step ?? null,
+          latest_backup_practiced: e.latest_backup_practiced ?? null,
+          // reserved fields not present on ITuneOverviewScheduled omitted
+          playlist_deleted: false,
+          has_staged: e.has_staged ?? null,
+          completed_at: e.completed_at ?? null,
+          private_for: null,
+        }));
         // Save unfiltered snapshot for metrics regardless of UI filtering
         setFullQueueSnapshot(mapped);
 
         const filtered = showSubmitted
           ? mapped
           : mapped.filter((row) => !row.completed_at);
-        setTunes(filtered as unknown as never);
+        // Debug: surface snapshot vs filtered counts for quick triage
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[PracticeQueue][Scheduled] fetched", {
+            playlistId,
+            refreshId,
+            showSubmitted,
+            total: mapped.length,
+            visible: filtered.length,
+            submittedCount: mapped.filter((r) => !!r.completed_at).length,
+          });
+        }
+        setTunes(filtered);
         setTunesRefreshId(refreshId);
         lastFetchedRefreshId.current = refreshId;
         lastFetchedPlaylistId.current = playlistId;
@@ -301,6 +232,7 @@ export default function TunesGridScheduled({
         handleError("Failed to load practice queue.");
       } finally {
         setIsLoading(false);
+        setIsSnapshotLoading(false);
         inFlight.current = false;
       }
     }
@@ -393,13 +325,9 @@ export default function TunesGridScheduled({
 
     // Queue-specific metrics
     const queued = all.length;
-    const submitted = all.filter(
-      (t) => !!(t as { completed_at?: string | null }).completed_at,
-    ).length;
+    const submitted = all.filter((t) => !!t.completed_at).length;
     const reviewed = all.filter(
-      (t) =>
-        !!(t as { completed_at?: string | null }).completed_at ||
-        !!(t as { recall_eval?: string | null }).recall_eval,
+      (t) => !!t.completed_at || !!t.recall_eval,
     ).length;
     const toPractice = Math.max(0, queued - reviewed);
 
@@ -460,103 +388,80 @@ export default function TunesGridScheduled({
               // Lightweight per-row refresh: fetch snapshot silently and merge updated metrics for this tune only
               void (async () => {
                 try {
-                  const raw = await getPracticeQueueAction(
+                  const snapshotEntries = await getPracticeQueueEntriesAction(
                     userId,
                     playlistId,
                     new Date(sitdownDate),
                     false,
                   );
-                  if (Array.isArray(raw)) {
-                    type UpdatedRow = {
-                      tune_ref: number;
-                      latest_quality?: number | null;
-                      latest_easiness?: number | null;
-                      latest_interval?: number | null;
-                      latest_review_date?: string | null;
-                      scheduled?: string | null;
-                      latest_difficulty?: number | null;
-                      latest_stability?: number | null;
-                      latest_step?: number | null;
-                      latest_repetitions?: number | null;
-                      latest_goal?: string | null;
-                      latest_technique?: string | null;
-                      latest_practiced?: string | null;
-                      latest_backup_practiced?: string | null;
-                    };
-                    const updated = raw.find(
-                      (r: unknown): r is UpdatedRow =>
-                        !!r && (r as { tune_ref?: number }).tune_ref === tuneId,
+                  const updated = snapshotEntries.find(
+                    (r) => r.tune_ref === tuneId,
+                  );
+                  if (updated) {
+                    setTunes((prev) =>
+                      prev.map((t) => {
+                        if (t.id !== tuneId) return t;
+                        return {
+                          ...t,
+                          latest_quality:
+                            updated.latest_quality ?? t.latest_quality,
+                          latest_easiness:
+                            updated.latest_easiness ?? t.latest_easiness,
+                          latest_interval:
+                            updated.latest_interval ?? t.latest_interval,
+                          latest_review_date:
+                            updated.latest_review_date ?? t.latest_review_date,
+                          scheduled: null, //updated.scheduled ?? t.scheduled, // I think we want this null always for staging?
+                          latest_difficulty:
+                            updated.latest_difficulty ?? t.latest_difficulty,
+                          latest_stability:
+                            updated.latest_stability ?? t.latest_stability,
+                          latest_step: updated.latest_step ?? t.latest_step,
+                          latest_repetitions:
+                            updated.latest_repetitions ?? t.latest_repetitions,
+                          latest_goal: updated.latest_goal ?? t.latest_goal,
+                          latest_technique:
+                            updated.latest_technique ?? t.latest_technique,
+                          latest_practiced:
+                            updated.latest_practiced ?? t.latest_practiced,
+                          latest_backup_practiced:
+                            updated.latest_backup_practiced ??
+                            t.latest_backup_practiced,
+                        };
+                      }),
                     );
-                    if (updated) {
-                      setTunes((prev) =>
-                        prev.map((t) => {
-                          if (t.id !== tuneId) return t;
-                          return {
-                            ...t,
-                            latest_quality:
-                              updated.latest_quality ?? t.latest_quality,
-                            latest_easiness:
-                              updated.latest_easiness ?? t.latest_easiness,
-                            latest_interval:
-                              updated.latest_interval ?? t.latest_interval,
-                            latest_review_date:
-                              updated.latest_review_date ??
-                              t.latest_review_date,
-                            scheduled: null, //updated.scheduled ?? t.scheduled, // I think we want this null always for staging?
-                            latest_difficulty:
-                              updated.latest_difficulty ?? t.latest_difficulty,
-                            latest_stability:
-                              updated.latest_stability ?? t.latest_stability,
-                            latest_step: updated.latest_step ?? t.latest_step,
-                            latest_repetitions:
-                              updated.latest_repetitions ??
-                              t.latest_repetitions,
-                            latest_goal: updated.latest_goal ?? t.latest_goal,
-                            latest_technique:
-                              updated.latest_technique ?? t.latest_technique,
-                            latest_practiced:
-                              updated.latest_practiced ?? t.latest_practiced,
-                            latest_backup_practiced:
-                              updated.latest_backup_practiced ??
-                              t.latest_backup_practiced,
-                          };
-                        }),
-                      );
-                      setFullQueueSnapshot((prev) =>
-                        prev.map((t) => {
-                          if (t.id !== tuneId) return t;
-                          return {
-                            ...t,
-                            latest_quality:
-                              updated.latest_quality ?? t.latest_quality,
-                            latest_easiness:
-                              updated.latest_easiness ?? t.latest_easiness,
-                            latest_interval:
-                              updated.latest_interval ?? t.latest_interval,
-                            latest_review_date:
-                              updated.latest_review_date ??
-                              t.latest_review_date,
-                            scheduled: null,
-                            latest_difficulty:
-                              updated.latest_difficulty ?? t.latest_difficulty,
-                            latest_stability:
-                              updated.latest_stability ?? t.latest_stability,
-                            latest_step: updated.latest_step ?? t.latest_step,
-                            latest_repetitions:
-                              updated.latest_repetitions ??
-                              t.latest_repetitions,
-                            latest_goal: updated.latest_goal ?? t.latest_goal,
-                            latest_technique:
-                              updated.latest_technique ?? t.latest_technique,
-                            latest_practiced:
-                              updated.latest_practiced ?? t.latest_practiced,
-                            latest_backup_practiced:
-                              updated.latest_backup_practiced ??
-                              t.latest_backup_practiced,
-                          };
-                        }),
-                      );
-                    }
+                    setFullQueueSnapshot((prev) =>
+                      prev.map((t) => {
+                        if (t.id !== tuneId) return t;
+                        return {
+                          ...t,
+                          latest_quality:
+                            updated.latest_quality ?? t.latest_quality,
+                          latest_easiness:
+                            updated.latest_easiness ?? t.latest_easiness,
+                          latest_interval:
+                            updated.latest_interval ?? t.latest_interval,
+                          latest_review_date:
+                            updated.latest_review_date ?? t.latest_review_date,
+                          scheduled: null,
+                          latest_difficulty:
+                            updated.latest_difficulty ?? t.latest_difficulty,
+                          latest_stability:
+                            updated.latest_stability ?? t.latest_stability,
+                          latest_step: updated.latest_step ?? t.latest_step,
+                          latest_repetitions:
+                            updated.latest_repetitions ?? t.latest_repetitions,
+                          latest_goal: updated.latest_goal ?? t.latest_goal,
+                          latest_technique:
+                            updated.latest_technique ?? t.latest_technique,
+                          latest_practiced:
+                            updated.latest_practiced ?? t.latest_practiced,
+                          latest_backup_practiced:
+                            updated.latest_backup_practiced ??
+                            t.latest_backup_practiced,
+                        };
+                      }),
+                    );
                   }
                 } catch (error) {
                   console.warn("Per-row refresh failed", error);
@@ -574,105 +479,84 @@ export default function TunesGridScheduled({
           // Perform lightweight per-row refresh to sync derived metrics (latest_* revert to committed values).
           void (async () => {
             try {
-              const raw = await getPracticeQueueAction(
+              const snapshotEntries = await getPracticeQueueEntriesAction(
                 userId,
                 playlistId,
                 new Date(sitdownDate),
                 false,
               );
-              if (Array.isArray(raw)) {
-                type UpdatedRow = {
-                  tune_ref: number;
-                  latest_quality?: number | null;
-                  latest_easiness?: number | null;
-                  latest_interval?: number | null;
-                  latest_review_date?: string | null;
-                  scheduled?: string | null;
-                  recall_eval?: string | null;
-                  has_staged?: boolean | null;
-                  latest_difficulty?: number | null;
-                  latest_stability?: number | null;
-                  latest_step?: number | null;
-                  latest_repetitions?: number | null;
-                  latest_goal?: string | null;
-                  latest_technique?: string | null;
-                  latest_practiced?: string | null;
-                  latest_backup_practiced?: string | null;
-                };
-                const updated = raw.find(
-                  (r: unknown): r is UpdatedRow =>
-                    !!r && (r as { tune_ref?: number }).tune_ref === tuneId,
+              const updated = snapshotEntries.find(
+                (r) => r.tune_ref === tuneId,
+              );
+              if (updated) {
+                setTunes((prev) =>
+                  prev.map((t) => {
+                    if (t.id !== tuneId) return t;
+                    return {
+                      ...t,
+                      latest_quality:
+                        updated.latest_quality ?? t.latest_quality,
+                      latest_easiness:
+                        updated.latest_easiness ?? t.latest_easiness,
+                      latest_interval:
+                        updated.latest_interval ?? t.latest_interval,
+                      latest_review_date:
+                        updated.latest_review_date ?? t.latest_review_date,
+                      scheduled: updated.scheduled ?? t.scheduled,
+                      recall_eval: null,
+                      has_staged: updated.has_staged ?? false,
+                      latest_difficulty:
+                        updated.latest_difficulty ?? t.latest_difficulty,
+                      latest_stability:
+                        updated.latest_stability ?? t.latest_stability,
+                      latest_step: updated.latest_step ?? t.latest_step,
+                      latest_repetitions:
+                        updated.latest_repetitions ?? t.latest_repetitions,
+                      latest_goal: updated.latest_goal ?? t.latest_goal,
+                      latest_technique:
+                        updated.latest_technique ?? t.latest_technique,
+                      latest_practiced:
+                        updated.latest_practiced ?? t.latest_practiced,
+                      latest_backup_practiced:
+                        updated.latest_backup_practiced ??
+                        t.latest_backup_practiced,
+                    };
+                  }),
                 );
-                if (updated) {
-                  setTunes((prev) =>
-                    prev.map((t) => {
-                      if (t.id !== tuneId) return t;
-                      return {
-                        ...t,
-                        latest_quality:
-                          updated.latest_quality ?? t.latest_quality,
-                        latest_easiness:
-                          updated.latest_easiness ?? t.latest_easiness,
-                        latest_interval:
-                          updated.latest_interval ?? t.latest_interval,
-                        latest_review_date:
-                          updated.latest_review_date ?? t.latest_review_date,
-                        scheduled: updated.scheduled ?? t.scheduled,
-                        recall_eval: updated.recall_eval ?? null,
-                        has_staged: updated.has_staged ?? false,
-                        latest_difficulty:
-                          updated.latest_difficulty ?? t.latest_difficulty,
-                        latest_stability:
-                          updated.latest_stability ?? t.latest_stability,
-                        latest_step: updated.latest_step ?? t.latest_step,
-                        latest_repetitions:
-                          updated.latest_repetitions ?? t.latest_repetitions,
-                        latest_goal: updated.latest_goal ?? t.latest_goal,
-                        latest_technique:
-                          updated.latest_technique ?? t.latest_technique,
-                        latest_practiced:
-                          updated.latest_practiced ?? t.latest_practiced,
-                        latest_backup_practiced:
-                          updated.latest_backup_practiced ??
-                          t.latest_backup_practiced,
-                      };
-                    }),
-                  );
-                  setFullQueueSnapshot((prev) =>
-                    prev.map((t) => {
-                      if (t.id !== tuneId) return t;
-                      return {
-                        ...t,
-                        latest_quality:
-                          updated.latest_quality ?? t.latest_quality,
-                        latest_easiness:
-                          updated.latest_easiness ?? t.latest_easiness,
-                        latest_interval:
-                          updated.latest_interval ?? t.latest_interval,
-                        latest_review_date:
-                          updated.latest_review_date ?? t.latest_review_date,
-                        scheduled: updated.scheduled ?? t.scheduled,
-                        recall_eval: updated.recall_eval ?? null,
-                        has_staged: updated.has_staged ?? false,
-                        latest_difficulty:
-                          updated.latest_difficulty ?? t.latest_difficulty,
-                        latest_stability:
-                          updated.latest_stability ?? t.latest_stability,
-                        latest_step: updated.latest_step ?? t.latest_step,
-                        latest_repetitions:
-                          updated.latest_repetitions ?? t.latest_repetitions,
-                        latest_goal: updated.latest_goal ?? t.latest_goal,
-                        latest_technique:
-                          updated.latest_technique ?? t.latest_technique,
-                        latest_practiced:
-                          updated.latest_practiced ?? t.latest_practiced,
-                        latest_backup_practiced:
-                          updated.latest_backup_practiced ??
-                          t.latest_backup_practiced,
-                      };
-                    }),
-                  );
-                }
+                setFullQueueSnapshot((prev) =>
+                  prev.map((t) => {
+                    if (t.id !== tuneId) return t;
+                    return {
+                      ...t,
+                      latest_quality:
+                        updated.latest_quality ?? t.latest_quality,
+                      latest_easiness:
+                        updated.latest_easiness ?? t.latest_easiness,
+                      latest_interval:
+                        updated.latest_interval ?? t.latest_interval,
+                      latest_review_date:
+                        updated.latest_review_date ?? t.latest_review_date,
+                      scheduled: updated.scheduled ?? t.scheduled,
+                      recall_eval: null,
+                      has_staged: updated.has_staged ?? false,
+                      latest_difficulty:
+                        updated.latest_difficulty ?? t.latest_difficulty,
+                      latest_stability:
+                        updated.latest_stability ?? t.latest_stability,
+                      latest_step: updated.latest_step ?? t.latest_step,
+                      latest_repetitions:
+                        updated.latest_repetitions ?? t.latest_repetitions,
+                      latest_goal: updated.latest_goal ?? t.latest_goal,
+                      latest_technique:
+                        updated.latest_technique ?? t.latest_technique,
+                      latest_practiced:
+                        updated.latest_practiced ?? t.latest_practiced,
+                      latest_backup_practiced:
+                        updated.latest_backup_practiced ??
+                        t.latest_backup_practiced,
+                    };
+                  }),
+                );
               }
             } catch (error) {
               console.warn("Per-row refresh after clear failed", error);
@@ -845,12 +729,28 @@ export default function TunesGridScheduled({
         <div className="w-full h-full flex items-center justify-center">
           <p className="text-lg">Loading...</p>
         </div>
-      ) : tunes.length === 0 ? (
-        <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+      ) : (isLoading || isSnapshotLoading) && tunes.length === 0 ? (
+        <div className="w-full h-full flex items-center justify-center">
+          <p className="text-lg">Loading...</p>
+        </div>
+      ) : !isSnapshotLoading && tunes.length === 0 ? (
+        <div
+          className="w-full h-full flex flex-col items-center justify-center gap-2"
+          data-testid="scheduled-empty-state"
+        >
           <p className="text-lg font-semibold">No scheduled tunes</p>
           <p className="text-sm text-muted-foreground">
-            Use Add Tunes to bring items into your queue.
+            Try toggling "Display Submitted" or use Add Tunes to bring items
+            into your queue.
           </p>
+          {fullQueueSnapshot.length > 0 ? (
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="scheduled-empty-diagnostics"
+            >
+              {`Snapshot: total ${fullQueueSnapshot.length}, submitted ${fullQueueSnapshot.filter((t) => !!t.completed_at).length}`}
+            </p>
+          ) : null}
         </div>
       ) : (
         <>
@@ -950,10 +850,9 @@ export default function TunesGridScheduled({
                             } else {
                               // Map newRows into internal shape and prioritize due-today items
                               const mapped = newRows.map((enriched) => {
-                                const row: IPracticeQueueRowInternal = {
+                                const row: IPracticeQueueRow = {
                                   id: enriched.tune_ref,
                                   title: enriched.tune_title ?? null,
-                                  name: enriched.tune_title ?? null,
                                   type: enriched.type ?? null,
                                   structure: enriched.structure ?? null,
                                   learned: enriched.learned ?? null,
@@ -983,68 +882,54 @@ export default function TunesGridScheduled({
                                     enriched.latest_stability ?? null,
                                   latest_step: enriched.latest_step ?? null,
                                   latest_backup_practiced:
-                                    (
-                                      enriched as unknown as {
-                                        latest_backup_practiced?: string | null;
-                                      }
-                                    ).latest_backup_practiced ?? null,
-                                  latest_due_date: null,
-                                  next_review_date: null,
-                                  practice_state: null,
+                                    enriched.latest_backup_practiced ?? null,
                                   playlist_deleted: false,
                                   has_staged: enriched.has_staged ?? null,
                                   completed_at: enriched.completed_at ?? null,
+                                  private_for: null,
                                 };
                                 return row;
                               });
                               // Prioritize tunes due today (bucket === 1) before backfill items
                               mapped.sort((a, b) => {
-                                let pa = 1;
-                                let pb = 1;
-                                if (
-                                  (a as { bucket?: number | null }).bucket === 1
-                                ) {
-                                  pa = 0;
-                                }
-                                if (
-                                  (b as { bucket?: number | null }).bucket === 1
-                                ) {
-                                  pb = 0;
-                                }
+                                const pa = a.bucket === 1 ? 0 : 1;
+                                const pb = b.bucket === 1 ? 0 : 1;
                                 return pa - pb;
                               });
 
                               setTunes((prev) => {
-                                const combined = [...prev, ...mapped];
+                                const combined: IPracticeQueueRow[] = [
+                                  ...prev,
+                                  ...mapped,
+                                ];
                                 return showSubmitted
-                                  ? (combined as unknown as never)
-                                  : (combined.filter(
-                                      (r) =>
-                                        !(
-                                          r as unknown as {
-                                            completed_at?: string | null;
-                                          }
-                                        ).completed_at,
-                                    ) as unknown as never);
+                                  ? combined
+                                  : combined.filter((r) => !r.completed_at);
                               });
 
                               // Merge added rows into full snapshot (dedupe by id)
                               setFullQueueSnapshot((prev) => {
                                 const byId = new Map<
                                   number,
-                                  IPracticeQueueRowInternal
+                                  IPracticeQueueRow
                                 >();
-                                for (const row of prev) byId.set(row.id, row);
-                                for (const row of mapped) byId.set(row.id, row);
+                                for (const row of prev) {
+                                  if (row.id !== null && row.id !== undefined) {
+                                    byId.set(row.id, row);
+                                  }
+                                }
+                                for (const row of mapped) {
+                                  if (row.id !== null && row.id !== undefined) {
+                                    byId.set(row.id, row);
+                                  }
+                                }
                                 return [...byId.values()];
                               });
 
                               // Compute how many of the added rows are due today (bucket === 1)
                               let dueTodayCount = 0;
                               for (const r of mapped) {
-                                if (
-                                  (r as { bucket?: number | null }).bucket === 1
-                                ) {
+                                if (r.bucket === 1) {
                                   dueTodayCount += 1;
                                 }
                               }

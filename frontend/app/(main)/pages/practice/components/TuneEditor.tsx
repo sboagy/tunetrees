@@ -1231,7 +1231,7 @@ export default function TuneEditor({
                       </div>
                       <div className="tune-form-control-style" />
                     </div>
-                    <CollapsibleContent>
+                    <CollapsibleContent forceMount>
                       <FormField
                         control={form.control}
                         name="latest_easiness"
@@ -1314,7 +1314,7 @@ export default function TuneEditor({
                       </div>
                       <div className="tune-form-control-style" />
                     </div>
-                    <CollapsibleContent>
+                    <CollapsibleContent forceMount>
                       <FormField
                         control={form.control}
                         name="latest_difficulty"

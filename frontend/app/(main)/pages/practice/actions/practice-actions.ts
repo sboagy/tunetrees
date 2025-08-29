@@ -35,6 +35,7 @@ import {
   getTuneStaged,
   // getTuneStaged NOT wrapped (server component uses it directly)
   getPracticeQueue,
+  getPracticeQueueEntries,
   refillPracticeQueue,
   addTunesToPracticeQueue,
 } from "../queries";
@@ -50,6 +51,7 @@ import type {
   IPracticeRecord,
   IGenre,
   ITuneType,
+  IPracticeQueueEntry,
 } from "../types";
 
 export async function createReferenceAction(
@@ -254,6 +256,19 @@ export async function getPracticeQueueAction(
   forceRegen = false,
 ): ReturnType<typeof getPracticeQueue> {
   return getPracticeQueue(userId, playlistId, sitdownDate, forceRegen);
+}
+
+/**
+ * Normalized variant: always returns a flat array of IPracticeQueueEntry.
+ * Keeps existing getPracticeQueueAction (meta wrapper) intact for views that need counts.
+ */
+export async function getPracticeQueueEntriesAction(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  forceRegen = false,
+): Promise<IPracticeQueueEntry[]> {
+  return getPracticeQueueEntries(userId, playlistId, sitdownDate, forceRegen);
 }
 
 export async function refillPracticeQueueAction(

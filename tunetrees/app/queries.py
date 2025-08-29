@@ -808,6 +808,10 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
         base["latest_step"] = jr.get("latest_step") if jr else None
         base["latest_repetitions"] = jr.get("latest_repetitions") if jr else None
         base["latest_review_date"] = jr.get("latest_review_date") if jr else None
+        # surfaced backup_practiced from staged/record coalesce (view column)
+        base["latest_backup_practiced"] = (
+            jr.get("latest_backup_practiced") if jr else None
+        )
         base["latest_goal"] = jr.get("latest_goal") if jr else None
         base["latest_technique"] = jr.get("latest_technique") if jr else None
         base["tags"] = jr.get("tags") if jr else None

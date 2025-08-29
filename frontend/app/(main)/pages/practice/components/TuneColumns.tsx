@@ -476,15 +476,23 @@ export function get_columns(
       accessorKey: "title",
       header: ({ column, table }) => sortableHeader(column, table, "Title"),
       cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
-        const favoriteUrl = info.row.original.favorite_url;
-        const cellValue = favoriteUrl ? (
-          <a href={favoriteUrl} target="_blank" rel="noopener noreferrer">
-            {info.getValue()}
+        const original = info.row.original;
+        const rawValue = info.getValue();
+        const titleText = typeof rawValue === "string" ? rawValue : "";
+        const href =
+          original.favorite_url ||
+          original.external_ref ||
+          `https://www.irishtune.info/tune/${original.id}/`;
+        return (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid={`title-link-${original.id}`}
+          >
+            {titleText}
           </a>
-        ) : (
-          info.getValue()
         );
-        return cellValue;
       },
       enableSorting: true,
       enableHiding: true,

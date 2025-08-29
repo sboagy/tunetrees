@@ -146,6 +146,143 @@ async def get_practice_queue(
         )
 
 
+# New explicit endpoint: entries-only
+@router.get(
+    "/practice-queue/{user_id}/{playlist_ref}/entries",
+    response_model=list[PracticeQueueEntryModel],
+    summary="Get Daily Practice Queue (entries only)",
+    description=(
+        "Return only the frozen daily practice queue entries (enriched rows)."
+    ),
+)
+async def get_practice_queue_entries(
+    user_id: int = Path(..., description="User identifier"),
+    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+    sitdown_date: datetime = Query(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Practice sitdown timestamp (UTC recommended).",
+    ),
+    local_tz_offset_minutes: Optional[int] = Query(
+        None,
+        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5).",
+    ),
+    force_regen: bool = Query(
+        False, description="Force regeneration even if an active snapshot exists."
+    ),
+):
+    try:
+        if sitdown_date.tzinfo is None:
+            sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
+        with SessionLocal() as db:
+            rows = generate_or_get_practice_queue(
+                db=db,
+                user_ref=user_id,
+                playlist_ref=playlist_ref,
+                review_sitdown_date=sitdown_date,
+                local_tz_offset_minutes=local_tz_offset_minutes,
+                force_regen=force_regen,
+            )
+            return rows
+    except Exception as e:
+        logger.error(f"Unable to fetch practice queue entries: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to fetch practice queue entries: {e}"
+        )
+
+
+class PracticeQueueWithMetaModel(pydantic.BaseModel):
+    entries: list[PracticeQueueEntryModel]
+    new_tunes_due_count: int
+
+
+# New explicit endpoint: entries + meta
+@router.get(
+    "/practice-queue/{user_id}/{playlist_ref}/with-meta",
+    response_model=PracticeQueueWithMetaModel,
+    summary="Get Daily Practice Queue with meta",
+    description=(
+        "Return the daily practice queue entries and a derived count of newly-due tunes not in the snapshot (bucket 1 gap)."
+    ),
+)
+async def get_practice_queue_with_meta(
+    user_id: int = Path(..., description="User identifier"),
+    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+    sitdown_date: datetime = Query(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Practice sitdown timestamp (UTC recommended).",
+    ),
+    local_tz_offset_minutes: Optional[int] = Query(
+        None,
+        description="Client local timezone offset in minutes relative to UTC (e.g. -300 for UTC-5).",
+    ),
+    force_regen: bool = Query(
+        False, description="Force regeneration even if an active snapshot exists."
+    ),
+):
+    try:
+        if sitdown_date.tzinfo is None:
+            sitdown_date = sitdown_date.replace(tzinfo=timezone.utc)
+        with SessionLocal() as db:
+            # Snapshot rows (enriched)
+            snapshot_rows_dicts = generate_or_get_practice_queue(
+                db=db,
+                user_ref=user_id,
+                playlist_ref=playlist_ref,
+                review_sitdown_date=sitdown_date,
+                local_tz_offset_minutes=local_tz_offset_minutes,
+                force_regen=force_regen,
+            )
+            # Validate into Pydantic models for type safety
+            snapshot_rows: list[PracticeQueueEntryModel] = [
+                PracticeQueueEntryModel.model_validate(r) for r in snapshot_rows_dicts
+            ]
+
+            # Compute meta: newly-due tunes (bucket 1) that are not in the snapshot
+            try:
+                scheduled = query_practice_list_scheduled(
+                    db,
+                    user_ref=user_id,
+                    playlist_ref=playlist_ref,
+                    show_deleted=False,
+                    show_playlist_deleted=False,
+                    review_sitdown_date=sitdown_date,
+                    local_tz_offset_minutes=local_tz_offset_minutes,
+                    enable_backfill=False,
+                )
+                # Extract ids from scheduled bucket 1
+                scheduled_due_ids: set[int] = set()
+                for row in scheduled:
+                    if (
+                        getattr(row, "bucket", None) == 1
+                        and getattr(row, "id", None) is not None
+                    ):
+                        # row.id is Optional[int] on PlaylistTuneJoinedModel
+                        scheduled_due_ids.add(row.id)  # type: ignore[arg-type]
+
+                # Extract ids present in snapshot (bucket 1 only)
+                snapshot_due_ids: set[int] = set(
+                    row.tune_ref
+                    for row in snapshot_rows
+                    if getattr(row, "bucket", None) == 1
+                )
+                new_due_count = max(0, len(scheduled_due_ids - snapshot_due_ids))
+            except Exception as _e:
+                logger.warning(
+                    f"Failed computing new_tunes_due_count, defaulting to 0: {_e}"
+                )
+                new_due_count = 0
+
+            return PracticeQueueWithMetaModel(
+                entries=snapshot_rows,
+                new_tunes_due_count=new_due_count,
+            )
+    except Exception as e:
+        logger.error(f"Unable to fetch practice queue with meta: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to fetch practice queue with meta: {e}"
+        )
+
+
 @router.post(
     "/practice-queue/{user_id}/{playlist_ref}/refill",
     response_model=list[PracticeQueueEntryModel],

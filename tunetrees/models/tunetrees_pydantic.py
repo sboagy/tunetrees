@@ -995,6 +995,7 @@ class PracticeQueueEntryModel(BaseModel):
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
     latest_review_date: Optional[str] = None
+    latest_backup_practiced: Optional[str] = None
     latest_goal: Optional[str] = None
     latest_technique: Optional[str] = None
     tags: Optional[str] = None

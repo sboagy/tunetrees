@@ -307,6 +307,7 @@ export interface IPracticeQueueEntry {
   scheduled?: string | null;
   latest_practiced?: string | null;
   latest_review_date?: string | null;
+  latest_backup_practiced?: string | null;
   latest_quality?: number | null;
   latest_easiness?: number | null;
   latest_interval?: number | null;

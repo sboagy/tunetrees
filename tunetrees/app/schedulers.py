@@ -322,7 +322,11 @@ class FSRScheduler(SpacedRepetitionScheduler):
             last_review=last_review,
         )
         rating = self._quality4_to_fsrs_rating(quality)
-        card_reviewed, review_log = self.scheduler.review_card(card, rating)
+        # Pass the practiced timestamp as the review_datetime to ensure the review log
+        # reflects the actual time of review (not the next due date)
+        card_reviewed, review_log = self.scheduler.review_card(
+            card, rating, review_datetime=practiced
+        )
         result = self._review_result(card_reviewed, review_log)
         result["repetitions"] = repetitions + 1
 
@@ -399,6 +403,11 @@ class FSRScheduler(SpacedRepetitionScheduler):
                 card_reviewed.difficulty if card_reviewed.difficulty is not None else 0
             ),
             # "repetitions": getattr(card_reviewed, "repetitions", 0),
-            "review_datetime": str(card_reviewed.due),
+            # Return the actual review timestamp; fall back to last_review or due
+            "review_datetime": str(
+                getattr(review_log, "review_datetime", None)
+                or getattr(card_reviewed, "last_review", None)
+                or card_reviewed.due
+            ),
             "review_duration": review_log.review_duration if review_log else None,
         }
