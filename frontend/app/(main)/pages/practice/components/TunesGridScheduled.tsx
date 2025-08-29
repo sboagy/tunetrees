@@ -733,25 +733,6 @@ export default function TunesGridScheduled({
         <div className="w-full h-full flex items-center justify-center">
           <p className="text-lg">Loading...</p>
         </div>
-      ) : !isSnapshotLoading && tunes.length === 0 ? (
-        <div
-          className="w-full h-full flex flex-col items-center justify-center gap-2"
-          data-testid="scheduled-empty-state"
-        >
-          <p className="text-lg font-semibold">No scheduled tunes</p>
-          <p className="text-sm text-muted-foreground">
-            Try toggling "Display Submitted" or use Add Tunes to bring items
-            into your queue.
-          </p>
-          {fullQueueSnapshot.length > 0 ? (
-            <p
-              className="text-xs text-muted-foreground mt-1"
-              data-testid="scheduled-empty-diagnostics"
-            >
-              {`Snapshot: total ${fullQueueSnapshot.length}, submitted ${fullQueueSnapshot.filter((t) => !!t.completed_at).length}`}
-            </p>
-          ) : null}
-        </div>
       ) : (
         <>
           <div
@@ -973,84 +954,112 @@ export default function TunesGridScheduled({
                 onCheckedChange={handleModeChange}
               />
             </div>
-            <div className="flex items-center space-x-4 mb-4">
-              <div
-                style={{
-                  visibility: mode === "flashcard" ? "hidden" : "visible",
-                }}
-              >
-                <ColumnsMenu
-                  user_id={userId}
-                  tablePurpose={"practice"}
-                  playlistId={playlistId}
-                  table={table}
-                  triggerRefresh={triggerRefresh}
-                />
-              </div>
-            </div>
-          </div>
-          {mode === "grid" ? (
-            <TunesGrid
-              table={table}
-              userId={userId}
-              playlistId={playlistId}
-              tablePurpose={"practice"}
-              getStyleForSchedulingState={getStyleForSchedulingState}
-              onRowClickCallback={onRowClickCallback}
-              lapsedCount={lapsedCount}
-              currentCount={currentCount}
-              futureCount={futureCount}
-              newCount={queuedCount}
-              onFooterDoubleClick={() => setMetricsDialogOpen(true)}
-              reviewedTodayCount={reviewedTodayCount}
-              toBePracticedCount={toBePracticedCount}
-              reviewedCount={reviewedCount}
-            />
-          ) : (
-            <FlashcardPanel
-              table={table}
-              userId={userId}
-              playlistId={playlistId}
-              purpose={"practice"}
-              onRecallEvalChange={handleRecallEvalChange}
-            />
-          )}
-          {/* Metrics dialog, opened via footer double-click */}
-          <Dialog open={metricsDialogOpen} onOpenChange={setMetricsDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Practice Queue Metrics</DialogTitle>
-                <DialogDescription>
-                  Snapshot of your current session metrics.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2 py-2 text-sm">
-                <div className="text-muted-foreground">Lapsed</div>
-                <div>{lapsedCount}</div>
-                <div className="text-muted-foreground">Due Today</div>
-                <div>{currentCount}</div>
-                <div className="text-muted-foreground">Future/Backfill</div>
-                <div>{futureCount}</div>
-                <div className="text-muted-foreground">Queued</div>
-                <div>{queuedCount}</div>
-                <div className="text-muted-foreground">Submitted</div>
-                <div>{reviewedTodayCount}</div>
-                <div className="text-muted-foreground">Reviewed</div>
-                <div>{reviewedCount}</div>
-                <div className="text-muted-foreground">To Be Practiced</div>
-                <div>{toBePracticedCount}</div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="ghost"
-                  onClick={() => setMetricsDialogOpen(false)}
-                  data-testid="metrics-dialog-close"
+            {table ? (
+              <div className="flex items-center space-x-4 mb-4">
+                <div
+                  style={{
+                    visibility: mode === "flashcard" ? "hidden" : "visible",
+                  }}
                 >
-                  Close
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                  <ColumnsMenu
+                    user_id={userId}
+                    tablePurpose={"practice"}
+                    playlistId={playlistId}
+                    table={table}
+                    triggerRefresh={triggerRefresh}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+          {!isSnapshotLoading && tunes.length === 0 ? (
+            <div
+              className="w-full h-full flex flex-col items-center justify-center gap-2"
+              data-testid="scheduled-empty-state"
+            >
+              <p className="text-lg font-semibold">No scheduled tunes</p>
+              <p className="text-sm text-muted-foreground">
+                Try toggling "Display Submitted" or use Add Tunes to bring items
+                into your queue.
+              </p>
+              {fullQueueSnapshot.length > 0 ? (
+                <p
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="scheduled-empty-diagnostics"
+                >
+                  {`Snapshot: total ${fullQueueSnapshot.length}, submitted ${fullQueueSnapshot.filter((t) => !!t.completed_at).length}`}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <>
+              {mode === "grid" ? (
+                <TunesGrid
+                  table={table}
+                  userId={userId}
+                  playlistId={playlistId}
+                  tablePurpose={"practice"}
+                  getStyleForSchedulingState={getStyleForSchedulingState}
+                  onRowClickCallback={onRowClickCallback}
+                  lapsedCount={lapsedCount}
+                  currentCount={currentCount}
+                  futureCount={futureCount}
+                  newCount={queuedCount}
+                  onFooterDoubleClick={() => setMetricsDialogOpen(true)}
+                  reviewedTodayCount={reviewedTodayCount}
+                  toBePracticedCount={toBePracticedCount}
+                  reviewedCount={reviewedCount}
+                />
+              ) : (
+                <FlashcardPanel
+                  table={table}
+                  userId={userId}
+                  playlistId={playlistId}
+                  purpose={"practice"}
+                  onRecallEvalChange={handleRecallEvalChange}
+                />
+              )}
+              {/* Metrics dialog, opened via footer double-click */}
+              <Dialog
+                open={metricsDialogOpen}
+                onOpenChange={setMetricsDialogOpen}
+              >
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Practice Queue Metrics</DialogTitle>
+                    <DialogDescription>
+                      Snapshot of your current session metrics.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 py-2 text-sm">
+                    <div className="text-muted-foreground">Lapsed</div>
+                    <div>{lapsedCount}</div>
+                    <div className="text-muted-foreground">Due Today</div>
+                    <div>{currentCount}</div>
+                    <div className="text-muted-foreground">Future/Backfill</div>
+                    <div>{futureCount}</div>
+                    <div className="text-muted-foreground">Queued</div>
+                    <div>{queuedCount}</div>
+                    <div className="text-muted-foreground">Submitted</div>
+                    <div>{reviewedTodayCount}</div>
+                    <div className="text-muted-foreground">Reviewed</div>
+                    <div>{reviewedCount}</div>
+                    <div className="text-muted-foreground">To Be Practiced</div>
+                    <div>{toBePracticedCount}</div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setMetricsDialogOpen(false)}
+                      data-testid="metrics-dialog-close"
+                    >
+                      Close
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
         </>
       )}
     </div>
