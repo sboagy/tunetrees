@@ -172,8 +172,9 @@ test.describe.serial("Tune Edit Tests", () => {
 
     await ttPO.openTuneEditorForCurrentTune();
 
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(1_000);
+    for (const formField of ttPO.sampleBoyneHunt) {
+      await expect(formField.locator).toBeVisible();
+    }
 
     // Confirm that the values are as expected
     for (const formField of ttPO.sampleBoyneHunt) {

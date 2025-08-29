@@ -324,10 +324,12 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
     });
     await this.sidebarButton.isEnabled();
 
-    await this.sidebarButton.click();
-    await this.page.waitForTimeout(100);
-    await this.form.waitFor({ state: "visible" });
-    await this.IdTitle.waitFor({ state: "visible" });
+    // Click and wait deterministically for the editor form to appear
+    await Promise.all([
+      this.form.waitFor({ state: "visible", timeout: 15_000 }),
+      this.sidebarButton.click(),
+    ]);
+    await this.IdTitle.waitFor({ state: "visible", timeout: 15_000 });
 
     console.log("===> tune-editor.po.ts:32 ~ ");
   }

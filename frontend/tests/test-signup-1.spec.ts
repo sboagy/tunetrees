@@ -59,26 +59,21 @@ test.describe.serial("Signup Tests", () => {
       const linkBackURLValue = (await linkBackHandle.jsonValue()) as string;
       console.log("Retrieved linkBackURL from localStorage:", linkBackURLValue);
 
-      if (!linkBackURLValue) {
-        // Let's check what's actually in localStorage
-        const allLocalStorage = await ttPO.page.evaluate(() => {
-          const items: Record<string, string | null> = {};
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key) {
-              items[key] = localStorage.getItem(key);
-            }
-          }
-          return items;
-        });
-        console.log("All localStorage items:", allLocalStorage);
-        throw new Error("No linkBackURL found in localStorage");
-      }
+      const url = new URL(linkBackURLValue);
+      const token = url.searchParams.get("token");
+      console.log("Extracted token:", token);
 
-      await page.goto(linkBackURLValue, {
-        timeout: initialPageLoadTimeout,
-        waitUntil: "domcontentloaded", // More reliable than networkidle in CI
-      });
+      const codeInput = page.getByRole("textbox");
+      await codeInput.fill(token || "");
+
+      const verifyButton = page.getByRole("button", { name: "Verify" });
+      await expect(verifyButton).toBeEnabled({ timeout: 10000 });
+      await verifyButton.click();
+
+      // After successful verification, the playlist selection dialog should appear.
+      // Wait for the dialog to become visible to ensure the verification action is complete.
+      const dialog = page.getByRole("dialog");
+      await dialog.waitFor({ state: "visible", timeout: 15000 });
     } else {
       const gmailLoginURL = "https://mail.google.com/";
       await page.goto(gmailLoginURL, { waitUntil: "domcontentloaded" });
@@ -143,12 +138,10 @@ test.describe.serial("Signup Tests", () => {
         timeout: initialPageLoadTimeout,
         waitUntil: "domcontentloaded", // More reliable than networkidle in CI
       });
+      await page.waitForTimeout(100);
     }
-
-    await page.waitForTimeout(4_000);
-
     // Ensure playlist dialog completes before waiting for table status.
-    await processPlaylistDialog(page);
+    await processPlaylistDialog(page, ttPO);
     // Small buffer: dialog submission triggers playlist/tunes fetch; allow network to start.
     await page.waitForTimeout(750);
 
@@ -179,6 +172,7 @@ test.describe.serial("Signup Tests", () => {
     //   path: path.join(screenShotDir, "page_just_after_repertoire_select.png"),
     // });
 
+    await page.waitForTimeout(1_000);
     console.log("===> test-signup-1.spec.ts:128 ~ test-1 completed");
   });
 
@@ -316,7 +310,7 @@ test.describe.serial("Signup Tests", () => {
     await page.waitForTimeout(4_000);
 
     // Wait for the checkbox to be ready before interacting with it
-    await processPlaylistDialog(page);
+    await processPlaylistDialog(page, ttPO);
 
     // Not sure why the following doesn't work.
     // await this.addToRepertoireButton.waitFor({
@@ -700,27 +694,28 @@ test.describe.serial("Signup Tests", () => {
   });
 });
 
-async function processPlaylistDialog(page: Page) {
+async function processPlaylistDialog(page: Page, ttPO: TuneTreesPageObject) {
   // Dialog may take a moment to mount after verification redirect.
-  const dialog = page.getByRole("dialog");
+  const dialog = page.getByTestId("playlist-dialog");
   await dialog.waitFor({ state: "visible", timeout: 15000 });
+  await dialog.waitFor({ state: "attached" });
 
-  const fiveStringBanjoRow = page.getByRole("row", {
-    name: /5-String Banjo/i,
-  });
-  await fiveStringBanjoRow.waitFor({ state: "visible", timeout: 15000 });
+  // const fiveStringBanjoRow = page.getByRole("row", {
+  //   name: /5-String Banjo/i,
+  // });
+  // await fiveStringBanjoRow.waitFor({ state: "visible", timeout: 15000 });
 
   // Row checkbox/button (defensive: locate after row visible)
-  const checkBoxButton = fiveStringBanjoRow.getByRole("button").first();
-  await checkBoxButton.waitFor({ state: "visible" });
-  await expect(checkBoxButton).toBeEnabled();
-  await checkBoxButton.click();
+  // getByRole('row', { name: '5 5-String Banjo BGRA 5-' }).getByRole('button').first()
+  const checkBoxButton = page.getByTestId("toggle-playlist-5");
 
-  // Confirm selection reflected (optional lightweight assertion)
+  await ttPO.ensureClickable(checkBoxButton);
+  // brief delay to let UI settle before interacting
   await page.waitForTimeout(200);
+  await ttPO.clickWithTimeAfter(checkBoxButton, 400);
 
   const submitButton = page.getByTestId("submit-button");
-  await submitButton.waitFor({ state: "visible", timeout: 5000 });
+  await submitButton.waitFor({ state: "visible" });
   await expect(submitButton).toBeEnabled();
   await submitButton.click();
   // Wait for dialog to close before proceeding to table wait.

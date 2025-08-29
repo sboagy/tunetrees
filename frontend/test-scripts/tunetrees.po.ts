@@ -282,32 +282,24 @@ export class TuneTreesPageObject {
     await this.repertoireTabTrigger.waitFor({
       state: "visible",
     });
+    // Ensure the tab is ready and click it
+    await this.ensureClickable(this.repertoireTabTrigger);
     await this.repertoireTabTrigger.click();
-    await this.page.waitForTimeout(100);
 
-    await this.filterInput.isVisible();
-    await this.filterInput.isEnabled();
-    await this.page.waitForTimeout(500);
+    // Wait for the filter input to be visible and enabled before interacting with it
+    await expect(this.filterInput).toBeVisible({ timeout: 10000 });
+    await expect(this.filterInput).toBeEnabled({ timeout: 10000 });
 
-    await this.filterInput.click();
-    await this.page.waitForTimeout(500);
-
+    await this.ensureClickable(this.filterInput);
+    // The ensureClickable helper already confirms the input is ready.
+    // We can now safely interact with it.
+    // Using `fill` is generally more reliable than `click` then `type` as it clears the field first.
+    // Playwright's `fill` has built-in auto-waiting, making manual waits unnecessary.
     await this.filterInput.fill(tuneTitle);
 
-    // Wait until at least 1 data row present; prefer 2 (header + filtered result) but don't hard fail.
-    let attempts = 0;
-    let rowCount = await this.tunesGridRows.count();
-    while (rowCount < 2 && attempts < 40) {
-      // up to ~20s
-      if (attempts > 1) {
-        console.warn(
-          `retrying for row count >= 2 (rowCount=${rowCount}). Attempt ${attempts}`,
-        );
-      }
-      await this.page.waitForTimeout(1000);
-      rowCount = await this.tunesGridRows.count();
-      attempts++;
-    }
+    await this.waitForTablePopulationToStart();
+
+    const rowCount = await this.tunesGridRows.count();
     if (rowCount < 2) {
       console.warn(
         `navigateToTune(): expected filtered table row not loaded (rowCount=${rowCount}). Proceeding with best-effort click if available.`,

@@ -64,7 +64,7 @@ test.describe.serial("Add Tune Tests", () => {
 
     // await page.waitForTimeout(60_000 * 60);
 
-    await expect(ttPO.addToRepertoireButton).toBeVisible();
+    await expect(ttPO.addTuneButton).toBeVisible();
 
     await ttPO.addTuneButton.click();
 
