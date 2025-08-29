@@ -30,7 +30,7 @@ def test_sm2_first_review_and_review():
     assert "easiness" in result
     # Simulate a review
     review_result = scheduler.review(
-        4, result["easiness"], result["interval"], result["repetitions"], now
+        4, result["easiness"], result["interval"], result["repetitions"], now, now
     )
     assert isinstance(review_result, dict)
     assert "easiness" in review_result
@@ -55,7 +55,12 @@ def test_fsrs_first_review_and_review():
     # assert "easiness" in result
     # Test regular review
     review_result_dict2 = scheduler.review(
-        quality=3, easiness=2.5, interval=1, repetitions=1, practiced=now
+        quality=3,
+        easiness=2.5,
+        interval=1,
+        repetitions=1,
+        sitdown_date=now,
+        sr_scheduled_date=now,
     )
     assert isinstance(review_result_dict2, dict)
     assert "easiness" in review_result_dict2

@@ -67,18 +67,25 @@ def test_fsrs_missing_optional_args():
     #   "review_duration": null,
     #   "repetitions": 10
     # }
-    last_review = datetime.fromisoformat("2025-09-06 00:47:38.859129+00:00")
+    sitdown_date: datetime = datetime.fromisoformat("2025-09-06 00:47:38.859129+00:00")
+    sr_scheduled_date: datetime = datetime.fromisoformat(
+        "2025-09-06 00:47:38.859129+00:00"
+    )
+    last_practiced: datetime = datetime.fromisoformat(
+        "2025-09-06 00:47:38.859129+00:00"
+    )
 
     result = scheduler.review(
         quality=2,
         easiness=1.5717428232260808,
         interval=1,
         repetitions=10,
-        practiced=last_review,
+        sitdown_date=sitdown_date,
+        sr_scheduled_date=sr_scheduled_date,
         stability=13.630435348122646,
         difficulty=7.961928825804394,
         step=None,
-        last_review=last_review,
+        last_practiced=last_practiced,
     )
     assert isinstance(result, dict)
     assert "easiness" in result
@@ -98,6 +105,6 @@ def test_sm2_missing_optional_args():
     scheduler = SM2Scheduler()
     now = datetime.now()
     # Should not raise
-    result = scheduler.review(4, 2.5, 1, 1, now)
+    result = scheduler.review(4, 2.5, 1, 1, now, now)
     assert isinstance(result, dict)
     assert "easiness" in result

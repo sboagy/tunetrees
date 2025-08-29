@@ -73,11 +73,12 @@ class SpacedRepetitionScheduler:
         easiness: float,
         interval: int,
         repetitions: int,
-        practiced: datetime,
+        sitdown_date: datetime,
+        sr_scheduled_date: datetime,
         stability: Optional[float] = None,
         difficulty: Optional[float] = None,
         step: Optional[int] = None,
-        last_review: Optional[datetime] = None,
+        last_practiced: Optional[datetime] = None,
     ) -> ReviewResultDict:
         raise NotImplementedError
 
@@ -118,14 +119,15 @@ class SM2Scheduler(SpacedRepetitionScheduler):
         easiness: float,
         interval: int,
         repetitions: int,
-        practiced: datetime,
+        sitdown_date: datetime,
+        sr_scheduled_date: datetime,
         stability: Optional[float] = None,
         difficulty: Optional[float] = None,
         step: Optional[int] = None,
-        last_review: Optional[datetime] = None,
+        last_practiced: Optional[datetime] = None,
     ) -> ReviewResultDict:
-        _ = (stability, difficulty, step, last_review)
-        result = sm_two.review(quality, easiness, interval, repetitions, practiced)
+        _ = (stability, difficulty, step, last_practiced, sr_scheduled_date)
+        result = sm_two.review(quality, easiness, interval, repetitions, sitdown_date)
         return {
             "id": None,
             "quality": quality,
@@ -137,7 +139,7 @@ class SM2Scheduler(SpacedRepetitionScheduler):
             "review_datetime": (
                 str(result["review_datetime"])
                 if "review_datetime" in result
-                else str(practiced)
+                else str(sitdown_date)
             ),
             "review_duration": None,
         }
@@ -298,14 +300,23 @@ class FSRScheduler(SpacedRepetitionScheduler):
         easiness: float,
         interval: int,
         repetitions: int,
-        practiced: datetime,
+        sitdown_date: datetime,
+        sr_scheduled_date: datetime,
         stability: Optional[float] = None,
         difficulty: Optional[float] = None,
         step: Optional[int] = None,
-        last_review: Optional[datetime] = None,
+        last_practiced: Optional[datetime] = None,
     ) -> ReviewResultDict:
-        # Use all arguments to avoid linter/type checker warnings
-        _ = (easiness, interval, repetitions, stability, difficulty, step, last_review)
+        # Arguments intentionally not being used, to avoid linter/type checker warnings
+        _ = (
+            easiness,
+            interval,
+            repetitions,
+            # stability,
+            # difficulty,
+            # step,
+            # last_practiced,
+        )
         if difficulty is None or difficulty == 0.0:
             if easiness > 0:
                 difficulty = FSRScheduler._e_factor_to_difficulty(easiness)
@@ -318,14 +329,14 @@ class FSRScheduler(SpacedRepetitionScheduler):
             step=step,
             stability=stability if stability is not None else 1.0,
             difficulty=difficulty,
-            due=practiced,
-            last_review=last_review,
+            due=sr_scheduled_date,
+            last_review=last_practiced,
         )
         rating = self._quality4_to_fsrs_rating(quality)
         # Pass the practiced timestamp as the review_datetime to ensure the review log
         # reflects the actual time of review (not the next due date)
         card_reviewed, review_log = self.scheduler.review_card(
-            card, rating, review_datetime=practiced
+            card, rating, review_datetime=sitdown_date
         )
         result = self._review_result(card_reviewed, review_log)
         result["repetitions"] = repetitions + 1

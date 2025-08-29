@@ -812,29 +812,30 @@ def _process_single_tune_feedback(
             quality_text=quality_str,
         )
     else:
-        last_review_str = latest_practice_record.review_date
+        latest_practiced_str = latest_practice_record.practiced
 
-        if last_review_str:
+        if latest_practiced_str:
             try:
-                last_review = datetime.strptime(
-                    last_review_str, TT_DATE_FORMAT
+                latest_practiced = datetime.strptime(
+                    latest_practiced_str, TT_DATE_FORMAT
                 ).replace(tzinfo=timezone.utc)
             except ValueError:
-                last_review = None
-                log.warning(f"Could not parse last_review date: {last_review_str}")
+                latest_practiced = None
+                log.warning(f"Could not parse last_review date: {latest_practiced_str}")
         else:
-            last_review = None
+            latest_practiced = None
 
         review_result_dict = scheduler.review(
             quality=normalized_quality_int,
             easiness=latest_practice_record.easiness,
             interval=latest_practice_record.interval,
             repetitions=latest_practice_record.repetitions,
-            practiced=sitdown_date,
+            sitdown_date=sitdown_date,
+            sr_scheduled_date=latest_practice_record.review_date,
             stability=getattr(latest_practice_record, "stability", None),
             difficulty=getattr(latest_practice_record, "difficulty", None),
             step=getattr(latest_practice_record, "step", None),
-            last_review=last_review,
+            last_practiced=latest_practiced,
         )
 
     review_dt = review_result_dict.get("review_datetime")

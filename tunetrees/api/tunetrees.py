@@ -34,6 +34,7 @@ from tunetrees.app.schedule import (
     update_practice_feedbacks,
     update_practice_schedules,
 )
+from tunetrees.app.schedulers import SpacedRepetitionScheduler
 from tunetrees.models.tunetrees import TableTransientData
 from sqlalchemy import select as sql_select
 from sqlalchemy import update as sql_update
@@ -644,7 +645,7 @@ def _stage_practice_feedbacks(
 
 def _stage_single_tune(
     db_stage: Session,
-    scheduler: Any,
+    scheduler: SpacedRepetitionScheduler,
     playlist_id: str,
     user_ref: str,
     sitdown_date: datetime,
@@ -705,26 +706,27 @@ def _stage_single_tune(
             quality_text=quality_str,
         )
     else:
-        last_review_str = latest_pr.practiced if latest_pr else None
-        if last_review_str:
+        last_practiced_str = latest_pr.practiced if latest_pr else None
+        if last_practiced_str:
             try:
-                last_review = datetime.strptime(
-                    last_review_str, TT_DATE_FORMAT
+                last_practiced = datetime.strptime(
+                    last_practiced_str, TT_DATE_FORMAT
                 ).replace(tzinfo=timezone.utc)
             except ValueError:
-                last_review = None
+                last_practiced = None
         else:
-            last_review = None
+            last_practiced = None
         result = scheduler.review(
             quality=quality_lookup_int,
             easiness=latest_pr.easiness,
             interval=latest_pr.interval,
             repetitions=latest_pr.repetitions,
-            practiced=sitdown_date,
+            sitdown_date=sitdown_date,
+            sr_scheduled_date=latest_pr.review_date,
             stability=getattr(latest_pr, "stability", None),
             difficulty=getattr(latest_pr, "difficulty", None),
             step=getattr(latest_pr, "step", None),
-            last_review=last_review,
+            last_practiced=last_practiced,
         )
 
     review_dt = result.get("review_datetime")
