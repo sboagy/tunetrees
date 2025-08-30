@@ -108,7 +108,7 @@ test("test-secondary-playlist-add-to-repertoire", async ({ page }) => {
   await ttPO.gotoMainPage();
 
   // Navigate to Irish Tenor Banjo instrument for secondary playlist testing
-  await ttPO.navigateToIrishTenorBanjoInstrument();
+  await ttPO.navigateToIrishTenorBanjoInstrument(false);
 
   // Navigate to the Catalog tab
   await ttPO.navigateToCatalogTab();

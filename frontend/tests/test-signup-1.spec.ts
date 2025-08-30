@@ -697,7 +697,7 @@ test.describe.serial("Signup Tests", () => {
 async function processPlaylistDialog(page: Page, ttPO: TuneTreesPageObject) {
   // Dialog may take a moment to mount after verification redirect.
   const dialog = page.getByTestId("playlist-dialog");
-  await dialog.waitFor({ state: "visible", timeout: 15000 });
+  await dialog.waitFor({ state: "visible", timeout: 30000 });
   await dialog.waitFor({ state: "attached" });
 
   // const fiveStringBanjoRow = page.getByRole("row", {

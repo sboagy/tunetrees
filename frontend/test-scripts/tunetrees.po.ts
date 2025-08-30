@@ -439,6 +439,10 @@ export class TuneTreesPageObject {
       await expect(this.tableStatus).toContainText("0 of 0 row(s) selected", {
         timeout: 30000,
       });
+    } else {
+      await expect(this.tableStatus).toContainText("row(s) selected", {
+        timeout: 30000,
+      });
     }
   }
 
