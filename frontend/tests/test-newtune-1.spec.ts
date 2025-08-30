@@ -51,26 +51,24 @@ test.afterEach(async ({ page }, testInfo) => {
 test.describe.serial("Add Tune Tests", () => {
   test("test-newtune-1", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
-    await ttPO.gotoMainPage();
+    // await ttPO.gotoMainPage();
 
     await ttPO.navigateToRepertoireTab();
 
     // await page.waitForTimeout(1000 * 200);
-
-    await ttPO.tabsMenuButton.click();
-    await ttPO.tabsMenuCatalogChoice.click();
+    await ttPO.clickWithTimeAfter(ttPO.tabsMenuButton);
+    await ttPO.clickWithTimeAfter(ttPO.tabsMenuCatalogChoice);
     await expect(ttPO.catalogTab).toBeVisible();
-    await ttPO.catalogTab.click();
+    await ttPO.clickWithTimeAfter(ttPO.catalogTab);
 
-    // await page.waitForTimeout(60_000 * 60);
+    // await for the tab to be change
+    await expect(ttPO.addToRepertoireButton).toBeVisible();
 
-    await expect(ttPO.addTuneButton).toBeVisible();
+    await ttPO.clickWithTimeAfter(ttPO.addTuneButton);
 
-    await ttPO.addTuneButton.click();
+    await ttPO.page.getByText("Select Genre:").isVisible();
 
-    // await ttPO.newTuneButton.waitFor({ state: "visible" });
-    await ttPO.newTuneButton.isEnabled();
-    await ttPO.newTuneButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.newTuneButton);
 
     // await page.getByTestId("tt-tune-editor-title-input").click();
 
@@ -78,6 +76,12 @@ test.describe.serial("Add Tune Tests", () => {
     // See https://github.com/axios/axios/issues/6761
     for (const formField of ttPO.sampleSiBheagSiMhorShort) {
       await ttPO.doFormFieldValueMod(formField);
+      const value = await formField.locator.inputValue();
+      if (formField.select_modification) {
+        expect(value.toLowerCase()).toBe(formField.modification.toLowerCase());
+      } else {
+        expect(value).toBe(formField.modification);
+      }
       // await formField.locator.fill(formField.modification);
       await page.waitForTimeout(50);
     }
@@ -102,30 +106,30 @@ test.describe.serial("Add Tune Tests", () => {
 
   test("test-import-1", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
-    await ttPO.gotoMainPage();
+    // await ttPO.gotoMainPage();
 
     await ttPO.navigateToRepertoireTab();
 
-    await expect(ttPO.addTuneButton).toBeVisible();
-
-    await ttPO.addTuneButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.addTuneButton);
 
     await ttPO.addtuneUrlOrTitleInput.fill("https://thesession.org/tunes/248"); // Tam Lin
 
-    await ttPO.addtuneButtonImport.click();
+    await ttPO.clickWithTimeAfter(ttPO.addtuneButtonImport);
+
+    const selectSettingHeading = page.getByRole("heading", {
+      name: "Select a Setting",
+    });
+    await selectSettingHeading.waitFor({ state: "visible" });
 
     // const setting2Locator = page.getByRole("radio", { name: "Setting 2" });
     // const setting2Locator = page.getByText("Setting 2");
     const setting2Locator = page.getByText("Setting 2", { exact: true });
 
-    await setting2Locator.waitFor({ state: "visible" });
-    await setting2Locator.click();
+    await ttPO.clickWithTimeAfter(setting2Locator);
 
-    await ttPO.selectSettingButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.selectSettingButton);
 
-    await ttPO.tuneEditorSubmitButton.waitFor({ state: "visible" });
-
-    await ttPO.tuneEditorSubmitButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.tuneEditorSubmitButton);
 
     const currentTuneTitleLocator = page.locator("#current-tune-title");
     await currentTuneTitleLocator.waitFor({ state: "visible" });

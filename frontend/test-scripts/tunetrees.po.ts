@@ -622,7 +622,7 @@ export class TuneTreesPageObject {
       { timeout: 2000 },
     );
 
-    await dialogSignInButton.click();
+    await this.clickWithTimeAfter(dialogSignInButton);
 
     // Not sure why the following doesn't work.
     // await this.addToRepertoireButton.waitFor({

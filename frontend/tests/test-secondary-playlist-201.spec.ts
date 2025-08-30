@@ -100,6 +100,7 @@ test("test-secondary-add-to-repertoire-deselection", async ({ page }) => {
   await ttPO.expectTuneUnselected("66");
   await ttPO.expectTuneUnselected("54");
 
+  await page.waitForTimeout(1_000);
   console.log("test-secondary-add-to-repertoire-deselection completed");
 });
 
@@ -135,6 +136,7 @@ test("test-secondary-playlist-add-to-repertoire", async ({ page }) => {
   await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
   await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
 
+  await page.waitForTimeout(1_000);
   console.log("test-secondary-playlist-add-to-repertoire completed");
 });
 
@@ -183,5 +185,6 @@ test("test-secondary-playlist-add-to-review", async ({ page }) => {
   await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
   await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
 
+  await page.waitForTimeout(1_000);
   console.log("Secondary playlist 'Add To Review' completed");
 });
