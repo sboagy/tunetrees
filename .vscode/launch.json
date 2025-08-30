@@ -158,7 +158,8 @@
             "name": "App: Backend + Frontend",
             "configurations": [
                 "Python Debugger: FastAPI",
-                "Next: Node"
+                "Next: Node",
+                "Next: Chrome"
             ],
             "stopAll": true
         }
