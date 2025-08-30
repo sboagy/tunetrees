@@ -40,11 +40,13 @@ Notes:
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import os
 from pathlib import Path
 import sys
 from typing import ContextManager, List, Sequence, TYPE_CHECKING, Tuple
 
+from tunetrees.app.schedule import TT_DATE_FORMAT
 from tunetrees.models.tunetrees import PracticeRecord
 
 if TYPE_CHECKING:  # imports for type checking only
@@ -350,7 +352,25 @@ def fsrs_fixup(rows: Sequence[PracticeRecord]) -> Tuple[Sequence[PracticeRecord]
             rating = Rating(int(r.quality or 1))
 
         # Always advance card on FSRS rows using observed rating
-        previous_card, _ = scheduler.review_card(previous_card, rating)
+        if r.practiced:
+            # practiced may be a string or a datetime; parse strings, pass datetimes through
+            if isinstance(r.practiced, datetime):
+                _dt = r.practiced
+            else:
+                _dt = datetime.strptime(r.practiced, TT_DATE_FORMAT)
+        else:
+            # fallback to current time in UTC when practiced is null
+            _dt = __import__("datetime").datetime.now(
+                __import__("datetime").timezone.utc
+            )
+        _tz_utc = __import__("datetime").timezone.utc
+        if _dt.tzinfo is None:
+            _dt = _dt.replace(tzinfo=_tz_utc)
+        else:
+            _dt = _dt.astimezone(_tz_utc)
+        previous_card, _ = scheduler.review_card(
+            previous_card, rating, review_datetime=_dt
+        )
 
         r.state = previous_card.state
         r.step = previous_card.step
