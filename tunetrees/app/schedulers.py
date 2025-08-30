@@ -415,10 +415,6 @@ class FSRScheduler(SpacedRepetitionScheduler):
             ),
             # "repetitions": getattr(card_reviewed, "repetitions", 0),
             # Return the actual review timestamp; fall back to last_review or due
-            "review_datetime": str(
-                getattr(review_log, "review_datetime", None)
-                or getattr(card_reviewed, "last_review", None)
-                or card_reviewed.due
-            ),
+            "review_datetime": str(card_reviewed.due),
             "review_duration": review_log.review_duration if review_log else None,
         }
