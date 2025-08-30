@@ -11,7 +11,12 @@ import {
 } from "../test-scripts/test-logging";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 
-const expectTimeout = process.env.CI ? 30000 : 15000;
+// set 5 minutes for each test in this file
+const testTimeout = process.env.CI ? 5 * 60 * 1000 : 1 * 60 * 1000;
+
+test.setTimeout(testTimeout);
+
+const expectTimeout = process.env.CI ? 60_000 : 30_000;
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),

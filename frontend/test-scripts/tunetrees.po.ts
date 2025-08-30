@@ -665,7 +665,7 @@ export class TuneTreesPageObject {
     if (!hasCatalogTrigger) {
       // Open the tabs menu to access Catalog
       await this.ensureClickable(this.tabsMenuButton);
-      await this.tabsMenuButton.click();
+      await this.clickWithTimeAfter(this.tabsMenuButton);
 
       // Wait for the menu containing the catalog choice to be visible
       const dropdownMenu = this.page.locator('[role="menu"]').first();
@@ -706,7 +706,7 @@ export class TuneTreesPageObject {
       .catch(() => false);
     if (catalogTriggerVisible) {
       await this.ensureClickable(this.catalogTab, 10000);
-      await this.catalogTab.click();
+      await this.clickWithTimeAfter(this.catalogTab);
     } else {
       // Second attempt: DOM-based click that doesn't require visibility
       try {
