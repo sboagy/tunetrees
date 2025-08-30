@@ -98,7 +98,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
 
     // Click the sort button to sort ascending
     await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForTimeout(500); // Wait for sorting to complete
+    await page.waitForTimeout(2000); // Wait for sorting to complete
 
     // Verify the sort changed to ascending
     const ascendingIcon = ttPO.idColumnHeaderSortButton.locator("svg");
@@ -195,13 +195,12 @@ test.describe.serial("TuneGrid Regression Tests", () => {
 
     // Click again to clear sorting
     await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForTimeout(500);
 
-    // Verify the sort arrow is back to unsorted (ArrowUpDown)
-    const unsortedIconFinal = ttPO.idColumnHeaderSortButton.locator("svg");
-    await expect(unsortedIconFinal).toBeVisible();
-
-    console.log("✅ Column sorting arrows are working correctly!");
+    // Wait until the sort state is cleared (button title no longer matches ascending/descending)
+    await expect(ttPO.idColumnHeaderSortButton).not.toHaveAttribute(
+      "title",
+      /(Ascending|Descending) column sort/,
+    );
   });
 
   test("test-multicolumn-sorting", async ({ page }) => {

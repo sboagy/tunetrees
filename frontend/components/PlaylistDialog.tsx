@@ -502,9 +502,12 @@ export default function PlaylistDialog({
       <Dialog open={true} modal={true}>
         <DialogPortal>
           <DialogOverlay className="bg-black/50 fixed inset-0" />
+          {/* biome-ignore lint/a11y/useSemanticElements: We intentionally set role for Playwright tests and Radix DialogContent */}
           <DialogContent
+            role="dialog"
             ref={dialogRef}
             tabIndex={-1}
+            data-testid="playlist-dialog"
             className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[60rem] p-6 bg-white dark:bg-background rounded-md shadow-2xl border-2 border-gray-400 dark:border-gray-600 focus:outline-none focus:ring-0"
           >
             <DialogHeader className="flex justify-between">
@@ -587,6 +590,7 @@ export default function PlaylistDialog({
                                 editedInstrumentRow,
                               )
                             }
+                            data-testid={`toggle-playlist-${editedInstrumentRow.id}`}
                           >
                             {playlistsInMenuModified.some(
                               (p) =>

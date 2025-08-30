@@ -13,14 +13,20 @@ import {
 import type { CellContext } from "@tanstack/react-table";
 import { Check, ChevronDownIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { logVerbose } from "@/lib/logging";
 import {
   getColorForEvaluation,
   getQualityListForGoalAndTechnique,
 } from "../quality-lists";
+// Staging now uses scheduling-aware practice feedback path (stage=true) so
+// we intentionally stop using the generic transient settings helpers that
+// only persisted recall_eval. This ensures algorithm-derived fields (quality,
+// interval, etc.) are populated in table_transient_data and surfaced via the
+// practice_list_staged view.
 import {
-  createOrUpdateTableTransientData,
-  deleteTableTransientData,
-} from "../settings";
+  stagePracticeFeedback,
+  clearStagedPracticeFeedback,
+} from "../commands";
 import type {
   ITuneOverview,
   TablePurpose,
@@ -42,50 +48,35 @@ type RecallEvalComboBoxProps = {
   playlistId: number;
   purpose: TablePurpose;
   onRecallEvalChange?: (tuneId: number, newValue: string) => void;
+  readOnly?: boolean;
 };
 
 export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const { info, userId, playlistId, purpose, onRecallEvalChange } = props;
+  const { info, playlistId, onRecallEvalChange, readOnly } = props;
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  const isDisabled = onRecallEvalChange && !isMounted;
+  const isDisabled = !!readOnly || (!!onRecallEvalChange && !isMounted);
 
   // const [isOpen, setIsOpen] = useState(false);
   const { openPopoverId, setOpenPopoverId } = useRowRecallEvalPopoverContext();
   const isOpen = openPopoverId === info.row.original.id;
 
   const popoverRef = useRef<HTMLDivElement>(null);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(
     info.row.original.recall_eval ?? null,
   );
 
-  // Debounced popover state change to prevent bouncing
-  const debouncedSetPopoverId = useCallback(
-    (id: number | null) => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-      debounceTimeoutRef.current = setTimeout(() => {
-        setOpenPopoverId(id);
-        debounceTimeoutRef.current = null;
-      }, 50); // 50ms debounce to prevent rapid state changes
+  // Directly control open state for predictability in tests and headless
+  const setOpenDirect = useCallback(
+    (open: boolean) => {
+      setOpenPopoverId(open ? (info.row.original.id ?? null) : null);
     },
-    [setOpenPopoverId],
+    [info.row.original.id, setOpenPopoverId],
   );
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Get appropriate quality list based on goal and technique
   const qualityList = getQualityListForGoalAndTechnique(
@@ -94,61 +85,50 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
   );
 
   const saveData = async (changed_value: string) => {
+    if (!changed_value) {
+      // Attempt backend clear if available; ignore failure (local state already cleared).
+      void clearStagedPracticeFeedback(playlistId, info.row.original.id ?? 0);
+      return;
+    }
     try {
-      // In the following, id may be omitted in the case of a new tune,
-      // but I don't think it's ever undefined in this case?
-      // But, keep an eye on it.
-      if (changed_value) {
-        console.log(
-          "===> RowRecallEvalComboBox.tsx:103 ~ saveData - changed_value",
-          changed_value,
-        );
-        await createOrUpdateTableTransientData(
-          userId,
-          info.row.original.id ?? 0,
-          playlistId,
-          purpose,
-          null,
-          null,
-          changed_value,
-        );
-        console.log(
-          `LF17 State saved: ${changed_value} for ${info.row.original.id}`,
-        );
-      } else {
-        console.log(
-          "===> RowRecallEvalComboBox.tsx:121 ~ saveData calling deleteTableTransientData",
-        );
-        await deleteTableTransientData(
-          userId,
-          info.row.original.id ?? 0,
-          playlistId,
-          purpose,
-        );
-        console.log(`LF17 State deleted for ${info.row.original.id}`);
+      // Map recall_eval selection directly to feedback string expected by
+      // stagePracticeFeedback. (Values already aligned: 0-5 quality labels.)
+      // Retrieve or derive sitdown date. We prefer a data attribute on body
+      // (set by parent container). Fallback: now UTC.
+      let sitdownDate: Date | null = null;
+      const attr = document.body.getAttribute("data-sitdown-iso");
+      if (attr) {
+        const d = new Date(attr);
+        if (!Number.isNaN(d.getTime())) sitdownDate = d;
       }
+      if (!sitdownDate) sitdownDate = new Date();
+
+      const success = await stagePracticeFeedback(
+        playlistId,
+        info.row.original.id ?? 0,
+        changed_value,
+        sitdownDate,
+        info.row.original.goal ?? null,
+      );
+      if (!success) {
+        throw new Error("stagePracticeFeedback returned false");
+      }
+      logVerbose(
+        `Staged practice feedback '${changed_value}' for tune ${info.row.original.id}`,
+      );
     } catch (error) {
-      console.error("LF17 Failed to save state:", error);
-      alert("Failed to save state. Please try again.");
+      console.error("RecallEval staging failure:", error);
+      alert("Failed to stage practice feedback. Please retry.");
     }
   };
 
-  const handleBlur = (event: React.FocusEvent<HTMLButtonElement>) => {
-    if (popoverRef.current === null) {
-      return;
-    }
-    if (!popoverRef.current.contains(event.relatedTarget as Node)) {
-      // Use debounced function to prevent rapid state changes
-      debouncedSetPopoverId(null);
-    }
-  };
+  // Avoid blur-driven close; let Radix onOpenChange manage lifecycle
+  const handleBlur = () => {};
 
   return (
     <Popover
-      open={isOpen}
-      onOpenChange={(open) =>
-        debouncedSetPopoverId(open ? (info.row.original.id ?? null) : null)
-      }
+      open={readOnly ? false : isOpen}
+      onOpenChange={readOnly ? undefined : setOpenDirect}
       data-testid="tt-recal-eval-popover"
     >
       <PopoverTrigger
@@ -163,8 +143,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
         }}
         onClick={(event) => {
           event.stopPropagation(); // Prevents the click from reaching the TableRow
-          // Use debounced function to prevent rapid state changes
-          debouncedSetPopoverId(isOpen ? null : (info.row.original.id ?? null));
+          // Do not toggle here; Popover will call onOpenChange for us
         }}
         onBlur={handleBlur}
         disabled={isDisabled}
@@ -183,6 +162,8 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
         align="end"
         data-testid="tt-recal-eval-popover-content"
         ref={popoverRef}
+        // Prevent auto-focus bounce on open which can trigger immediate blur close
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <Command>
           <CommandList className="max-h-none">
@@ -195,7 +176,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                   data-testid={`tt-recal-eval-${qualityFeedbackItem.value}`}
                   value={qualityFeedbackItem.value}
                   onSelect={(currentValue) => {
-                    console.log(
+                    logVerbose(
                       "===> RowRecallEvalComboBox.tsx:171 ~ onSelect - currentValue: ",
                       currentValue,
                     );
@@ -207,7 +188,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                           ? ""
                           : currentValue;
 
-                    console.log(
+                    logVerbose(
                       "===> RowRecallEvalComboBox.tsx:183 ~ onSelect - newValue: ",
                       newValue,
                     );
@@ -219,7 +200,7 @@ export function RecallEvalComboBox(props: RecallEvalComboBoxProps) {
                     setSelectedQuality(newValue);
                     info.row.original.recall_eval = newValue;
 
-                    console.log(
+                    logVerbose(
                       `===> RowRecallEvalComboBox.tsx:206 ~ calling saveDate(${newValue})`,
                     );
 

@@ -11,10 +11,14 @@ import { ChevronDown } from "lucide-react";
 import { useTabsState } from "./TabsStateContext";
 
 const TabsMenu = () => {
-  const { tabSpec, setTabVisibility } = useTabsState();
+  const { tabSpec, setTabVisibility, setActiveTab } = useTabsState();
 
   const handleCheckedChange = (tabId: string) => (value: boolean) => {
     setTabVisibility(tabId, value);
+    // If enabling a tab, also activate it so its content becomes visible immediately
+    if (value) {
+      setActiveTab(tabId);
+    }
   };
 
   return (

@@ -43,6 +43,11 @@ export default [
       "**/.next/",
       ".next/*",
       ".next/cache/",
+      // Generated artifacts and reports
+      "playwright-output/**",
+      "**/playwright-output/**",
+      // Next.js generated types file triggers triple-slash rule; ignore it
+      "next-env.d.ts",
       "**/archive/",
       "components/ui/button.tsx",
       "components/ui/form.tsx",

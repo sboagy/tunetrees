@@ -60,6 +60,7 @@ export function getMockTune(): ITuneOverview {
     notes: "",
     private_for: null,
     latest_difficulty: 1,
+    latest_stability: 1,
     latest_step: 1,
   };
   return tuneData;
@@ -129,6 +130,7 @@ export const ERROR_TUNE: ITuneOverview[] = [
     notes: "",
     private_for: null,
     latest_difficulty: 0,
+    latest_stability: 0,
     latest_step: 0,
   },
 ];
@@ -156,5 +158,6 @@ export const ERROR_PLAYLIST_TUNE: ITuneOverview = {
   notes: "",
   private_for: null,
   latest_difficulty: 0,
+  latest_stability: 0,
   latest_step: 0,
 };

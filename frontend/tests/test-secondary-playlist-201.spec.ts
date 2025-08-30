@@ -11,6 +11,13 @@ import {
 } from "../test-scripts/test-logging";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 
+// set 5 minutes for each test in this file
+const testTimeout = process.env.CI ? 5 * 60 * 1000 : 1 * 60 * 1000;
+
+test.setTimeout(testTimeout);
+
+const expectTimeout = process.env.CI ? 60_000 : 30_000;
+
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
   trace: "retain-on-failure",
@@ -26,163 +33,163 @@ test.beforeEach(async ({ page }, testInfo) => {
 
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
+  await page.waitForTimeout(1_000);
 });
 
 test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
-  await restartBackend();
-  await page.waitForTimeout(1_000);
+  await restartBackend(true);
   logBrowserContextEnd();
   logTestEnd(testInfo);
+  await page.waitForTimeout(1_000);
 });
 
-test.describe.serial("Secondary Playlist Tests - Issue 201", () => {
-  test("test-secondary-add-to-repertoire-deselection", async ({ page }) => {
-    const ttPO = new TuneTreesPageObject(page);
-    await ttPO.gotoMainPage();
+test("test-secondary-add-to-repertoire-deselection", async ({ page }) => {
+  const ttPO = new TuneTreesPageObject(page);
+  await ttPO.gotoMainPage();
 
-    // Navigate to Irish Tenor Banjo instrument for secondary playlist testing
-    await ttPO.navigateToIrishTenorBanjoInstrument();
+  // Navigate to Irish Tenor Banjo instrument for secondary playlist testing
+  await ttPO.navigateToIrishTenorBanjoInstrument();
 
-    // Navigate to the Catalog tab
-    await ttPO.navigateToCatalogTab();
+  // Navigate to the Catalog tab
+  await ttPO.navigateToCatalogTab();
 
-    // Test for Issue 201: Secondary playlist functionality
-    // Select specific tunes to test the secondary playlist issue
-    await ttPO.addTuneToSelection("66");
-    await ttPO.addTuneToSelection("54");
+  // Test for Issue 201: Secondary playlist functionality
+  // Select specific tunes to test the secondary playlist issue
+  await ttPO.addTuneToSelection("66");
+  await ttPO.addTuneToSelection("54");
 
-    // Wait for button to be enabled
-    await expect(ttPO.addToRepertoireButton).toBeEnabled();
+  // Wait for button to be enabled
+  await expect(ttPO.addToRepertoireButton).toBeEnabled();
 
-    // Set up error handling for the fetch failure
-    ttPO.setupConsoleErrorHandling();
-    ttPO.setupNetworkFailureHandling();
+  // Set up error handling for the fetch failure
+  ttPO.setupConsoleErrorHandling();
+  ttPO.setupNetworkFailureHandling();
 
-    // Try to click Add To Repertoire - this should trigger the Issue 201 error
-    await ttPO.addToRepertoireButton.click();
+  // Try to click Add To Repertoire - this should trigger the Issue 201 error
+  await ttPO.addToRepertoireButton.click();
 
-    // Wait for potential dialog or error
-    await page.waitForTimeout(2_000);
+  // Wait for potential dialog or error
+  await page.waitForTimeout(2_000);
 
-    // Check if error overlay appeared (this indicates Issue 201)
-    const errorOverlay = page.getByRole("button", {
-      name: "Open issues overlay",
+  // Check if error overlay appeared (this indicates Issue 201)
+  const errorOverlay = page.getByRole("button", {
+    name: "Open issues overlay",
+  });
+  if (await errorOverlay.isVisible()) {
+    console.log(
+      "ERROR DETECTED: Issue 201 - Secondary playlist error occurred",
+    );
+    await errorOverlay.click();
+
+    // Try to capture error details
+    const stackTraceButton = page.getByRole("button", {
+      name: "Copy Stack Trace",
     });
-    if (await errorOverlay.isVisible()) {
-      console.log(
-        "ERROR DETECTED: Issue 201 - Secondary playlist error occurred",
-      );
-      await errorOverlay.click();
-
-      // Try to capture error details
-      const stackTraceButton = page.getByRole("button", {
-        name: "Copy Stack Trace",
-      });
-      if (await stackTraceButton.isVisible()) {
-        await stackTraceButton.click();
-        console.log("Stack trace captured for Issue 201");
-      }
+    if (await stackTraceButton.isVisible()) {
+      await stackTraceButton.click();
+      console.log("Stack trace captured for Issue 201");
     }
+  }
 
-    console.log("Checking if tunes are unselected...");
-    await ttPO.expectTuneUnselected("66");
-    await ttPO.expectTuneUnselected("54");
+  console.log("Checking if tunes are unselected...");
+  await ttPO.expectTuneUnselected("66");
+  await ttPO.expectTuneUnselected("54");
 
-    await ttPO.repertoireTabTrigger.click();
-    await page.waitForTimeout(2_000);
+  await ttPO.repertoireTabTrigger.click();
+  await page.waitForTimeout(2_000);
 
-    await ttPO.catalogTab.click();
-    await page.waitForTimeout(4_000);
+  await ttPO.catalogTab.click();
+  await page.waitForTimeout(4_000);
 
-    await ttPO.expectTuneUnselected("66");
-    await ttPO.expectTuneUnselected("54");
+  await ttPO.expectTuneUnselected("66");
+  await ttPO.expectTuneUnselected("54");
 
-    console.log("test-secondary-add-to-repertoire-deselection completed");
-  });
+  await page.waitForTimeout(1_000);
+  console.log("test-secondary-add-to-repertoire-deselection completed");
+});
 
-  test("test-secondary-playlist-add-to-repertoire", async ({ page }) => {
-    const ttPO = new TuneTreesPageObject(page);
-    await ttPO.gotoMainPage();
+test("test-secondary-playlist-add-to-repertoire", async ({ page }) => {
+  const ttPO = new TuneTreesPageObject(page);
+  await ttPO.gotoMainPage();
 
-    // Navigate to Irish Tenor Banjo instrument for secondary playlist testing
-    await ttPO.navigateToIrishTenorBanjoInstrument();
+  // Navigate to Irish Tenor Banjo instrument for secondary playlist testing
+  await ttPO.navigateToIrishTenorBanjoInstrument(false);
 
-    // Navigate to the Catalog tab
-    await ttPO.navigateToCatalogTab();
+  // Navigate to the Catalog tab
+  await ttPO.navigateToCatalogTab();
 
-    // Test for Issue 201: Secondary playlist functionality
-    // Select specific tunes to test the secondary playlist issue
-    await ttPO.addTuneToSelection("66");
-    await ttPO.addTuneToSelection("54");
+  // Test for Issue 201: Secondary playlist functionality
+  // Select specific tunes to test the secondary playlist issue
+  await ttPO.addTuneToSelection("66");
+  await ttPO.addTuneToSelection("54");
 
-    // Wait for button to be enabled
-    await expect(ttPO.addToRepertoireButton).toBeEnabled();
+  // Wait for button to be enabled
+  await expect(ttPO.addToRepertoireButton).toBeEnabled();
 
-    await ttPO.addToRepertoireButton.click();
+  await ttPO.addToRepertoireButton.click();
 
-    await page.waitForTimeout(1_000);
+  await page.waitForTimeout(1_000);
 
-    await ttPO.repertoireTabTrigger.click({ timeout: 60000 });
-    if (process.env.CI) {
-      await page.waitForTimeout(8_000);
-    } else {
-      await page.waitForTimeout(2_000);
-    }
+  await ttPO.repertoireTabTrigger.click({ timeout: 60000 });
+  // Ensure the repertoire panel and table are visible and populated before measuring rows
+  await ttPO.repertoireTab.waitFor({ state: "visible", timeout: 60000 });
+  await ttPO.waitForTablePopulationToStart();
 
-    const rowCount = await ttPO.tunesGridRows.count();
-    expect(rowCount).toBe(3);
+  await expect(ttPO.tunesGridRows).toHaveCount(3, { timeout: expectTimeout });
 
-    await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
-    await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
+  await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
+  await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
 
-    console.log("test-secondary-playlist-add-to-repertoire completed");
-  });
+  await page.waitForTimeout(1_000);
+  console.log("test-secondary-playlist-add-to-repertoire completed");
+});
 
-  test("test-secondary-playlist-add-to-review", async ({ page }) => {
-    const ttPO = new TuneTreesPageObject(page);
-    await ttPO.gotoMainPage();
+test("test-secondary-playlist-add-to-review", async ({ page }) => {
+  const ttPO = new TuneTreesPageObject(page);
+  await page.waitForTimeout(2_000);
+  await ttPO.gotoMainPage();
+  await page.waitForTimeout(2_000);
 
-    // Navigate to Irish Tenor Banjo instrument for secondary playlist testing
-    await ttPO.navigateToIrishTenorBanjoInstrument();
+  // Navigate to Irish Tenor Banjo instrument for secondary playlist testing
+  await ttPO.navigateToIrishTenorBanjoInstrument();
 
-    // Navigate to the Catalog tab
-    await ttPO.navigateToCatalogTab();
+  // Navigate to the Catalog tab
+  await ttPO.navigateToCatalogTab();
 
-    // Test for Issue 201: Secondary playlist functionality
-    // Select specific tunes to test the secondary playlist issue
-    await ttPO.addTuneToSelection("66");
-    await ttPO.addTuneToSelection("54");
+  // Test for Issue 201: Secondary playlist functionality
+  // Select specific tunes to test the secondary playlist issue
+  await ttPO.addTuneToSelection("66");
+  await ttPO.addTuneToSelection("54");
 
-    // Wait for button to be enabled
-    await expect(ttPO.addToRepertoireButton).toBeEnabled();
+  // Wait for button to be enabled
+  await expect(ttPO.addToRepertoireButton).toBeEnabled();
 
-    await ttPO.addToRepertoireButton.click();
+  await ttPO.addToRepertoireButton.click();
 
-    await page.waitForTimeout(1_000);
+  await page.waitForTimeout(1_000);
 
-    await ttPO.repertoireTabTrigger.click({ timeout: 60000 });
-    await page.waitForTimeout(2_000);
+  await ttPO.repertoireTabTrigger.click({ timeout: 60000 });
+  await page.waitForTimeout(2_000);
 
-    const rowCount = await ttPO.tunesGridRows.count();
-    expect(rowCount).toBe(3);
+  await expect(ttPO.tunesGridRows).toHaveCount(3, { timeout: expectTimeout });
 
-    await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
-    await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
+  await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
+  await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
 
-    await ttPO.addTuneToSelection("66");
-    await ttPO.addTuneToSelection("54");
+  await ttPO.addTuneToSelection("66");
+  await ttPO.addTuneToSelection("54");
 
-    await expect(ttPO.addToReviewButton).toBeEnabled();
+  await expect(ttPO.addToReviewButton).toBeEnabled();
 
-    await ttPO.addToReviewButton.click();
-    await page.waitForTimeout(1_000);
-    await ttPO.practiceTabTrigger.click({ timeout: 60000 });
-    await page.waitForTimeout(1_000);
+  await ttPO.addToReviewButton.click();
+  await page.waitForTimeout(1_000);
+  await ttPO.practiceTabTrigger.click({ timeout: 60000 });
+  await page.waitForTimeout(1_000);
 
-    await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
-    await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
+  await ttPO.expectTuneInTableAndClick(66, "An Chóisir");
+  await ttPO.expectTuneInTableAndClick(54, "Alasdruim's March");
 
-    console.log("Secondary playlist 'Add To Review' completed");
-  });
+  await page.waitForTimeout(1_000);
+  console.log("Secondary playlist 'Add To Review' completed");
 });

@@ -22,6 +22,8 @@ import type {
   ITuneOverviewScheduled,
   ITuneType,
   IViewPlaylistJoined,
+  IPracticeQueueEntry,
+  IPracticeQueueWithMeta,
 } from "./types";
 import { formatDateToIso8601UtcString } from "@/lib/date-utils";
 
@@ -75,6 +77,7 @@ export async function getScheduledTunesOverview(
   playlistId: number,
   sitdownDate: Date,
   showDeleted = false,
+  enableBackfill = false,
 ): Promise<ITuneOverviewScheduled[]> {
   if (
     !sitdownDate ||
@@ -103,14 +106,282 @@ export async function getScheduledTunesOverview(
           show_playlist_deleted: showDeleted,
           sitdown_date: sitdownDateUtcString,
           local_tz_offset_minutes: localTzOffsetMinutes,
+          enable_backfill: enableBackfill,
         },
       },
     );
+    try {
+      const sample = response.data.slice(0, 5).map((t) => ({
+        id: (t as unknown as { id?: number }).id ?? null,
+        bucket: (t as unknown as { bucket?: number | null }).bucket ?? null,
+      }));
+      console.log(
+        "[ScheduledFetch][Query] axios response",
+        JSON.stringify({ length: response.data.length, sample }),
+      );
+    } catch {
+      // ignore logging error
+    }
     return response.data;
   } catch (error) {
     console.error("Error in getPracticeListScheduled: ", error);
     // Return a dummy Tune object to avoid breaking the UI
     return ERROR_TUNE;
+  }
+}
+
+/**
+ * Fetch (or generate) the frozen daily practice queue snapshot for a user/playlist.
+ * Returns entries plus a derived count of newly-due tunes not in the snapshot (bucket 1 gap).
+ */
+export async function getPracticeQueue(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  forceRegen = false,
+): Promise<IPracticeQueueWithMeta> {
+  if (!sitdownDate || Number.isNaN(sitdownDate.getTime())) {
+    throw new Error("sitdownDate (Date) required for practice queue fetch");
+  }
+  const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
+  const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
+  try {
+    const response = await client.get<IPracticeQueueWithMeta>(
+      `/practice-queue/${userId}/${playlistId}/with-meta`,
+      {
+        params: {
+          sitdown_date: sitdownDateUtcString,
+          local_tz_offset_minutes: localTzOffsetMinutes,
+          force_regen: forceRegen,
+        },
+      },
+    );
+    // Contract (stable): this function ALWAYS returns a wrapper
+    //   { entries: IPracticeQueueEntry[], new_tunes_due_count: number }
+    // regardless of backend/raw shape.
+    // The backend currently returns a raw array for GET /practice-queue
+    // (response_model=list[PracticeQueueEntryModel]). We normalize here.
+    const dataAny: unknown = response.data;
+    let normalizedEntries: IPracticeQueueEntry[] = [];
+    let newTunesDueCount = 0;
+
+    if (Array.isArray(dataAny)) {
+      // Legacy/raw array fallback (older endpoint)
+      normalizedEntries = dataAny as IPracticeQueueEntry[];
+    } else if (dataAny && typeof dataAny === "object") {
+      // Wrapper-like shape from any caller/adapter that already wrapped it
+      const maybeWrapper = dataAny as {
+        entries?: unknown;
+        new_tunes_due_count?: unknown;
+      };
+      const { entries } = maybeWrapper;
+      if (Array.isArray(entries)) {
+        normalizedEntries = entries as IPracticeQueueEntry[];
+      } else if (entries && typeof entries === "object") {
+        // Occasionally an object-map keyed by tune id; convert to array
+        normalizedEntries = Object.values(
+          entries as Record<string, IPracticeQueueEntry>,
+        );
+      } else {
+        normalizedEntries = [];
+      }
+      if (typeof maybeWrapper.new_tunes_due_count === "number") {
+        newTunesDueCount = maybeWrapper.new_tunes_due_count;
+      }
+    }
+
+    const wrapped: IPracticeQueueWithMeta = {
+      entries: normalizedEntries,
+      new_tunes_due_count: newTunesDueCount,
+    };
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        const length = wrapped.entries.length;
+        const sample = wrapped.entries.slice(0, 3).map((e) => {
+          const row = e as Partial<IPracticeQueueEntry>;
+          return {
+            tune_ref: row.tune_ref,
+            completed_at: row.completed_at,
+            bucket: row.bucket as number | null | undefined,
+          };
+        });
+        console.debug("[PracticeQueue][Query] normalized", {
+          userId,
+          playlistId,
+          forceRegen,
+          entriesType: "array",
+          length,
+          new_tunes_due_count: wrapped.new_tunes_due_count,
+          sample,
+        });
+      } catch {
+        // ignore debug errors
+      }
+    }
+    return wrapped;
+  } catch (error) {
+    console.error("Error in getPracticeQueue: ", error);
+    return { entries: [], new_tunes_due_count: 0 };
+  }
+}
+
+/**
+ * Entries-only variant of the practice queue fetch.
+ * Stable contract: returns IPracticeQueueEntry[] directly from backend /entries endpoint.
+ */
+export async function getPracticeQueueEntries(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  forceRegen = false,
+): Promise<IPracticeQueueEntry[]> {
+  if (!sitdownDate || Number.isNaN(sitdownDate.getTime())) {
+    throw new Error("sitdownDate (Date) required for practice queue fetch");
+  }
+  const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
+  const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
+  try {
+    const response = await client.get<IPracticeQueueEntry[]>(
+      `/practice-queue/${userId}/${playlistId}/entries`,
+      {
+        params: {
+          sitdown_date: sitdownDateUtcString,
+          local_tz_offset_minutes: localTzOffsetMinutes,
+          force_regen: forceRegen,
+        },
+      },
+    );
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    // Fallback: if the server returned wrapper or object-map by mistake
+    if (data && typeof data === "object") {
+      const maybeEntries = (data as unknown as { entries?: unknown }).entries;
+      if (Array.isArray(maybeEntries))
+        return maybeEntries as IPracticeQueueEntry[];
+      if (maybeEntries && typeof maybeEntries === "object") {
+        return Object.values(
+          maybeEntries as Record<string, IPracticeQueueEntry>,
+        );
+      }
+    }
+    return [];
+  } catch (error) {
+    console.error("Error in getPracticeQueueEntries: ", error);
+    return [];
+  }
+}
+
+/**
+ * Request additional backlog tunes (explicit backfill) appended to active daily queue.
+ * Returns ONLY newly appended queue entries (can be empty if none eligible).
+ */
+export async function refillPracticeQueue(
+  userId: number,
+  playlistId: number,
+  sitdownDate: Date,
+  count = 5,
+): Promise<IPracticeQueueEntry[]> {
+  if (!sitdownDate || Number.isNaN(sitdownDate.getTime())) {
+    throw new Error("sitdownDate (Date) required for practice queue refill");
+  }
+  const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
+  const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
+  try {
+    const response = await client.post<IPracticeQueueEntry[]>(
+      `/practice-queue/${userId}/${playlistId}/refill`,
+      null,
+      {
+        params: {
+          sitdown_date: sitdownDateUtcString,
+          local_tz_offset_minutes: localTzOffsetMinutes,
+          count,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in refillPracticeQueue: ", error);
+    return [];
+  }
+}
+
+/**
+ * Manually (priority) add selected tunes to today's practice queue snapshot.
+ * Returns structure with added_tune_ids, skipped_tune_ids, and enriched new_entries (queue rows added).
+ */
+export async function addTunesToPracticeQueue(
+  userId: number,
+  playlistId: number,
+  tuneIds: number[],
+  sitdownDate: Date,
+): Promise<{
+  added_tune_ids: number[];
+  skipped_tune_ids: number[];
+  new_entries: IPracticeQueueEntry[];
+}> {
+  if (!sitdownDate || Number.isNaN(sitdownDate.getTime())) {
+    throw new Error("sitdownDate (Date) required for practice queue add");
+  }
+  const sitdownDateUtcString = formatDateToIso8601UtcString(sitdownDate);
+  const localTzOffsetMinutes = -sitdownDate.getTimezoneOffset();
+  try {
+    const response = await client.post(
+      `/practice-queue/${userId}/${playlistId}/add`,
+      { tune_ids: tuneIds },
+      {
+        params: {
+          sitdown_date: sitdownDateUtcString,
+          local_tz_offset_minutes: localTzOffsetMinutes,
+        },
+      },
+    );
+    /**
+     * Backend (add_practice_queue_tunes_endpoint) returns shape:
+     *   {
+     *     added: [<serialized queue rows>],
+     *     skipped_existing: number[],
+     *     missing: number[],
+     *     duplicate_request_ignored: number[]
+     *   }
+     * Frontend historically expected { added_tune_ids, skipped_tune_ids, new_entries }.
+     * To avoid a broader refactor we adapt here.
+     */
+    const backend = response.data as unknown as {
+      added?: Array<
+        Partial<IPracticeQueueEntry> & {
+          tune_ref?: number;
+          tune_id?: number;
+          id?: number;
+        }
+      >;
+      skipped_existing?: number[];
+      missing?: number[];
+      duplicate_request_ignored?: number[];
+    };
+    const addedTuneIds: number[] = Array.isArray(backend.added)
+      ? backend.added
+          .map((r) => {
+            if (typeof r.tune_ref === "number") return r.tune_ref;
+            if (typeof r.tune_id === "number") return r.tune_id;
+            if (typeof r.id === "number") return r.id;
+            return undefined;
+          })
+          .filter((v): v is number => typeof v === "number")
+      : [];
+    const skippedTuneIds: number[] = Array.isArray(backend.skipped_existing)
+      ? backend.skipped_existing
+      : [];
+    const newEntries: IPracticeQueueEntry[] = Array.isArray(backend.added)
+      ? (backend.added as IPracticeQueueEntry[])
+      : [];
+    return {
+      added_tune_ids: addedTuneIds,
+      skipped_tune_ids: skippedTuneIds,
+      new_entries: newEntries,
+    };
+  } catch (error) {
+    console.error("Error in addTunesToPracticeQueue: ", error);
+    return { added_tune_ids: [], skipped_tune_ids: [], new_entries: [] };
   }
 }
 
@@ -209,9 +480,8 @@ export async function getTunesOnlyIntoOverview(
       notes: null,
       favorite_url: null,
       playlist_deleted: null,
-      difficulty: null,
-      step: null,
       latest_difficulty: null,
+      latest_stability: null,
       latest_step: null,
       latest_technique: null,
       latest_goal: null,

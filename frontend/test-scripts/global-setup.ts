@@ -40,9 +40,28 @@ async function globalSetup() {
 
   const serverPreUp = await checkServer();
   if (serverPreUp) {
-    console.log("Server is already up and running.");
-    return;
+    console.log(
+      "Server is already up and running. Killing it before continuing.",
+    );
+    try {
+      const pid = await fs.promises.readFile(pidFilePath, "utf-8");
+      if (pid && !Number.isNaN(Number(pid))) {
+        process.kill(Number(pid), "SIGTERM");
+        // Wait for process to exit
+        for (let i = 0; i < 10; i++) {
+          const stillUp = await checkServer();
+          if (!stillUp) break;
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+    } catch (error) {
+      console.warn("Could not kill running FastAPI server:", error);
+    }
   }
+  // if (serverPreUp) {
+  //   console.log("Server is already up and running.");
+  //   return;
+  // }
 
   await setupDatabase();
 
@@ -165,10 +184,10 @@ async function restartBackendHard() {
   await globalSetup();
 }
 
-export async function restartBackend() {
+export async function restartBackend(restartHard = true) {
   // In CI, perform a full stop -> copy -> start cycle to avoid copying
   // the SQLite DB while the server has it open (which can corrupt the file).
-  if (process.env.CI === "true") {
+  if (process.env.CI === "true" || restartHard) {
     await restartBackendHard();
     return;
   }

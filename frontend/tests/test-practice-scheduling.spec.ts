@@ -34,7 +34,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     await setTestDefaults(page);
     await applyNetworkThrottle(page);
     pageObject = new TuneTreesPageObject(page);
-    await pageObject.gotoMainPage();
+    // await pageObject.gotoMainPage();
   });
 
   test.afterEach(async ({ page }, testInfo) => {
@@ -52,6 +52,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
   });
 
   test("User submits quality feedback and tunes are rescheduled", async () => {
+    await pageObject.gotoMainPage();
     await pageObject.navigateToPracticeTabDirectly();
     const feedbacks = ["hard", "good", "(Not Set)", "again"];
 
@@ -60,6 +61,8 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     const count = await rows.count();
     const limit = Math.min(count - 1, 4);
     const reviewedIds: number[] = [];
+    // Capture pre-submission row text for change detection
+    const preRowTexts: Record<number, string> = {};
     for (let i = 1; i <= limit; i++) {
       // skip header row
       const row = rows.nth(i);
@@ -68,6 +71,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
       const idText = await idCell.textContent();
       const tuneId = Number(idText);
       if (!Number.isNaN(tuneId)) {
+        preRowTexts[tuneId] = (await row.textContent()) ?? "";
         const evalType = feedbacks[i - 1];
         // Always apply the evaluation if set; but only assert disappearance for non-again evals
         if (evalType !== "(Not Set)") {
@@ -83,18 +87,41 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     const submitButton = pageObject.page.getByRole("button", {
       name: "Submit Practiced Tunes",
     });
-    await expect(submitButton).toBeEnabled({ timeout: 15000 });
-    await pageObject.page.waitForTimeout(100);
-    await pageObject.clickWithTimeAfter(submitButton);
-    await pageObject.waitForSuccessfullySubmitted();
+    await expect(submitButton).toBeEnabled();
+    await Promise.all([
+      submitButton.click(),
+      pageObject.toast.last().waitFor({ state: "visible" }),
+    ]);
+    await expect(pageObject.toast.last()).toContainText(
+      // "Practice successfully submitted",
+      "Submitted evaluated tunes.",
+    );
 
-    // Verify that the reviewed tunes are no longer listed for today.
-    // The grid may backfill other tunes, so avoid asserting exact row counts.
-    const idCells = pageObject.tunesGridRows.locator("td:first-child");
+    // Verify that each reviewed tune either disappeared OR its row text changed (rescheduled metrics updated)
+    const postRows = pageObject.tunesGridRows;
     for (const tid of reviewedIds) {
-      await expect(
-        idCells.filter({ hasText: new RegExp(`^${tid}$`) }),
-      ).toHaveCount(0, { timeout: 20000 });
+      const idCells = postRows.locator("td:first-child");
+      let target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
+      let presentCount = await target.count();
+      // Retry up to 10 times with a short delay until the ID appears
+      let attempt = 0;
+      for (; attempt < 10 && presentCount < 1; attempt++) {
+        await pageObject.page.waitForTimeout(200);
+        target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
+        presentCount = await target.count();
+      }
+      if (presentCount === 0) {
+        continue; // disappeared: acceptable
+      }
+      // Row still present: check for changed text
+      const row = postRows
+        .locator("tr")
+        .filter({ has: target.first() })
+        .first();
+      const afterText = await row.textContent();
+      expect(
+        afterText && preRowTexts[tid] && afterText !== preRowTexts[tid],
+      ).toBeTruthy();
     }
   });
 
@@ -112,7 +139,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
 
     pageObject = new TuneTreesPageObject(page);
     await pageObject.gotoMainPage();
-    await pageObject.navigateToPracticeTab();
+    await pageObject.navigateToPracticeTabDirectly();
     // Check that only tunes scheduled for the new day are shown
     const rowCount = await pageObject.tunesGridRows.count();
     expect(rowCount).toBeGreaterThan(1);

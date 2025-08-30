@@ -163,15 +163,18 @@ export default function SchedulingOptionsForm({
         onSubmit={(e) => {
           void form.handleSubmit(onSubmit)(e);
         }}
-        className="space-y-6"
+        // Reduced vertical spacing for denser layout
+        className="space-y-4"
       >
         <FormField
           control={form.control}
           name="acceptable_delinquency_window"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Acceptable Delinquency Window (days)</FormLabel>
-              <FormDescription>
+            <FormItem className="space-y-1.5">
+              <FormLabel className="leading-snug">
+                Acceptable Delinquency Window (days)
+              </FormLabel>
+              <FormDescription className="text-xs leading-snug">
                 How many days late a review can be without penalty.
               </FormDescription>
               <FormControl>
@@ -192,13 +195,15 @@ export default function SchedulingOptionsForm({
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <FormField
             control={form.control}
             name="min_reviews_per_day"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Min Reviews Per Day</FormLabel>
+              <FormItem className="space-y-1.5">
+                <FormLabel className="leading-snug">
+                  Min Reviews Per Day
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -220,8 +225,10 @@ export default function SchedulingOptionsForm({
             control={form.control}
             name="max_reviews_per_day"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Max Reviews Per Day</FormLabel>
+              <FormItem className="space-y-1.5">
+                <FormLabel className="leading-snug">
+                  Max Reviews Per Day
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -245,9 +252,9 @@ export default function SchedulingOptionsForm({
           control={form.control}
           name="days_per_week"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Days per Week</FormLabel>
-              <FormDescription>
+            <FormItem className="space-y-1.5">
+              <FormLabel className="leading-snug">Days per Week</FormLabel>
+              <FormDescription className="text-xs leading-snug">
                 How many days you aim to practice each week.
               </FormDescription>
               <FormControl>
@@ -272,9 +279,11 @@ export default function SchedulingOptionsForm({
           control={form.control}
           name="weekly_rules"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Weekly Rules (JSON)</FormLabel>
-              <FormDescription>
+            <FormItem className="space-y-1.5">
+              <FormLabel className="leading-snug">
+                Weekly Rules (JSON)
+              </FormLabel>
+              <FormDescription className="text-xs leading-snug">
                 Describe weekly practice rules (e.g., which weekdays to
                 practice).
               </FormDescription>
@@ -283,7 +292,7 @@ export default function SchedulingOptionsForm({
                   placeholder='{"mon": true, "wed": true, "fri": true}'
                   data-testid="sched-weekly-rules-input"
                   {...field}
-                  className="min-h-[60px]"
+                  className="min-h-[56px] text-sm"
                   onChange={(e) => {
                     markTouched();
                     field.onChange(e.target.value);
@@ -299,9 +308,9 @@ export default function SchedulingOptionsForm({
           control={form.control}
           name="exceptions"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Exceptions (JSON)</FormLabel>
-              <FormDescription>
+            <FormItem className="space-y-1.5">
+              <FormLabel className="leading-snug">Exceptions (JSON)</FormLabel>
+              <FormDescription className="text-xs leading-snug">
                 Specific date overrides (YYYY-MM-DD).
               </FormDescription>
               <FormControl>
@@ -309,7 +318,7 @@ export default function SchedulingOptionsForm({
                   placeholder='["2025-08-15", "2025-08-22"]'
                   data-testid="sched-exceptions-input"
                   {...field}
-                  className="min-h-[60px]"
+                  className="min-h-[56px] text-sm"
                   onChange={(e) => {
                     markTouched();
                     field.onChange(e.target.value);
@@ -325,7 +334,7 @@ export default function SchedulingOptionsForm({
           type="submit"
           data-testid="sched-submit-button"
           variant="secondary"
-          className="flex justify-center items-center px-4 mt-2 space-x-2 w-full h-12"
+          className="flex justify-center items-center px-4 mt-1 space-x-2 w-full h-11 text-sm"
           // Enable when user touched something AND there are no validation errors
           disabled={!touched || isSubmitting || Object.keys(errors).length > 0}
         >

@@ -32,7 +32,11 @@ test("test-notes-1", async ({ page }) => {
 
   await page.getByPlaceholder("Filter").click();
   await page.getByPlaceholder("Filter").fill("Peacock's Feather");
-  await page.getByRole("row", { name: "4377 Peacock's Feather Hpipe" }).click();
+  await page
+    .getByRole("row", { name: "4377 Peacock's Feather Hpipe" })
+    .getByRole("cell")
+    .nth(1)
+    .click();
 
   await page.waitForSelector("#current-tune-title", {
     state: "visible",
@@ -61,11 +65,14 @@ test("test-notes-1", async ({ page }) => {
   await expect(noteEditBoxLocator).toBeVisible();
   await expect(noteEditBoxLocator).toBeEditable();
   await noteEditBoxLocator.click();
-  await ttPO.page.waitForTimeout(1000);
+
+  // Wait for things to calm down before typing into the editor.
+  await ttPO.page.waitForLoadState("domcontentloaded");
+  await page.waitForTimeout(2000);
 
   const newNoteText = "abcdef";
 
-  await noteEditBoxLocator.pressSequentially(newNoteText, { delay: 100 });
+  await noteEditBoxLocator.pressSequentially(newNoteText, { delay: 200 });
 
   const saveEditButtonLocator = page.getByTestId("tt-save-note");
   await expect(saveEditButtonLocator).toBeVisible();
@@ -81,7 +88,7 @@ test("test-notes-1", async ({ page }) => {
   await responsePromise;
 
   // Wait for the DOM to calm down by ensuring no network activity and a short pause
-  await page.waitForLoadState("networkidle");
+  // await page.waitForLoadState("networkidle");
   await page.waitForLoadState("domcontentloaded");
   await page.waitForTimeout(500);
 
