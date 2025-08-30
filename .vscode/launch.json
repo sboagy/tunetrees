@@ -33,7 +33,7 @@
             "justMyCode": false
         },
         {
-            "name": "Python Debugger: FastAPI (test)",
+            "name": "Python Debugger FastAPI test",
             "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
@@ -73,6 +73,94 @@
                 "PYTHONPATH": "${workspaceFolder}"
             },
             "justMyCode": true
+        },
+        {
+            "name": "Next: Node",
+            "request": "launch",
+            "runtimeArgs": [
+                "dev",
+                "--experimental-https"
+            ],
+            "runtimeExecutable": "next",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node",
+            "cwd": "${workspaceFolder}/frontend",
+            "envFile": "${workspaceFolder}/frontend/.env.local",
+            "env": {
+                "NODE_ENV": "development",
+                "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION": "false"
+            }
+        },
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Next: Chrome",
+            "url": "https://localhost:3000/home",
+            "webRoot": "${workspaceFolder}/frontend"
+        },
+        {
+            "name": "Launch",
+            "request": "launch",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node",
+            "preLaunchTask": "tsc: build - tsconfig.json",
+            "outFiles": [
+                "${workspaceFolder}/.next/**/*.js"
+            ],
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/.next/**/*",
+                "${workspaceFolder}/node_modules/**/*"
+            ]
+        },
+        {
+            "name": "Attach",
+            "port": 9229,
+            "request": "attach",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node",
+            "preLaunchTask": "tsc: build - tsconfig.json",
+            "outFiles": [
+                "${workspaceFolder}/.next/**/*.js"
+            ],
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/node_modules/**/*"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Run Login Script",
+            "program": "${workspaceFolder}/scripts/run-login.mts",
+            "runtimeExecutable": "node",
+            "runtimeArgs": [
+                "--loader",
+                "ts-node/esm"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/frontend"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Next: Full",
+            "configurations": [
+                "Next: Node",
+                "Next: Chrome"
+            ]
+        },
+        {
+            "name": "App: Backend + Frontend",
+            "configurations": [
+                "Python Debugger: FastAPI",
+                "Next: Node"
+            ],
+            "stopAll": true
         }
     ]
 }
