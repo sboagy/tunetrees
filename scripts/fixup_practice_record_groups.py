@@ -24,6 +24,7 @@ Persistence behavior:
 
 Output:
 - Rich tables printed to stdout. Use --output <file> to write the rendered output to a file instead.
+- Optionally export a colorized HTML report with --html-output <file> (uses inline styles).
 - Groups are preceded by a summary count and separated by rules for readability.
 
 Run from repo root:
@@ -42,7 +43,7 @@ import argparse
 import os
 from pathlib import Path
 import sys
-from typing import ContextManager, List, Optional, Sequence, TYPE_CHECKING, Tuple
+from typing import ContextManager, List, Sequence, TYPE_CHECKING, Tuple
 
 from tunetrees.models.tunetrees import PracticeRecord
 
@@ -50,7 +51,7 @@ if TYPE_CHECKING:  # imports for type checking only
     from tunetrees.models.tunetrees import PracticeRecord
 
 from fsrs import Card, Rating, Scheduler, State
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 import warnings
 from sqlalchemy.exc import SAWarning
@@ -120,6 +121,25 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional path to write the rendered tables/output (defaults to stdout)",
     )
+    parser.add_argument(
+        "--html-output",
+        dest="html_output",
+        type=Path,
+        default=None,
+        help=(
+            "Optional path to write a colorized HTML report. When provided, output is also recorded and exported "
+            "as HTML with inline styles."
+        ),
+    )
+    parser.add_argument(
+        "--fsrsonly",
+        action="store_true",
+        default=False,
+        help=(
+            "Only include and display rows where technique is 'fsrs' (case-insensitive). "
+            "By default, all practice records are processed regardless of technique."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -135,17 +155,28 @@ def get_session_from_database_module(db_path: Path) -> ContextManager[Session]:
     return database.SessionLocal()
 
 
+def _build_group_select_stmt(tune_ref: int, fsrsonly: bool):
+    """Build base SELECT for a tune_ref with optional FSRS-only filter."""
+    from tunetrees.models.tunetrees import PracticeRecord
+
+    stmt = select(PracticeRecord).where(PracticeRecord.tune_ref == tune_ref)
+    if fsrsonly:
+        # Restrict to rows where technique is exactly 'fsrs' (case-insensitive, trimmed)
+        stmt = stmt.where(func.lower(func.trim(PracticeRecord.technique)) == "fsrs")
+    return stmt.order_by(PracticeRecord.id.asc())
+
+
 def find_all_fsrs_tune_refs(db: Session, limit: int | None = None) -> List[int]:
     from tunetrees.models.tunetrees import PracticeRecord
 
     # Count rows where technique is exactly 'fsrs' (case-insensitive, trimmed)
-    tech_normalized = func.lower(func.trim(PracticeRecord.technique))
-    good_count = func.sum(case(((tech_normalized == "fsrs"), 1), else_=0))
+    # tech_normalized: Function[Any] = func.lower(func.trim(PracticeRecord.technique))
+    # good_count = func.sum(case(((tech_normalized == "fsrs"), 1), else_=0))
 
     stmt = (
         select(PracticeRecord.tune_ref)
         .group_by(PracticeRecord.tune_ref)
-        .having(good_count > 0)
+        # .having(good_count > 0)
         .order_by(PracticeRecord.tune_ref)
     )
     if limit is not None and limit > 0:
@@ -156,9 +187,11 @@ def find_all_fsrs_tune_refs(db: Session, limit: int | None = None) -> List[int]:
 def _render_rows_table(
     rows: Sequence["PracticeRecord"],
     title: str,
-    reps_override: Optional[Sequence[Optional[int]]] = None,
+    *,
+    title_style: str | None = None,
+    row_style: str | None = None,
 ) -> None:
-    table = Table(title=title)
+    table = Table(title=title, title_style=title_style)
     for col in [
         "tune_ref",
         "id",
@@ -175,17 +208,12 @@ def _render_rows_table(
         "step",
     ]:
         table.add_column(col)
-    for idx, pr in enumerate(rows):
-        rep_val: Optional[int | str]
-        if reps_override is not None:
-            rep_val = reps_override[idx]
-        else:
-            rep_val = pr.repetitions if pr.repetitions is not None else ""
+    for _, pr in enumerate(rows):
         table.add_row(
             str(pr.tune_ref),
             str(pr.id),
             str(pr.practiced or ""),
-            str(rep_val),
+            str(pr.repetitions or ""),
             str(pr.technique or ""),
             str(pr.quality if pr.quality is not None else ""),
             str(pr.stability if pr.stability is not None else ""),
@@ -195,6 +223,7 @@ def _render_rows_table(
             str(pr.easiness if pr.easiness is not None else ""),
             str(pr.interval if pr.interval is not None else ""),
             str(pr.step if pr.step is not None else ""),
+            style=row_style,
         )
     console.print(table)
 
@@ -206,26 +235,26 @@ def _e_factor_to_difficulty(e_factor: float) -> float:
     return float(round(d))
 
 
-def _compute_normalized_reps(rows: Sequence["PracticeRecord"]) -> List[Optional[int]]:
-    orig_reps: List[Optional[int]] = [
-        (r.repetitions if isinstance(r.repetitions, int) else None) for r in rows
-    ]
-    norm_reps: List[Optional[int]] = orig_reps.copy()
+# def _compute_normalized_reps(rows: Sequence["PracticeRecord"]) -> List[Optional[int]]:
+#     orig_reps: List[Optional[int]] = [
+#         (r.repetitions if isinstance(r.repetitions, int) else None) for r in rows
+#     ]
+#     norm_reps: List[Optional[int]] = orig_reps.copy()
 
-    start_idx: Optional[int] = None
-    for i, rv in enumerate(orig_reps):
-        if rv is not None and rv != 0:
-            start_idx = i
-            break
-    if start_idx is not None:
-        for j in range(start_idx + 1, len(norm_reps)):
-            prev = norm_reps[j - 1]
-            prev_int = int(prev) if prev is not None else 0
-            norm_reps[j] = prev_int + 1
-    else:
-        for j in range(len(norm_reps)):
-            norm_reps[j] = j + 1
-    return norm_reps
+#     start_idx: Optional[int] = None
+#     for i, rv in enumerate(orig_reps):
+#         if rv is not None and rv != 0:
+#             start_idx = i
+#             break
+#     if start_idx is not None:
+#         for j in range(start_idx + 1, len(norm_reps)):
+#             prev = norm_reps[j - 1]
+#             prev_int = int(prev) if prev is not None else 0
+#             norm_reps[j] = prev_int + 1
+#     else:
+#         for j in range(len(norm_reps)):
+#             norm_reps[j] = j + 1
+#     return norm_reps
 
 
 def _quality_to_fsrs_rating(quality_int: int) -> Rating:
@@ -249,7 +278,9 @@ def _quality_to_fsrs_rating(quality_int: int) -> Rating:
         raise ValueError(f"Unexpected quality value: {quality_int}")
 
 
-def fsrs_fixup(rows: Sequence[PracticeRecord]) -> Tuple[Sequence[PracticeRecord], bool]:
+def fsrs_fixup_old(
+    rows: Sequence[PracticeRecord],
+) -> Tuple[Sequence[PracticeRecord], bool]:
     """Repair FSRS fields by replaying review history.
 
     Logic:
@@ -306,47 +337,76 @@ def fsrs_fixup(rows: Sequence[PracticeRecord]) -> Tuple[Sequence[PracticeRecord]
     return rows, fsrs_updated
 
 
-def dump_group(
-    db: Session, tune_ref: int, *, apply: bool = False, nofixup: bool = False
-) -> None:
-    from tunetrees.models.tunetrees import PracticeRecord
+def fsrs_fixup(rows: Sequence[PracticeRecord]) -> Tuple[Sequence[PracticeRecord], bool]:
+    fsrs_updated = False
+    scheduler = Scheduler()
+    previous_card = Card()
 
+    for r in rows:
+        tech = (r.technique or "").lower()
+        if tech != "fsrs":
+            rating = _quality_to_fsrs_rating(int(r.quality or 0))
+        else:
+            rating = Rating(int(r.quality or 1))
+
+        # Always advance card on FSRS rows using observed rating
+        previous_card, _ = scheduler.review_card(previous_card, rating)
+
+        r.state = previous_card.state
+        r.step = previous_card.step
+        r.stability = previous_card.stability
+        r.difficulty = previous_card.difficulty
+        r.review_date = previous_card.due
+        r.technique = "fsrs"
+        r.quality = rating.value
+        fsrs_updated = True
+
+    return rows, fsrs_updated
+
+
+def dump_group(
+    db: Session,
+    tune_ref: int,
+    *,
+    apply: bool = False,
+    nofixup: bool = False,
+    fsrsonly: bool = False,
+) -> None:
     rows: Sequence[PracticeRecord] = (
-        db.execute(
-            select(PracticeRecord)
-            .where(PracticeRecord.tune_ref == tune_ref)
-            .order_by(PracticeRecord.id.asc())
-        )
-        .scalars()
-        .all()
+        db.execute(_build_group_select_stmt(tune_ref, fsrsonly)).scalars().all()
     )
     if not rows:
         return
 
-    _render_rows_table(rows, title=f"tune_ref={tune_ref} (rows={len(rows)}) — original")
+    _render_rows_table(
+        rows,
+        title=f"tune_ref={tune_ref} (rows={len(rows)}) — original",
+        row_style="blue",
+    )
 
     if nofixup:
         console.rule()
         return
 
-    norm_reps = _compute_normalized_reps(rows)
+    # norm_reps = _compute_normalized_reps(rows)
+    rep_updates = 0
+    repetitions = (rows[0].repetitions if rows else 1) or 1
+    for _, pr in enumerate(rows):
+        if pr.repetitions != repetitions:
+            rep_updates += 1
+            pr.repetitions = repetitions
+        repetitions += 1
 
     rows, fsrs_updated = fsrs_fixup(rows)
 
     _render_rows_table(
         rows,
         title=f"tune_ref={tune_ref} (rows={len(rows)}) — repetitions normalized",
-        reps_override=norm_reps,
+        row_style="green",
     )
     # Apply normalized values back to DB if requested
     if apply:
         try:
-            rep_updates = 0
-            for idx, pr in enumerate(rows):
-                nv = norm_reps[idx]
-                if nv is not None and pr.repetitions != nv:
-                    pr.repetitions = nv
-                rep_updates += 1
             if fsrs_updated or rep_updates:
                 db.commit()
                 console.print(
@@ -359,12 +419,6 @@ def dump_group(
                 f"[red]Failed to apply updates for tune_ref={tune_ref}: {e}[/red]"
             )
     else:
-        # Dry-run summary of changes
-        rep_updates = 0
-        for idx, pr in enumerate(rows):
-            nv = norm_reps[idx]
-            if nv is not None and pr.repetitions != nv:
-                rep_updates += 1
         console.print(
             f"[cyan]DRY-RUN[/cyan]: would update FSRS: {'yes' if fsrs_updated else 'no'},"
             f" reps: {rep_updates} for tune_ref={tune_ref}. Use --apply to commit."
@@ -380,7 +434,13 @@ def main() -> None:
     def run() -> None:
         with get_session_from_database_module(args.db) as db:
             if args.tune is not None:
-                dump_group(db, args.tune, apply=args.apply, nofixup=args.nofixup)
+                dump_group(
+                    db,
+                    args.tune,
+                    apply=args.apply,
+                    nofixup=args.nofixup,
+                    fsrsonly=args.fsrsonly,
+                )
                 return
 
             tune_refs = find_all_fsrs_tune_refs(db, limit=args.limit)
@@ -392,16 +452,48 @@ def main() -> None:
                     "[dim]No matching groups. Tip: try --tune <id> to inspect a specific tune, or verify technique values in the DB.[/dim]"
                 )
             for t in tune_refs:
-                dump_group(db, t, apply=args.apply, nofixup=args.nofixup)
+                dump_group(
+                    db,
+                    t,
+                    apply=args.apply,
+                    nofixup=args.nofixup,
+                    fsrsonly=args.fsrsonly,
+                )
 
-    if args.output is not None:
-        # Send all Rich output to the specified file
+    # Prepare consoles based on output options
+    global console
+    html_export: str | None = None
+
+    if args.output is not None and args.html_output is not None:
+        # Dual output: write plain text file and also export HTML
         with open(args.output, "w", encoding="utf-8") as out_fp:
-            global console
+            console = Console(file=out_fp, record=True)
+            run()
+            html_export = console.export_html(inline_styles=True)
+    elif args.output is not None:
+        # Only text output
+        with open(args.output, "w", encoding="utf-8") as out_fp:
             console = Console(file=out_fp)
             run()
-    else:
+    elif args.html_output is not None:
+        # Only HTML export, still show to stdout while recording
+        console = Console(record=True)
         run()
+        html_export = console.export_html(inline_styles=True)
+    else:
+        # Default behavior: stdout only
+        run()
+
+    # Write HTML file if requested
+    if args.html_output is not None and html_export is not None:
+        try:
+            args.html_output.parent.mkdir(parents=True, exist_ok=True)
+            with open(args.html_output, "w", encoding="utf-8") as fp:
+                fp.write(html_export)
+        except Exception as e:  # noqa: BLE001
+            console.print(
+                f"[red]Failed to write HTML report to {args.html_output}: {e}[/red]"
+            )
 
 
 if __name__ == "__main__":

@@ -60,12 +60,13 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "args": [
-                // "--output",
-                // "fsrs_fixup_report_apply.txt",
+                "--html-output",
+                "fsrs_fixup_report_apply.html",
                 // "--limit",
                 // "5",
                 // "--apply"
                 "--nofixup"
+                // "--fsrsonly"
             ],
             "env": {
                 "TUNETREES_DB": "${workspaceFolder}/tunetrees_production_manual.sqlite3",
