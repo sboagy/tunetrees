@@ -60,6 +60,7 @@ test.describe.serial("Tune Edit Tests", () => {
   test("test-edit-1", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
     await ttPO.gotoMainPage();
+    await ttPO.page.waitForTimeout(1000);
 
     await ttPO.navigateToTune("Lakes of Sligo");
 
@@ -101,6 +102,7 @@ test.describe.serial("Tune Edit Tests", () => {
   test("test-edit-2", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
     await ttPO.gotoMainPage();
+    await ttPO.page.waitForTimeout(1000);
 
     await ttPO.navigateToTune("Boyne Hunt");
 
@@ -167,6 +169,7 @@ test.describe.serial("Tune Edit Tests", () => {
   test("test-edit-3", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
     await ttPO.gotoMainPage();
+    await ttPO.page.waitForTimeout(1000);
 
     await ttPO.navigateToTune("Boyne Hunt");
 

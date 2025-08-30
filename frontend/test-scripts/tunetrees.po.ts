@@ -282,9 +282,9 @@ export class TuneTreesPageObject {
     await this.repertoireTabTrigger.waitFor({
       state: "visible",
     });
-    // Ensure the tab is ready and click it
+
     await this.ensureClickable(this.repertoireTabTrigger);
-    await this.repertoireTabTrigger.click();
+    await this.clickWithTimeAfter(this.repertoireTabTrigger);
 
     // Wait for the filter input to be visible and enabled before interacting with it
     await expect(this.filterInput).toBeVisible({ timeout: 10000 });
@@ -308,7 +308,7 @@ export class TuneTreesPageObject {
     if (rowCount >= 2) {
       const tuneRow = this.page.getByRole("row").nth(1);
       const firstCell = tuneRow.getByRole("cell").nth(1);
-      await firstCell.click();
+      await this.clickWithTimeAfter(firstCell);
     } else {
       // Attempt to click any row containing the title
       const fallback = this.page.getByRole("row", { name: tuneTitle }).first();
@@ -320,7 +320,7 @@ export class TuneTreesPageObject {
         );
       }
     }
-    await this.page.waitForTimeout(100);
+    await this.page.waitForTimeout(300);
     // await this.page.getByRole("row", { name: tuneTitle }).click();
   }
 
@@ -659,6 +659,8 @@ export class TuneTreesPageObject {
 
   async navigateToCatalogTab(): Promise<void> {
     // Step 1: If Catalog trigger already exists, try normal activation
+    await this.page.waitForLoadState("domcontentloaded");
+
     let hasCatalogTrigger = await this.catalogTab
       .isVisible()
       .catch(() => false);
@@ -768,9 +770,10 @@ export class TuneTreesPageObject {
     } catch {
       await expect(catalogContent).toBeVisible({ timeout: 10000 });
     }
+    await this.page.waitForLoadState("domcontentloaded");
 
     // Verify we can see the Add To Repertoire button
-    await expect(this.addToRepertoireButton).toBeVisible({ timeout: 15000 });
+    await expect(this.addToRepertoireButton).toBeVisible();
     await expect(this.addToRepertoireButton).toBeEnabled();
 
     await this.page.waitForTimeout(2000);
