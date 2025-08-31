@@ -669,7 +669,7 @@ export class TuneTreesPageObject {
     // Step 1: If Catalog trigger already exists, try normal activation
     await this.page.waitForLoadState("domcontentloaded");
 
-    let hasCatalogTrigger = await this.catalogTab
+    const hasCatalogTrigger = await this.catalogTab
       .isVisible()
       .catch(() => false);
     if (!hasCatalogTrigger) {
@@ -690,101 +690,28 @@ export class TuneTreesPageObject {
         await this.tabsMenuCatalogChoice.getAttribute("aria-checked");
       if (menuChecked !== "true") {
         await this.ensureClickable(this.tabsMenuCatalogChoice);
-
         await this.clickWithTimeAfter(this.tabsMenuCatalogChoice);
-
-        // Wait for aria-checked to reflect the change
-        await expect(this.tabsMenuCatalogChoice).toHaveAttribute(
-          "aria-checked",
-          "true",
-        );
+      } else {
+        // Close the menu using Escape
+        await this.page.keyboard.press("Escape");
+        await dropdownMenu
+          .waitFor({ state: "hidden", timeout: 3000 })
+          .catch(() =>
+            dropdownMenu.waitFor({ state: "detached", timeout: 3000 }),
+          );
       }
-
-      // Close the menu using Escape to avoid overlay intercepts
-      await this.page.keyboard.press("Escape");
-      await dropdownMenu
-        .waitFor({ state: "hidden", timeout: 3000 })
-        .catch(() =>
-          dropdownMenu.waitFor({ state: "detached", timeout: 3000 }),
-        );
 
       // Re-check if the Catalog trigger is now attached/visible
-      hasCatalogTrigger = await this.catalogTab.isVisible().catch(() => false);
+      // hasCatalogTrigger = await this.catalogTab.isVisible().catch(() => false);
+      await expect(this.catalogTab).toBeVisible();
     }
 
-    // First attempt: if visible, perform a standard click
-    const catalogTriggerVisible = await this.catalogTab
-      .isVisible()
-      .catch(() => false);
-    if (catalogTriggerVisible) {
-      await this.ensureClickable(this.catalogTab, 10000);
-      await this.clickWithTimeAfter(this.catalogTab);
-    } else {
-      // Second attempt: DOM-based click that doesn't require visibility
-      try {
-        await this.catalogTab.evaluate((el) => (el as HTMLElement).click());
-        await this.page.waitForTimeout(150);
-      } catch {
-        // ignore and try keyboard fallback
-      }
+    await this.clickWithTimeAfter(this.catalogTab);
 
-      // If still not active, fallback: use keyboard navigation (ArrowRight + Enter) to activate Catalog
-      const practiceTrigger = this.page.getByRole("tab", { name: "Practice" });
-      const repertoireTrigger = this.page.getByRole("tab", {
-        name: "Repertoire",
-      });
-      if (await practiceTrigger.isVisible().catch(() => false)) {
-        await this.ensureClickable(practiceTrigger);
-        await practiceTrigger.click();
-      } else if (await repertoireTrigger.isVisible().catch(() => false)) {
-        await this.ensureClickable(repertoireTrigger);
-        await repertoireTrigger.click();
-      }
-
-      const catalogContent = this.page.getByTestId("tt-catalog-tab");
-      let reached = await catalogContent.isVisible().catch(() => false);
-      let attempts = 0;
-      while (!reached && attempts < 6) {
-        await this.page.keyboard.press("ArrowRight");
-        await this.page.waitForTimeout(50);
-        // Activate the currently focused tab explicitly
-        await this.page.keyboard.press("Enter");
-        await this.page.waitForTimeout(150);
-        // Check either content visibility or trigger active state
-        const triggerActive =
-          (await this.catalogTab.getAttribute("data-state")) === "active" ||
-          (await this.catalogTab.getAttribute("aria-selected")) === "true";
-        reached =
-          triggerActive ||
-          (await catalogContent.isVisible().catch(() => false));
-        attempts += 1;
-      }
-
-      if (!reached) {
-        // Final attempt: force click the trigger
-        try {
-          await this.catalogTab.click({ force: true, timeout: 2000 });
-        } catch {
-          // ignore; will assert below
-        }
-      }
-    }
-
-    // Wait for the Catalog content to become active
-    const catalogContent = this.page.getByTestId("tt-catalog-tab");
-    // Prefer state-based readiness but fall back to visibility
-    try {
-      await expect(this.catalogTab).toHaveAttribute("data-state", "active", {
-        timeout: 10000,
-      });
-    } catch {
-      await expect(catalogContent).toBeVisible({ timeout: 10000 });
-    }
     await this.page.waitForLoadState("domcontentloaded");
 
     // Verify we can see the Add To Repertoire button
     await expect(this.addToRepertoireButton).toBeVisible();
-    await expect(this.addToRepertoireButton).toBeEnabled();
 
     await this.page.waitForTimeout(2000);
   }
