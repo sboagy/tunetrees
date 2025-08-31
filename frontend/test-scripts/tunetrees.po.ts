@@ -452,6 +452,12 @@ export class TuneTreesPageObject {
         timeout: 30000,
       });
     }
+    await this.page.waitForTimeout(2000);
+    // Wait for grid to finish client-side loading indicators
+    const loadingTimeout = process.env.CI ? 60_000 : 20_000;
+    await expect(this.tunesGrid).not.toContainText("Loading...", {
+      timeout: loadingTimeout,
+    });
   }
 
   async clickWithTimeAfter(
