@@ -51,9 +51,8 @@ test.afterEach(async ({ page }, testInfo) => {
 test.describe.serial("Add Tune Tests", () => {
   test("test-newtune-1", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
-    // await ttPO.gotoMainPage();
 
-    await ttPO.navigateToRepertoireTab();
+    await ttPO.gotoMainPage();
 
     // await page.waitForTimeout(1000 * 200);
     await ttPO.clickWithTimeAfter(ttPO.tabsMenuButton);
@@ -106,9 +105,8 @@ test.describe.serial("Add Tune Tests", () => {
 
   test("test-import-1", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
-    // await ttPO.gotoMainPage();
 
-    await ttPO.navigateToRepertoireTab();
+    await ttPO.gotoMainPage();
 
     await ttPO.clickWithTimeAfter(ttPO.addTuneButton);
 

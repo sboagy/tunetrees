@@ -47,8 +47,8 @@ test.skip("3-day scheduling progression validates basic spaced repetition", asyn
 
   // Day 1: Navigate to practice and submit some feedback
   console.log("📅 Day 1: Initial practice session");
+
   await ttPO.gotoMainPage();
-  await ttPO.navigateToPracticeTab();
 
   // Check if we have tunes to practice
   await expect(ttPO.tunesGrid).toBeVisible({ timeout: 15000 });
@@ -104,7 +104,7 @@ test.skip("3-day scheduling progression validates basic spaced repetition", asyn
   }
 
   // Record tunes scheduled for next few days
-  await ttPO.navigateToRepertoireTab();
+  await ttPO.navigateToRepertoireTabDirectly();
   await expect(ttPO.tunesGrid).toBeVisible();
 
   const day1RepertoireCount = await ttPO.tunesGridRows.count();
@@ -121,13 +121,13 @@ test("scheduled column drives practice availability", async ({ page }) => {
   await ttPO.gotoMainPage();
 
   // Check repertoire tab to see total tunes
-  await ttPO.navigateToRepertoireTab();
+  // await ttPO.navigateToRepertoireTabDirectly();
   await expect(ttPO.tunesGrid).toBeVisible();
   const totalTunes = await ttPO.tunesGridRows.count();
   console.log(`Total tunes in repertoire: ${totalTunes}`);
 
   // Check practice tab to see available tunes
-  await ttPO.navigateToPracticeTab();
+  await ttPO.navigateToPracticeTabDirectly();
   await expect(ttPO.tunesGrid).toBeVisible();
   const availableTunes = await ttPO.tunesGridRows.count();
   console.log(`Tunes available for practice: ${availableTunes}`);
@@ -150,7 +150,6 @@ test.skip("practice feedback updates scheduling state", async ({ page }) => {
 
   console.log("⚡ Testing that practice feedback updates tune scheduling");
 
-  await ttPO.gotoMainPage();
   await ttPO.navigateToPracticeTab();
 
   await expect(ttPO.tunesGrid).toBeVisible();

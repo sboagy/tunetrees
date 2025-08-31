@@ -325,8 +325,16 @@ export class TuneTreesPageObject {
   }
 
   async navigateToRepertoireTab(pauseSecondsAfter = 2) {
-    await this.gotoMainPage();
+    const mainTabVisible = await this.mainTabGroup
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    if (!mainTabVisible) {
+      await this.gotoMainPage();
+    }
+    await this.navigateToRepertoireTabDirectly(pauseSecondsAfter);
+  }
 
+  async navigateToRepertoireTabDirectly(pauseSecondsAfter = 2) {
     await this.mainTabGroup.waitFor({ state: "visible" });
     // Click the Repertoire tab trigger first, then wait for the panel to be visible
     await this.repertoireTabTrigger.waitFor({

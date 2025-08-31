@@ -116,6 +116,12 @@ test("test-secondary-playlist-add-to-repertoire", async ({ page }) => {
   // Navigate to Irish Tenor Banjo instrument for secondary playlist testing
   await ttPO.navigateToIrishTenorBanjoInstrument(false);
 
+  // There's a bit of a race condition here if the catalog tab is invoked before,
+  // to try and ensure we're past the loading stage.
+  // Still, this is really a bug I'm hacking around.
+  await ttPO.addToReviewButton.isVisible();
+  await page.waitForTimeout(2_000);
+
   // Navigate to the Catalog tab
   await ttPO.navigateToCatalogTab();
 
@@ -154,6 +160,12 @@ test("test-secondary-playlist-add-to-review", async ({ page }) => {
 
   // Navigate to Irish Tenor Banjo instrument for secondary playlist testing
   await ttPO.navigateToIrishTenorBanjoInstrument();
+
+  // There's a bit of a race condition here if the catalog tab is invoked before,
+  // to try and ensure we're past the loading stage.
+  // Still, this is really a bug I'm hacking around.
+  await ttPO.addToReviewButton.isVisible();
+  await page.waitForTimeout(2_000);
 
   // Navigate to the Catalog tab
   await ttPO.navigateToCatalogTab();
