@@ -49,10 +49,9 @@ async function clearExistingSorts(ttPO: TuneTreesPageObject, page: Page) {
 
   // Click the Scheduled/Latest Review column to cycle through its sort states until unsorted
   // Scheduled is likely pre-sorted ascending, so: asc → desc → unsorted
-  await ttPO.LatestReviewColumnHeaderSortButton.click();
-  await page.waitForTimeout(500);
-  await ttPO.LatestReviewColumnHeaderSortButton.click(); // Should now be unsorted
-  await page.waitForTimeout(500);
+  await ttPO.clickWithTimeAfter(ttPO.LatestReviewColumnHeaderSortButton, 1000);
+
+  await ttPO.clickWithTimeAfter(ttPO.LatestReviewColumnHeaderSortButton, 1000);
 
   console.log(
     "Latest Review column cleared, now testing multi-column sorting...",
@@ -146,8 +145,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     }
 
     // Click again to sort descending
-    await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForTimeout(500);
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
 
     // Verify the sort changed to descending
     const descendingIcon = ttPO.idColumnHeaderSortButton.locator("svg");
@@ -193,7 +191,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     }
 
     // Click again to clear sorting
-    await ttPO.idColumnHeaderSortButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
 
     // Wait until the sort state is cleared (button title no longer matches ascending/descending)
     await expect(ttPO.idColumnHeaderSortButton).not.toHaveAttribute(
@@ -221,8 +219,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
       timeout: 15000,
     });
 
-    await ttPO.typeColumnHeaderSortButton.click();
-    await page.waitForTimeout(1000);
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
 
     // Then sort by Title while holding shift (multicolumn)
     await ttPO.titleColumnHeaderSortButton.scrollIntoViewIfNeeded();
@@ -232,7 +229,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
 
     // Use keyboard modifier for multicolumn sorting
     await page.keyboard.down("Shift");
-    await ttPO.titleColumnHeaderSortButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
     await page.keyboard.up("Shift");
     await page.waitForTimeout(1000);
 
@@ -340,8 +337,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     await expect(tunesGrid).toBeVisible({ timeout: 15000 });
 
     // Sort by ID column
-    await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForTimeout(1000);
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
 
     // Get the first row ID after sorting
     const firstRowIdCell = page
