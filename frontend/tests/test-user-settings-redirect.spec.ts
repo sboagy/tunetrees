@@ -12,6 +12,7 @@ import {
   logBrowserContextStart,
   logBrowserContextEnd,
 } from "../test-scripts/test-logging";
+import { restartBackend } from "@/test-scripts/global-setup";
 
 test.beforeEach(async ({ page }, testInfo) => {
   logTestStart(testInfo);
@@ -22,6 +23,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 
 test.afterEach(async ({ page }, testInfo) => {
   // tiny pause to ensure logs flush
+  await restartBackend();
   await page.waitForTimeout(10);
   logBrowserContextEnd();
   logTestEnd(testInfo);
