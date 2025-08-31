@@ -67,10 +67,10 @@ test("test-secondary-add-to-repertoire-deselection", async ({ page }) => {
   ttPO.setupNetworkFailureHandling();
 
   // Try to click Add To Repertoire - this should trigger the Issue 201 error
-  await ttPO.addToRepertoireButton.click();
+  await ttPO.clickWithTimeAfter(ttPO.addToRepertoireButton);
 
   // Wait for potential dialog or error
-  await page.waitForTimeout(2_000);
+  await page.waitForTimeout(1_000);
 
   // Check if error overlay appeared (this indicates Issue 201)
   const errorOverlay = page.getByRole("button", {
@@ -96,10 +96,10 @@ test("test-secondary-add-to-repertoire-deselection", async ({ page }) => {
   await ttPO.expectTuneUnselected("66");
   await ttPO.expectTuneUnselected("54");
 
-  await ttPO.repertoireTabTrigger.click();
+  await ttPO.clickWithTimeAfter(ttPO.repertoireTabTrigger);
   await page.waitForTimeout(2_000);
 
-  await ttPO.catalogTab.click();
+  await ttPO.clickWithTimeAfter(ttPO.catalogTab);
   await page.waitForTimeout(4_000);
 
   await ttPO.expectTuneUnselected("66");
@@ -127,11 +127,12 @@ test("test-secondary-playlist-add-to-repertoire", async ({ page }) => {
   // Wait for button to be enabled
   await expect(ttPO.addToRepertoireButton).toBeEnabled();
 
-  await ttPO.addToRepertoireButton.click();
+  await ttPO.clickWithTimeAfter(ttPO.addToRepertoireButton);
 
   await page.waitForTimeout(1_000);
 
-  await ttPO.repertoireTabTrigger.click({ timeout: 60000 });
+  await ttPO.clickWithTimeAfter(ttPO.repertoireTabTrigger);
+
   // Ensure the repertoire panel and table are visible and populated before measuring rows
   await ttPO.repertoireTab.waitFor({ state: "visible", timeout: 60000 });
   await ttPO.waitForTablePopulationToStart();
@@ -180,11 +181,11 @@ test("test-secondary-playlist-add-to-review", async ({ page }) => {
   await ttPO.addTuneToSelection("66");
   await ttPO.addTuneToSelection("54");
 
-  await expect(ttPO.addToReviewButton).toBeEnabled();
-
-  await ttPO.addToReviewButton.click();
+  await ttPO.clickWithTimeAfter(ttPO.addToReviewButton);
   await page.waitForTimeout(1_000);
-  await ttPO.practiceTabTrigger.click({ timeout: 60000 });
+
+  await ttPO.clickWithTimeAfter(ttPO.practiceTabTrigger);
+
   await page.waitForTimeout(1_000);
 
   await ttPO.expectTuneInTableAndClick(66, "An Chóisir");

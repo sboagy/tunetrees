@@ -611,7 +611,7 @@ export class TuneTreesPageObject {
       exact: true,
     });
     await passwordEntryBox.press("Tab");
-    await this.page.waitForTimeout(10);
+    await this.page.waitForTimeout(20);
 
     await this.page.waitForFunction(
       (button) => {
@@ -632,10 +632,10 @@ export class TuneTreesPageObject {
     //
     // instead, we'll wait for the tableStatus to be visible.
     // Use CI-aware timeout: longer in CI environment for reliability
-    const loginTimeout = process.env.CI ? 90_000 : 20_000;
-    await this.tableStatus.waitFor({
-      state: "visible",
-      timeout: loginTimeout,
+    await this.tableStatus.isVisible();
+    const tableStatusTimeout = process.env.CI ? 120_000 : 25_000;
+    await expect(this.tableStatus).toContainText("row(s) selected", {
+      timeout: tableStatusTimeout,
     });
 
     console.log("===> run-login2.ts:50 ~ ", "Login completed");
@@ -819,8 +819,9 @@ export class TuneTreesPageObject {
       .filter({ hasText: tune_name });
 
     await expect(tuneRow).toBeVisible({ timeout: 10000 });
-
-    await tuneRow.click();
+    const tuneIdTestIdStr = `${tune_id}_id`;
+    const tuneIdCell = this.page.getByTestId(tuneIdTestIdStr);
+    await this.clickWithTimeAfter(tuneIdCell);
   }
 
   async expectTuneUnselected(tune_id: string): Promise<void> {

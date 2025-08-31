@@ -46,6 +46,7 @@ test("scheduling options validates JSON and disables submit until valid/dirty", 
       process.env.TEST1_LOGIN_USER_PASSWORD,
     );
   }
+  await page.waitForLoadState("domcontentloaded");
 
   // Navigate directly to scheduling options
   await page.goto("https://localhost:3000/user-settings/scheduling-options", {
