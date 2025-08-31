@@ -5,8 +5,8 @@ if [ -f .env.local ]; then
   source .env.local
 fi
 
-OWNER=${GITT_OWNER}
-REPO=${GITTHUB_REPO}
+OWNER="${GITT_OWNER:-sboagy}"
+REPO="${GITHUB_REPO:-tunetrees}"
 
 echo "Deleting all workflow runs for $OWNER/$REPO"
 
