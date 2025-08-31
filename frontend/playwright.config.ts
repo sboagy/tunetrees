@@ -160,6 +160,7 @@ export default defineConfig({
       GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
       GITHUB_CLIENT_ID: process.env.GGITHUB_CLIENT_ID || "",
       GITHUB_CLIENT_SECRET: process.env.GGITHUB_CLIENT_SECRET || "",
+      NODE_OPTIONS: process.env.NODE_OPTIONS || "--max-old-space-size=4096",
       TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
     },
     url: "https://localhost:3000/api/health",
