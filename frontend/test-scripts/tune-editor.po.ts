@@ -388,7 +388,9 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
         response.status() === 200 &&
         response.request().method() === "POST",
     );
-    await this.page.getByRole("button", { name: buttonName }).click();
+    await this.clickWithTimeAfter(
+      this.page.getByRole("button", { name: buttonName }),
+    );
     return responsePromise;
   }
 

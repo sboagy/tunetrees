@@ -33,10 +33,10 @@ async function doEditAndButtonClick(
   expectedText: string | null = null,
 ) {
   const formFieldTextBox = await ttPO.navigateToFormFieldById(formFieldTestId);
-  await expect(formFieldTextBox).toHaveValue(originalText, {
-    timeout: 5000,
-  });
+  await expect(formFieldTextBox).toHaveValue(originalText);
   await formFieldTextBox.fill(modifiedText);
+  await ttPO.page.waitForTimeout(500);
+  await expect(formFieldTextBox).toHaveValue(modifiedText);
 
   // Click the button and, if saving, wait for the editor modal to close (submit button detached)
   await Promise.all([

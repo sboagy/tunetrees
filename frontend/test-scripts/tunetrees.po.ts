@@ -313,7 +313,7 @@ export class TuneTreesPageObject {
       // Attempt to click any row containing the title
       const fallback = this.page.getByRole("row", { name: tuneTitle }).first();
       if (await fallback.isVisible()) {
-        await fallback.click();
+        await this.clickWithTimeAfter(fallback);
       } else {
         throw new Error(
           `navigateToTune(): Unable to locate tune row for title '${tuneTitle}'.`,
@@ -690,7 +690,9 @@ export class TuneTreesPageObject {
         await this.tabsMenuCatalogChoice.getAttribute("aria-checked");
       if (menuChecked !== "true") {
         await this.ensureClickable(this.tabsMenuCatalogChoice);
-        await this.tabsMenuCatalogChoice.click();
+
+        await this.clickWithTimeAfter(this.tabsMenuCatalogChoice);
+
         // Wait for aria-checked to reflect the change
         await expect(this.tabsMenuCatalogChoice).toHaveAttribute(
           "aria-checked",

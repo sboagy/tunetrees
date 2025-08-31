@@ -91,6 +91,10 @@ test.describe.serial("Add Tune Tests", () => {
 
     const tuneTitle = ttPO.sampleSiBheagSiMhorShort[ttPO.iffTitle].modification;
 
+    await ttPO.tableStatus.waitFor({ state: "visible" });
+    await expect(ttPO.tableStatus).toContainText("0 of 489");
+    await page.waitForTimeout(500);
+
     await ttPO.navigateToTune(tuneTitle);
 
     const currentTuneTitleLocator = page.locator("#current-tune-title");
