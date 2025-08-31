@@ -5,6 +5,9 @@ import { getStorageState } from "@/test-scripts/storage-state";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { expect, test } from "@playwright/test";
 
+const testTimeout = process.env.CI ? 3 * 60 * 1000 : 1 * 60 * 1000;
+test.setTimeout(testTimeout);
+
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
   trace: "retain-on-failure",

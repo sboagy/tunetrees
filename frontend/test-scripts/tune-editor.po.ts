@@ -294,6 +294,9 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
     );
     if (tagName === "input") {
       await formField.locator.fill(formField.modification);
+      await this.page.waitForTimeout(10);
+      await formField.locator.press("Tab");
+      await this.page.waitForTimeout(10);
     } else if (tagName === "select") {
       const selectedOption =
         formField.select_modification !== undefined

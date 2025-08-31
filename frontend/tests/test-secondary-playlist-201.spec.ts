@@ -54,6 +54,8 @@ test("test-secondary-add-to-repertoire-deselection", async ({ page }) => {
   // Navigate to the Catalog tab
   await ttPO.navigateToCatalogTab();
 
+  await expect(ttPO.addToRepertoireButton).toBeVisible();
+
   // Test for Issue 201: Secondary playlist functionality
   // Select specific tunes to test the secondary playlist issue
   await ttPO.addTuneToSelection("66");

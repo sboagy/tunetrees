@@ -685,11 +685,11 @@ export class TuneTreesPageObject {
         timeout: 5000,
       });
 
-      // Ensure the Catalog tab is enabled in the menu
+      // Ensure the Catalog tab is not enabled in the menu
       const menuChecked =
         await this.tabsMenuCatalogChoice.getAttribute("aria-checked");
       if (menuChecked !== "true") {
-        await this.ensureClickable(this.tabsMenuCatalogChoice);
+        // await this.ensureClickable(this.tabsMenuCatalogChoice);
         await this.clickWithTimeAfter(this.tabsMenuCatalogChoice);
       } else {
         // Close the menu using Escape
@@ -704,6 +704,9 @@ export class TuneTreesPageObject {
       // Re-check if the Catalog trigger is now attached/visible
       // hasCatalogTrigger = await this.catalogTab.isVisible().catch(() => false);
       await expect(this.catalogTab).toBeVisible();
+      await this.page.waitForLoadState("domcontentloaded");
+      await this.page.waitForTimeout(2000);
+      return;
     }
 
     await this.clickWithTimeAfter(this.catalogTab);
