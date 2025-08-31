@@ -35,10 +35,7 @@ test.afterEach(async ({ page }, testInfo) => {
   logTestEnd(testInfo);
 });
 
-// Helper function to clear existing sorts (e.g., Scheduled/Latest Review column)
-import type { Page } from "@playwright/test";
-
-async function clearExistingSorts(ttPO: TuneTreesPageObject, page: Page) {
+async function clearExistingSorts(ttPO: TuneTreesPageObject) {
   console.log(
     "Clearing Scheduled/Latest Review column sorting to avoid multi-column interference...",
   );
@@ -76,7 +73,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     await page.waitForTimeout(1000);
 
     // ... inside your test:
-    await clearExistingSorts(ttPO, page);
+    await clearExistingSorts(ttPO);
 
     // Find the ID column sorting button (anchor by data-testid for robustness)
     await expect(ttPO.idColumnHeaderSortButton).toBeVisible({ timeout: 15000 });
@@ -210,7 +207,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     const tunesGrid = page.locator("table").first();
     await expect(tunesGrid).toBeVisible({ timeout: 15000 });
 
-    await clearExistingSorts(ttPO, page);
+    await clearExistingSorts(ttPO);
 
     // Test sorting by Type column first using Page Object locators (button-based to avoid role brittleness)
     // Ensure the Type header button is scrolled into view (header can be horizontally off-screen)

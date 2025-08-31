@@ -59,9 +59,8 @@ export async function getUserExtendedByEmailFromDb(
   email: string,
 ): Promise<IUser | null> {
   const path = `${_baseURL}/auth/get-user-by-email/${email}`;
-  let res;
   try {
-    res = await fetchWithTimeout(
+    const res = await fetchWithTimeout(
       path,
       {
         method: "GET",
@@ -72,6 +71,7 @@ export async function getUserExtendedByEmailFromDb(
       },
       7000, // 7s header timeout for auth RPC
     );
+    return (await res.json()) as IUser;
   } catch (error) {
     console.error(
       "auth-fetch:getUserExtendedByEmailFromDb fetch error:",
@@ -79,7 +79,6 @@ export async function getUserExtendedByEmailFromDb(
     );
     throw error;
   }
-  return (await res.json()) as IUser;
 }
 
 export async function createUserInDatabase(user: IUser): Promise<IUser> {
