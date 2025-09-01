@@ -142,16 +142,15 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
         if (c.sameSite === "None" && !c.secure) {
           c.sameSite = "Lax";
         }
-        // Prefer url-based cookies to avoid Domain/IP scoping pitfalls.
-        // Ensure each cookie has either `url` or (`domain` and `path`). We choose url.
+        // Ensure each cookie has either `url` or (`domain` and `path`).
+        // For CI, use url-based cookies to avoid Domain/IP scoping issues
         c.url = targetOrigin;
-        delete c.domain; // remove domain to rely on url scoping
-        c.path = c.path || "/"; // keep path as safe default
-        // Final guard: if for any reason url is falsy, fallback to domain+path
-        if (!c.url) {
-          c.domain = targetHost;
-          c.path = c.path || "/";
+        // Remove domain when using url to avoid conflicts
+        if ("domain" in c) {
+          delete c.domain;
         }
+        // Always ensure path is set as backup
+        c.path = c.path || "/";
       }
 
       // Rewrite origins array from https://localhost:3000 -> http://127.0.0.1:3000
@@ -180,6 +179,16 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
     typeof storageStateParsed === "string"
       ? storageStateParsed
       : JSON.stringify(storageStateParsed, null, 2);
+
+  // Debug: Log the first cookie to see its structure
+  if (process.env.CI === "true" && typeof storageStateParsed !== "string") {
+    const firstCookie = storageStateParsed.cookies?.[0];
+    console.log(
+      "===> First cookie after adaptation:",
+      JSON.stringify(firstCookie, null, 2),
+    );
+  }
+
   fs.writeFileSync(outPath, toWrite, "utf8");
   return outPath;
 }
