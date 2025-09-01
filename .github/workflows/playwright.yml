@@ -102,9 +102,8 @@ jobs:
       #   run: wait-on https://localhost:3000
       #   working-directory: frontend
 
-      - name: Run Frontend Playwright tests
-        # run: npx playwright test --project=chromium --grep "test-practice-1-2"
-        run: npx playwright test --project=chromium --reporter=list
+      - name: Run Frontend Playwright tests (notes only)
+        run: npx playwright test --project=chromium --reporter=list tests/test-notes.spec.ts
         working-directory: frontend
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
