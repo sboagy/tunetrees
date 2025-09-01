@@ -61,8 +61,8 @@ jobs:
       - name: Build frontend for CI
         if: always()
         run: |
-          mkdir -p frontend/test-results
-          npm run build 2>&1 | tee frontend/test-results/frontend-build.log
+          mkdir -p test-results
+          npm run build 2>&1 | tee test-results/frontend-build.log
         working-directory: frontend
         env:
           # Ensure Next.js embeds necessary env when building (for NEXT_PUBLIC_* and server rendering)
@@ -72,13 +72,13 @@ jobs:
           AUTH_TRUST_HOST: true
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          TUNETREES_FRONTEND_LOG: frontend/test-results/frontend.log
+          TUNETREES_FRONTEND_LOG: test-results/frontend.log
 
       - name: Start frontend (production) in background
         if: always()
         run: |
-          mkdir -p frontend/test-results
-          npm run start 2>&1 | tee frontend/test-results/frontend.log &
+          mkdir -p test-results
+          npm run start 2>&1 | tee test-results/frontend.log &
           echo $! > .next-start.pid
         working-directory: frontend
         env:
@@ -90,7 +90,7 @@ jobs:
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           AUTH_DEBUG: true
-          TUNETREES_FRONTEND_LOG: frontend/test-results/frontend.log
+          TUNETREES_FRONTEND_LOG: test-results/frontend.log
 
       - name: Wait for frontend health
         if: always()
@@ -203,4 +203,8 @@ jobs:
           name: playwright-report
           path: |
             frontend/test-results/
+            frontend/playwright-report/
+            frontend/test-results/fastapi.log
+            frontend/test-results/frontend.log
+            frontend/test-results/frontend-build.log
           retention-days: 30
