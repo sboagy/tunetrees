@@ -158,8 +158,14 @@ export default defineConfig({
         NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION:
           process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "true",
         TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
-        AUTH_SECRET: process.env.AUTH_SECRET || "",
-        NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",
+        // Ensure NextAuth works under production server in CI
+        AUTH_URL: process.env.AUTH_URL || (isCI ? "http://127.0.0.1:3000" : ""),
+        AUTH_SECRET:
+          process.env.AUTH_SECRET ||
+          (isCI ? "test_auth_secret_for_ci_only" : ""),
+        NEXTAUTH_SECRET:
+          process.env.NEXTAUTH_SECRET ||
+          (isCI ? "test_nextauth_secret_for_ci_only" : ""),
         AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
         AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET || "",
         AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || "",
