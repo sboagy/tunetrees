@@ -86,8 +86,10 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
         if (c.name.startsWith("__Host-")) {
           // Example: __Host-authjs.csrf-token -> authjs.csrf-token
           c.name = c.name.replace("__Host-", "");
-          // Ensure secure=false for HTTP in CI
-          c.secure = false;
+          // Ensure cookie path is root when __Host- prefix was used
+          c.path = c.path || "/";
+        }
+        if (c.name.startsWith("__Secure-")) {
           c.name = c.name.replace("__Secure-", "");
         }
         // Ensure secure=false for HTTP in CI
@@ -121,11 +123,12 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
         if (c.sameSite === "None" && !c.secure) {
           c.sameSite = "Lax";
         }
-
-        // Use URL-based cookie format for IP hosts to satisfy browser cookie rules
-        // Domain cookies generally can't target IPs; switch to URL and drop domain.
-        c.url = targetOrigin;
-        delete c.domain;
+        // Ensure domain+path format (preferred for Playwright storage state) and no url field
+        c.domain = targetHost;
+        c.path = c.path || "/";
+        if ("url" in c) {
+          delete c.url;
+        }
       }
 
       // Rewrite origins array from https://localhost:3000 -> http://127.0.0.1:3000
