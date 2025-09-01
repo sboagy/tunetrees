@@ -66,7 +66,11 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
   const storageStateParsed: IMutableStorageState | string =
     JSON.parse(storageStateContent);
   // Adapt storage state to match the environment base URL so cookies/origins align.
-  if (typeof storageStateParsed !== "string") {
+  // Only do this in CI or when explicitly forced to avoid unexpected local changes.
+  const shouldAdapt =
+    process.env.CI === "true" ||
+    process.env.PLAYWRIGHT_FORCE_STORAGE_ADAPT === "true";
+  if (shouldAdapt && typeof storageStateParsed !== "string") {
     try {
       const envBase =
         process.env.PLAYWRIGHT_BASE_URL ||
