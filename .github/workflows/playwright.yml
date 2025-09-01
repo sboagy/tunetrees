@@ -187,7 +187,9 @@ jobs:
           TT_REVIEW_SITDOWN_DATE: 2024-12-31 16:47:57.671465+00:00
           THROTTLE_MAX: 0
           AUTH_TRUST_HOST: true
-        run: npx playwright test --project=chromium --reporter=list
+        run: |
+          mkdir -p test-results
+          npx playwright test --project=chromium --reporter=list 2>&1 | tee test-results/playwright-phase2.log
       - name: Stop frontend
         if: always()
         run: |
@@ -207,4 +209,6 @@ jobs:
             frontend/test-results/fastapi.log
             frontend/test-results/frontend.log
             frontend/test-results/frontend-build.log
+            frontend/test-results/playwright-phase1.log
+            frontend/test-results/playwright-phase2.log
           retention-days: 30

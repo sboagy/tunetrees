@@ -15,7 +15,9 @@ if [[ -z "${TEST1_LOGIN_USER_EMAIL:-}" || -z "${TEST1_LOGIN_USER_PASSWORD:-}" ]]
   exit 1
 fi
 
-# Run only the login test
-npx playwright test --project=chromium --reporter=list tests/test-login-1.spec.ts
+mkdir -p test-results
+
+# Run only the login test and tee output to a log file for CI artifacts
+npx playwright test --project=chromium --reporter=list tests/test-login-1.spec.ts 2>&1 | tee test-results/playwright-phase1.log
 
 echo "Saved storage state at test-scripts/storageStateSboagyLogin.json"
