@@ -64,9 +64,9 @@ jobs:
         working-directory: frontend
         env:
           # Ensure Next.js embeds necessary env when building (for NEXT_PUBLIC_* and server rendering)
-          NEXT_BASE_URL: http://127.0.0.1:3000
-          TT_API_BASE_URL: http://127.0.0.1:8000
-          AUTH_URL: http://127.0.0.1:3000
+          NEXT_BASE_URL: http://localhost:3000
+          TT_API_BASE_URL: http://localhost:8000
+          AUTH_URL: http://localhost:3000
           AUTH_TRUST_HOST: true
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
@@ -79,9 +79,9 @@ jobs:
         working-directory: frontend
         env:
           # Ensure runtime env for NextAuth and server-side API calls
-          NEXT_BASE_URL: http://127.0.0.1:3000
-          TT_API_BASE_URL: http://127.0.0.1:8000
-          AUTH_URL: http://127.0.0.1:3000
+          NEXT_BASE_URL: http://localhost:3000
+          TT_API_BASE_URL: http://localhost:8000
+          AUTH_URL: http://localhost:3000
           AUTH_TRUST_HOST: true
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
@@ -91,7 +91,7 @@ jobs:
         if: always()
         run: |
           for i in {1..30}; do
-            if curl -sSf "http://127.0.0.1:3000/api/health" >/dev/null 2>&1; then
+            if curl -sSf "http://localhost:3000/api/health" >/dev/null 2>&1; then
               echo "frontend healthy"; exit 0
             fi
             sleep 2
@@ -99,9 +99,9 @@ jobs:
           echo "frontend did not become healthy"; exit 1
         working-directory: frontend
         env:
-          NEXT_BASE_URL: http://127.0.0.1:3000
-          TT_API_BASE_URL: http://127.0.0.1:8000
-          AUTH_URL: http://127.0.0.1:3000
+          NEXT_BASE_URL: http://localhost:3000
+          TT_API_BASE_URL: http://localhost:8000
+          AUTH_URL: http://localhost:3000
           AUTH_TRUST_HOST: true
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
@@ -130,9 +130,9 @@ jobs:
         run: npx playwright test --project=chromium --reporter=list tests/test-notes.spec.ts
         working-directory: frontend
         env:
-          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
-          NEXT_BASE_URL: http://127.0.0.1:3000
-          TT_API_BASE_URL: http://127.0.0.1:8000
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          NEXT_BASE_URL: http://localhost:3000
+          TT_API_BASE_URL: http://localhost:8000
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}

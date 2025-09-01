@@ -69,7 +69,7 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
   // http://127.0.0.1:3000. This fixes cookie/origin mismatches without re-generating secrets.
   if (process.env.CI === "true" && typeof storageStateParsed !== "string") {
     try {
-      const targetHost = "127.0.0.1";
+      const targetHost = "localhost";
       const targetOrigin = `http://${targetHost}:3000`;
 
       // Rewrite cookies: domain localhost -> 127.0.0.1, secure -> false
@@ -123,12 +123,13 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
         if (c.sameSite === "None" && !c.secure) {
           c.sameSite = "Lax";
         }
-        // Ensure domain+path format (preferred for Playwright storage state) and no url field
-        c.domain = targetHost;
-        c.path = c.path || "/";
-        if ("url" in c) {
-          delete c.url;
+        // For IP hosts, prefer url-based cookies; browsers may ignore Domain on IPs
+        c.url = targetOrigin;
+        if ("domain" in c) {
+          delete c.domain;
         }
+        // Keep a safe default path in case Playwright inspects it
+        c.path = c.path || "/";
       }
 
       // Rewrite origins array from https://localhost:3000 -> http://127.0.0.1:3000
