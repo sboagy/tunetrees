@@ -8,7 +8,8 @@ type StorageStateType =
       cookies: Array<{
         name: string;
         value: string;
-        domain: string;
+        domain?: string;
+        url?: string;
         path: string;
         expires: number;
         httpOnly: boolean;
@@ -70,15 +71,32 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
       // Rewrite cookies: domain localhost -> 127.0.0.1, secure -> false
       // Also adjust callback-url cookie value if it encodes https://localhost:3000
       for (const c of storageState.cookies ?? []) {
+        // Normalize host for CI http server
         if (c.domain === "localhost") {
           c.domain = targetHost;
         }
-        // For HTTP in CI, ensure cookies can be sent
-        if (c.secure) {
+        // Playwright enforces cookie prefix rules:
+        // - __Host- requires Secure + Path=/ + no Domain (HTTPS only)
+        // - __Secure- requires Secure (HTTPS only)
+        // Since CI uses HTTP, drop these prefixes and set secure=false
+        if (c.name.startsWith("__Host-")) {
+          // Example: __Host-authjs.csrf-token -> authjs.csrf-token
+          c.name = c.name.replace("__Host-", "");
+          // Ensure secure=false for HTTP in CI
           c.secure = false;
+          c.name = c.name.replace("__Secure-", "");
         }
+        // Ensure secure=false for HTTP in CI
+        c.secure = false;
+
+        // Some tools export fractional expires; coerce to integer seconds
+        if (typeof c.expires === "number" && c.expires > 0) {
+          c.expires = Math.floor(c.expires);
+        }
+
+        // Update callback-url cookie value to http://127.0.0.1:3000 when present
         if (
-          c.name === "__Secure-authjs.callback-url" &&
+          c.name === "authjs.callback-url" &&
           c.value.includes("https%3A%2F%2Flocalhost%3A3000")
         ) {
           c.value = c.value.replace(
@@ -86,6 +104,24 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
             encodeURIComponent(targetOrigin),
           );
         }
+
+        // Back-compat: if someone persisted the old __Secure-authjs.callback-url name
+        if (
+          c.name === "authjs.callback-url" &&
+          c.value.includes("https://localhost:3000")
+        ) {
+          c.value = c.value.replace("https://localhost:3000", targetOrigin);
+        }
+
+        // Ensure sameSite is compatible with non-secure (None requires Secure)
+        if (c.sameSite === "None" && !c.secure) {
+          c.sameSite = "Lax";
+        }
+
+        // Use URL-based cookie format for IP hosts to satisfy browser cookie rules
+        // Domain cookies generally can't target IPs; switch to URL and drop domain.
+        c.url = targetOrigin;
+        delete c.domain;
       }
 
       // Rewrite origins array from https://localhost:3000 -> http://127.0.0.1:3000
