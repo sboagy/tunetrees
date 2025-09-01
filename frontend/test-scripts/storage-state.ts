@@ -65,6 +65,15 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
   }
   const storageStateParsed: IMutableStorageState | string =
     JSON.parse(storageStateContent);
+
+  // Always ensure cookies have valid schema for Playwright (path or url must be present)
+  if (typeof storageStateParsed !== "string") {
+    for (const c of storageStateParsed.cookies ?? []) {
+      // Ensure every cookie has at least a path property for Playwright validation
+      c.path = c.path || "/";
+    }
+  }
+
   // Adapt storage state to match the environment base URL so cookies/origins align.
   // Only do this in CI or when explicitly forced to avoid unexpected local changes.
   const shouldAdapt =
