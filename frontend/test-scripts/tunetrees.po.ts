@@ -4,7 +4,8 @@ import { initialPageLoadTimeout } from "./paths-for-tests";
 
 export class TuneTreesPageObject {
   readonly page: Page;
-  pageLocation = "https://localhost:3000";
+  // Use relative path so Playwright's baseURL applies (HTTPS locally, HTTP in CI)
+  pageLocation = "/";
   initialPageLoadTimeout = 50000;
   readonly currentTuneTitle;
   readonly repertoireTabTrigger;
@@ -863,7 +864,21 @@ export class TuneTreesPageObject {
       const isExpectedHttpsError = expectedHttpsErrors.some((error) =>
         errorText.includes(error),
       );
-      const isLocalhostRequest = url.includes("https://localhost:3000");
+      // Treat local baseURL as expected; allow http/https and IPv4/IPv6 loopback
+      let isLocalhostRequest = false;
+      try {
+        const u = new URL(url);
+        const host = u.hostname;
+        const port = u.port || (u.protocol === "https:" ? "443" : "80");
+        isLocalhostRequest =
+          (host === "localhost" ||
+            host === "127.0.0.1" ||
+            host === "::1" ||
+            host === "[::1]") &&
+          port === "3000";
+      } catch {
+        isLocalhostRequest = false;
+      }
 
       if (isExpectedHttpsError && isLocalhostRequest) {
         // Only log in debug mode for expected errors
