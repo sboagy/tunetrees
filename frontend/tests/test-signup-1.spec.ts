@@ -347,7 +347,7 @@ test.describe.serial("Signup Tests", () => {
     const ttPO = new TuneTreesPageObject(page);
 
     await checkHealth();
-    await page.goto("https://localhost:3000", {
+    await page.goto("/", {
       timeout: initialPageLoadTimeout,
       waitUntil: "domcontentloaded",
     });
@@ -413,7 +413,7 @@ test.describe.serial("Signup Tests", () => {
     const ttPO = new TuneTreesPageObject(page);
 
     await checkHealth();
-    await page.goto("https://localhost:3000", {
+    await page.goto("/", {
       timeout: initialPageLoadTimeout,
       waitUntil: "domcontentloaded",
     });
@@ -478,7 +478,7 @@ test.describe.serial("Signup Tests", () => {
     const ttPO = new TuneTreesPageObject(page);
 
     await checkHealth();
-    await page.goto("https://localhost:3000", {
+    await page.goto("/", {
       timeout: initialPageLoadTimeout,
       waitUntil: "domcontentloaded",
     });
@@ -546,7 +546,7 @@ test.describe.serial("Signup Tests", () => {
     const ttPO = new TuneTreesPageObject(page);
 
     await checkHealth();
-    await page.goto("https://localhost:3000", {
+    await page.goto("/", {
       timeout: initialPageLoadTimeout,
       waitUntil: "domcontentloaded",
     });
@@ -609,7 +609,7 @@ test.describe.serial("Signup Tests", () => {
     const ttPO = new TuneTreesPageObject(page);
 
     await checkHealth();
-    await page.goto("https://localhost:3000", {
+    await page.goto("/", {
       timeout: initialPageLoadTimeout,
       waitUntil: "domcontentloaded",
     });
@@ -661,7 +661,7 @@ test.describe.serial("Signup Tests", () => {
     );
 
     // Now simulate user closing browser/navigating away and trying to sign up again
-    await page.goto("https://localhost:3000", {
+    await page.goto("/", {
       timeout: initialPageLoadTimeout,
       waitUntil: "domcontentloaded",
     });
@@ -728,7 +728,7 @@ async function initialSignIn(page: Page) {
 
   await checkHealth();
 
-  await page.goto("https://localhost:3000", {
+  await page.goto("/", {
     timeout: initialPageLoadTimeout,
     waitUntil: "domcontentloaded", // More reliable than networkidle in CI
   });

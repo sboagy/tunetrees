@@ -35,7 +35,7 @@ test("user-settings redirects to scheduling-options then account form works", as
   await checkHealth();
 
   // Login first
-  await navigateToPageWithRetry(page, "https://localhost:3000");
+  await navigateToPageWithRetry(page, "/");
   if (process.env.SAVE_COOKIES === "true") {
     await runLoginWithCookieSave(
       page,
@@ -51,7 +51,7 @@ test("user-settings redirects to scheduling-options then account form works", as
   }
 
   // Navigate to /user-settings and verify redirect to /user-settings/scheduling-options (default tab)
-  await page.goto("https://localhost:3000/user-settings", {
+  await page.goto("/user-settings", {
     waitUntil: "domcontentloaded",
   });
   await page.waitForLoadState("domcontentloaded");

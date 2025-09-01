@@ -30,7 +30,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 
   // Navigate to the app and handle login (matching the MCP demo workflow)
   // Navigate directly to /home to avoid redirect interruption
-  await navigateToPageWithRetry(page, "https://localhost:3000/home");
+  await navigateToPageWithRetry(page, "/home");
   await page.waitForLoadState("domcontentloaded");
   await page.waitForTimeout(2_000);
 

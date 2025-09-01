@@ -34,7 +34,7 @@ test("scheduling options validates JSON and disables submit until valid/dirty", 
   await checkHealth();
 
   // Login first
-  await navigateToPageWithRetry(page, "https://localhost:3000");
+  await navigateToPageWithRetry(page, "/");
   if (process.env.SAVE_COOKIES === "true") {
     await runLoginWithCookieSave(
       page,
@@ -51,7 +51,7 @@ test("scheduling options validates JSON and disables submit until valid/dirty", 
   await page.waitForLoadState("domcontentloaded");
 
   // Navigate directly to scheduling options
-  await page.goto("https://localhost:3000/user-settings/scheduling-options", {
+  await page.goto("/user-settings/scheduling-options", {
     waitUntil: "domcontentloaded",
   });
   await page.waitForLoadState("domcontentloaded");

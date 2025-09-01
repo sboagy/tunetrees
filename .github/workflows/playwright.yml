@@ -58,6 +58,30 @@ jobs:
         run: npm run test:unit
         working-directory: frontend
 
+      - name: Build frontend for CI
+        if: always()
+        run: npm run build
+        working-directory: frontend
+
+      - name: Start frontend (production) in background
+        if: always()
+        run: |
+          npm run start &
+          echo $! > .next-start.pid
+        working-directory: frontend
+
+      - name: Wait for frontend health
+        if: always()
+        run: |
+          for i in {1..30}; do
+            if curl -sSf "http://127.0.0.1:3000/api/health" >/dev/null 2>&1; then
+              echo "frontend healthy"; exit 0
+            fi
+            sleep 2
+          done
+          echo "frontend did not become healthy"; exit 1
+        working-directory: frontend
+
       - name: Debug environment
         run: |
           echo "CI=$CI"
@@ -83,6 +107,7 @@ jobs:
         run: npx playwright test --project=chromium --reporter=list
         working-directory: frontend
         env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
           NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
           TT_API_BASE_URL: ${{ vars.TT_API_BASE_URL }}
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
@@ -111,7 +136,15 @@ jobs:
           THROTTLE_MAX: 0
           AUTH_TRUST_HOST: true
           # ...add other test-specific environment variables as needed
-
+      - name: Stop frontend
+        if: always()
+        run: |
+          if [ -f frontend/.next-start.pid ]; then
+            kill "$(cat frontend/.next-start.pid)" || true
+            rm frontend/.next-start.pid || true
+          else
+            pkill -f 'next start' || true
+          fi
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:

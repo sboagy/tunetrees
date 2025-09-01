@@ -14,12 +14,17 @@ export const checkBackend = async (): Promise<boolean> => {
 
 export const checkFrontend = async (): Promise<boolean> => {
   try {
-    const httpsAgent = new https.Agent({
-      rejectUnauthorized: false, // Ignore self-signed certificate errors
-    });
-    const response = await axios.get("https://localhost:3000/api/health", {
-      httpsAgent,
-    });
+    const frontendBase = (
+      process.env.PLAYWRIGHT_BASE_URL || "https://localhost:3000"
+    ).replace(/\/$/, "");
+    const url = `${frontendBase}/api/health`;
+    const isHttps = url.startsWith("https://");
+    const response = await axios.get(
+      url,
+      isHttps
+        ? { httpsAgent: new https.Agent({ rejectUnauthorized: false }) }
+        : undefined,
+    );
     return response.status === 200;
   } catch (error) {
     console.error("Error checking frontend health:", error);

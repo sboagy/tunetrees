@@ -81,12 +81,18 @@ test("test-notes-1", async ({ page }) => {
   await expect(saveEditButtonLocator).toBeVisible();
   await expect(saveEditButtonLocator).toBeEnabled();
 
-  const responsePromise = page.waitForResponse(
-    (response) =>
-      response.url() === "https://localhost:3000/home" &&
-      response.status() === 200 &&
-      response.request().method() === "POST",
-  );
+  const responsePromise = page.waitForResponse((response) => {
+    try {
+      const u = new URL(response.url());
+      return (
+        u.pathname === "/home" &&
+        response.status() === 200 &&
+        response.request().method() === "POST"
+      );
+    } catch {
+      return false;
+    }
+  });
   await saveEditButtonLocator.click();
   await responsePromise;
 

@@ -43,7 +43,7 @@ test("test-login-1", async ({ page }) => {
   const isCookieSave = process.env.SAVE_COOKIES === "true";
 
   // Use improved navigation with retry logic
-  await navigateToPageWithRetry(page, "https://localhost:3000");
+  await navigateToPageWithRetry(page, "/");
   if (isCookieSave) {
     await runLoginWithCookieSave(
       page,
