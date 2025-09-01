@@ -65,12 +65,18 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
   }
   const storageStateParsed: IMutableStorageState | string =
     JSON.parse(storageStateContent);
-  // In CI, adapt storage state created under https://localhost:3000 so it matches
-  // http://127.0.0.1:3000. This fixes cookie/origin mismatches without re-generating secrets.
-  if (process.env.CI === "true" && typeof storageStateParsed !== "string") {
+  // Adapt storage state to match the environment base URL so cookies/origins align.
+  if (typeof storageStateParsed !== "string") {
     try {
-      const targetHost = "localhost";
-      const targetOrigin = `http://${targetHost}:3000`;
+      const envBase =
+        process.env.PLAYWRIGHT_BASE_URL ||
+        process.env.NEXT_BASE_URL ||
+        process.env.AUTH_URL ||
+        "http://localhost:3000";
+      const parsed = new URL(envBase);
+      const targetOrigin = parsed.origin; // e.g., http://localhost:3000 or https://localhost:3000
+      const targetHost = parsed.hostname; // e.g., localhost
+      const isHttps = parsed.protocol === "https:";
 
       // Rewrite cookies: domain localhost -> 127.0.0.1, secure -> false
       // Also adjust callback-url cookie value if it encodes https://localhost:3000
@@ -92,15 +98,15 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
         if (c.name.startsWith("__Secure-")) {
           c.name = c.name.replace("__Secure-", "");
         }
-        // Ensure secure=false for HTTP in CI
-        c.secure = false;
+        // Set secure according to protocol (HTTPS true, HTTP false)
+        c.secure = isHttps;
 
         // Some tools export fractional expires; coerce to integer seconds
         if (typeof c.expires === "number" && c.expires > 0) {
           c.expires = Math.floor(c.expires);
         }
 
-        // Update callback-url cookie value to http://127.0.0.1:3000 when present
+        // Update callback-url cookie value to current base origin when present
         if (
           c.name === "authjs.callback-url" &&
           c.value.includes("https%3A%2F%2Flocalhost%3A3000")
@@ -123,20 +129,21 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
         if (c.sameSite === "None" && !c.secure) {
           c.sameSite = "Lax";
         }
-        // For IP hosts, prefer url-based cookies; browsers may ignore Domain on IPs
+        // Prefer url-based cookies to avoid Domain/IP scoping pitfalls.
+        // Ensure each cookie has either `url` or (`domain` and `path`). We choose url.
         c.url = targetOrigin;
-        if ("domain" in c) {
-          delete c.domain;
+        delete c.domain; // remove domain to rely on url scoping
+        c.path = c.path || "/"; // keep path as safe default
+        // Final guard: if for any reason url is falsy, fallback to domain+path
+        if (!c.url) {
+          c.domain = targetHost;
+          c.path = c.path || "/";
         }
-        // Keep a safe default path in case Playwright inspects it
-        c.path = c.path || "/";
       }
 
       // Rewrite origins array from https://localhost:3000 -> http://127.0.0.1:3000
       for (const o of storageStateParsed.origins ?? []) {
-        if (o.origin === "https://localhost:3000") {
-          o.origin = targetOrigin;
-        }
+        o.origin = targetOrigin;
       }
     } catch (error) {
       console.warn(
