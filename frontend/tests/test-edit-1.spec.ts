@@ -34,7 +34,10 @@ async function doEditAndButtonClick(
 ) {
   const formFieldTextBox = await ttPO.navigateToFormFieldById(formFieldTestId);
   await expect(formFieldTextBox).toHaveValue(originalText);
+  await ttPO.page.waitForTimeout(500);
   await formFieldTextBox.fill(modifiedText);
+  await ttPO.page.waitForTimeout(500);
+  await formFieldTextBox.press("Tab");
   await ttPO.page.waitForTimeout(500);
   await expect(formFieldTextBox).toHaveValue(modifiedText);
 
