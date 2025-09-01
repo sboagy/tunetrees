@@ -60,5 +60,46 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
     // );
   }
   const storageState: StorageStateType = JSON.parse(storageStateContent);
+  // In CI, adapt storage state created under https://localhost:3000 so it matches
+  // http://127.0.0.1:3000. This fixes cookie/origin mismatches without re-generating secrets.
+  if (process.env.CI === "true" && typeof storageState !== "string") {
+    try {
+      const targetHost = "127.0.0.1";
+      const targetOrigin = `http://${targetHost}:3000`;
+
+      // Rewrite cookies: domain localhost -> 127.0.0.1, secure -> false
+      // Also adjust callback-url cookie value if it encodes https://localhost:3000
+      for (const c of storageState.cookies ?? []) {
+        if (c.domain === "localhost") {
+          c.domain = targetHost;
+        }
+        // For HTTP in CI, ensure cookies can be sent
+        if (c.secure) {
+          c.secure = false;
+        }
+        if (
+          c.name === "__Secure-authjs.callback-url" &&
+          c.value.includes("https%3A%2F%2Flocalhost%3A3000")
+        ) {
+          c.value = c.value.replace(
+            "https%3A%2F%2Flocalhost%3A3000",
+            encodeURIComponent(targetOrigin),
+          );
+        }
+      }
+
+      // Rewrite origins array from https://localhost:3000 -> http://127.0.0.1:3000
+      for (const o of storageState.origins ?? []) {
+        if (o.origin === "https://localhost:3000") {
+          o.origin = targetOrigin;
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "storage-state.ts: CI adaptation skipped due to error:",
+        error,
+      );
+    }
+  }
   return storageState;
 }
