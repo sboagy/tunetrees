@@ -2,28 +2,31 @@ import { frontendDirPath } from "@/test-scripts/paths-for-tests";
 import * as fs from "node:fs";
 import path from "node:path";
 
-type StorageStateType =
-  | string
-  | {
-      cookies: Array<{
-        name: string;
-        value: string;
-        domain?: string;
-        url?: string;
-        path: string;
-        expires: number;
-        httpOnly: boolean;
-        secure: boolean;
-        sameSite: "Strict" | "Lax" | "None";
-      }>;
-      origins: Array<{
-        origin: string;
-        localStorage: Array<{
-          name: string;
-          value: string;
-        }>;
-      }>;
-    };
+// Internal mutable types to allow url-based cookies during CI adaptation
+type IMutableCookie = {
+  name: string;
+  value: string;
+  domain?: string;
+  url?: string;
+  path: string;
+  expires: number;
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: "Strict" | "Lax" | "None";
+};
+
+type IMutableStorageState = {
+  cookies: IMutableCookie[];
+  origins: Array<{
+    origin: string;
+    localStorage: Array<{
+      name: string;
+      value: string;
+    }>;
+  }>;
+};
+
+type StorageStateType = string;
 
 export function getStorageState(storageStateVarName: string): StorageStateType {
   let storageStateContent = "";
@@ -60,17 +63,18 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
     //   `Storage state environment variable last 100 (${storageStateVarName}) end: ${storageStateContent.slice(-100)}...`,
     // );
   }
-  const storageState: StorageStateType = JSON.parse(storageStateContent);
+  const storageStateParsed: IMutableStorageState | string =
+    JSON.parse(storageStateContent);
   // In CI, adapt storage state created under https://localhost:3000 so it matches
   // http://127.0.0.1:3000. This fixes cookie/origin mismatches without re-generating secrets.
-  if (process.env.CI === "true" && typeof storageState !== "string") {
+  if (process.env.CI === "true" && typeof storageStateParsed !== "string") {
     try {
       const targetHost = "127.0.0.1";
       const targetOrigin = `http://${targetHost}:3000`;
 
       // Rewrite cookies: domain localhost -> 127.0.0.1, secure -> false
       // Also adjust callback-url cookie value if it encodes https://localhost:3000
-      for (const c of storageState.cookies ?? []) {
+      for (const c of storageStateParsed.cookies ?? []) {
         // Normalize host for CI http server
         if (c.domain === "localhost") {
           c.domain = targetHost;
@@ -125,7 +129,7 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
       }
 
       // Rewrite origins array from https://localhost:3000 -> http://127.0.0.1:3000
-      for (const o of storageState.origins ?? []) {
+      for (const o of storageStateParsed.origins ?? []) {
         if (o.origin === "https://localhost:3000") {
           o.origin = targetOrigin;
         }
@@ -137,5 +141,21 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
       );
     }
   }
-  return storageState;
+  // Always return a file path to satisfy Playwright type expectations for storageState
+  // Write the (possibly adapted) storage state JSON to a generated file
+  const outDir = path.resolve(
+    frontendDirPath,
+    "test-scripts/.generated-storage-states",
+  );
+  if (!fs.existsSync(outDir)) {
+    fs.mkdirSync(outDir, { recursive: true });
+  }
+  const safeName = `${storageStateVarName.toLowerCase()}-${process.env.CI === "true" ? "ci" : "local"}.json`;
+  const outPath = path.resolve(outDir, safeName);
+  const toWrite =
+    typeof storageStateParsed === "string"
+      ? storageStateParsed
+      : JSON.stringify(storageStateParsed, null, 2);
+  fs.writeFileSync(outPath, toWrite, "utf8");
+  return outPath;
 }
