@@ -64,8 +64,8 @@ jobs:
         working-directory: frontend
         env:
           # Ensure Next.js embeds necessary env when building (for NEXT_PUBLIC_* and server rendering)
-          NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
-          TT_API_BASE_URL: ${{ vars.TT_API_BASE_URL }}
+          NEXT_BASE_URL: http://127.0.0.1:3000
+          TT_API_BASE_URL: http://127.0.0.1:8000
           AUTH_URL: http://127.0.0.1:3000
           AUTH_TRUST_HOST: true
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
@@ -79,12 +79,13 @@ jobs:
         working-directory: frontend
         env:
           # Ensure runtime env for NextAuth and server-side API calls
-          NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
-          TT_API_BASE_URL: ${{ vars.TT_API_BASE_URL }}
+          NEXT_BASE_URL: http://127.0.0.1:3000
+          TT_API_BASE_URL: http://127.0.0.1:8000
           AUTH_URL: http://127.0.0.1:3000
           AUTH_TRUST_HOST: true
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          AUTH_DEBUG: true
 
       - name: Wait for frontend health
         if: always()
@@ -98,8 +99,8 @@ jobs:
           echo "frontend did not become healthy"; exit 1
         working-directory: frontend
         env:
-          NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
-          TT_API_BASE_URL: ${{ vars.TT_API_BASE_URL }}
+          NEXT_BASE_URL: http://127.0.0.1:3000
+          TT_API_BASE_URL: http://127.0.0.1:8000
           AUTH_URL: http://127.0.0.1:3000
           AUTH_TRUST_HOST: true
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
@@ -130,8 +131,8 @@ jobs:
         working-directory: frontend
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
-          NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
-          TT_API_BASE_URL: ${{ vars.TT_API_BASE_URL }}
+          NEXT_BASE_URL: http://127.0.0.1:3000
+          TT_API_BASE_URL: http://127.0.0.1:8000
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}
