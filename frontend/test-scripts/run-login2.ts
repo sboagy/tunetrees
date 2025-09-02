@@ -22,17 +22,30 @@ export async function runLoginStandalone(
     throw new Error("No login credentials found");
   }
 
+  await page.waitForTimeout(500);
+
+  const signInButton = page.getByRole("button", { name: "Sign in" });
+  await signInButton.isVisible();
+  await signInButton.isEnabled();
+
   await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForTimeout(100);
+
   const userEmailLocator = page.getByTestId("user_email");
+  await userEmailLocator.isVisible();
+  await userEmailLocator.isEditable();
+
   await userEmailLocator.fill(user || "");
   await userEmailLocator.press("Tab");
+
   const passwordEntryBox = page.getByTestId("user_password");
+  await passwordEntryBox.isVisible();
+  await passwordEntryBox.isEditable();
+
   await passwordEntryBox.fill(pw || "");
-  const signInButton = page.getByRole("button", {
-    name: "Sign In",
-    exact: true,
-  });
+  await page.waitForTimeout(100);
   await passwordEntryBox.press("Tab");
+  await page.waitForTimeout(100);
 
   await page.waitForFunction(
     (button) => {
@@ -43,7 +56,14 @@ export async function runLoginStandalone(
     { timeout: 5000 }, // Increased timeout for CSRF token fetch
   );
 
-  await signInButton.click();
+  const signInButton2 = page.getByRole("button", {
+    name: "Sign In",
+    exact: true,
+  });
+  await signInButton2.isVisible();
+  await signInButton2.isEnabled();
+  await signInButton2.click();
+  await page.waitForTimeout(500);
 
   let sessionCookie: Cookie | undefined;
   for (let i = 0; i < 30; i++) {
