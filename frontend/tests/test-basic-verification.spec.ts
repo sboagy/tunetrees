@@ -13,6 +13,7 @@ import {
   logBrowserContextStart,
   logBrowserContextEnd,
 } from "../test-scripts/test-logging";
+import { checkHealth } from "@/test-scripts/check-servers";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -27,13 +28,14 @@ test.beforeEach(async ({ page }, testInfo) => {
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
   await page.waitForLoadState("domcontentloaded");
+  await checkHealth();
 });
 
 test.afterEach(async ({ page }, testInfo) => {
   await restartBackend();
-  await page.waitForTimeout(1_000);
   logBrowserContextEnd();
   logTestEnd(testInfo);
+  await page.waitForTimeout(500);
 });
 
 test.describe("Basic TuneGrid Verification", () => {

@@ -1,9 +1,19 @@
+import { checkHealth } from "@/test-scripts/check-servers";
 import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
+import {
+  logBrowserContextEnd,
+  logBrowserContextStart,
+  logTestEnd,
+  logTestStart,
+} from "@/test-scripts/test-logging";
 import { TuneEditorPageObject } from "@/test-scripts/tune-editor.po";
 import { expect, test } from "@playwright/test";
+
+// Allow extra time for this suite under full-run concurrency and Next.js dev retries
+test.setTimeout(process.env.CI ? 120_000 : 75_000);
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -11,17 +21,24 @@ test.use({
 });
 
 test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
-  // doConsolelogs(page, testInfo);
-  // await page.waitForTimeout(1);
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
+  await page.waitForLoadState("domcontentloaded");
+  await checkHealth();
+  await page.waitForTimeout(500);
 });
 
-test.afterEach(async ({ page }) => {
-  // After each test is run in this set, restore the backend to its original state.
+test.afterEach(async ({ page }, testInfo) => {
+  // await page.waitForTimeout(500);
+  await page.waitForLoadState("domcontentloaded");
   await restartBackend();
-  await page.waitForTimeout(100);
+  await checkHealth();
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
+  await page.waitForTimeout(500);
 });
 
 async function doEditAndButtonClick(
@@ -96,9 +113,7 @@ test.describe.serial("Tune Edit Tests", () => {
     // await ttPO.filterInput.fill("Lakes of Sligo x");
     await expect(ttPO.tunesGridRows).toHaveCount(2); // 1 for the header, 1 for the tune
     expect(page.getByRole("row", { name: "Lakes of Sligo x" }).isVisible());
-    // I get a 500 error here without the wait when it's doing a get on table state.  Not good.
-    // would a waitForResponse be better?
-    await page.waitForTimeout(100);
+
     console.log("===> test-edit-1.ts:158 ~ exit test-edit-1");
   });
 
@@ -164,8 +179,8 @@ test.describe.serial("Tune Edit Tests", () => {
       console.log(`${formField.label}: ${await sampleLocator.inputValue()}`);
       await expect(sampleLocator).toHaveValue(formField.original);
     }
+    await page.waitForTimeout(1000);
 
-    await page.waitForTimeout(100);
     console.log("===> test-edit-1.spec.ts:182 ~ ");
   });
 
@@ -204,7 +219,12 @@ test.describe.serial("Tune Edit Tests", () => {
 
     await ttPO.pressSave();
 
-    await ttPO.navigateToTune("Boyne Hunt");
+    const newTuneTitle = ttPO.findUpdateByLabel(
+      "Title",
+      ttPO.sampleBoyneHunt,
+    )?.modification;
+
+    await ttPO.navigateToTune(newTuneTitle || "");
 
     // Do some light checking in the grid (not a full test)
     for (const formField of ttPO.sampleBoyneHunt) {
@@ -227,7 +247,6 @@ test.describe.serial("Tune Edit Tests", () => {
       await expect(sampleLocator).toHaveValue(formField.modification);
     }
 
-    await page.waitForTimeout(100);
     console.log("===> test-edit-1.spec.ts:182 ~ ");
   });
 });

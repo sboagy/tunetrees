@@ -2,10 +2,7 @@ import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
-import {
-  navigateToRepertoireTabStandalone,
-  TuneTreesPageObject,
-} from "@/test-scripts/tunetrees.po";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { expect, test } from "@playwright/test";
 import {
   logTestStart,
@@ -29,6 +26,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 });
 
 test.afterEach(async ({ page }, testInfo) => {
+  await page.waitForLoadState("domcontentloaded");
   await restartBackend();
   await page.waitForTimeout(1_000);
   logBrowserContextEnd();
@@ -60,7 +58,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // Navigate to main page first, then repertoire tab using the working pattern
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
-    await navigateToRepertoireTabStandalone(page);
+    // await navigateToRepertoireTabStandalone(page);
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for the grid to be visible
@@ -201,7 +199,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // Navigate to main page first, then repertoire tab using the working pattern
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
-    await navigateToRepertoireTabStandalone(page);
+    // await navigateToRepertoireTabStandalone(page);
     await page.waitForLoadState("domcontentloaded");
 
     const tunesGrid = page.locator("table").first();
@@ -244,7 +242,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // Navigate to main page first, then repertoire tab using the working pattern
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
-    await navigateToRepertoireTabStandalone(page);
+    // await navigateToRepertoireTabStandalone(page);
     await page.waitForLoadState("domcontentloaded");
 
     const tunesGrid = page.locator("table").first();
@@ -327,11 +325,14 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // Navigate to main page first, then repertoire tab using the working pattern
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
-    await navigateToRepertoireTabStandalone(page);
+    // await navigateToRepertoireTabStandalone(page);
     await page.waitForLoadState("domcontentloaded");
 
     const tunesGrid = page.locator("table").first();
     await expect(tunesGrid).toBeVisible({ timeout: 15000 });
+
+    await ttPO.tableStatus.waitFor({ state: "attached", timeout: 15000 });
+    await expect(ttPO.tableStatus).toContainText("1 of 488 row(s) selected");
 
     // Sort by ID column
     await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
