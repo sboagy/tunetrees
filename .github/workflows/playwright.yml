@@ -78,7 +78,11 @@ jobs:
         if: always()
         run: |
           mkdir -p test-results
-          npm run start 2>&1 | tee test-results/frontend.log &
+          if [ -f .next/standalone/server.js ]; then
+            node .next/standalone/server.js 2>&1 | tee test-results/frontend.log &
+          else
+            npm run start 2>&1 | tee test-results/frontend.log &
+          fi
           echo $! > .next-start.pid
         working-directory: frontend
         env:
