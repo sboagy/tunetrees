@@ -45,6 +45,8 @@ test("test-login-1", async ({ page }) => {
   // Use improved navigation with retry logic
   await navigateToPageWithRetry(page, "/");
   if (isCookieSave) {
+    await page.waitForTimeout(500);
+
     await runLoginWithCookieSave(
       page,
       process.env.TEST1_LOGIN_USER_EMAIL,

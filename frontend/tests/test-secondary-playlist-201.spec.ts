@@ -10,6 +10,7 @@ import {
   logBrowserContextEnd,
 } from "../test-scripts/test-logging";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
+import { checkHealth } from "@/test-scripts/check-servers";
 
 // set 5 minutes for each test in this file
 const testTimeout = process.env.CI ? 5 * 60 * 1000 : 1 * 60 * 1000;
@@ -33,6 +34,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
+  await checkHealth();
   await page.waitForTimeout(1_000);
 });
 
