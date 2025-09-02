@@ -4,6 +4,7 @@ import type { TableState } from "@tanstack/react-table";
 import { isExtendedLoggingEnabled, logVerbose } from "@/lib/logging";
 import { Mutex } from "async-mutex";
 import axios, { isAxiosError } from "axios";
+import { createServerAxios } from "@/lib/axios-server";
 import { type ITabSpec, initialTabSpec } from "./tab-spec";
 import type {
   ITableStateTable,
@@ -35,10 +36,7 @@ logVerbose("TT_API_BASE_URL resolved:", TT_API_BASE_URL);
 const baseURL = `${TT_API_BASE_URL}/settings`;
 logVerbose("Settings API baseURL:", baseURL);
 
-const client = axios.create({
-  baseURL: baseURL,
-  timeout: 6000, // Increase timeout to 2 seconds
-});
+const client = createServerAxios(baseURL);
 
 const tableStateMutex = new Mutex();
 
@@ -142,32 +140,69 @@ export async function updateTableStateInDb(
       );
       return 0; // 0 => skipped / no-op
     }
+    const maxEConnRefusedRetries = 5;
+    let isConnRefused = null;
+    let isConnReset = null;
+    for (let attempt = 1; attempt <= maxEConnRefusedRetries; attempt++) {
+      try {
+        logVerbose(
+          `=> updateTableStateInDb: purpose=${purpose}, playlistId=${playlistId})}`,
+        );
+        const tableStatesStr = JSON.stringify(tableStates);
+        const tableStateTable: Partial<ITableStateTable> = {
+          user_id: userId,
+          screen_size: screenSize,
+          purpose: purpose,
+          playlist_id: playlistId,
+          settings: tableStatesStr,
+        };
+        const response = await client.patch<Partial<ITableStateTable>>(
+          `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
+          tableStateTable,
+          { timeout: 10000 }, // Increase timeout to 10 seconds
+        );
+        logVerbose(
+          `=> updateTableStateInDb: response.status=${response.status} purpose=${purpose}, playlistId=${playlistId})}`,
+        );
+        return response.status;
+      } catch (error) {
+        // Suppress noisy logs and early exits for connection-refused errors so retry loop can continue.
+        const axiosErr = isAxiosError(error) ? error : null;
+        const code =
+          (axiosErr as unknown as { code?: string })?.code ||
+          (error as { code?: string })?.code;
+        const message = (error as Error)?.message ?? "";
 
-    try {
-      logVerbose(
-        `=> updateTableStateInDb: purpose=${purpose}, playlistId=${playlistId})}`,
-      );
-      const tableStatesStr = JSON.stringify(tableStates);
-      const tableStateTable: Partial<ITableStateTable> = {
-        user_id: userId,
-        screen_size: screenSize,
-        purpose: purpose,
-        playlist_id: playlistId,
-        settings: tableStatesStr,
-      };
-      const response = await client.patch<Partial<ITableStateTable>>(
-        `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
-        tableStateTable,
-        { timeout: 10_000 }, // Increase timeout to 10 seconds
-      );
-      logVerbose(
-        `=> updateTableStateInDb: response.status=${response.status} purpose=${purpose}, playlistId=${playlistId})}`,
-      );
-      return response.status;
-    } catch (error) {
-      console.error("<= updateTableStateInDb: ", error);
-      return 500;
+        isConnRefused =
+          code === "ECONNREFUSED" || message.includes("ECONNREFUSED");
+
+        isConnReset = code === "ECONNRESET" || message.includes("ECONNRESET");
+
+        if (isConnRefused) {
+          // silently retry after a small backoff
+          await new Promise((r) => setTimeout(r, attempt * 200));
+          continue;
+        }
+        if (isConnReset) {
+          break;
+        }
+
+        console.error("<= updateTableStateInDb: ", error);
+        return 500;
+      }
     }
+    if (isConnReset) {
+      console.warn(
+        `<= updateTableStateInDb: table update occurred after DB reboot, abandoning update`,
+      );
+    } else if (isConnRefused) {
+      console.error(
+        `<= updateTableStateInDb: exhausted all retries, ECONNREFUSED`,
+      );
+    } else {
+      console.error(`<= updateTableStateInDb: exhausted all retries, fallback`);
+    }
+    return 500;
   });
 }
 

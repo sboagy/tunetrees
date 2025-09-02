@@ -4,6 +4,7 @@
 // IMPORTANT: Read TT_API_BASE_URL lazily at call time to avoid throwing during build/import.
 
 import axios from "axios";
+import { createServerAxios } from "@/lib/axios-server";
 
 export interface IPrefsSchedulingOptionsBase {
   user_id: number;
@@ -27,7 +28,7 @@ function getClient() {
     throw new Error("TT_API_BASE_URL environment variable is not set");
   }
   // NOTE: Preferences endpoints live at /preferences (root), NOT under /tunetrees.
-  return axios.create({ baseURL: base });
+  return createServerAxios(base);
 }
 
 export async function getSchedulingOptions(

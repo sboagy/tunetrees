@@ -4,7 +4,7 @@ import { normalizeKey } from "@/lib/abc-utils";
 import { fetchWithTimeout } from "@/lib/fetch-utils";
 import { parseParamsWithArrays } from "@/lib/utils";
 import type { SortingState } from "@tanstack/react-table";
-import axios from "axios";
+import { createServerAxios } from "@/lib/axios-server";
 import { ERROR_TUNE } from "./mocks";
 import type {
   IGenre,
@@ -57,16 +57,7 @@ if (!TT_API_BASE_URL) {
 }
 
 // Most queries APIs are under /tunetrees/ path
-const client = axios.create({
-  baseURL: `${TT_API_BASE_URL}/tunetrees`,
-});
-
-console.log(
-  "Queries API baseURL:",
-  `${TT_API_BASE_URL}/tunetrees`,
-  "client baseURL:",
-  client.defaults.baseURL,
-);
+const client = createServerAxios(`${TT_API_BASE_URL}/tunetrees`);
 
 // The sitdown date must always be passed from the client/browser.
 // There is no default for SSR; if missing, throw an error.
