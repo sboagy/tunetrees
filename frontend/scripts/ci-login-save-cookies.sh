@@ -15,6 +15,9 @@ if [[ -z "${TEST1_LOGIN_USER_EMAIL:-}" || -z "${TEST1_LOGIN_USER_PASSWORD:-}" ]]
   exit 1
 fi
 
+# restore the DB
+cp ../tunetrees_test_clean.sqlite3 ../tunetrees_test.sqlite3
+
 mkdir -p test-results
 
 # Run only the login test and tee output to a log file for CI artifacts
