@@ -125,6 +125,10 @@ npx dotenv -f .env.local -- bash -c '
 PLAYWRIGHT_HEADLESS=true \
 NODE_ENV=development \
 NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION=true \
+AUTH_TRUST_HOST=true \
+AUTH_URL=https://localhost:3000 \
+NEXT_BASE_URL=https://localhost:3000 \
+TT_API_BASE_URL=http://localhost:8000 \
 npx playwright test '"$REPORTER_ARG"' '"$TEST_FILE_ARG"' '"$PLAYWRIGHT_ARGS"' \
 | tee "'"$OUTPUT_DIR"'/playwright.log"
 '

@@ -171,9 +171,9 @@ export const NO_PID = 0;
 export const INVALID_PID = -1;
 
 async function restartBackendHard() {
-  console.warn(
-    "Failed to update reloadTriggerFile. Attempting fallback strategy.",
-  );
+  // console.warn(
+  //   "Failed to update reloadTriggerFile. Attempting fallback strategy.",
+  // );
   await globalTeardown();
   // Make sure the server is down
   for (let i = 0; i < 10; i++) {
@@ -185,6 +185,9 @@ async function restartBackendHard() {
 }
 
 export async function restartBackend(restartHard = true) {
+  // Brief pause to let filesystem/process state settle before attempting restart
+  const waitMs = process.env.CI === "true" ? 2000 : 1000;
+  await new Promise((resolve) => setTimeout(resolve, waitMs));
   // In CI, perform a full stop -> copy -> start cycle to avoid copying
   // the SQLite DB while the server has it open (which can corrupt the file).
   if (process.env.CI === "true" || restartHard) {

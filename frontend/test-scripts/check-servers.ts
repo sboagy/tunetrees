@@ -35,16 +35,21 @@ export const checkFrontend = async (): Promise<boolean> => {
 export const checkHealth = async (): Promise<void> => {
   // Probably not needed any more, but just in case one of the servers is slow to
   // start, we'll try a few times.
-  const nRetries = process.env.CI ? 10 : 5;
+  const nRetries = process.env.CI ? 10 : 8;
+  const waitMs = process.env.CI ? 2000 : 1500;
   for (let attempt = 1; attempt <= nRetries; attempt++) {
     const backendOk = await checkBackend();
     const frontendOk = await checkFrontend();
     if (backendOk && frontendOk) {
-      break;
+      console.log(
+        `===> check-servers ~ health OK on attempt ${attempt}: backendOk=${backendOk}, frontendOk=${frontendOk}`,
+      );
+      return; // Success; don't re-check again to avoid flakiness
     }
     if (attempt < nRetries) {
-      console.log(`Attempt ${attempt} failed. Retrying in 1000ms...`);
-      const waitMs = process.env.CI ? 2000 : 1000;
+      console.log(
+        `Attempt ${attempt} failed (backendOk=${backendOk}, frontendOk=${frontendOk}). Retrying in ${waitMs}ms...`,
+      );
       await new Promise((res) => setTimeout(res, waitMs));
     } else {
       console.error(`Failed to check health after ${nRetries} attempts.`);
@@ -52,18 +57,5 @@ export const checkHealth = async (): Promise<void> => {
         `Backend or frontend not up after ${nRetries} attempts. Exiting test.`,
       );
     }
-  }
-  const backendOk = await checkBackend();
-  const frontendOk = await checkFrontend();
-  console.log(
-    `===> test-login-1:44 ~ backendOk: ${backendOk}, frontendOk: ${frontendOk}`,
-  );
-  if (!frontendOk || !backendOk) {
-    console.error(
-      `Backend or frontend not up frontendOk=${frontendOk}, backendOk=${backendOk}.  Exiting test.  Please start backend and frontend.`,
-    );
-    throw new Error(
-      `Backend or frontend not up (not up frontendOk=${frontendOk}, backendOk=${backendOk}).  Exiting test.`,
-    );
   }
 };

@@ -149,23 +149,32 @@ export default defineConfig({
       // Playwright will start the server using this webServer config in both local and CI environments.
       // In CI we build and start the production server for stability; locally we run dev with --experimental-https.
       command: isCI
-        ? `npm run build && npm run start 2>&1 | tee ${logPath}`
+        ? `npm run build && if [ -f .next/standalone/server.js ]; then node .next/standalone/server.js 2>&1 | tee ${logPath}; else npm run start 2>&1 | tee ${logPath}; fi`
         : `npm run dev 2>&1 | tee ${process.env.TUNETREES_FRONTEND_LOG || "test-results/frontend.log"}`, // Combine the command and arguments,
       env: {
-        NEXT_BASE_URL: process.env.NEXT_BASE_URL || "",
+        // Always provide a concrete base URL for the app
+        NEXT_BASE_URL:
+          process.env.NEXT_BASE_URL ||
+          (isCI ? "http://127.0.0.1:3000" : "https://localhost:3000"),
         NEXT_PUBLIC_MOCK_EXTERNAL_APIS:
           process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS || "true",
         NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION:
           process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "true",
-        TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
-        // Ensure NextAuth works under production server in CI
-        AUTH_URL: process.env.AUTH_URL || (isCI ? "http://127.0.0.1:3000" : ""),
+        // Point server-side axios to the local FastAPI by default so server actions don't 404
+        TT_API_BASE_URL: process.env.TT_API_BASE_URL || "http://127.0.0.1:8000",
+        // Ensure NextAuth works across both CI and local HTTPS dev
+        AUTH_URL:
+          process.env.AUTH_URL ||
+          (isCI ? "http://127.0.0.1:3000" : "https://localhost:3000"),
+        AUTH_TRUST_HOST: process.env.AUTH_TRUST_HOST || "true",
         AUTH_SECRET:
           process.env.AUTH_SECRET ||
-          (isCI ? "test_auth_secret_for_ci_only" : ""),
+          (isCI ? "test_auth_secret_for_ci_only" : "test_auth_secret_local"),
         NEXTAUTH_SECRET:
           process.env.NEXTAUTH_SECRET ||
-          (isCI ? "test_nextauth_secret_for_ci_only" : ""),
+          (isCI
+            ? "test_nextauth_secret_for_ci_only"
+            : "test_nextauth_secret_local"),
         AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
         AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET || "",
         AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || "",

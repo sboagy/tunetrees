@@ -31,10 +31,10 @@ type StorageStateType = string;
 export function getStorageState(storageStateVarName: string): StorageStateType {
   let storageStateContent = "";
   const storageStateVarValue = process.env[storageStateVarName];
-  console.log(
-    "===> storage-state.ts:31 ~ storageStateVarValue",
-    storageStateVarValue,
-  );
+  // console.log(
+  //   "===> storage-state.ts:31 ~ storageStateVarValue",
+  //   storageStateVarValue,
+  // );
   if (!storageStateVarValue) {
     throw new Error(`Environment variable ${storageStateVarName} is not set`);
   }
@@ -44,7 +44,7 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
     "test-scripts/storageState",
   );
   if (isFileInput) {
-    console.log("===> storage-state.ts:42 ~ processing storage state case 1");
+    // console.log("===> storage-state.ts:42 ~ processing storage state case 1");
     const storageStatePath = path.resolve(
       frontendDirPath,
       storageStateVarValue,
@@ -52,7 +52,7 @@ export function getStorageState(storageStateVarName: string): StorageStateType {
     storageStateContent = fs.readFileSync(storageStatePath, "utf8");
     // Debugging: Log the first few characters of the file content
   } else {
-    console.log("===> storage-state.ts:50 ~  processing storage state case 2");
+    // console.log("===> storage-state.ts:50 ~  processing storage state case 2");
     // Assume it's coming from a secret and the value is already JSON
     storageStateContent = Buffer.from(storageStateVarValue, "base64").toString(
       "utf8",

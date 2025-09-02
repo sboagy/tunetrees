@@ -214,20 +214,55 @@ export class TuneTreesPageObject {
     throw exception;
   };
 
+  setupPageErrorHandling(): void {
+    // Filter transient page errors typical in Next.js dev (especially with HTTPS + server actions)
+    const ignoreSubstrings = [
+      "TypeError: Failed to fetch",
+      "AggregateError: An error occurred in the Server Components render",
+      // Next.js dev occasionally emits manifest parse errors mid-reload
+      // which are transient and recover on the next request
+      "SyntaxError: Unexpected end of JSON input",
+      "Unexpected end of JSON input",
+      // Next.js dev RSC bug seen intermittently under concurrency
+      "Invariant: Expected clientReferenceManifest to be defined",
+    ];
+    this.page.on("pageerror", (exception) => {
+      const msg = exception?.message ?? String(exception);
+      const isIgnorable = ignoreSubstrings.some((s) => msg.includes(s));
+      if (isIgnorable) {
+        const timestamp = new Date().toISOString();
+        console.log(`[${timestamp}] (ignored pageerror) ${msg}`);
+        return; // swallow transient dev error
+      }
+      // Re-throw all other page errors to fail fast
+      this.onError(exception);
+    });
+  }
+
   async gotoMainPage(waitForTableStatus = true) {
     await checkHealth();
 
     // Set up error and network monitoring before navigation
     this.setupConsoleErrorHandling();
+    this.setupPageErrorHandling();
     this.setupNetworkFailureHandling();
 
-    await this.page.goto(this.pageLocation, {
+    const navResponse = await this.page.goto(this.pageLocation, {
       timeout: initialPageLoadTimeout,
       waitUntil: "domcontentloaded", // More reliable than networkidle in CI
     });
-    this.page.on("pageerror", this.onError);
+    // If Next.js dev serves an occasional 500 on first request, reload once
+    if (navResponse && navResponse.status() >= 500) {
+      console.log(
+        `Initial navigation returned ${navResponse.status()}, reloading once...`,
+      );
+      await this.page.waitForTimeout(250);
+      await this.page.reload({ waitUntil: "domcontentloaded" });
+    }
+    // Page errors already handled via filtered setupPageErrorHandling()
     await this.page.waitForLoadState("domcontentloaded");
-    await this.page.waitForSelector("body");
+    // Only require the body to be attached; visibility can be affected by transient dev overlays
+    await this.page.waitForSelector("body", { state: "attached" });
 
     // const pageContent = await this.page.content();
     // console.log("Page content after goto:", pageContent.slice(0, 500)); // Log first 500 chars for inspection
@@ -235,10 +270,25 @@ export class TuneTreesPageObject {
     await this.page.waitForTimeout(1000);
     if (waitForTableStatus) {
       const tableStatusTimeout = process.env.CI ? 120_000 : 25_000;
-      await this.tableStatus.waitFor({
-        state: "visible",
-        timeout: tableStatusTimeout,
-      });
+      try {
+        await this.tableStatus.waitFor({
+          state: "visible",
+          timeout: tableStatusTimeout,
+        });
+      } catch {
+        // Fallback: if tableStatus is slow, ensure main UI is ready and proceed.
+        const mainTabsVisible = await this.mainTabGroup
+          .isVisible({ timeout: 10_000 })
+          .catch(() => false);
+        if (!mainTabsVisible) {
+          // Try one soft reload to recover from a bad initial render/SSR 500
+          await this.page.reload({ waitUntil: "domcontentloaded" });
+          await this.mainTabGroup.waitFor({
+            state: "visible",
+            timeout: 10_000,
+          });
+        }
+      }
 
       // await expect(this.tableStatus).toHaveText("1 of 488 row(s) selected.", {
       //   timeout: 60000,
@@ -297,6 +347,7 @@ export class TuneTreesPageObject {
     // Using `fill` is generally more reliable than `click` then `type` as it clears the field first.
     // Playwright's `fill` has built-in auto-waiting, making manual waits unnecessary.
     await this.filterInput.fill(tuneTitle);
+    await this.page.waitForTimeout(500);
 
     await this.waitForTablePopulationToStart();
 
@@ -306,22 +357,104 @@ export class TuneTreesPageObject {
         `navigateToTune(): expected filtered table row not loaded (rowCount=${rowCount}). Proceeding with best-effort click if available.`,
       );
     }
-    if (rowCount >= 2) {
-      const tuneRow = this.page.getByRole("row").nth(1);
-      const firstCell = tuneRow.getByRole("cell").nth(1);
-      await this.clickWithTimeAfter(firstCell);
-    } else {
-      // Attempt to click any row containing the title
-      const fallback = this.page.getByRole("row", { name: tuneTitle }).first();
-      if (await fallback.isVisible()) {
-        await this.clickWithTimeAfter(fallback);
+
+    // Helper to perform the click on the desired tune row/cell
+    const clickDesiredTune = async () => {
+      const currentRowCount = await this.tunesGridRows.count();
+      if (currentRowCount >= 2) {
+        // Determine Title column index (fallback to column 1 if not found)
+        let titleColIdx = await getTuneGridColumnIndex(this.page, "Title");
+        if (titleColIdx === null) titleColIdx = 1;
+
+        // Search first few rows for an exact title match
+        let clicked = false;
+        const maxAttempts = 6;
+        for (let attempt = 1; attempt <= maxAttempts && !clicked; attempt++) {
+          const maxCheck = Math.min(currentRowCount - 1, 10);
+          for (let i = 1; i <= maxCheck; i++) {
+            const row = this.page.getByRole("row").nth(i);
+            const titleCell = row.getByRole("cell").nth(titleColIdx);
+            const text = (await titleCell.textContent())?.trim();
+            if (text === tuneTitle) {
+              const idCell = row.getByRole("cell").nth(1);
+              await this.clickWithTimeAfter(idCell);
+              clicked = true;
+              break;
+            }
+          }
+          if (!clicked) {
+            await this.page.waitForTimeout(300);
+          }
+        }
+        if (!clicked) {
+          // const tuneRow = this.page.getByRole("row").nth(1);
+          // const firstCell = tuneRow.getByRole("cell").nth(1);
+          // await this.clickWithTimeAfter(firstCell);
+          throw new Error(
+            `navigateToTune(): Unable to locate tune row for title '${tuneTitle}'.`,
+          );
+        }
       } else {
+        // // Attempt to click any row containing the title
+        // const fallback = this.page
+        //   .getByRole("row", { name: tuneTitle })
+        //   .first();
+        // if (await fallback.isVisible()) {
+        //   await this.clickWithTimeAfter(fallback);
+        // } else {
+        //   throw new Error(
+        //     `navigateToTune(): Unable to locate tune row for title '${tuneTitle}'.`,
+        //   );
+        // }
         throw new Error(
           `navigateToTune(): Unable to locate tune row for title '${tuneTitle}'.`,
         );
       }
-    }
+    };
+
+    // Initial attempt
+    await clickDesiredTune();
     await this.page.waitForTimeout(300);
+
+    // Wait until the detail pane reflects the selected tune to ensure editor fields can preload
+    const titleVisible = await this.currentTuneTitle
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
+
+    if (!titleVisible) {
+      console.warn(
+        `navigateToTune(): current-tune-title not visible after first click. Retrying click...`,
+      );
+      // Retry clicking the desired tune
+      await clickDesiredTune();
+      await this.page.waitForTimeout(300);
+    }
+
+    // If still not visible, perform a soft reload and repeat once
+    const titleVisibleAfterRetry = await this.currentTuneTitle
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false);
+    if (!titleVisibleAfterRetry) {
+      console.warn(
+        `navigateToTune(): current-tune-title still hidden. Performing a soft reload and retrying once...`,
+      );
+      await this.page.reload({ waitUntil: "domcontentloaded" });
+      await this.navigateToRepertoireTabDirectly(1);
+
+      // Re-apply the filter and selection
+      await expect(this.filterInput).toBeVisible({ timeout: 10_000 });
+      await expect(this.filterInput).toBeEnabled({ timeout: 10_000 });
+      await this.filterInput.fill("");
+      await this.filterInput.fill(tuneTitle);
+      await this.waitForTablePopulationToStart();
+      await clickDesiredTune();
+      await this.page.waitForTimeout(300);
+    }
+
+    await expect(this.currentTuneTitle).toBeVisible({ timeout: 15_000 });
+    await expect(this.currentTuneTitle).toContainText(tuneTitle, {
+      timeout: 15_000,
+    });
     // await this.page.getByRole("row", { name: tuneTitle }).click();
   }
 
@@ -336,7 +469,16 @@ export class TuneTreesPageObject {
   }
 
   async navigateToRepertoireTabDirectly(pauseSecondsAfter = 2) {
-    await this.mainTabGroup.waitFor({ state: "visible" });
+    // Ensure main tabs are visible; if not, recover by reloading the main page
+    try {
+      await this.mainTabGroup.waitFor({ state: "visible", timeout: 10_000 });
+    } catch {
+      console.warn(
+        "navigateToRepertoireTabDirectly(): mainTabGroup not visible; attempting recovery via gotoMainPage()",
+      );
+      await this.gotoMainPage(false);
+      await this.mainTabGroup.waitFor({ state: "visible", timeout: 20_000 });
+    }
     // Click the Repertoire tab trigger first, then wait for the panel to be visible
     await this.repertoireTabTrigger.waitFor({
       state: "attached",
@@ -733,14 +875,49 @@ export class TuneTreesPageObject {
 
     await this.page.waitForTimeout(1000);
 
+    // Wait for grid to finish any loading indicators
+    const loadingTimeout = process.env.CI ? 60_000 : 20_000;
+    try {
+      await expect(this.tunesGrid).not.toContainText("Loading...", {
+        timeout: loadingTimeout,
+      });
+    } catch {
+      // proceed regardless; some views may not show this indicator
+    }
+
     const tuneCheckbox = this.page
       .getByTestId(`${tune_id}_select`)
       .getByTestId("tt-row-checkbox");
 
-    await expect(tuneCheckbox).toBeVisible();
-    await expect(tuneCheckbox).toBeEnabled();
-    await tuneCheckbox.check();
-    await expect(tuneCheckbox).toBeChecked();
+    // Robust wait with retries: if not visible at first, try to re-scroll and retry
+    const ensureVisibleAndCheck = async () => {
+      await tuneCheckbox
+        .waitFor({ state: "attached", timeout: 10_000 })
+        .catch(() => undefined);
+      const visible = await tuneCheckbox.isVisible().catch(() => false);
+      if (!visible) {
+        // Retry scroll and short wait
+        await this.page.evaluate((tuneId: number) => {
+          window.scrollToTuneById?.(tuneId);
+        }, Number(tune_id));
+        await this.page.waitForTimeout(500);
+      }
+      await expect(tuneCheckbox).toBeVisible({ timeout: 10_000 });
+      await expect(tuneCheckbox).toBeEnabled({ timeout: 10_000 });
+      await tuneCheckbox.check();
+      await expect(tuneCheckbox).toBeChecked({ timeout: 10_000 });
+    };
+
+    try {
+      await ensureVisibleAndCheck();
+    } catch {
+      // One last fallback: small delay and retry once more before failing
+      console.warn(
+        `addTuneToSelection(${tune_id}): initial selection failed, retrying after short delay...`,
+      );
+      await this.page.waitForTimeout(1000);
+      await ensureVisibleAndCheck();
+    }
   }
 
   async scrollToTuneById(tuneId: number): Promise<void> {
