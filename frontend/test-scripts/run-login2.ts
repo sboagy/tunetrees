@@ -33,14 +33,14 @@ export async function runLoginStandalone(
 
   const userEmailLocator = page.getByTestId("user_email");
   await userEmailLocator.isVisible();
-  await userEmailLocator.isEditable();
+  await userEmailLocator.isEnabled();
 
   await userEmailLocator.fill(user || "");
   await userEmailLocator.press("Tab");
 
   const passwordEntryBox = page.getByTestId("user_password");
   await passwordEntryBox.isVisible();
-  await passwordEntryBox.isEditable();
+  await passwordEntryBox.isEnabled();
 
   await passwordEntryBox.fill(pw || "");
   await page.waitForTimeout(100);
