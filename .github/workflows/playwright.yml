@@ -128,6 +128,8 @@ jobs:
           TEST2_LOGIN_USER_NAME: ${{ secrets.TEST2_LOGIN_USER_NAME }}
           TEST2_LOGIN_GMAIL_PW: ${{ secrets.TEST2_LOGIN_GMAIL_PW }}
           TT_REVIEW_SITDOWN_DATE: 2024-12-31 16:47:57.671465+00:00
+          NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION: true
+          NEXT_PUBLIC_MOCK_EXTERNAL_APIS: true
           THROTTLE_MAX: 0
           AUTH_TRUST_HOST: true
         run: |
@@ -161,6 +163,8 @@ jobs:
           TEST2_LOGIN_USER_NAME: ${{ secrets.TEST2_LOGIN_USER_NAME }}
           TEST2_LOGIN_GMAIL_PW: ${{ secrets.TEST2_LOGIN_GMAIL_PW }}
           TT_REVIEW_SITDOWN_DATE: 2024-12-31 16:47:57.671465+00:00
+          NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION: true
+          NEXT_PUBLIC_MOCK_EXTERNAL_APIS: true
           THROTTLE_MAX: 0
           AUTH_TRUST_HOST: true
         run: |

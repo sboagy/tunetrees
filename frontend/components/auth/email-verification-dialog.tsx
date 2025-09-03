@@ -55,7 +55,7 @@ export function EmailVerificationDialog({
         `/api/verify-user?email=${encodeURIComponent(email)}&token=${verificationCode.trim()}`,
       );
 
-      if (response?.ok && response?.statusText === "OK") {
+      if (response?.ok) {
         console.log("Email verification successful");
         // Close dialog first
         onOpenChange(false);
@@ -64,7 +64,9 @@ export function EmailVerificationDialog({
           onVerificationComplete();
         }, 100);
       } else {
-        throw new Error(`Verification failed: ${response.statusText}`);
+        throw new Error(
+          `Verification failed: ${response.status} ${response.statusText}`,
+        );
       }
     } catch (error) {
       console.error("Email verification error:", error);
