@@ -2,6 +2,12 @@ import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
+import {
+  logBrowserContextEnd,
+  logBrowserContextStart,
+  logTestEnd,
+  logTestStart,
+} from "@/test-scripts/test-logging";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { expect, test } from "@playwright/test";
 
@@ -15,17 +21,20 @@ test.use({
 });
 
 test.beforeEach(async ({ page }, testInfo) => {
-  console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+  logTestStart(testInfo);
+  logBrowserContextStart();
   // doConsolelogs(page, testInfo);
   // await page.waitForTimeout(1);
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
 });
 
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
   await page.waitForTimeout(1_000);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
 });
 
 test("test-notes-1", async ({ page }) => {
