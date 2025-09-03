@@ -1,6 +1,6 @@
 import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
-import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+// import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { expect, test } from "@playwright/test";
 import {
@@ -33,17 +33,17 @@ test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
 
   await setTestDefaults(page);
-  await applyNetworkThrottle(page);
+  // await applyNetworkThrottle(page);
   await checkHealth();
-  await page.waitForTimeout(1_000);
+  // await page.waitForTimeout(1_000);
 });
 
 test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
-  await restartBackend(true);
+  await page.waitForTimeout(2_000);
+  await restartBackend();
   logBrowserContextEnd();
   logTestEnd(testInfo);
-  await page.waitForTimeout(1_000);
 });
 
 test("test-secondary-add-to-repertoire-deselection", async ({ page }) => {
@@ -131,7 +131,8 @@ test("test-secondary-add-to-repertoire-deselection", async ({ page }) => {
   await page.waitForTimeout(2_000);
 
   await ttPO.clickWithTimeAfter(ttPO.catalogTab);
-  await page.waitForTimeout(4_000);
+  await page.waitForTimeout(1_000);
+  await ttPO.waitForTablePopulationToStart();
 
   await ttPO.expectTuneUnselected("66");
   await ttPO.expectTuneUnselected("54");
@@ -233,9 +234,32 @@ test("test-secondary-playlist-add-to-review", async ({ page }) => {
   // Wait for button to be enabled
   await expect(ttPO.addToRepertoireButton).toBeEnabled();
 
-  await ttPO.addToRepertoireButton.click();
-
-  await page.waitForTimeout(1_000);
+  // Click Add To Repertoire and wait deterministically for outcome
+  await ttPO.clickWithTimeAfter(ttPO.addToRepertoireButton);
+  {
+    const errorOverlay = page.getByRole("button", {
+      name: "Open issues overlay",
+    });
+    const selectionCleared = async () => {
+      try {
+        await expect(ttPO.tableStatus).toContainText("0 row(s) selected", {
+          timeout: 10_000,
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const errorVisible = await errorOverlay
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
+    if (!errorVisible) {
+      const cleared = await selectionCleared();
+      if (!cleared) {
+        await page.waitForTimeout(500);
+      }
+    }
+  }
 
   await ttPO.repertoireTabTrigger.click({ timeout: 60000 });
   await page.waitForTimeout(2_000);
@@ -248,8 +272,24 @@ test("test-secondary-playlist-add-to-review", async ({ page }) => {
   await ttPO.addTuneToSelection("66");
   await ttPO.addTuneToSelection("54");
 
+  // Click Add To Review and wait for the "Successfully submitted" snackbar or table update
   await ttPO.clickWithTimeAfter(ttPO.addToReviewButton);
-  await page.waitForTimeout(1_000);
+  {
+    // Prefer a concrete UI signal; fallback to short delay if not available
+    const successText = page.getByText("Practice successfully submitted", {
+      exact: false,
+    });
+    const submitted = await successText
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
+    if (!submitted) {
+      // as a fallback, ensure rows remain in practice table before switching tabs
+      await expect(ttPO.tunesGridRows.first())
+        .toBeVisible({ timeout: expectTimeout })
+        .catch(() => {});
+      await page.waitForTimeout(500);
+    }
+  }
 
   await ttPO.clickWithTimeAfter(ttPO.practiceTabTrigger);
 

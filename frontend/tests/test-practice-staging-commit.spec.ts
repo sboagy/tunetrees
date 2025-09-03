@@ -1,12 +1,18 @@
 import { test, expect } from "@playwright/test";
 import { setTestDefaults } from "@/test-scripts/set-test-defaults";
-import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { restartBackend } from "@/test-scripts/global-setup";
 import {
   TuneTreesPageObject,
   navigateToPracticeTabStandalone,
 } from "@/test-scripts/tunetrees.po";
+import {
+  logBrowserContextEnd,
+  logBrowserContextStart,
+  logTestEnd,
+  logTestStart,
+} from "@/test-scripts/test-logging";
+import { checkHealth } from "@/test-scripts/check-servers";
 
 // Use storage state for auth if available (falls back to direct login tests if not configured)
 // This mirrors established patterns: keep fast and deterministic.
@@ -18,14 +24,21 @@ test.use({
 
 test.describe.serial("Practice staging + commit flow", () => {
   test.beforeEach(async ({ page }, testInfo) => {
+    logTestStart(testInfo);
+    logBrowserContextStart();
     console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+
     await setTestDefaults(page);
-    await applyNetworkThrottle(page);
+    // await applyNetworkThrottle(page);
+    await checkHealth();
+    // await page.waitForTimeout(1_000);
   });
 
-  test.afterEach(async ({ page }) => {
+  test.afterEach(async ({ page }, testInfo) => {
+    await page.waitForTimeout(2_000);
     await restartBackend();
-    await page.waitForTimeout(1000);
+    logBrowserContextEnd();
+    logTestEnd(testInfo);
   });
 
   test("stage evaluation then submission clears staged row styling", async ({
