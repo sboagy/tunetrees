@@ -58,18 +58,7 @@ jobs:
         run: npm run test:unit
         working-directory: frontend
 
-      - name: Start backend (uvicorn)
-        run: |
-          mkdir -p frontend/test-results
-          # Start Uvicorn from the created venv so installed deps are used
-          .venv/bin/uvicorn tunetrees.api.main:app --host 0.0.0.0 --port 8000 --reload 2>&1 | tee frontend/test-results/fastapi.log &
-          echo $! > .uvicorn.pid
-        env:
-          TUNETREES_DB: "${workspaceFolder}/tunetrees_test.sqlite3"
-          TUNETREES_DEPLOY_BASE_DIR: "${workspaceFolder}"
-          LOG_FUTURE_REVIEWS: "true"
-          GITTHUB_REPO: "tunetrees"
-          PYTHONPATH: .
+      # Backend is started/stopped by Playwright global-setup/teardown. No manual uvicorn here.
 
       - name: Build frontend for CI
         if: always()
@@ -87,51 +76,9 @@ jobs:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           TUNETREES_FRONTEND_LOG: test-results/frontend.log
 
-      - name: Start frontend (production) in background
-        if: always()
-        run: |
-          mkdir -p test-results
-          if [ -f .next/standalone/server.js ]; then
-            node .next/standalone/server.js 2>&1 | tee test-results/frontend.log &
-          else
-            npm run start 2>&1 | tee test-results/frontend.log &
-          fi
-          echo $! > .next-start.pid
-        working-directory: frontend
-        env:
-          # Ensure runtime env for NextAuth and server-side API calls
-          NEXT_BASE_URL: http://localhost:3000
-          TT_API_BASE_URL: http://localhost:8000
-          AUTH_URL: http://localhost:3000
-          AUTH_TRUST_HOST: true
-          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          AUTH_DEBUG: true
-          TUNETREES_FRONTEND_LOG: test-results/frontend.log
-          TUNETREES_DB: "${workspaceFolder}/tunetrees_test.sqlite3"
-          TUNETREES_DEPLOY_BASE_DIR: "${workspaceFolder}"
-          LOG_FUTURE_REVIEWS: "true"
-          GITTHUB_REPO: "tunetrees"
-          PYTHONPATH: .
+      # Frontend will be started by Playwright webServer. We only build here for logs/verification.
 
-      - name: Wait for frontend health
-        if: always()
-        run: |
-          for i in {1..30}; do
-            if curl -sSf "http://localhost:3000/api/health" >/dev/null 2>&1; then
-              echo "frontend healthy"; exit 0
-            fi
-            sleep 2
-          done
-          echo "frontend did not become healthy"; exit 1
-        working-directory: frontend
-        env:
-          NEXT_BASE_URL: http://localhost:3000
-          TT_API_BASE_URL: http://localhost:8000
-          AUTH_URL: http://localhost:3000
-          AUTH_TRUST_HOST: true
-          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      # Health wait is handled by Playwright webServer configuration.
 
       - name: Debug environment
         run: |
@@ -216,15 +163,7 @@ jobs:
         run: |
           mkdir -p test-results
           npx playwright test --project=chromium --reporter=list 2>&1 | tee test-results/playwright-phase2.log
-      - name: Stop frontend
-        if: always()
-        run: |
-          if [ -f frontend/.next-start.pid ]; then
-            kill "$(cat frontend/.next-start.pid)" || true
-            rm frontend/.next-start.pid || true
-          else
-            pkill -f 'next start' || true
-          fi
+      # Stop handled by Playwright; no manual kill needed.
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:

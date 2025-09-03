@@ -149,7 +149,7 @@ export default defineConfig({
       // Playwright will start the server using this webServer config in both local and CI environments.
       // In CI we build and start the production server for stability; locally we run dev with --experimental-https.
       command: isCI
-        ? `npm run build && if [ -f .next/standalone/server.js ]; then node .next/standalone/server.js 2>&1 | tee ${logPath}; else npm run start 2>&1 | tee ${logPath}; fi`
+        ? `npm run start 2>&1 | tee ${logPath}`
         : `npm run dev 2>&1 | tee ${process.env.TUNETREES_FRONTEND_LOG || "test-results/frontend.log"}`, // Combine the command and arguments,
       env: {
         // Always provide a concrete base URL for the app
