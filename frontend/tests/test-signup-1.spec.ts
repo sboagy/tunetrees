@@ -42,7 +42,9 @@ test.describe.serial("Signup Tests", () => {
 
     // Prefer using localStorage linkBackURL (mock path) when available, but fall back to Gmail
     // if it doesn't appear quickly. This avoids depending on build-time NEXT_PUBLIC flags.
+    const forceMockInCI = !!process.env.CI;
     const preferMock =
+      forceMockInCI ||
       process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true";
     let linkBackURLValue: string | null = null;
     if (preferMock) {
@@ -52,11 +54,16 @@ test.describe.serial("Signup Tests", () => {
       try {
         const linkBackHandle = await ttPO.page.waitForFunction(
           () => window.localStorage.getItem("linkBackURL") || undefined,
-          { timeout: 5000 }, // brief probe; do not hold the whole test hostage
+          { timeout: forceMockInCI ? 8000 : 5000 }, // allow a bit longer in CI
         );
         linkBackURLValue = (await linkBackHandle.jsonValue()) as string;
       } catch {
-        // Not found quickly; will fall back below.
+        // Not found quickly; if in CI we must not hit Gmail, fail fast with a clear message.
+        if (forceMockInCI) {
+          throw new Error(
+            "CI requires mocked email confirmation via localStorage. Ensure NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true and the app sets linkBackURL.",
+          );
+        }
       }
     }
 
@@ -79,6 +86,12 @@ test.describe.serial("Signup Tests", () => {
       const dialog = page.getByRole("dialog");
       await dialog.waitFor({ state: "visible", timeout: 15000 });
     } else {
+      // In CI we never try Gmail fallback
+      if (forceMockInCI) {
+        throw new Error(
+          "Missing linkBackURL in CI. Gmail fallback is disabled in CI. Check mock email confirmation wiring.",
+        );
+      }
       const gmailLoginURL = "https://mail.google.com/";
       await page.goto(gmailLoginURL, { waitUntil: "domcontentloaded" });
 
@@ -185,8 +198,12 @@ test.describe.serial("Signup Tests", () => {
 
     // So, if NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, instead of trying to retrieve the
     // link from the email, we'll just retrieve it from localStorage.
+    const forceMockInCI = !!process.env.CI;
     let verificationCode: string | null;
-    if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+    if (
+      forceMockInCI ||
+      process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true"
+    ) {
       console.log(
         "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, checking localStorage",
       );
@@ -216,7 +233,12 @@ test.describe.serial("Signup Tests", () => {
           return items;
         });
         console.log("All localStorage items:", allLocalStorage);
-        throw new Error("No linkBackURL found in localStorage");
+        if (forceMockInCI) {
+          throw new Error(
+            "CI requires mocked email confirmation via localStorage. Ensure NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true and the app sets linkBackURL.",
+          );
+        }
+        throw new Error("No linkBackURL found in localStorage (local run)");
       }
 
       // Extract verification code from URL - handle both token parameter and potential additional params
@@ -230,6 +252,12 @@ test.describe.serial("Signup Tests", () => {
 
       console.log("Extracted verification code:", verificationCode);
     } else {
+      // In CI we never try Gmail fallback
+      if (forceMockInCI) {
+        throw new Error(
+          "Missing linkBackURL in CI. Gmail fallback is disabled in CI. Check mock email confirmation wiring.",
+        );
+      }
       // Open Gmail in a new tab
       const gmailPage = await page.context().newPage();
       const gmailLoginURL = "https://mail.google.com/";
