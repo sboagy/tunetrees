@@ -136,6 +136,7 @@ jobs:
 
       - name: "Phase 2: Run Frontend Playwright tests (full suite)"
         working-directory: frontend
+        shell: bash
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
           NEXT_BASE_URL: http://localhost:3000
@@ -164,6 +165,7 @@ jobs:
           AUTH_TRUST_HOST: true
         run: |
           mkdir -p test-results
+          set -o pipefail
           npx playwright test --project=chromium --reporter=list 2>&1 | tee test-results/playwright-phase2.log
       # Stop handled by Playwright; no manual kill needed.
       - uses: actions/upload-artifact@v4
