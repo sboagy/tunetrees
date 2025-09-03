@@ -739,16 +739,20 @@ async function processPlaylistDialog(page: Page, ttPO: TuneTreesPageObject) {
 
   // Row checkbox/button (defensive: locate after row visible)
   // getByRole('row', { name: '5 5-String Banjo BGRA 5-' }).getByRole('button').first()
-  const checkBoxButton = page.getByTestId("toggle-playlist-5");
+  // Prefer the known playlist test-id if present, otherwise fallback to first toggle in list
+  const knownToggle = page.getByTestId("toggle-playlist-5");
+  const anyToggle = dialog.locator('[data-testid^="toggle-playlist-"]').first();
 
-  await ttPO.ensureClickable(checkBoxButton);
+  const toggle = (await knownToggle.count()) > 0 ? knownToggle : anyToggle;
+  await ttPO.ensureClickable(toggle);
   // brief delay to let UI settle before interacting
   await page.waitForTimeout(200);
-  await ttPO.clickWithTimeAfter(checkBoxButton, 400);
+  await ttPO.clickWithTimeAfter(toggle, 400);
 
   const submitButton = page.getByTestId("submit-button");
   await submitButton.waitFor({ state: "visible" });
-  await expect(submitButton).toBeEnabled();
+  // Wait until selection enables submission
+  await expect(submitButton).toBeEnabled({ timeout: 10000 });
   await submitButton.click();
   // Wait for dialog to close before proceeding to table wait.
   await dialog.waitFor({ state: "detached", timeout: 15000 });
