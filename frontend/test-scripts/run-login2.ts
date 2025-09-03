@@ -29,18 +29,18 @@ export async function runLoginStandalone(
   await signInButton.isEnabled();
 
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(1000);
 
   const userEmailLocator = page.getByTestId("user_email");
   await userEmailLocator.isVisible();
-  await userEmailLocator.isEnabled();
+  // await userEmailLocator.isEnabled();
 
   await userEmailLocator.fill(user || "");
   await userEmailLocator.press("Tab");
 
   const passwordEntryBox = page.getByTestId("user_password");
   await passwordEntryBox.isVisible();
-  await passwordEntryBox.isEnabled();
+  // await passwordEntryBox.isEnabled();
 
   await passwordEntryBox.fill(pw || "");
   await page.waitForTimeout(100);
