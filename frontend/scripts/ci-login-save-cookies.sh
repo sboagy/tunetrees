@@ -21,6 +21,7 @@ cp ../tunetrees_test_clean.sqlite3 ../tunetrees_test.sqlite3
 mkdir -p test-results
 
 # Run only the login test and tee output to a log file for CI artifacts
-npx playwright test --project=chromium --reporter=list tests/test-login-1.spec.ts 2>&1 | tee test-results/playwright-phase1.log
+# npx playwright test --project=chromium --reporter=list tests/test-login-1.spec.ts 2>&1 | tee test-results/playwright-phase1.log
+npm run test:ui:single tests/test-login-1.spec.ts 2>&1 | tee test-results/playwright-phase1.log
 
 echo "Saved storage state at test-scripts/storageStateSboagyLogin.json"
