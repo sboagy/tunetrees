@@ -72,6 +72,8 @@ jobs:
           TT_API_BASE_URL: http://localhost:8000
           AUTH_URL: http://localhost:3000
           AUTH_TRUST_HOST: true
+          NEXT_PUBLIC_MOCK_EXTERNAL_APIS: true
+          NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION: true
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           TUNETREES_FRONTEND_LOG: test-results/frontend.log
