@@ -1,5 +1,4 @@
 import { type Locator, type Page, expect } from "@playwright/test";
-import { checkHealth } from "./check-servers";
 import { initialPageLoadTimeout } from "./paths-for-tests";
 
 export class TuneTreesPageObject {
@@ -240,8 +239,6 @@ export class TuneTreesPageObject {
   }
 
   async gotoMainPage(waitForTableStatus = true) {
-    await checkHealth();
-
     // Set up error and network monitoring before navigation
     this.setupConsoleErrorHandling();
     this.setupPageErrorHandling();
@@ -300,7 +297,7 @@ export class TuneTreesPageObject {
       // );
       await this.waitForTablePopulationToStart();
       await this.page.waitForLoadState("domcontentloaded");
-      await this.page.waitForTimeout(1000);
+      await this.page.waitForTimeout(500);
     }
   }
 
@@ -347,7 +344,6 @@ export class TuneTreesPageObject {
     // Using `fill` is generally more reliable than `click` then `type` as it clears the field first.
     // Playwright's `fill` has built-in auto-waiting, making manual waits unnecessary.
     await this.filterInput.fill(tuneTitle);
-    await this.page.waitForTimeout(500);
 
     await this.waitForTablePopulationToStart();
 
