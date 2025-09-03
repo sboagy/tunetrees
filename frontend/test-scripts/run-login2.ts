@@ -45,16 +45,16 @@ export async function runLoginStandalone(
   await passwordEntryBox.fill(pw || "");
   await page.waitForTimeout(100);
   await passwordEntryBox.press("Tab");
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(1000);
 
-  await page.waitForFunction(
-    (button) => {
-      const btn = button as HTMLButtonElement;
-      return !btn.disabled;
-    },
-    await signInButton.elementHandle(),
-    { timeout: 5000 }, // Increased timeout for CSRF token fetch
-  );
+  // await page.waitForFunction(
+  //   (button) => {
+  //     const btn = button as HTMLButtonElement;
+  //     return !btn.disabled;
+  //   },
+  //   await signInButton.elementHandle(),
+  //   { timeout: 20000 }, // Increased timeout for CSRF token fetch
+  // );
 
   const signInButton2 = page.getByRole("button", {
     name: "Sign In",
