@@ -58,6 +58,19 @@ jobs:
         run: npm run test:unit
         working-directory: frontend
 
+      - name: Start backend (uvicorn)
+        run: |
+          mkdir -p frontend/test-results
+          # Start Uvicorn from the created venv so installed deps are used
+          .venv/bin/uvicorn tunetrees.api.main:app --host 0.0.0.0 --port 8000 --reload 2>&1 | tee frontend/test-results/fastapi.log &
+          echo $! > .uvicorn.pid
+        env:
+          TUNETREES_DB: "${workspaceFolder}/tunetrees_test.sqlite3"
+          TUNETREES_DEPLOY_BASE_DIR: "${workspaceFolder}"
+          LOG_FUTURE_REVIEWS: "true"
+          GITTHUB_REPO: "tunetrees"
+          PYTHONPATH: .
+
       - name: Build frontend for CI
         if: always()
         run: |
@@ -95,6 +108,11 @@ jobs:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           AUTH_DEBUG: true
           TUNETREES_FRONTEND_LOG: test-results/frontend.log
+          TUNETREES_DB: "${workspaceFolder}/tunetrees_test.sqlite3"
+          TUNETREES_DEPLOY_BASE_DIR: "${workspaceFolder}"
+          LOG_FUTURE_REVIEWS: "true"
+          GITTHUB_REPO: "tunetrees"
+          PYTHONPATH: .
 
       - name: Wait for frontend health
         if: always()
