@@ -141,10 +141,6 @@ jobs:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
           NEXT_BASE_URL: http://localhost:3000
           TT_API_BASE_URL: http://localhost:8000
-          # Test defaults parity
-          TT_REVIEW_SITDOWN_DATE: 2024-12-31 16:47:57.671465+00:00
-          THROTTLE_MAX: 0
-          AUTH_TRUST_HOST: true
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}
@@ -157,8 +153,16 @@ jobs:
           GITHUB_CLIENT_SECRET: ${{ secrets.GGITHUB_CLIENT_SECRET }}
           TT_AUTH_SENDGRID_API_KEY: ${{ secrets.TT_AUTH_SENDGRID_API_KEY }}
           CI: true
+          STORAGE_STATE_TEST1: test-scripts/storageStateSboagyLogin.json
           TEST1_LOGIN_USER_EMAIL: ${{ secrets.TEST1_LOGIN_USER_EMAIL }}
           TEST1_LOGIN_USER_PASSWORD: ${{ secrets.TEST1_LOGIN_USER_PASSWORD }}
+          TEST2_LOGIN_USER_EMAIL: ${{ secrets.TEST2_LOGIN_USER_EMAIL }}
+          TEST2_LOGIN_USER_PASSWORD: ${{ secrets.TEST2_LOGIN_USER_PASSWORD }}
+          TEST2_LOGIN_USER_NAME: ${{ secrets.TEST2_LOGIN_USER_NAME }}
+          TEST2_LOGIN_GMAIL_PW: ${{ secrets.TEST2_LOGIN_GMAIL_PW }}
+          TT_REVIEW_SITDOWN_DATE: 2024-12-31 16:47:57.671465+00:00
+          THROTTLE_MAX: 0
+          AUTH_TRUST_HOST: true
         run: |
           chmod +x scripts/ci-login-save-cookies.sh
           ./scripts/ci-login-save-cookies.sh
