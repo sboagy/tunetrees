@@ -40,23 +40,27 @@ test.describe.serial("Signup Tests", () => {
   test("test-signup-1", async ({ page }) => {
     const ttPO = await initialSignIn(page);
 
-    // So, if NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, instead of trying to retrieve the
-    // link from the email, we'll just retrieve it from localStorage.
-    if (process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true") {
+    // Prefer using localStorage linkBackURL (mock path) when available, but fall back to Gmail
+    // if it doesn't appear quickly. This avoids depending on build-time NEXT_PUBLIC flags.
+    const preferMock =
+      process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION === "true";
+    let linkBackURLValue: string | null = null;
+    if (preferMock) {
       console.log(
-        "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, checking localStorage",
+        "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION is true, probing localStorage",
       );
+      try {
+        const linkBackHandle = await ttPO.page.waitForFunction(
+          () => window.localStorage.getItem("linkBackURL") || undefined,
+          { timeout: 5000 }, // brief probe; do not hold the whole test hostage
+        );
+        linkBackURLValue = (await linkBackHandle.jsonValue()) as string;
+      } catch {
+        // Not found quickly; will fall back below.
+      }
+    }
 
-      // Poll for localStorage linkBackURL to be set (avoid fixed sleep timing flakes)
-      const linkBackHandle = await ttPO.page.waitForFunction(
-        () => {
-          const stored = window.localStorage.getItem("linkBackURL");
-          return stored && stored.length > 0 ? stored : undefined;
-        },
-        { timeout: 15000 },
-      );
-
-      const linkBackURLValue = (await linkBackHandle.jsonValue()) as string;
+    if (linkBackURLValue) {
       console.log("Retrieved linkBackURL from localStorage:", linkBackURLValue);
 
       const url = new URL(linkBackURLValue);
