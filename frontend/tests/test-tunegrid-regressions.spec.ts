@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 });
 
 test.afterEach(async ({ page }, testInfo) => {
-  await page.waitForLoadState("domcontentloaded");
+  await page.waitForTimeout(1_000);
   await restartBackend();
   await page.waitForTimeout(1_000);
   logBrowserContextEnd();
