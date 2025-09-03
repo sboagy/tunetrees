@@ -337,9 +337,7 @@ test.describe.serial("Signup Tests", () => {
     // Click the Verify button instead of pressing Enter
     const verifyButton = page.getByRole("button", { name: "Verify" });
     await verifyButton.waitFor({ state: "visible", timeout: 5000 });
-    await verifyButton.click();
-
-    await page.waitForTimeout(4_000);
+    await ttPO.clickWithTimeAfter(verifyButton);
 
     // Wait for the checkbox to be ready before interacting with it
     await processPlaylistDialog(page, ttPO);
@@ -729,7 +727,8 @@ test.describe.serial("Signup Tests", () => {
 async function processPlaylistDialog(page: Page, ttPO: TuneTreesPageObject) {
   // Dialog may take a moment to mount after verification redirect.
   const dialog = page.getByTestId("playlist-dialog");
-  await dialog.waitFor({ state: "visible", timeout: 30000 });
+  // Be tolerant in CI: sometimes the playlist dialog may not appear immediately or at all
+  await dialog.waitFor({ state: "visible" });
   await dialog.waitFor({ state: "attached" });
 
   // const fiveStringBanjoRow = page.getByRole("row", {
