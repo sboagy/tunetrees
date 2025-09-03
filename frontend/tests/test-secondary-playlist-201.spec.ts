@@ -73,24 +73,51 @@ test("test-secondary-add-to-repertoire-deselection", async ({ page }) => {
   // Try to click Add To Repertoire - this should trigger the Issue 201 error
   await ttPO.clickWithTimeAfter(ttPO.addToRepertoireButton);
 
-  // Wait for potential dialog or error
-  await page.waitForTimeout(1_000);
-
-  // Check if error overlay appeared (this indicates Issue 201)
+  // Wait deterministically for either an error overlay or selection cleared
   const errorOverlay = page.getByRole("button", {
     name: "Open issues overlay",
   });
-  if (await errorOverlay.isVisible()) {
+  const tableStatus = ttPO.tableStatus;
+  const selectionCleared = async () => {
+    try {
+      await expect(tableStatus).toContainText("0 row(s) selected", {
+        timeout: 10_000,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const errorVisible = await errorOverlay
+    .isVisible({ timeout: 10_000 })
+    .catch(() => false);
+  if (!errorVisible) {
+    const cleared = await selectionCleared();
+    if (!cleared) {
+      // one more short wait to let UI settle, then re-check overlay once
+      await page.waitForTimeout(500);
+      if (await errorOverlay.isVisible().catch(() => false)) {
+        console.log(
+          "ERROR DETECTED: Issue 201 - Secondary playlist error occurred",
+        );
+      }
+    } else {
+      console.log("Selection cleared successfully after Add To Repertoire");
+    }
+  } else {
     console.log(
       "ERROR DETECTED: Issue 201 - Secondary playlist error occurred",
     );
-    await errorOverlay.click();
+  }
 
-    // Try to capture error details
+  // If overlay is present, open and capture stack trace for diagnostics
+  if (await errorOverlay.isVisible().catch(() => false)) {
+    await errorOverlay.click();
     const stackTraceButton = page.getByRole("button", {
       name: "Copy Stack Trace",
     });
-    if (await stackTraceButton.isVisible()) {
+    if (await stackTraceButton.isVisible().catch(() => false)) {
       await stackTraceButton.click();
       console.log("Stack trace captured for Issue 201");
     }
@@ -139,7 +166,31 @@ test("test-secondary-playlist-add-to-repertoire", async ({ page }) => {
 
   await ttPO.clickWithTimeAfter(ttPO.addToRepertoireButton);
 
-  await page.waitForTimeout(1_000);
+  // Wait deterministically for either error overlay or selection cleared
+  {
+    const errorOverlay = page.getByRole("button", {
+      name: "Open issues overlay",
+    });
+    const selectionCleared = async () => {
+      try {
+        await expect(ttPO.tableStatus).toContainText("0 row(s) selected", {
+          timeout: 10_000,
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const errorVisible = await errorOverlay
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
+    if (!errorVisible) {
+      const cleared = await selectionCleared();
+      if (!cleared) {
+        await page.waitForTimeout(500);
+      }
+    }
+  }
 
   await ttPO.clickWithTimeAfter(ttPO.repertoireTabTrigger);
 
