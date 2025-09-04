@@ -113,4 +113,10 @@ with open(path, "w", encoding="utf-8") as f:
         f.write(line)
 PY
 
+# ensure final file permissions are -rw-r--r--
+if [[ -f "$OUT" ]]; then
+    echo "Setting permissions to -rw-r--r-- for $OUT"
+    chmod 644 "$OUT" || echo "Warning: chmod failed for $OUT" >&2
+fi
+
 echo "SQLAlchemy models generated: $OUT"
