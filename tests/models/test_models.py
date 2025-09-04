@@ -99,10 +99,11 @@ def test_practice_list_joined():
             assert filtered, f"Expected tune id {tune_id} in scheduled list"
             assert str(filtered[0].title) == expected
 
-        _assert_title(1081, "Lakes of Sligo")
-        _assert_title(1820, "St. Mary's")
-        _assert_title(2451, "Church Street Polka")
-        _assert_title(1684, "Road to Lisdoonvarna")
+        _assert_title(1861, "Sweep's Hornpipe")
+        _assert_title(3923, "Sergeant Early's Dream")
+        _assert_title(1089, "Langstern Pony")
+        _assert_title(2798, "Hinchy's Delight")
+        # There are more, but that's good enough
 
 
 def test_direct_sql_on_practice_list_staged():
