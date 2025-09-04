@@ -129,7 +129,34 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     page,
   }) => {
     // Simulate advancing to the next day
-    const baseSitdownDate = new Date();
+    const baseSitdownMs = await page.evaluate(() => {
+      // Use injected sitdown date if present, otherwise use the browser's current time
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const s = (window as any).__TT_REVIEW_SITDOWN_DATE__;
+      if (s) {
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) {
+          return d.getTime();
+        }
+      }
+      const raw = "2024-12-31 11:47:57.671465-00:00";
+      // Normalize: replace space with 'T' and trim microseconds to milliseconds for Date parsing
+      const m = raw.match(
+        /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\.(\d+)([+-]\d{2}:\d{2}|Z)$/,
+      );
+      let iso: string;
+      if (m) {
+        const datePart = m[1];
+        const timePart = m[2];
+        const ms = m[3].slice(0, 3).padEnd(3, "0"); // first 3 digits -> milliseconds
+        const tz = m[4];
+        iso = `${datePart}T${timePart}.${ms}${tz}`;
+      } else {
+        iso = raw.replace(" ", "T");
+      }
+      return new Date(iso).getTime();
+    });
+    const baseSitdownDate = new Date(baseSitdownMs);
     const tomorrow = new Date(baseSitdownDate.getTime());
     tomorrow.setDate(tomorrow.getDate() + 1);
 

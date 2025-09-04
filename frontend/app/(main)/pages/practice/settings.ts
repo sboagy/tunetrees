@@ -193,14 +193,14 @@ export async function updateTableStateInDb(
     }
     if (isConnReset) {
       console.warn(
-        `<= updateTableStateInDb: table update occurred after DB reboot, abandoning update`,
+        "<= updateTableStateInDb: table update occurred after DB reboot, abandoning update",
       );
     } else if (isConnRefused) {
       console.error(
-        `<= updateTableStateInDb: exhausted all retries, ECONNREFUSED`,
+        "<= updateTableStateInDb: exhausted all retries, ECONNREFUSED",
       );
     } else {
-      console.error(`<= updateTableStateInDb: exhausted all retries, fallback`);
+      console.error("<= updateTableStateInDb: exhausted all retries, fallback");
     }
     return 500;
   });

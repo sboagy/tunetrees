@@ -30,17 +30,17 @@ test.describe.serial("Practice Goals E2E Tests", () => {
     // Navigate to practice tab using Page Object method
     await po.navigateToPracticeTab();
 
-    // Verify goal and technique column headers are visible
+    // Verify Scheduled and technique column headers are visible
     // Note: These appear as cells with text, not columnheader role
     // Use a more specific selector to avoid matching "Prev Goal"
-    const goalHeader = page
-      .getByRole("cell", { name: "Goal", exact: true })
+    const scheduledHeader = page
+      .getByRole("cell", { name: "Scheduled", exact: true })
       .first();
     // const techniqueHeader = page.getByRole("cell", {
     //   name: "Algorithm",
     // });
 
-    await expect(goalHeader).toBeVisible();
+    await expect(scheduledHeader).toBeVisible();
     // await expect(techniqueHeader).toBeVisible();
   });
 });

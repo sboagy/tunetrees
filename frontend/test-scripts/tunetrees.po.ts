@@ -356,7 +356,13 @@ export class TuneTreesPageObject {
 
     // Helper to perform the click on the desired tune row/cell
     const clickDesiredTune = async () => {
-      const currentRowCount = await this.tunesGridRows.count();
+      let currentRowCount = await this.tunesGridRows.count();
+      let attempts = 0;
+      while (currentRowCount < 2 && attempts < 10) {
+        await this.page.waitForTimeout(1000);
+        currentRowCount = await this.tunesGridRows.count();
+        attempts++;
+      }
       if (currentRowCount >= 2) {
         // Determine Title column index (fallback to column 1 if not found)
         let titleColIdx = await getTuneGridColumnIndex(this.page, "Title");

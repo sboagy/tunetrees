@@ -691,14 +691,14 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Goal",
+            "Latest Goal",
           ),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
-        meta: { headerLabel: "Goal" },
+        meta: { headerLabel: "Latest Goal" },
         size: 130,
         minSize: 110,
       },
@@ -813,7 +813,7 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "SR Scheduled",
+            "Due",
           ),
         cell: (info) => {
           return transformToDatetimeLocalForDisplay(info.getValue() as string);
@@ -823,7 +823,7 @@ export function get_columns(
         size: 160,
         minSize: 150,
         sortingFn: datetimeTextSortingFn,
-        meta: { headerLabel: "SR Scheduled" },
+        meta: { headerLabel: "Due" },
       },
       // {
       //   accessorKey: "backup_practiced",

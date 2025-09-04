@@ -804,7 +804,7 @@ const TunesGrid = ({
                 >
                   {table.getFilteredSelectedRowModel().rows.length} of{" "}
                   {table.getFilteredRowModel().rows.length} row(s) selected.
-                  {lapsedCount !== undefined && `, lapsed: ${lapsedCount}`}
+                  {lapsedCount !== undefined && `, overdue: ${lapsedCount}`}
                   {currentCount !== undefined && `, due: ${currentCount}`}
                   {futureCount !== undefined && `, future: ${futureCount}`}
                   {/* Queue-specific metrics (present for Practice tab) */}

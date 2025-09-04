@@ -27,6 +27,7 @@ import {
   getAllGenres,
   getTuneTypesByGenre,
   updatePracticeRecord,
+  upsertPracticeRecord,
   updateTuneInPlaylistFromTuneOverview,
   getTunesOnlyIntoOverview,
   intersectPlaylistTunes,
@@ -186,6 +187,14 @@ export async function updatePracticeRecordAction(
   practiceRecord: Partial<IPracticeRecord>,
 ): ReturnType<typeof updatePracticeRecord> {
   return updatePracticeRecord(tuneId, playlistId, practiceRecord);
+}
+
+export async function upsertPracticeRecordAction(
+  tuneId: number,
+  playlistId: number,
+  practiceRecord: Partial<IPracticeRecord>,
+): ReturnType<typeof upsertPracticeRecord> {
+  return upsertPracticeRecord(tuneId, playlistId, practiceRecord);
 }
 export async function updateTuneInPlaylistFromTuneOverviewAction(
   userId: number,

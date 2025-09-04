@@ -33,7 +33,7 @@
             "justMyCode": false
         },
         {
-            "name": "Python Debugger FastAPI test",
+            "name": "Python Debugger: FastAPI test",
             "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
@@ -64,12 +64,14 @@
                 "fsrs_fixup_report_apply.html",
                 // "--limit",
                 // "5",
-                "--apply"
+                "--apply",
                 // "--nofixup"
                 // "--fsrsonly"
+                "--db",
+                "tunetrees_test_clean.sqlite3"
             ],
             "env": {
-                "TUNETREES_DB": "${workspaceFolder}/tunetrees_production_manual.sqlite3",
+                "TUNETREES_DB": "${workspaceFolder}/tunetrees_test_clean.sqlite3",
                 "PYTHONPATH": "${workspaceFolder}"
             },
             "justMyCode": true
@@ -157,11 +159,11 @@
         {
             "name": "App: Backend + Frontend",
             "configurations": [
-                "Python Debugger: FastAPI",
+                "Python Debugger: FastAPI test",
                 "Next: Node",
                 "Next: Chrome"
             ],
-            "stopAll": true
+            "stopAll": true,
         }
     ]
 }

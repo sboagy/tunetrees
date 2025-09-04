@@ -786,10 +786,10 @@ export async function getReferences(
       userRef,
     );
     console.log(
-      `Request URL: /references?user_ref=${userRef}&tune_ref=${tuneRef}&public=0`,
+      `Request URL (computed): /references/${userRef ?? 0}/${tuneRef}?public=0`,
     );
     const response = await client.get<IReferenceData[]>(
-      `/references/${userRef ?? ""}/${tuneRef}`,
+      `/references/${userRef ?? 0}/${tuneRef}`,
       {
         params: {
           public: 0,
@@ -836,10 +836,13 @@ export async function getReferenceFavorite(
       userRef,
     );
     console.log(
-      `Request URL: /references?user_ref=${userRef}&tune_ref=${tuneRef}&public=0`,
+      `Request URL (computed): /references/${userRef ?? 0}/${tuneRef}?public=1`,
     );
     const response = await client.get<IReferenceData[]>(
-      `/references?tune_ref=${tuneRef}&user_ref=${userRef}&public=0`,
+      `/references/${userRef ?? 0}/${tuneRef}`,
+      {
+        params: { public: 1 },
+      },
     );
     const references = response.data;
     const favoriteReference = references.find((ref) => ref.favorite === 1);
@@ -848,7 +851,7 @@ export async function getReferenceFavorite(
     }
     return references.length > 0 ? references[0] : null;
   } catch (error) {
-    console.error("Error in getReferences: ", error);
+    console.error("Error in getReferenceFavorite: ", error);
     return null;
   }
 }

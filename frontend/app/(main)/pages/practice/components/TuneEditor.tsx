@@ -31,14 +31,13 @@ import * as z from "zod";
 import { ERROR_PLAYLIST_TUNE } from "../mocks";
 import {
   createPlaylistTuneAction,
-  createPracticeRecordAction,
   deleteTuneAction,
   getAllGenresAction,
   getPlaylistByIdAction,
   getPlaylistTuneOverviewAction,
   getTuneTypesByGenreAction,
   updatePlaylistTunesAction,
-  updatePracticeRecordAction,
+  upsertPracticeRecordAction,
   updateTuneInPlaylistFromTuneOverviewAction,
 } from "../actions/practice-actions";
 import { updateCurrentTuneInDb } from "../settings";
@@ -406,8 +405,14 @@ export default function TuneEditor({
   async function savePracticeRecordPart(
     data: z.infer<typeof formSchema>,
   ): Promise<boolean> {
+    // Ensure UTC formatting for datetime fields before sending to API
+    const practicedUtc = transformToDatetimeUtcForDB(
+      data.latest_practiced ?? "",
+    );
+    const reviewDateUtc = transformToDatetimeUtcForDB(data.review_date ?? "");
+
     const practiceRecord: Partial<IPracticeRecord> = {
-      practiced: data.latest_practiced ?? "",
+      practiced: practicedUtc,
       quality: data.latest_quality ?? 0,
       easiness: data.latest_easiness ?? 0,
       difficulty: data.latest_difficulty ?? 0,
@@ -415,53 +420,21 @@ export default function TuneEditor({
       interval: data.latest_interval ?? 0,
       step: data.latest_step ?? 0,
       repetitions: data.latest_repetitions ?? 0,
-      review_date: data.review_date ?? "",
+      review_date: reviewDateUtc,
       state: data.latest_state ?? undefined,
-      // tags: z.string().nullable().optional(),
     };
 
-    // Try to update the latest practice record first
-    const responsePracticeRecordUpdate = await updatePracticeRecordAction(
+    const response = await upsertPracticeRecordAction(
       tuneId,
       playlistId,
       practiceRecord,
     );
-    if ("detail" in responsePracticeRecordUpdate) {
-      console.log(
-        "Failed to update latest practice record:",
-        responsePracticeRecordUpdate.detail,
+    if ("detail" in response) {
+      console.error("Failed to upsert practice record:", response.detail);
+      handleError(
+        `Failed to save practice record: ${typeof response.detail === "string" ? response.detail : "Unknown error"}`,
       );
-      // If update failed (likely 404 - no record exists), create a new one
-      const practiceRecord2: Partial<IPracticeRecord> = {
-        tune_ref: tuneId,
-        playlist_ref: playlistId,
-        practiced: data.latest_practiced ?? "",
-        quality: data.latest_quality ?? 0,
-        easiness: data.latest_easiness ?? 0,
-        difficulty: data.latest_difficulty ?? 0,
-        stability: data.latest_stability ?? 0,
-        interval: data.latest_interval ?? 0,
-        step: data.latest_step ?? 0,
-        repetitions: data.latest_repetitions ?? 0,
-        review_date: data.review_date ?? "",
-        state: data.latest_state ?? undefined,
-      };
-      const responsePracticeRecordUpdate2 = await createPracticeRecordAction(
-        tuneId,
-        playlistId,
-        practiceRecord2,
-      );
-      if ("detail" in responsePracticeRecordUpdate2) {
-        console.error(
-          "Failed to create practice record:",
-          responsePracticeRecordUpdate2.detail,
-        );
-        handleError(
-          `Failed to create practice record: ${typeof responsePracticeRecordUpdate2.detail === "string" ? responsePracticeRecordUpdate2.detail : "Unknown error"}`,
-        );
-        // Don't close the editor on error
-        return true;
-      }
+      return true;
     }
     return false;
   }
@@ -479,6 +452,12 @@ export default function TuneEditor({
       return false; // No original data to compare against
     }
 
+    // Helper: treat undefined and empty-string as null for comparison
+    const norm = (v: unknown): unknown => {
+      if (v === "" || v === undefined) return null;
+      return v;
+    };
+
     // For datetime fields, compare the UTC values (currentData already has UTC conversion)
     // Map form field names to originalPracticeData field names
     const datetimeFieldMappings = [
@@ -493,13 +472,8 @@ export default function TuneEditor({
     ];
 
     for (const { formField, originalField } of datetimeFieldMappings) {
-      const currentUtcValue = currentData[formField];
-      const originalUtcValue = originalPracticeData[originalField];
-
-      // Handle null/undefined equivalence
-      if ((currentUtcValue === null) !== (originalUtcValue === null)) {
-        return true;
-      }
+      const currentUtcValue = norm(currentData[formField]);
+      const originalUtcValue = norm(originalPracticeData[originalField]);
 
       if (currentUtcValue !== originalUtcValue) {
         return true;
@@ -548,15 +522,8 @@ export default function TuneEditor({
     ];
 
     return nonDatetimeFieldMappings.some(({ formField, originalField }) => {
-      const currentValue = currentData[formField];
-      const originalValue = originalPracticeData[originalField];
-
-      // Handle null/undefined equivalence
-      if ((currentValue === null) !== (originalValue === null)) {
-        return true;
-      }
-
-      // Compare actual values
+      const currentValue = norm(currentData[formField]);
+      const originalValue = norm(originalPracticeData[originalField]);
       return currentValue !== originalValue;
     });
   };
@@ -587,6 +554,7 @@ export default function TuneEditor({
       ...data,
       deleted: false,
       practiced: practicedUtc,
+      latest_practiced: practicedUtc, // keep change detection aligned with UTC
       review_date: reviewDateUtc,
     };
 

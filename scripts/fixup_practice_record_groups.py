@@ -7,19 +7,16 @@ What this does:
 - Finds tune_refs where at least one row has technique == 'fsrs' (case-insensitive; null/empty ignored)
 - For each such tune_ref:
     - Prints rows sorted by id with key fields (original view)
-    - Computes a normalized repetitions sequence:
-        • If any non-zero repetitions value exists, the first such value becomes the seed and every subsequent row increments by +1 from the previous.
-        • If all repetitions are 0/None, assigns 1..N across the group.
-    - Replays FSRS scheduling to repair missing FSRS fields on FSRS rows:
-        • Seed card: State.Review, step=0, stability=0.1, difficulty=5.0.
-        • Non-FSRS (e.g., SM2) rows advance the virtual FSRS card using the observed quality and an easiness→difficulty mapping.
-        • Quality (0–5) maps to FSRS Rating: 0/1 Again, 2 Hard, 3 Good, 4/5 Easy.
-        • Repair begins on the first FSRS row where stability is None; from there onward FSRS rows get state, step, stability, difficulty, and review_date written.
-- Shows a second table with the normalized repetitions overlay.
+    - Expands each row into a sequence of simulated FSRS repetitions:
+        • Simulate `repetitions` reviews, scheduling each at the previous card's due date.
+        • Interim reviews use Rating.Good; final review uses the rating mapped from original `quality` (0–5 scale).
+        • Each simulated row gets technique='fsrs' and an enumerated repetitions counter (1..N).
+        • Practiced timestamps are made unique within (tune_ref, playlist_ref, practiced).
+- Shows a second table with the simulated sequence overlay.
 
 Persistence behavior:
-- Dry-run by default (no writes). Use --apply to persist both normalized repetitions and FSRS field repairs.
-- Updates are performed on existing rows only (no row creation/deletion); timestamps are not altered.
+- Dry-run by default (no writes). Use --apply to INSERT the simulated rows and DELETE the original row(s) so the sequence is clean.
+- Timestamps are preserved/normalized to UTC-naive strings; uniqueness is ensured without altering existing rows.
 - A single commit is issued per tune_ref group when --apply is set.
 
 Output:
@@ -34,13 +31,13 @@ Run from repo root:
 
 Notes:
 - Uses SQLAlchemy ORM models and the project's SessionLocal (via TUNETREES_DB).
-- Avoids altering unique practiced timestamps; only updates repetitions and FSRS-related fields when repairing.
+- Avoids altering unique practiced timestamps; new rows are created with distinct times when needed.
 """
 
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from pathlib import Path
 import sys
@@ -197,6 +194,7 @@ def _render_rows_table(
     for col in [
         "tune_ref",
         "id",
+        "state",
         "practiced",
         "repetitions",
         "technique",
@@ -214,6 +212,7 @@ def _render_rows_table(
         table.add_row(
             str(pr.tune_ref),
             str(pr.id),
+            str(pr.state or State.Learning),
             str(pr.practiced or ""),
             str(pr.repetitions or ""),
             str(pr.technique or ""),
@@ -228,13 +227,6 @@ def _render_rows_table(
             style=row_style,
         )
     console.print(table)
-
-
-def _e_factor_to_difficulty(e_factor: float) -> float:
-    normalized_e = (e_factor - 1.3) / (2.5 - 1.3)
-    inverted_e = 1 - normalized_e
-    d = 1 + inverted_e * 9
-    return float(round(d))
 
 
 # def _compute_normalized_reps(rows: Sequence["PracticeRecord"]) -> List[Optional[int]]:
@@ -280,108 +272,185 @@ def _quality_to_fsrs_rating(quality_int: int) -> Rating:
         raise ValueError(f"Unexpected quality value: {quality_int}")
 
 
-def fsrs_fixup_old(
+def _subtract_months(dt: datetime, months: int) -> datetime:
+    # Preserve tzinfo if present
+    tz = dt.tzinfo
+    year = dt.year
+    month = dt.month - months
+    while month <= 0:
+        month += 12
+        year -= 1
+
+    # Determine last day of target month
+    if month == 12:
+        next_month = 1
+        next_month_year = year + 1
+    else:
+        next_month = month + 1
+        next_month_year = year
+    next_month_first = datetime(next_month_year, next_month, 1, tzinfo=tz)
+    last_day = (next_month_first - timedelta(days=1)).day
+
+    day = min(dt.day, last_day)
+    return datetime(
+        year, month, day, dt.hour, dt.minute, dt.second, dt.microsecond, tzinfo=tz
+    )
+
+
+def fsrs_fixup(  # noqa: C901
+    db: Session,
     rows: Sequence[PracticeRecord],
+    *,
+    apply: bool,
 ) -> Tuple[Sequence[PracticeRecord], bool]:
-    """Repair FSRS fields by replaying review history.
+    """Expand each input row into a sequence of simulated FSRS practice records.
 
-    Logic:
-    - Assume rows sorted by id ascending (oldest first)
-    - Use SM2/unknown technique rows to advance a virtual FSRS card (map easiness -> difficulty)
-    - When encountering the first FSRS row with missing stability, start populating FSRS fields
-    - For each subsequent FSRS row, advance and write state, step, stability, difficulty, and review_date
-    - Non-FSRS rows are not written to, but still advance the card state
-    Returns (rows, fsrs_updated_flag)
+    - Simulate `repetitions` reviews per input row.
+    - Interim reviews use a realistic random distribution; final review uses rating mapped from r.quality.
+    - Each simulated row is technique='fsrs' with enumerated repetitions (1..N).
+    - Practiced timestamps are unique per (tune_ref, playlist_ref, practiced).
+    - When apply=True, INSERT new rows and DELETE originals; otherwise dry-run.
     """
-    start_fsrs_repair = False
-    previous_card = Card(state=State.Review, step=0, stability=0.1, difficulty=5.0)
+
+    from datetime import timezone
+    import random
+
+    def ensure_aware_utc(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    def fmt_tt(dt: datetime) -> str:
+        # Store as UTC-naive string in TT_DATE_FORMAT
+        aware = ensure_aware_utc(dt)
+        return aware.replace(tzinfo=None).strftime(TT_DATE_FORMAT)
+
+    def normalize_practiced(v: str | datetime | None) -> datetime:
+        if v is None:
+            return datetime.now(timezone.utc)
+        if isinstance(v, datetime):
+            return ensure_aware_utc(v)
+        parsed = datetime.strptime(v, TT_DATE_FORMAT)
+        return ensure_aware_utc(parsed)
+
+    def exists_in_db(prac_str: str, tune_ref: int, playlist_ref: int) -> bool:
+        stmt = select(PracticeRecord.id).where(
+            PracticeRecord.tune_ref == tune_ref,
+            PracticeRecord.playlist_ref == playlist_ref,
+            PracticeRecord.practiced == prac_str,
+        )
+        return db.execute(stmt).first() is not None
+
+    def ensure_unique_practiced(
+        base_dt: datetime, tune_ref: int, playlist_ref: int, used: set[str]
+    ) -> tuple[str, datetime]:
+        s = fmt_tt(base_dt)
+        if s not in used and not exists_in_db(s, tune_ref, playlist_ref):
+            used.add(s)
+            return s, base_dt
+        bump = 1
+        while True:
+            candidate = base_dt + timedelta(seconds=bump)
+            s2 = fmt_tt(candidate)
+            if s2 not in used and not exists_in_db(s2, tune_ref, playlist_ref):
+                used.add(s2)
+                return s2, candidate
+            bump += 1
+
     fsrs_updated = False
     scheduler = Scheduler()
+
+    simulated_sitdown_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
+
+    # Seed scheduler with a baseline due (aware UTC)
+    due_seed = _subtract_months(simulated_sitdown_date, 9)
+    previous_card = Card(due=ensure_aware_utc(due_seed))
+    previous_card.due = ensure_aware_utc(due_seed)
+
+    # Gather existing practiced strings to avoid collisions
+    used_practiced: set[str] = set(
+        [p for p in (r.practiced for r in rows) if isinstance(p, str) and p]
+    )
+
+    new_rows: List[PracticeRecord] = []
     for r in rows:
         tech = (r.technique or "").lower()
-        rating = _quality_to_fsrs_rating(int(r.quality or 0))
-
-        if tech != "fsrs":
-            # Treat SM2/unknown technique as prior practice to advance FSRS card
-            ef = r.easiness
-            diff = _e_factor_to_difficulty(float(ef)) if ef is not None else 5.0
-            # Clamp difficulty into FSRS domain [1, 10]
-            if diff < 1.0:
-                diff = 1.0
-            elif diff > 10.0:
-                diff = 10.0
-            seed = Card(
-                state=previous_card.state,
-                step=previous_card.step,
-                stability=previous_card.stability,
-                difficulty=diff,
-                due=previous_card.due,
-                last_review=previous_card.last_review,
-            )
-            previous_card, _ = scheduler.review_card(seed, rating)
-            continue
-
-        # FSRS row
-        if not start_fsrs_repair and r.stability is None:
-            start_fsrs_repair = True
-
-        # Always advance card on FSRS rows using observed rating
-        previous_card, _ = scheduler.review_card(previous_card, rating)
-
-        if start_fsrs_repair:
-            r.state = previous_card.state
-            r.step = previous_card.step
-            r.stability = previous_card.stability
-            r.difficulty = previous_card.difficulty
-            r.review_date = previous_card.due
-            fsrs_updated = True
-
-    return rows, fsrs_updated
-
-
-def fsrs_fixup(rows: Sequence[PracticeRecord]) -> Tuple[Sequence[PracticeRecord], bool]:
-    fsrs_updated = False
-    scheduler = Scheduler()
-    previous_card = Card()
-
-    for r in rows:
-        tech = (r.technique or "").lower()
-        if tech != "fsrs":
-            rating = _quality_to_fsrs_rating(int(r.quality or 0))
-        else:
-            rating = Rating(int(r.quality or 1))
-
-        # Always advance card on FSRS rows using observed rating
-        if r.practiced:
-            # practiced may be a string or a datetime; parse strings, pass datetimes through
-            if isinstance(r.practiced, datetime):
-                _dt = r.practiced
-            else:
-                _dt = datetime.strptime(r.practiced, TT_DATE_FORMAT)
-        else:
-            # fallback to current time in UTC when practiced is null
-            _dt = __import__("datetime").datetime.now(
-                __import__("datetime").timezone.utc
-            )
-        _tz_utc = __import__("datetime").timezone.utc
-        if _dt.tzinfo is None:
-            _dt = _dt.replace(tzinfo=_tz_utc)
-        else:
-            _dt = _dt.astimezone(_tz_utc)
-        previous_card, _ = scheduler.review_card(
-            previous_card, rating, review_datetime=_dt
+        final_rating = (
+            _quality_to_fsrs_rating(int(r.quality or 0))
+            if tech != "fsrs"
+            else Rating(int(r.quality or 1))
         )
 
-        r.state = previous_card.state
-        r.step = previous_card.step
-        r.stability = previous_card.stability
-        r.difficulty = previous_card.difficulty
-        r.review_date = previous_card.due
-        r.technique = "fsrs"
-        r.quality = rating.value
+        current_dt = normalize_practiced(r.practiced)
+        # Clamp to sitdown date if any input exceeds it
+        if current_dt > ensure_aware_utc(simulated_sitdown_date):
+            current_dt = ensure_aware_utc(simulated_sitdown_date)
+        total_reps = int(r.repetitions or 1)
+        if total_reps < 1:
+            total_reps = 1
+
+        for i in range(1, total_reps + 1):
+            # Final repetition uses mapped rating; interim use randomized distribution
+            if i == total_reps:
+                rating_i = final_rating
+            else:
+                # Split early vs later repetitions for realism
+                early_phase = i <= max(1, total_reps // 2)
+                if early_phase:
+                    # Bias toward Again/Hard: 60% Hard(2), 40% Again(1)
+                    rating_i = Rating.Hard if random.random() < 0.6 else Rating.Again
+                else:
+                    # Bias toward Good/Easy: 70% Good(3), 30% Easy(4)
+                    rating_i = Rating.Good if random.random() < 0.7 else Rating.Easy
+            # Advance scheduler with aware UTC datetime
+            previous_card, _ = scheduler.review_card(
+                previous_card, rating_i, review_datetime=ensure_aware_utc(current_dt)
+            )
+
+            # Ensure practiced time never exceeds sitdown date
+            if current_dt > ensure_aware_utc(simulated_sitdown_date):
+                current_dt = ensure_aware_utc(simulated_sitdown_date)
+            prac_str, current_dt = ensure_unique_practiced(
+                current_dt, r.tune_ref, r.playlist_ref, used_practiced
+            )
+
+            pr_new = PracticeRecord(
+                playlist_ref=r.playlist_ref,
+                tune_ref=r.tune_ref,
+                practiced=prac_str,
+                quality=rating_i.value,
+                easiness=r.easiness if i == total_reps else None,
+                interval=r.interval if i == total_reps else None,
+                repetitions=r.repetitions  # has the effect of allowing 0
+                if i == total_reps
+                else i,
+                review_date=fmt_tt(previous_card.due),
+                backup_practiced=None,
+                stability=previous_card.stability,
+                elapsed_days=None,
+                lapses=None,
+                state=previous_card.state,
+                difficulty=previous_card.difficulty,
+                step=previous_card.step,
+                goal=r.goal or "recall",
+                technique="fsrs",
+            )
+            new_rows.append(pr_new)
+            if apply:
+                db.add(pr_new)
+
+            # Next review at the due date; keep aware UTC for scheduler
+            due_next = previous_card.due
+            current_dt = ensure_aware_utc(due_next)
+            # Clamp next review to sitdown date
+            if current_dt > ensure_aware_utc(simulated_sitdown_date):
+                current_dt = ensure_aware_utc(simulated_sitdown_date)
+
+        if apply:
+            db.delete(r)
         fsrs_updated = True
 
-    return rows, fsrs_updated
+    return new_rows, fsrs_updated
 
 
 def dump_group(
@@ -408,20 +477,13 @@ def dump_group(
         console.rule()
         return
 
-    # norm_reps = _compute_normalized_reps(rows)
-    rep_updates = 0
-    repetitions = (rows[0].repetitions if rows else 1) or 1
-    for _, pr in enumerate(rows):
-        if pr.repetitions != repetitions:
-            rep_updates += 1
-            pr.repetitions = repetitions
-        repetitions += 1
-
-    rows, fsrs_updated = fsrs_fixup(rows)
+    # Replace each row with a simulated sequence of repetitions using FSRS scheduling
+    rep_updates = 0  # Not used in simulation mode; retained for summary output
+    rows, fsrs_updated = fsrs_fixup(db, rows, apply=apply)
 
     _render_rows_table(
         rows,
-        title=f"tune_ref={tune_ref} (rows={len(rows)}) — repetitions normalized",
+        title=f"tune_ref={tune_ref} (rows={len(rows)}) — simulated repetitions",
         row_style="green",
     )
     # Apply normalized values back to DB if requested

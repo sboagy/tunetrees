@@ -13,7 +13,7 @@ import { TuneEditorPageObject } from "@/test-scripts/tune-editor.po";
 import { expect, test } from "@playwright/test";
 
 // Allow extra time for this suite under full-run concurrency and Next.js dev retries
-test.setTimeout(process.env.CI ? 120_000 : 75_000);
+test.setTimeout(process.env.CI ? 120_000 : 300_000);
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -99,6 +99,8 @@ test.describe.serial("Tune Edit Tests", () => {
       "Lakes of Sligo",
     );
 
+    await page.waitForTimeout(1000);
+
     // ========== Now do a title edit, then Save ==============
     await ttPO.openTuneEditorForCurrentTune();
     await doEditAndButtonClick(
@@ -137,7 +139,8 @@ test.describe.serial("Tune Edit Tests", () => {
     // Confirm that the values are as expected
     for (const formField of ttPO.sampleBoyneHunt) {
       const sampleLocator = formField.locator;
-      console.log(`${formField.label}: ${await sampleLocator.inputValue()}`);
+      console.log(`${formField.label}:`);
+      console.log(`   ${await sampleLocator.inputValue()}`);
       await expect(sampleLocator).toHaveValue(formField.original);
     }
 

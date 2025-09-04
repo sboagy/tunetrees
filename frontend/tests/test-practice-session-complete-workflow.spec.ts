@@ -86,16 +86,16 @@ test("should complete full practice session workflow with recall quality evaluat
   });
   await expect(submitButton).toBeDisabled();
 
-  // Step 4: Verify Goal and Technique columns are visible
+  // Step 4: Verify Scheduled and Technique columns are visible
   const goalHeader = page
     .getByRole("cell", {
-      name: "Goal",
+      name: "Scheduled",
       exact: true,
     })
     .first();
 
   await expect(goalHeader).toBeVisible();
-  console.log("Goal column confirmed visible");
+  console.log("Scheduled column confirmed visible");
 
   // Step 5: Get all recall quality dropdowns
   const recallDropdowns = page.locator(
