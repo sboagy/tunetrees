@@ -106,7 +106,7 @@ Captured once per day per (user_ref, playlist_ref):
 | ----------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `snapshot_coalesced_ts`                   | Canonical date/time basis for ordering (string).                                          |
 | `scheduled_snapshot`                      | The scheduled (next review) timestamp captured at snapshot time (may be null for lapsed). |
-| `latest_review_date_snapshot`             | Last actual practice time at snapshot creation (null if none).                            |
+| `latest_due_snapshot`                     | Last actual practice time at snapshot creation (null if none).                            |
 | `acceptable_delinquency_window_snapshot`  | Window (days) used to include recently lapsed items.                                      |
 | `tz_offset_minutes_snapshot`              | Client tz offset captured for stable local-day semantics.                                 |
 | `bucket` (frontend derived / transmitted) | 1=Due Today, 2=Recently Lapsed, 3=Backfill (older backlog pulled in).                     |
@@ -183,7 +183,7 @@ interface IQueueEntry {
   bucket: 1 | 2 | 3;
   snapshot_coalesced_ts: string;
   scheduled_snapshot?: string | null;
-  latest_review_date_snapshot?: string | null;
+  latest_due_snapshot?: string | null;
   acceptable_delinquency_window_snapshot?: number | null;
   tz_offset_minutes_snapshot?: number | null;
   // ...additional tune metadata fields
@@ -198,7 +198,7 @@ PracticeRecord(
   playlist_ref: int,
   quality: int,
   practiced: str,      # UTC practice timestamp
-  review_date: str,    # (currently same as practiced; next review stored on playlist_tune)
+  due: str,    # (currently same as practiced; next review stored on playlist_tune)
   interval: int,
   easiness: float | None,
   repetitions: int,
@@ -222,7 +222,7 @@ Full field reference for the `practice_record` table:
 | REAL    | easiness         | Easiness factor (SM2 path)                                                                                  |
 | INTEGER | interval         | Interval (days) until next review (output of scheduler/heuristic)                                           |
 | INTEGER | repetitions      | Number of successful reviews (algorithm-specific increment semantics)                                       |
-| TEXT    | review_date      | Historical field; currently set equal to `practiced` (next review now tracked on `playlist_tune.scheduled`) |
+| TEXT    | due              | Historical field; currently set equal to `practiced` (next review now tracked on `playlist_tune.scheduled`) |
 | TEXT    | backup_practiced | Deprecated legacy field (retained for migration safety)                                                     |
 | REAL    | stability        | FSRS stability metric                                                                                       |
 | INTEGER | elapsed_days     | Days elapsed since last review (algorithm input)                                                            |
@@ -233,8 +233,8 @@ Full field reference for the `practice_record` table:
 
 Notes:
 
-1. The authoritative NEXT review date is **not** this table's `review_date`; instead it is stored on `playlist_tune.scheduled` and captured into snapshots (`scheduled_snapshot`).
-2. Future migration could repurpose `review_date` or introduce a dedicated `next_review` column once legacy semantics fully retired.
+1. The authoritative NEXT review date is **not** this table's `due`; instead it is stored on `playlist_tune.scheduled` and captured into snapshots (`scheduled_snapshot`).
+2. Future migration could repurpose `due` or introduce a dedicated `next_review` column once legacy semantics fully retired.
 3. Uniqueness of a practice event is enforced by timestamp precision on `(tune_ref, playlist_ref, practiced)`.
 
 ### Daily Practice Queue Schema Reference
@@ -256,7 +256,7 @@ Full field reference for the `daily_practice_queue` table. Represents the frozen
 | TEXT    | mode                                   | Tune mode cached for display/styling                                                      |
 | TEXT    | queue_date                             | Local date string (for resilience when tz shifts)                                         |
 | TEXT    | scheduled_snapshot                     | Next review date captured at snapshot time (nullable)                                     |
-| TEXT    | latest_review_date_snapshot            | Latest practice time captured at snapshot time (nullable)                                 |
+| TEXT    | latest_due_snapshot                    | Latest practice time captured at snapshot time (nullable)                                 |
 | INTEGER | acceptable_delinquency_window_snapshot | Window (days) value used during classification                                            |
 | INTEGER | tz_offset_minutes_snapshot             | Client timezone offset minutes captured for local-day logic                               |
 | TEXT    | completed_at                           | When user completed this tune today (set once; row retained)                              |
@@ -331,7 +331,7 @@ Request payload (staging single tune):
 }
 ```
 
-Stored transient columns used now: `recall_eval`, `practiced`, `quality`, `easiness`, `difficulty`, `interval`, `step`, `repetitions`, `review_date`, `goal`, `technique`, `stability` (notes fields currently unused in staging path).
+Stored transient columns used now: `recall_eval`, `practiced`, `quality`, `easiness`, `difficulty`, `interval`, `step`, `repetitions`, `due`, `goal`, `technique`, `stability` (notes fields currently unused in staging path).
 
 ### Lifecycle Summary
 
@@ -478,9 +478,9 @@ Steps (recall goal):
 8. Compute review outcome:
    - `first_review()` if NEW / RESCHEDULED quality marker.
    - Otherwise `review()` with previous easiness, interval, repetitions, etc.
-9. Derive `review_date_str` from scheduler output (next review datetime) and `practiced_str` from `sitdown_date` (current session timestamp).
+9. Derive `due_str` from scheduler output (next review datetime) and `practiced_str` from `sitdown_date` (current session timestamp).
 10. Create new `PracticeRecord` (ALWAYS appending; never updating previous) with:
-    - `review_date` set to the ACTUAL practice date (current design decision: track when practiced; next review date is stored separately in playlist_tune.scheduled).
+    - `due` set to the ACTUAL practice date (current design decision: track when practiced; next review date is stored separately in playlist_tune.scheduled).
 11. Add record to session.
 12. If a valid next review date was produced, call `update_playlist_tune_scheduled()` to mirror it into `playlist_tune.scheduled` (migration Step 2 toward playlist-based scheduling).
 
@@ -492,8 +492,8 @@ Differences:
 
 1. Goal-specific intervals chosen from preset arrays (e.g., `initial_learn`, `fluency`, `session_ready`, `performance_polish`).
 2. Adjust step based on prior repetitions and current quality.
-3. Derive next review date via `_calculate_goal_specific_review_date()` (technique modifiers: `daily_practice`, `motor_skills`, `metronome`).
-4. Create new `PracticeRecord` (includes interval estimation and repetition increment) with `review_date` still set to practice time (consistency) and update `playlist_tune.scheduled` with computed next review date.
+3. Derive next review date via `_calculate_goal_specific_due()` (technique modifiers: `daily_practice`, `motor_skills`, `metronome`).
+4. Create new `PracticeRecord` (includes interval estimation and repetition increment) with `due` still set to practice time (consistency) and update `playlist_tune.scheduled` with computed next review date.
 
 ### 7. Data Persistence & Uniqueness
 
@@ -507,20 +507,20 @@ Responsibilities:
 
 - Accepts `review_sitdown_date` (UTC) + `acceptable_delinquency_window` to define a sliding window: `(sitdown_date - window_days, sitdown_date]`.
 - Filters rows from `t_practice_list_staged` for the current user + playlist.
-- Uses `COALESCE(playlist_tune.scheduled, latest_review_date)` so new playlist-based scheduling supersedes legacy practice record scheduling but still works during migration.
+- Uses `COALESCE(playlist_tune.scheduled, latest_due)` so new playlist-based scheduling supersedes legacy practice record scheduling but still works during migration.
 - Excludes deleted tunes / deleted playlists unless flags set.
 - Orders by (coalesced) scheduled/review date descending, then performs a secondary in-memory sort by tune type for stable UI grouping.
 - Returns rows consumed by `/scheduled_tunes_overview/{user}/{playlist}` endpoint which the frontend calls via `getScheduledTunesOverviewAction()`.
 
 Why it matters:
 
-- Central place where the migration from historical `PracticeRecord.review_date` to `playlist_tune.scheduled` is abstracted away.
+- Central place where the migration from historical `PracticeRecord.due` to `playlist_tune.scheduled` is abstracted away.
 - Ensures users see both slightly delinquent (within window) and due-today tunes in one list.
 - Prevents N+1 queries by operating entirely in a single SELECT over the staged view.
 
 Data Fallback Behavior:
 
-- If `playlist_tune.scheduled` is NULL (older entries), the previous `latest_review_date` (from practice history) still governs visibility.
+- If `playlist_tune.scheduled` is NULL (older entries), the previous `latest_due` (from practice history) still governs visibility.
 - Once a tune receives new feedback under the new system, `playlist_tune.scheduled` is populated, taking precedence.
 
 ### 8. Refresh Cycle Back to UI
@@ -552,7 +552,7 @@ PracticeRecord(
   playlist_ref: int,
   quality: int,
   practiced: str,         # UTC timestamp of review session
-  review_date: str,       # (Design) also set to practiced timestamp
+  due: str,       # (Design) also set to practiced timestamp
   interval: int,
   easiness: float | None,
   repetitions: int,

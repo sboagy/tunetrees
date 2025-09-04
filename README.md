@@ -270,7 +270,7 @@ erDiagram
         REAL easiness
         INTEGER interval
         INTEGER repetitions
-        TEXT review_date
+        TEXT due
         TEXT backup_practiced
         REAL stability
         INTEGER elapsed_days
