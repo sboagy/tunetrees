@@ -2,9 +2,10 @@ import json
 import logging
 import time
 import urllib.parse
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from os import environ
-from typing import Any, Dict, List, Optional, Sequence as _Sequence
+from typing import Any, Dict, List, Optional
+from typing import Sequence as _Sequence
 
 import pydantic
 from fastapi import (
@@ -15,18 +16,19 @@ from fastapi import (
     Query,
 )
 from sqlalchemy import ColumnElement, Table, and_, delete, func, insert
+from sqlalchemy import select as sql_select
+from sqlalchemy import update as sql_update
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.query import Query as QueryOrm
 from starlette import status as status
 
 from tunetrees.app.database import SessionLocal
-from tunetrees.app.queries import (
-    query_practice_list_scheduled,
-    # query_practice_list_scheduled_original,
-    generate_or_get_practice_queue,
-    refill_practice_queue,
+from tunetrees.app.queries import (  # query_practice_list_scheduled_original,
     add_tunes_to_practice_queue,
+    generate_or_get_practice_queue,
+    query_practice_list_scheduled,
+    refill_practice_queue,
 )
 from tunetrees.app.schedule import (
     TuneFeedbackUpdate,
@@ -35,11 +37,8 @@ from tunetrees.app.schedule import (
     update_practice_schedules,
 )
 from tunetrees.app.schedulers import SpacedRepetitionScheduler
-from tunetrees.models.tunetrees import TableTransientData
-from sqlalchemy import select as sql_select
-from sqlalchemy import update as sql_update
-from tunetrees.models.tunetrees import DailyPracticeQueue
 from tunetrees.models.tunetrees import (
+    DailyPracticeQueue,
     Genre,
     Instrument,
     Note,
@@ -47,6 +46,7 @@ from tunetrees.models.tunetrees import (
     PlaylistTune,
     PracticeRecord,
     Reference,
+    TableTransientData,
     Tune,
     TuneOverride,
     TuneType,
@@ -73,6 +73,7 @@ from tunetrees.models.tunetrees_pydantic import (
     PlaylistTuneModel,
     PlaylistTuneModelPartial,
     PracticeListStagedModel,
+    PracticeQueueEntryModel,
     PracticeRecordModel,
     PracticeRecordModelPartial,
     ReferenceModel,
@@ -87,7 +88,6 @@ from tunetrees.models.tunetrees_pydantic import (
     TuneTypeModel,
     TuneTypeModelPartial,
     ViewPlaylistJoinedModel,
-    PracticeQueueEntryModel,
 )
 
 logger = logging.getLogger("tunetrees.api")
@@ -600,14 +600,15 @@ def _stage_practice_feedbacks(
 
     NOTE: This is an interim implementation; later refactor to reuse core compute path.
     """
+    import json as _json
+    from datetime import timedelta
+
     from tunetrees.app.schedule import (
+        SpacedRepetitionScheduler,
         fetch_algorithm_type,
         fetch_user_ref_from_playlist_ref,
         get_prefs_spaced_repetition,
-        SpacedRepetitionScheduler,
     )
-    import json as _json
-    from datetime import timedelta
 
     with SessionLocal() as db_stage:
         user_ref = fetch_user_ref_from_playlist_ref(db_stage, int(playlist_id))
@@ -653,11 +654,11 @@ def _stage_single_tune(
     tune_update: TuneFeedbackUpdate,
 ) -> None:
     from tunetrees.app.schedule import (
-        get_latest_practice_record,
-        parse_review_date,
         TT_DATE_FORMAT,
+        get_latest_practice_record,
+        parse_due,
     )
-    from tunetrees.models.quality import quality_lookup, NOT_SET, NEW, RESCHEDULED
+    from tunetrees.models.quality import NEW, NOT_SET, RESCHEDULED, quality_lookup
 
     quality_str = tune_update.get("feedback")
     if not quality_str:
@@ -682,7 +683,7 @@ def _stage_single_tune(
                 "interval",
                 "step",
                 "repetitions",
-                "review_date",
+                "due",
                 "backup_practiced",
                 "goal",
                 "technique",
@@ -722,16 +723,16 @@ def _stage_single_tune(
             interval=latest_pr.interval,
             repetitions=latest_pr.repetitions,
             sitdown_date=sitdown_date,
-            sr_scheduled_date=latest_pr.review_date,
+            sr_scheduled_date=latest_pr.due,
             stability=getattr(latest_pr, "stability", None),
             difficulty=getattr(latest_pr, "difficulty", None),
             step=getattr(latest_pr, "step", None),
             last_practiced=last_practiced,
         )
 
-    review_dt = result.get("review_datetime")
-    review_date_str = (
-        parse_review_date(review_dt)
+    review_dt = result.get("due")
+    due_str = (
+        parse_due(review_dt)
         if review_dt
         else datetime.strftime(sitdown_date, "%Y-%m-%d %H:%M:%S")
     )
@@ -754,7 +755,7 @@ def _stage_single_tune(
         existing.interval = result.get("interval")  # type: ignore
         existing.step = result.get("step")  # type: ignore
         existing.repetitions = result.get("repetitions")  # type: ignore
-        existing.review_date = review_date_str  # type: ignore
+        existing.due = due_str  # type: ignore
         existing.backup_practiced = None  # type: ignore
         existing.goal = goal  # type: ignore
         existing.technique = technique  # type: ignore
@@ -776,7 +777,7 @@ def _stage_single_tune(
                 interval=result.get("interval"),
                 step=result.get("step"),
                 repetitions=result.get("repetitions"),
-                review_date=review_date_str,
+                due=due_str,
                 backup_practiced=None,
                 goal=goal,
                 technique=technique,
@@ -846,7 +847,7 @@ def _persist_staged_rows(
             "interval",
             "step",
             "repetitions",
-            "review_date",
+            "due",
             "backup_practiced",
             "goal",
             "technique",
@@ -870,7 +871,7 @@ def _insert_practice_record_with_retry(db: Session, playlist_id: int, row: Any) 
                 easiness=row.easiness,
                 interval=row.interval,
                 repetitions=row.repetitions,
-                review_date=row.review_date,
+                due=row.due,
                 backup_practiced=row.backup_practiced,
                 stability=row.stability,
                 elapsed_days=None,
@@ -952,7 +953,7 @@ async def clear_staged_practice_feedback(playlist_id: int, tune_id: int) -> None
                     "interval",
                     "step",
                     "repetitions",
-                    "review_date",
+                    "due",
                     "backup_practiced",
                     "goal",
                     "technique",

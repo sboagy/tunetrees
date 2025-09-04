@@ -1,14 +1,15 @@
+import json
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Tuple, Optional
-from typing_extensions import TypedDict, NotRequired
+from typing import Dict, List, Optional, Tuple
 
-from fsrs import Rating, Scheduler, ReviewLog
+from dateutil.parser import parse
+from fsrs import Rating, ReviewLog, Scheduler
 from fsrs.optimizer import Optimizer
 from sqlalchemy import Row, and_, select, update
 from sqlalchemy.orm.session import Session
 from tabulate import tabulate
-from dateutil.parser import parse
+from typing_extensions import NotRequired, TypedDict
 
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import (
@@ -24,7 +25,6 @@ from tunetrees.models.tunetrees import (
     PrefsSpacedRepetition,
 )
 from tunetrees.models.tunetrees_pydantic import AlgorithmType
-import json
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ Core Fields:
     PracticeRecord.practiced
         Timestamp the review actually occurred (event time).
 
-    PracticeRecord.review_date
+    PracticeRecord.due
         Immutable snapshot of the NEXT due timestamp produced by the scheduler (FSRS/SM2 or
         goal-specific heuristic) at the moment the practice event was processed. Each new
         evaluation appends a row with a fresh snapshot. (Historical name retained; conceptually
@@ -44,13 +44,13 @@ Core Fields:
 
     PlaylistTune.scheduled
         Transient manual override of the next due date. After the scheduler processes a new
-        evaluation we record the next due in PracticeRecord.review_date and CLEAR this field
-        so downstream COALESCE(scheduled, latest_review_date) falls back to the canonical snapshot.
+        evaluation we record the next due in PracticeRecord.due and CLEAR this field
+        so downstream COALESCE(scheduled, latest_due) falls back to the canonical snapshot.
         A future manual override feature may set this field; it is always cleared on the next
         evaluation to avoid stale pinning.
 
 Effective Due Computation (queries layer):
-    effective_due = COALESCE(playlist_tune.scheduled, latest PracticeRecord.review_date)
+    effective_due = COALESCE(playlist_tune.scheduled, latest PracticeRecord.due)
 
 Rationale:
     - Keeps historical trail of every scheduling decision (auditable, optimizable).
@@ -58,7 +58,7 @@ Rationale:
     - Simplifies migration: removing a manual override requires only clearing scheduled.
 
 Implementation Notes:
-    - schedule.py creates PracticeRecord rows with review_date set to the *next* due (not practiced).
+    - schedule.py creates PracticeRecord rows with due set to the *next* due (not practiced).
     - After recording an evaluation it invokes clear_playlist_tune_scheduled().
     - Legacy code update_playlist_tune_scheduled() retained temporarily for reference; avoid new uses.
 """
@@ -107,9 +107,9 @@ def backup_practiced_dates():  # sourcery skip: extract-method
 #             row.interval = review.get("interval")
 #             row.repetitions = review.get("repetitions")
 #             # XTODO: check these next two lines!
-#             review_date_orig = review.get("review_datetime", datetime.now(timezone.utc))
-#             review_date_str = datetime.strftime(review_date_orig, TT_DATE_FORMAT)
-#             row.review_date = review_date_str
+#             due_orig = review.get("due", datetime.now(timezone.utc))
+#             due_str = datetime.strftime(due_orig, TT_DATE_FORMAT)
+#             row.due = due_str
 #             row.quality = quality
 
 #         db.commit()
@@ -282,7 +282,7 @@ class ReviewResult(TypedDict):
     interval: int
     step: int | None
     repetitions: int
-    review_datetime: datetime
+    due: datetime
     review_duration: int | None
 
 
@@ -350,49 +350,45 @@ def get_latest_practice_record(
             interval=0,
             step=None,
             repetitions=0,
-            review_date="",
+            due="",
             quality=0,
             practiced="",
         )
         return practice_record
 
 
-def parse_review_date(review_date: datetime | str) -> str:
-    if isinstance(review_date, datetime):
-        if review_date.tzinfo is None or review_date.tzinfo.utcoffset(
-            review_date
-        ) != timedelta(0):
-            raise ValueError("review_date must be timezone aware and in UTC")
+def parse_due(due: datetime | str) -> str:
+    if isinstance(due, datetime):
+        if due.tzinfo is None or due.tzinfo.utcoffset(due) != timedelta(0):
+            raise ValueError("due must be timezone aware and in UTC")
 
-        return datetime.strftime(review_date, TT_DATE_FORMAT)
-    elif isinstance(review_date, str):  # type: ignore
+        return datetime.strftime(due, TT_DATE_FORMAT)
+    elif isinstance(due, str):  # type: ignore
         try:
-            review_date_dt = parse(review_date)
+            due_dt = parse(due)
         except ValueError:
-            log.error(f"Unable to parse date: {review_date}")
+            log.error(f"Unable to parse date: {due}")
             raise
-        review_date_dt = review_date_dt.replace(second=0, microsecond=0)
-        if review_date_dt.tzinfo is None:
-            review_date_dt = review_date_dt.replace(tzinfo=timezone.utc)
-        elif review_date_dt.tzinfo.utcoffset(review_date_dt) != timedelta(0):
-            raise ValueError("review_date must be in UTC")
-        return review_date_dt.strftime(TT_DATE_FORMAT)
+        due_dt = due_dt.replace(second=0, microsecond=0)
+        if due_dt.tzinfo is None:
+            due_dt = due_dt.replace(tzinfo=timezone.utc)
+        elif due_dt.tzinfo.utcoffset(due_dt) != timedelta(0):
+            raise ValueError("due must be in UTC")
+        return due_dt.strftime(TT_DATE_FORMAT)
     else:
-        raise ValueError(
-            f"Unexpected review_date type: {type(review_date)}: {review_date}"
-        )
+        raise ValueError(f"Unexpected due type: {type(due)}: {due}")
 
 
 def update_playlist_tune_scheduled(
     db: Session,
     tune_id: str,
     playlist_ref: int,
-    review_date_str: str,
+    due_str: str,
 ) -> None:
     """Update the scheduled field in playlist_tune table (Step 2 of 6-step plan).
 
     This function updates the playlist_tune.scheduled field with the same review date
-    that gets written to practice_record.review_date, enabling the transition from
+    that gets written to practice_record.due, enabling the transition from
     practice_record-based scheduling to playlist_tune-based scheduling.
     """
     try:
@@ -408,9 +404,9 @@ def update_playlist_tune_scheduled(
 
         if playlist_tune:
             # Update the scheduled field
-            playlist_tune.scheduled = review_date_str
+            playlist_tune.scheduled = due_str
             log.debug(
-                f"Updated playlist_tune.scheduled for tune {tune_id}, playlist {playlist_ref}: {review_date_str}"
+                f"Updated playlist_tune.scheduled for tune {tune_id}, playlist {playlist_ref}: {due_str}"
             )
         else:
             log.warning(
@@ -429,10 +425,10 @@ def clear_playlist_tune_scheduled(
     """Clear (NULL) the playlist_tune.scheduled field.
 
     New semantics (Aug 2025 refactor):
-      - PracticeRecord.review_date now stores the NEXT due timestamp produced by the scheduler at
+      - PracticeRecord.due now stores the NEXT due timestamp produced by the scheduler at
         the moment of evaluation.
       - playlist_tune.scheduled is no longer the persistent authoritative next due; we clear it
-        after using any manual override so that queries fall back to the latest PracticeRecord.review_date.
+        after using any manual override so that queries fall back to the latest PracticeRecord.due.
       - Manual override feature (future) will temporarily set scheduled; upon next evaluation we
         apply scheduler result to PracticeRecord and clear the override here.
     """
@@ -619,25 +615,25 @@ def _process_non_recall_goal(
     latest_practice_record = get_latest_practice_record(db, tune_id, playlist_ref)
 
     # Calculate next review date based on goal-specific strategies
-    next_review_date = _calculate_goal_specific_review_date(
+    next_due = _calculate_goal_specific_due(
         goal, technique, quality_int, sitdown_date, latest_practice_record
     )
 
     # Create new practice record with goal-specific scheduling
     practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
 
-    next_due_str = next_review_date.strftime(TT_DATE_FORMAT)
+    next_due_str = next_due.strftime(TT_DATE_FORMAT)
     new_practice_record = PracticeRecord(
         id=None,
         tune_ref=tune_id,
         playlist_ref=playlist_ref,
         quality=quality_int,
         practiced=practiced_str,
-        review_date=next_due_str,  # Store NEXT due (goal-specific scheduler output)
+        due=next_due_str,  # Store NEXT due (goal-specific scheduler output)
         backup_practiced=practiced_str,
         goal=goal,
         technique=technique,
-        interval=max(1, (next_review_date - sitdown_date).days),
+        interval=max(1, (next_due - sitdown_date).days),
         repetitions=(
             (latest_practice_record.repetitions + 1) if latest_practice_record else 1
         ),
@@ -661,7 +657,7 @@ def _process_non_recall_goal(
     clear_playlist_tune_scheduled(db, tune_id, playlist_ref)
 
 
-def _calculate_goal_specific_review_date(
+def _calculate_goal_specific_due(
     goal: str,
     technique: Optional[str],
     quality: int,
@@ -831,18 +827,18 @@ def _process_single_tune_feedback(
             interval=latest_practice_record.interval,
             repetitions=latest_practice_record.repetitions,
             sitdown_date=sitdown_date,
-            sr_scheduled_date=latest_practice_record.review_date,
+            sr_scheduled_date=latest_practice_record.due,
             stability=getattr(latest_practice_record, "stability", None),
             difficulty=getattr(latest_practice_record, "difficulty", None),
             step=getattr(latest_practice_record, "step", None),
             last_practiced=latest_practiced,
         )
 
-    review_dt = review_result_dict.get("review_datetime")
+    review_dt = review_result_dict.get("due")
     if review_dt is None:
-        review_date_str = ""
+        due_str = ""
     else:
-        review_date_str = parse_review_date(review_dt)
+        due_str = parse_due(review_dt)
 
     # Always create a new practice record for historical tracking
     practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
@@ -858,7 +854,7 @@ def _process_single_tune_feedback(
         interval=review_result_dict.get("interval"),
         step=review_result_dict.get("step"),
         repetitions=review_result_dict.get("repetitions"),
-        review_date=review_date_str
+        due=due_str
         or practiced_str,  # Store NEXT due; fallback to practiced timestamp if missing
         quality=quality_int,
         practiced=practiced_str,
@@ -870,12 +866,12 @@ def _process_single_tune_feedback(
     db.add(new_practice_record)
 
     # Step 2: Also update playlist_tune.scheduled with the same review date
-    # Clear any existing scheduled override so COALESCE falls back to latest PracticeRecord.review_date
+    # Clear any existing scheduled override so COALESCE falls back to latest PracticeRecord.due
     clear_playlist_tune_scheduled(db, tune_id, playlist_ref)
 
 
 class TuneScheduleUpdate(TypedDict):
-    review_date: str
+    due: str
 
 
 # DEADCODE: Dead code?
@@ -904,24 +900,22 @@ def update_practice_schedules(
                 assert isinstance(tune_id, str)
                 tune_update = user_tune_updates.get(tune_id)
                 assert tune_update is not None
-                review_date = tune_update.get("review_date")
-                assert review_date is not None
+                due = tune_update.get("due")
+                assert due is not None
                 assert isinstance(user_tune_updates, Dict)
 
-                if isinstance(review_date, datetime):
-                    review_date_str = datetime.strftime(review_date, TT_DATE_FORMAT)
-                elif isinstance(review_date, str):  # type: ignore
-                    review_date_str = review_date
+                if isinstance(due, datetime):
+                    due_str = datetime.strftime(due, TT_DATE_FORMAT)
+                elif isinstance(due, str):  # type: ignore
+                    due_str = due
                 else:
-                    raise ValueError(
-                        f"Unexpected review_date type: {type(review_date)}: {review_date}"
-                    )
+                    raise ValueError(f"Unexpected due type: {type(due)}: {due}")
 
                 data_to_update.append(
                     {
                         "tune_ref": tune_id,
                         "playlist_ref": playlist_ref,
-                        "review_date": review_date_str,
+                        "due": due_str,
                     }
                 )
 
@@ -983,10 +977,10 @@ def get_user_review_history(
                 tzinfo=timezone.utc
             )
             review_dt = (
-                datetime.strptime(record.review_date, TT_DATE_FORMAT).replace(
+                datetime.strptime(record.due, TT_DATE_FORMAT).replace(
                     tzinfo=timezone.utc
                 )
-                if record.review_date
+                if record.due
                 else practiced_dt
             )
 
@@ -999,7 +993,7 @@ def get_user_review_history(
             Attributes:
                 card_id: The id of the card being reviewed.
                 rating: The rating given to the card during the review.
-                review_datetime: The date and time of the review.
+                due: The date and time of the review.
                 review_duration: The number of miliseconds it took to review the card or None if unspecified.
             """
 

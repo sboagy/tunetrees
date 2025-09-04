@@ -1,9 +1,8 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, NamedTuple
-from tunetrees.models.tunetrees_pydantic import PlaylistTuneJoinedModel
+from typing import Any, Dict, List, NamedTuple, Optional
 
-from sqlalchemy import and_, desc, func
+from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Query, Session
 from tabulate import tabulate
@@ -11,12 +10,11 @@ from tabulate import tabulate
 from tunetrees.models.tunetrees import (
     Playlist,
     PracticeRecord,
-    Tune,
     PrefsSchedulingOptions,
+    Tune,
     t_practice_list_staged,
 )
-
-from sqlalchemy import or_
+from tunetrees.models.tunetrees_pydantic import PlaylistTuneJoinedModel
 
 logger = logging.getLogger(__name__)
 
@@ -251,18 +249,18 @@ def get_playlist_ids_for_user(session: Session, user_ref: str) -> List[int]:
     return [playlist_id[0] for playlist_id in playlist_ids]
 
 
-def get_most_recent_review_date(session: Session, playlist_ref: int) -> None | datetime:
-    most_recent_review_date = (
+def get_most_recent_due(session: Session, playlist_ref: int) -> None | datetime:
+    most_recent_due = (
         session.query(PracticeRecord)
         .filter(PracticeRecord.playlist_ref == playlist_ref)
-        .order_by(desc(PracticeRecord.review_date))
+        .order_by(desc(PracticeRecord.due))
         .first()
     )
-    if most_recent_review_date is None:
+    if most_recent_due is None:
         return None
-    most_recent_review_date_str = most_recent_review_date.review_date
-    most_recent_review_date = datetime.fromisoformat(most_recent_review_date_str)
-    return most_recent_review_date
+    most_recent_due_str = most_recent_due.due
+    most_recent_due = datetime.fromisoformat(most_recent_due_str)
+    return most_recent_due
 
 
 def get_most_recent_practiced(session: Session, playlist_ref: int):
@@ -329,9 +327,9 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
     ------------
     Override vs Fallback:
     - ``scheduled`` (explicit future/target review time) acts as an override.
-    - If ``scheduled`` is NULL we fall back to ``latest_review_date`` for both
+    - If ``scheduled`` is NULL we fall back to ``latest_due`` for both
     classification AND ordering.
-    - Conceptually we operate on COALESCE(scheduled, latest_review_date).
+    - Conceptually we operate on COALESCE(scheduled, latest_due).
 
     Buckets / Phases (detailed)
     ---------------------------
@@ -382,7 +380,7 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
     FUTURE EXTENSIONS
     -----------------
     - Weekly rules / days_per_week could pre-populate future ``scheduled`` values
-    powering Q1 instead of relying solely on historical latest_review_date.
+    powering Q1 instead of relying solely on historical latest_due.
     - A later refactor might merge the phase queries into a window function +
     single pass ranking, though current clarity is prioritized.
 
@@ -457,7 +455,7 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
 
     # --- Column references ---
     scheduled_ts_col = t_practice_list_staged.c.scheduled
-    latest_ts_col = t_practice_list_staged.c.latest_review_date
+    latest_ts_col = t_practice_list_staged.c.latest_due
     coalesced_col = func.coalesce(scheduled_ts_col, latest_ts_col)
 
     base_filters = _build_base_filters(
@@ -488,11 +486,9 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
         sample = []
         for r in q1_rows[:5]:
             sample.append(
-                (
-                    getattr(r, "scheduled", None)
-                    or getattr(r, "latest_review_date", None)
-                    or ""
-                )[:19]
+                (getattr(r, "scheduled", None) or getattr(r, "latest_due", None) or "")[
+                    :19
+                ]
             )
         logger.debug(
             "Q1(today) count=%d interval=[%s,%s) sample=%s",
@@ -514,7 +510,7 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
             m = PlaylistTuneJoinedModel.model_validate(r)
             coalesced_raw = (
                 getattr(r, "scheduled", None)
-                or getattr(r, "latest_review_date", None)
+                or getattr(r, "latest_due", None)
                 or windows.start_ts
             )
             m.bucket = _classify_queue_bucket(coalesced_raw, windows)
@@ -542,11 +538,9 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
         sample = []
         for r in q2_rows[:5]:
             sample.append(
-                (
-                    getattr(r, "scheduled", None)
-                    or getattr(r, "latest_review_date", None)
-                    or ""
-                )[:19]
+                (getattr(r, "scheduled", None) or getattr(r, "latest_due", None) or "")[
+                    :19
+                ]
             )
         logger.debug(
             "Q2(lapsed-window) count=%d window=[%s,%s) sample=%s",
@@ -569,7 +563,7 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
             m = PlaylistTuneJoinedModel.model_validate(r)
             coalesced_raw = (
                 getattr(r, "scheduled", None)
-                or getattr(r, "latest_review_date", None)
+                or getattr(r, "latest_due", None)
                 or windows.start_ts
             )
             m.bucket = _classify_queue_bucket(coalesced_raw, windows)
@@ -609,7 +603,7 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
                     sample.append(
                         (
                             getattr(r, "scheduled", None)
-                            or getattr(r, "latest_review_date", None)
+                            or getattr(r, "latest_due", None)
                             or ""
                         )[:19]
                     )
@@ -631,7 +625,7 @@ def query_practice_list_scheduled(  # noqa: C901 - complexity temporarily tolera
         m = PlaylistTuneJoinedModel.model_validate(r)
         coalesced_raw = (
             getattr(r, "scheduled", None)
-            or getattr(r, "latest_review_date", None)
+            or getattr(r, "latest_due", None)
             or windows.start_ts
         )
         m.bucket = _classify_queue_bucket(coalesced_raw, windows)
@@ -686,6 +680,7 @@ def _fetch_existing_active_queue(
     Any
 ]:  # list[DailyPracticeQueue]; typed loosely to avoid circular import hints
     from sqlalchemy import select
+
     from tunetrees.models.tunetrees import DailyPracticeQueue
 
     return list(
@@ -709,9 +704,8 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
     # DailyPracticeQueue snapshot rows to avoid duplication and potential drift; instead we rely
     # on this enrichment step so the API can return a composite PracticeQueueEntryModel.
     from sqlalchemy import select
-    from tunetrees.models.tunetrees import (
-        t_practice_list_staged as _t_view_staged,
-    )
+
+    from tunetrees.models.tunetrees import t_practice_list_staged as _t_view_staged
 
     if not rows:
         return []
@@ -770,7 +764,7 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
             "order_index": r.order_index,
             "snapshot_coalesced_ts": r.snapshot_coalesced_ts,
             "scheduled_snapshot": r.scheduled_snapshot,
-            "latest_review_date_snapshot": r.latest_review_date_snapshot,
+            "latest_due_snapshot": r.latest_due_snapshot,
             "acceptable_delinquency_window_snapshot": r.acceptable_delinquency_window_snapshot,
             "tz_offset_minutes_snapshot": r.tz_offset_minutes_snapshot,
             "generated_at": r.generated_at,
@@ -807,7 +801,7 @@ def _serialize_queue_rows(rows: list[Any]) -> list[dict[str, Any]]:
         base["latest_interval"] = jr.get("latest_interval") if jr else None
         base["latest_step"] = jr.get("latest_step") if jr else None
         base["latest_repetitions"] = jr.get("latest_repetitions") if jr else None
-        base["latest_review_date"] = jr.get("latest_review_date") if jr else None
+        base["latest_due"] = jr.get("latest_due") if jr else None
         # surfaced backup_practiced from staged/record coalesce (view column)
         base["latest_backup_practiced"] = (
             jr.get("latest_backup_practiced") if jr else None
@@ -847,7 +841,7 @@ def _build_queue_rows(
     fmt = "%Y-%m-%d %H:%M:%S"
     for order_index, row in enumerate(rows):
         scheduled_val = getattr(row, "scheduled", None)
-        latest_val = getattr(row, "latest_review_date", None)
+        latest_val = getattr(row, "latest_due", None)
         coalesced_raw = scheduled_val or latest_val or windows.start_ts
         bucket = _classify_queue_bucket(coalesced_raw, windows)
         results.append(
@@ -863,7 +857,7 @@ def _build_queue_rows(
                 order_index=order_index,
                 snapshot_coalesced_ts=coalesced_raw,
                 scheduled_snapshot=scheduled_val,
-                latest_review_date_snapshot=latest_val,
+                latest_due_snapshot=latest_val,
                 acceptable_delinquency_window_snapshot=prefs.acceptable_delinquency_window,
                 tz_offset_minutes_snapshot=local_tz_offset_minutes,
                 generated_at=datetime.now(timezone.utc).strftime(fmt),
@@ -883,8 +877,9 @@ def _persist_queue_rows(
     playlist_ref: int,
     windows: SchedulingWindows,
 ) -> list[Any]:
-    from sqlalchemy.exc import IntegrityError
     from sqlalchemy import select
+    from sqlalchemy.exc import IntegrityError
+
     from tunetrees.models.tunetrees import DailyPracticeQueue as DPQ
 
     for r in rows:
@@ -985,6 +980,7 @@ def get_active_practice_queue_bucket_counts(
 ) -> dict[int, int]:
     """Return counts per bucket for the active queue window (diagnostic)."""
     from sqlalchemy import select
+
     from tunetrees.models.tunetrees import DailyPracticeQueue
 
     rows = (
@@ -1019,7 +1015,7 @@ def refill_practice_queue(
     """Append additional older (backfill) tunes to an existing active queue snapshot.
 
     This replaces the previous automatic Q3 behaviour with a deliberate user action.
-    Only rows whose coalesced timestamp (scheduled OR latest_review_date) lies strictly
+    Only rows whose coalesced timestamp (scheduled OR latest_due) lies strictly
     before the lapsed window floor (older backlog) and which are not already present
     in the active queue are eligible.
 
@@ -1061,7 +1057,7 @@ def refill_practice_queue(
 
     existing_tune_ids = {r.tune_ref for r in existing}
     scheduled_ts_col = t_practice_list_staged.c.scheduled
-    latest_ts_col = t_practice_list_staged.c.latest_review_date
+    latest_ts_col = t_practice_list_staged.c.latest_due
     coalesced_col = func.coalesce(scheduled_ts_col, latest_ts_col)
 
     # Older-than backlog filter (legacy Q3 definition)
@@ -1205,10 +1201,10 @@ def add_tunes_to_practice_queue(  # noqa: C901 - complexity accepted for now (mi
 
     existing_tune_ids = {r.tune_ref for r in existing_active}
 
-    from tunetrees.models.tunetrees import (
-        PlaylistTune,
+    from tunetrees.models.tunetrees import (  # local import to avoid cycle
         DailyPracticeQueue,
-    )  # local import to avoid cycle
+        PlaylistTune,
+    )
 
     fmt = "%Y-%m-%d %H:%M:%S"
     scheduled_override = review_sitdown_date.astimezone(timezone.utc).strftime(fmt)
@@ -1262,7 +1258,7 @@ def add_tunes_to_practice_queue(  # noqa: C901 - complexity accepted for now (mi
                 mode="per_day",
                 queue_date=windows.start_ts[:10],
                 scheduled_snapshot=scheduled_override,
-                latest_review_date_snapshot=None,
+                latest_due_snapshot=None,
                 acceptable_delinquency_window_snapshot=prefs.acceptable_delinquency_window,
                 tz_offset_minutes_snapshot=local_tz_offset_minutes,
                 completed_at=None,
@@ -1304,7 +1300,7 @@ def query_practice_list_scheduled_original(
 ) -> List[Row[Any]]:
     """Get a list of tunes to practice on the review_sitdown_date.
 
-    FIXED: Now uses playlist_tune.scheduled column for filtering with fallback to practice_record.latest_review_date.
+    FIXED: Now uses playlist_tune.scheduled column for filtering with fallback to practice_record.latest_due.
     This ensures scheduling is based on the current scheduled date (mutable) when available, but gracefully
     falls back to historical practice record data during the transition period when scheduled column may be null.
 
@@ -1352,18 +1348,18 @@ def query_practice_list_scheduled_original(
     )
     lower_bound_date = review_sitdown_date - timedelta(days=effective_window)
 
-    # Create the query - FIXED: Use scheduled column with fallback to latest_review_date
+    # Create the query - FIXED: Use scheduled column with fallback to latest_due
     # This handles the transition period where scheduled column may be null
     try:
         # Base time column used for inclusion window (scheduled date or latest/next review date)
         base_time_col = func.coalesce(
             t_practice_list_staged.c.scheduled,
-            t_practice_list_staged.c.latest_review_date,
+            t_practice_list_staged.c.latest_due,
         )
 
-        # We normally include tunes whose (scheduled OR latest_review_date) fall inside the window.
+        # We normally include tunes whose (scheduled OR latest_due) fall inside the window.
         # However, when a tune is "staged" we have already computed a *future* next review date and
-        # overlaid it into latest_review_date. That would prematurely exclude the row from the
+        # overlaid it into latest_due. That would prematurely exclude the row from the
         # current practice list after a refresh (user complaint: rows disappear immediately after staging).
         # Fix: add an OR branch that keeps staged rows visible based on their practiced timestamp
         # (which represents the current sitdown) even if the newly staged next review date is in the future.
@@ -1405,7 +1401,7 @@ def query_practice_list_scheduled_original(
         func.DATE(
             func.coalesce(
                 t_practice_list_staged.c.scheduled,
-                t_practice_list_staged.c.latest_review_date,
+                t_practice_list_staged.c.latest_due,
             )
         ).desc()
     )
@@ -1493,13 +1489,13 @@ def query_practice_list_scheduled_original(
 
 # practice_list_query_scheduled = practice_list_query.where(
 #     and_(
-#         PracticeRecord.review_date
+#         PracticeRecord.due
 #         > (review_sitdown_date - timedelta(acceptable_delinquency_window)),
-#         PracticeRecord.review_date <= review_sitdown_date,
+#         PracticeRecord.due <= review_sitdown_date,
 #     )
 # )
 # scheduled_rows_query_sorted = practice_list_query_scheduled.order_by(
-#     func.DATE(PracticeRecord.review_date).desc()
+#     func.DATE(PracticeRecord.due).desc()
 # )
 # scheduled_rows_query_clipped = scheduled_rows_query_sorted.offset(skip).limit(limit)
 

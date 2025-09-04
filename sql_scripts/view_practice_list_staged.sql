@@ -26,7 +26,7 @@ SELECT
 	COALESCE(td.interval, pr.interval) AS latest_interval,
 	COALESCE(td.step, pr.step) AS latest_step,
 	COALESCE(td.repetitions, pr.repetitions) AS latest_repetitions,
-	COALESCE(td.review_date, pr.review_date) AS latest_review_date,
+	COALESCE(td.due, pr.due) AS latest_due,
 	COALESCE(td.backup_practiced, pr.backup_practiced) AS latest_backup_practiced,
 	COALESCE(td.goal, pr.goal) AS latest_goal,
 	COALESCE(td.technique, pr.technique) AS latest_technique,
@@ -76,7 +76,7 @@ SELECT
 		OR td.interval IS NOT NULL
 		OR td.step IS NOT NULL
 		OR td.repetitions IS NOT NULL
-		OR td.review_date IS NOT NULL
+		OR td.due IS NOT NULL
 		OR td.backup_practiced IS NOT NULL
 		OR td.goal IS NOT NULL
 		OR td.technique IS NOT NULL

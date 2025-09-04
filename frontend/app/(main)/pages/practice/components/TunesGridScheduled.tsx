@@ -185,7 +185,7 @@ export default function TunesGridScheduled({
           learned: e.learned ?? null,
           scheduled: e.scheduled ?? null,
           latest_practiced: e.latest_practiced ?? null,
-          latest_review_date: e.latest_review_date ?? null,
+          latest_due: e.latest_due ?? null,
           bucket: (e.bucket as number | null) ?? null,
           recall_eval: null,
           goal: null,
@@ -299,10 +299,10 @@ export default function TunesGridScheduled({
         let f = 0;
         for (const tune of result as Array<{
           scheduled?: string | null;
-          latest_review_date?: string | null;
+          latest_due?: string | null;
         }>) {
           // Coalesce: prefer scheduled, fallback to canonical snapshot next due
-          const ts = tune.scheduled ?? tune.latest_review_date ?? null;
+          const ts = tune.scheduled ?? tune.latest_due ?? null;
           const sd = parseDbTimestamp(ts);
           if (!sd) continue;
           if (sd < lowerBound) l += 1;
@@ -409,8 +409,7 @@ export default function TunesGridScheduled({
                             updated.latest_easiness ?? t.latest_easiness,
                           latest_interval:
                             updated.latest_interval ?? t.latest_interval,
-                          latest_review_date:
-                            updated.latest_review_date ?? t.latest_review_date,
+                          latest_due: updated.latest_due ?? t.latest_due,
                           scheduled: null, //updated.scheduled ?? t.scheduled, // I think we want this null always for staging?
                           latest_difficulty:
                             updated.latest_difficulty ?? t.latest_difficulty,
@@ -441,8 +440,7 @@ export default function TunesGridScheduled({
                             updated.latest_easiness ?? t.latest_easiness,
                           latest_interval:
                             updated.latest_interval ?? t.latest_interval,
-                          latest_review_date:
-                            updated.latest_review_date ?? t.latest_review_date,
+                          latest_due: updated.latest_due ?? t.latest_due,
                           scheduled: null,
                           latest_difficulty:
                             updated.latest_difficulty ?? t.latest_difficulty,
@@ -500,8 +498,7 @@ export default function TunesGridScheduled({
                         updated.latest_easiness ?? t.latest_easiness,
                       latest_interval:
                         updated.latest_interval ?? t.latest_interval,
-                      latest_review_date:
-                        updated.latest_review_date ?? t.latest_review_date,
+                      latest_due: updated.latest_due ?? t.latest_due,
                       scheduled: updated.scheduled ?? t.scheduled,
                       recall_eval: null,
                       has_staged: updated.has_staged ?? false,
@@ -534,8 +531,7 @@ export default function TunesGridScheduled({
                         updated.latest_easiness ?? t.latest_easiness,
                       latest_interval:
                         updated.latest_interval ?? t.latest_interval,
-                      latest_review_date:
-                        updated.latest_review_date ?? t.latest_review_date,
+                      latest_due: updated.latest_due ?? t.latest_due,
                       scheduled: updated.scheduled ?? t.scheduled,
                       recall_eval: null,
                       has_staged: updated.has_staged ?? false,
@@ -840,8 +836,7 @@ export default function TunesGridScheduled({
                                   scheduled: enriched.scheduled ?? null,
                                   latest_practiced:
                                     enriched.latest_practiced ?? null,
-                                  latest_review_date:
-                                    enriched.latest_review_date ?? null,
+                                  latest_due: enriched.latest_due ?? null,
                                   bucket:
                                     (enriched.bucket as number | null) ?? null,
                                   recall_eval: null,

@@ -37,11 +37,11 @@ Notes:
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timedelta
 import os
-from pathlib import Path
 import sys
-from typing import ContextManager, List, Sequence, TYPE_CHECKING, Tuple
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import TYPE_CHECKING, ContextManager, List, Sequence, Tuple
 
 from tunetrees.app.schedule import TT_DATE_FORMAT
 from tunetrees.models.tunetrees import PracticeRecord
@@ -49,13 +49,14 @@ from tunetrees.models.tunetrees import PracticeRecord
 if TYPE_CHECKING:  # imports for type checking only
     from tunetrees.models.tunetrees import PracticeRecord
 
-from fsrs import Card, Rating, Scheduler, State
-from sqlalchemy import select, func
-from sqlalchemy.orm import Session
 import warnings
-from sqlalchemy.exc import SAWarning
+
+from fsrs import Card, Rating, Scheduler, State
 from rich.console import Console
 from rich.table import Table
+from sqlalchemy import func, select
+from sqlalchemy.exc import SAWarning
+from sqlalchemy.orm import Session
 
 # Suppress benign SQLAlchemy warning from model inheritance name collision
 warnings.filterwarnings(
@@ -201,7 +202,7 @@ def _render_rows_table(
         "quality",
         "stability",
         "difficulty",
-        "review_date",
+        "due",
         "-",
         "easiness",
         "interval",
@@ -219,7 +220,7 @@ def _render_rows_table(
             str(pr.quality if pr.quality is not None else ""),
             str(pr.stability if pr.stability is not None else ""),
             str(pr.difficulty if pr.difficulty is not None else ""),
-            str(pr.review_date if pr.review_date is not None else ""),
+            str(pr.due if pr.due is not None else ""),
             str(" "),
             str(pr.easiness if pr.easiness is not None else ""),
             str(pr.interval if pr.interval is not None else ""),
@@ -312,8 +313,8 @@ def fsrs_fixup(  # noqa: C901
     - When apply=True, INSERT new rows and DELETE originals; otherwise dry-run.
     """
 
-    from datetime import timezone
     import random
+    from datetime import timezone
 
     def ensure_aware_utc(dt: datetime) -> datetime:
         if dt.tzinfo is None:
@@ -421,10 +422,12 @@ def fsrs_fixup(  # noqa: C901
                 quality=rating_i.value,
                 easiness=r.easiness if i == total_reps else None,
                 interval=r.interval if i == total_reps else None,
-                repetitions=r.repetitions  # has the effect of allowing 0
-                if i == total_reps
-                else i,
-                review_date=fmt_tt(previous_card.due),
+                repetitions=(
+                    r.repetitions  # has the effect of allowing 0
+                    if i == total_reps
+                    else i
+                ),
+                due=fmt_tt(previous_card.due),
                 backup_practiced=None,
                 stability=previous_card.stability,
                 elapsed_days=None,

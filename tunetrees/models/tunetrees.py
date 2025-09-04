@@ -51,7 +51,7 @@ class DailyPracticeQueue(Base):
     mode = mapped_column(Text)
     queue_date = mapped_column(Text)
     scheduled_snapshot = mapped_column(Text)
-    latest_review_date_snapshot = mapped_column(Text)
+    latest_due_snapshot = mapped_column(Text)
     acceptable_delinquency_window_snapshot = mapped_column(Integer)
     tz_offset_minutes_snapshot = mapped_column(Integer)
     completed_at = mapped_column(Text)
@@ -104,7 +104,7 @@ t_practice_list_joined = Table(
     Column("latest_stability", Float),
     Column("latest_step", Integer),
     Column("latest_repetitions", Integer),
-    Column("latest_review_date", Text),
+    Column("latest_due", Text),
     Column("latest_goal", Text),
     Column("latest_technique", Text),
     Column("tags", NullType),
@@ -145,7 +145,7 @@ t_practice_list_staged = Table(
     Column("latest_interval", NullType),
     Column("latest_step", NullType),
     Column("latest_repetitions", NullType),
-    Column("latest_review_date", NullType),
+    Column("latest_due", NullType),
     Column("latest_backup_practiced", NullType),
     Column("latest_goal", NullType),
     Column("latest_technique", NullType),
@@ -492,7 +492,7 @@ class PracticeRecord(Base):
     easiness = mapped_column(Float)
     interval = mapped_column(Integer)
     repetitions = mapped_column(Integer)
-    review_date = mapped_column(Text)
+    due = mapped_column(Text)
     backup_practiced = mapped_column(Text)
     stability = mapped_column(Float)
     elapsed_days = mapped_column(Integer)
@@ -573,7 +573,7 @@ class TableTransientData(Base):
     interval = mapped_column(Integer)
     step = mapped_column(Integer)
     repetitions = mapped_column(Integer)
-    review_date = mapped_column(Text)
+    due = mapped_column(Text)
     backup_practiced = mapped_column(Text)
     goal = mapped_column(Text)
     technique = mapped_column(Text)

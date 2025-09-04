@@ -142,7 +142,7 @@ export class TuneTreesPageObject {
       .filter({ has: this.scheduledColumnHeaderSortButton });
 
     this.LatestReviewColumnHeaderSortButton = page.getByTestId(
-      "col-latest_review_date-sort-button",
+      "col-latest_due-sort-button",
     );
     this.LatestReviewColumnHeader = page
       .getByRole("columnheader")

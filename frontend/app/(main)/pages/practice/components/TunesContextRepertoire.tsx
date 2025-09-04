@@ -136,8 +136,8 @@ export const TunesProviderRepertoire = ({
     let futureCounter = 0;
     let newCounter = 0;
     for (const tune of tuneList) {
-      // Coalesce current scheduling date using scheduled first, then historical latest_review_date
-      const coalescedTs = tune.scheduled ?? tune.latest_review_date ?? null;
+      // Coalesce current scheduling date using scheduled first, then historical latest_due
+      const coalescedTs = tune.scheduled ?? tune.latest_due ?? null;
       if (!coalescedTs) {
         newCounter += 1;
         continue;

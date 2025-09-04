@@ -21,7 +21,7 @@ class ColumnSettingsModel(BaseModel):
     easiness: ColumnConfig
     interval: ColumnConfig
     repetitions: ColumnConfig
-    review_date: ColumnConfig
+    due: ColumnConfig
     backup_practiced: ColumnConfig
     external_ref: ColumnConfig
     note_private: ColumnConfig
@@ -96,7 +96,7 @@ column_settings_example_data = {
         "visible": False,
         "enabled": True,
     },
-    "review_date": {
+    "due": {
         "sort_direction": None,
         "visible": False,
         "enabled": True,

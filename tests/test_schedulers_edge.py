@@ -1,10 +1,11 @@
-from datetime import datetime
 import logging
-from fsrs import Rating, State
+from datetime import datetime, timedelta
+
 import pytest
+from fsrs import Rating, State
 from fsrs.scheduler import DEFAULT_PARAMETERS
-from tunetrees.app.schedulers import SM2Scheduler, FSRScheduler
-from datetime import timedelta
+
+from tunetrees.app.schedulers import FSRScheduler, SM2Scheduler
 
 
 class DummyPrefs:
@@ -64,7 +65,7 @@ def test_fsrs_missing_optional_args():
     #   "step": null,
     #   "stability": 13.630435348122646,
     #   "difficulty": 7.961928825804394,
-    #   "review_datetime": "2025-09-06 00:47:38.859129+00:00",
+    #   "due": "2025-09-06 00:47:38.859129+00:00",
     #   "review_duration": null,
     #   "repetitions": 10
     # }
@@ -97,8 +98,8 @@ def test_fsrs_missing_optional_args():
     assert difficulty > 7 and difficulty < 8
     assert result.get("step") is None
     # Compare as ISO strings to avoid tzinfo or type mismatches
-    review_dt_str = result.get("review_datetime", "")
-    assert review_dt_str, "review_datetime missing"
+    review_dt_str = result.get("due", "")
+    assert review_dt_str, "due missing"
     # Parse the review datetime, will throw an error if invalid
     review_dt = datetime.fromisoformat(review_dt_str)
     logging.info(f"Review datetime is {review_dt}")

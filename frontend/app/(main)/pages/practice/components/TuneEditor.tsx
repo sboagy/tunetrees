@@ -111,8 +111,8 @@ const formSchema = z.object({
   latest_step: z.number().nullable().optional(), // practice_record.step
   latest_repetitions: z.number().nullable().optional(), // practice_record.repetitions
   latest_state: z.number().int().nullable().optional(), // practice_record.state (FSRS)
-  review_date: z.string().nullable().optional(), // practice_record.review_date
-  backup_practiced: z.string().nullable().optional(), // practice_record.review_date
+  due: z.string().nullable().optional(), // practice_record.due
+  backup_practiced: z.string().nullable().optional(), // practice_record.due
   note_private: z.string().nullable().optional(), // not used
   note_public: z.string().nullable().optional(), // not used
   tags: z.string().nullable().optional(),
@@ -176,7 +176,7 @@ export default function TuneEditor({
     interval?: number | null;
     step?: number | null;
     repetitions?: number | null;
-    review_date?: string | null;
+    due?: string | null;
     backup_practiced?: string | null;
     state?: number | null;
   } | null>(null);
@@ -310,9 +310,9 @@ export default function TuneEditor({
               latest_practiced: transformToDatetimeLocalForInput(
                 tuneOverview.latest_practiced as string,
               ),
-              // Show latest_review_date for now (historical), until playlist-level scheduled editing is wired.
-              review_date: transformToDatetimeLocalForInput(
-                (tuneOverview.latest_review_date as string) || "",
+              // Show latest_due for now (historical), until playlist-level scheduled editing is wired.
+              due: transformToDatetimeLocalForInput(
+                (tuneOverview.latest_due as string) || "",
               ),
               // learned: transformToDatetimeLocal(tuneOverview.learned as string),
               latest_stability: tuneOverview.latest_stability ?? null,
@@ -330,7 +330,7 @@ export default function TuneEditor({
               interval: tuneOverview.latest_interval,
               step: tuneOverview.latest_step,
               repetitions: tuneOverview.latest_repetitions,
-              review_date: tuneOverview.latest_review_date, // Historical review date from practice_record
+              due: tuneOverview.latest_due, // Historical review date from practice_record
               backup_practiced: tuneOverview.latest_backup_practiced,
               state: tuneOverview.latest_state ?? null,
             });
@@ -409,7 +409,7 @@ export default function TuneEditor({
     const practicedUtc = transformToDatetimeUtcForDB(
       data.latest_practiced ?? "",
     );
-    const reviewDateUtc = transformToDatetimeUtcForDB(data.review_date ?? "");
+    const reviewDateUtc = transformToDatetimeUtcForDB(data.due ?? "");
 
     const practiceRecord: Partial<IPracticeRecord> = {
       practiced: practicedUtc,
@@ -420,7 +420,7 @@ export default function TuneEditor({
       interval: data.latest_interval ?? 0,
       step: data.latest_step ?? 0,
       repetitions: data.latest_repetitions ?? 0,
-      review_date: reviewDateUtc,
+      due: reviewDateUtc,
       state: data.latest_state ?? undefined,
     };
 
@@ -466,8 +466,8 @@ export default function TuneEditor({
         originalField: "practiced" as const,
       },
       {
-        formField: "review_date" as const,
-        originalField: "review_date" as const,
+        formField: "due" as const,
+        originalField: "due" as const,
       },
     ];
 
@@ -548,14 +548,14 @@ export default function TuneEditor({
     const practicedUtc = transformToDatetimeUtcForDB(
       data.latest_practiced ?? "",
     );
-    const reviewDateUtc = transformToDatetimeUtcForDB(data.review_date ?? "");
+    const reviewDateUtc = transformToDatetimeUtcForDB(data.due ?? "");
 
     const dataLocal = {
       ...data,
       deleted: false,
       practiced: practicedUtc,
       latest_practiced: practicedUtc, // keep change detection aligned with UTC
-      review_date: reviewDateUtc,
+      due: reviewDateUtc,
     };
 
     const result = await updateTuneInPlaylistFromTuneOverviewAction(
@@ -1417,11 +1417,11 @@ export default function TuneEditor({
 
                   <FormField
                     control={form.control}
-                    name="review_date"
+                    name="due"
                     render={({ field }) => (
                       <FormItem
                         className="tune-form-item-style"
-                        data-testid="tt-tune-editor-review_date"
+                        data-testid="tt-tune-editor-due"
                       >
                         <FormLabel className="tune-form-label-style">
                           <em>Scheduled:</em>{" "}
@@ -1438,7 +1438,7 @@ export default function TuneEditor({
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => form.setValue("review_date", null)}
+                            onClick={() => form.setValue("due", null)}
                             data-testid="tt-tune-editor-scheduled-clear"
                             title="Clear scheduled date"
                           >

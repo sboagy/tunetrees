@@ -7,14 +7,16 @@ feedbacks are submitted.
 """
 
 import os
-import pytest
 import threading
 from datetime import datetime
+
+import pytest
+from sqlalchemy import and_, select
+
 from tests.conftest import reset_test_db_function
-from tunetrees.app.schedule import update_practice_feedbacks, TuneFeedbackUpdate
 from tunetrees.app.database import SessionLocal
+from tunetrees.app.schedule import TuneFeedbackUpdate, update_practice_feedbacks
 from tunetrees.models.tunetrees import PracticeRecord
-from sqlalchemy import select, and_
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -63,10 +65,10 @@ class TestGoalTechniqueStorage:
         }
 
         playlist_ref = 1  # Using known existing playlist
-        review_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
+        due = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
 
         # Submit the practice feedbacks
-        update_practice_feedbacks(test_tune_updates, playlist_ref, review_date)
+        update_practice_feedbacks(test_tune_updates, playlist_ref, due)
 
         # Verify the data was stored correctly
         with SessionLocal() as db:
@@ -101,10 +103,10 @@ class TestGoalTechniqueStorage:
         }
 
         playlist_ref = 1  # Using known existing playlist
-        review_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
+        due = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
 
         # Submit the practice feedbacks
-        update_practice_feedbacks(test_tune_updates, playlist_ref, review_date)
+        update_practice_feedbacks(test_tune_updates, playlist_ref, due)
 
         # Verify the data was stored correctly
         with SessionLocal() as db:
@@ -145,10 +147,10 @@ class TestGoalTechniqueStorage:
         }
 
         playlist_ref = 1  # Using known existing playlist
-        review_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
+        due = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
 
         # Submit the practice feedbacks
-        update_practice_feedbacks(test_tune_updates, playlist_ref, review_date)
+        update_practice_feedbacks(test_tune_updates, playlist_ref, due)
 
         # Verify the data was stored with defaults
         with SessionLocal() as db:
@@ -186,10 +188,10 @@ class TestGoalTechniqueStorage:
         }
 
         playlist_ref = 1  # Using known existing playlist
-        review_date = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
+        due = datetime.fromisoformat("2024-12-31 11:47:57.671465-00:00")
 
         # Submit the practice feedbacks
-        update_practice_feedbacks(test_tune_updates, playlist_ref, review_date)
+        update_practice_feedbacks(test_tune_updates, playlist_ref, due)
 
         # Verify the data was stored correctly for both tunes
         with SessionLocal() as db:

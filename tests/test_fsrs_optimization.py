@@ -1,20 +1,20 @@
 """Tests for FSRS optimization functionality."""
 
-import pytest
 from datetime import datetime, timezone
+from typing import Any, List
 from unittest.mock import MagicMock, patch
-from typing import List, Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from tunetrees.api.main import app
 from tunetrees.app.schedule import (
-    optimize_fsrs_parameters,
     create_tuned_scheduler,
     get_user_review_history,
+    optimize_fsrs_parameters,
 )
 from tunetrees.models.tunetrees_pydantic import AlgorithmType
-from tunetrees.api.main import app
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def mock_practice_records() -> List[Any]:
         record = MagicMock()
         record.id = i + 1
         record.practiced = base_time.strftime("%Y-%m-%d %H:%M:%S")
-        record.review_date = (base_time).strftime("%Y-%m-%d %H:%M:%S")
+        record.due = (base_time).strftime("%Y-%m-%d %H:%M:%S")
         record.quality = 3 + (i % 3)  # Vary quality between 3-5
         records.append(record)
 
@@ -104,7 +104,7 @@ class TestGetUserReviewHistory:
         invalid_record = MagicMock()
         invalid_record.id = 1
         invalid_record.practiced = None  # Invalid
-        invalid_record.review_date = None
+        invalid_record.due = None
         invalid_record.quality = None
 
         mock_stmt = MagicMock()

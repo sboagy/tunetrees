@@ -166,7 +166,7 @@ export interface ITuneOverview extends ITune {
   latest_repetitions: number | null;
   // FSRS state for latest practice record (enum-like integer)
   latest_state?: number | null;
-  latest_review_date: string | null; // Historical data - use scheduled for current scheduling
+  latest_due: string | null; // Historical data - use scheduled for current scheduling
   latest_backup_practiced?: string | null;
   external_ref?: string | null;
   tags?: string | null;
@@ -209,7 +209,7 @@ export interface IPracticeRecord {
   interval?: number;
   step: number;
   repetitions?: number;
-  review_date?: string;
+  due?: string;
   backup_practiced?: string;
   stability?: number;
   elapsed_days?: number;
@@ -290,7 +290,7 @@ export interface IPracticeQueueEntry {
   order_index: number;
   snapshot_coalesced_ts: string;
   scheduled_snapshot?: string | null;
-  latest_review_date_snapshot?: string | null;
+  latest_due_snapshot?: string | null;
   acceptable_delinquency_window_snapshot?: number | null;
   tz_offset_minutes_snapshot?: number | null;
   generated_at: string;
@@ -306,7 +306,7 @@ export interface IPracticeQueueEntry {
   learned?: string | null;
   scheduled?: string | null;
   latest_practiced?: string | null;
-  latest_review_date?: string | null;
+  latest_due?: string | null;
   latest_backup_practiced?: string | null;
   latest_quality?: number | null;
   latest_easiness?: number | null;

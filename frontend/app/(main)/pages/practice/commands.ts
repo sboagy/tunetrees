@@ -211,7 +211,7 @@ export const submitPracticeFeedbacks = async (
 };
 
 export interface ITuneScheduleUpdate {
-  review_date: string;
+  due: string;
 }
 
 interface IPracticeSchedulesProps {

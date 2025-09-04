@@ -1,6 +1,6 @@
 -- practice_list_joined source
-
-CREATE VIEW practice_list_joined as
+CREATE VIEW
+    practice_list_joined as
 SELECT
     tune.id AS id,
     COALESCE(tune_override.title, tune.title) AS title,
@@ -23,7 +23,7 @@ SELECT
     practice_record.stability AS latest_stability,
     practice_record.step AS latest_step,
     practice_record.repetitions AS latest_repetitions,
-    practice_record.review_date AS latest_review_date,
+    practice_record.due AS latest_due,
     practice_record.goal AS latest_goal,
     practice_record.technique AS latest_technique,
     (
@@ -71,15 +71,19 @@ FROM
     LEFT JOIN (
         SELECT
             pr.*
-        FROM practice_record pr
-        INNER JOIN (
-            SELECT
-                tune_ref,
-                playlist_ref,
-                MAX(id) as max_id
-            FROM practice_record
-            GROUP BY tune_ref, playlist_ref
-        ) latest ON pr.tune_ref = latest.tune_ref
+        FROM
+            practice_record pr
+            INNER JOIN (
+                SELECT
+                    tune_ref,
+                    playlist_ref,
+                    MAX(id) as max_id
+                FROM
+                    practice_record
+                GROUP BY
+                    tune_ref,
+                    playlist_ref
+            ) latest ON pr.tune_ref = latest.tune_ref
             AND pr.playlist_ref = latest.playlist_ref
             AND pr.id = latest.max_id
     ) practice_record ON practice_record.tune_ref = tune.id

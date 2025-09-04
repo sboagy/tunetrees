@@ -105,11 +105,7 @@ class SM2Scheduler(SpacedRepetitionScheduler):
             "interval": result["interval"],
             "step": None,
             "repetitions": result["repetitions"],
-            "review_datetime": (
-                str(result["review_datetime"])
-                if "review_datetime" in result
-                else str(practiced)
-            ),
+            "due": (str(result["due"]) if "due" in result else str(practiced)),
             "review_duration": None,
         }
 
@@ -136,11 +132,7 @@ class SM2Scheduler(SpacedRepetitionScheduler):
             "interval": result["interval"],
             "step": None,
             "repetitions": result["repetitions"],
-            "review_datetime": (
-                str(result["review_datetime"])
-                if "review_datetime" in result
-                else str(sitdown_date)
-            ),
+            "due": (str(result["due"]) if "due" in result else str(sitdown_date)),
             "review_duration": None,
         }
 
@@ -260,12 +252,16 @@ class FSRScheduler(SpacedRepetitionScheduler):
             "0",
             str(card_simulated.state),
             str(card_simulated.step),
-            f"{card_simulated.stability:.4f}"
-            if card_simulated.stability is not None
-            else "-",
-            f"{card_simulated.difficulty:.4f}"
-            if card_simulated.difficulty is not None
-            else "-",
+            (
+                f"{card_simulated.stability:.4f}"
+                if card_simulated.stability is not None
+                else "-"
+            ),
+            (
+                f"{card_simulated.difficulty:.4f}"
+                if card_simulated.difficulty is not None
+                else "-"
+            ),
             str(card_simulated.due),
             str(card_simulated.last_review) if card_simulated.last_review else "-",
         )
@@ -281,12 +277,16 @@ class FSRScheduler(SpacedRepetitionScheduler):
                 str(i + 1),
                 str(card_simulated.state),
                 str(card_simulated.step),
-                f"{card_simulated.stability:.4f}"
-                if card_simulated.stability is not None
-                else "-",
-                f"{card_simulated.difficulty:.4f}"
-                if card_simulated.difficulty is not None
-                else "-",
+                (
+                    f"{card_simulated.stability:.4f}"
+                    if card_simulated.stability is not None
+                    else "-"
+                ),
+                (
+                    f"{card_simulated.difficulty:.4f}"
+                    if card_simulated.difficulty is not None
+                    else "-"
+                ),
                 str(card_simulated.due),
                 last_review_str,
             )
@@ -333,7 +333,7 @@ class FSRScheduler(SpacedRepetitionScheduler):
             last_review=last_practiced,
         )
         rating = self._quality4_to_fsrs_rating(quality)
-        # Pass the practiced timestamp as the review_datetime to ensure the review log
+        # Pass the practiced timestamp as the due to ensure the review log
         # reflects the actual time of review (not the next due date)
         card_reviewed, review_log = self.scheduler.review_card(
             card, rating, review_datetime=sitdown_date
@@ -415,6 +415,6 @@ class FSRScheduler(SpacedRepetitionScheduler):
             ),
             # "repetitions": getattr(card_reviewed, "repetitions", 0),
             # Return the actual review timestamp; fall back to last_review or due
-            "review_datetime": str(card_reviewed.due),
+            "due": str(card_reviewed.due),
             "review_duration": review_log.review_duration if review_log else None,
         }

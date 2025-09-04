@@ -739,7 +739,7 @@ const TunesGrid = ({
                         // } ${getColorForEvaluation(row.original.recall_eval || null)}`}
                         // className={`absolute h-16 cursor-pointer w-full ${getColorForEvaluation(row.original.recall_eval || null)}`}
                         className={`absolute cursor-pointer w-full 
-                        ${getStyleForSchedulingState ? getStyleForSchedulingState(row.original.scheduled || row.original.latest_review_date, row.original.id) : ""} 
+                        ${getStyleForSchedulingState ? getStyleForSchedulingState(row.original.scheduled || row.original.latest_due, row.original.id) : ""} 
                         ${
                           currentTune === row.original.id
                             ? "outline outline-blue-500"

@@ -2,10 +2,10 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
-from tunetrees.app.database import SessionLocal as _SessionLocal
 
 from tunetrees.api.main import app
 from tunetrees.app.database import SessionLocal
+from tunetrees.app.database import SessionLocal as _SessionLocal
 from tunetrees.models.tunetrees import PracticeRecord, TableTransientData
 
 client = TestClient(app)
@@ -31,7 +31,7 @@ def _ensure_staging_columns():
             "interval": "INTEGER",
             "step": "INTEGER",
             "repetitions": "INTEGER",
-            "review_date": "TEXT",
+            "due": "TEXT",
             "backup_practiced": "TEXT",
             "goal": "TEXT",
             "technique": "TEXT",
@@ -154,4 +154,4 @@ def test_staging_clear(reset_test_db):  # type: ignore
         assert transient is not None
         assert transient.practiced is None
         assert transient.quality is None
-        assert transient.review_date is None
+        assert transient.due is None

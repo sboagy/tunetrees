@@ -53,8 +53,8 @@ def test_database_view_changes():
             # Update playlist_tune to have different values than practice_record
             cursor.execute(
                 """
-                UPDATE playlist_tune 
-                SET goal = 'fluency', technique = 'motor_skills' 
+                UPDATE playlist_tune
+                SET goal = 'fluency', technique = 'motor_skills'
                 WHERE tune_ref = ? AND playlist_ref = 1
             """,
                 (test_tune_id,),
@@ -63,7 +63,7 @@ def test_database_view_changes():
             # Insert a practice record with different values (simulating historical state)
             cursor.execute(
                 """
-                DELETE FROM practice_record 
+                DELETE FROM practice_record
                 WHERE tune_ref = ? AND playlist_ref = 1
             """,
                 (test_tune_id,),
@@ -71,8 +71,8 @@ def test_database_view_changes():
 
             cursor.execute(
                 """
-                INSERT INTO practice_record 
-                (tune_ref, playlist_ref, practiced, quality, goal, technique, easiness, interval, repetitions, review_date) 
+                INSERT INTO practice_record
+                (tune_ref, playlist_ref, practiced, quality, goal, technique, easiness, interval, repetitions, due)
                 VALUES (?, 1, '2024-01-01 10:00:00', 2, 'recall', 'fsrs', 2.5, 1, 1, '2024-01-02 10:00:00')
             """,
                 (test_tune_id,),
@@ -83,7 +83,7 @@ def test_database_view_changes():
             # Test 3: Verify view shows current state (playlist_tune) not historical state (practice_record)
             cursor.execute(
                 """
-                SELECT goal, technique FROM playlist_tune 
+                SELECT goal, technique FROM playlist_tune
                 WHERE tune_ref = ? AND playlist_ref = 1
             """,
                 (test_tune_id,),
@@ -92,8 +92,8 @@ def test_database_view_changes():
 
             cursor.execute(
                 """
-                SELECT goal, technique FROM practice_record 
-                WHERE tune_ref = ? AND playlist_ref = 1 
+                SELECT goal, technique FROM practice_record
+                WHERE tune_ref = ? AND playlist_ref = 1
                 ORDER BY id DESC LIMIT 1
             """,
                 (test_tune_id,),
@@ -102,7 +102,7 @@ def test_database_view_changes():
 
             cursor.execute(
                 """
-                SELECT goal, technique FROM practice_list_joined 
+                SELECT goal, technique FROM practice_list_joined
                 WHERE id = ?
             """,
                 (test_tune_id,),
@@ -136,10 +136,12 @@ def test_database_view_changes():
             )
 
             # Test 4: Verify the fix works for multiple records
-            cursor.execute("""
-                SELECT COUNT(*) FROM practice_list_joined 
+            cursor.execute(
+                """
+                SELECT COUNT(*) FROM practice_list_joined
                 WHERE goal IS NOT NULL
-            """)
+            """
+            )
             count = cursor.fetchone()[0]
 
             if count == 0:

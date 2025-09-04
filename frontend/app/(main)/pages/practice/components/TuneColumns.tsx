@@ -632,7 +632,7 @@ export function get_columns(
     >[] = [
       {
         id: "scheduled",
-        accessorFn: (row) => row.scheduled || row.latest_review_date || "",
+        accessorFn: (row) => row.scheduled || row.latest_due || "",
         header: ({ column, table }) =>
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
@@ -808,7 +808,7 @@ export function get_columns(
         meta: { headerLabel: "Repetitions" },
       },
       {
-        accessorKey: "latest_review_date",
+        accessorKey: "latest_due",
         header: ({ column, table }) =>
           sortableHeader(
             column as Column<ITuneOverview, unknown>,

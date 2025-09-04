@@ -412,9 +412,7 @@ class PracticeRecordModel(BaseModel):
     easiness: Optional[float]
     interval: Optional[int]
     repetitions: Optional[int]
-    review_date: Optional[
-        str
-    ]  # NEXT due snapshot (immutable) written at evaluation time
+    due: Optional[str]  # NEXT due snapshot (immutable) written at evaluation time
     backup_practiced: Optional[str]
     stability: Optional[float]
     elapsed_days: Optional[int]
@@ -438,7 +436,7 @@ class PracticeRecordModelPartial(BaseModel):
     easiness: Optional[float] = None
     interval: Optional[int] = None
     repetitions: Optional[int] = None
-    review_date: Optional[str] = None  # NEXT due snapshot (immutable)
+    due: Optional[str] = None  # NEXT due snapshot (immutable)
     backup_practiced: Optional[str] = None
     stability: Optional[float] = None
     elapsed_days: Optional[int] = None
@@ -470,7 +468,7 @@ class TableTransientDataModel(BaseModel):
     interval: Optional[int] = None
     step: Optional[int] = None
     repetitions: Optional[int] = None
-    review_date: Optional[str] = None
+    due: Optional[str] = None
     backup_practiced: Optional[str] = None
     goal: Optional[str] = None
     technique: Optional[str] = None
@@ -497,7 +495,7 @@ class TableTransientDataModelPartial(BaseModel):
     interval: Optional[int] = None
     step: Optional[int] = None
     repetitions: Optional[int] = None
-    review_date: Optional[str] = None
+    due: Optional[str] = None
     backup_practiced: Optional[str] = None
     goal: Optional[str] = None
     technique: Optional[str] = None
@@ -612,7 +610,7 @@ class PlaylistTuneJoinedModel(BaseModel):
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
     latest_state: Optional[int] = None
-    latest_review_date: Optional[str] = None
+    latest_due: Optional[str] = None
     latest_technique: Optional[str] = None
     latest_goal: Optional[str] = None
     tags: Optional[str] = None
@@ -654,7 +652,7 @@ class PracticeListStagedModel(BaseModel):
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
     latest_state: Optional[int] = None
-    latest_review_date: Optional[str] = (
+    latest_due: Optional[str] = (
         None  # Canonical next due snapshot from last PracticeRecord
     )
     latest_backup_practiced: Optional[str] = None
@@ -890,7 +888,7 @@ class DailyPracticeQueueModel(BaseModel):
     order_index: int
     snapshot_coalesced_ts: str
     scheduled_snapshot: Optional[str] = None
-    latest_review_date_snapshot: Optional[str] = None
+    latest_due_snapshot: Optional[str] = None
     acceptable_delinquency_window_snapshot: Optional[int] = None
     tz_offset_minutes_snapshot: Optional[int] = None
     generated_at: str
@@ -916,7 +914,7 @@ class DailyPracticeQueueModelPartial(BaseModel):
     order_index: Optional[int] = None
     snapshot_coalesced_ts: Optional[str] = None
     scheduled_snapshot: Optional[str] = None
-    latest_review_date_snapshot: Optional[str] = None
+    latest_due_snapshot: Optional[str] = None
     acceptable_delinquency_window_snapshot: Optional[int] = None
     tz_offset_minutes_snapshot: Optional[int] = None
     generated_at: Optional[str] = None
@@ -966,7 +964,7 @@ class PracticeQueueEntryModel(BaseModel):
     order_index: int
     snapshot_coalesced_ts: str
     scheduled_snapshot: Optional[str] = None
-    latest_review_date_snapshot: Optional[str] = None
+    latest_due_snapshot: Optional[str] = None
     acceptable_delinquency_window_snapshot: Optional[int] = None
     tz_offset_minutes_snapshot: Optional[int] = None
     generated_at: str
@@ -994,7 +992,7 @@ class PracticeQueueEntryModel(BaseModel):
     latest_interval: Optional[int] = None
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
-    latest_review_date: Optional[str] = None
+    latest_due: Optional[str] = None
     latest_backup_practiced: Optional[str] = None
     latest_goal: Optional[str] = None
     latest_technique: Optional[str] = None

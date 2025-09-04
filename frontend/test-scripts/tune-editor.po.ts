@@ -70,7 +70,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
     this.ffEasiness = this.form.getByTestId("tt-tune-editor-easiness");
     this.ffInterval = this.form.getByTestId("tt-tune-editor-interval");
     this.ffRepetitions = this.form.getByTestId("tt-tune-editor-repetitions");
-    this.ffReviewDate = this.form.getByTestId("tt-tune-editor-review_date");
+    this.ffReviewDate = this.form.getByTestId("tt-tune-editor-due");
     this.ffTags = this.form.getByTestId("tt-tune-editor-tags");
 
     this.allFormFields = [
@@ -174,7 +174,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
         modification: "",
         original: "",
         // TODO: Have to factor out date formatting and maybe (?) time zone issues
-        // cellId: "200_review_date",
+        // cellId: "200_due",
       },
     };
 
@@ -255,7 +255,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
       //   modification: "2023-06-07T18:25:16",
       //   original: "2023-06-07T18:25:16",
       //   // TODO: Have to factor out date formatting and maybe (?) time zone issues
-      //   // cellId: "200_review_date",
+      //   // cellId: "200_due",
       // },
     ];
 
