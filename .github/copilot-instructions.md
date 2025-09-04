@@ -1,909 +1,127 @@
-# GitHub Copilot Instructions
+# GitHub Copilot: Repository Instructions
 
-## Quick Start (AI Agent 40-line Core Guide)
+Audience and intent
 
-Architecture: FastAPI backend (`tunetrees/app`) + Next.js App Router frontend (`frontend/app`). Core spaced repetition algorithms (FSRS + SM2) live in `tunetrees/app/schedule.py`; practice data persists via SQLAlchemy models in `tunetrees/app/models.py` with critical uniqueness on `(tune_ref, playlist_ref, practiced)` for historical records.
+- This file guides Copilot’s code suggestions for the TuneTrees repo. Optimize for correctness, safety, and speed. Prefer minimal diffs and existing patterns.
+- Respond with short, actionable output. Provide complete, runnable code with only necessary imports. Avoid boilerplate and new abstractions unless required.
 
-Frontend Pattern: Server Components fetch data + pass to thin Client Components (forms). New settings pages follow pattern: `page.tsx` (server, does `auth()` + server-side fetch via queries) -> client form component calling Server Actions -> queries module (axios to API). Reference: `frontend/app/user-settings/scheduling-options/` (queries.ts, actions/, form, page.tsx) as canonical.
+Top ten rules (read first)
 
-Server Actions & Queries: Keep external calls inside server-only queries (axios base URL from `TT_API_BASE_URL`, no extra path segment). Server Actions wrap queries for mutation. Avoid client-side fetch in forms except optimistic UI.
+1. SQLAlchemy 2.0 only: use `select(Model).where(...)` and session patterns in `tunetrees/app`.
+2. PracticeRecord uniqueness is sacred: `(tune_ref, playlist_ref, practiced)` must be unique. Use model helpers that stamp a fresh timestamp; never reuse timestamps.
+3. Strict TypeScript: no `any`; interfaces start with `I*`. Keep client code thin; server components fetch data.
+4. Never import Server Actions into client bundles. Client components should call Server Actions indirectly.
+5. Batch DB queries; avoid N+1 (use `.in_(...)` and fetch related data upfront).
+6. Follow existing page patterns for settings and scheduling options (server `page.tsx` → thin client form → Server Actions → queries module).
+7. Playwright tests use storage state, Page Objects, `ttPO.gotoMainPage()` first, and `data-testid` locators.
+8. Add minimal tests for new behavior (happy path + 1–2 edges). Keep tests stable and readable.
+9. Quality gates must pass with zero warnings (ESLint, Biome, type-check, Ruff, Prettier formatting).
+10. Prefer MCP tools (Memory, Playwright, GitHub) when available. If unavailable, pause and ask to start them.
 
-Spaced Repetition Flow: User review submission -> `update_practice_feedbacks()` -> `_process_single_tune_feedback()` -> preference lookup (`get_prefs_spaced_repetition()`) -> schedule calc (FSRS/SM2) -> write new `PracticeRecord` row (ensuring unique `practiced` timestamp) -> optional FSRS parameter optimization every 50 reviews.
+Architecture snapshot
 
-Key Backend Files: `main.py` (FastAPI app + CORS + router registration), `schedule.py` (≈850 lines algorithms), `models.py` (SQLAlchemy 2.0 style), `database.py` (session mgmt), `routers/` (feature endpoints). Always use 2.0 query style (`select(Model).where(...)`). Rollback on exception.
+- Backend: FastAPI (`tunetrees/app`), SQLAlchemy 2.0 models in `tunetrees/app/models.py`, scheduling logic (FSRS/SM2) in `tunetrees/app/schedule.py`, app init in `tunetrees/app/main.py`.
+- Frontend: Next.js App Router (`frontend/app`), strict TypeScript, Tailwind + Headless UI, NextAuth v5 config in `frontend/auth.ts`.
+- Tests: Backend pytest under `tests/`; Frontend E2E Playwright under `frontend/tests/` with helpers in `frontend/test-scripts/`.
 
-Frontend Conventions: Strict TS (no `any`), all interfaces prefixed with `I`. Tailwind + Headless UI. Shared UI patterns enforced by `frontend/UI_STYLE_GUIDE2.md` and `.github/instructions/ui-development.instructions.md`. Use `data-testid` attributes for new interactive elements; update page objects in Playwright tests.
+Patterns to copy
 
-Database Instructions: For database schema rules, invariants, and safety guidance see `.github/instructions/database.instructions.md` (general DB instructions; migration workflow lives in `docs/database-migration-direct.md`).
+- Settings pages: server `page.tsx` does `auth()` + server-only queries → thin Client form → Server Actions wrapping query calls.
+- API calls: queries module uses axios with `TT_API_BASE_URL` (no extra path segments added).
+- Scheduling review flow: `update_practice_feedbacks()` → `_process_single_tune_feedback()` → `get_prefs_spaced_repetition()` → FSRS/SM2 calc → create new `PracticeRecord` (unique timestamp) → FSRS optimization every ~50 reviews.
+- Playwright: storage state auth, use Page Objects, `ttPO.gotoMainPage()` first, and `data-testid` selectors.
 
-Testing: Playwright E2E in `frontend/tests/`. Always run via provided scripts (`npm run test:ui` or `npm run test:ui:single <test-file-pattern>`, avoid `./run-playwright-tests.sh [test-file-pattern]`) unless special circumstances arise, and not raw `npx playwright test` unless very special circumstances. Use storage state auth helpers. Page Objects: `frontend/test-scripts/tunetrees.po.ts` etc. For backend logic add/modify pytest tests in `tests/` (root) mirroring module paths.
+Backend rules
 
-Quality Gates: Before commits run (frontend): `npm run lint && npm run biome_lint && npm run type-check && npx prettier --write <changed files>`. Backend: `python -m ruff check tunetrees/ && python -m ruff format tunetrees/` plus pytest if logic changed. No warnings permitted. Never commit unformatted code.
+- Use SQLAlchemy 2.0 style. Example commit pattern:
+  ```python
+  try:
+      db.commit()
+  # GitHub Copilot: Repository Instructions (Consolidated)
+  except Exception as e:
+      db.rollback()
+      raise
+  ```
+- Strict TS: no `any`. New interfaces use `I*` prefix; reuse existing types when possible.
+- Add `data-testid` to new interactive UI and update Page Objects when selectors change.
+- `practice_record` unique key `(tune_ref, playlist_ref, practiced)`.
+- Always create new practice rows via helpers that stamp a fresh `practiced` timestamp.
+- See `.github/instructions/database.instructions.md` for additional rules and safety guidance.
 
-Commit Rules: Start message with 1–3 gitmojis (impact order). Split unrelated concerns (e.g., refactor vs tests vs dependency bump). Example: `:recycle:💄 Refactor scheduling options page: server-side hydration` followed by `:sparkles::fire: Add scheduling options queries/actions & tests; remove obsolete form2` (real recent pattern). Ask for confirmation before pushing.
+Scheduling specifics
 
-Branching: `feat/`, `fix/`, `refactor/`, etc. Keep names short; add issue number suffix when relevant (e.g., `feat/enhance-user-settings-235`).
+- Algorithms: FSRS + SM2. Ratings map 0–5 to Again/Hard/Good/Easy for FSRS.
+- FSRS parameter optimization triggers approximately every 50 reviews; weights must be JSON-serializable.
 
-Data Integrity Gotcha: Creating a new `PracticeRecord` must not duplicate `(tune_ref, playlist_ref, practiced)`; rely on helper that stamps current timestamp—do not manually reuse timestamps.
+Testing
 
-Scheduling Options Form Pattern: Uses touched flag instead of React Hook Form `isDirty` (edge case after reset). If replicating, prefer `touched && Object.keys(errors).length===0` gating submit.
+- Frontend E2E: Use the repo’s scripts and helpers; do not run bare `npx playwright test`. Prefer storage state auth and Page Objects.
+- Backend: Add pytest tests for algorithmic or API changes (happy path + 1–2 edge cases).
+- UI: Prefer `data-testid` for stable selectors.
 
-When Extending Algorithms: Add new enum value(s), implement rating mapping, update optimization trigger, and extend tests. Keep FSRS weight serialization JSON-compatible.
+Quality gates (no warnings allowed)
 
-Danger Zones: Avoid direct DB writes bypassing model helpers; ensure server actions not imported into client-only bundles; maintain strict interface prefixes; do not add unauthorized external state libs.
+MCP tools
 
-Performance Considerations: Batch DB queries with `select().where(Model.field.in_(...))`. Avoid N+1 inside review loop—gather needed rows up front.
+- Playwright MCP: run focused E2E via standard helpers and storage state; always use Page Objects and `data-testid` selectors.
+- Memory MCP: persist and recall repo norms, decisions, flaky areas, and gotchas. After major changes, store a short observation.
+- Availability check: If any MCP tool isn’t accessible, stop and ask for it to be started before proceeding with tasks that depend on it. If you must fall back (e.g., to local git), state the fallback and ask for confirmation first.
 
-If Unsure: Search existing scheduling or user-settings patterns first; mirror structure; keep surface area minimal; propose delta before large refactor.
+Danger zones (avoid these)
 
----
+- Reusing a `practiced` timestamp (breaks uniqueness constraint).
+- Importing Server Actions into client bundles.
+- Client-side fetching where server queries exist.
+  When details are missing
+- Infer 1–2 reasonable assumptions from nearby patterns and proceed; document assumptions briefly in a code comment.
+- Don’t restate unchanged plans. Provide only the delta.
+- Produce complete, runnable edits with minimal imports. Avoid `any` and maintain existing public APIs.
+- Use up to 3 gitmojis; order by impact. Split unrelated changes.
+- Branch prefixes: `feat/`, `fix/`, `refactor/`, etc., short kebab-case; optional issue suffix (e.g., `feat/sched-algo-235`).
+  References (open these first)
+- DB rules: `.github/instructions/database.instructions.md`
 
-## Tone & Style
+That’s it. Follow patterns, keep TS strict, protect DB uniqueness, batch queries, add small tests, pass all linters, and leverage MCP tools. If MCP isn’t running, pause and ask to start it.
 
-You are an impartial and objective analyst. Your task is to review the provided information and present your findings directly and concisely. You should avoid using phrases that affirm or praise my input, such as 'You're absolutely right!', 'Excellent!', or similar expressions. Focus purely on the content, presenting facts and analysis without any subjective commentary or conversational filler. Your response should be professional and to the point.
+### Stack
 
-## Project Overview
+### Golden rules
 
-TuneTrees is a spaced repetition learning app for musical tunes built with FastAPI backend and Next.js frontend. The system uses FSRS (Free Spaced Repetition Scheduler) and SM2 algorithms to optimize practice scheduling.
+- SQLAlchemy 2.0 only: `select(Model).where(...)`.
 
-## Architecture & Key Components
+### Copy these patterns
 
-### Backend Structure (`tunetrees/app/`)
+- Playwright: storage state auth, Page Objects, `ttPO.gotoMainPage()` first, prefer `data-testid` selectors.
 
-- **`main.py`**: FastAPI application entry point with CORS and route registration
-- **`schedule.py`**: Core spaced repetition logic with FSRS/SM2 algorithms (~850 lines)
-- **`models.py`**: SQLAlchemy 2.0.35 models for practice records, playlists, and preferences
-- **`database.py`**: Database configuration and session management
-- **`routers/`**: API endpoints organized by feature area
+- Add minimal tests for new behavior (happy path + 1–2 edges); prefer `data-testid` in UI.
 
-### Frontend Structure (`frontend/`)
+- Direct DB writes that bypass helpers.
 
-- **Next.js 15.1.3 with App Router**: Modern file-based routing in `app/` directory
-- **TypeScript**: Strict typing with `I` prefix for interfaces, **NO `any!` types allowed**
-- **Styling**: Tailwind CSS with Headless UI components
-- **UI Guidelines**: Comprehensive patterns in `frontend/UI_STYLE_GUIDE2.md`. Core patterns automatically included via `.github/instructions/ui-development.instructions.md` when editing frontend files
-- **Authentication**: NextAuth.js v5 beta configured in `auth.ts`
-- **State Management**: React built-in hooks + custom context providers
-- **Testing**: Playwright E2E tests in `tests/` directory
+### References
 
-## Critical Patterns & Conventions
+- DB rules: `.github/instructions/database.instructions.md`
+- UI rules: `.github/instructions/ui-development.instructions.md`, `frontend/UI_STYLE_GUIDE2.md`
+- Core code: `tunetrees/app/schedule.py`, `tunetrees/app/models.py`, `tunetrees/app/main.py`
+- Tests: `frontend/tests/`, `frontend/test-scripts/`, `tests/`
 
-### Code Quality Standards
+### MCP tools (use when available)
 
-- **Strict typing**: No `any` types - use proper TypeScript interfaces and generics
-- **Clean lints**: Code must pass all linting rules without warnings
-- **Python linting & formatting**: Use ruff for Python code - `python -m ruff check tunetrees/` and `python -m ruff format tunetrees/`
-- **Prettier formatting**: ALWAYS run prettier on code before committing - use `npx prettier --write <files>`
-- **Automatic formatting**: Use prettier for consistent code style - it handles indentation, spacing, line breaks, and semicolons
-- **ESLint compliance**: All ESLint rules must pass without warnings after prettier formatting
-- **Biome lint compliance**: All Biome lint rules must pass without warnings after prettier formatting
-- **Interface naming**: Use `I` prefix for all TypeScript interfaces
+- Memory MCP: persist and recall repo norms, decisions, flaky areas, and gotchas. After major changes, store a short observation. When missing or not reachable, pause and ask to start the Memory MCP server.
+- Playwright MCP: run focused E2E tests via standard helpers and storage state; prefer Page Objects and `data-testid` selectors. If unavailable, ask to start it; do not fall back to raw `npx playwright test`.
+- GitHub MCP (preferred for git): use to push files, create/update PRs, and fetch PR context. If unavailable, state that you’ll fall back to local git and ask for confirmation.
 
-### Database Layer (SQLAlchemy 2.0.35)
+Availability check: If any MCP tool above is not accessible, stop and request it be started before proceeding with actions that depend on it.
 
-```python
-# Use new SQLAlchemy 2.0 syntax throughout
-stmt = select(PracticeRecord).where(PracticeRecord.tune_ref == tune_id)
-result = db.execute(stmt).scalars().all()
-```
+### Implementation hygiene
 
-**Critical Database Schema Note**: The `practice_record` table uses a unique constraint on `(tune_ref, playlist_ref, practiced)` to support historical practice record tracking. When creating new practice records, ensure unique timestamps to avoid constraint violations. The `upsert_practice_record` function automatically handles this by setting the current timestamp for new records.
+- Provide runnable, minimal changes with necessary imports and types only.
+- Keep surface area small; prefer extending existing modules over new abstractions.
+- Note assumptions briefly in comments when non-obvious.
 
-### TypeScript Conventions
+### Commit/branching
 
-```typescript
-// Interface naming with I prefix - REQUIRED
-interface IUserPreferences {
-  algorithmType: AlgorithmType;
-  requestRetention: number;
-}
+- Use up to 3 gitmojis; split unrelated concerns. Branch `feat/`, `fix/`, `refactor/` etc. Ask before pushing when acting as assistant.
 
-// Strict typing - NO any! types - use proper generics
-const handleSubmit = <T extends IFormData>(
-  data: T
-): Promise<IApiResponse<T>> => {
-  // implementation
-};
-
-// Proper error handling with typed responses
-interface IApiError {
-  message: string;
-  code: number;
-  details?: Record<string, unknown>;
-}
-```
-
-### UI/UX Development
-
-- **Style Guide**: Comprehensive UI patterns in `frontend/UI_STYLE_GUIDE2.md`, with core patterns automatically included for frontend development
-- **Tailwind CSS**: Utility-first styling approach
-- **Headless UI**: Accessible component primitives
-- **Responsive design**: Mobile-first approach
-- **Dark mode**: Theme switching support via Tailwind
-- **Component composition**: Reusable components in `frontend/components/`
-
-### Spaced Repetition Core Logic
-
-- **Two algorithms**: `AlgorithmType.FSRS` and `AlgorithmType.SM2`
-- **Key functions in `schedule.py`**:
-  - `_process_single_tune_feedback()`: Main review processing
-  - `get_prefs_spaced_repetition()`: User-specific algorithm preferences
-  - `optimize_fsrs_parameters()`: FSRS parameter tuning every 50 reviews
-- **Quality ratings**: Integer 0-5 mapped to FSRS ratings (Again/Hard/Good/Easy)
-
-### Authentication & User Management
-
-- **NextAuth.js v5**: Configuration in `frontend/auth.ts`
-- **User identification**: `user_ref` string used throughout backend API calls
-- **Session management**: Server-side sessions with database persistence
-- **Self-hosted**: No external auth providers, credentials managed internally
-
-### Frontend State Management
-
-- **React built-in hooks**: `useState`, `useReducer`, `useContext`
-- **Custom context providers**: For shared application state
-- **Server components**: Next.js App Router for server-side state
-- **No external state library**: Avoiding Redux/Zustand complexity
-
-### Data Flow Pattern
-
-1. User submits practice feedback → `update_practice_feedbacks()`
-2. Process each tune → `_process_single_tune_feedback()`
-3. Load user preferences → `get_prefs_spaced_repetition()`
-4. Calculate next review date using scheduler
-5. Update `PracticeRecord` with new scheduling data
-
-### Error Handling Convention
-
-```python
-try:
-    # Database operations
-    db.commit()
-except Exception as e:
-    db.rollback()
-    log.error(f"Operation failed: {e}")
-    raise e
-```
+### TL;DR
 
-## Development Workflow
-
-### Backend Development
-
-```bash
-# Start development server
-cd tunetrees
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Run backend tests
-pytest tests/
-```
-
-### Frontend Development
-
-```bash
-cd frontend
-npm run dev  # Next.js dev server on port 3000
-npm run build
-npm run start  # Production build
-npm run lint  # Must pass without warnings
-npm run biome_lint  # Must pass without warnings
-npm run type-check  # TypeScript strict checking
-
-# Run frontend tests
-npm run test:unit        # Jest unit tests ONLY (password utils, etc.)
-npm run test            # All tests including E2E (not recommended for development)
-npm run test:ui        # Run Playwright UI tests in headless mode
-npm run test:ui:single        # Run a single Playwright UI test in headless mode
-
-# For more playwright test control for E2E tests - use environment setup script
-`npm run test:ui:single <test-file-pattern>`  # Properly sets up environment and database
-# Do NOT use: npx playwright test directly - it lacks proper environment setup
-```
-
-### Code Quality Checks
-
-- **TypeScript**: Strict mode enabled, no `any` types permitted
-- **ESLint**: All rules must pass without warnings
-- **Prettier**: Consistent formatting enforced - ALWAYS run `npx prettier --write <files>` before commits
-- **Type checking**: Full TypeScript compilation without errors
-- **Python ruff**: Use `python -m ruff check tunetrees/` for linting and `python -m ruff format tunetrees/` for formatting
-- **Pre-commit formatting**: Use `npx prettier --write .` to format all files or target specific files with patterns like `"app/**/*.{ts,tsx}"`
-
-### Git Operations & GitHub Integration
-
-**IMPORTANT**: Always use the GitHub MCP server tools for git operations instead of basic `git` commands when available. The GitHub MCP server provides:
-
-- Better GitHub API integration with proper authentication
-- Richer metadata and PR/issue association
-- GitHub-specific features like workflow triggers
-- Superior error handling for GitHub operations
-
-**Preferred tools for commits:**
-
-- `mcp_github_push_files` - For pushing multiple files in a single commit
-- `mcp_github_create_pull_request` - For creating commits via GitHub API
-- `mcp_github_update_pull_request` - For updating PR with commit information
-
-**Only fall back to basic `git` commands if GitHub MCP server tools are unavailable.**
-
-### Code Formatting Workflow (CRITICAL)
-
-**ALWAYS use prettier for code formatting before any commit or file edit completion:**
-
-```bash
-# Format specific files (RECOMMENDED for targeted changes)
-npx prettier --write app/auth/login/page.tsx app/auth/password-reset/route.ts
-
-# Format by pattern (useful for related files)
-npx prettier --write "app/auth/**/*.{ts,tsx}"
-
-# Format all files (use sparingly, only when needed)
-npx prettier --write .
-```
-
-**Integration with tools:**
-
-- **After creating/editing files**: ALWAYS run prettier on the modified files
-- **Before commits**: Run prettier to ensure consistent formatting
-- **Never commit unformatted code**: Prettier fixes indentation, spacing, quotes, and semicolons automatically
-- **Use the run_in_terminal tool**: Call prettier via terminal rather than manual formatting
-
-**Prettier handles:**
-
-- Consistent indentation (2 spaces for TypeScript/React)
-- Line length optimization (automatic wrapping)
-- Quote consistency (double quotes for strings)
-- Semicolon placement (always add)
-- Bracket spacing and trailing commas
-- Import statement formatting
-
-### Commit Message Guidelines
-
-**REQUIRED**: Always use gitmojis to lead commit messages for clear visual categorization.
-
-You can use either the emoji (🎨) or the text code (`:art:`) - both are equivalent:
-
-**Core Development:**
-
-- 🎨 `:art:` - Improve structure/format of the code
-- ⚡️ `:zap:` - Improve performance
-- 🔥 `:fire:` - Remove code or files
-- 🐛 `:bug:` - Fix a bug
-- ✨ `:sparkles:` - Introduce new features
-- 📝 `:memo:` - Add or update documentation
-- 🚀 `:rocket:` - Deploy stuff
-- 🚑 `:ambulance:` - Critical hotfix
-- ♻️ `:recycle:` - Refactor code
-- 🏗️ `:building_construction:` - Make architectural changes
-
-**Dependencies & Build:**
-
-- ➕ `:heavy_plus_sign:` - Add or update dependencies
-- ➖ `:heavy_minus_sign:` - Remove a dependency
-- ⬆️ `:arrow_up:` - Upgrade a dependency
-- ⬇️ `:arrow_down:` - Downgrade a dependency
-- 🔨 `:hammer:` - Add or update build scripts
-- 📦 `:package:` - Add or update compiled files or packages
-
-**Database & Infrastructure:**
-
-- 🗃️ `:card_file_box:` - Perform database related changes
-- 🔊 `:loud_sound:` - Add or update logs
-- 🔇 `:mute:` - Remove logs
-
-**Frontend & UX:**
-
-- 📱 `:iphone:` - Work on responsive design
-- � `:lipstick:` - Add or update the UI and style files
-- �🚸 `:children_crossing:` - Improve user experience/usability
-- 🌐 `:globe_with_meridians:` - Internationalization (i18n)
-- ♿ `:wheelchair:` - Improve accessibility
-- 💫 `:dizzy:` - Add or update animations
-
-**Code Quality & Testing:**
-
-- ✅ `:white_check_mark:` - Add, update, or pass tests
-- 🧪 `:test_tube:` - Add or update tests
-- 💡 `:bulb:` - Add or update comments in source code
-- 🏷️ `:label:` - Add or update types
-- 🥅 `:goal_net:` - Catch errors
-- 🤡 `:clown_face:` - Mock things
-
-**Configuration & Maintenance:**
-
-- 🔧 `:wrench:` - Change configuration files
-- ⚙️ `:gear:` - Update CI/CD pipeline
-- 🩹 `:adhesive_bandage:` - Simple fix for a non-critical issue
-- 🧹 `:broom:` - Clean up code or files
-
-**Other:**
-
-- 💬 `:speech_balloon:` - Add or update text and literals
-- 👥 `:busts_in_silhouette:` - Add or update contributor(s)
-- 🔍 `:mag:` - Improve SEO
-- 🌱 `:seedling:` - Add or update seed files
-- 🚩 `:triangular_flag_on_post:` - Add, update, or remove feature flags
-- 🥚 `:egg:` - Add or update an easter egg
-- 🚧 `:construction:` - Work in progress
-- ⚠️ `:warning:` - Address warnings or introduce breaking changes
-- ↩️ `:leftwards_arrow_with_hook:` - Revert changes
-- ⏪ `:rewind:` - Revert previous commits
-- 🔖 `:bookmark:` - Release/Version tags
-- 🎉 `:tada:` - Begin a project
-
-**Commit Structure Best Practices:**
-
-- **Break commits into logical units** when possible (e.g., separate backend fixes, database changes, and frontend improvements)
-- **Each commit should have a single clear purpose** that can be described in the first line
-- **Use descriptive commit bodies** with bullet points for multiple changes
-- **Reference issues/PRs** when applicable
-- **Follow conventional commit format**: `<gitmoji> <type>: <description>`
-- **Always ask for user approval** before executing commits - present the proposed commit message(s) and wait for confirmation
-
-**Example Multi-Commit Approach:**
-
-```
-🔒 Fix authentication constraint violation in user endpoint
-🗃️ Update database schema for historical user tracking
-✨ Add frontend validation and improve user experience
-```
-
-This approach creates cleaner git history, easier code review, and safer rollback capabilities.
-
-### Gitmoji Selection Guidelines
-
-**CRITICAL**: Always carefully examine the actual code changes before selecting gitmojis. Don't rely solely on file names or user descriptions.
-
-**Gitmoji Selection Process:**
-
-1. **Analyze the diff**: Read through the actual code changes line by line
-2. **Identify change types**: Look for patterns in the modifications (refer to the gitmoji categories in the Commit Message Guidelines section above)
-3. **Apply multiple gitmojis**: When changes span multiple categories, use multiple gitmojis in order of importance
-4. **Prioritize by impact**: Place the most significant change type first
-
-**Multiple Gitmoji Examples:**
-
-```bash
-# Database schema + frontend changes
-🗃️✨ Add user preferences table and settings UI
-
-# Bug fix + test addition
-🐛✅ Fix authentication timeout and add regression tests
-
-# Performance + refactoring + tests
-⚡️♻️🧪 Optimize query performance, refactor cache logic, and add benchmarks
-
-# UI + accessibility improvements
-💄♿ Update button styles and improve keyboard navigation
-
-# Configuration + dependency updates
-🔧⬆️ Update Docker config and upgrade Node.js dependencies
-```
-
-**Guidelines for Multiple Gitmojis:**
-
-- **Maximum 3 gitmojis** per commit to maintain readability
-- **Order by significance**: Most important change first
-- **Related changes only**: Don't combine unrelated modifications
-- **Consider splitting**: If you need 4+ gitmojis, consider multiple commits
-
-**Change Detection Checklist:**
-
-- [ ] Are new files being created? (✨ `:sparkles:`)
-- [ ] Are bugs being fixed? (🐛 `:bug:`)
-- [ ] Are tests being added/modified? (✅ `:white_check_mark:` or 🧪 `:test_tube:`)
-- [ ] Are dependencies changing? (➕➖⬆️⬇️)
-- [ ] Are UI/styles being modified? (💄 `:lipstick:`)
-- [ ] Are database schemas changing? (🗃️ `:card_file_box:`)
-- [ ] Are configuration files being updated? (🔧 `:wrench:`)
-- [ ] Is code being refactored without functional changes? (♻️ `:recycle:`)
-- [ ] Are performance optimizations being made? (⚡️ `:zap:`)
-- [ ] Is documentation being updated? (📝 `:memo:`)
-
-### Testing Strategy
-
-- **Backend**: pytest in `tests/` directory with GitHub Actions CI
-- **Frontend**: Playwright E2E tests in `frontend/tests/` with GitHub Actions CI
-- **CI/CD**: Automated testing on push/PR via GitHub Actions
-
-### Branch Naming Conventions
-
-Follow these naming conventions for Git branches to maintain consistency and enable automated workflows. Based on industry standards like GitFlow, GitHub Flow, and conventional commits.
-
-**Format**: `{type}/{brief-description}` or `{type}/{brief-description}-{issue-number}`
-
-**Primary Types** (following conventional commits):
-
-- `feat/` or `feature/` - New features or enhancements
-- `fix/` or `bugfix/` - Bug fixes and hotfixes
-- `docs/` - Documentation-only changes
-- `style/` - Code style/formatting changes (no logic changes)
-- `refactor/` - Code refactoring without feature changes
-- `test/` - Adding or modifying tests
-- `chore/` - Maintenance, dependencies, tooling
-- `perf/` - Performance improvements
-- `ci/` - CI/CD configuration changes
-
-**Additional Types** (for workflow management):
-
-- `release/` - Release preparation branches
-- `hotfix/` - Critical production fixes
-- `experiment/` - Experimental or spike work
-
-**Guidelines**:
-
-- **Use kebab-case** (hyphens) for descriptions - industry standard
-- **Keep concise but descriptive** - aim for 2-4 words
-- **Include issue numbers** when applicable for traceability
-- **Lowercase only** for consistency across platforms
-- **20-character limit** - keep total branch name under 20 characters using abbreviations when needed
-
-**Examples**:
-
-```bash
-feat/user-auth               # New authentication system (abbreviated)
-feat/spaced-rep-123          # Feature with issue reference (abbreviated)
-fix/login-redirect-bug       # Bug fix
-fix/db-conn-456              # Bug fix with issue number (abbreviated)
-docs/api-docs                # Documentation update (abbreviated)
-refactor/sched-algo          # Code refactoring (abbreviated)
-test/e2e-playlist-mgmt       # Test additions (abbreviated)
-chore/update-deps            # Maintenance work (abbreviated)
-perf/optimize-query-456      # Performance improvement
-hotfix/critical-fix-789      # Critical production fix
-release/v2.1.0               # Release preparation
-experiment/new-ui-framework  # Experimental work
-```
-
-**Branch Management**:
-
-```bash
-# Create and switch to new branch
-git checkout -b feat/user-authentication
-
-# Create branch from specific commit/branch
-git checkout -b hotfix/critical-fix main
-
-# Push and set upstream tracking
-git push -u origin feat/user-authentication
-
-# Create branch with issue reference
-git checkout -b fix/login-redirect-456
-```
-
-**Integration Patterns**:
-
-- **Feature branches**: `feat/` → merge to `main` via PR
-- **Hotfixes**: `hotfix/` → merge to `main` and `develop` if using GitFlow
-- **Release branches**: `release/` → merge to `main` and tag version
-- **Experiments**: `experiment/` → merge or delete based on outcome
-
-This naming convention enables:
-
-- **Conventional commits compatibility** for automated changelogs
-- **Semantic versioning integration** for automated releases
-- **GitHub/GitLab automation** with type-based workflow triggers
-- **Clear intent communication** through standardized type prefixes
-- **Issue tracking integration** via optional number suffixes
-- **Tool compatibility** with popular Git workflows and CI/CD systems
-
-## Deployment (DigitalOcean)
-
-### Docker Multi-Service Setup
-
-- **docker-compose**: Orchestrated via `compose.yaml`
-- **Multi-platform builds**: `docker-bake.hcl` with `linux/amd64` and `linux/arm64` targets
-- **Container registry**: `docker.io/sboagy/tunetrees-server:latest` and `tunetrees-frontend:latest`
-
-### Deployment Commands
-
-```bash
-# Deploy to DigitalOcean droplet
-./scripts/redeploy_tt1dd.sh
-
-# Build and push containers
-docker buildx bake --push
-```
-
-### Infrastructure Details
-
-- **DigitalOcean droplet**: 165.227.182.140
-- **SSH access**: `~/.ssh/id_rsa_ttdroplet`
-- **Production database**: SQLite with automated backups via migration script
-
-### Database Migration (Current System)
-
-- **Manual SQLite migration**: `scripts/migrate_from_prod_db.sh`
-- **Schema changes**: Made in `tunetrees_test_clean.sqlite3` first
-- **Production sync**: SCP download from DigitalOcean droplet
-- **Backup strategy**: Timestamped backups in `tunetrees_do_backup/` and `tunetrees_local_backup/`
-- **Known migration issues**: May need to delete `view_playlist_joined` from production DB
-
-## Key Integration Points
-
-### FSRS Library Integration
-
-- Import: `from fsrs import Scheduler, Rating, ReviewLog`
-- Optimization: `from fsrs.optimizer import Optimizer`
-- Parameter tuning happens every 50 reviews in `optimize_fsrs_parameters()`
-
-### Database Models Relationships
-
-- `PracticeRecord` ↔ `Playlist` (many-to-one)
-- `PrefsSpacedRepetition` ↔ User (one-to-one per algorithm type)
-- JSON serialization for complex fields (FSRS weights, learning steps)
-
-### Date Handling Pattern
-
-```python
-# Consistent date format throughout
-TT_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-practiced_str = datetime.strftime(sitdown_date, TT_DATE_FORMAT)
-```
-
-### Frontend-Backend API Integration
-
-- **FastAPI OpenAPI**: Auto-generated schemas for TypeScript integration
-- **API base URL**: Configurable via environment variables
-- **Error handling**: Consistent error response format across endpoints
-- **Type safety**: Generate TypeScript types from OpenAPI schema
-
-## Testing & Debugging
-
-### Playwright E2E Testing Guidelines
-
-**CRITICAL**: All TuneTrees Playwright tests MUST follow these patterns for consistency, reliability, and maintainability.
-
-#### 1. **Running Tests**: Environment Setup Script
-
-For Playwright tests use the npm script (headless):
-
-```bash
-cd frontend
-npm run test:ui
-```
-
-OR (headless)
-
-```bash
-cd frontend
-npm run test:ui:single [test-file-pattern]
-```
-
-OR, for headed mode (but avoid this, use headless mode instead)
-
-```bash
-cd frontend
-./run-playwright-tests.sh [test-file-pattern]
-```
-
-Do NOT use `npx playwright test` directly - it lacks proper environment setup including database initialization and environment variables.
-
-#### 2. **Authentication Pattern: Storage State (PREFERRED)**
-
-**Use storage state for authentication in most cases** instead of manual login:
-
-```typescript
-import { getStorageState } from "@/test-scripts/storage-state";
-
-test.use({
-  storageState: getStorageState("STORAGE_STATE_TEST1"),
-  trace: "retain-on-failure",
-  viewport: { width: 1728 - 50, height: 1117 - 200 },
-});
-```
-
-Storage state is faster, more reliable, and consistent than manual login. Only use manual login patterns like `runLoginStandalone()` when there's a specific reason to test the login flow itself or when storage state doesn't meet the test requirements.
-
-#### 3. **Test Structure: Standard Pattern (REQUIRED)**
-
-**Imports**: Always include these standard imports:
-
-```typescript
-import { setTestDefaults } from "../test-scripts/set-test-defaults";
-import { restartBackend } from "@/test-scripts/global-setup";
-import { applyNetworkThrottle } from "@/test-scripts/network-utils";
-import { getStorageState } from "@/test-scripts/storage-state";
-import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
-import { expect, test } from "@playwright/test";
-import {
-  logTestStart,
-  logTestEnd,
-  logBrowserContextStart,
-  logBrowserContextEnd,
-} from "../test-scripts/test-logging";
-```
-
-**beforeEach Pattern**: Always include proper logging and setup:
-
-```typescript
-test.beforeEach(async ({ page }, testInfo) => {
-  logTestStart(testInfo);
-  logBrowserContextStart();
-  console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
-  await setTestDefaults(page);
-  await applyNetworkThrottle(page);
-  // Do NOT navigate here - let individual tests handle navigation
-});
-```
-
-**afterEach Pattern**: Always restore backend state with logging:
-
-```typescript
-test.afterEach(async ({ page }, testInfo) => {
-  await restartBackend();
-  await page.waitForTimeout(1_000);
-  logBrowserContextEnd();
-  logTestEnd(testInfo);
-});
-```
-
-#### 4. **Page Objects: Mandatory Usage (REQUIRED)**
-
-**ALWAYS** use Page Objects instead of raw selectors:
-
-- **`TuneTreesPageObject`** (`frontend/test-scripts/tunetrees.po.ts`): Main application navigation and common elements
-- **`TuneEditorPageObject`** (`frontend/test-scripts/tune-editor.po.ts`): Tune editing workflows
-
-**Navigation Pattern**: Always use Page Object methods:
-
-```typescript
-test("example-test", async ({ page }) => {
-  const ttPO = new TuneTreesPageObject(page);
-  await ttPO.gotoMainPage(); // REQUIRED first step
-  await ttPO.navigateToRepertoireTab(); // Use Page Object methods
-
-  // Use Page Object locators
-  await expect(ttPO.tunesGrid).toBeVisible();
-  await ttPO.repertoireTabTrigger.click();
-});
-```
-
-#### 5. **Locator Management: DRY Principle (REQUIRED)**
-
-**Add locators to Page Objects** instead of repeating selectors:
-
-```typescript
-// BAD: Repeating selectors across tests
-const sortButton = page.locator('button[title*="sort"]');
-const columnHeader = page.getByRole("columnheader").filter({ hasText: "Id" });
-
-// GOOD: Add to Page Object
-// In tunetrees.po.ts:
-readonly idColumnHeader = this.page.getByRole("columnheader").filter({ hasText: "ID" });
-readonly typeSortButton = this.page.locator('button[title*="sort Type"]');
-
-// In test:
-const ttPO = new TuneTreesPageObject(page);
-await expect(ttPO.idColumnHeader).toBeVisible();
-await ttPO.typeSortButton.click();
-```
-
-**When to add new locators**:
-
-- If you use the same selector in 2+ tests
-- If the selector is complex or likely to change
-- If it represents a key UI component
-
-#### 5a. **Data Test IDs: Preferred Selector Strategy (RECOMMENDED)**
-
-**PREFER `data-testid` attributes** for reliable element targeting:
-
-```typescript
-// EXCELLENT: Using data-testid attributes
-readonly passwordResetPasswordInput = page.getByTestId("password-reset-password-input");
-readonly passwordStrengthIndicator = page.getByTestId("password-strength-indicator");
-readonly submitButton = page.getByTestId("form-submit-button");
-
-// GOOD: Semantic selectors when data-testid isn't available
-readonly emailInput = page.getByRole("textbox", { name: "Email" });
-readonly loginDialog = page.getByRole("dialog", { name: "Sign In" });
-
-// AVOID: CSS selectors that can break easily
-readonly fragileButton = page.locator('.btn-primary.submit-btn'); // ❌ Brittle
-```
-
-**Add `data-testid` to components** when creating or modifying UI elements:
-
-```tsx
-// Add data-testid to interactive elements and key components
-<Input
-  type="password"
-  placeholder="Enter password"
-  data-testid="password-input"
-/>
-
-<Button
-  type="submit"
-  disabled={isLoading}
-  data-testid="form-submit-button"
->
-  Submit
-</Button>
-
-<div className="password-strength" data-testid="password-strength-indicator">
-  {/* Component content */}
-</div>
-```
-
-**`data-testid` Naming Conventions**:
-
-- Use kebab-case: `data-testid="password-reset-form"`
-- Be descriptive: `data-testid="user-profile-edit-button"`
-- Include context: `data-testid="signup-password-input"` vs `data-testid="login-password-input"`
-- Group related elements: `data-testid="password-requirement-length"`, `data-testid="password-requirement-uppercase"`
-
-**Update Page Objects** when adding new `data-testid` attributes:
-
-```typescript
-// Always add new testid-based locators to Page Objects
-// In tunetrees.po.ts:
-readonly signupPasswordInput: Locator;
-readonly signupConfirmInput: Locator;
-readonly passwordStrengthIndicator: Locator;
-
-// In constructor:
-this.signupPasswordInput = page.getByTestId("signup-password-input");
-this.signupConfirmInput = page.getByTestId("signup-confirm-input");
-this.passwordStrengthIndicator = page.getByTestId("password-strength-indicator");
-```
-
-#### 6. **Navigation Best Practices (REQUIRED)**
-
-**Standard Navigation Flow**:
-
-```typescript
-test("example-test", async ({ page }) => {
-  const ttPO = new TuneTreesPageObject(page);
-
-  // 1. Always start with gotoMainPage()
-  await ttPO.gotoMainPage();
-
-  // 2. Use Page Object navigation methods
-  await ttPO.navigateToRepertoireTab();
-  await ttPO.navigateToPracticeTab();
-
-  // 3. Wait for content to load
-  await page.waitForLoadState("domcontentloaded");
-});
-```
-
-**Available Page Object Navigation Methods**:
-
-- `gotoMainPage()`: Initial navigation with authentication check
-- `navigateToRepertoireTab()`: Navigate to repertoire grid
-- `navigateToPracticeTab()`: Navigate to practice mode
-- `navigateToTune(tuneName)`: Navigate to specific tune
-
-#### 7. **Common Locators in Page Objects**
-
-**Use existing locators from TuneTreesPageObject**:
-
-```typescript
-// Grid and table elements
-ttPO.tunesGrid;
-ttPO.tunesGridRows;
-ttPO.tableStatus;
-
-// Navigation
-ttPO.repertoireTabTrigger;
-ttPO.practiceTabTrigger;
-ttPO.mainTabGroup;
-
-// Actions
-ttPO.addToReviewButton;
-ttPO.submitPracticedTunesButton;
-ttPO.filterInput;
-```
-
-#### 8. **Error Handling and Debugging**
-
-**Defensive Testing**:
-
-```typescript
-// Always check visibility before interaction
-const element = ttPO.sortButton;
-if (await element.isVisible()) {
-  await element.click();
-} else {
-  console.log("Element not visible, taking alternative action");
-}
-
-// Use proper timeouts
-await expect(ttPO.tunesGrid).toBeVisible({ timeout: 15000 });
-```
-
-**Debugging Output**:
-
-```typescript
-// Use console.log for debugging
-console.log("Current URL:", page.url());
-console.log("Element count:", await ttPO.tunesGridRows.count());
-
-// Take screenshots for debugging
-await page.screenshot({ path: "debug-screenshot.png" });
-```
-
-#### 9. **Test Data and State Management**
-
-**Database State**: Tests automatically use clean database via `restartBackend()`
-
-**Test Isolation**: Each test starts with fresh backend state
-
-**Storage State**: Authentication persists across tests in same file
-
-#### 10. **Performance and Reliability**
-
-**Timeouts**: Use appropriate timeouts based on operation:
-
-- Page loads: 15-30 seconds
-- Element visibility: 5-10 seconds
-- Quick actions: 1-2 seconds
-
-**Wait Strategies**:
-
-```typescript
-// Preferred: Wait for specific conditions
-await expect(ttPO.tunesGrid).toBeVisible();
-
-// Avoid: Fixed timeouts unless necessary
-await page.waitForTimeout(500); // Only for animations/transitions
-```
-
-#### 11. **Adding New Tests: Checklist**
-
-When creating new tests, ensure:
-
-- [ ] Uses `getStorageState("STORAGE_STATE_TEST1")` for authentication
-- [ ] Includes proper logging in beforeEach/afterEach
-- [ ] Uses `TuneTreesPageObject` or `TuneEditorPageObject`
-- [ ] Calls `ttPO.gotoMainPage()` first
-- [ ] Uses existing Page Object locators when possible
-- [ ] Adds new locators to Page Objects if needed (with proper TypeScript types)
-- [ ] **Adds `data-testid` attributes to new UI elements** (recommended for reliability)
-- [ ] **Uses `data-testid` selectors via `page.getByTestId()` for new elements** (preferred approach)
-- [ ] Includes proper error handling and timeouts
-- [ ] Follows DRY principles (no repeated selectors)
-- [ ] Includes meaningful console.log statements for debugging
-
-#### 12. **Remote Copilot Instructions**
-
-When **GitHub Copilot** creates or modifies tests:
-
-1. **PREFER storage state authentication** - use manual login only when testing login flows specifically
-2. **ALWAYS use Page Objects** - never raw page.locator() calls when Page Object methods exist
-3. **ALWAYS call ttPO.gotoMainPage() first** in any test that navigates
-4. **ALWAYS add reusable locators to Page Objects** instead of inline selectors
-5. **ALWAYS include proper logging** (logTestStart, logTestEnd, etc.)
-6. **ALWAYS use defensive programming** with proper visibility checks
-7. **ALWAYS follow the established patterns** from existing working tests
-8. **ADD `data-testid` attributes** to new UI components for reliable testing (recommended)
-9. **USE `page.getByTestId()` for new elements** instead of CSS selectors (preferred)
-10. **UPDATE Page Objects** when adding new `data-testid` attributes
-
-This ensures consistency, maintainability, and reliability across all TuneTrees E2E tests.
-
-### Diagnostic Functions
-
-- `query_and_print_tune_by_id(tune_id)`: Debug specific practice records
-- `get_user_review_history()`: Fetch review logs for FSRS optimization
-- Enable debug logging: `log.debug(f"FSRS review_log: {review_log}")`
-
-### Key Files for Understanding Core Logic
-
-- `schedule.py`: Lines 490-600 contain main scheduling algorithms
-- `models.py`: Database schema and relationships
-- `main.py`: API structure and dependency injection patterns
-- `frontend/app/`: Next.js App Router pages and layouts
-- `frontend/components/`: Reusable UI components with Tailwind CSS
-- `frontend/UI_STYLE_GUIDE2.md`: Complete UI component patterns and design system
-- `compose.yaml`: Production deployment configuration
-- `docker-bake.hcl`: Multi-platform container build configuration
-
-## Quality Assurance Requirements
-
-- **No `any` types**: Use proper TypeScript interfaces and generics
-- **Clean lints**: All ESLint rules must pass without warnings
-- **Prettier formatting**: Consistent code style enforced - ALWAYS run `npx prettier --write <files>` before commits
-- **Type safety**: Full TypeScript compilation without errors
-- **UI consistency**: Comprehensive patterns in `frontend/UI_STYLE_GUIDE2.md`, with core patterns automatically included for frontend development
+- Follow patterns, keep TS strict, protect DB uniqueness, batch queries, add tests, pass all linters, and use MCP tools. Ask to start MCP servers if they’re down.
