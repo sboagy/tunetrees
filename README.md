@@ -393,7 +393,7 @@ pip install "sqlacodegen-v2 ~= 0.1.4"
 Then, generate the `tunetrees.py` python file which will contain the TuneTrees ORM code.
 
 ```bash
-sqlacodegen_v2 sqlite:///tunetrees_test_clean.sqlite3 > tunetrees/models/tunetrees.py
+./scripts/sqlacodegen.sh
 ```
 
 Then remove the extra `from sqlalchemy.orm.base import Mapped` line from the generated code.

@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Development**: `uvicorn tunetrees.api.main:app --reload` - Starts FastAPI server
 - **Tests**: `pytest tests/ -v` - Runs backend tests
 - **Lint**: `black tunetrees/` and `ruff check --fix tunetrees/` - Code formatting and linting
-- **ORM Generation**: `sqlacodegen_v2 sqlite:///tunetrees_test_clean.sqlite3 > tunetrees/models/tunetrees.py` - Generates SQLAlchemy models
+- **ORM Generation**: `scripts/sqlacodegen.sh` - Generates SQLAlchemy models
 
 ### Docker
 
@@ -54,7 +54,7 @@ TuneTrees is a full-stack web application for helping folk musicians memorize tu
 - **Schema Source**: `tunetrees_test_clean.sqlite3` (checked into git)
 - **Development DB**: `tunetrees.sqlite3` (local, git-ignored)
 - **Test DB**: `tunetrees_test.sqlite3` (auto-reset for each test run)
-- **ORM Models**: Auto-generated from schema using `sqlacodegen-v2`
+- **ORM Models**: Auto-generated from schema using `./scripts/sqlacodegen.sh`
 
 ### Practice System
 
@@ -98,7 +98,7 @@ The core functionality revolves around spaced repetition scheduling:
 ### Making Database Changes
 
 1. Modify schema in `tunetrees_test_clean.sqlite3`
-2. Regenerate ORM: `sqlacodegen_v2 sqlite:///tunetrees_test_clean.sqlite3 > tunetrees/models/tunetrees.py`
+2. Regenerate ORM: `./scripts/sqlacodegen.sh`
 3. Format code: `black tunetrees/models/tunetrees.py && ruff check --fix tunetrees/`
 4. Test changes with both backend and frontend tests
 
