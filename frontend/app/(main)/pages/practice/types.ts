@@ -320,6 +320,10 @@ export interface IPracticeQueueEntry {
   tags?: string | null;
   notes?: string | null;
   has_staged?: boolean | null;
+  // Staged/transient overlay fields surfaced from backend
+  recall_eval?: string | null;
+  goal?: string | null;
+  favorite_url?: string | null;
 }
 
 export interface IPracticeQueueWithMeta {
