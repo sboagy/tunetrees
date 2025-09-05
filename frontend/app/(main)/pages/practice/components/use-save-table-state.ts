@@ -1,6 +1,5 @@
 import type { TableState, Table as TanstackTable } from "@tanstack/react-table";
 import { useEffect } from "react";
-import { createOrUpdateTableState } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
 import { useTune } from "./CurrentTuneContext";
 import { tableStateCacheService } from "./table-state-cache";

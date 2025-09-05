@@ -1,5 +1,6 @@
 "use client";
 
+import { logVerbose } from "@/lib/logging";
 import type {
   ColumnSizingInfoState,
   ColumnSizingState,
@@ -22,12 +23,11 @@ import {
   getTableStateTable,
   updateTableStateInDb,
 } from "../settings";
-import { tableStateCacheService } from "./table-state-cache";
 import type { ITuneOverview, TablePurpose } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
+import { tableStateCacheService } from "./table-state-cache";
 import { get_columns } from "./TuneColumns";
-import { logVerbose } from "@/lib/logging";
 
 export const globalFlagManualSorting = false;
 

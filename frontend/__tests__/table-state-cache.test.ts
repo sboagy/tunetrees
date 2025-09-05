@@ -3,8 +3,8 @@
  */
 
 import { tableStateCacheService } from "../app/(main)/pages/practice/components/table-state-cache";
-import type { TablePurpose } from "../app/(main)/pages/practice/types";
 import * as settings from "../app/(main)/pages/practice/settings";
+import type { TablePurpose } from "../app/(main)/pages/practice/types";
 
 // Mock the settings module
 jest.mock("../../settings", () => ({
