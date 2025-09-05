@@ -1,4 +1,14 @@
+import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+import { setTestDefaults } from "@/test-scripts/set-test-defaults";
+import {
+  logBrowserContextEnd,
+  logBrowserContextStart,
+  logTestEnd,
+  logTestStart,
+} from "@/test-scripts/test-logging";
 import { test, expect } from "@playwright/test";
+import { getStorageState } from "@/test-scripts/storage-state";
+import { restartBackend } from "@/test-scripts/global-setup";
 
 interface INetworkRequest {
   url: string;
@@ -6,28 +16,29 @@ interface INetworkRequest {
   timestamp: number;
 }
 
-// Use existing test patterns - storage state and basic setup
 test.use({
+  storageState: getStorageState("STORAGE_STATE_TEST1"),
   trace: "retain-on-failure",
-  viewport: { width: 1200, height: 800 },
+  viewport: { width: 1728 - 50, height: 1117 - 200 },
 });
 
-test.beforeEach(async ({ page }) => {
-  // Simple page navigation without complex setup for now
-  // This test focuses on the caching behavior rather than full app integration
+test.beforeEach(async ({ page }, testInfo) => {
+  logTestStart(testInfo);
+  logBrowserContextStart();
+  console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+  await setTestDefaults(page);
+  await applyNetworkThrottle(page);
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  await page.waitForTimeout(1_000);
+  await restartBackend();
+  await page.waitForTimeout(1_000);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
 });
 
 test.describe("Table State Caching Optimization", () => {
-  test.beforeEach(async ({ page }) => {
-    // Skip tests if environment is not properly configured
-    const baseURL = page.context().request.options.baseURL;
-    if (!baseURL || baseURL.includes("localhost")) {
-      // In CI environments, we may not have a full server running
-      // Skip the test gracefully
-      test.skip(true, "Server environment not configured for this test");
-    }
-  });
-
   test("should batch table state updates and reduce API calls", async ({
     page,
   }) => {

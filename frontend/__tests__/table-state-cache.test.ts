@@ -31,6 +31,8 @@ describe("TableStateCacheService", () => {
     mockUpdateTableStateInDb.mockResolvedValue(200);
   });
 
+  // No test-level console suppression required; logging is controlled by TABLE_STATE_DEBUG env var
+
   afterEach(() => {
     tableStateCacheService.clear();
   });

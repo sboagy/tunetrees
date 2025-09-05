@@ -27,6 +27,24 @@ class TableStateCacheService {
   private debugMode = false;
 
   /**
+   * Helper to determine whether we should emit debug/warn logs.
+   * Controlled by explicit setDebugMode or the TABLE_STATE_DEBUG env var.
+   */
+  private shouldLog(): boolean {
+    if (this.debugMode) return true;
+    try {
+      // Check env var (works in Node/test environments). Use string checks for flexibility.
+      const v =
+        typeof process !== "undefined"
+          ? process.env?.TABLE_STATE_DEBUG
+          : undefined;
+      return v === "1" || v === "true";
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Enable debug logging for testing
    */
   public setDebugMode(enabled: boolean): void {
@@ -34,7 +52,7 @@ class TableStateCacheService {
   }
 
   private debugLog(message: string, ...args: unknown[]): void {
-    if (this.debugMode) {
+    if (this.shouldLog()) {
       console.log(`[TableStateCache] ${message}`, ...args);
     }
   }
@@ -88,9 +106,11 @@ class TableStateCacheService {
     }
 
     this.debugLog(`Processing ${dirtyEntries.length} dirty entries`);
-    console.debug(
-      `[TableStateCache] Processing ${dirtyEntries.length} dirty entries`,
-    );
+    if (this.shouldLog()) {
+      console.debug(
+        `[TableStateCache] Processing ${dirtyEntries.length} dirty entries`,
+      );
+    }
 
     // Process each dirty entry
     const updatePromises = dirtyEntries.map(async (entry) => {
@@ -109,16 +129,20 @@ class TableStateCacheService {
           this.debugLog(
             `Successfully updated state for ${entry.tablePurpose}, playlistId=${entry.playlistId}`,
           );
-          console.debug(
-            `[TableStateCache] Successfully updated state for ${entry.tablePurpose}, playlistId=${entry.playlistId}`,
-          );
+          if (this.shouldLog()) {
+            console.debug(
+              `[TableStateCache] Successfully updated state for ${entry.tablePurpose}, playlistId=${entry.playlistId}`,
+            );
+          }
         } else {
           this.debugLog(
             `Failed to update state for ${entry.tablePurpose}, status=${status}`,
           );
-          console.warn(
-            `[TableStateCache] Failed to update state for ${entry.tablePurpose}, status=${status}`,
-          );
+          if (this.shouldLog()) {
+            console.warn(
+              `[TableStateCache] Failed to update state for ${entry.tablePurpose}, status=${status}`,
+            );
+          }
         }
       } catch (error) {
         console.error(
@@ -141,9 +165,11 @@ class TableStateCacheService {
     tableStateOverride?: Partial<TableState>,
   ): void {
     if (playlistId <= 0 || !userId) {
-      console.warn(
-        "[TableStateCache] Skipping cache update - invalid parameters",
-      );
+      if (this.shouldLog()) {
+        console.warn(
+          "[TableStateCache] Skipping cache update - invalid parameters",
+        );
+      }
       return;
     }
 
@@ -180,9 +206,11 @@ class TableStateCacheService {
     playlistId: number,
     tableStateOverride?: Partial<TableState>,
   ): Promise<number> {
-    console.debug(
-      `[TableStateCache] Immediate flush for ${tablePurpose}, playlistId=${playlistId}`,
-    );
+    if (this.shouldLog()) {
+      console.debug(
+        `[TableStateCache] Immediate flush for ${tablePurpose}, playlistId=${playlistId}`,
+      );
+    }
 
     const key = this.getKey(userId, tablePurpose, playlistId);
     let tableStateToFlush: Partial<TableState>;
@@ -197,9 +225,11 @@ class TableStateCacheService {
       // Use cached state only
       const existing = this.cache.get(key);
       if (!existing || !existing.isDirty) {
-        console.debug(
-          `[TableStateCache] No dirty state to flush for ${tablePurpose}`,
-        );
+        if (this.shouldLog()) {
+          console.debug(
+            `[TableStateCache] No dirty state to flush for ${tablePurpose}`,
+          );
+        }
         return 200; // Nothing to flush
       }
       tableStateToFlush = existing.tableState;
