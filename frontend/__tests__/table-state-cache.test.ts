@@ -7,7 +7,7 @@ import * as settings from "../app/(main)/pages/practice/settings";
 import type { TablePurpose } from "../app/(main)/pages/practice/types";
 
 // Mock the settings module
-jest.mock("../../settings", () => ({
+jest.mock("../app/(main)/pages/practice/settings", () => ({
   updateTableStateInDb: jest.fn(),
 }));
 
