@@ -132,51 +132,73 @@ export function formatDateToIsoUtcString(date: Date): string {
 }
 
 export function convertToIsoUTCString(dateString: string): string {
-  // First, try to parse it directly.
-  // If it's a valid ISO string, Date() constructor will handle it,
-  // and toISOString() will then ensure it's in the correct output format.
-  const parsedDateFromInput = new Date(dateString);
+  if (!dateString) return dateString;
 
-  // If parsed successfully as a standard/ISO date, and it's not 'Invalid Date'
-  if (!Number.isNaN(parsedDateFromInput.getTime())) {
-    // If it's already an ISO string, or another format Date() understands,
-    // toISOString() will convert it to the standard UTC ISO format.
-    return parsedDateFromInput.toISOString();
-  }
+  const tryParse = (s: string): string | null => {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  };
 
-  // If the direct parse failed, it might be a Python-style UTC string
-  // (e.g., "YYYY-MM-DD HH:MM:SS") which the Date constructor might not parse reliably across all browsers/contexts
-  // if it doesn't have the 'T' separator or timezone info.
-  // We'll manually parse it to be safe, assuming it's UTC.
+  // 1) Fast path: native parse
+  const native = tryParse(dateString);
+  if (native) return native;
 
-  const parts = dateString.match(
-    /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/,
+  // 2) Normalize common variants like:
+  //    "YYYY-MM-DD HH:MM:SS(.fraction)?(Z|±HH:MM|±HHMM)?"
+  //    - Replace space with 'T'
+  //    - Ensure timezone offset has a colon
+  //    - Trim fraction to milliseconds (3 digits)
+  let normalized = dateString.trim();
+  // Replace single space between date and time with 'T'
+  normalized = normalized.replace(
+    /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)(.*)$/,
+    "$1T$2$3",
   );
 
-  if (parts) {
-    // Extract parts: [full_match, year, month, day, hour, minute, second]
-    const year = Number.parseInt(parts[1], 10);
-    const month = Number.parseInt(parts[2], 10) - 1; // Month is 0-indexed in Date constructor
-    const day = Number.parseInt(parts[3], 10);
-    const hour = Number.parseInt(parts[4], 10);
-    const minute = Number.parseInt(parts[5], 10);
-    const second = Number.parseInt(parts[6], 10);
+  // If offset like -0500 or +0930 exists, insert colon to match ISO (e.g., -05:00)
+  normalized = normalized.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
 
-    // Construct a Date object using UTC components.
-    // This creates a Date object that represents the *exact UTC moment*
-    // specified by the Python-style string.
-    const utcDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+  // Trim microseconds to milliseconds if present (e.g., .671465 -> .671)
+  normalized = normalized.replace(/(\.\d{3})\d+(Z|[+-]\d{2}:?\d{2})?$/, "$1$2");
 
-    // Then convert this UTC Date object to an ISO string.
-    return utcDate.toISOString();
+  const normalizedParsed = tryParse(normalized);
+  if (normalizedParsed) return normalizedParsed;
+
+  // 3) Manual parse for Python-style without or with tz: YYYY-MM-DD HH:MM:SS(.frac)?(Z|±HH:MM|±HHMM)?
+  const match = dateString.match(
+    /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:?\d{2})?$/,
+  );
+  if (match) {
+    const year = Number.parseInt(match[1], 10);
+    const month = Number.parseInt(match[2], 10) - 1;
+    const day = Number.parseInt(match[3], 10);
+    const hour = Number.parseInt(match[4], 10);
+    const minute = Number.parseInt(match[5], 10);
+    const second = Number.parseInt(match[6], 10);
+    const frac = match[7] ? match[7].slice(0, 3) : "0"; // milliseconds (trim to 3)
+    const tz = match[8] ?? null;
+
+    let ms = Date.UTC(year, month, day, hour, minute, second, Number(frac));
+    if (tz && tz !== "Z") {
+      // tz like -05:00 or -0500
+      const tzMatch = tz.match(/([+-])(\d{2}):?(\d{2})/);
+      if (tzMatch) {
+        const sign = tzMatch[1] === "-" ? -1 : 1;
+        const hh = Number.parseInt(tzMatch[2], 10);
+        const mm = Number.parseInt(tzMatch[3], 10);
+        const offsetMinutes = sign * (hh * 60 + mm);
+        // The given wall time is with tz offset; convert to UTC by subtracting the offset
+        ms -= offsetMinutes * 60 * 1000;
+      }
+    }
+    return new Date(ms).toISOString();
   }
 
-  // If neither parsing method worked, return the original string or throw an error,
-  // depending on desired behavior for truly unrecognized formats.
-  // For robustness, returning the original string is less likely to break things
-  // than throwing, but it means you'd need to handle invalid outputs upstream.
+  // 4) Legacy Python-style without time (very rare). Let native handle or return as-is.
+  // As a safe fallback, return original string to avoid throwing in client code paths.
   console.warn(
-    `Unrecognized date format for string: "${dateString}". Returning as-is or consider throwing.`,
+    `Unrecognized date format for string: "${dateString}". Returning as-is or consider throwing.
+Normalized attempted: "${normalized}"`,
   );
-  return dateString; // Or throw new Error("Invalid date string format");
+  return dateString;
 }

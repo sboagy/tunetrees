@@ -139,7 +139,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
           return d.getTime();
         }
       }
-      const raw = "2024-12-31 11:47:57.671465-00:00";
+      const raw = "2024-12-31 06:47:57.671465-05:00";
       // Normalize: replace space with 'T' and trim microseconds to milliseconds for Date parsing
       const m = raw.match(
         /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\.(\d+)([+-]\d{2}:\d{2}|Z)$/,

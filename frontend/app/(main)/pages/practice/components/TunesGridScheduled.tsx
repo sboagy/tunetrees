@@ -46,6 +46,7 @@ import {
 } from "../actions/practice-actions";
 import { getRepertoireTunesOverviewAction } from "../actions/practice-actions";
 import { useSitDownDate } from "./SitdownDateProvider";
+import PracticeDateChooser from "./PracticeDateChooser";
 
 type ReviewMode = "grid" | "flashcard";
 
@@ -118,6 +119,46 @@ export default function TunesGridScheduled({
   const lastFetchedShowSubmitted = useRef<boolean | null>(null);
   const inFlight = useRef(false);
   const fetchSeq = useRef(0);
+
+  // Local sitdown date state for header controls
+  const [sitdownDateLocal, setSitdownDateLocal] = useState<Date | null>(null);
+  useEffect(() => {
+    try {
+      setSitdownDateLocal(new Date(getSitdownDateFromBrowser()));
+    } catch (error_) {
+      console.warn("Failed to init sitdownDateLocal", error_);
+      setSitdownDateLocal(new Date());
+    }
+  }, []);
+
+  const persistSitdownAndRefresh = (d: Date) => {
+    try {
+      const iso = d.toISOString();
+      window.localStorage.setItem("TT_REVIEW_SITDOWN_DATE", iso);
+      // Also update the global override used by getSitdownDateFromBrowser()
+      try {
+        (
+          window as typeof window & {
+            __TT_REVIEW_SITDOWN_DATE__?: string;
+          }
+        ).__TT_REVIEW_SITDOWN_DATE__ = iso;
+      } catch (error_) {
+        // Non-fatal if window augmentation fails
+        console.warn("Failed to set __TT_REVIEW_SITDOWN_DATE__", error_);
+      }
+      setSitdownDateLocal(d);
+      // Trigger a snapshot refetch by advancing the refresh marker
+      try {
+        triggerRefresh();
+      } catch (error) {
+        console.warn("Failed to trigger refresh after sitdown change", error);
+      }
+    } catch (error) {
+      console.error("Persist sitdown date failed", error);
+    }
+  };
+
+  // Date math helpers are now contained in PracticeDateChooser
 
   // Normalized action ensures we always receive IPracticeQueueEntry[]
   // Hydrate persisted Practice tab UI preferences (Display Submitted, Flashcard Mode)
@@ -626,18 +667,21 @@ export default function TunesGridScheduled({
     const sitdownDate = getSitdownDateFromBrowser();
     submitPracticeFeedbacks({ playlistId, updates, sitdownDate })
       .then(() => {
-        // Remove only tunes that were actually submitted (had a recall_eval); keep others in the grid.
-        // Remove only tunes that were practiced (present in updates) keeping others intact
+        // Visibility rule: if Display Submitted is OFF, remove submitted rows; if ON, keep them
         const practicedIds = new Set(
           Object.keys(updates).map((k) => Number(k)),
         );
-        setTunes((prev) =>
-          prev.filter((t) =>
-            t.id !== null && t.id !== undefined
-              ? !practicedIds.has(t.id)
-              : true,
-          ),
-        );
+        setTunes((prev) => {
+          if (!showSubmitted) {
+            return prev.filter((t) =>
+              t.id !== null && t.id !== undefined
+                ? !practicedIds.has(t.id)
+                : true,
+            );
+          }
+          // Keep rows; mark as completed via snapshot merge below
+          return prev;
+        });
         setCompletedTuneIds((prev) => {
           const next = new Set(prev);
           for (const id of practicedIds) {
@@ -941,6 +985,17 @@ export default function TunesGridScheduled({
                   Staged changes pending submit
                 </span>
               )}
+              {/* Date chooser (consolidated) */}
+              <div className="ml-2">
+                <PracticeDateChooser
+                  value={sitdownDateLocal}
+                  onChange={(d) => persistSitdownAndRefresh(d)}
+                  allSubmittedToday={
+                    fullQueueSnapshot.length > 0 &&
+                    fullQueueSnapshot.every((t) => !!t.completed_at)
+                  }
+                />
+              </div>
             </div>
             <div className="flex items-center space-x-4">
               <Label htmlFor="flashcard-mode">Flashcard Mode</Label>
