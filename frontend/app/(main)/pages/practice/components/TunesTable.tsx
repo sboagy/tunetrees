@@ -115,7 +115,7 @@ export const saveTableState = async (
   }
 
   logVerbose(
-    `LF7 saveTableState ${forceImmediate ? '(immediate)' : '(cached)'}: tablePurpose=${tablePurpose}`,
+    `LF7 saveTableState ${forceImmediate ? "(immediate)" : "(cached)"}: tablePurpose=${tablePurpose}`,
   );
 
   if (forceImmediate) {
@@ -128,16 +128,15 @@ export const saveTableState = async (
       mergedState as unknown as TableState,
     );
     return status;
-  } else {
-    // For normal events, use cached batching
-    tableStateCacheService.cacheUpdate(
-      userId,
-      tablePurpose,
-      playlistId,
-      mergedState as unknown as TableState,
-    );
-    return 200; // Return success immediately for cached updates
   }
+  // For normal events, use cached batching
+  tableStateCacheService.cacheUpdate(
+    userId,
+    tablePurpose,
+    playlistId,
+    mergedState as unknown as TableState,
+  );
+  return 200; // Return success immediately for cached updates
 };
 
 export function TunesTableComponent({

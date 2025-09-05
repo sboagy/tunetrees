@@ -1,29 +1,37 @@
 import { test, expect } from "@playwright/test";
-import { TuneTreesPO } from "../test-scripts/tunetrees.po";
+import { TuneTreesPageObject } from "../test-scripts/tunetrees.po";
+
+interface INetworkRequest {
+  url: string;
+  method: string;
+  timestamp: number;
+}
 
 test.describe("Table State Caching Optimization", () => {
-  let ttPO: TuneTreesPO;
+  let ttPO: TuneTreesPageObject;
 
   test.beforeEach(async ({ page }) => {
-    ttPO = new TuneTreesPO(page);
+    ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
   });
 
-  test("should batch table state updates and reduce API calls", async ({ page }) => {
+  test("should batch table state updates and reduce API calls", async ({
+    page,
+  }) => {
     // Set up network monitoring to track API calls
-    const tableStateRequests = [];
-    page.on('request', request => {
-      if (request.url().includes('/settings/table_state')) {
+    const tableStateRequests: INetworkRequest[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/settings/table_state")) {
         tableStateRequests.push({
           url: request.url(),
           method: request.method(),
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
       }
     });
 
     // Navigate to practice page where table state is used
-    await ttPO.clickPracticeTab();
+    await ttPO.navigateToPracticeTab();
     await page.waitForTimeout(1000);
 
     // Clear any existing requests from initial load
@@ -45,7 +53,7 @@ test.describe("Table State Caching Optimization", () => {
     // Try to interact with table sorting if available
     const sortHeaders = page.locator('[data-testid^="sort-header"]');
     const sortHeaderCount = await sortHeaders.count();
-    
+
     if (sortHeaderCount > 0) {
       // Click a few sort headers to trigger more state changes
       await sortHeaders.first().click();
@@ -62,35 +70,35 @@ test.describe("Table State Caching Optimization", () => {
     // Check that we have fewer API calls than we would expect without caching
     // With caching, we should see significantly fewer calls
     console.log(`Table state API calls made: ${tableStateRequests.length}`);
-    
+
     // Without caching, each interaction would trigger an immediate API call
     // With caching, we should see at most a few batched calls
     expect(tableStateRequests.length).toBeLessThan(8); // Should be much less than number of interactions
-    
+
     // Most requests should be GET requests for initial loads, with fewer POST/PATCH for updates
-    const updateRequests = tableStateRequests.filter(req => 
-      req.method === 'POST' || req.method === 'PATCH'
+    const updateRequests = tableStateRequests.filter(
+      (req) => req.method === "POST" || req.method === "PATCH",
     );
-    
+
     console.log(`Update API calls made: ${updateRequests.length}`);
     expect(updateRequests.length).toBeLessThan(5); // Should be batched
   });
 
   test("should immediately flush on page navigation", async ({ page }) => {
     // Monitor for table state requests
-    const tableStateRequests = [];
-    page.on('request', request => {
-      if (request.url().includes('/settings/table_state')) {
+    const tableStateRequests: INetworkRequest[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/settings/table_state")) {
         tableStateRequests.push({
           url: request.url(),
           method: request.method(),
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
       }
     });
 
     // Navigate to practice page
-    await ttPO.clickPracticeTab();
+    await ttPO.navigateToPracticeTab();
     await page.waitForTimeout(1000);
 
     // Clear initial requests
@@ -102,40 +110,47 @@ test.describe("Table State Caching Optimization", () => {
     await page.waitForTimeout(500);
 
     // Navigate away (this should trigger immediate flush)
-    await page.goto(page.url().replace(/\/pages\/practice.*/, '/pages/user-settings'));
+    await page.goto(
+      page.url().replace(/\/pages\/practice.*/, "/pages/user-settings"),
+    );
     await page.waitForTimeout(1000);
 
     // Should have triggered at least one immediate flush
-    const updateRequests = tableStateRequests.filter(req => 
-      req.method === 'POST' || req.method === 'PATCH'
+    const updateRequests = tableStateRequests.filter(
+      (req) => req.method === "POST" || req.method === "PATCH",
     );
-    
+
     expect(updateRequests.length).toBeGreaterThan(0);
     console.log(`Immediate flush requests: ${updateRequests.length}`);
   });
 
   test("should handle table sorting with cached updates", async ({ page }) => {
     // Navigate to a page with sortable tables
-    await ttPO.clickPracticeTab();
+    await ttPO.navigateToPracticeTab();
     await page.waitForTimeout(1000);
 
     // Wait for table to load
-    const tableContainer = page.locator('[data-testid*="table"], table').first();
-    await tableContainer.waitFor({ state: 'visible', timeout: 10000 });
+    const tableContainer = page
+      .locator('[data-testid*="table"], table')
+      .first();
+    await tableContainer.waitFor({ state: "visible", timeout: 10000 });
 
     // Monitor table state requests
-    const tableStateRequests = [];
-    page.on('request', request => {
-      if (request.url().includes('/settings/table_state')) {
+    const tableStateRequests: INetworkRequest[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/settings/table_state")) {
         tableStateRequests.push({
+          url: request.url(),
           method: request.method(),
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
       }
     });
 
     // Try to find and click sortable columns
-    const sortableHeaders = page.locator('th[role="columnheader"], [data-testid*="sort"]');
+    const sortableHeaders = page.locator(
+      'th[role="columnheader"], [data-testid*="sort"]',
+    );
     const headerCount = await sortableHeaders.count();
 
     if (headerCount > 0) {
@@ -149,10 +164,10 @@ test.describe("Table State Caching Optimization", () => {
       await page.waitForTimeout(3000);
 
       // Should have fewer API calls than clicks due to batching
-      const updateRequests = tableStateRequests.filter(req => 
-        req.method === 'POST' || req.method === 'PATCH'
+      const updateRequests = tableStateRequests.filter(
+        (req) => req.method === "POST" || req.method === "PATCH",
       );
-      
+
       console.log(`Sort interactions: 3, API calls: ${updateRequests.length}`);
       expect(updateRequests.length).toBeLessThanOrEqual(2); // Should be batched
     } else {

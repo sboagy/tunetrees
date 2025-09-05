@@ -2,18 +2,19 @@
  * @jest-environment jsdom
  */
 
-import { tableStateCacheService } from "../table-state-cache";
-import type { TablePurpose } from "../../types";
-import * as settings from "../../settings";
+import { tableStateCacheService } from "../app/(main)/pages/practice/components/table-state-cache";
+import type { TablePurpose } from "../app/(main)/pages/practice/types";
+import * as settings from "../app/(main)/pages/practice/settings";
 
 // Mock the settings module
 jest.mock("../../settings", () => ({
   updateTableStateInDb: jest.fn(),
 }));
 
-const mockUpdateTableStateInDb = settings.updateTableStateInDb as jest.MockedFunction<
-  typeof settings.updateTableStateInDb
->;
+const mockUpdateTableStateInDb =
+  settings.updateTableStateInDb as jest.MockedFunction<
+    typeof settings.updateTableStateInDb
+  >;
 
 describe("TableStateCacheService", () => {
   const mockUserId = 1;
@@ -40,7 +41,7 @@ describe("TableStateCacheService", () => {
         mockUserId,
         mockTablePurpose,
         mockPlaylistId,
-        mockTableState
+        mockTableState,
       );
 
       const stats = tableStateCacheService.getStats();
@@ -54,14 +55,14 @@ describe("TableStateCacheService", () => {
         mockUserId,
         mockTablePurpose,
         mockPlaylistId,
-        { sorting: [{ id: "title", desc: false }] }
+        { sorting: [{ id: "title", desc: false }] },
       );
 
       tableStateCacheService.cacheUpdate(
         mockUserId,
         mockTablePurpose,
         mockPlaylistId,
-        { columnVisibility: { title: true } }
+        { columnVisibility: { title: true } },
       );
 
       const stats = tableStateCacheService.getStats();
@@ -74,14 +75,14 @@ describe("TableStateCacheService", () => {
         mockUserId,
         "practice",
         mockPlaylistId,
-        mockTableState
+        mockTableState,
       );
 
       tableStateCacheService.cacheUpdate(
         mockUserId,
         "repertoire",
         mockPlaylistId,
-        mockTableState
+        mockTableState,
       );
 
       const stats = tableStateCacheService.getStats();
@@ -94,14 +95,14 @@ describe("TableStateCacheService", () => {
         0, // invalid userId
         mockTablePurpose,
         mockPlaylistId,
-        mockTableState
+        mockTableState,
       );
 
       tableStateCacheService.cacheUpdate(
         mockUserId,
         mockTablePurpose,
         0, // invalid playlistId
-        mockTableState
+        mockTableState,
       );
 
       const stats = tableStateCacheService.getStats();
@@ -116,7 +117,7 @@ describe("TableStateCacheService", () => {
         mockUserId,
         mockTablePurpose,
         mockPlaylistId,
-        mockTableState
+        mockTableState,
       );
 
       expect(result).toBe(200);
@@ -125,7 +126,7 @@ describe("TableStateCacheService", () => {
         "full",
         mockTablePurpose,
         mockPlaylistId,
-        mockTableState
+        mockTableState,
       );
     });
 
@@ -135,7 +136,7 @@ describe("TableStateCacheService", () => {
         mockUserId,
         mockTablePurpose,
         mockPlaylistId,
-        { sorting: [{ id: "title", desc: false }] }
+        { sorting: [{ id: "title", desc: false }] },
       );
 
       // Then flush with override
@@ -144,7 +145,7 @@ describe("TableStateCacheService", () => {
         mockUserId,
         mockTablePurpose,
         mockPlaylistId,
-        override
+        override,
       );
 
       expect(mockUpdateTableStateInDb).toHaveBeenCalledWith(
@@ -155,7 +156,7 @@ describe("TableStateCacheService", () => {
         expect.objectContaining({
           sorting: [{ id: "title", desc: false }],
           columnVisibility: { title: true },
-        })
+        }),
       );
     });
 
@@ -164,7 +165,7 @@ describe("TableStateCacheService", () => {
         mockUserId,
         mockTablePurpose,
         mockPlaylistId,
-        mockTableState
+        mockTableState,
       );
 
       let stats = tableStateCacheService.getStats();
@@ -173,7 +174,7 @@ describe("TableStateCacheService", () => {
       await tableStateCacheService.flushImmediate(
         mockUserId,
         mockTablePurpose,
-        mockPlaylistId
+        mockPlaylistId,
       );
 
       stats = tableStateCacheService.getStats();
@@ -187,7 +188,7 @@ describe("TableStateCacheService", () => {
         mockUserId,
         mockTablePurpose,
         mockPlaylistId,
-        mockTableState
+        mockTableState,
       );
 
       expect(result).toBe(500);
@@ -204,7 +205,7 @@ describe("TableStateCacheService", () => {
         mockUserId,
         mockTablePurpose,
         mockPlaylistId,
-        mockTableState
+        mockTableState,
       );
 
       stats = tableStateCacheService.getStats();
@@ -219,7 +220,7 @@ describe("TableStateCacheService", () => {
         mockUserId,
         mockTablePurpose,
         mockPlaylistId,
-        mockTableState
+        mockTableState,
       );
 
       let stats = tableStateCacheService.getStats();

@@ -42,7 +42,11 @@ class TableStateCacheService {
   /**
    * Generate a unique key for a table state entry
    */
-  private getKey(userId: number, tablePurpose: TablePurpose, playlistId: number): string {
+  private getKey(
+    userId: number,
+    tablePurpose: TablePurpose,
+    playlistId: number,
+  ): string {
     return `${userId}|${tablePurpose}|${playlistId}`;
   }
 
@@ -56,7 +60,7 @@ class TableStateCacheService {
 
     this.isPolling = true;
     this.pollTimer = setInterval(() => {
-      this.processDirtyEntries();
+      void this.processDirtyEntries();
     }, this.pollIntervalMs);
   }
 
@@ -75,14 +79,18 @@ class TableStateCacheService {
    * Process all dirty entries and update the backend
    */
   private async processDirtyEntries(): Promise<void> {
-    const dirtyEntries = Array.from(this.cache.values()).filter(entry => entry.isDirty);
-    
+    const dirtyEntries = [...this.cache.values()].filter(
+      (entry) => entry.isDirty,
+    );
+
     if (dirtyEntries.length === 0) {
       return;
     }
 
     this.debugLog(`Processing ${dirtyEntries.length} dirty entries`);
-    console.debug(`[TableStateCache] Processing ${dirtyEntries.length} dirty entries`);
+    console.debug(
+      `[TableStateCache] Processing ${dirtyEntries.length} dirty entries`,
+    );
 
     // Process each dirty entry
     const updatePromises = dirtyEntries.map(async (entry) => {
@@ -94,28 +102,28 @@ class TableStateCacheService {
           entry.playlistId,
           entry.tableState as TableState,
         );
-        
+
         if (status >= 200 && status < 300) {
           // Mark as clean on successful update
           entry.isDirty = false;
           this.debugLog(
-            `Successfully updated state for ${entry.tablePurpose}, playlistId=${entry.playlistId}`
+            `Successfully updated state for ${entry.tablePurpose}, playlistId=${entry.playlistId}`,
           );
           console.debug(
-            `[TableStateCache] Successfully updated state for ${entry.tablePurpose}, playlistId=${entry.playlistId}`
+            `[TableStateCache] Successfully updated state for ${entry.tablePurpose}, playlistId=${entry.playlistId}`,
           );
         } else {
           this.debugLog(
-            `Failed to update state for ${entry.tablePurpose}, status=${status}`
+            `Failed to update state for ${entry.tablePurpose}, status=${status}`,
           );
           console.warn(
-            `[TableStateCache] Failed to update state for ${entry.tablePurpose}, status=${status}`
+            `[TableStateCache] Failed to update state for ${entry.tablePurpose}, status=${status}`,
           );
         }
       } catch (error) {
         console.error(
           `[TableStateCache] Error updating state for ${entry.tablePurpose}:`,
-          error
+          error,
         );
       }
     });
@@ -130,16 +138,18 @@ class TableStateCacheService {
     userId: number,
     tablePurpose: TablePurpose,
     playlistId: number,
-    tableStateOverride?: Partial<TableState>
+    tableStateOverride?: Partial<TableState>,
   ): void {
     if (playlistId <= 0 || !userId) {
-      console.warn("[TableStateCache] Skipping cache update - invalid parameters");
+      console.warn(
+        "[TableStateCache] Skipping cache update - invalid parameters",
+      );
       return;
     }
 
     const key = this.getKey(userId, tablePurpose, playlistId);
     const existing = this.cache.get(key);
-    
+
     if (existing && tableStateOverride) {
       // Merge the override with existing state
       existing.tableState = { ...existing.tableState, ...tableStateOverride };
@@ -168,24 +178,28 @@ class TableStateCacheService {
     userId: number,
     tablePurpose: TablePurpose,
     playlistId: number,
-    tableStateOverride?: Partial<TableState>
+    tableStateOverride?: Partial<TableState>,
   ): Promise<number> {
-    console.debug(`[TableStateCache] Immediate flush for ${tablePurpose}, playlistId=${playlistId}`);
-    
+    console.debug(
+      `[TableStateCache] Immediate flush for ${tablePurpose}, playlistId=${playlistId}`,
+    );
+
     const key = this.getKey(userId, tablePurpose, playlistId);
     let tableStateToFlush: Partial<TableState>;
 
     if (tableStateOverride) {
       // If an override is provided, use it and merge with cached state
       const existing = this.cache.get(key);
-      tableStateToFlush = existing 
+      tableStateToFlush = existing
         ? { ...existing.tableState, ...tableStateOverride }
         : tableStateOverride;
     } else {
       // Use cached state only
       const existing = this.cache.get(key);
       if (!existing || !existing.isDirty) {
-        console.debug(`[TableStateCache] No dirty state to flush for ${tablePurpose}`);
+        console.debug(
+          `[TableStateCache] No dirty state to flush for ${tablePurpose}`,
+        );
         return 200; // Nothing to flush
       }
       tableStateToFlush = existing.tableState;
@@ -210,7 +224,7 @@ class TableStateCacheService {
 
       return status;
     } catch (error) {
-      console.error(`[TableStateCache] Error during immediate flush:`, error);
+      console.error("[TableStateCache] Error during immediate flush:", error);
       return 500;
     }
   }
@@ -235,7 +249,9 @@ class TableStateCacheService {
    * Get cache statistics (for debugging)
    */
   public getStats(): { totalEntries: number; dirtyEntries: number } {
-    const dirtyCount = Array.from(this.cache.values()).filter(entry => entry.isDirty).length;
+    const dirtyCount = [...this.cache.values()].filter(
+      (entry) => entry.isDirty,
+    ).length;
     return {
       totalEntries: this.cache.size,
       dirtyEntries: dirtyCount,
@@ -251,7 +267,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
     // Note: This is synchronous but we can't await in beforeunload
     // The polling should have handled most updates already
-    tableStateCacheService.flushAll();
+    void tableStateCacheService.flushAll();
   });
 }
 
