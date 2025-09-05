@@ -24,6 +24,20 @@ class TableStateCacheService {
   private pollIntervalMs = 2500; // Check for changes every 2.5 seconds
   private pollTimer: NodeJS.Timeout | null = null;
   private isPolling = false;
+  private debugMode = false;
+
+  /**
+   * Enable debug logging for testing
+   */
+  public setDebugMode(enabled: boolean): void {
+    this.debugMode = enabled;
+  }
+
+  private debugLog(message: string, ...args: unknown[]): void {
+    if (this.debugMode) {
+      console.log(`[TableStateCache] ${message}`, ...args);
+    }
+  }
 
   /**
    * Generate a unique key for a table state entry
@@ -67,6 +81,7 @@ class TableStateCacheService {
       return;
     }
 
+    this.debugLog(`Processing ${dirtyEntries.length} dirty entries`);
     console.debug(`[TableStateCache] Processing ${dirtyEntries.length} dirty entries`);
 
     // Process each dirty entry
@@ -83,10 +98,16 @@ class TableStateCacheService {
         if (status >= 200 && status < 300) {
           // Mark as clean on successful update
           entry.isDirty = false;
+          this.debugLog(
+            `Successfully updated state for ${entry.tablePurpose}, playlistId=${entry.playlistId}`
+          );
           console.debug(
             `[TableStateCache] Successfully updated state for ${entry.tablePurpose}, playlistId=${entry.playlistId}`
           );
         } else {
+          this.debugLog(
+            `Failed to update state for ${entry.tablePurpose}, status=${status}`
+          );
           console.warn(
             `[TableStateCache] Failed to update state for ${entry.tablePurpose}, status=${status}`
           );
