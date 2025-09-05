@@ -10,13 +10,13 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Switch } from "@/components/ui/switch";
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type {
   CellContext,
@@ -24,6 +24,12 @@ import type {
 } from "@tanstack/react-table";
 import type { ITuneOverview, TablePurpose } from "../types";
 import RecallEvalComboBox from "./RowRecallEvalComboBox";
+import {
+  getQualityListForGoalAndTechnique,
+  lookupQualityItem,
+} from "../quality-lists";
+import { useTune } from "./CurrentTuneContext";
+import { updateCurrentTuneInDb } from "../settings";
 
 function getCellContext(
   table: TanstackTable<ITuneOverview>,
@@ -54,14 +60,43 @@ type Props = {
 
 export default function FlashcardPanel(props: Props) {
   const table = props.table;
-
-  const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>({
-    title: true,
-    type: true,
-    practiced: true,
-    external_ref: true,
-    recall_eval: true,
-  });
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => setIsClient(true), []);
+  const { setCurrentTune, setCurrentTablePurpose } = useTune();
+  // Derive columns from the TanStack table so labels match grid headers
+  const leafColumns = useMemo(
+    () => table.getAllLeafColumns().filter((c) => c.id !== "select"),
+    [table],
+  );
+  const getHeaderLabel = (colId: string): string => {
+    const col = leafColumns.find((c) => c.id === colId);
+    // Prefer meta.headerLabel set in grid column defs
+    const metaLabel = (col?.columnDef as { meta?: { headerLabel?: string } })
+      ?.meta?.headerLabel;
+    if (metaLabel) return metaLabel;
+    // Fall back to static string header, otherwise the id
+    const header = col?.columnDef.header;
+    if (typeof header === "string" && header.length > 0) {
+      return header;
+    }
+    return colId;
+  };
+  // Default visibility aligned to prior behavior but keyed by column ids
+  const defaultVisible = useMemo(() => {
+    const defaults = new Set([
+      "title",
+      "type",
+      "latest_practiced",
+      "external_ref",
+      "recall_eval",
+    ]);
+    return leafColumns.reduce<Record<string, boolean>>((acc, c) => {
+      acc[c.id] = defaults.has(c.id);
+      return acc;
+    }, {});
+  }, [leafColumns]);
+  const [visibleFields, setVisibleFields] =
+    useState<Record<string, boolean>>(defaultVisible);
 
   const [tableIndex, setTableIndex] = useState<number>(0);
 
@@ -78,6 +113,40 @@ export default function FlashcardPanel(props: Props) {
   const toggleField = (field: string) => {
     setVisibleFields((prev) => ({ ...prev, [field]: !prev[field] }));
   };
+
+  // Keep side panel (current tune) synchronized with flashcard selection
+  useEffect(() => {
+    const row = table.getRowModel().rows[tableIndex];
+    const tuneId = row?.original?.id;
+    if (!tuneId) return;
+    setCurrentTune(tuneId);
+    setCurrentTablePurpose(props.purpose);
+    void updateCurrentTuneInDb(
+      props.userId,
+      "full",
+      props.purpose,
+      props.playlistId,
+      tuneId,
+    );
+    // Optionally scroll the grid to this tune if helper is present
+    try {
+      (
+        window as unknown as {
+          scrollToTuneById?: (id: number) => void;
+        }
+      ).scrollToTuneById?.(tuneId);
+    } catch {
+      // ignore
+    }
+  }, [
+    table,
+    tableIndex,
+    setCurrentTune,
+    setCurrentTablePurpose,
+    props.userId,
+    props.playlistId,
+    props.purpose,
+  ]);
 
   if (table.getRowCount() === 0) {
     return (
@@ -97,20 +166,64 @@ export default function FlashcardPanel(props: Props) {
           <Button onClick={onPrevious} disabled={Number(tableIndex) <= 0}>
             Previous
           </Button>
-          <RecallEvalComboBox
-            key={tableIndex}
-            info={getCellContext(
-              props.table,
-              props.userId,
-              props.playlistId,
-              props.purpose,
-              tableIndex,
-            )}
-            userId={props.userId}
-            playlistId={props.playlistId}
-            purpose={props.purpose}
-            onRecallEvalChange={props.onRecallEvalChange}
-          />
+          {(() => {
+            const rowOriginal = table.getRowModel().rows[tableIndex]?.original;
+            const completed = Boolean(rowOriginal?.completed_at);
+            const qualityList = getQualityListForGoalAndTechnique(
+              rowOriginal?.goal,
+              rowOriginal?.latest_technique,
+            );
+            // Derive display label similar to grid cell logic
+            let label = "(Not Set)";
+            const stored = rowOriginal?.recall_eval;
+            if (stored) {
+              label =
+                qualityList.find((q) => q.value === stored)?.label2 ?? stored;
+            } else {
+              const latestQuality = rowOriginal?.latest_quality;
+              const latestEasiness = rowOriginal?.latest_easiness;
+              if (latestQuality !== null && latestQuality !== undefined) {
+                const found = lookupQualityItem(latestQuality, qualityList);
+                if (found) label = found.label2;
+              } else if (
+                latestEasiness !== null &&
+                latestEasiness !== undefined
+              ) {
+                const rounded = Math.round(latestEasiness);
+                const found = lookupQualityItem(rounded, qualityList);
+                if (found) label = found.label2;
+              }
+            }
+
+            if (completed) {
+              return (
+                <div
+                  className="truncate"
+                  title={label}
+                  data-testid={`tt-recal-eval-static-${rowOriginal?.id}`}
+                >
+                  {label}
+                </div>
+              );
+            }
+            return (
+              <RecallEvalComboBox
+                key={tableIndex}
+                info={getCellContext(
+                  props.table,
+                  props.userId,
+                  props.playlistId,
+                  props.purpose,
+                  tableIndex,
+                )}
+                userId={props.userId}
+                playlistId={props.playlistId}
+                purpose={props.purpose}
+                onRecallEvalChange={props.onRecallEvalChange}
+                readOnly={false}
+              />
+            );
+          })()}
           <Button
             onClick={onNext}
             disabled={Number(tableIndex) >= table.getRowCount() - 1}
@@ -118,43 +231,65 @@ export default function FlashcardPanel(props: Props) {
             Next
           </Button>
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline">
-              Show Fields <ChevronDown className="ml-2 h-4 w-4" />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              {isClient && (window.innerWidth < 768 ? "" : "Columns")}
+              <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80">
-            <div className="grid gap-4">
-              {Object.keys(table.getRowModel().rows[tableIndex].original).map(
-                (field) => (
-                  <div key={field} className="flex items-center space-x-2">
-                    <Switch
-                      id={`show-${field}`}
-                      checked={visibleFields[field] || false}
-                      onCheckedChange={() => toggleField(field)}
-                    />
-                    <Label htmlFor={`show-${field}`}>{field}</Label>
-                  </div>
-                ),
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {leafColumns
+              .filter((col) => col.getCanHide?.() ?? true)
+              .map((col) => (
+                <DropdownMenuCheckboxItem
+                  key={col.id}
+                  className="capitalize"
+                  checked={Boolean(visibleFields[col.id])}
+                  onCheckedChange={() => toggleField(col.id)}
+                  data-testid={`flashcard-toggle-${col.id}`}
+                >
+                  {getHeaderLabel(col.id)}
+                </DropdownMenuCheckboxItem>
+              ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </CardHeader>
       <CardContent>
         <div className="grid gap-4">
-          {Object.entries(table.getRowModel().rows[tableIndex].original).map(
-            ([key, value]) =>
-              visibleFields[key] && (
-                <div key={key} className="flex flex-col space-y-1.5">
-                  <Label htmlFor={key}>{key}</Label>
-                  <div id={key} className="bg-muted p-2 rounded-md">
-                    {value !== null ? value.toString() : "N/A"}
-                  </div>
+          {leafColumns.map((col) => {
+            if (!visibleFields[col.id]) return null;
+            const row = table.getRowModel().rows[tableIndex];
+            const original = row?.original as ITuneOverview | undefined;
+            const fromGetter = row?.getValue ? row.getValue(col.id) : undefined;
+            const key = col.id as keyof ITuneOverview;
+            const fromOriginal = original ? original[key] : undefined;
+            const raw = fromGetter !== undefined ? fromGetter : fromOriginal;
+            let display: string;
+            if (raw === null || raw === undefined) {
+              display = "N/A";
+            } else if (
+              typeof raw === "string" ||
+              typeof raw === "number" ||
+              typeof raw === "boolean"
+            ) {
+              display = String(raw);
+            } else {
+              try {
+                display = JSON.stringify(raw);
+              } catch {
+                display = "[unserializable]";
+              }
+            }
+            return (
+              <div key={col.id} className="flex flex-col space-y-1.5">
+                <Label htmlFor={col.id}>{getHeaderLabel(col.id)}</Label>
+                <div id={col.id} className="bg-muted p-2 rounded-md">
+                  {display}
                 </div>
-              ),
-          )}
+              </div>
+            );
+          })}
         </div>
       </CardContent>
       <CardFooter className="flex justify-between">
