@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { CalendarDays, ChevronDown } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { getSitdownDateFromBrowser } from "./SitdownDateProvider";
 
 interface IPracticeDateChooserProps {
@@ -59,17 +59,17 @@ export default function PracticeDateChooser({
     );
   }, [sitdownBaseNoon]);
 
-  const isSameYmd = (
-    a: Date | null | undefined,
-    b: Date | null | undefined,
-  ) => {
-    if (!a || !b) return false;
-    return (
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate()
-    );
-  };
+  const isSameYmd = useCallback(
+    (a: Date | null | undefined, b: Date | null | undefined) => {
+      if (!a || !b) return false;
+      return (
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate()
+      );
+    },
+    [],
+  );
 
   const nextLabel = allSubmittedToday ? "Tomorrow" : "Tomorrow (Preview)";
   const triggerLabel = useMemo(() => {
@@ -78,7 +78,7 @@ export default function PracticeDateChooser({
     if (isSameYmd(v, prevDayNoon)) return "Yesterday";
     if (isSameYmd(v, nextDayNoon)) return nextLabel;
     return toLocalYmd(v);
-  }, [value, sitdownBaseNoon, prevDayNoon, nextDayNoon, nextLabel]);
+  }, [value, sitdownBaseNoon, prevDayNoon, nextDayNoon, nextLabel, isSameYmd]);
 
   return (
     <div

@@ -612,7 +612,7 @@ export default function TunesGridScheduled({
         console.error("stage submit failed", error);
       }
     },
-    [setTunes, playlistId, userId, handleError],
+  [setTunes, playlistId, userId],
   );
 
   const handleGoalChange = useCallback(

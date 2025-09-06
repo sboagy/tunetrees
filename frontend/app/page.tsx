@@ -7,10 +7,13 @@ import { redirect } from "next/navigation";
 // dev/testing query overrides (e.g. ?tt_sitdown=2025-09-05) are not lost.
 // If future logic adds additional root logic, ensure this redirect logic stays intact.
 // Accept standard Next.js App Router searchParams shape (record of strings/arrays).
+type TRawSearchParamsRoot = Record<string, string | string[] | undefined>;
+
 export default async function index({
   searchParams,
 }: {
-  searchParams?: { [key: string]: string | string[] | undefined };
+  // Align with Next.js 15 PageProps constraint (Promise | undefined)
+  searchParams?: Promise<TRawSearchParamsRoot>;
 }) {
   const session = await auth();
   if (!session?.user) {
@@ -53,9 +56,17 @@ export default async function index({
   }
   // Reconstruct query string (if any) and forward to /home.
   // searchParams is a Map-like (URLSearchParams) in Next 15 can be iterated via Object.entries after spread.
-  if (searchParams && Object.keys(searchParams).length > 0) {
+  let resolvedSearchParams: TRawSearchParamsRoot | undefined;
+  if (searchParams) {
+    try {
+      resolvedSearchParams = await searchParams;
+    } catch {
+      resolvedSearchParams = undefined;
+    }
+  }
+  if (resolvedSearchParams && Object.keys(resolvedSearchParams).length > 0) {
     const sp = new URLSearchParams();
-    for (const [key, value] of Object.entries(searchParams)) {
+    for (const [key, value] of Object.entries(resolvedSearchParams)) {
       if (value === undefined || value === null) continue;
       if (Array.isArray(value)) {
         for (const v of value) sp.append(key, v);
