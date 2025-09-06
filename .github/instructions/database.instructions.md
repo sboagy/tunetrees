@@ -1,10 +1,6 @@
 ---
 description: "TuneTrees database schema, invariants, and safety rules"
-applyTo: |
-  tunetrees/models/**/*.{py}
-  tunetrees/app/**/*.{py}
-  sql_scripts/**/*.sql
-  tests/**/*.{py}
+applyTo: "tunetrees/models/**/*.py,tunetrees/app/**/*.py,sql_scripts/**/*.sql,tests/**/*.py"
 ---
 
 # TuneTrees Database Instructions

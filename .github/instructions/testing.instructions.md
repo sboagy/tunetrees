@@ -7,11 +7,32 @@ applyTo: "frontend/tests/**/*.spec.ts"
 
 This document describes the standard structure and expectations for Playwright integration tests in this repository. Additions are encouraged but changes should be minimal and consistent across tests.
 
+## Testing Philosophy
+
+- **User-Centric**: Tests should be written from the user's perspective, focusing on the most important user journeys.
+- **Fast Feedback**: Aim for quick test execution to provide rapid feedback to developers.
+- **Maintainability**: Write tests that are easy to understand and maintain, with clear structure and naming.
+
 ## Golden rules
 
 - Tests must be deterministic and isolated.
 - Use the shared test-scripts helpers for setup, storage state, network throttling and logging.
 - Do not rely on tests running against a developer machine or an external local server. Tests should reset/seed the DB using the provided helpers.
+
+### Testing Strategy
+
+- **Backend**: pytest in `tests/` directory with GitHub Actions CI
+- **Frontend**: Playwright E2E tests in `frontend/tests/` with GitHub Actions CI
+- **CI**: Automated testing on push/PR via GitHub Actions
+
+## Playwright File Naming & Location
+
+- Place tests in `frontend/tests/` or subdirectories.
+- Use `.spec.ts` suffix for test files (e.g. `example.spec.ts`).
+- Test files must be prefixed with "test-"
+- Group related tests in the same file or subdirectory.
+- Page Object files should go in `frontend/test-scripts/` with `.po.ts` suffix.
+- Helper scripts should go in `frontend/test-scripts/` with `.ts` suffix.
 
 ## Required per-test boilerplate
 
@@ -67,6 +88,70 @@ test.afterEach(async ({ page }, testInfo) => {
 3. Add or update helper scripts under `frontend/test-scripts/` when necessary.
 4. Run `npm run test:ui:single path/to/spec` locally before opening a PR.
 
----
+## Adding New Tests: Checklist
 
-If you'd like me to add examples, a checklist for PRs that add tests, or an automated CI job that validates the boilerplate, tell me which and I will add it.
+When creating new tests, ensure:
+
+- [ ] Uses `getStorageState("STORAGE_STATE_TEST1")` for authentication
+- [ ] Includes proper logging in beforeEach/afterEach
+- [ ] Uses `TuneTreesPageObject` or `TuneEditorPageObject`
+- [ ] Calls `ttPO.gotoMainPage()` first
+- [ ] Uses existing Page Object locators when possible
+- [ ] Adds new locators to Page Objects if needed (with proper TypeScript types)
+- [ ] **Adds `data-testid` attributes to new UI elements** (recommended for reliability)
+- [ ] **Uses `data-testid` selectors via `page.getByTestId()` for new elements** (preferred approach)
+- [ ] Includes proper error handling and timeouts
+- [ ] Follows DRY principles (no repeated selectors)
+- [ ] Includes meaningful console.log statements for debugging
+
+## Defensive Testing
+
+```typescript
+// Always check visibility before interaction
+const element = ttPO.sortButton;
+if (await element.isVisible()) {
+  await element.click();
+} else {
+  console.log("Element not visible, taking alternative action");
+}
+
+// Use proper timeouts
+await expect(ttPO.tunesGrid).toBeVisible({ timeout: 15000 });
+```
+
+## Debugging Output
+
+```typescript
+// Use console.log for debugging
+console.log("Current URL:", page.url());
+console.log("Element count:", await ttPO.tunesGridRows.count());
+
+// Take screenshots for debugging
+await page.screenshot({ path: "debug-screenshot.png" });
+```
+
+## Test Data and State Management\*\*
+
+**Database State**: Tests automatically use clean database via `restartBackend()`
+
+**Test Isolation**: Each test starts with fresh backend state
+
+**Storage State**: Authentication persists across tests in same file
+
+## Performance and Reliability
+
+**Timeouts**: Use appropriate timeouts based on operation:
+
+- Page loads: 15-30 seconds
+- Element visibility: 5-10 seconds
+- Quick actions: 1-2 seconds
+
+**Wait Strategies**
+
+```typescript
+// Preferred: Wait for specific conditions
+await expect(ttPO.tunesGrid).toBeVisible();
+
+// Avoid: Fixed timeouts unless necessary
+await page.waitForTimeout(500); // Only for animations/transitions
+```
