@@ -1,16 +1,16 @@
 import { Blockquote, Flex, Heading, Text } from "@radix-ui/themes";
 import { auth } from "auth";
 import { redirect } from "next/navigation";
-import type { SearchParams } from "next/dist/server/request/search-params"; // type only (Next.js internal)
 
 // NOTE: We preserve any existing query parameters (not just tt_sitdown) when redirecting
 // an authenticated user from the root (/) to /home so that feature flags or
 // dev/testing query overrides (e.g. ?tt_sitdown=2025-09-05) are not lost.
 // If future logic adds additional root logic, ensure this redirect logic stays intact.
+// Accept standard Next.js App Router searchParams shape (record of strings/arrays).
 export default async function index({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams?: { [key: string]: string | string[] | undefined };
 }) {
   const session = await auth();
   if (!session?.user) {
@@ -53,19 +53,18 @@ export default async function index({
   }
   // Reconstruct query string (if any) and forward to /home.
   // searchParams is a Map-like (URLSearchParams) in Next 15 can be iterated via Object.entries after spread.
-  const sp = new URLSearchParams();
-  // Casting to Record<string, string | string[]> to iterate safely without 'any'.
-  const spObj = searchParams as unknown as Record<string, string | string[]>;
-  for (const key in spObj) {
-    const value = spObj[key];
-    if (value === undefined || value === null) continue;
-    // Next may supply string | string[]
-    if (Array.isArray(value)) {
-      for (const v of value) sp.append(key, v);
-    } else {
-      sp.set(key, value);
+  if (searchParams && Object.keys(searchParams).length > 0) {
+    const sp = new URLSearchParams();
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (value === undefined || value === null) continue;
+      if (Array.isArray(value)) {
+        for (const v of value) sp.append(key, v);
+      } else {
+        sp.set(key, value);
+      }
     }
+    const qs = sp.toString();
+    return redirect(qs ? `/home?${qs}` : "/home");
   }
-  const qs = sp.toString();
-  return redirect(qs ? `/home?${qs}` : "/home");
+  return redirect("/home");
 }
