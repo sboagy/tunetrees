@@ -1,5 +1,6 @@
 "use client";
 
+import { logVerbose } from "@/lib/logging";
 import type {
   ColumnSizingInfoState,
   ColumnSizingState,
@@ -25,8 +26,8 @@ import {
 import type { ITuneOverview, TablePurpose } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
+import { tableStateCacheService } from "./table-state-cache";
 import { get_columns } from "./TuneColumns";
-import { logVerbose } from "@/lib/logging";
 
 export const globalFlagManualSorting = false;
 
@@ -73,6 +74,7 @@ export const saveTableState = async (
   tablePurpose: TablePurpose,
   playlistId: number,
   overrides?: Partial<ITableStateExtended>,
+  forceImmediate?: boolean,
 ): Promise<number> => {
   const baseState = table.getState() as unknown as ITableStateExtended;
   // Merge only provided overrides (ignore undefined)
@@ -113,16 +115,28 @@ export const saveTableState = async (
   }
 
   logVerbose(
-    `LF7 saveTableState calling updateTableStateInDb: tablePurpose=${tablePurpose}`,
+    `LF7 saveTableState ${forceImmediate ? "(immediate)" : "(cached)"}: tablePurpose=${tablePurpose}`,
   );
-  const status = await updateTableStateInDb(
+
+  if (forceImmediate) {
+    // For critical events, flush immediately
+    const status = await updateTableStateInDb(
+      userId,
+      "full",
+      tablePurpose,
+      playlistId,
+      mergedState as unknown as TableState,
+    );
+    return status;
+  }
+  // For normal events, use cached batching
+  tableStateCacheService.cacheUpdate(
     userId,
-    "full",
     tablePurpose,
     playlistId,
     mergedState as unknown as TableState,
   );
-  return status;
+  return 200; // Return success immediately for cached updates
 };
 
 export function TunesTableComponent({
