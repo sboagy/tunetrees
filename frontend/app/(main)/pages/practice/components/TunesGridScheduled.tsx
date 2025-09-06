@@ -131,6 +131,27 @@ export default function TunesGridScheduled({
     try {
       const iso = d.toISOString();
       window.localStorage.setItem("TT_REVIEW_SITDOWN_DATE", iso);
+      // Manual flag: set when chosen date is not 'today' local calendar day; cleared otherwise.
+      try {
+        const now = new Date();
+        const isToday =
+          d.getFullYear() === now.getFullYear() &&
+          d.getMonth() === now.getMonth() &&
+          d.getDate() === now.getDate();
+        if (isToday) {
+          window.localStorage.removeItem("TT_REVIEW_SITDOWN_MANUAL");
+        } else {
+          window.localStorage.setItem("TT_REVIEW_SITDOWN_MANUAL", "true");
+        }
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[SitdownPersist] set date", {
+            iso,
+            manual: !isToday,
+          });
+        }
+      } catch {
+        /* non-fatal */
+      }
       // Also update the global override used by getSitdownDateFromBrowser()
       try {
         (

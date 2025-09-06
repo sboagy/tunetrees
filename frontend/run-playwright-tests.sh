@@ -59,6 +59,11 @@ mkdir -p "$PLAYWRIGHT_OUTPUT_DIR_ABS_PATH"
 # Generate timestamp for unique folder naming
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
+# Strip any leading standalone "--" (npm run passes one when forwarding args)
+while [ $# -gt 0 ] && [ "$1" = "--" ]; do
+  shift
+done
+
 # Determine output subdirectory name
 if [ $# -eq 0 ]; then
   # No arguments - use timestamp only

@@ -99,7 +99,9 @@
             "type": "chrome",
             "request": "launch",
             "name": "Next: Chrome",
-            "url": "https://localhost:3000/home",
+            "url": "https://localhost:3000/home?tt_sitdown=2024-12-31T06:47:57.671-05:00",
+            // "url": "http://localhost:3000/?tt_sitdown=2024-12-31T06:47:57.671-05:00",
+            // "url": "https://localhost:3000/home",
             "webRoot": "${workspaceFolder}/frontend"
         },
         {

@@ -1,13 +1,13 @@
-import { test, expect } from "@playwright/test";
+import { restartBackend } from "@/test-scripts/global-setup";
+import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+import { getStorageState } from "@/test-scripts/storage-state";
+import { logBrowserContextEnd, logTestEnd } from "@/test-scripts/test-logging";
+import { expect, test } from "@playwright/test";
 import {
   setTestDateTime,
   setTestDefaults,
 } from "../test-scripts/set-test-defaults";
 import { TuneTreesPageObject } from "../test-scripts/tunetrees.po";
-import { restartBackend } from "@/test-scripts/global-setup";
-import { getStorageState } from "@/test-scripts/storage-state";
-import { applyNetworkThrottle } from "@/test-scripts/network-utils";
-import { logBrowserContextEnd, logTestEnd } from "@/test-scripts/test-logging";
 
 // Extend the Window interface to include __TT_REVIEW_SITDOWN_DATE__
 declare global {
@@ -34,7 +34,8 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     await setTestDefaults(page);
     await applyNetworkThrottle(page);
     pageObject = new TuneTreesPageObject(page);
-    // await pageObject.gotoMainPage();
+    // Ensure main page (and baseline table/grid) is loaded before each test to reduce flakiness.
+    await pageObject.gotoMainPage();
   });
 
   test.afterEach(async ({ page }, testInfo) => {
@@ -46,13 +47,19 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
 
   test("User sees scheduled tunes for today", async () => {
     await pageObject.navigateToPracticeTab();
-    // Check that scheduled tunes are visible
-    const rowCount = await pageObject.tunesGridRows.count();
-    expect(rowCount).toBeGreaterThan(1); // 1 header + at least 1 tune
+    // Wait until at least 1 data row (header + >=1 tune) appears
+    let rowCount = await pageObject.tunesGridRows.count();
+    let tries = 0;
+    while (rowCount < 2 && tries < 30) {
+      await pageObject.page.waitForTimeout(500);
+      rowCount = await pageObject.tunesGridRows.count();
+      tries++;
+    }
+    expect(rowCount).toBeGreaterThan(1); // header + at least 1 tune
   });
 
   test("User submits quality feedback and tunes are rescheduled", async () => {
-    await pageObject.gotoMainPage();
+    // Main page already loaded in beforeEach; navigate directly to Practice tab.
     await pageObject.navigateToPracticeTabDirectly();
     const feedbacks = ["hard", "good", "(Not Set)", "again"];
 
@@ -164,8 +171,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     const isoTomorrow = tomorrow.toISOString();
     await setTestDateTime(page, isoTomorrow);
 
-    pageObject = new TuneTreesPageObject(page);
-    await pageObject.gotoMainPage();
+    // Re-use existing pageObject (already initialized & main page loaded). Navigate to Practice tab.
     await pageObject.navigateToPracticeTabDirectly();
     // Check that only tunes scheduled for the new day are shown
     const rowCount = await pageObject.tunesGridRows.count();

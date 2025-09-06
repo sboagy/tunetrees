@@ -12,11 +12,79 @@ export function getSitdownDateFromBrowser(): Date {
     const w = window as typeof window & {
       __TT_REVIEW_SITDOWN_DATE__?: string;
     };
-    const dateString =
+    // Manual override flag: set when user explicitly chooses a non-today date.
+    // Cleared automatically when user reverts to Today via chooser or when explicit date equals real today.
+    // manualFlag semantics:
+    // "true" => user explicitly selected a non-today calendar day; suppress midnight auto-rollover
+    const rawStored =
       w.__TT_REVIEW_SITDOWN_DATE__ ||
-      window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE") ||
-      new Date().toISOString();
-    const sitdownDate = new Date(convertToIsoUTCString(dateString));
+      window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE");
+    const fallbackNowIso = new Date().toISOString();
+    const dateString = rawStored || fallbackNowIso;
+    const parsed = new Date(convertToIsoUTCString(dateString));
+    let sitdownDate = parsed;
+    if (
+      !sitdownDate ||
+      !(sitdownDate instanceof Date) ||
+      Number.isNaN(sitdownDate.getTime())
+    ) {
+      // Corrupt stored value – reset to now and clear manual flag.
+      sitdownDate = new Date();
+      window.localStorage.setItem(
+        "TT_REVIEW_SITDOWN_DATE",
+        sitdownDate.toISOString(),
+      );
+      window.localStorage.removeItem("TT_REVIEW_SITDOWN_MANUAL");
+    } else {
+      // Auto rollover: if not manually pinned AND stored calendar day < local today, advance to today.
+      try {
+        const now = new Date();
+        const storedDayKey = `${sitdownDate.getFullYear()}-${sitdownDate.getMonth()}-${sitdownDate.getDate()}`;
+        const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+        if (storedDayKey !== todayKey) {
+          // Only rollover forward (stale yesterday or older) when not manual.
+          const storedTime = sitdownDate.getTime();
+          // Build midnight boundaries for diff test.
+          const todayMidnight = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+          );
+          const manualFlag = window.localStorage.getItem(
+            "TT_REVIEW_SITDOWN_MANUAL",
+          );
+          if (
+            (!manualFlag || manualFlag !== "true") &&
+            storedTime < todayMidnight.getTime()
+          ) {
+            const advanced = new Date(now); // keep current time-of-day; downstream UI normalizes to noon where needed.
+            window.localStorage.setItem(
+              "TT_REVIEW_SITDOWN_DATE",
+              advanced.toISOString(),
+            );
+            try {
+              (
+                w as typeof w & { __TT_REVIEW_SITDOWN_DATE__?: string }
+              ).__TT_REVIEW_SITDOWN_DATE__ = advanced.toISOString();
+            } catch {
+              /* ignore */
+            }
+            sitdownDate = advanced;
+            if (process.env.NODE_ENV !== "production") {
+              console.debug(
+                "[SitdownRollover] advanced stale sitdown to today",
+                {
+                  previous: dateString,
+                  advanced: advanced.toISOString(),
+                },
+              );
+            }
+          }
+        }
+      } catch {
+        // Non-fatal; leave existing sitdownDate in place.
+      }
+    }
     if (
       !sitdownDate ||
       !(sitdownDate instanceof Date) ||
@@ -82,6 +150,21 @@ export const SitDownDateProvider = ({ children }: { children: ReactNode }) => {
       setSitDownDate(new Date());
     }
   }, []); // the effect runs only once, after the initial render of the component.
+
+  // Listen for external sitdown updates (tests or dev console helper)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = () => {
+      try {
+        const updated = getSitdownDateFromBrowser();
+        setSitDownDate(updated);
+      } catch (error) {
+        console.warn("[SitdownDateProvider] failed external refresh", error);
+      }
+    };
+    window.addEventListener("tt-sitdown-updated", handler);
+    return () => window.removeEventListener("tt-sitdown-updated", handler);
+  }, []);
 
   return (
     <SitDownDateContext.Provider

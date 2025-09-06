@@ -60,6 +60,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     await ttPO.gotoMainPage();
     // await navigateToRepertoireTabStandalone(page);
     await page.waitForLoadState("domcontentloaded");
+    await ttPO.expectTableStatusBasic();
 
     // Wait for the grid to be visible
     const tunesGrid = page.locator("table").first();
@@ -209,7 +210,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
 
     // Test sorting by Type column first using Page Object locators (button-based to avoid role brittleness)
     // Ensure the Type header button is scrolled into view (header can be horizontally off-screen)
-    await ttPO.typeColumnHeaderSortButton.scrollIntoViewIfNeeded();
+    await ttPO.safeScrollIntoView(ttPO.typeColumnHeaderSortButton);
     await expect(ttPO.typeColumnHeaderSortButton).toBeVisible({
       timeout: 15000,
     });
@@ -217,7 +218,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
 
     // Then sort by Title while holding shift (multicolumn)
-    await ttPO.titleColumnHeaderSortButton.scrollIntoViewIfNeeded();
+    await ttPO.safeScrollIntoView(ttPO.titleColumnHeaderSortButton);
     await expect(ttPO.titleColumnHeaderSortButton).toBeVisible({
       timeout: 15000,
     });

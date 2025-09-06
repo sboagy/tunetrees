@@ -22,54 +22,69 @@ import { Toaster } from "./ui/toaster";
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 
-const fetchWithTimeout = (url: string, options = {}, timeout = 3000) => {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
-    clearTimeout(id),
-  );
-};
-
-const loadTestBrowserProperties = () => {
-  const nodeEnv = process.env.NODE_ENV;
-  if (typeof window !== "undefined" && nodeEnv === "development") {
-    fetchWithTimeout("/test-browser.properties", {}, 600000)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch test-browser.properties");
-        const text = res.text();
-        return text;
-      })
-      .then((text) => {
-        const lines = text.split("\n");
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith("#")) continue;
-          const [key, ...rest] = trimmed.split("=");
-          const value = rest.join("=").trim();
-          if (key === "TT_REVIEW_SITDOWN_DATE" && value) {
-            if (typeof window.__TT_REVIEW_SITDOWN_DATE__ === "undefined") {
-              window.__TT_REVIEW_SITDOWN_DATE__ = value;
-            }
-            window.localStorage.setItem("TT_REVIEW_SITDOWN_DATE", value);
-            console.assert(
-              window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE") === value,
-              "TT_REVIEW_SITDOWN_DATE in localStorage does not match the expected value",
-            );
-            // if (!window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE")) {
-            //   window.localStorage.setItem("TT_REVIEW_SITDOWN_DATE", value);
-            // }
-          }
-          // Add more keys as needed
+// Inject global helper & optional URL param override.
+function initSitdownDateHelpers() {
+  if (typeof window === "undefined") return;
+  const w = window as typeof window & {
+    __TT_REVIEW_SITDOWN_DATE__?: string;
+    __TT_SET_SITDOWN_DATE__?: (iso: string, manual?: boolean) => void;
+  };
+  if (!w.__TT_SET_SITDOWN_DATE__) {
+    w.__TT_SET_SITDOWN_DATE__ = (iso: string, manual = true) => {
+      try {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) {
+          console.warn("[SitdownHelper] Invalid date supplied", iso);
+          return;
         }
-      })
-      .catch((error) => {
-        if (error.name === "AbortError") {
-          console.warn("Fetch for test-browser.properties timed out");
+        w.__TT_REVIEW_SITDOWN_DATE__ = iso;
+        window.localStorage.setItem("TT_REVIEW_SITDOWN_DATE", iso);
+        if (manual) {
+          window.localStorage.setItem("TT_REVIEW_SITDOWN_MANUAL", "true");
+        } else {
+          window.localStorage.removeItem("TT_REVIEW_SITDOWN_MANUAL");
         }
-        // else ignore or handle other errors
-      });
+        window.dispatchEvent(new Event("tt-sitdown-updated"));
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[SitdownHelper] set", { iso, manual });
+        }
+      } catch (error) {
+        console.warn("[SitdownHelper] failed", error);
+      }
+    };
   }
-};
+  // URL param formats (non-production only):
+  //   ?tt_sitdown=ISO_STRING[,auto]  -> set date (manual unless ,auto)
+  //   ?tt_sitdown=reset              -> clear stored date & manual flag (next load auto rolls to today)
+  try {
+    if (process.env.NODE_ENV !== "production") {
+      const url = new URL(window.location.href);
+      const param = url.searchParams.get("tt_sitdown");
+      if (param) {
+        if (param === "reset") {
+          window.localStorage.removeItem("TT_REVIEW_SITDOWN_DATE");
+          window.localStorage.removeItem("TT_REVIEW_SITDOWN_MANUAL");
+          w.__TT_REVIEW_SITDOWN_DATE__ = undefined;
+          window.dispatchEvent(new Event("tt-sitdown-updated"));
+          if (
+            process.env.NODE_ENV === "development" ||
+            process.env.NODE_ENV === "test"
+          ) {
+            console.debug("[SitdownHelper] reset via query param");
+          }
+        } else {
+          // Allow optional suffix ",auto" to avoid setting manual flag
+          const [iso, mode] = param.split(",");
+          if (iso) {
+            w.__TT_SET_SITDOWN_DATE__(iso, mode !== "auto");
+          }
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
   const { data: session } = useSession();
@@ -77,7 +92,7 @@ const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
     ? Number.parseInt(session.user.id)
     : undefined;
   useEffect(() => {
-    loadTestBrowserProperties();
+    initSitdownDateHelpers();
   }, []);
   return (
     <SitDownDateProvider>

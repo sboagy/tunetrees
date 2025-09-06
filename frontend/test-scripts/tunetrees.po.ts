@@ -1107,6 +1107,62 @@ export class TuneTreesPageObject {
       }
     });
   }
+
+  async setSitdownDate(iso: string, manual: boolean = true): Promise<void> {
+    // Runtime helper: if global setter exists use it; else set directly then dispatch event.
+    await this.page.evaluate(
+      (args) => {
+        const [d, m] = args as [string, boolean];
+        const w = window as unknown as {
+          __TT_SET_SITDOWN_DATE__?: (iso: string, manual?: boolean) => void;
+          __TT_REVIEW_SITDOWN_DATE__?: string;
+        };
+        if (w.__TT_SET_SITDOWN_DATE__) {
+          w.__TT_SET_SITDOWN_DATE__(d, m);
+        } else {
+          w.__TT_REVIEW_SITDOWN_DATE__ = d;
+          localStorage.setItem("TT_REVIEW_SITDOWN_DATE", d);
+          if (m) localStorage.setItem("TT_REVIEW_SITDOWN_MANUAL", "true");
+          else localStorage.removeItem("TT_REVIEW_SITDOWN_MANUAL");
+          window.dispatchEvent(new Event("tt-sitdown-updated"));
+        }
+      },
+      [iso, manual],
+    );
+  }
+
+  // Basic table status assertion with tolerant pattern (handles minor wording variations)
+  async expectTableStatusBasic(timeoutMs = 20000) {
+    const deadline = Date.now() + timeoutMs;
+    const pattern = /row\(s\) selected|row\(s\) loaded|row\(s\) total/i;
+    while (Date.now() < deadline) {
+      try {
+        const txt = (await this.tableStatus.textContent())?.trim() || "";
+        if (pattern.test(txt)) return;
+      } catch {
+        /* ignore and retry */
+      }
+      await this.page.waitForTimeout(250);
+    }
+    const finalText = (await this.tableStatus.textContent()) || "<empty>";
+    throw new Error(
+      `expectTableStatusBasic(): did not observe expected pattern; last='${finalText}'`,
+    );
+  }
+
+  // Safer scroll into view with stale element retry (for virtualized headers / cells)
+  async safeScrollIntoView(locator: Locator, attempts = 3) {
+    for (let i = 0; i < attempts; i++) {
+      try {
+        await locator.scrollIntoViewIfNeeded();
+        await expect(locator).toBeVisible();
+        return;
+      } catch (error) {
+        if (i === attempts - 1) throw error;
+        await this.page.waitForTimeout(200);
+      }
+    }
+  }
 }
 
 export interface INavigateToPracticeTabStandaloneParams {
