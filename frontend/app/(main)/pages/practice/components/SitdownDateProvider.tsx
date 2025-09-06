@@ -53,6 +53,28 @@ export const SitDownDateProvider = ({ children }: { children: ReactNode }) => {
     // Initialize sitdown date from browser context
     try {
       const date = getSitdownDateFromBrowser();
+      // Debugging aid: print raw source and derived local/UTC strings when not in prod
+      try {
+        if (
+          process.env.NODE_ENV !== "production" &&
+          typeof window !== "undefined"
+        ) {
+          const win = window as Window & {
+            __TT_REVIEW_SITDOWN_DATE__?: string;
+          };
+          const raw =
+            win.__TT_REVIEW_SITDOWN_DATE__ ??
+            window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE");
+          console.debug("[SitdownDebug] raw sitdown string:", raw);
+          console.debug("[SitdownDebug] parsed (toString):", date.toString());
+          console.debug(
+            "[SitdownDebug] parsed (toLocaleString):",
+            date.toLocaleString(),
+          );
+        }
+      } catch {
+        // swallow debug errors
+      }
       setSitDownDate(date);
     } catch (error) {
       console.error("Failed to initialize sitdown date:", error);
