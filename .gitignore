@@ -367,3 +367,6 @@ tunetrees_test.sqlite3-journal
 frontend/playwright-reports-ci
 fsrs_fixup_report_apply.txt
 fsrs_fixup_report.txt
+# For now, ignore my personal todo.md, especially since changing it will cause
+# unnecessary commits.
+todo.md
