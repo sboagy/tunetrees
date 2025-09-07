@@ -57,7 +57,11 @@ function initSitdownDateHelpers() {
   //   ?tt_sitdown=ISO_STRING[,auto]  -> set date (manual unless ,auto)
   //   ?tt_sitdown=reset              -> clear stored date & manual flag (next load auto rolls to today)
   try {
-    if (process.env.NODE_ENV !== "production") {
+    // Allow parsing in non-production OR when running on localhost (CI Playwright runs production build at localhost)
+    if (
+      process.env.NODE_ENV !== "production" ||
+      window.location.hostname === "localhost"
+    ) {
       const url = new URL(window.location.href);
       const param = url.searchParams.get("tt_sitdown");
       if (param) {
