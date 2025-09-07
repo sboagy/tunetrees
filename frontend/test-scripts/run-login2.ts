@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { fileURLToPath } from "node:url";
 
-import type { Cookie, Page } from "@playwright/test";
+import { expect, type Cookie, type Page } from "@playwright/test";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const __filename = fileURLToPath(import.meta.url);
@@ -22,30 +22,28 @@ export async function runLoginStandalone(
     throw new Error("No login credentials found");
   }
 
-  await page.waitForTimeout(500);
-
   const signInButton = page.getByRole("button", { name: "Sign in" });
-  await signInButton.isVisible();
-  await signInButton.isEnabled();
+  await expect(signInButton).toBeAttached();
+  await expect(signInButton).toBeVisible();
+  await expect(signInButton).toBeEnabled();
 
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForTimeout(1000);
+  await signInButton.click();
 
   const userEmailLocator = page.getByTestId("user_email");
-  await userEmailLocator.isVisible();
+  await expect(userEmailLocator).toBeAttached();
+  await expect(userEmailLocator).toBeVisible();
   // await userEmailLocator.isEnabled();
 
   await userEmailLocator.fill(user || "");
   await userEmailLocator.press("Tab");
 
   const passwordEntryBox = page.getByTestId("user_password");
-  await passwordEntryBox.isVisible();
+  await expect(passwordEntryBox).toBeVisible();
   // await passwordEntryBox.isEnabled();
 
   await passwordEntryBox.fill(pw || "");
   await page.waitForTimeout(100);
   await passwordEntryBox.press("Tab");
-  await page.waitForTimeout(1000);
 
   // await page.waitForFunction(
   //   (button) => {
@@ -56,13 +54,12 @@ export async function runLoginStandalone(
   //   { timeout: 20000 }, // Increased timeout for CSRF token fetch
   // );
 
-  const signInButton2 = page.getByRole("button", {
-    name: "Sign In",
-    exact: true,
-  });
-  await signInButton2.isVisible();
-  await signInButton2.isEnabled();
-  await signInButton2.click();
+  const loginSubmitButton = page.getByTestId("login-submit-button");
+  await expect(loginSubmitButton).toBeAttached();
+  await expect(loginSubmitButton).toBeVisible();
+  await expect(loginSubmitButton).toBeEnabled();
+
+  await loginSubmitButton.click();
   await page.waitForTimeout(500);
 
   let sessionCookie: Cookie | undefined;

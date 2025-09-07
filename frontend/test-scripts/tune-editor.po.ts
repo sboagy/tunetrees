@@ -468,6 +468,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
       // Close editor if visible
       try {
         const cancelBtn = this.page.getByRole("button", { name: "Cancel" });
+        await expect(cancelBtn).toBeVisible();
         if (await cancelBtn.isVisible({ timeout: 500 }).catch(() => false)) {
           await this.clickWithTimeAfter(cancelBtn);
           await this.form

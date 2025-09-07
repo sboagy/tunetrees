@@ -32,7 +32,12 @@ test.beforeEach(async ({ page }, testInfo) => {
   // Navigate directly to /home to avoid redirect interruption
   await navigateToPageWithRetry(page, "/home");
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForTimeout(2_000);
+  const homeTuneTreesLogo = page.getByRole("button", {
+    name: "Home TuneTrees",
+  });
+  await expect(homeTuneTreesLogo).toBeVisible();
+  const toggleThemeButton = page.getByRole("button", { name: "Toggle theme" });
+  await expect(toggleThemeButton).toBeVisible();
 
   // Always perform login as part of the complete workflow test
   await runLoginStandalone(
@@ -43,7 +48,12 @@ test.beforeEach(async ({ page }, testInfo) => {
 
   await page.waitForLoadState("domcontentloaded");
 
-  await page.waitForTimeout(2000); // Wait for the page to stabilize
+  const ttTableStatus = page.getByTestId("tt-table-status");
+  await expect(ttTableStatus).toBeVisible();
+  await expect(ttTableStatus).toContainText("row(s) selected");
+  const ttImportButton = page.getByTestId("tt-import-button");
+  await expect(ttImportButton).toBeVisible();
+  await expect(ttImportButton).toBeEnabled();
 
   // // I shouldn't have to do this!!! But it seems to be necessary?
   // await navigateToRepertoireTabStandalone(page);
