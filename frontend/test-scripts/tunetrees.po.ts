@@ -376,6 +376,8 @@ export class TuneTreesPageObject {
           for (let i = 1; i <= maxCheck; i++) {
             const row = this.page.getByRole("row").nth(i);
             const titleCell = row.getByRole("cell").nth(titleColIdx);
+            await expect(titleCell).toBeVisible();
+            await expect(titleCell).toContainText(tuneTitle);
             const text = (await titleCell.textContent())?.trim();
             if (text === tuneTitle) {
               const idCell = row.getByRole("cell").nth(1);
@@ -978,6 +980,32 @@ export class TuneTreesPageObject {
       if (msg.type() === "error") {
         const errorText = msg.text();
         const location = msg.location();
+
+        // Heuristic filter for benign transient Next.js server-action fetch aborts / early failures.
+        // These typically manifest as `TypeError: Failed to fetch` with a stack/URL pointing at
+        // router-reducer server-action code or devtools interception layer before the request is
+        // fully established. They are noisy but not actionable for our E2E tests and usually
+        // recover on the next retry/render. We keep an opt-in env flag to surface them when
+        // debugging deeper network issues.
+        const isTransientServerActionFetch =
+          (errorText.includes("TypeError: Failed to fetch") ||
+            errorText === "Failed to fetch" ||
+            /Failed to fetch/.test(errorText)) &&
+          (location.url.includes(
+            "router-reducer/reducers/server-action-reducer.js",
+          ) ||
+            location.url.includes(
+              "next-devtools/userspace/app/errors/intercept-console-error.js",
+            ));
+        const forceLogFetch =
+          process.env.PLAYWRIGHT_LOG_FETCH_ERRORS === "true";
+        if (isTransientServerActionFetch && !forceLogFetch) {
+          const timestamp = new Date().toISOString();
+          console.log(
+            `[${timestamp}] (ignored transient fetch) ${errorText} @ ${location.url}`,
+          );
+          return; // swallow benign transient fetch error
+        }
 
         // Filter out the known 404 for user preferences to reduce log noise
         if (
