@@ -19,7 +19,7 @@ import { Toaster } from "./ui/toaster";
 // import Footer from "./Footer";
 // import Header from "./Header";
 
-import { useEffect } from "react";
+// Note: no hooks currently required here after moving initSitdownDateHelpers to render path.
 import { useSession } from "next-auth/react";
 
 // Inject global helper & optional URL param override.
@@ -91,9 +91,11 @@ const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
   const userId = session?.user?.id
     ? Number.parseInt(session.user.id)
     : undefined;
-  useEffect(() => {
-    initSitdownDateHelpers();
-  }, []);
+  // Run helper immediately during first render (still guarded for browser) so that
+  // localStorage + globals are available before tests or subsequent code reads them.
+  // This replaces the previous useEffect timing which introduced a race for URL-param
+  // based initialization assertions executed immediately after navigation/redirect.
+  initSitdownDateHelpers();
   return (
     <SitDownDateProvider>
       <CurrentPlaylistProvider userId={userId}>
