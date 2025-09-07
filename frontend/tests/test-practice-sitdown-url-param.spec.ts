@@ -34,8 +34,12 @@ test.describe("Practice sitdown date URL param override", () => {
     await setTestDefaults(page);
     await page.goto(`/?tt_sitdown=${encodeURIComponent(isoTomorrow)}`);
 
+    // allow the app a moment to process the tt_sitdown query param
+    await page.waitForTimeout(1000);
+
     const ttPO = new TuneTreesPageObject(page);
-    await ttPO.practiceTabTrigger.click();
+    await ttPO.clickWithTimeAfter(ttPO.practiceTabTrigger);
+
     const labelManual = await getChooserLabel(ttPO);
     // Allow Tomorrow, Today (timezone normalization), or explicit date
     expect(labelManual).toMatch(/Tomorrow|Today|\d{4}-\d{2}-\d{2}/);
@@ -67,6 +71,9 @@ test.describe("Practice sitdown date URL param override", () => {
     await setTestDefaults(page);
     await page.goto(`/?tt_sitdown=${encodeURIComponent(todayIso)}`);
 
+    // allow the app a moment to process the tt_sitdown query param
+    await page.waitForTimeout(1000);
+
     // Should end up on /home retaining the query param (or at least having initialized storage)
     await page.waitForURL(/\/home(\?|$)/);
     // Confirm localStorage picked up the value
@@ -87,6 +94,10 @@ test.describe("Practice sitdown date URL param override", () => {
     const todayIso = toNoonIso(now);
     await setTestDefaults(page);
     await page.goto(`/?tt_sitdown=${encodeURIComponent(todayIso)}`);
+
+    // allow the app a moment to process the tt_sitdown query param
+    await page.waitForTimeout(1000);
+
     await page.waitForURL(/\/home(\?|$)/);
     // Confirm it is set
     let stored = await page.evaluate(() =>

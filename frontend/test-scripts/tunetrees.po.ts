@@ -325,25 +325,25 @@ export class TuneTreesPageObject {
   }
 
   async navigateToTune(tuneTitle: string) {
-    await this.mainTabGroup.waitFor({ state: "visible" });
-
-    await this.repertoireTabTrigger.waitFor({
-      state: "visible",
-    });
+    await expect(this.mainTabGroup).toBeAttached();
+    await expect(this.mainTabGroup).toBeVisible();
 
     await this.ensureClickable(this.repertoireTabTrigger);
     await this.clickWithTimeAfter(this.repertoireTabTrigger);
 
-    // Wait for the filter input to be visible and enabled before interacting with it
-    await expect(this.filterInput).toBeVisible({ timeout: 10000 });
-    await expect(this.filterInput).toBeEnabled({ timeout: 10000 });
-
     await this.ensureClickable(this.filterInput);
+    await this.clickWithTimeAfter(this.filterInput);
     // The ensureClickable helper already confirms the input is ready.
     // We can now safely interact with it.
     // Using `fill` is generally more reliable than `click` then `type` as it clears the field first.
     // Playwright's `fill` has built-in auto-waiting, making manual waits unnecessary.
-    await this.filterInput.fill(tuneTitle);
+    // await this.filterInput.fill(tuneTitle);
+    await this.filterInput.fill("");
+    // Small delay to ensure the field is cleared before entering new text
+    await this.page.waitForTimeout(100);
+    // Use pressSequentially to simulate more realistic typing with a slight delay between keystrokes
+    await this.filterInput.pressSequentially(tuneTitle, { delay: 10 });
+    await this.page.waitForTimeout(500);
 
     await this.waitForTablePopulationToStart();
 
@@ -358,7 +358,8 @@ export class TuneTreesPageObject {
     const clickDesiredTune = async () => {
       let currentRowCount = await this.tunesGridRows.count();
       let attempts = 0;
-      while (currentRowCount < 2 && attempts < 10) {
+
+      while (currentRowCount < 2 && attempts < 30) {
         await this.page.waitForTimeout(1000);
         currentRowCount = await this.tunesGridRows.count();
         attempts++;
@@ -629,8 +630,8 @@ export class TuneTreesPageObject {
   // Ensures a locator is truly clickable: visible, attached, enabled, scrolled into view,
   // and passes a Playwright trial click probe before performing a real click elsewhere.
   async ensureClickable(locator: Locator, timeout = 10000): Promise<void> {
-    await locator.waitFor({ state: "visible", timeout });
-    await locator.waitFor({ state: "attached", timeout });
+    await expect(locator).toBeAttached();
+    await expect(locator).toBeVisible({ timeout });
     await expect(locator).toBeEnabled({ timeout });
 
     await this.page.waitForLoadState("domcontentloaded");
@@ -663,7 +664,7 @@ export class TuneTreesPageObject {
     }
     // One final attempt to surface a clear error
     try {
-      await locator.click({ trial: true, timeout: 500 });
+      await this.clickWithTimeAfter(locator);
     } catch (_error) {
       lastErr = _error;
     }

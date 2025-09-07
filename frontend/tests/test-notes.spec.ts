@@ -1,3 +1,4 @@
+import { checkHealth } from "@/test-scripts/check-servers";
 import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
@@ -27,6 +28,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   // await page.waitForTimeout(1);
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
+  await checkHealth();
 });
 
 test.afterEach(async ({ page }, testInfo) => {
@@ -35,6 +37,7 @@ test.afterEach(async ({ page }, testInfo) => {
   await page.waitForTimeout(1_000);
   logBrowserContextEnd();
   logTestEnd(testInfo);
+  await checkHealth();
 });
 
 test("test-notes-1", async ({ page }) => {

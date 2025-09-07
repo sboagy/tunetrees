@@ -10,6 +10,7 @@ import {
   logBrowserContextStart,
   logBrowserContextEnd,
 } from "../test-scripts/test-logging";
+import { checkHealth } from "@/test-scripts/check-servers";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -23,27 +24,16 @@ test.beforeEach(async ({ page }, testInfo) => {
   logTestStart(testInfo);
   logBrowserContextStart();
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
-
-  // Add this at the start to see ALL requests
-  // await page.route("**", async (route) => {
-  //   const url = route.request().url();
-  //   console.log("===> route.request().url() <=== url: ", url);
-  //   if (url.includes("thesession.org")) {
-  //     console.log("DETECTED thesession.org URL:", url);
-  //   }
-  //   await route.continue();
-  // });
-
-  // doConsolelogs(page, testInfo);
-  // await page.waitForTimeout(1);
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
+  await checkHealth();
 });
 
 test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
   await page.waitForTimeout(1_000);
+  await checkHealth();
   logBrowserContextEnd();
   logTestEnd(testInfo);
 });
@@ -61,6 +51,7 @@ test.describe.serial("Add Tune Tests", () => {
     await ttPO.clickWithTimeAfter(ttPO.catalogTab);
 
     // await for the tab to be change
+    await expect(ttPO.addToRepertoireButton).toBeAttached();
     await expect(ttPO.addToRepertoireButton).toBeVisible();
 
     await ttPO.clickWithTimeAfter(ttPO.addTuneButton);

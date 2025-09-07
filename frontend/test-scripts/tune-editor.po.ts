@@ -296,9 +296,12 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
     if (tagName === "input") {
       // Fill with resilience against React re-renders wiping the field
       const fillAndVerify = async () => {
+        await expect(formField.locator).toBeAttached();
+        await expect(formField.locator).toBeVisible();
+        await expect(formField.locator).toBeEditable();
         await formField.locator.fill(formField.modification);
         // Brief pause to allow any onChange handlers to run
-        await this.page.waitForTimeout(10);
+        await this.page.waitForTimeout(50);
         await formField.locator.press("Tab");
         await this.page.waitForTimeout(10);
         // Verify the value stuck; if not, retry below
@@ -572,7 +575,12 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
   }
 
   async pressCancel(): Promise<Response> {
+    const cancelButton = this.page.getByRole("button", { name: "Cancel" });
+    await expect(cancelButton).toBeAttached();
+    await expect(cancelButton).toBeVisible();
+    await expect(cancelButton).toBeEnabled();
     const response = await this.pressButton("Cancel");
+    await this.page.waitForTimeout(500);
     return response;
   }
 }
