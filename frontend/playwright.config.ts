@@ -187,7 +187,8 @@ export default defineConfig({
         TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
       },
       // In CI use HTTP health URL; locally just wait for port to open (avoids TLS validation issues)
-      url: isCI ? "http://localhost:3000/api/health" : undefined,
+      // Use 127.0.0.1 consistently (baseURL also uses 127.0.0.1 in CI) to avoid hostname mismatches in logic relying on window.location.hostname
+      url: isCI ? "http://127.0.0.1:3000/api/health" : undefined,
       port: isCI ? undefined : 3000,
 
       // Playwright seems to trip up due to SSL errors (because the self-signed certificate

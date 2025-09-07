@@ -60,7 +60,9 @@ function initSitdownDateHelpers() {
     // Allow parsing in non-production OR when running on localhost (CI Playwright runs production build at localhost)
     if (
       process.env.NODE_ENV !== "production" ||
-      window.location.hostname === "localhost"
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      window.location.hostname === "::1" /* IPv6 loopback */
     ) {
       const url = new URL(window.location.href);
       const param = url.searchParams.get("tt_sitdown");
