@@ -338,11 +338,21 @@ export class TuneTreesPageObject {
     // Using `fill` is generally more reliable than `click` then `type` as it clears the field first.
     // Playwright's `fill` has built-in auto-waiting, making manual waits unnecessary.
     // await this.filterInput.fill(tuneTitle);
-    await this.filterInput.fill("");
-    // Small delay to ensure the field is cleared before entering new text
-    await this.page.waitForTimeout(100);
+
+    await expect(async () => {
+      await this.filterInput.fill("");
+      await this.page.waitForTimeout(100);
+      await expect(this.filterInput).toHaveValue("");
+    }).toPass({
+      // Probe, wait 1s, probe, wait 2s, probe, wait 10s, probe, wait 10s, probe
+      // ... Defaults to [100, 250, 500, 1000].
+      intervals: [100, 250, 500, 1000],
+      timeout: 60_000,
+    });
+
     // Use pressSequentially to simulate more realistic typing with a slight delay between keystrokes
-    await this.filterInput.pressSequentially(tuneTitle, { delay: 10 });
+    // await this.filterInput.pressSequentially(tuneTitle, { delay: 10 });
+    await this.filterInput.fill(tuneTitle);
     await this.page.waitForTimeout(500);
 
     await this.waitForTablePopulationToStart();
