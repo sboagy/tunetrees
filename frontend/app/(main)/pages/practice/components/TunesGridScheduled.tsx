@@ -109,6 +109,11 @@ export default function TunesGridScheduled({
     IPracticeQueueRow[]
   >([]);
 
+  // Option B tracking
+  const lastSubmitUtcRef = useRef<string | null>(null);
+  const loadedTomorrowOnceRef = useRef<boolean>(false);
+  const tomorrowGeneratedAtRef = useRef<string | null>(null);
+
   const lastFetchedRefreshId = useRef<number | null>(null);
   const lastFetchedPlaylistId = useRef<number | null>(null);
   // Track the last value of `showSubmitted` used for the most recent snapshot fetch.
@@ -233,6 +238,59 @@ export default function TunesGridScheduled({
           new Date(sitdownDate),
           false,
         );
+        // Capture tomorrow snapshot metadata if previewing tomorrow
+        try {
+          const today = new Date();
+          const base = new Date(sitdownDate);
+          const isTomorrowPreview =
+            base.getFullYear() === today.getFullYear() &&
+            base.getMonth() === today.getMonth() &&
+            base.getDate() === today.getDate() + 1;
+          if (isTomorrowPreview && snapshotEntries.length > 0) {
+            const g = snapshotEntries[0] as { generated_at?: string };
+            if (g.generated_at) {
+              tomorrowGeneratedAtRef.current = g.generated_at;
+              loadedTomorrowOnceRef.current = true;
+              // If stale relative to last submit, force regen now before user sees outdated data
+              if (lastSubmitUtcRef.current) {
+                const genAt = Date.parse(g.generated_at);
+                const lastSub = Date.parse(lastSubmitUtcRef.current);
+                if (
+                  !Number.isNaN(genAt) &&
+                  !Number.isNaN(lastSub) &&
+                  genAt < lastSub
+                ) {
+                  const forceUrl = `/api/tunetrees/practice-queue/${userId}/${playlistId}?sitdown_date=${encodeURIComponent(
+                    base.toISOString(),
+                  )}&force_regen=true`;
+                  try {
+                    const r = await fetch(forceUrl);
+                    if (r.ok) {
+                      const fresh = await r.json();
+                      if (Array.isArray(fresh) && fresh.length > 0) {
+                        const fg = fresh[0];
+                        if (fg?.generated_at) {
+                          tomorrowGeneratedAtRef.current =
+                            fg.generated_at as string;
+                        }
+                        // Overwrite entries with regenerated snapshot
+                        snapshotEntries.splice(
+                          0,
+                          snapshotEntries.length,
+                          ...fresh,
+                        );
+                      }
+                    }
+                  } catch {
+                    /* ignore regen failure */
+                  }
+                }
+              }
+            }
+          }
+        } catch {
+          /* ignore */
+        }
 
         const mapped: IPracticeQueueRow[] = snapshotEntries.map((e) => ({
           id: e.tune_ref,
@@ -709,6 +767,8 @@ export default function TunesGridScheduled({
           title: "Success",
           description: "Submitted evaluated tunes.",
         });
+        // Record submit timestamp (used for stale tomorrow detection)
+        lastSubmitUtcRef.current = new Date().toISOString();
         // Trigger global tune data refresh so Repertoire grid reflects new practice metadata
         try {
           triggerRefresh();
@@ -718,6 +778,42 @@ export default function TunesGridScheduled({
             "Failed to trigger global tune refresh after submit",
             error,
           );
+        }
+        // Background refresh of tomorrow if previously loaded and stale
+        if (loadedTomorrowOnceRef.current && tomorrowGeneratedAtRef.current) {
+          const genAt = Date.parse(tomorrowGeneratedAtRef.current);
+          const lastSub = Date.parse(lastSubmitUtcRef.current);
+          if (
+            !Number.isNaN(genAt) &&
+            !Number.isNaN(lastSub) &&
+            genAt < lastSub
+          ) {
+            try {
+              // fire & forget force_regen tomorrow
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              fetch(
+                `/api/tunetrees/practice-queue/${userId}/${playlistId}?sitdown_date=${encodeURIComponent(
+                  tomorrow.toISOString(),
+                )}&force_regen=true`,
+              )
+                .then(async (r) => {
+                  if (!r.ok) return;
+                  const rows = await r.json();
+                  if (Array.isArray(rows) && rows.length > 0) {
+                    const g = rows[0];
+                    if (g?.generated_at) {
+                      tomorrowGeneratedAtRef.current = g.generated_at;
+                    }
+                  }
+                })
+                .catch(() => {
+                  /* ignore */
+                });
+            } catch {
+              /* ignore */
+            }
+          }
         }
       })
       .catch((error) => {
@@ -741,6 +837,18 @@ export default function TunesGridScheduled({
   };
 
   // Persist Flashcard Mode changes after state updates (avoid side-effects during render)
+  useEffect(() => {
+    const resetHandler = () => {
+      tomorrowGeneratedAtRef.current = null;
+      loadedTomorrowOnceRef.current = false;
+    };
+    window.addEventListener("tt-practice-queues-reset", resetHandler);
+    return () =>
+      window.removeEventListener("tt-practice-queues-reset", resetHandler);
+  }, []);
+
+  // When sitdown date changes to tomorrow (preview) detect stale snapshot condition after fetch (hook into snapshot setting logic later)
+  // This will be integrated where queue entries are fetched (not shown in truncated excerpt). Caller should set loadedTomorrowOnceRef & tomorrowGeneratedAtRef from first row.
   useEffect(() => {
     if (!prefsLoaded || userId <= 0) return;
     void updateTabGroupMainState(userId, {

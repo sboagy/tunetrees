@@ -33,6 +33,7 @@ from tunetrees.app.queries import (  # query_practice_list_scheduled_original,
 from tunetrees.app.schedule import (
     TuneFeedbackUpdate,
     TuneScheduleUpdate,
+    fetch_user_ref_from_playlist_ref,
     update_practice_feedbacks,
     update_practice_schedules,
 )
@@ -281,6 +282,53 @@ async def get_practice_queue_with_meta(
         logger.error(f"Unable to fetch practice queue with meta: {e}")
         raise HTTPException(
             status_code=500, detail=f"Unable to fetch practice queue with meta: {e}"
+        )
+
+
+@router.post(
+    "/practice-queue/{user_id}/{playlist_ref}/reset",
+    summary="Deactivate active daily practice queue snapshots",
+    description=(
+        "Set active=FALSE for all active daily_practice_queue rows for the given user+playlist. "
+        "Subsequent fetch will regenerate snapshots on demand. Returns count of deactivated rows."
+    ),
+)
+async def reset_active_practice_queues(
+    user_id: int = Path(..., description="User identifier"),
+    playlist_ref: int = Path(..., description="Playlist reference identifier"),
+):
+    from sqlalchemy import update, select
+    from tunetrees.models.tunetrees import DailyPracticeQueue
+
+    try:
+        with SessionLocal() as db:
+            # Confirm user owns playlist (lightweight check reused from other endpoints)
+            try:
+                _ = fetch_user_ref_from_playlist_ref(db, playlist_ref)
+            except Exception:
+                raise HTTPException(status_code=404, detail="Playlist not found")
+            stmt_sel = select(DailyPracticeQueue.id).where(
+                DailyPracticeQueue.user_ref == user_id,
+                DailyPracticeQueue.playlist_ref == playlist_ref,
+                DailyPracticeQueue.active.is_(True),
+            )
+            active_ids = [r[0] for r in db.execute(stmt_sel).all()]
+            if not active_ids:
+                return {"deactivated": 0}
+            stmt_upd = (
+                update(DailyPracticeQueue)
+                .where(DailyPracticeQueue.id.in_(active_ids))
+                .values(active=False)
+            )
+            db.execute(stmt_upd)
+            db.commit()
+            return {"deactivated": len(active_ids)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unable to reset practice queue snapshots: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Unable to reset practice queue snapshots: {e}"
         )
 
 

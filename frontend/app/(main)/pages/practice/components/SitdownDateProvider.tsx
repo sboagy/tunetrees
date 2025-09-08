@@ -6,7 +6,56 @@ import type { ReactNode } from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 // import { getReviewSitdownDate } from "../queries";
 
-// Returns a Date object for the sitdown date using browser globals, localStorage, or current date
+/**
+ * getSitdownDateFromBrowser
+ * -------------------------------------------------------------
+ * Single authoritative reader for the current "sitdown" (practice anchor) date
+ * used by scheduling, practice queue snapshots, and UI date chooser labels.
+ *
+ * SOURCE PRIORITY (highest first):
+ * 1. window.__TT_REVIEW_SITDOWN_DATE__ (ephemeral in‑memory override set by
+ *    tests or user interactions via global helper)
+ * 2. localStorage["TT_REVIEW_SITDOWN_DATE"] (persisted across reloads)
+ * 3. Fallback: current browser time (new Date())
+ *
+ * MANUAL FLAG (localStorage["TT_REVIEW_SITDOWN_MANUAL"] === "true"):
+ * Indicates the user intentionally pinned a non‑today calendar day. While set,
+ * automatic midnight rollover (see below) is suppressed so the chosen day
+ * persists across sessions until the user selects Today (or picks a date whose
+ * calendar day == real today, which implicitly clears manual intent elsewhere).
+ *
+ * MIDNIGHT ROLLOVER LOGIC:
+ * If the stored date is before the browser's current local calendar day AND
+ * there is no manual flag, we advance (roll forward) to "today" (keeping the
+ * current time-of-day) to avoid silently operating on stale historical queues.
+ * This prevents users who leave a tab open overnight from unknowingly working
+ * on yesterday's review snapshot after midnight.
+ *
+ * VALIDATION / SELF-HEALING:
+ * - Corrupt / unparsable stored value -> reset to now & clear manual flag.
+ * - Always returns a valid Date object or throws (non-browser contexts only).
+ *
+ * INVARIANTS EXPECTED BY OTHER COMPONENTS:
+ * - Returned Date's calendar day defines the anchors for PracticeDateChooser:
+ *   Yesterday = base - 1 day, Today = base, Tomorrow = base + 1 day.
+ * - Arbitrary user-picked dates (e.g. via PracticeDateChooser free input) MUST
+ *   NOT mutate the underlying sitdown base; they are transient selection values.
+ *   The chooser therefore always recomputes its Yesterday/Today/Tomorrow labels
+ *   from getSitdownDateFromBrowser(), not from the currently selected value.
+ *
+ * USAGE GUIDELINES:
+ * - Prefer the SitDownDateContext (useSitDownDate()) inside React components
+ *   when reactivity is needed. Direct calls to this function are acceptable
+ *   only for one-off, immediate computations (e.g. forming a snapshot request
+ *   pushed during initial render) or within utility helpers outside React.
+ * - Avoid duplicating rollover or storage logic elsewhere—centralize here.
+ * - Tests should modify the sitdown date via the injected global setter or
+ *   URL param (in permitted environments) so that UI + context stay consistent.
+ *
+ * POTENTIAL FUTURE REFACTOR:
+ * We may eventually hide direct exports and expose only a context-driven hook
+ * plus an explicit imperative helper (setSitdownDate) to reduce mixed usage.
+ */
 export function getSitdownDateFromBrowser(): Date {
   if (typeof window !== "undefined") {
     const w = window as typeof window & {

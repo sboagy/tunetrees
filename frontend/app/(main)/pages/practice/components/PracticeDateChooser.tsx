@@ -6,6 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { CalendarDays, ChevronDown } from "lucide-react";
@@ -139,6 +140,53 @@ export default function PracticeDateChooser({
               data-testid="datechooser-input"
             />
           </div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => {
+              if (
+                !confirm(
+                  "Reset active queues? This will regenerate snapshots on next access.",
+                )
+              ) {
+                return;
+              }
+              try {
+                interface IGlobalWithIds extends Window {
+                  __TT_USER_ID__?: string;
+                  __TT_PLAYLIST_ID__?: string;
+                }
+                const g = window as unknown as IGlobalWithIds;
+                const userIdStr = g.__TT_USER_ID__;
+                const playlistIdStr = g.__TT_PLAYLIST_ID__;
+                if (!userIdStr || !playlistIdStr) return;
+                const userId = Number(userIdStr);
+                const playlistId = Number(playlistIdStr);
+                // Fire and forget; we do not await to keep handler sync
+                fetch(
+                  `/api/tunetrees/practice-queue/${userId}/${playlistId}/reset`,
+                  { method: "POST" },
+                )
+                  .then(() => {
+                    try {
+                      window.dispatchEvent(
+                        new Event("tt-practice-queues-reset"),
+                      );
+                    } catch {
+                      /* ignore */
+                    }
+                  })
+                  .catch((error) => {
+                    console.error("Reset queues failed", error);
+                  });
+              } catch (error) {
+                console.error("Reset queues failed (threw)", error);
+              }
+            }}
+            className="text-red-600 focus:text-red-600"
+            data-testid="reset-active-queues"
+          >
+            Reset Active Queues
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
