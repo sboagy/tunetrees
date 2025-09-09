@@ -86,7 +86,7 @@ test.describe("Practice sitdown date URL param override", () => {
     }
   });
 
-  test("reset query clears stored sitdown and manual flag", async ({
+  test("reset query repopulates with today and clears manual flag", async ({
     page,
   }) => {
     // First set a manual date
@@ -113,7 +113,12 @@ test.describe("Practice sitdown date URL param override", () => {
     const manualFlag = await page.evaluate(() =>
       localStorage.getItem("TT_REVIEW_SITDOWN_MANUAL"),
     );
-    expect(stored).toBeNull();
+    // After reset we now immediately re-seed with "today" (auto mode) so date is not null,
+    // but manual flag must remain cleared.
+    expect(stored).not.toBeNull();
+    if (stored) {
+      expect(stored).toMatch(/\d{4}-\d{2}-\d{2}T?/);
+    }
     expect(manualFlag).toBeNull();
   });
 });

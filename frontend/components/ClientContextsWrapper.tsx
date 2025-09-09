@@ -15,6 +15,7 @@ import Header from "@/components/Header";
 import "@radix-ui/themes/styles.css";
 import { GenreProvider } from "./GenreContext";
 import { Toaster } from "./ui/toaster";
+import { useEffect } from "react";
 
 // import Footer from "./Footer";
 // import Header from "./Header";
@@ -22,7 +23,7 @@ import { Toaster } from "./ui/toaster";
 // Note: no hooks currently required here after moving initSitdownDateHelpers to render path.
 import { useSession } from "next-auth/react";
 
-// Inject global helper & optional URL param override.
+// Inject global helper (URL param now handled via SSR bootstrap script on practice page).
 function initSitdownDateHelpers() {
   if (typeof window === "undefined") return;
   const w = window as typeof window & {
@@ -53,43 +54,6 @@ function initSitdownDateHelpers() {
       }
     };
   }
-  // URL param formats (non-production only):
-  //   ?tt_sitdown=ISO_STRING[,auto]  -> set date (manual unless ,auto)
-  //   ?tt_sitdown=reset              -> clear stored date & manual flag (next load auto rolls to today)
-  try {
-    // Allow parsing in non-production OR when running on localhost (CI Playwright runs production build at localhost)
-    if (
-      process.env.NODE_ENV !== "production" ||
-      window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1" ||
-      window.location.hostname === "::1" /* IPv6 loopback */
-    ) {
-      const url = new URL(window.location.href);
-      const param = url.searchParams.get("tt_sitdown");
-      if (param) {
-        if (param === "reset") {
-          window.localStorage.removeItem("TT_REVIEW_SITDOWN_DATE");
-          window.localStorage.removeItem("TT_REVIEW_SITDOWN_MANUAL");
-          w.__TT_REVIEW_SITDOWN_DATE__ = undefined;
-          window.dispatchEvent(new Event("tt-sitdown-updated"));
-          if (
-            process.env.NODE_ENV === "development" ||
-            process.env.NODE_ENV === "test"
-          ) {
-            console.debug("[SitdownHelper] reset via query param");
-          }
-        } else {
-          // Allow optional suffix ",auto" to avoid setting manual flag
-          const [iso, mode] = param.split(",");
-          if (iso) {
-            w.__TT_SET_SITDOWN_DATE__(iso, mode !== "auto");
-          }
-        }
-      }
-    }
-  } catch {
-    /* ignore */
-  }
 }
 
 const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
@@ -97,11 +61,13 @@ const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
   const userId = session?.user?.id
     ? Number.parseInt(session.user.id)
     : undefined;
-  // Run helper immediately during first render (still guarded for browser) so that
-  // localStorage + globals are available before tests or subsequent code reads them.
-  // This replaces the previous useEffect timing which introduced a race for URL-param
-  // based initialization assertions executed immediately after navigation/redirect.
-  initSitdownDateHelpers();
+  // Defer helper side-effects (URL param parsing & event dispatch) until after initial
+  // render to avoid React warning: "Cannot update a component while rendering a different component".
+  // Parent wrapper effect runs before child provider effects, so SitDownDateProvider
+  // still sees the initialized globals during its own mount effect.
+  useEffect(() => {
+    initSitdownDateHelpers();
+  }, []);
   return (
     <SitDownDateProvider>
       <CurrentPlaylistProvider userId={userId}>
