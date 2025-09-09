@@ -9,52 +9,74 @@ import { createContext, useContext, useEffect, useState } from "react";
 /**
  * getSitdownDateFromBrowser
  * -------------------------------------------------------------
- * Single authoritative reader for the current "sitdown" (practice anchor) date
- * used by scheduling, practice queue snapshots, and UI date chooser labels.
+ * Single authoritative reader for the current "sitdown" (practice anchor) date used by
+ * scheduling, practice queue snapshots, and UI date chooser labels.
  *
  * SOURCE PRIORITY (highest first):
- * 1. window.__TT_REVIEW_SITDOWN_DATE__ (ephemeral in‑memory override set by
- *    tests or user interactions via global helper)
+ * 1. window.__TT_REVIEW_SITDOWN_DATE__ (ephemeral in‑memory override set by tests or user
+ *    interactions via global helper)
  * 2. localStorage["TT_REVIEW_SITDOWN_DATE"] (persisted across reloads)
  * 3. Fallback: current browser time (new Date())
  *
  * MANUAL FLAG (localStorage["TT_REVIEW_SITDOWN_MANUAL"] === "true"):
- * Indicates the user intentionally pinned a non‑today calendar day. While set,
- * automatic midnight rollover (see below) is suppressed so the chosen day
- * persists across sessions until the user selects Today (or picks a date whose
- * calendar day == real today, which implicitly clears manual intent elsewhere).
+ * Indicates the user intentionally pinned a non‑today calendar day. While set, automatic
+ * midnight rollover (see below) is suppressed so the chosen day persists across sessions
+ * until the user selects Today (or picks a date whose calendar day == real today, which
+ * implicitly clears manual intent elsewhere).
  *
  * MIDNIGHT ROLLOVER LOGIC:
- * If the stored date is before the browser's current local calendar day AND
- * there is no manual flag, we advance (roll forward) to "today" (keeping the
- * current time-of-day) to avoid silently operating on stale historical queues.
- * This prevents users who leave a tab open overnight from unknowingly working
- * on yesterday's review snapshot after midnight.
+ * If the stored date is before the browser's current local calendar day AND there is no
+ * manual flag, we advance (roll forward) to "today" (keeping the current time-of-day) to
+ * avoid silently operating on stale historical queues. This prevents users who leave a tab
+ * open overnight from unknowingly working on yesterday's review snapshot after midnight.
  *
  * VALIDATION / SELF-HEALING:
  * - Corrupt / unparsable stored value -> reset to now & clear manual flag.
  * - Always returns a valid Date object or throws (non-browser contexts only).
  *
  * INVARIANTS EXPECTED BY OTHER COMPONENTS:
- * - Returned Date's calendar day defines the anchors for PracticeDateChooser:
- *   Yesterday = base - 1 day, Today = base, Tomorrow = base + 1 day.
- * - Arbitrary user-picked dates (e.g. via PracticeDateChooser free input) MUST
- *   NOT mutate the underlying sitdown base; they are transient selection values.
- *   The chooser therefore always recomputes its Yesterday/Today/Tomorrow labels
- *   from getSitdownDateFromBrowser(), not from the currently selected value.
+ * - Returned Date's calendar day defines the anchors for PracticeDateChooser: Yesterday =
+ *   base - 1 day, Today = base, Tomorrow = base + 1 day.
+ * - Arbitrary user-picked dates (e.g. via PracticeDateChooser free input) MUST NOT mutate
+ *   the underlying sitdown base; they are transient selection values. The chooser therefore
+ *   always recomputes its Yesterday/Today/Tomorrow labels from getSitdownDateFromBrowser(),
+ *   not from the currently selected value.
  *
  * USAGE GUIDELINES:
- * - Prefer the SitDownDateContext (useSitDownDate()) inside React components
- *   when reactivity is needed. Direct calls to this function are acceptable
- *   only for one-off, immediate computations (e.g. forming a snapshot request
- *   pushed during initial render) or within utility helpers outside React.
+ * - Prefer the SitDownDateContext (useSitDownDate()) inside React components when reactivity
+ *   is needed. Direct calls to this function are acceptable only for one-off, immediate
+ *   computations (e.g. forming a snapshot request pushed during initial render) or within
+ *   utility helpers outside React.
  * - Avoid duplicating rollover or storage logic elsewhere—centralize here.
- * - Tests should modify the sitdown date via the injected global setter or
- *   URL param (in permitted environments) so that UI + context stay consistent.
+ * - Tests should modify the sitdown date via the injected global setter or URL param (in
+ *   permitted environments) so that UI + context stay consistent.
  *
  * POTENTIAL FUTURE REFACTOR:
- * We may eventually hide direct exports and expose only a context-driven hook
- * plus an explicit imperative helper (setSitdownDate) to reduce mixed usage.
+ * We may eventually hide direct exports and expose only a context-driven hook plus an
+ * explicit imperative helper (setSitdownDate) to reduce mixed usage.
+ *
+ * FURTHER EXPLANATION:
+ *
+ * `TT_REVIEW_SITDOWN_MANUAL` encodes user intent so we can distinguish:
+ * - “Stale leftover date” (should auto‑advance) vs “User deliberately pinned this date”
+ *   (must not auto‑advance).
+ * - Without it, a user who intentionally selects yesterday (e.g., finishing an incomplete
+ *   prior session) would have that choice silently overridden on any reload or midnight
+ *   boundary.
+ * - It lets a manually pinned date persist across navigation/reloads until the user
+ *   explicitly picks Today (or uses reset).
+ * - Prevents mid‑session anchor drift: multiple calls wouldn’t suddenly shift the base date,
+ *   which would otherwise cause inconsistent queue snapshot boundaries.
+ * - Enables tests / tooling to simulate pinned vs auto dates explicitly.
+ * - Avoids ambiguity if the stored date is in the future (user scheduled ahead) — we don’t
+ *   want to auto “correct” it unless it was auto mode.
+ *
+ * If, for current date, a value was each time with no manual flag, we’d either:
+ * 1. Always use real now → sitdown anchor could change during a long session, or
+ * 2. Keep the first stored date but auto-roll everything old → destroys intentional pinning.
+ *
+ * So the manual flag is the minimal persisted bit that preserves intentional selection while
+ * allowing safe automatic rollover for unattended stale dates.
  */
 export function getSitdownDateFromBrowser(): Date {
   if (typeof window !== "undefined") {
