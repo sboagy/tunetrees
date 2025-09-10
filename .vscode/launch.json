@@ -42,11 +42,14 @@
                 "TUNETREES_DB": "${workspaceFolder}/tunetrees_test.sqlite3",
                 "TUNETREES_DEPLOY_BASE_DIR": "${workspaceFolder}",
                 "LOG_FUTURE_REVIEWS": "true",
+                "LOG_LEVEL": "debug"
                 // "NODE_ENV": "production"
             },
             "args": [
                 "tunetrees.api.main:app",
-                "--reload"
+                "--reload",
+                "--log-level",
+                "debug"
             ],
             "jinja": true,
             "preLaunchTask": "clean_and_stop",
