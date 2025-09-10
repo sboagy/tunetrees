@@ -41,13 +41,10 @@ export default async function PracticePage({
   if (typeof rawSitdownParam === "string" && rawSitdownParam.length > 0) {
     // Build minimal inline script. We avoid any dynamic date generation here.
     // NOTE: Script runs before hydration; guards for idempotency.
-    const js = buildSitdownBootstrap(rawSitdownParam);
-    sitdownBootstrapScript = (
-      <script
-        dangerouslySetInnerHTML={{ __html: js }}
-        data-tt="sitdown-bootstrap"
-      />
-    );
+    let js = buildSitdownBootstrap(rawSitdownParam);
+    // Avoid ending the script early if serialized function ever contained </script>
+    js = js.replace(/<\/script>/gi, "<\\/script>");
+    sitdownBootstrapScript = <script data-tt="sitdown-bootstrap">{js}</script>;
   }
   return (
     <div className="p-4 space-y-6" data-testid="practice-queue-page">
