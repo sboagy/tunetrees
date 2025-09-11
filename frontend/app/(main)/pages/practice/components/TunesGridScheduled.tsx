@@ -691,7 +691,8 @@ export default function TunesGridScheduled({
         }
       }
     },
-    [setTunes, playlistId, userId],
+    // Added fullQueueSnapshot to satisfy exhaustive-deps (used for debug size logging)
+    [setTunes, playlistId, userId, fullQueueSnapshot],
   );
 
   const handleGoalChange = useCallback(
