@@ -655,9 +655,6 @@ found in `.github/workflows/playwright.yml`.
 `tunetrees_test_clean.sqlite3` (checked in) is the base test database, and is copied into
 `tunetrees_test.sqlite3` (transient, git ignored) for every test.
 
-Stability of using this test database relies on setting the environment variable
-This value should be set to `2024-12-31 16:47:57.671465+00:00`.
-
 ### 4.3. React/Next Frontend Testing
 
 Unit Testing, Integration Testing, Visual Regression Testing, and Accessibility Testing
