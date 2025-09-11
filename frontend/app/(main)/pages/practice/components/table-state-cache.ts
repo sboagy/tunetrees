@@ -25,6 +25,7 @@ class TableStateCacheService {
   private pollTimer: NodeJS.Timeout | null = null;
   private isPolling = false;
   private debugMode = false;
+  private opCounter = 0;
 
   /**
    * Helper to determine whether we should emit debug/warn logs.
@@ -115,6 +116,16 @@ class TableStateCacheService {
     // Process each dirty entry
     const updatePromises = dirtyEntries.map(async (entry) => {
       try {
+        const opId = ++this.opCounter;
+        if (this.shouldLog()) {
+          console.debug(
+            `[TableStateCache][flush-op:${opId}] sending keys=${Object.keys(
+              (entry.tableState as TableState) || {},
+            ).join(
+              ",",
+            )} playlistId=${entry.playlistId} purpose=${entry.tablePurpose}`,
+          );
+        }
         const status = await updateTableStateInDb(
           entry.userId,
           "full",
@@ -181,6 +192,13 @@ class TableStateCacheService {
       existing.tableState = { ...existing.tableState, ...tableStateOverride };
       existing.isDirty = true;
       existing.lastUpdated = Date.now();
+      if (this.shouldLog()) {
+        console.debug(
+          `[TableStateCache][cacheUpdate:merge] key=${key} keys=${Object.keys(
+            existing.tableState as TableState,
+          ).join(",")}`,
+        );
+      }
     } else if (tableStateOverride) {
       // Create new cache entry
       this.cache.set(key, {
@@ -191,6 +209,13 @@ class TableStateCacheService {
         isDirty: true,
         lastUpdated: Date.now(),
       });
+      if (this.shouldLog()) {
+        console.debug(
+          `[TableStateCache][cacheUpdate:new] key=${key} keys=${Object.keys(
+            tableStateOverride as TableState,
+          ).join(",")}`,
+        );
+      }
     }
 
     // Start polling if not already running

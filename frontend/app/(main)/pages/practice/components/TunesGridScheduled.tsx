@@ -460,6 +460,18 @@ export default function TunesGridScheduled({
 
   const handleRecallEvalChange = useCallback(
     (tuneId: number, newValue: string): void => {
+      const traceEnabled =
+        process.env.NEXT_PUBLIC_TABLE_STATE_TRACE === "1" ||
+        process.env.NEXT_PUBLIC_TABLE_STATE_TRACE === "true";
+      if (traceEnabled) {
+        try {
+          console.debug(
+            `[TableStateTrace][eval-change] tuneId=${tuneId} value=${newValue} staged=${!!newValue} playlistId=${playlistId} beforeSnapshotSize=${fullQueueSnapshot.length}`,
+          );
+        } catch {
+          /* ignore */
+        }
+      }
       setTunes((prev) =>
         prev.map((t) =>
           t.id === tuneId ? { ...t, recall_eval: newValue } : t,
@@ -668,6 +680,15 @@ export default function TunesGridScheduled({
         }
       } catch (error) {
         console.error("stage submit failed", error);
+      }
+      if (traceEnabled) {
+        try {
+          console.debug(
+            `[TableStateTrace][eval-change:post] tuneId=${tuneId} value=${newValue} afterSnapshotSize=${fullQueueSnapshot.length}`,
+          );
+        } catch {
+          /* ignore */
+        }
       }
     },
     [setTunes, playlistId, userId],

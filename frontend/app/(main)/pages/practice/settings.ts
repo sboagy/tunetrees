@@ -125,6 +125,9 @@ export async function updateTableStateInDb(
   playlistId: number,
   tableStates: TableState,
 ): Promise<number> {
+  const traceEnabled =
+    process.env.NEXT_PUBLIC_TABLE_STATE_TRACE === "1" ||
+    process.env.NEXT_PUBLIC_TABLE_STATE_TRACE === "true";
   logVerbose(
     (() => {
       if (!isExtendedLoggingEnabled()) return "LF6: updateTableStateInDb";
@@ -156,6 +159,13 @@ export async function updateTableStateInDb(
           playlist_id: playlistId,
           settings: tableStatesStr,
         };
+        if (traceEnabled) {
+          console.debug(
+            `[TableStateTrace][patch:updateTableStateInDb] keys=${Object.keys(
+              tableStates as unknown as Record<string, unknown>,
+            ).join(",")} purpose=${purpose} playlistId=${playlistId}`,
+          );
+        }
         const response = await client.patch<Partial<ITableStateTable>>(
           `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
           tableStateTable,
@@ -213,6 +223,9 @@ export async function updateCurrentTuneInDb(
   playlistId: number,
   currentTune: number | null,
 ): Promise<number> {
+  const traceEnabled =
+    process.env.NEXT_PUBLIC_TABLE_STATE_TRACE === "1" ||
+    process.env.NEXT_PUBLIC_TABLE_STATE_TRACE === "true";
   logVerbose(
     (() => {
       if (!isExtendedLoggingEnabled()) return "LF6: updateCurrentTuneInDb";
@@ -231,6 +244,11 @@ export async function updateCurrentTuneInDb(
         `/table_state/${userId}/${playlistId}/${screenSize}/${purpose}`,
         tableStateTable,
       );
+      if (traceEnabled) {
+        console.debug(
+          `[TableStateTrace][patch:updateCurrentTuneInDb] currentTune=${currentTune} purpose=${purpose} playlistId=${playlistId}`,
+        );
+      }
       logVerbose(
         `=> updateCurrentTuneInDb: response.status=${response.status} purpose=${purpose}, currentTune=${currentTune})}`,
       );

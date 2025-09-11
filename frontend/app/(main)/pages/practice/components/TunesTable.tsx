@@ -520,6 +520,26 @@ export function TunesTableComponent({
           if (filterStringCallback)
             filterStringCallback(tableStateFromDb.globalFilter);
           table.setPagination(tableStateFromDb.pagination);
+          try {
+            const traceEnabled =
+              process.env.NEXT_PUBLIC_TABLE_STATE_TRACE === "1" ||
+              process.env.NEXT_PUBLIC_TABLE_STATE_TRACE === "true";
+            if (traceEnabled && typeof window !== "undefined") {
+              const w = window as unknown as {
+                __TT_TABLE_HYDRATED__?: Record<string, number>;
+              };
+              w.__TT_TABLE_HYDRATED__ = w.__TT_TABLE_HYDRATED__ || {};
+              w.__TT_TABLE_HYDRATED__[`${tablePurpose}|${playlistId}`] =
+                Date.now();
+              console.debug(
+                `[TableStateTrace][hydrate] purpose=${tablePurpose} playlistId=${playlistId} keys=${Object.keys(
+                  tableStateFromDb as unknown as Record<string, unknown>,
+                ).join(",")}`,
+              );
+            }
+          } catch {
+            /* ignore */
+          }
         } else {
           logVerbose("LF1 TunesTableComponent: no table state found in db");
         }
