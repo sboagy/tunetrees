@@ -5,12 +5,10 @@ import type { Page } from "@playwright/test";
  * Call this in your Playwright beforeEach hooks.
  */
 export async function setTestDefaults(page: Page) {
-  const sitdownDate = process.env.TT_REVIEW_SITDOWN_DATE;
-  if (!sitdownDate) {
-    throw new Error(
-      "Environment variable TT_REVIEW_SITDOWN_DATE is not defined.",
-    );
-  }
+  // NOTE: Environment-driven sitdown seed removed. We now use a deterministic
+  // fixed ISO timestamp (local noon) solely for test stability. Individual
+  // specs that need dynamic dates should override via URL param or setTestDateTime.
+  const sitdownDate = "2024-12-31T12:00:00.000Z"; // stable baseline
   await page.addInitScript((dateString) => {
     window.__TT_REVIEW_SITDOWN_DATE__ = dateString;
   }, sitdownDate);

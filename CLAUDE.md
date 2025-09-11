@@ -83,7 +83,6 @@ The core functionality revolves around spaced repetition scheduling:
 
 ### Environment Setup
 
-- **Test Database**: Set `TT_REVIEW_SITDOWN_DATE` to `2024-12-31 16:47:57.671465+00:00` for stable test conditions
 - **Frontend Tests**: Use Playwright with headless mode in CI (`PLAYWRIGHT_HEADLESS=true`)
 - **Backend Tests**: Use pytest with automatic database reset per test
 

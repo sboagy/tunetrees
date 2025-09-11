@@ -656,7 +656,6 @@ found in `.github/workflows/playwright.yml`.
 `tunetrees_test.sqlite3` (transient, git ignored) for every test.
 
 Stability of using this test database relies on setting the environment variable
-`TT_REVIEW_SITDOWN_DATE` on the frontend, which must be specified in Coordinated Universal Time (UTC).  
 This value should be set to `2024-12-31 16:47:57.671465+00:00`.
 
 ### 4.3. React/Next Frontend Testing
@@ -674,7 +673,6 @@ Page Object object model for TuneTrees, abstracting many of the components for u
 tests.
 
 Stability of Playwright testing relies on setting the environment variable for the frontend to
-`TT_REVIEW_SITDOWN_DATE`, which must be specified in Coordinated Universal Time (UTC).  
 This value should be set to `2024-12-31 16:47:57.671465+00:00`.
 
 ##### 4.3.1.2. Test Cookies
