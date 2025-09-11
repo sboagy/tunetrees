@@ -233,26 +233,24 @@ export const SitDownDateProvider = ({ children }: { children: ReactNode }) => {
                     // swallow; non‑critical fallback
                   }
                 } else {
-                  const [iso, mode] = raw.split(",");
-                  if (iso) {
-                    const parsed = new Date(iso);
-                    if (!Number.isNaN(parsed.getTime())) {
-                      ls.setItem("TT_REVIEW_SITDOWN_DATE", iso);
-                      if (mode === "auto") {
-                        ls.removeItem("TT_REVIEW_SITDOWN_MANUAL");
-                      } else {
-                        // Treat absence of ,auto as an intentional manual pin (aligns with SSR bootstrap)
-                        ls.setItem("TT_REVIEW_SITDOWN_MANUAL", "true");
-                      }
-                      try {
-                        (
-                          window as typeof window & {
-                            __TT_REVIEW_SITDOWN_DATE__?: string;
-                          }
-                        ).__TT_REVIEW_SITDOWN_DATE__ = iso;
-                      } catch {
-                        /* ignore */
-                      }
+                  const [, mode] = raw.split(",");
+                  if (mode === "auto") {
+                    ls.removeItem("TT_REVIEW_SITDOWN_MANUAL");
+                  } else {
+                    // Treat absence of ,auto as an intentional manual pin (aligns with SSR bootstrap)
+                    ls.setItem("TT_REVIEW_SITDOWN_MANUAL", "true");
+                  }
+                  const parsed = new Date(raw);
+                  if (!Number.isNaN(parsed.getTime())) {
+                    ls.setItem("TT_REVIEW_SITDOWN_DATE", raw);
+                    try {
+                      (
+                        window as typeof window & {
+                          __TT_REVIEW_SITDOWN_DATE__?: string;
+                        }
+                      ).__TT_REVIEW_SITDOWN_DATE__ = raw;
+                    } catch {
+                      /* ignore */
                     }
                   }
                 }
@@ -309,6 +307,34 @@ export const SitDownDateProvider = ({ children }: { children: ReactNode }) => {
     return () => window.removeEventListener("tt-sitdown-updated", handler);
   }, []);
 
+  // Secondary pass: if a tt_sitdown param with ,auto is present but a prior render or
+  // earlier bootstrap already set a manual flag, ensure it is cleared so tests expecting
+  // auto mode (no TT_REVIEW_SITDOWN_MANUAL) pass consistently.
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const ls = window.localStorage;
+      const qp = window.location.search;
+      if (!qp) return;
+      const usp = new URLSearchParams(qp);
+      const raw = usp.get("tt_sitdown");
+      if (!raw) return;
+      if (raw === "reset") {
+        // Reset already seeds today + clears manual in initial bootstrap branch; nothing extra.
+        return;
+      }
+      const [, mode] = raw.split(",");
+      if (mode === "auto") {
+        // If auto explicitly requested, guarantee manual flag removal even if previously set.
+        if (ls.getItem("TT_REVIEW_SITDOWN_MANUAL")) {
+          ls.removeItem("TT_REVIEW_SITDOWN_MANUAL");
+        }
+      }
+    } catch {
+      /* non-fatal */
+    }
+  }, []);
+
   return (
     <SitDownDateContext.Provider
       value={{
@@ -325,7 +351,7 @@ export const SitDownDateProvider = ({ children }: { children: ReactNode }) => {
 export const useSitDownDate = () => {
   const context = useContext(SitDownDateContext);
   if (context === undefined) {
-    throw new Error("useTune must be used within a TuneProvider");
+    throw new Error("useSitDownDate must be used within a SitDownDateProvider");
   }
   return context;
 };
