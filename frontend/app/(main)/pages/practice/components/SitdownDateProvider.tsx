@@ -191,6 +191,78 @@ export const SitDownDateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Initialize sitdown date from browser context
     try {
+      // Fallback bootstrap (client hydration) — if for any reason the early inline <script>
+      // seeding via buildSitdownBootstrap did not run (e.g. production streaming race, CSP
+      // blocking inline scripts in CI, or very slow chunk delivery) we still want the
+      // ?tt_sitdown=... URL param semantics to apply before the rest of the app relies on
+      // localStorage having a value. This mirrors logic in sitdown-bootstrap.ts and is
+      // idempotent (runs only when storage key absent). Safe to keep minimal here to avoid
+      // duplicating more than necessary.
+      try {
+        if (typeof window !== "undefined") {
+          const ls = window.localStorage;
+          // Only attempt if not already set by SSR inline bootstrap.
+          if (!ls.getItem("TT_REVIEW_SITDOWN_DATE")) {
+            const qp = window.location.search;
+            if (qp) {
+              const usp = new URLSearchParams(qp);
+              const raw = usp.get("tt_sitdown");
+              if (raw && raw.length > 0) {
+                if (raw === "reset") {
+                  // Mirror reset semantics: reseed with *today* local noon (auto mode)
+                  try {
+                    const now = new Date();
+                    const todayNoon = new Date(
+                      now.getFullYear(),
+                      now.getMonth(),
+                      now.getDate(),
+                      12,
+                      0,
+                      0,
+                      0,
+                    );
+                    const isoToday = todayNoon.toISOString();
+                    ls.setItem("TT_REVIEW_SITDOWN_DATE", isoToday);
+                    ls.removeItem("TT_REVIEW_SITDOWN_MANUAL");
+                    (
+                      window as typeof window & {
+                        __TT_REVIEW_SITDOWN_DATE__?: string;
+                      }
+                    ).__TT_REVIEW_SITDOWN_DATE__ = isoToday;
+                  } catch {
+                    // swallow; non‑critical fallback
+                  }
+                } else {
+                  const [iso, mode] = raw.split(",");
+                  if (iso) {
+                    const parsed = new Date(iso);
+                    if (!Number.isNaN(parsed.getTime())) {
+                      ls.setItem("TT_REVIEW_SITDOWN_DATE", iso);
+                      if (mode === "auto") {
+                        ls.removeItem("TT_REVIEW_SITDOWN_MANUAL");
+                      } else {
+                        // Treat absence of ,auto as an intentional manual pin (aligns with SSR bootstrap)
+                        ls.setItem("TT_REVIEW_SITDOWN_MANUAL", "true");
+                      }
+                      try {
+                        (
+                          window as typeof window & {
+                            __TT_REVIEW_SITDOWN_DATE__?: string;
+                          }
+                        ).__TT_REVIEW_SITDOWN_DATE__ = iso;
+                      } catch {
+                        /* ignore */
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // Non-fatal: fallback seeding not strictly required; main parsing still proceeds below.
+      }
       const date = getSitdownDateFromBrowser();
       // Debugging aid: print raw source and derived local/UTC strings when not in prod
       try {
