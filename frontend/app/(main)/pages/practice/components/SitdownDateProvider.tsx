@@ -320,8 +320,30 @@ export const SitDownDateProvider = ({ children }: { children: ReactNode }) => {
       const raw = usp.get("tt_sitdown");
       if (!raw) return;
       if (raw === "reset") {
-        // Reset already seeds today + clears manual in initial bootstrap branch; nothing extra.
-        return;
+        // Always force reseed to today (noon) and clear manual flag even if date already existed.
+        const now = new Date();
+        const todayNoon = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          12,
+          0,
+          0,
+          0,
+        );
+        const isoToday = todayNoon.toISOString();
+        ls.setItem("TT_REVIEW_SITDOWN_DATE", isoToday);
+        ls.removeItem("TT_REVIEW_SITDOWN_MANUAL");
+        try {
+          (
+            window as typeof window & {
+              __TT_REVIEW_SITDOWN_DATE__?: string;
+            }
+          ).__TT_REVIEW_SITDOWN_DATE__ = isoToday;
+        } catch {
+          /* ignore */
+        }
+        return; // done
       }
       const [, mode] = raw.split(",");
       if (mode === "auto") {
