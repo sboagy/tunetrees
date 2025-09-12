@@ -18,11 +18,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import * as React from "react";
-import {
-  createOrUpdateTableState,
-  getTableStateTable,
-  updateTableStateInDb,
-} from "../settings";
+import { createOrUpdateTableState, getTableStateTable } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
@@ -38,6 +34,8 @@ type ITableStateExtended = TableState & {
   columnOrder?: string[];
   // Custom persisted scroll position for the main virtualized grid scroll container
   scrollTop?: number;
+  // Monotonic per-tab version to gate hydration and stale overwrites
+  clientVersion?: number;
 };
 
 export interface IScheduledTunesType {
@@ -119,15 +117,13 @@ export const saveTableState = async (
   );
 
   if (forceImmediate) {
-    // For critical events, flush immediately
-    const status = await updateTableStateInDb(
+    // For critical events, flush immediately via cache service so version is stamped
+    return tableStateCacheService.flushImmediate(
       userId,
-      "full",
       tablePurpose,
       playlistId,
       mergedState as unknown as TableState,
     );
-    return status;
   }
   // For normal events, use cached batching
   tableStateCacheService.cacheUpdate(
@@ -475,21 +471,58 @@ export function TunesTableComponent({
         }
         const tableStateFromDb = tableStateTable?.settings as TableState;
         if (tableStateFromDb) {
-          setTableStateFromDb(tableStateFromDb);
-          const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
-          if (currentTuneState > 0) setCurrentTune(currentTuneState);
-          else setCurrentTune(null);
-          setCurrentTablePurpose(tablePurpose);
-          table.setRowSelection(tableStateFromDb.rowSelection);
-          table.setColumnVisibility(tableStateFromDb.columnVisibility);
-          table.setColumnFilters(tableStateFromDb.columnFilters);
-          table.setSorting(tableStateFromDb.sorting);
-          if (tableStateFromDb?.columnOrder)
-            table.setColumnOrder(tableStateFromDb.columnOrder);
-          if (tableStateFromDb?.columnSizing)
-            table.setColumnSizing(tableStateFromDb.columnSizing);
-          if (tableStateFromDb?.columnSizingInfo)
-            table.setColumnSizingInfo(tableStateFromDb.columnSizingInfo);
+          // Hydration gating: ignore stale server state if local tab has a newer version
+          let allowHydration = true;
+          try {
+            if (typeof window !== "undefined") {
+              const key = `${tablePurpose}|${playlistId}`;
+              const w = window as unknown as {
+                __TT_TABLE_VERSION__?: Record<string, number>;
+              };
+              w.__TT_TABLE_VERSION__ = w.__TT_TABLE_VERSION__ || {};
+              const localVersion = w.__TT_TABLE_VERSION__[key] ?? 0;
+              const serverVersion =
+                (tableStateFromDb as ITableStateExtended).clientVersion ?? 0;
+              if (localVersion > 0 && serverVersion < localVersion) {
+                // Stale server state: skip applying
+                allowHydration = false;
+                if (
+                  process.env.NEXT_PUBLIC_TABLE_STATE_TRACE === "1" ||
+                  process.env.NEXT_PUBLIC_TABLE_STATE_TRACE === "true"
+                ) {
+                  console.debug(
+                    `[TableStateTrace][hydrate-skip] purpose=${tablePurpose} playlistId=${playlistId} serverVersion=${serverVersion} < localVersion=${localVersion}`,
+                  );
+                }
+              } else {
+                // Advance local epoch to at least server version
+                w.__TT_TABLE_VERSION__[key] = Math.max(
+                  localVersion,
+                  serverVersion,
+                );
+              }
+            }
+          } catch {
+            // ignore
+          }
+
+          if (allowHydration) {
+            setTableStateFromDb(tableStateFromDb);
+            const currentTuneState = Number(tableStateTable?.current_tune ?? 0);
+            if (currentTuneState > 0) setCurrentTune(currentTuneState);
+            else setCurrentTune(null);
+            setCurrentTablePurpose(tablePurpose);
+            table.setRowSelection(tableStateFromDb.rowSelection);
+            table.setColumnVisibility(tableStateFromDb.columnVisibility);
+            table.setColumnFilters(tableStateFromDb.columnFilters);
+            table.setSorting(tableStateFromDb.sorting);
+            if (tableStateFromDb?.columnOrder)
+              table.setColumnOrder(tableStateFromDb.columnOrder);
+            if (tableStateFromDb?.columnSizing)
+              table.setColumnSizing(tableStateFromDb.columnSizing);
+            if (tableStateFromDb?.columnSizingInfo)
+              table.setColumnSizingInfo(tableStateFromDb.columnSizingInfo);
+          }
           try {
             if (typeof window !== "undefined") {
               try {

@@ -26,6 +26,8 @@ class TableStateCacheService {
   private isPolling = false;
   private debugMode = false;
   private opCounter = 0;
+  // Track keys currently flushing to avoid overlapping writes per key
+  private inflightKeys = new Set<string>();
 
   /**
    * Helper to determine whether we should emit debug/warn logs.
@@ -67,6 +69,30 @@ class TableStateCacheService {
     playlistId: number,
   ): string {
     return `${userId}|${tablePurpose}|${playlistId}`;
+  }
+
+  /**
+   * Retrieve and increment a per-table local version counter, stored on window
+   * so it persists across component instances in the same tab.
+   */
+  private nextClientVersion(
+    userId: number,
+    tablePurpose: TablePurpose,
+    playlistId: number,
+  ): number {
+    try {
+      if (typeof window === "undefined") return 0;
+      const key = this.getKey(userId, tablePurpose, playlistId);
+      const w = window as unknown as {
+        __TT_TABLE_VERSION__?: Record<string, number>;
+      };
+      w.__TT_TABLE_VERSION__ = w.__TT_TABLE_VERSION__ || {};
+      const next = (w.__TT_TABLE_VERSION__[key] ?? 0) + 1;
+      w.__TT_TABLE_VERSION__[key] = next;
+      return next;
+    } catch {
+      return 0;
+    }
   }
 
   /**
@@ -126,16 +152,42 @@ class TableStateCacheService {
             )} playlistId=${entry.playlistId} purpose=${entry.tablePurpose}`,
           );
         }
+        const key = this.getKey(
+          entry.userId,
+          entry.tablePurpose,
+          entry.playlistId,
+        );
+        if (this.inflightKeys.has(key)) {
+          // Skip overlapping flush for this key; it'll be retried next tick if still dirty
+          if (this.shouldLog()) {
+            console.debug(
+              `[TableStateCache][flush-op:${opId}] skip inflight key=${key}`,
+            );
+          }
+          return;
+        }
+        this.inflightKeys.add(key);
+        const payload: TableState & { [k: string]: unknown } = {
+          ...(entry.tableState as TableState),
+          // Stamp a monotonically increasing per-tab version
+          clientVersion: this.nextClientVersion(
+            entry.userId,
+            entry.tablePurpose,
+            entry.playlistId,
+          ),
+        };
+
         const status = await updateTableStateInDb(
           entry.userId,
           "full",
           entry.tablePurpose,
           entry.playlistId,
-          entry.tableState as TableState,
+          payload,
         );
 
         if (status >= 200 && status < 300) {
           // Mark as clean on successful update
+          // Mark as clean if no newer updates arrived while flushing
           entry.isDirty = false;
           this.debugLog(
             `Successfully updated state for ${entry.tablePurpose}, playlistId=${entry.playlistId}`,
@@ -160,6 +212,13 @@ class TableStateCacheService {
           `[TableStateCache] Error updating state for ${entry.tablePurpose}:`,
           error,
         );
+      } finally {
+        const key = this.getKey(
+          entry.userId,
+          entry.tablePurpose,
+          entry.playlistId,
+        );
+        this.inflightKeys.delete(key);
       }
     });
 
@@ -261,12 +320,18 @@ class TableStateCacheService {
     }
 
     try {
+      // Attach a fresh clientVersion to the outgoing payload
+      const payload: TableState & { [k: string]: unknown } = {
+        ...(tableStateToFlush as TableState),
+        clientVersion: this.nextClientVersion(userId, tablePurpose, playlistId),
+      };
+
       const status = await updateTableStateInDb(
         userId,
         "full",
         tablePurpose,
         playlistId,
-        tableStateToFlush as TableState,
+        payload,
       );
 
       if (status >= 200 && status < 300) {
