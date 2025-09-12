@@ -128,7 +128,10 @@ describe("TableStateCacheService", () => {
         "full",
         mockTablePurpose,
         mockPlaylistId,
-        mockTableState,
+        expect.objectContaining({
+          ...mockTableState,
+          clientVersion: expect.any(Number),
+        }),
       );
     });
 
