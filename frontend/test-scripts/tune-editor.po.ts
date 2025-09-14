@@ -571,6 +571,14 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
 
   async pressSave(): Promise<Response> {
     const response = await this.pressButton("Save");
+    await this.page.waitForTimeout(500);
+    try {
+      // Wait for the editor form to be fully removed from the DOM after save
+      await this.form.waitFor({ state: "detached", timeout: 15_000 });
+    } catch {
+      // Best-effort: if it didn't detach, log and continue so tests can surface a clear failure later
+      console.warn("[TuneEditor] form did not detach after save (continuing)");
+    }
     return response;
   }
 
@@ -580,6 +588,13 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
     await expect(cancelButton).toBeVisible();
     await expect(cancelButton).toBeEnabled();
     const response = await this.pressButton("Cancel");
+    try {
+      // Wait for the editor form to be fully removed from the DOM after save
+      await this.form.waitFor({ state: "detached", timeout: 15_000 });
+    } catch {
+      // Best-effort: if it didn't detach, log and continue so tests can surface a clear failure later
+      console.warn("[TuneEditor] form did not detach after save (continuing)");
+    }
     await this.page.waitForTimeout(500);
     return response;
   }

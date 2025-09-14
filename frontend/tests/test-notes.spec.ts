@@ -1,5 +1,5 @@
+import { expect, test } from "@playwright/test";
 import { checkHealth } from "@/test-scripts/check-servers";
-import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
@@ -10,7 +10,7 @@ import {
   logTestStart,
 } from "@/test-scripts/test-logging";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
-import { expect, test } from "@playwright/test";
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 
 const testTimeout = process.env.CI ? 3 * 60 * 1000 : 1 * 60 * 1000;
 test.setTimeout(testTimeout);
@@ -74,7 +74,7 @@ test("test-notes-1", async ({ page }) => {
   await newNoteLocator.click({ trial: true });
   await newNoteLocator.click();
   await ttPO.page.waitForLoadState("domcontentloaded");
-  await ttPO.page.waitForTimeout(1000);
+  await ttPO.page.waitForTimeout(1500);
 
   const noteEditBoxLocator = page.locator(".jodit-wysiwyg");
   await expect(noteEditBoxLocator).toBeVisible();

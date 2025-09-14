@@ -1,5 +1,5 @@
+import { expect, test } from "@playwright/test";
 import { checkHealth } from "@/test-scripts/check-servers";
-import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
@@ -10,7 +10,7 @@ import {
   logTestStart,
 } from "@/test-scripts/test-logging";
 import { TuneEditorPageObject } from "@/test-scripts/tune-editor.po";
-import { expect, test } from "@playwright/test";
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 
 // Allow extra time for this suite under full-run concurrency and Next.js dev retries
 test.setTimeout(process.env.CI ? 120_000 : 300_000);
@@ -160,6 +160,9 @@ test.describe.serial("Tune Edit Tests", () => {
 
     await ttPO.pressCancel();
 
+    // pressCancel already did an await, but seems we need a bit more time
+    await ttPO.page.waitForTimeout(1500);
+
     await ttPO.navigateToTune("Boyne Hunt");
 
     // Do some light checking in the grid (not a full test)
@@ -221,6 +224,8 @@ test.describe.serial("Tune Edit Tests", () => {
     }
 
     await ttPO.pressSave();
+
+    await page.waitForTimeout(2000);
 
     const newTuneTitle = ttPO.findUpdateByLabel(
       "Title",

@@ -1,16 +1,16 @@
-import { setTestDefaults } from "../test-scripts/set-test-defaults";
+import { expect, test } from "@playwright/test";
+import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { TuneEditorPageObject } from "@/test-scripts/tune-editor.po";
-import { expect, test } from "@playwright/test";
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import {
-  logTestStart,
-  logTestEnd,
-  logBrowserContextStart,
   logBrowserContextEnd,
+  logBrowserContextStart,
+  logTestEnd,
+  logTestStart,
 } from "../test-scripts/test-logging";
-import { checkHealth } from "@/test-scripts/check-servers";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -84,7 +84,7 @@ test.describe.serial("Add Tune Tests", () => {
 
     await ttPO.tableStatus.waitFor({ state: "visible" });
     await expect(ttPO.tableStatus).toContainText("0 of 489");
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(2000);
 
     await ttPO.navigateToTune(tuneTitle);
 
