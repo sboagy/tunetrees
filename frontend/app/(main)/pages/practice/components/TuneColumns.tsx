@@ -1,14 +1,5 @@
 "use client";
 
-import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
-import RowGoalComboBox from "@/app/(main)/pages/practice/components/RowGoalComboBox";
-import {
-  getQualityListForGoalAndTechnique,
-  lookupQualityItem,
-} from "../quality-lists";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { transformToDatetimeLocalForDisplay } from "@/lib/date-utils";
 import type { CheckedState } from "@radix-ui/react-checkbox";
 import type {
   CellContext,
@@ -21,6 +12,15 @@ import type {
 } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useState } from "react";
+import RowGoalComboBox from "@/app/(main)/pages/practice/components/RowGoalComboBox";
+import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { transformToDatetimeLocalForDisplay } from "@/lib/date-utils";
+import {
+  getQualityListForGoalAndTechnique,
+  lookupQualityItem,
+} from "../quality-lists";
 import { updateTableStateInDb } from "../settings";
 import type {
   ITuneOverview,
@@ -28,8 +28,8 @@ import type {
   TunesGridColumnGeneralType,
 } from "../types";
 import "./TuneColumns.css";
-import { saveTableState } from "./TunesTable";
 import { logVerbose } from "@/lib/logging";
+import { saveTableState } from "./TunesTable";
 
 // =================================================================================================
 // For now, I'm going to feature-down the column control menu, as it's going to be more complex than
@@ -254,7 +254,7 @@ export function get_columns(
   // };
 
   function selectionHeader<TData, TValue>(
-    column: Column<TData, TValue>,
+    _column: Column<TData, TValue>,
     table: TanstackTable<ITuneOverview>,
   ) {
     // console.log("column: ", column);
@@ -737,6 +737,31 @@ export function get_columns(
         meta: { headerLabel: "Qual" },
       },
       {
+        accessorKey:
+          srAlgType === "FSRS" ? "latest_stability" : "latest_interval",
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            srAlgType === "FSRS" ? "Stability" : "Interval",
+          ),
+        cell: (info) => {
+          const original = info.row.original;
+          const rawValue =
+            srAlgType === "FSRS"
+              ? original.latest_stability
+              : original.latest_interval;
+          return rawValue !== null && rawValue !== undefined
+            ? rawValue.toFixed(2)
+            : "";
+        },
+        enableSorting: true,
+        enableHiding: true,
+        size: 13 * 8, // Approximate width for 11 characters
+        minSize: 90,
+        meta: { headerLabel: srAlgType === "FSRS" ? "Stability" : "Interval" },
+      },
+      {
         // Adaptive column: shows Difficulty for FSRS playlists, Easiness for SM2 playlists (re-uses persisted id 'latest_easiness')
         accessorKey: "latest_easiness",
         header: ({ column, table }) =>
@@ -764,31 +789,6 @@ export function get_columns(
           headerLabel: srAlgType === "FSRS" ? "Difficulty" : "Easiness",
           type: srAlgType === "FSRS" ? "difficulty" : "easiness",
         },
-      },
-      {
-        accessorKey:
-          srAlgType === "FSRS" ? "latest_stability" : "latest_interval",
-        header: ({ column, table }) =>
-          sortableHeader(
-            column as Column<ITuneOverview, unknown>,
-            table,
-            srAlgType === "FSRS" ? "Stability" : "Interval",
-          ),
-        cell: (info) => {
-          const original = info.row.original;
-          const rawValue =
-            srAlgType === "FSRS"
-              ? original.latest_stability
-              : original.latest_interval;
-          return rawValue !== null && rawValue !== undefined
-            ? rawValue.toFixed(2)
-            : "";
-        },
-        enableSorting: true,
-        enableHiding: true,
-        size: 13 * 8, // Approximate width for 11 characters
-        minSize: 90,
-        meta: { headerLabel: srAlgType === "FSRS" ? "Stability" : "Interval" },
       },
       {
         accessorKey: "latest_repetitions",
