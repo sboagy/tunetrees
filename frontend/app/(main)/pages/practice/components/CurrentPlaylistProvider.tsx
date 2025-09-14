@@ -24,7 +24,9 @@ export const CurrentPlaylistProvider = ({
   // Default to playlist 1 so main grids can render promptly after auth;
   // PlaylistChooser will override this from server state shortly after mount.
   const [currentPlaylist, setCurrentPlaylist] = useState<number>(1);
-  const [srAlgType, setSrAlgType] = useState<"FSRS" | "SM2" | null>(null);
+  // Default SR algorithm to FSRS synchronously so adaptive columns (Stability/Difficulty)
+  // render deterministically on first paint (important for headless/E2E).
+  const [srAlgType, setSrAlgType] = useState<"FSRS" | "SM2" | null>("FSRS");
   // Auto-fetch user's spaced repetition algorithm preference once (or when userId changes)
   useEffect(() => {
     let cancelled = false;
@@ -40,9 +42,6 @@ export const CurrentPlaylistProvider = ({
             const alg = (first.algorithm || "FSRS").toUpperCase();
             if (alg === "FSRS" || alg === "SM2") setSrAlgType(alg);
             else setSrAlgType("FSRS");
-          } else if (srAlgType === null) {
-            // No prefs record exists yet: default explicitly to FSRS
-            setSrAlgType("FSRS");
           }
         }
       } catch {
@@ -53,7 +52,7 @@ export const CurrentPlaylistProvider = ({
     return () => {
       cancelled = true;
     };
-  }, [userId, srAlgType]);
+  }, [userId]);
 
   return (
     <CurrentPlaylistContext.Provider
