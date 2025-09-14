@@ -67,7 +67,7 @@ test.describe.serial("Add to Review Tests", () => {
     const foxhunterCheckbox = foxhunterRow.getByTestId("tt-row-checkbox");
     // await expect(foxhunterCheckbox).toBeVisible();
     await foxhunterCheckbox.check();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(2000);
 
     // Clear the filter to see all tunes again
     await ttPO.filterInput.clear();

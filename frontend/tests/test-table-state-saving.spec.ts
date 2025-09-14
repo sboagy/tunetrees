@@ -29,6 +29,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
+  await page.waitForTimeout(2000);
 });
 
 test.afterEach(async ({ page }, testInfo) => {
@@ -71,7 +72,7 @@ test.describe("Table State Saving Test", () => {
     await ttPO.navigateToPracticeTabDirectly();
 
     // small wait to see if it helps in CI
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
     const practiceGridColumnsLocator = ttPO.tunesGridRows.nth(0).nth(0);
 
