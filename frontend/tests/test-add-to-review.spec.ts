@@ -1,14 +1,14 @@
-import { setTestDefaults } from "../test-scripts/set-test-defaults";
+import { expect, test } from "@playwright/test";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
-import { expect, test } from "@playwright/test";
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import {
-  logTestStart,
-  logTestEnd,
-  logBrowserContextStart,
   logBrowserContextEnd,
+  logBrowserContextStart,
+  logTestEnd,
+  logTestStart,
 } from "../test-scripts/test-logging";
 
 test.use({
@@ -67,11 +67,11 @@ test.describe.serial("Add to Review Tests", () => {
     const foxhunterCheckbox = foxhunterRow.getByTestId("tt-row-checkbox");
     // await expect(foxhunterCheckbox).toBeVisible();
     await foxhunterCheckbox.check();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(500);
 
     // Clear the filter to see all tunes again
     await ttPO.filterInput.clear();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(500);
 
     // Rely on status assertion below instead of fixed sleep
 

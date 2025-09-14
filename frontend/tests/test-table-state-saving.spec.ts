@@ -70,6 +70,9 @@ test.describe("Table State Saving Test", () => {
 
     await ttPO.navigateToPracticeTabDirectly();
 
+    // small wait to see if it helps in CI
+    await page.waitForTimeout(1000);
+
     const practiceGridColumnsLocator = ttPO.tunesGridRows.nth(0).nth(0);
 
     const cellTitlesBeforeExpected: string = [
@@ -89,7 +92,7 @@ test.describe("Table State Saving Test", () => {
     ].join("\n");
 
     const cellTitlesOriginal = await practiceGridColumnsLocator.innerText();
-    console.log("Cell titles:", cellTitlesOriginal);
+    console.log("Cell titles: (cellTitlesOriginal)", cellTitlesOriginal);
     expect(cellTitlesOriginal).toEqual(cellTitlesBeforeExpected);
 
     const columnsMenuButton = page.getByRole("button", { name: "Columns" });
@@ -147,7 +150,7 @@ test.describe("Table State Saving Test", () => {
     // const rowHtml: string = await ttPO.tunesGridRows.nth(0).innerHTML();
     // console.log("First tunes grid row innerHTML:", rowHtml);
     const cellTitlesAfterClicks = await practiceGridColumnsLocator.innerText();
-    console.log("Cell titles:", cellTitlesAfterClicks);
+    console.log("Cell titles (cellTitlesAfterClicks):", cellTitlesAfterClicks);
     expect(cellTitlesAfterClicks).toEqual(cellTitlesAfterClicksExpected);
 
     await ttPO.navigateToRepertoireTabDirectly();
@@ -158,7 +161,10 @@ test.describe("Table State Saving Test", () => {
 
     const cellTitlesAfterTabSwitch =
       await practiceGridColumnsLocator.innerText();
-    console.log("Cell titles after tab switch:", cellTitlesAfterTabSwitch);
+    console.log(
+      "Cell titles after tab switch (cellTitlesAfterTabSwitch):",
+      cellTitlesAfterTabSwitch,
+    );
 
     expect(cellTitlesAfterTabSwitch).toEqual(cellTitlesAfterClicksExpected);
 
