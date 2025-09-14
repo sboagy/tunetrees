@@ -1,9 +1,9 @@
 "use client";
 
+import type { RowSelectionState } from "@tanstack/react-table";
+import { Plus, Upload } from "lucide-react";
+import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -13,36 +13,37 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type { RowSelectionState } from "@tanstack/react-table";
-import { Plus, Upload } from "lucide-react";
-import { type JSX, useCallback, useEffect, useRef, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
+import {
+  getPracticeQueueEntriesAction,
+  getRepertoireTunesOverviewAction,
+  refillPracticeQueueAction,
+} from "../actions/practice-actions";
 import { type ITuneUpdate, submitPracticeFeedbacks } from "../commands";
-
 import {
   deleteTableTransientData,
-  updateCurrentTuneInDb,
-  updateTableStateInDb,
   getTabGroupMainState,
+  updateCurrentTuneInDb,
   updateTabGroupMainState,
+  updateTableStateInDb,
 } from "../settings";
+import type { ITuneOverviewScheduled } from "../types";
 import ColumnsMenu from "./ColumnsMenu";
 import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
 import FlashcardPanel from "./FlashcardPanel";
+import PracticeDateChooser from "./PracticeDateChooser";
+import {
+  getSitdownDateFromBrowser,
+  useSitDownDate,
+} from "./SitdownDateProvider";
 import { useTuneDataRefresh } from "./TuneDataRefreshContext";
 import { useScheduledTunes } from "./TunesContextScheduled";
 import TunesGrid from "./TunesGrid";
 import { useTunesTable } from "./TunesTable";
-import { useToast } from "@/hooks/use-toast";
-import type { ITuneOverviewScheduled } from "../types";
-import { getSitdownDateFromBrowser } from "./SitdownDateProvider";
-import {
-  getPracticeQueueEntriesAction,
-  refillPracticeQueueAction,
-} from "../actions/practice-actions";
-import { getRepertoireTunesOverviewAction } from "../actions/practice-actions";
-import { useSitDownDate } from "./SitdownDateProvider";
-import PracticeDateChooser from "./PracticeDateChooser";
 
 type ReviewMode = "grid" | "flashcard";
 

@@ -1,28 +1,22 @@
 "use client";
 
+import type { CheckedState } from "@radix-ui/react-checkbox";
+import type { Table } from "@tanstack/react-table";
 import { ChevronDown } from "lucide-react";
-
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Table, TableState } from "@tanstack/react-table";
-import { useEffect, useState } from "react";
 import { logVerbose } from "@/lib/logging";
-import { updateTableStateInDb } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
 import type { IColumnMeta } from "./TuneColumns";
 
 const ColumnsMenu = ({
-  user_id,
-  tablePurpose,
-  playlistId,
   table,
-  triggerRefresh,
 }: {
   user_id: number;
   tablePurpose: TablePurpose;
@@ -30,10 +24,24 @@ const ColumnsMenu = ({
   table: Table<ITuneOverview>;
   triggerRefresh: () => void;
 }) => {
-  const [isClient, setIsClient] = useState(false);
+  // Local tick to force a re-render when table visibility changes so checkbox states stay in sync
+  const [renderTick, setRenderTick] = useState(0);
+  // Control the Radix Dropdown open state so we can deterministically close after a toggle
+  const [open, setOpen] = useState(false);
 
+  // (removed isClient usage; we now always render an accessible label with sr-only)
+
+  // Re-render this menu when column visibility changes elsewhere (e.g., from table interceptors)
   useEffect(() => {
-    setIsClient(true);
+    const handler = () => setRenderTick((t) => t + 1);
+    if (typeof window !== "undefined") {
+      window.addEventListener("tt-visibility-changed", handler);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("tt-visibility-changed", handler);
+      }
+    };
   }, []);
 
   // useEffect(() => {
@@ -47,25 +55,23 @@ const ColumnsMenu = ({
   // }, [table]);
 
   function handleCheckedChange(columnId: string) {
-    return (value: boolean) => {
-      logVerbose("toggleVisibility (requested)", value);
+    return (checked: CheckedState) => {
+      // Radix passes CheckedState: true | false | "indeterminate". Only true means visible.
+      const nextVisible = checked === true;
+      logVerbose("toggleVisibility (requested)", checked);
       const column = table.getColumn(columnId);
       if (column) {
         logVerbose("toggleVisibility (before)", column.getIsVisible());
-        column.toggleVisibility(value);
-        logVerbose("LF7: Saving table state on filter change: ", value);
-        // (See comment in TunesGridRepertoire.tsx handleGlobalFilterChange)
-        const tableState: TableState = table.getState();
-        tableState.columnVisibility[columnId] = value;
-        void updateTableStateInDb(
-          user_id,
-          "full",
-          tablePurpose,
-          playlistId,
-          tableState,
-        );
-
-        triggerRefresh();
+        // Use the column API so TanStack resolves the full visibility state and triggers onColumnVisibilityChange
+        column.toggleVisibility(nextVisible);
+        logVerbose("LF7: Column visibility updated to:", nextVisible);
+        // Immediately bump a tick so the menu reflects the new checked state without waiting for external events
+        setRenderTick((t) => t + 1);
+        // Close the menu after a selection so subsequent test clicks on the trigger will re-open it reliably
+        setOpen(false);
+        // Persistence is handled centrally by TunesTable interceptors (onColumnVisibilityChange)
+        // which route through the in-memory cache with immediate flush. Avoid direct backend calls
+        // or forced refreshes here to prevent double-writes and hydration races.
       } else {
         logVerbose("column not found", columnId);
       }
@@ -73,14 +79,27 @@ const ColumnsMenu = ({
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="ml-auto">
-          {isClient && (window.innerWidth < 768 ? "" : "Columns")}
+        <Button
+          variant="outline"
+          className="ml-auto relative z-[60]"
+          aria-label="Columns"
+          title="Columns"
+          type="button"
+          data-testid="tt-columns-menu-trigger"
+        >
+          Columns
           <ChevronDown className="ml-2 h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        side="bottom"
+        sideOffset={10}
+        collisionPadding={8}
+        data-render-tick={renderTick}
+      >
         {table
           .getAllColumns()
           .filter((column) => column.getCanHide())

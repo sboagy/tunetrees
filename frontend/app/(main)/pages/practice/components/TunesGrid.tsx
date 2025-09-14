@@ -1,4 +1,24 @@
 import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  horizontalListSortingStrategy,
+  SortableContext,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { Row, Table as TanstackTable } from "@tanstack/react-table";
+import { flexRender } from "@tanstack/react-table";
+import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
   Table,
   TableBody,
   TableCell,
@@ -7,34 +27,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Row, Table as TanstackTable } from "@tanstack/react-table";
-import { flexRender } from "@tanstack/react-table";
-import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePlaylist } from "./CurrentPlaylistProvider";
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  arrayMove,
-  horizontalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { getColorForEvaluation } from "../quality-list";
 import { updateCurrentTuneInDb } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
-import { tableContext, saveTableState } from "./TunesTable";
+import { saveTableState, tableContext } from "./TunesTable";
 
 type Props = {
   table: TanstackTable<ITuneOverview>;
@@ -96,7 +96,7 @@ const TunesGrid = ({
   // Listen for explicit sorting change events to ensure the virtualizer resets consistently
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const handler = (e: Event) => {
+    const handler = (_e: Event) => {
       // const detail = (e as CustomEvent<unknown>).detail;
       // console.warn("TunesGrid event tt-sorting-changed", detail);
       const el = tableBodyRef.current;
@@ -132,6 +132,13 @@ const TunesGrid = ({
         handler as EventListener,
       );
     };
+  }, []);
+
+  // Also re-render when column visibility changes (headers/leaf columns changed)
+  useEffect(() => {
+    const handler = () => setTableStateTick((t) => t + 1);
+    window.addEventListener("tt-visibility-changed", handler);
+    return () => window.removeEventListener("tt-visibility-changed", handler);
   }, []);
 
   // Subscribe to table state changes to trigger a lightweight re-render when sorting/order/filters update
@@ -685,6 +692,13 @@ const TunesGrid = ({
                             {/* Resizer */}
                             {header.column.getCanResize() && (
                               <div
+                                role="separator"
+                                aria-orientation="vertical"
+                                aria-label={`Resize ${header.column.id} column`}
+                                aria-valuemin={50}
+                                aria-valuemax={800}
+                                aria-valuenow={header.column.getSize?.() ?? 140}
+                                tabIndex={0}
                                 onMouseDown={makeEnhancedResizeHandler(
                                   header.getResizeHandler(),
                                 )}

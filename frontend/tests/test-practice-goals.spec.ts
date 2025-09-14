@@ -1,9 +1,9 @@
+import { expect, test } from "@playwright/test";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { setTestDefaults } from "@/test-scripts/set-test-defaults";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
-import { test, expect } from "@playwright/test";
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -34,7 +34,7 @@ test.describe.serial("Practice Goals E2E Tests", () => {
     // Note: These appear as cells with text, not columnheader role
     // Use a more specific selector to avoid matching "Prev Goal"
     const scheduledHeader = page
-      .getByRole("cell", { name: "Scheduled", exact: true })
+      .getByRole("button", { name: "Scheduled", exact: true })
       .first();
     // const techniqueHeader = page.getByRole("cell", {
     //   name: "Algorithm",

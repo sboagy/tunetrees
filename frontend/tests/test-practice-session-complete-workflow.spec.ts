@@ -1,18 +1,20 @@
-import { test, expect } from "@playwright/test";
-import { restartBackend } from "@/test-scripts/global-setup";
-import { applyNetworkThrottle } from "@/test-scripts/network-utils";
-import { setTestDefaults } from "@/test-scripts/set-test-defaults";
-import { runLoginStandalone } from "@/test-scripts/run-login2";
-import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
-import { navigateToPageWithRetry } from "@/test-scripts/navigation-utils";
+import { expect, test } from "@playwright/test";
 import { checkHealth } from "@/test-scripts/check-servers";
-import { navigateToPracticeTabStandalone } from "@/test-scripts/tunetrees.po";
+import { restartBackend } from "@/test-scripts/global-setup";
+import { navigateToPageWithRetry } from "@/test-scripts/navigation-utils";
+import { applyNetworkThrottle } from "@/test-scripts/network-utils";
+import { runLoginStandalone } from "@/test-scripts/run-login2";
+import { setTestDefaults } from "@/test-scripts/set-test-defaults";
 import {
   logBrowserContextEnd,
   logBrowserContextStart,
   logTestEnd,
   logTestStart,
 } from "@/test-scripts/test-logging";
+import {
+  navigateToPracticeTabStandalone,
+  TuneTreesPageObject,
+} from "@/test-scripts/tunetrees.po";
 
 // Increase timeout for complete workflow tests
 test.use({ actionTimeout: 300_000 }); // 300,000 ms = 5 minutes
@@ -98,7 +100,7 @@ test("should complete full practice session workflow with recall quality evaluat
 
   // Step 4: Verify Scheduled and Technique columns are visible
   const goalHeader = page
-    .getByRole("cell", {
+    .getByRole("button", {
       name: "Scheduled",
       exact: true,
     })

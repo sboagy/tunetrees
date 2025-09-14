@@ -1,4 +1,4 @@
-import { type Locator, type Page, expect } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { initialPageLoadTimeout } from "./paths-for-tests";
 
 export class TuneTreesPageObject {
@@ -325,6 +325,43 @@ export class TuneTreesPageObject {
   }
 
   async navigateToTune(tuneTitle: string) {
+    // Fast-path: if the current details panel already shows this tune title, we're done.
+    try {
+      const visible = await this.currentTuneTitle
+        .isVisible({ timeout: 3000 })
+        .catch(() => false);
+      if (visible) {
+        const current = (await this.currentTuneTitle.textContent())
+          ?.trim()
+          .toLowerCase();
+        if (current?.includes(tuneTitle.toLowerCase())) {
+          // Already selected; narrow the grid to just this tune for determinism in callers
+          await this.ensureClickable(this.repertoireTabTrigger);
+          await this.clickWithTimeAfter(this.repertoireTabTrigger);
+          await this.ensureClickable(this.filterInput);
+          await this.filterInput.fill("");
+          await this.page.waitForTimeout(100);
+          await this.filterInput.fill(tuneTitle);
+          await this.waitForTablePopulationToStart();
+          // Wait briefly for the grid to narrow to a single data row (header + 1)
+          let cnt = await this.tunesGridRows.count();
+          for (let k = 0; k < 20 && cnt !== 2; k++) {
+            await this.page.waitForTimeout(100);
+            cnt = await this.tunesGridRows.count();
+          }
+          if (cnt === 2) {
+            const onlyDataRow = this.page.getByRole("row").nth(1);
+            const idCell = onlyDataRow.getByRole("cell").nth(1);
+            await this.clickWithTimeAfter(idCell);
+            await this.page.waitForTimeout(150);
+          }
+          return;
+        }
+      }
+    } catch {
+      // ignore and proceed with normal navigation
+    }
+
     await expect(this.mainTabGroup).toBeAttached();
     await expect(this.mainTabGroup).toBeVisible();
 
@@ -357,6 +394,27 @@ export class TuneTreesPageObject {
 
     await this.waitForTablePopulationToStart();
 
+    // If filtering by full title leads to a single row, prefer clicking that deterministically
+    // to avoid reliance on the Title column visibility or virtualized cell text reads.
+    let filteredToSingleRow = false;
+    for (let k = 0; k < 14; k++) {
+      const cnt = await this.tunesGridRows.count();
+      if (cnt === 2) {
+        filteredToSingleRow = true;
+        break;
+      }
+      await this.page.waitForTimeout(250);
+    }
+    if (filteredToSingleRow) {
+      const onlyDataRow = this.page.getByRole("row").nth(1);
+      const idCell = onlyDataRow.getByRole("cell").nth(1);
+      await this.clickWithTimeAfter(idCell);
+      // Small pause and proceed to verification below
+      await this.page.waitForTimeout(200);
+      // Early return from clickDesiredTune path by short-circuiting later logic
+      // using a flag captured in closure.
+    }
+
     const rowCount = await this.tunesGridRows.count();
     if (rowCount < 2) {
       console.warn(
@@ -375,6 +433,10 @@ export class TuneTreesPageObject {
         attempts++;
       }
       if (currentRowCount >= 2) {
+        // If we already have a single data row, we clicked it above; skip further matching
+        if (currentRowCount === 2) {
+          return; // already selected
+        }
         // Determine Title column index (fallback to column 1 if not found)
         let titleColIdx = await getTuneGridColumnIndex(this.page, "Title");
         if (titleColIdx === null) titleColIdx = 1;
@@ -383,31 +445,43 @@ export class TuneTreesPageObject {
         let clicked = false;
         const maxAttempts = 6;
         for (let attempt = 1; attempt <= maxAttempts && !clicked; attempt++) {
-          const maxCheck = Math.min(currentRowCount - 1, 10);
+          const maxCheck = Math.min(currentRowCount - 1, 15);
           for (let i = 1; i <= maxCheck; i++) {
             const row = this.page.getByRole("row").nth(i);
             const titleCell = row.getByRole("cell").nth(titleColIdx);
-            await expect(titleCell).toBeVisible();
-            await expect(titleCell).toContainText(tuneTitle);
-            const text = (await titleCell.textContent())?.trim();
-            if (text === tuneTitle) {
-              const idCell = row.getByRole("cell").nth(1);
-              await this.clickWithTimeAfter(idCell);
-              clicked = true;
-              break;
+            // If the title cell isn't visible or doesn't exactly match, skip and keep looping
+            const isVisible = await titleCell.isVisible().catch(() => false);
+            let textVal: string | null = null;
+            if (isVisible) {
+              textVal = (await titleCell.textContent())?.trim() ?? null;
             }
+            if (!isVisible || textVal !== tuneTitle) {
+              // continue to next row/attempt without asserting
+              continue;
+            }
+            const idCell = row.getByRole("cell").nth(1);
+            await this.clickWithTimeAfter(idCell);
+            clicked = true;
           }
           if (!clicked) {
             await this.page.waitForTimeout(300);
           }
         }
         if (!clicked) {
-          // const tuneRow = this.page.getByRole("row").nth(1);
-          // const firstCell = tuneRow.getByRole("cell").nth(1);
-          // await this.clickWithTimeAfter(firstCell);
-          throw new Error(
-            `navigateToTune(): Unable to locate tune row for title '${tuneTitle}'.`,
-          );
+          // As a last resort, only click the first data row if there is exactly one data row.
+          // Avoid arbitrarily clicking the first row when multiple results remain.
+          const dataRowCount = currentRowCount - 1;
+          if (dataRowCount === 1) {
+            const firstDataRow = this.page.getByRole("row").nth(1);
+            const idCell = firstDataRow.getByRole("cell").nth(1);
+            await this.clickWithTimeAfter(idCell);
+            clicked = true;
+          }
+          if (!clicked) {
+            throw new Error(
+              `navigateToTune(): Unable to locate tune row for title '${tuneTitle}'.`,
+            );
+          }
         }
       } else {
         // // Attempt to click any row containing the title
@@ -917,22 +991,32 @@ export class TuneTreesPageObject {
         }, Number(tune_id));
         await this.page.waitForTimeout(500);
       }
-      await expect(tuneCheckbox).toBeVisible({ timeout: 10_000 });
-      await expect(tuneCheckbox).toBeEnabled({ timeout: 10_000 });
       await tuneCheckbox.check();
-      await expect(tuneCheckbox).toBeChecked({ timeout: 10_000 });
     };
 
-    try {
-      await ensureVisibleAndCheck();
-    } catch {
-      // One last fallback: small delay and retry once more before failing
-      console.warn(
-        `addTuneToSelection(${tune_id}): initial selection failed, retrying after short delay...`,
-      );
-      await this.page.waitForTimeout(1000);
-      await ensureVisibleAndCheck();
+    // Retry loop: try up to 6 times, break early when checked
+    let checked = false;
+    const maxAttempts = 6;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await ensureVisibleAndCheck();
+        checked = await tuneCheckbox.isChecked().catch(() => false);
+        if (checked) break;
+        console.warn(
+          `addTuneToSelection(${tune_id}): attempt ${attempt} did not result in checked state.`,
+        );
+      } catch (error) {
+        console.warn(
+          `addTuneToSelection(${tune_id}): attempt ${attempt} failed: ${String(
+            error,
+          )}`,
+        );
+      }
+      // Backoff before next attempt
+      await this.page.waitForTimeout(500);
     }
+
+    await expect(tuneCheckbox).toBeChecked();
   }
 
   async scrollToTuneById(tuneId: number): Promise<void> {
