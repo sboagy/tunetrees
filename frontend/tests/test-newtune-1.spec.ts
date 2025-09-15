@@ -73,8 +73,9 @@ test.describe.serial("Add Tune Tests", () => {
         expect(value).toBe(formField.modification);
       }
       // await formField.locator.fill(formField.modification);
-      await page.waitForTimeout(50);
+      await page.waitForTimeout(100);
     }
+    await page.waitForTimeout(1000);
 
     await ttPO.pressSave();
 
