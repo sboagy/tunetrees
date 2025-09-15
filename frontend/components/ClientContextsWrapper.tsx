@@ -69,49 +69,39 @@ const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
     initSitdownDateHelpers();
   }, []);
 
-  // Test-only: clear any window-scoped table-state caches if the cache epoch has changed.
-  // This runs in the parent wrapper effect, which fires before child provider effects,
-  // so children like TunesTable won't read stale window.__TT_TABLE_LAST__ snapshots.
+  // Test-only: clear any window-scoped table-state caches if the test cookie is set.
+  // This runs before child providers, so children won't read stale window.__TT_TABLE_LAST__ snapshots.
   useEffect(() => {
-    let cancelled = false;
-    const maybeClearByEpoch = async () => {
+    const maybeClearByCookie = () => {
       try {
-        const res = await fetch("/api/test-flags/cache-epoch", {
-          method: "GET",
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as { epoch?: number };
-        const epoch = Number(data?.epoch ?? 0);
-        if (!Number.isFinite(epoch)) return;
+        const cookieStr = document.cookie || "";
+        if (!cookieStr.includes("TT_CLEAR_TABLE_STATE")) return;
         const w = window as typeof window & {
-          __TT_TEST_CACHE_EPOCH__?: number;
           __TT_TABLE_LAST__?: Record<string, unknown>;
           __TT_TABLE_VERSION__?: Record<string, number>;
           __ttScrollLast?: Record<string, number>;
           __TT_HYDRATING__?: Record<string, boolean>;
         };
-        const prev = w.__TT_TEST_CACHE_EPOCH__ ?? 0;
-        if (epoch > prev && !cancelled) {
-          // Clear window-scoped caches used by TunesTable
-          try {
-            w.__TT_TABLE_LAST__ = {};
-            w.__TT_TABLE_VERSION__ = {} as Record<string, number>;
-            w.__ttScrollLast = {} as Record<string, number>;
-            w.__TT_HYDRATING__ = {} as Record<string, boolean>;
-          } catch {
-            // ignore
-          }
-          w.__TT_TEST_CACHE_EPOCH__ = epoch;
+        // Clear window-scoped caches used by TunesTable
+        try {
+          w.__TT_TABLE_LAST__ = {};
+          w.__TT_TABLE_VERSION__ = {} as Record<string, number>;
+          w.__ttScrollLast = {} as Record<string, number>;
+          w.__TT_HYDRATING__ = {} as Record<string, boolean>;
+        } catch {
+          // ignore
         }
+        // Delete the cookie to avoid repeated clearing
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore - assigning to document.cookie is fine here for tests
+        // eslint-disable-next-line unicorn/no-document-cookie
+        document.cookie = "TT_CLEAR_TABLE_STATE=; Max-Age=0; path=/";
       } catch {
-        // endpoint may not exist in non-test envs; ignore
+        // ignore
       }
     };
-    void maybeClearByEpoch();
-    return () => {
-      cancelled = true;
-    };
+    maybeClearByCookie();
+    return () => {};
   }, []);
   return (
     <SitDownDateProvider>
