@@ -40,6 +40,40 @@ class TableStateCacheService {
     } | null>
   >();
 
+  // Test-only cache busting: fetch an epoch from a Next.js API route and
+  // clear local caches when it changes. This helps when Playwright reuses
+  // the same browser/server between tests.
+  private lastEpoch: number = 0;
+  private lastEpochCheckedAt: number = 0;
+  private epochCheckThrottleMs = 1000; // at most once per second
+
+  private async checkAndMaybeClearForTestEpoch(): Promise<void> {
+    try {
+      // Only in browser and only when running with test envs
+      if (typeof window === "undefined") return;
+      const now = Date.now();
+      if (now - this.lastEpochCheckedAt < this.epochCheckThrottleMs) return;
+      this.lastEpochCheckedAt = now;
+      const res = await fetch("/api/test-flags/cache-epoch", {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { epoch?: number };
+      const epoch = Number(data?.epoch ?? 0);
+      if (Number.isFinite(epoch) && epoch > this.lastEpoch) {
+        this.clear();
+        this.inflightFetches.clear();
+        this.lastEpoch = epoch;
+        if (this.shouldLog()) {
+          console.debug("[TableStateCache] Cleared by epoch", epoch);
+        }
+      }
+    } catch {
+      // ignore (endpoint may not exist outside tests)
+    }
+  }
+
   /**
    * Helper to determine whether we should emit debug/warn logs.
    * Controlled by explicit setDebugMode or the TABLE_STATE_DEBUG env var.
@@ -490,6 +524,8 @@ class TableStateCacheService {
     settings: Partial<TableState> | null;
     current_tune?: number | null;
   } | null> {
+    // Test cache clear hook: non-blocking
+    void this.checkAndMaybeClearForTestEpoch();
     const key = this.getKey(userId, tablePurpose, playlistId);
     const inflight = this.inflightFetches.get(key);
     if (inflight) return inflight;

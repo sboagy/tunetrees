@@ -13,9 +13,9 @@ import { TunesProviderScheduled } from "@/app/(main)/pages/practice/components/T
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import "@radix-ui/themes/styles.css";
+import { useEffect } from "react";
 import { GenreProvider } from "./GenreContext";
 import { Toaster } from "./ui/toaster";
-import { useEffect } from "react";
 
 // import Footer from "./Footer";
 // import Header from "./Header";
@@ -67,6 +67,51 @@ const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
   // still sees the initialized globals during its own mount effect.
   useEffect(() => {
     initSitdownDateHelpers();
+  }, []);
+
+  // Test-only: clear any window-scoped table-state caches if the cache epoch has changed.
+  // This runs in the parent wrapper effect, which fires before child provider effects,
+  // so children like TunesTable won't read stale window.__TT_TABLE_LAST__ snapshots.
+  useEffect(() => {
+    let cancelled = false;
+    const maybeClearByEpoch = async () => {
+      try {
+        const res = await fetch("/api/test-flags/cache-epoch", {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { epoch?: number };
+        const epoch = Number(data?.epoch ?? 0);
+        if (!Number.isFinite(epoch)) return;
+        const w = window as typeof window & {
+          __TT_TEST_CACHE_EPOCH__?: number;
+          __TT_TABLE_LAST__?: Record<string, unknown>;
+          __TT_TABLE_VERSION__?: Record<string, number>;
+          __ttScrollLast?: Record<string, number>;
+          __TT_HYDRATING__?: Record<string, boolean>;
+        };
+        const prev = w.__TT_TEST_CACHE_EPOCH__ ?? 0;
+        if (epoch > prev && !cancelled) {
+          // Clear window-scoped caches used by TunesTable
+          try {
+            w.__TT_TABLE_LAST__ = {};
+            w.__TT_TABLE_VERSION__ = {} as Record<string, number>;
+            w.__ttScrollLast = {} as Record<string, number>;
+            w.__TT_HYDRATING__ = {} as Record<string, boolean>;
+          } catch {
+            // ignore
+          }
+          w.__TT_TEST_CACHE_EPOCH__ = epoch;
+        }
+      } catch {
+        // endpoint may not exist in non-test envs; ignore
+      }
+    };
+    void maybeClearByEpoch();
+    return () => {
+      cancelled = true;
+    };
   }, []);
   return (
     <SitDownDateProvider>
