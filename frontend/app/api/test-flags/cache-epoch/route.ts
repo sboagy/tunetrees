@@ -10,8 +10,8 @@ export function GET() {
 export function POST() {
   epoch += 1;
   const res = NextResponse.json({ epoch });
-  // Set a simple cookie the client can read to trigger cache clearing on next mount
-  // Not HttpOnly so the browser code can clear it afterward.
+  // Set a cookie holding the current epoch. Client will clear caches exactly once
+  // per epoch by comparing to its last-cleared value; no time-based expiry needed.
   res.cookies.set("TT_CLEAR_TABLE_STATE", String(epoch), {
     path: "/",
     httpOnly: false,

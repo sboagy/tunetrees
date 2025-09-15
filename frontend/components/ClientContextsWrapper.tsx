@@ -75,27 +75,30 @@ const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
     const maybeClearByCookie = () => {
       try {
         const cookieStr = document.cookie || "";
-        if (!cookieStr.includes("TT_CLEAR_TABLE_STATE")) return;
+        const match = cookieStr.match(/(?:^|;\s*)TT_CLEAR_TABLE_STATE=([^;]+)/);
+        if (!match) return;
+        const epochStr = decodeURIComponent(match[1] ?? "");
+        const cookieEpoch = Number.parseInt(epochStr, 10);
+        if (!Number.isFinite(cookieEpoch)) return;
         const w = window as typeof window & {
           __TT_TABLE_LAST__?: Record<string, unknown>;
           __TT_TABLE_VERSION__?: Record<string, number>;
           __ttScrollLast?: Record<string, number>;
           __TT_HYDRATING__?: Record<string, boolean>;
+          __TT_CACHE_CLEAR_EPOCH_LAST__?: number;
         };
+        const lastCleared = w.__TT_CACHE_CLEAR_EPOCH_LAST__ ?? 0;
+        if (cookieEpoch <= lastCleared) return;
         // Clear window-scoped caches used by TunesTable
         try {
           w.__TT_TABLE_LAST__ = {};
           w.__TT_TABLE_VERSION__ = {} as Record<string, number>;
           w.__ttScrollLast = {} as Record<string, number>;
           w.__TT_HYDRATING__ = {} as Record<string, boolean>;
+          w.__TT_CACHE_CLEAR_EPOCH_LAST__ = cookieEpoch;
         } catch {
           // ignore
         }
-        // Delete the cookie to avoid repeated clearing
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore - assigning to document.cookie is fine here for tests
-        // eslint-disable-next-line unicorn/no-document-cookie
-        document.cookie = "TT_CLEAR_TABLE_STATE=; Max-Age=0; path=/";
       } catch {
         // ignore
       }
