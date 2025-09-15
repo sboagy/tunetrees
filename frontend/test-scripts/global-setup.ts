@@ -182,19 +182,20 @@ async function restartBackendHard() {
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
   await globalSetup();
+
+  // Signal the frontend to clear table-state caches before the next test
+  try {
+    console.log("Signaling test cache epoch increment.");
+    await axios.post("http://localhost:3000/api/test-flags/cache-epoch");
+  } catch {
+    // endpoint may not be available; ignore
+  }
 }
 
 export async function restartBackend(restartHard = true) {
   // Brief pause to let filesystem/process state settle before attempting restart
   const waitMs = process.env.CI === "true" ? 2000 : 1000;
   await new Promise((resolve) => setTimeout(resolve, waitMs));
-
-  // Signal the frontend to clear table-state caches before the next test
-  try {
-    await axios.post("http://localhost:3000/api/test-flags/cache-epoch");
-  } catch {
-    // endpoint may not be available; ignore
-  }
 
   // In CI, perform a full stop -> copy -> start cycle to avoid copying
   // the SQLite DB while the server has it open (which can corrupt the file).
@@ -231,6 +232,8 @@ export async function restartBackend(restartHard = true) {
       try {
         const response = await axios.get("http://localhost:8000/hello/test");
         if (response.status === 200) {
+          console.log("Signaling test cache epoch increment.");
+          await axios.post("http://localhost:3000/api/test-flags/cache-epoch");
           serverReady = true;
           break;
         }
