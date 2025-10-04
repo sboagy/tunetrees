@@ -33,7 +33,19 @@ echo "TUNETREES_DB: $TUNETREES_DB"
 
 echo "Redeploying the tt1dd stack"
 
-docker -c default buildx bake all
+# Optional flags:
+#   --no-cache   Force a clean build without using cache
+NO_CACHE_ARG=""
+for arg in "$@"; do
+    case "$arg" in
+        --no-cache)
+            NO_CACHE_ARG="--no-cache"
+            shift
+            ;;
+    esac
+done
+
+docker -c default buildx bake ${NO_CACHE_ARG} all
 
 docker -c tt1dd compose down
 docker -c tt1dd compose pull

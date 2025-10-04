@@ -16,6 +16,7 @@ COPY tsconfig.json  ./tsconfig.json
 COPY tsconfig.theme-script.json  ./tsconfig.theme-script.json
 
 # Install necessary dependencies
+RUN npm install -g npm@11.6.0
 RUN npm install --save-dev @next/eslint-plugin-next
 RUN npm install gts
 RUN npx gts init --no
@@ -89,7 +90,7 @@ COPY package.json package-lock.json ./
 RUN --mount=type=bind,source=package.json,target=package.json \
   --mount=type=bind,source=package-lock.json,target=package-lock.json \
   --mount=type=cache,target=/root/.npm \
-  npm ci --omit=dev
+  npm ci --omit=dev --ignore-scripts
 
 ################################################################################
 # Create a stage for building the application.
