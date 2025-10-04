@@ -1,0 +1,17 @@
+.main-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar {
+  overflow-y: auto;
+  max-height: 100%;
+}
+
+.content-panel {
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
+}

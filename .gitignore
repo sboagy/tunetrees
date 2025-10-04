@@ -371,3 +371,55 @@ fsrs_fixup_report.txt
 # unnecessary commits.
 todo.md
 tunetrees_test_clean_with_queue.sqlite3
+
+# ============================================================================
+# SolidJS PWA Rewrite Additions
+# ============================================================================
+
+# Build outputs
+/dist
+/.solid
+/.output
+/.vinxi
+/.vercel
+
+# SolidJS specific
+.solid/
+
+# Vite
+vite.config.ts.timestamp-*
+
+# Cloudflare
+.wrangler/
+wrangler.toml
+
+# SQLite WASM (local development)
+*.db
+*.db-shm
+*.db-wal
+
+# Drizzle ORM
+drizzle/
+
+# Package manager
+pnpm-lock.yaml
+yarn.lock
+.pnpm-store/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment
+.env.local
+.env.production.local
+.env.development.local
+
+# Supabase (local development)
+supabase/.branches
+supabase/.temp
+
+# Legacy code (keep in git, but IDE might generate files)
+legacy/node_modules/
+legacy/.next/
+legacy/dist/
+legacy/__pycache__/

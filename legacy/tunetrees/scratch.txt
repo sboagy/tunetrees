@@ -1,0 +1,60 @@
+tune scheduled for 3 days from now, 
+
+
+     June 2024        
+Su Mo Tu We Th Fr Sa  
+                   1  
+ 2  3  4  5  6  7  8  
+ 9 10 11 12 13 14 15  
+16 17 18 19 20 21 22  
+23 24 25 26 27 28 29  
+30                    
+     July 2024        
+Su Mo Tu We Th Fr Sa  
+    1  2  3  4  5  6  
+ 7  8  9 10 11 12 13  
+14 15 16 17 18 19 20  
+21 22 23 24 25 26 27  
+28 29 30 31  
+
+variable "platforms" {
+  default = ["linux/amd64", "linux/arm64"]
+}
+
+
+target "server" {
+  dockerfile = "Dockerfile"
+  platforms = platforms
+  output = ["type=local,dest=bin"]
+}
+
+target "frontend" {
+  dockerfile = "Dockerfile"
+  platforms = platforms
+  output = ["type=local,dest=bin"]
+}
+
+
+FROM --platform=$BUILDPLATFORM python:${PYTHON_VERSION}-slim as base
+
+TT_BASE_URL: "http://127.0.0.1:8000/tunetrees"
+
+baseURL: process.env.TT_BASE_URL
+
+
+publicRuntimeConfig: {
+    baseURL: process.env.TT_BASE_URL
+}
+
+
+===== July 17 =====
+
+webserver    | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+webserver    | /docker-entrypoint.sh: Configuration complete; ready for start up
+webserver    | 2024/07/17 18:18:03 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/conf.d/nginx.conf:17
+webserver    | nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/conf.d/nginx.conf:17
+webserver    | 2024/07/17 18:18:03 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/conf.d/nginx.conf:18
+webserver    | nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/conf.d/nginx.conf:18
+webserver    | 2024/07/17 18:18:03 [emerg] 1#1: host not found in upstream "nodejs" in /etc/nginx/conf.d/nginx.conf:47
+webserver    | nginx: [emerg] host not found in upstream "nodejs" in /etc/nginx/conf.d/nginx.conf:47
+webserver exited with code 1

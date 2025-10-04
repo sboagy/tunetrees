@@ -1,0 +1,226 @@
+# Page snapshot
+
+```yaml
+- banner:
+  - link "Home TuneTrees":
+    - /url: /
+    - button "Home TuneTrees":
+      - img "Home"
+      - text: TuneTrees
+  - 'button "Instrument: Irish Tenor Banjo (id-18)"'
+  - button "sboagy@gmail.com Scott Boag":
+    - text: sboagy@gmail.com
+    - img "Scott Boag"
+  - button "Toggle theme"
+- main:
+  - heading "No Title" [level=2]
+  - button "Edit"
+  - text: References
+  - button "Add new reference"
+  - button [expanded]
+  - button "Unflag as favorite"
+  - button "Set to private"
+  - button "Delete reference"
+  - button "Edit"
+  - text: website
+  - 'link "irishtune.info #54"':
+    - /url: https://www.irishtune.info/tune/54/
+  - text: Notes
+  - button "New Note"
+  - button [expanded]
+  - button "Flag as favorite"
+  - button "Set to private"
+  - button "Delete reference"
+  - button "Edit"
+  - paragraph: Last tune in Danú Road Less Traveled - Top it off / Jig Gan Ainm / Kilkenny Jig / Alasdruims March; also and mainly 2nd tune in The McCarthys - The Rolling Wave - Alexander's March
+  - separator
+  - tablist:
+    - tab "Practice"
+    - tab "Repertoire"
+    - tab "Catalog" [selected]
+    - button "Tabs"
+  - tabpanel "Catalog":
+    - button "Add To Repertoire" [disabled]
+    - textbox "Filter"
+    - button "Import tune or tunes": Add Tune
+    - button "Delete Selected Tunes" [disabled]: Delete Tunes
+    - button "Columns"
+    - table:
+      - rowgroup:
+        - row "Id Title Type Structure":
+          - cell "Id":
+            - button "Id":
+              - text: Id
+              - button "Column not sorted"
+          - cell:
+            - button:
+              - checkbox
+          - cell "Title":
+            - button "Title":
+              - text: Title
+              - button "Column not sorted"
+          - cell "Type":
+            - button "Type":
+              - text: Type
+              - button "Column not sorted"
+          - cell "Structure":
+            - button "Structure":
+              - text: Structure
+              - button "Column not sorted"
+      - rowgroup:
+        - row "36 Lilting Fisherman JigD AABB":
+          - cell "36"
+          - cell:
+            - checkbox
+          - cell "Lilting Fisherman"
+          - cell "JigD"
+          - cell "AABB"
+        - row "43 Abbey Reel Reel AB":
+          - cell "43"
+          - cell:
+            - checkbox
+          - cell "Abbey Reel"
+          - cell "Reel"
+          - cell "AB"
+        - row "54 Alasdruim's March JigD AABB":
+          - cell "54"
+          - cell:
+            - checkbox
+          - cell "Alasdruim's March"
+          - cell "JigD"
+          - cell "AABB"
+        - row "55 Alexander's Hpipe AABB":
+          - cell "55"
+          - cell:
+            - checkbox
+          - cell "Alexander's"
+          - cell "Hpipe"
+          - cell "AABB"
+        - row "66 An Chóisir Slide AABB":
+          - cell "66"
+          - cell:
+            - checkbox
+          - cell "An Chóisir"
+          - cell "Slide"
+          - cell "AABB"
+        - row "70 An Sean Duine JigD":
+          - cell "70"
+          - cell:
+            - checkbox
+          - cell "An Sean Duine"
+          - cell "JigD"
+          - cell
+        - row "72 Anderson's Reel Reel AB":
+          - cell "72"
+          - cell:
+            - checkbox
+          - cell "Anderson's Reel"
+          - cell "Reel"
+          - cell "AB"
+        - row "83 Apples in Winter JigD AABB":
+          - cell "83"
+          - cell:
+            - checkbox
+          - cell "Apples in Winter"
+          - cell "JigD"
+          - cell "AABB"
+        - row "89 Ash Plant Reel AABB":
+          - cell "89"
+          - cell:
+            - checkbox
+          - cell "Ash Plant"
+          - cell "Reel"
+          - cell "AABB"
+        - row "105 Ballydesmond Polka Polka AABB":
+          - cell "105"
+          - cell:
+            - checkbox
+          - cell "Ballydesmond Polka"
+          - cell "Polka"
+          - cell "AABB"
+        - 'row "106 Ballydesmond Polka #2 Polka AABB"':
+          - cell "106"
+          - cell:
+            - checkbox
+          - 'cell "Ballydesmond Polka #2"'
+          - cell "Polka"
+          - cell "AABB"
+        - row "107 Ballydesmond Polka Polka AABB":
+          - cell "107"
+          - cell:
+            - checkbox
+          - cell "Ballydesmond Polka"
+          - cell "Polka"
+          - cell "AABB"
+        - row "113 Banish Misfortune JigD AABBCC":
+          - cell "113"
+          - cell:
+            - checkbox
+          - cell "Banish Misfortune"
+          - cell "JigD"
+          - cell "AABBCC"
+        - row "114 Bank of Ireland Reel AABB":
+          - cell "114"
+          - cell:
+            - checkbox
+          - cell "Bank of Ireland"
+          - cell "Reel"
+          - cell "AABB"
+        - row "115 Bank of Turf JigD AABB":
+          - cell "115"
+          - cell:
+            - checkbox
+          - cell "Bank of Turf"
+          - cell "JigD"
+          - cell "AABB"
+        - row "125 Banshee Reel AABB":
+          - cell "125"
+          - cell:
+            - checkbox
+          - cell "Banshee"
+          - cell "Reel"
+          - cell "AABB"
+        - row "129 Battering Ram JigD AABBCC":
+          - cell "129"
+          - cell:
+            - checkbox
+          - cell "Battering Ram"
+          - cell "JigD"
+          - cell "AABBCC"
+        - row "137 Behind the Haystack JigD AABBCC":
+          - cell "137"
+          - cell:
+            - checkbox
+          - cell "Behind the Haystack"
+          - cell "JigD"
+          - cell "AABBCC"
+        - row "141 Belltable Waltz AABB":
+          - cell "141"
+          - cell:
+            - checkbox
+          - cell "Belltable"
+          - cell "Waltz"
+          - cell "AABB"
+    - status
+    - table:
+      - rowgroup:
+        - row "0 of 488 row(s) selected.":
+          - cell "0 of 488 row(s) selected."
+- contentinfo:
+  - img
+  - link "Whitepaper":
+    - /url: https://github.com/sboagy/tunetrees/blob/main/docs/core-proposal.md
+  - link "Source on GitHub":
+    - /url: https://github.com/sboagy/tunetrees
+  - link "Spaced Repetition Terminology":
+    - /url: https://github.com/sboagy/tunetrees/blob/main/docs/sr_readme.md
+  - link "Contact":
+    - /url: mailto:sboag@tunetrees.com
+  - link "Policy":
+    - /url: /policy
+  - region "Notifications (F8)":
+    - list
+- region "Notifications (F8)":
+  - list
+- alert
+```

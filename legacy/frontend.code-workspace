@@ -1,0 +1,33 @@
+{
+	"folders": [
+		{
+			"path": "./frontend"
+		}
+	],
+	"settings": {
+		"debug.javascript.terminalOptions": {
+
+			"skipFiles": [
+				"<node_internals>/**"
+			],
+			"resolveSourceMapLocations": [
+				"${workspaceFolder}/.next/**/*",
+				"${workspaceFolder}/node_modules/**/*"
+			],
+			"outFiles": [
+				"${workspaceFolder}/.next/**/*.js"
+			]
+		},
+		"debug.javascript.autoAttachFilter": "always",
+		"debug.javascript.unmapMissingSources": true,
+		"inline-bookmarks.view.showVisibleFilesOnly": true,
+		"terminal.integrated.scrollback": 50000,
+		"gitmoji.addCustomEmoji": [
+		{
+			"emoji": "📇",
+			"code": ":card_index:",
+			"description": "Database schema changes"
+		}
+		]
+	}
+}

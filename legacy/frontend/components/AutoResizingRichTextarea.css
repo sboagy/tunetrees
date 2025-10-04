@@ -1,0 +1,102 @@
+.controls {
+  display: flex;
+  border: 1px solid var(--jd-color-border);
+  border-top: 0;
+  padding: 0.625rem;
+}
+
+.controls-right {
+  margin-left: auto;
+}
+
+.state {
+  margin: 0.625rem 0;
+  font-family: monospace;
+}
+
+.state-title {
+  color: var(--jd-color-icon);
+  text-transform: uppercase;
+}
+
+.read-only-rich {
+  padding: 0.625rem;
+}
+
+/* AutoResizingRichTextarea.css */
+:root {
+  /* Light Theme Variables */
+  --jodit-color-default: #222;
+  --jodit-color-background: #fff;
+  --jodit-color-border: #ddd;
+
+  /* Other variables as needed */
+}
+
+/* Base editor styles */
+.jodit-wrapper {
+  min-height: 20px;
+  margin-bottom: 1rem;
+}
+
+/* Fix the editor sizes */
+.jodit-container {
+  border: none !important; /* We're handling borders on the wrapper */
+  min-height: 150px !important;
+  width: 100% !important;
+}
+
+.jodit-wysiwyg {
+  min-height: 120px !important;
+  padding: 10px !important;
+}
+
+/* Fix the empty bar at bottom */
+.jodit-status-bar {
+  display: none !important;
+}
+
+/* Fix focus issues */
+.jodit-wysiwyg {
+  outline: none !important;
+}
+
+/* Dark mode colors */
+[data-theme="dark"] .jodit-wysiwyg,
+.dark .jodit-wysiwyg {
+  color: #e0e0e0 !important;
+  background-color: #333 !important;
+}
+
+[data-theme="dark"] .jodit-toolbar,
+.dark .jodit-toolbar {
+  background-color: #444 !important;
+  border-color: #555 !important;
+}
+
+[data-theme="dark"] .jodit-toolbar-button,
+.dark .jodit-toolbar-button {
+  color: #e0e0e0 !important;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+}
+
+.jodit-toolbar-button__icon {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* Make the toolbar itself more compact */
+.jodit-toolbar {
+  padding: 2px !important;
+}
+
+.jodit-toolbar__box {
+  padding: 0 !important;
+}
+
+/* Fix text alignment in buttons */
+.jodit-toolbar-button__text {
+  font-size: 0.75rem !important;
+}

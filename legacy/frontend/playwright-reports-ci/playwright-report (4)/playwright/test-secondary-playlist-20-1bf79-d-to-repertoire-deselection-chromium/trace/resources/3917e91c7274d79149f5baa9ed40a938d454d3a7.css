@@ -1,0 +1,302 @@
+/*!************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!./app/(main)/pages/practice/components/MainPanel.css ***!
+  \************************************************************************************************************************************************************************************************************************************************************************************************/
+.main-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar {
+  overflow-y: auto;
+  max-height: 100%;
+}
+
+.content-panel {
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
+}
+
+/*!*************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!./components/AutoResizingRichTextarea.css ***!
+  \*************************************************************************************************************************************************************************************************************************************************************************************/
+.controls {
+  display: flex;
+  border: 1px solid var(--jd-color-border);
+  border-top: 0;
+  padding: 0.625rem;
+}
+
+.controls-right {
+  margin-left: auto;
+}
+
+.state {
+  margin: 0.625rem 0;
+  font-family: monospace;
+}
+
+.state-title {
+  color: var(--jd-color-icon);
+  text-transform: uppercase;
+}
+
+.read-only-rich {
+  padding: 0.625rem;
+}
+
+/* AutoResizingRichTextarea.css */
+:root {
+  /* Light Theme Variables */
+  --jodit-color-default: #222;
+  --jodit-color-background: #fff;
+  --jodit-color-border: #ddd;
+
+  /* Other variables as needed */
+}
+
+/* Base editor styles */
+.jodit-wrapper {
+  min-height: 20px;
+  margin-bottom: 1rem;
+}
+
+/* Fix the editor sizes */
+.jodit-container {
+  border: none !important; /* We're handling borders on the wrapper */
+  min-height: 150px !important;
+  width: 100% !important;
+}
+
+.jodit-wysiwyg {
+  min-height: 120px !important;
+  padding: 10px !important;
+}
+
+/* Fix the empty bar at bottom */
+.jodit-status-bar {
+  display: none !important;
+}
+
+/* Fix focus issues */
+.jodit-wysiwyg {
+  outline: none !important;
+}
+
+/* Dark mode colors */
+[data-theme="dark"] .jodit-wysiwyg,
+.dark .jodit-wysiwyg {
+  color: #e0e0e0 !important;
+  background-color: #333 !important;
+}
+
+[data-theme="dark"] .jodit-toolbar,
+.dark .jodit-toolbar {
+  background-color: #444 !important;
+  border-color: #555 !important;
+}
+
+[data-theme="dark"] .jodit-toolbar-button,
+.dark .jodit-toolbar-button {
+  color: #e0e0e0 !important;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+}
+
+.jodit-toolbar-button__icon {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* Make the toolbar itself more compact */
+.jodit-toolbar {
+  padding: 2px !important;
+}
+
+.jodit-toolbar__box {
+  padding: 0 !important;
+}
+
+/* Fix text alignment in buttons */
+.jodit-toolbar-button__text {
+  font-size: 0.75rem !important;
+}
+
+/*!*****************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!./app/(main)/pages/practice/components/ReferenceCards.css ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************************************************/
+.no-hover {
+  cursor: default;
+  background-color: lightgreen;
+  transition: none;
+}
+
+.no-hover:hover {
+  background-color: lightgreen;
+}
+
+/*!**********************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!./app/(main)/pages/practice/components/Sidebar.css ***!
+  \**********************************************************************************************************************************************************************************************************************************************************************************************/
+.sidebar {
+  /* width: 30em; */
+  /* padding: 10px; */
+  /* border-left: 1px solid #ccc; */
+  transition: width 0.3s ease-in-out;
+}
+
+.sidebar.collapsed {
+  width: 3em;
+}
+
+.urls,
+.notes {
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    background: white;
+    z-index: 1000;
+    transform: translateX(100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+/*!**************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!./app/(main)/pages/practice/components/TuneColumns.css ***!
+  \**************************************************************************************************************************************************************************************************************************************************************************************************/
+.column-icon-style {
+  margin-left: 0.5rem; /* 8px */
+  height: 1rem; /* 16px */
+  width: 1rem; /* 16px */
+}
+
+.column-menu-icon-style {
+  margin-left: 0.5rem; /* 8px */
+  margin-right: 0.5rem; /* 8px */
+  height: 1rem; /* 16px */
+  width: 1rem; /* 16px */
+}
+
+/*!*********************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[5].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[5].use[3]!./components/PlaylistChooser.module.css ***!
+  \*********************************************************************************************************************************************************************************************************************************************************************************/
+.PlaylistChooser_dialog_content__nokOT {
+  position: fixed;
+  z-index: 50;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  max-width: 60rem;
+  padding: 1.5rem;
+  background-color: white;
+  background-color: var(--background);
+  border-radius: 0.375rem;
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 2px solid #cbd5e0;
+  border: 2px solid var(--border-gray-600);
+  outline: none;
+}
+
+.PlaylistChooser_dialog_content__nokOT .PlaylistChooser_dialog_table__6_FHb {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  font-weight: bold;
+}
+
+.PlaylistChooser_dialog_content__nokOT .PlaylistChooser_column_include__GXnwN {
+  width: 2.75rem;
+  margin-left: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.PlaylistChooser_dialog_content__nokOT .PlaylistChooser_column_id__0DAqT {
+  width: 6em;
+  margin-top: 0.5rem;
+}
+
+.PlaylistChooser_dialog_content__nokOT .PlaylistChooser_column_instrument__TFUlq {
+  width: 12em;
+  margin-top: 0.5rem;
+}
+
+.PlaylistChooser_dialog_content__nokOT .PlaylistChooser_column_genre_default__URHoa {
+  width: 16em;
+  margin-top: 0.5rem;
+}
+
+.PlaylistChooser_dialog_content__nokOT .PlaylistChooser_column_description__G9Zf_ {
+  width: 15rem;
+  margin-top: 0.5rem;
+}
+
+.PlaylistChooser_dialog_content__nokOT .PlaylistChooser_column_change_controls__AuPuw {
+  width: 2.75rem;
+  margin-left: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.PlaylistChooser_dialog_content__nokOT .PlaylistChooser_column_change_controls__AuPuw button {
+  margin-top: -0.25rem;
+}
+
+.PlaylistChooser_dialog_content__nokOT .PlaylistChooser_dialog_footer__J1Nps {
+  display: block;
+  text-align: center;
+}
+
+/*!*************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!./app/(main)/pages/practice/components/TuneEditor.css ***!
+  \*************************************************************************************************************************************************************************************************************************************************************************************************/
+/* TuneEditor.css */
+.tune-form-base-item-style {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem; /* 12px */
+}
+
+.tune-form-item-style {
+  /* @apply tune-form-base-item-style; */
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem; /* 12px */
+  /* space-y-0; */ /* Tailwind class for space-y-0 */
+}
+
+.tune-form-item-style2 {
+  /* @apply tune-form-base-item-style; */
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem; /* 12px */
+  /* space-y-1; */ /* Tailwind class for space-y-1 */
+}
+
+.tune-form-label-style {
+  width: 20%; /* Equivalent to 1/5 */
+  text-align: right;
+}
+
+.tune-form-control-style {
+  width: 40%; /* Equivalent to 2/5 */
+}
+

@@ -1,0 +1,87 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Next: Node",
+      "request": "launch",
+      "runtimeArgs": [
+        "dev",
+        "--experimental-https"
+      ],
+      "runtimeExecutable": "next",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "node",
+      "envFile": "${workspaceFolder}/.env.local",
+      "env": {
+        "NODE_ENV": "development",
+        "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION": "false"
+      }
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Next: Chrome",
+      "url": "https://localhost:3000/home",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "name": "Launch",
+      "request": "launch",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "node",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/.next/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/.next/**/*",
+        "${workspaceFolder}/node_modules/**/*"
+      ]
+    },
+    {
+      "name": "Attach",
+      "port": 9229,
+      "request": "attach",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "node",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/.next/**/*.js"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/node_modules/**/*"
+      ]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run Login Script",
+      "program": "${workspaceFolder}/scripts/run-login.mts",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--loader",
+        "ts-node/esm"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Next: Full",
+      "configurations": [
+        "Next: Node",
+        "Next: Chrome"
+      ]
+    }
+  ]
+}

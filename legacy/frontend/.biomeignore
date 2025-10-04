@@ -1,0 +1,11 @@
+.vscode/
+.vscode/**/*.json
+node_modules
+build
+.next/
+.vercel/
+.git/ 
+.github/
+dist/
+out/
+/Users/sboag/gittt/tunetrees/frontend/.vscode/saved_launch.json

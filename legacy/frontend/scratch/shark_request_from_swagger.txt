@@ -1,0 +1,168 @@
+Frame 7081: 890 bytes on wire (7120 bits), 890 bytes captured (7120 bits) on interface lo0, id 0
+    Section number: 1
+    Interface id: 0 (lo0)
+        Interface name: lo0
+        Interface description: Loopback
+    Encapsulation type: NULL/Loopback (15)
+    Arrival Time: Jan 15, 2025 20:39:16.719482000 EST
+    UTC Arrival Time: Jan 16, 2025 01:39:16.719482000 UTC
+    Epoch Arrival Time: 1736991556.719482000
+    [Time shift for this packet: 0.000000000 seconds]
+    [Time delta from previous captured frame: 0.000039000 seconds]
+    [Time delta from previous displayed frame: 0.000039000 seconds]
+    [Time since reference or first frame: 1119.366666000 seconds]
+    Frame Number: 7081
+    Frame Length: 890 bytes (7120 bits)
+    Capture Length: 890 bytes (7120 bits)
+    [Frame is marked: False]
+    [Frame is ignored: False]
+    [Protocols in frame: null:ip:tcp:http:json]
+    [Coloring Rule Name: HTTP]
+    [Coloring Rule String: http || tcp.port == 80 || http2]
+Null/Loopback
+    Family: IP (2)
+Internet Protocol Version 4, Src: 127.0.0.1, Dst: 127.0.0.1
+    0100 .... = Version: 4
+    .... 0101 = Header Length: 20 bytes (5)
+    Differentiated Services Field: 0x00 (DSCP: CS0, ECN: Not-ECT)
+        0000 00.. = Differentiated Services Codepoint: Default (0)
+        .... ..00 = Explicit Congestion Notification: Not ECN-Capable Transport (0)
+    Total Length: 886
+    Identification: 0x0000 (0)
+    010. .... = Flags: 0x2, Don't fragment
+        0... .... = Reserved bit: Not set
+        .1.. .... = Don't fragment: Set
+        ..0. .... = More fragments: Not set
+    ...0 0000 0000 0000 = Fragment Offset: 0
+    Time to Live: 64
+    Protocol: TCP (6)
+    Header Checksum: 0x0000 [validation disabled]
+    [Header checksum status: Unverified]
+    Source Address: 127.0.0.1
+    Destination Address: 127.0.0.1
+    [Stream index: 0]
+Transmission Control Protocol, Src Port: 60056, Dst Port: 8000, Seq: 1, Ack: 1, Len: 834
+    Source Port: 60056
+    Destination Port: 8000
+    [Stream index: 527]
+    [Conversation completeness: Complete, WITH_DATA (31)]
+        ..0. .... = RST: Absent
+        ...1 .... = FIN: Present
+        .... 1... = Data: Present
+        .... .1.. = ACK: Present
+        .... ..1. = SYN-ACK: Present
+        .... ...1 = SYN: Present
+        [Completeness Flags: ·FDASS]
+    [TCP Segment Len: 834]
+    Sequence Number: 1    (relative sequence number)
+    Sequence Number (raw): 2435708433
+    [Next Sequence Number: 835    (relative sequence number)]
+    Acknowledgment Number: 1    (relative ack number)
+    Acknowledgment number (raw): 1050199062
+    1000 .... = Header Length: 32 bytes (8)
+    Flags: 0x018 (PSH, ACK)
+        000. .... .... = Reserved: Not set
+        ...0 .... .... = Accurate ECN: Not set
+        .... 0... .... = Congestion Window Reduced: Not set
+        .... .0.. .... = ECN-Echo: Not set
+        .... ..0. .... = Urgent: Not set
+        .... ...1 .... = Acknowledgment: Set
+        .... .... 1... = Push: Set
+        .... .... .0.. = Reset: Not set
+        .... .... ..0. = Syn: Not set
+        .... .... ...0 = Fin: Not set
+        [TCP Flags: ·······AP···]
+    Window: 6379
+    [Calculated window size: 408256]
+    [Window size scaling factor: 64]
+    Checksum: 0x016b [unverified]
+    [Checksum Status: Unverified]
+    Urgent Pointer: 0
+    Options: (12 bytes), No-Operation (NOP), No-Operation (NOP), Timestamps
+        TCP Option - No-Operation (NOP)
+            Kind: No-Operation (1)
+        TCP Option - No-Operation (NOP)
+            Kind: No-Operation (1)
+        TCP Option - Timestamps: TSval 575480837, TSecr 3550974938
+            Kind: Time Stamp Option (8)
+            Length: 10
+            Timestamp value: 575480837
+            Timestamp echo reply: 3550974938
+    [Timestamps]
+        [Time since first frame in this TCP stream: 0.000144000 seconds]
+        [Time since previous frame in this TCP stream: 0.000039000 seconds]
+    [SEQ/ACK analysis]
+        [iRTT: 0.000091000 seconds]
+        [Bytes in flight: 834]
+        [Bytes sent since last PSH flag: 834]
+    TCP payload (834 bytes)
+Hypertext Transfer Protocol
+    PATCH /tunetrees/tune/7281 HTTP/1.1\r\n
+        Request Method: PATCH
+        Request URI: /tunetrees/tune/7281
+        Request Version: HTTP/1.1
+    Host: localhost:8000\r\n
+    Connection: keep-alive\r\n
+    Content-Length: 193\r\n
+        [Content length: 193]
+    sec-ch-ua-platform: "macOS"\r\n
+    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36\r\n
+    accept: application/json\r\n
+    sec-ch-ua: "Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"\r\n
+    Content-Type: application/json\r\n
+    sec-ch-ua-mobile: ?0\r\n
+    Origin: http://localhost:8000\r\n
+    Sec-Fetch-Site: same-origin\r\n
+    Sec-Fetch-Mode: cors\r\n
+    Sec-Fetch-Dest: empty\r\n
+    Referer: http://localhost:8000/docs\r\n
+    Accept-Encoding: gzip, deflate, br, zstd\r\n
+    Accept-Language: en-US,en;q=0.9\r\n
+    \r\n
+    [Response in frame: 7219]
+    [Full request URI: http://localhost:8000/tunetrees/tune/7281]
+    File Data: 193 bytes
+JavaScript Object Notation: application/json
+    Object
+        Member: title
+            [Path with value: /title:Sí Bheag, Sí Mhór]
+            [Member with value: title:Sí Bheag, Sí Mhór]
+            String value: Sí Bheag, Sí Mhór
+            Key: title
+            [Path: /title]
+        Member: type
+            [Path with value: /type:air/waltz]
+            [Member with value: type:air/waltz]
+            String value: air/waltz
+            Key: type
+            [Path: /type]
+        Member: structure
+            [Path with value: /structure:AABB]
+            [Member with value: structure:AABB]
+            String value: AABB
+            Key: structure
+            [Path: /structure]
+        Member: mode
+            [Path with value: /mode:D Major]
+            [Member with value: mode:D Major]
+            String value: D Major
+            Key: mode
+            [Path: /mode]
+        Member: incipit
+            [Path with value: /incipit:de|:f3e d2|d2 de d2|B4 A2|F4 A2|]
+            [Member with value: incipit:de|:f3e d2|d2 de d2|B4 A2|F4 A2|]
+            String value: de|:f3e d2|d2 de d2|B4 A2|F4 A2|
+            Key: incipit
+            [Path: /incipit]
+        Member: genre
+            [Path with value: /genre:ITRAD]
+            [Member with value: genre:ITRAD]
+            String value: ITRAD
+            Key: genre
+            [Path: /genre]
+        Member: deleted
+            [Path with value: /deleted:false]
+            [Member with value: deleted:false]
+            False value
+            Key: deleted
+            [Path: /deleted]

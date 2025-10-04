@@ -1,0 +1,45 @@
+# Page snapshot
+
+```yaml
+- banner:
+  - link "Home TuneTrees":
+    - /url: /
+    - button "Home TuneTrees":
+      - img "Home"
+      - text: TuneTrees
+  - 'button "Instrument: (id-1)"'
+  - button "sboagy@gmail.com Scott Boag":
+    - text: sboagy@gmail.com
+    - img "Scott Boag"
+  - button "Toggle theme"
+- main:
+  - paragraph: No Tune selected
+  - separator
+  - tablist:
+    - tab "Practice" [selected]
+    - tab "Repertoire"
+    - tab "Catalog"
+    - tab "Analysis"
+    - button "Tabs"
+  - tabpanel "Practice":
+    - paragraph: No scheduled tunes
+    - paragraph: Add tunes from backlog.
+    - button "Add from Backlog"
+- contentinfo:
+  - img
+  - link "Whitepaper":
+    - /url: https://github.com/sboagy/tunetrees/blob/main/docs/core-proposal.md
+  - link "Source on GitHub":
+    - /url: https://github.com/sboagy/tunetrees
+  - link "Spaced Repetition Terminology":
+    - /url: https://github.com/sboagy/tunetrees/blob/main/docs/sr_readme.md
+  - link "Contact":
+    - /url: mailto:sboag@tunetrees.com
+  - link "Policy":
+    - /url: /policy
+  - region "Notifications (F8)":
+    - list
+- region "Notifications (F8)":
+  - list
+- alert
+```
