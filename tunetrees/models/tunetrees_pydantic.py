@@ -328,6 +328,9 @@ class TabGroupMainStateModel(BaseModel):
     which_tab: WhichTabEnum
     playlist_id: int
     tab_spec: Optional[str] = None
+    # Newly persisted Practice tab UI flags
+    practice_show_submitted: Optional[bool] = False
+    practice_mode_flashcard: Optional[bool] = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -338,6 +341,8 @@ class TabGroupMainStateModelPartial(BaseModel):
     which_tab: Optional[WhichTabEnum] = None
     playlist_id: Optional[int] = None
     tab_spec: Optional[str] = None
+    practice_show_submitted: Optional[bool] = None
+    practice_mode_flashcard: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -407,13 +412,14 @@ class PracticeRecordModel(BaseModel):
     easiness: Optional[float]
     interval: Optional[int]
     repetitions: Optional[int]
-    review_date: Optional[str]
+    due: Optional[str]  # NEXT due snapshot (immutable) written at evaluation time
     backup_practiced: Optional[str]
     stability: Optional[float]
     elapsed_days: Optional[int]
     lapses: Optional[int]
     state: Optional[int]
     difficulty: Optional[float]
+    stability: Optional[float]
     step: Optional[int]
     goal: Optional[str] = "recall"
     technique: Optional[str]
@@ -430,13 +436,14 @@ class PracticeRecordModelPartial(BaseModel):
     easiness: Optional[float] = None
     interval: Optional[int] = None
     repetitions: Optional[int] = None
-    review_date: Optional[str] = None
+    due: Optional[str] = None  # NEXT due snapshot (immutable)
     backup_practiced: Optional[str] = None
     stability: Optional[float] = None
     elapsed_days: Optional[int] = None
     lapses: Optional[int] = None
     state: Optional[int] = None
     difficulty: Optional[float] = None
+    stability: Optional[float] = None
     step: Optional[int] = None
     goal: Optional[str] = "recall"
     technique: Optional[str] = None
@@ -452,6 +459,22 @@ class TableTransientDataModel(BaseModel):
     note_private: Optional[str]
     note_public: Optional[str]
     recall_eval: Optional[str]
+    # Staged practice outcome fields
+    practiced: Optional[str] = None
+    quality: Optional[int] = None
+    easiness: Optional[float] = None
+    difficulty: Optional[float] = None
+    stability: Optional[float] = None
+    interval: Optional[int] = None
+    step: Optional[int] = None
+    repetitions: Optional[int] = None
+    due: Optional[str] = None
+    backup_practiced: Optional[str] = None
+    goal: Optional[str] = None
+    technique: Optional[str] = None
+    stability: Optional[float] = None
+    # FSRS/SM2 stage: transient state value (mirrors practice_record.state)
+    state: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -464,6 +487,20 @@ class TableTransientDataModelPartial(BaseModel):
     note_private: Optional[str] = None
     note_public: Optional[str] = None
     recall_eval: Optional[str] = None
+    practiced: Optional[str] = None
+    quality: Optional[int] = None
+    easiness: Optional[float] = None
+    difficulty: Optional[float] = None
+    stability: Optional[float] = None
+    interval: Optional[int] = None
+    step: Optional[int] = None
+    repetitions: Optional[int] = None
+    due: Optional[str] = None
+    backup_practiced: Optional[str] = None
+    goal: Optional[str] = None
+    technique: Optional[str] = None
+    stability: Optional[float] = None
+    state: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -562,16 +599,18 @@ class PlaylistTuneJoinedModel(BaseModel):
     learned: Optional[str] = None
     goal: Optional[str] = None
     scheduled: Optional[str] = (
-        None  # Next review date for this tune from playlist_tune table
+        None  # Transient manual override of next due (cleared on evaluation)
     )
     latest_practiced: Optional[str] = None
     latest_quality: Optional[int] = None
     latest_easiness: Optional[float] = None
     latest_difficulty: Optional[float] = None
+    latest_stability: Optional[float] = None
     latest_interval: Optional[int] = None
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
-    latest_review_date: Optional[str] = None
+    latest_state: Optional[int] = None
+    latest_due: Optional[str] = None
     latest_technique: Optional[str] = None
     latest_goal: Optional[str] = None
     tags: Optional[str] = None
@@ -580,6 +619,9 @@ class PlaylistTuneJoinedModel(BaseModel):
     favorite_url: Optional[str] = None
     playlist_deleted: Optional[bool] = None
     has_override: Optional[bool] = None
+    bucket: Optional[int] = (
+        None  # Daily practice classification (1=due today,2=recently lapsed,3=backfill)
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -596,7 +638,7 @@ class PracticeListStagedModel(BaseModel):
     deleted: Optional[bool] = None
     learned: Optional[str] = None
     goal: Optional[str] = None
-    scheduled: Optional[str] = None  # Next review date for this tune in this playlist
+    scheduled: Optional[str] = None  # Transient manual override (may be cleared)
     user_ref: Optional[int] = None
     playlist_id: Optional[int] = None
     instrument: Optional[str] = None
@@ -605,10 +647,14 @@ class PracticeListStagedModel(BaseModel):
     latest_quality: Optional[int] = None
     latest_easiness: Optional[float] = None
     latest_difficulty: Optional[float] = None
+    latest_stability: Optional[float] = None
     latest_interval: Optional[int] = None
     latest_step: Optional[int] = None
     latest_repetitions: Optional[int] = None
-    latest_review_date: Optional[str] = None
+    latest_state: Optional[int] = None
+    latest_due: Optional[str] = (
+        None  # Canonical next due snapshot from last PracticeRecord
+    )
     latest_backup_practiced: Optional[str] = None
     latest_technique: Optional[str] = None
     latest_goal: Optional[str] = None
@@ -620,6 +666,7 @@ class PracticeListStagedModel(BaseModel):
     notes: Optional[str] = None
     favorite_url: Optional[str] = None
     has_override: Optional[bool] = None
+    has_staged: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -818,3 +865,146 @@ class GenreTuneTypeModelPartial(BaseModel):
     tune_type_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DailyPracticeQueueModel(BaseModel):
+    """Snapshot of a tune selected for a user's daily (or rolling) practice window.
+
+    Fields ending with `_snapshot` capture the scheduling state at generation time so later
+    mutations to underlying scheduling data (e.g., new reviews) don't retroactively change
+    the frozen queue ordering. `bucket` + `order_index` deterministically order the queue.
+    `completed_at` is null until the user practices the tune within the window.
+    """
+
+    id: int
+    user_ref: int
+    playlist_ref: int
+    mode: Optional[str] = None  # e.g., 'per_day' or 'rolling'
+    queue_date: Optional[str] = None  # For per_day mode (local date as string)
+    window_start_utc: str
+    window_end_utc: str
+    tune_ref: int
+    bucket: int  # 1=today due, 2=recently lapsed, 3=backfill (see design #237)
+    order_index: int
+    snapshot_coalesced_ts: str
+    scheduled_snapshot: Optional[str] = None
+    latest_due_snapshot: Optional[str] = None
+    acceptable_delinquency_window_snapshot: Optional[int] = None
+    tz_offset_minutes_snapshot: Optional[int] = None
+    generated_at: str
+    completed_at: Optional[str] = None
+    exposures_required: Optional[int] = None
+    exposures_completed: Optional[int] = 0
+    outcome: Optional[str] = None  # Future: practice outcome summary / qualitative tag
+    active: Optional[bool] = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DailyPracticeQueueModelPartial(BaseModel):
+    id: Optional[int] = None
+    user_ref: Optional[int] = None
+    playlist_ref: Optional[int] = None
+    mode: Optional[str] = None
+    queue_date: Optional[str] = None
+    window_start_utc: Optional[str] = None
+    window_end_utc: Optional[str] = None
+    tune_ref: Optional[int] = None
+    bucket: Optional[int] = None
+    order_index: Optional[int] = None
+    snapshot_coalesced_ts: Optional[str] = None
+    scheduled_snapshot: Optional[str] = None
+    latest_due_snapshot: Optional[str] = None
+    acceptable_delinquency_window_snapshot: Optional[int] = None
+    tz_offset_minutes_snapshot: Optional[int] = None
+    generated_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    exposures_required: Optional[int] = None
+    exposures_completed: Optional[int] = None
+    outcome: Optional[str] = None
+    active: Optional[bool] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Composite enriched practice queue entry (queue snapshot + tune metadata)
+# ---------------------------------------------------------------------------
+class PracticeQueueEntryModel(BaseModel):
+    """Enriched practice queue row returned by the practice queue endpoints.
+
+    Combines the frozen daily/rolling queue snapshot fields (prefixed or suffixed
+    with *_snapshot) and selected tune metadata joined from the staged overlay
+    view (t_practice_list_staged). This avoids persisting duplicate metadata in
+    the queue table while still giving the frontend everything it needs to render
+    the scheduled practice grid.
+
+    Design notes:
+        * favorite_url is sourced dynamically from the staged view (via a JOIN) and
+            is intentionally NOT stored in DailyPracticeQueue or PracticeRecord to
+            avoid duplication / drift.
+        * recall_eval & has_staged surface transient staged review state so the UI
+            can reflect pending feedback without re-deriving it.
+        * tune_title kept distinct from queue row "title" to avoid clobbering; the
+            frontend currently maps tune_title -> title for display.
+        * mode_key holds the tune's musical mode (e.g. Dorian) so we don't collide
+            with the queue's own "mode" (per_day / rolling etc.).
+    """
+
+    # Queue snapshot fields
+    id: int
+    user_ref: int
+    playlist_ref: int
+    mode: Optional[str] = None
+    queue_date: Optional[str] = None
+    window_start_utc: str
+    window_end_utc: str
+    tune_ref: int
+    bucket: Optional[int] = None
+    order_index: int
+    snapshot_coalesced_ts: str
+    scheduled_snapshot: Optional[str] = None
+    latest_due_snapshot: Optional[str] = None
+    acceptable_delinquency_window_snapshot: Optional[int] = None
+    tz_offset_minutes_snapshot: Optional[int] = None
+    generated_at: str
+    completed_at: Optional[str] = None
+    exposures_required: Optional[int] = None
+    exposures_completed: Optional[int] = None
+    outcome: Optional[str] = None
+    active: Optional[bool] = None
+
+    # Joined tune metadata (all optional – may be absent if join fails)
+    tune_title: Optional[str] = None
+    type: Optional[str] = None
+    structure: Optional[str] = None
+    mode_key: Optional[str] = None
+    incipit: Optional[str] = None
+    genre: Optional[str] = None
+    learned: Optional[str] = None
+    goal: Optional[str] = None
+    scheduled: Optional[str] = None
+    latest_practiced: Optional[str] = None
+    latest_quality: Optional[int] = None
+    latest_easiness: Optional[float] = None
+    latest_difficulty: Optional[float] = None
+    latest_stability: Optional[float] = None
+    latest_interval: Optional[int] = None
+    latest_step: Optional[int] = None
+    latest_repetitions: Optional[int] = None
+    latest_due: Optional[str] = None
+    latest_backup_practiced: Optional[str] = None
+    latest_goal: Optional[str] = None
+    latest_technique: Optional[str] = None
+    tags: Optional[str] = None
+    playlist_deleted: Optional[bool] = None
+    notes: Optional[str] = None
+    favorite_url: Optional[str] = None
+    has_override: Optional[bool] = None
+    deleted: Optional[bool] = None
+    private_for: Optional[int] = None
+    tune_id: Optional[int] = None
+    recall_eval: Optional[str] = None
+    has_staged: Optional[bool] = None
+
+    model_config = ConfigDict(from_attributes=True, extra="ignore")

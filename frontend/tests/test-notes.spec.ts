@@ -1,9 +1,19 @@
-import { setTestDefaults } from "../test-scripts/set-test-defaults";
+import { expect, test } from "@playwright/test";
+import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
+import {
+  logBrowserContextEnd,
+  logBrowserContextStart,
+  logTestEnd,
+  logTestStart,
+} from "@/test-scripts/test-logging";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
-import { expect, test } from "@playwright/test";
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
+
+const testTimeout = process.env.CI ? 3 * 60 * 1000 : 1 * 60 * 1000;
+test.setTimeout(testTimeout);
 
 test.use({
   storageState: getStorageState("STORAGE_STATE_TEST1"),
@@ -12,17 +22,22 @@ test.use({
 });
 
 test.beforeEach(async ({ page }, testInfo) => {
-  console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
+  logTestStart(testInfo);
+  logBrowserContextStart();
   // doConsolelogs(page, testInfo);
   // await page.waitForTimeout(1);
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
+  await checkHealth();
 });
 
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
   await page.waitForTimeout(1_000);
+  logBrowserContextEnd();
+  logTestEnd(testInfo);
+  await checkHealth();
 });
 
 test("test-notes-1", async ({ page }) => {
@@ -32,7 +47,11 @@ test("test-notes-1", async ({ page }) => {
 
   await page.getByPlaceholder("Filter").click();
   await page.getByPlaceholder("Filter").fill("Peacock's Feather");
-  await page.getByRole("row", { name: "4377 Peacock's Feather Hpipe" }).click();
+  await page
+    .getByRole("row", { name: "4377 Peacock's Feather Hpipe" })
+    .getByRole("cell")
+    .nth(1)
+    .click();
 
   await page.waitForSelector("#current-tune-title", {
     state: "visible",
@@ -55,33 +74,42 @@ test("test-notes-1", async ({ page }) => {
   await newNoteLocator.click({ trial: true });
   await newNoteLocator.click();
   await ttPO.page.waitForLoadState("domcontentloaded");
-  await ttPO.page.waitForTimeout(1000);
+  await ttPO.page.waitForTimeout(1500);
 
   const noteEditBoxLocator = page.locator(".jodit-wysiwyg");
   await expect(noteEditBoxLocator).toBeVisible();
   await expect(noteEditBoxLocator).toBeEditable();
   await noteEditBoxLocator.click();
-  await ttPO.page.waitForTimeout(1000);
+
+  // Wait for things to calm down before typing into the editor.
+  await ttPO.page.waitForLoadState("domcontentloaded");
+  await page.waitForTimeout(2000);
 
   const newNoteText = "abcdef";
 
-  await noteEditBoxLocator.pressSequentially(newNoteText, { delay: 100 });
+  await noteEditBoxLocator.pressSequentially(newNoteText, { delay: 200 });
 
   const saveEditButtonLocator = page.getByTestId("tt-save-note");
   await expect(saveEditButtonLocator).toBeVisible();
   await expect(saveEditButtonLocator).toBeEnabled();
 
-  const responsePromise = page.waitForResponse(
-    (response) =>
-      response.url() === "https://localhost:3000/home" &&
-      response.status() === 200 &&
-      response.request().method() === "POST",
-  );
+  const responsePromise = page.waitForResponse((response) => {
+    try {
+      const u = new URL(response.url());
+      return (
+        u.pathname === "/home" &&
+        response.status() === 200 &&
+        response.request().method() === "POST"
+      );
+    } catch {
+      return false;
+    }
+  });
   await saveEditButtonLocator.click();
   await responsePromise;
 
   // Wait for the DOM to calm down by ensuring no network activity and a short pause
-  await page.waitForLoadState("networkidle");
+  // await page.waitForLoadState("networkidle");
   await page.waitForLoadState("domcontentloaded");
   await page.waitForTimeout(500);
 

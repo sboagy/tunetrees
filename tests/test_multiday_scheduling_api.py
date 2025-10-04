@@ -4,24 +4,24 @@ Multi-day scheduling validation tests using direct API calls.
 This module tests the spaced repetition scheduling over extended periods by:
 1. Simulating practice sessions via API endpoints over 30 days
 2. Validating that scheduling algorithms (FSRS/SM2) work correctly
-3. Ensuring scheduled vs latest_review_date behavior is correct
+3. Ensuring scheduled vs latest_due behavior is correct
 4. Testing various quality feedback patterns and their scheduling outcomes
 """
 
-import pytest
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
+import pytest
+import pytz
+from dateutil import parser
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from tunetrees.api.main import app
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.schedule import TT_DATE_FORMAT
-from tunetrees.models.tunetrees import PracticeRecord, PlaylistTune
-from dateutil import parser
-import pytz
+from tunetrees.models.tunetrees import PlaylistTune, PracticeRecord
 
 
 @pytest.mark.skip(reason="Multiday scheduling tests not ready - skipping for now")
@@ -61,14 +61,16 @@ class TestMultiDayScheduling:
 
         # This simulates what the repertoire endpoint returns
         query_result = db.execute(
-            text("""
+            text(
+                """
                 SELECT id, title, type, scheduled
                 FROM practice_list_staged
                 WHERE playlist_id = :playlist_id
                 AND deleted = 0
                 ORDER BY id
                 LIMIT 1000
-            """),
+            """
+            ),
             {"playlist_id": playlist_id},
         )
 
@@ -219,23 +221,21 @@ class TestMultiDayScheduling:
         pytest.skip("SM2 vs FSRS comparison test - to be implemented")
         print("✅ test_sm2_vs_fsrs_comparison completed successfully (skipped)")
 
-    def test_scheduled_vs_latest_review_date_consistency(
+    def test_scheduled_vs_latest_due_consistency(
         self,
         client: TestClient,
         clean_test_data: List[Dict[str, Any]],
         db_session: Session,
     ):
-        """Verify that scheduled column is used for scheduling, not latest_review_date."""
+        """Verify that scheduled column is used for scheduling, not latest_due."""
         playlist_id = 1
         test_tune_id = clean_test_data[0]["id"]
         base_date = datetime.now(timezone.utc).replace(
             hour=10, minute=0, second=0, microsecond=0
         )
-        print(
-            "✅ test_scheduled_vs_latest_review_date_consistency completed successfully"
-        )
+        print("✅ test_scheduled_vs_latest_due_consistency completed successfully")
 
-        print(f"\n🔍 Testing scheduled vs latest_review_date for tune {test_tune_id}")
+        print(f"\n🔍 Testing scheduled vs latest_due for tune {test_tune_id}")
 
         # Day 1: Practice the tune
         day1_date = base_date
@@ -271,16 +271,16 @@ class TestMultiDayScheduling:
         )
         assert playlist_tune is not None, "PlaylistTune should exist"
 
-        # Verify that scheduled and latest_review_date are initially the same
-        latest_review_date = practice_record.review_date
+        # Verify that scheduled and latest_due are initially the same
+        latest_due = practice_record.due
         scheduled_date = playlist_tune.scheduled
 
         print("📊 After day 1:")
-        print(f"  latest_review_date: {latest_review_date}")
+        print(f"  latest_due: {latest_due}")
         print(f"  scheduled: {scheduled_date}")
 
-        assert latest_review_date == scheduled_date, (
-            "Initially, scheduled should equal latest_review_date"
+        assert latest_due == scheduled_date, (
+            "Initially, scheduled should equal latest_due"
         )
 
         # Calculate what day this tune should next appear
@@ -293,10 +293,8 @@ class TestMultiDayScheduling:
 
         # Check scheduling on the expected day
         if days_until_next > 0:
-            next_review_date = day1_date + timedelta(days=days_until_next)
-            scheduled_tunes = self._get_scheduled_tunes(
-                client, playlist_id, next_review_date
-            )
+            next_due = day1_date + timedelta(days=days_until_next)
+            scheduled_tunes = self._get_scheduled_tunes(client, playlist_id, next_due)
 
             scheduled_tune_ids = [t["id"] for t in scheduled_tunes]
 
@@ -308,10 +306,8 @@ class TestMultiDayScheduling:
                 f"Tune {test_tune_id} should be scheduled on day {days_until_next + 1}"
             )
 
-        print("✅ Scheduled vs latest_review_date test passed!")
-        print(
-            "✅ test_scheduled_vs_latest_review_date_consistency completed successfully"
-        )
+        print("✅ Scheduled vs latest_due test passed!")
+        print("✅ test_scheduled_vs_latest_due_consistency completed successfully")
 
     def _validate_scheduling_patterns(
         self, scheduling_log: List[Dict[str, Any]], test_tunes: List[Dict[str, Any]]
@@ -384,9 +380,11 @@ class TestSchedulingAPIEndpoints:
         )
 
         # Should either succeed or fail gracefully
-        assert response.status_code in [200, 400, 422], (
-            f"Unexpected status: {response.status_code}"
-        )
+        assert response.status_code in [
+            200,
+            400,
+            422,
+        ], f"Unexpected status: {response.status_code}"
         print("✅ test_submit_feedbacks_endpoint completed successfully")
 
     def test_scheduled_tunes_endpoint(self):

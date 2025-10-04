@@ -12,6 +12,7 @@ import {
   logBrowserContextStart,
   logBrowserContextEnd,
 } from "../test-scripts/test-logging";
+import { restartBackend } from "@/test-scripts/global-setup";
 
 test.beforeEach(async ({ page }, testInfo) => {
   logTestStart(testInfo);
@@ -22,18 +23,19 @@ test.beforeEach(async ({ page }, testInfo) => {
 
 test.afterEach(async ({ page }, testInfo) => {
   // tiny pause to ensure logs flush
+  await restartBackend();
   await page.waitForTimeout(10);
   logBrowserContextEnd();
   logTestEnd(testInfo);
 });
 
-test("user-settings redirects to account and button is disabled until dirty", async ({
+test("user-settings redirects to scheduling-options then account form works", async ({
   page,
 }) => {
   await checkHealth();
 
   // Login first
-  await navigateToPageWithRetry(page, "https://localhost:3000");
+  await navigateToPageWithRetry(page, "/");
   if (process.env.SAVE_COOKIES === "true") {
     await runLoginWithCookieSave(
       page,
@@ -48,15 +50,20 @@ test("user-settings redirects to account and button is disabled until dirty", as
     );
   }
 
-  // Navigate to /user-settings and verify redirect to /user-settings/account
-  await page.goto("https://localhost:3000/user-settings", {
+  // Navigate to /user-settings and verify redirect to /user-settings/scheduling-options (default tab)
+  await page.goto("/user-settings", {
     waitUntil: "domcontentloaded",
   });
   await page.waitForLoadState("domcontentloaded");
 
+  await expect(page).toHaveURL(/\/user-settings\/scheduling-options$/);
+
+  // Navigate to Account tab via sidebar
+  const accountLink = page.getByRole("link", { name: /Account/i });
+  await accountLink.click();
   await expect(page).toHaveURL(/\/user-settings\/account$/);
 
-  // Verify the submit button label and disabled state until a change is made
+  // Verify the submit button label and disabled state until a change is made on Account form
   const submitButton = page.getByRole("button", { name: "Update account" });
   await expect(submitButton).toBeVisible();
   await expect(submitButton).toBeDisabled();

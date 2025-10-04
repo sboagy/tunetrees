@@ -1,4 +1,5 @@
 import type { Locator, Page, Response } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { TuneTreesPageObject } from "./tunetrees.po";
 
 // await ttPO.ffTitle.fill("Boyne Hunt x");
@@ -69,7 +70,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
     this.ffEasiness = this.form.getByTestId("tt-tune-editor-easiness");
     this.ffInterval = this.form.getByTestId("tt-tune-editor-interval");
     this.ffRepetitions = this.form.getByTestId("tt-tune-editor-repetitions");
-    this.ffReviewDate = this.form.getByTestId("tt-tune-editor-review_date");
+    this.ffReviewDate = this.form.getByTestId("tt-tune-editor-due");
     this.ffTags = this.form.getByTestId("tt-tune-editor-tags");
 
     this.allFormFields = [
@@ -173,7 +174,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
         modification: "",
         original: "",
         // TODO: Have to factor out date formatting and maybe (?) time zone issues
-        // cellId: "200_review_date",
+        // cellId: "200_due",
       },
     };
 
@@ -254,7 +255,7 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
       //   modification: "2023-06-07T18:25:16",
       //   original: "2023-06-07T18:25:16",
       //   // TODO: Have to factor out date formatting and maybe (?) time zone issues
-      //   // cellId: "200_review_date",
+      //   // cellId: "200_due",
       // },
     ];
 
@@ -293,7 +294,42 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
       node.tagName.toLowerCase(),
     );
     if (tagName === "input") {
-      await formField.locator.fill(formField.modification);
+      // Fill with resilience against React re-renders wiping the field
+      const fillAndVerify = async () => {
+        await expect(formField.locator).toBeAttached();
+        await expect(formField.locator).toBeVisible();
+        await expect(formField.locator).toBeEditable();
+        await formField.locator.fill(formField.modification);
+        // Brief pause to allow any onChange handlers to run
+        await this.page.waitForTimeout(50);
+        await formField.locator.press("Tab");
+        await this.page.waitForTimeout(10);
+        // Verify the value stuck; if not, retry below
+        const deadline = Date.now() + 2000;
+        while (Date.now() < deadline) {
+          try {
+            const v = await formField.locator.inputValue();
+            if (v === formField.modification) return true;
+          } catch {
+            // ignore transient detach during render
+          }
+          await this.page.waitForTimeout(100);
+        }
+        return false;
+      };
+
+      let ok = await fillAndVerify();
+      if (!ok) {
+        // One targeted retry after a short delay
+        await this.page.waitForTimeout(200);
+        ok = await fillAndVerify();
+      }
+      if (!ok) {
+        // As a last resort, assert current value equals desired to surface clear error in tests
+        await expect(formField.locator).toHaveValue(formField.modification, {
+          timeout: 1000,
+        });
+      }
     } else if (tagName === "select") {
       const selectedOption =
         formField.select_modification !== undefined
@@ -314,19 +350,68 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
 
   async openTuneEditorForCurrentTune(): Promise<void> {
     await this.page.waitForLoadState("domcontentloaded");
-    await this.sidebarButton.waitFor({
-      state: "attached",
-      timeout: 60000,
-    });
-    await this.sidebarButton.waitFor({
-      state: "visible",
-      timeout: 60000,
-    });
-    await this.sidebarButton.isEnabled();
+    const waitForSidebar = async () => {
+      await this.sidebarButton.waitFor({
+        state: "attached",
+        timeout: 60_000,
+      });
+      await this.sidebarButton.waitFor({
+        state: "visible",
+        timeout: 60_000,
+      });
+      await this.sidebarButton.isEnabled();
+    };
+    try {
+      await waitForSidebar();
+    } catch (error) {
+      // Recover from a transient full page reload/closure in Next.js dev
+      if (this.page.isClosed()) {
+        throw error; // cannot recover without a page
+      }
+      try {
+        await this.page.reload({ waitUntil: "domcontentloaded" });
+      } catch {
+        // ignore
+      }
+      // Ensure main UI is available again
+      try {
+        await this.navigateToRepertoireTabDirectly(0);
+      } catch {
+        // best-effort, continue
+      }
+      await waitForSidebar();
+    }
 
-    await this.sidebarButton.click();
-    await this.form.waitFor({ state: "visible" });
-    await this.IdTitle.waitFor({ state: "visible" });
+    // Click and wait for the editor form to appear with a self-healing retry
+    const tryOpen = async (): Promise<boolean> => {
+      try {
+        await this.sidebarButton.click();
+        await this.form.waitFor({ state: "visible", timeout: 12_000 });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    let opened = await tryOpen();
+    if (!opened) {
+      console.warn(
+        "[TuneEditor] Edit form failed to appear. Reloading and retrying once...",
+      );
+      try {
+        await this.page.reload({ waitUntil: "domcontentloaded" });
+      } catch {
+        // ignore reload errors
+      }
+      await this.sidebarButton.waitFor({ state: "visible", timeout: 15_000 });
+      await this.sidebarButton.isEnabled();
+      opened = await tryOpen();
+    }
+    if (!opened) {
+      throw new Error("Tune editor form did not appear after retry");
+    }
+
+    await this.IdTitle.waitFor({ state: "visible", timeout: 15_000 });
 
     console.log("===> tune-editor.po.ts:32 ~ ");
   }
@@ -336,16 +421,108 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
 
     // const titleFormFieldLocator = page.getByTestId("tt-tune-editor-title");
     // const titleFormFieldLocator = page.getByLabel("Title:");
-    const formFieldLocator = this.form.getByTestId(formFieldTestId);
+    let formFieldLocator = this.form.getByTestId(formFieldTestId);
+
     await formFieldLocator.waitFor({ state: "attached" });
     await formFieldLocator.waitFor({ state: "visible" });
 
-    const formFieldTextBox: Locator = formFieldLocator.getByRole("textbox");
+    let formFieldTextBox: Locator = formFieldLocator.getByRole("textbox");
+
     await formFieldTextBox.waitFor({ state: "attached" });
     await formFieldTextBox.waitFor({ state: "visible" });
 
-    const formFieldText4 = await formFieldTextBox.inputValue();
-    console.log("===> test-edit-1.spec.ts:57 ~ formFieldText3", formFieldText4);
+    // Try a short, bounded wait for server-action hydration to populate the input value.
+    // This improves stability when the first fetch briefly fails and retries.
+    const tryHydration = async (deadlineMs: number): Promise<string> => {
+      let value = "";
+      const deadline = Date.now() + deadlineMs;
+      while (Date.now() < deadline) {
+        // Bail out cleanly if the page is closing/closed to avoid post-test timeouts
+        const state = this.page.context()?.browser()?.isConnected?.() ?? true;
+        if (!state) break;
+        if (this.page.isClosed()) break;
+        try {
+          value = await formFieldTextBox.inputValue();
+          if (value !== "") break;
+        } catch {
+          // ignore transient detach/errors during render
+        }
+        try {
+          await this.page.waitForTimeout(200);
+        } catch {
+          break; // test likely ended
+        }
+      }
+      return value;
+    };
+
+    let observedValue = await tryHydration(8_000);
+
+    // Final recovery: if still empty, reload page, reselect current tune, reopen editor, and retry once more
+    if (observedValue === "") {
+      console.warn(
+        "[TuneEditor] Field still empty after reopen. Performing full recovery: reload page, reselect tune, reopen editor...",
+      );
+      // Capture the current tune title to reselect after reload
+      const currentTitle = await this.currentTuneTitle
+        .textContent()
+        .then((t) => t?.trim())
+        .catch(() => null);
+      // Close editor if visible
+      try {
+        const cancelBtn = this.page.getByRole("button", { name: "Cancel" });
+        await expect(cancelBtn).toBeVisible();
+        if (await cancelBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+          await this.clickWithTimeAfter(cancelBtn);
+          await this.form
+            .waitFor({ state: "hidden", timeout: 5_000 })
+            .catch(() => undefined);
+        }
+      } catch {
+        // ignore
+      }
+      try {
+        await this.page.reload({ waitUntil: "domcontentloaded" });
+      } catch {
+        // ignore
+      }
+      // Navigate back to Repertoire and reselect the tune if we know it
+      await this.navigateToRepertoireTabDirectly(0);
+      if (currentTitle) {
+        try {
+          await this.filterInput.fill("");
+          await this.filterInput.fill(currentTitle);
+          await this.waitForTablePopulationToStart();
+          // Click the first matching row/cell
+          const row = this.page
+            .getByRole("row", { name: currentTitle })
+            .first();
+          if (await row.isVisible().catch(() => false)) {
+            await this.clickWithTimeAfter(row);
+          }
+          await expect(this.currentTuneTitle).toContainText(currentTitle, {
+            timeout: 10_000,
+          });
+        } catch {
+          // best-effort
+        }
+      }
+      // Reopen editor and retry hydration
+      await this.openTuneEditorForCurrentTune();
+      const finalFormField = this.form.getByTestId(formFieldTestId);
+      await finalFormField.waitFor({ state: "attached" });
+      await finalFormField.waitFor({ state: "visible" });
+      const finalTextBox: Locator = finalFormField.getByRole("textbox");
+      await finalTextBox.waitFor({ state: "attached" });
+      await finalTextBox.waitFor({ state: "visible" });
+      formFieldLocator = finalFormField;
+      formFieldTextBox = finalTextBox;
+      observedValue = await tryHydration(8_000);
+    }
+    console.log(
+      "===> test-edit-1.spec.ts:57 ~ formFieldText3 (post-hydration)",
+      observedValue,
+    );
 
     await formFieldTextBox.isEditable();
     await formFieldTextBox.click();
@@ -379,23 +556,46 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
   // }
 
   async pressButton(buttonName: string): Promise<Response> {
+    // Be protocol/baseURL agnostic; the editor posts to /home on save/cancel
     const responsePromise: Promise<Response> = this.page.waitForResponse(
       (response) =>
-        response.url() === "https://localhost:3000/home" &&
+        new URL(response.url()).pathname === "/home" &&
         response.status() === 200 &&
         response.request().method() === "POST",
     );
-    await this.page.getByRole("button", { name: buttonName }).click();
+    await this.clickWithTimeAfter(
+      this.page.getByRole("button", { name: buttonName }),
+    );
     return responsePromise;
   }
 
   async pressSave(): Promise<Response> {
     const response = await this.pressButton("Save");
+    await this.page.waitForTimeout(500);
+    try {
+      // Wait for the editor form to be fully removed from the DOM after save
+      await this.form.waitFor({ state: "detached", timeout: 15_000 });
+    } catch {
+      // Best-effort: if it didn't detach, log and continue so tests can surface a clear failure later
+      console.warn("[TuneEditor] form did not detach after save (continuing)");
+    }
     return response;
   }
 
   async pressCancel(): Promise<Response> {
+    const cancelButton = this.page.getByRole("button", { name: "Cancel" });
+    await expect(cancelButton).toBeAttached();
+    await expect(cancelButton).toBeVisible();
+    await expect(cancelButton).toBeEnabled();
     const response = await this.pressButton("Cancel");
+    try {
+      // Wait for the editor form to be fully removed from the DOM after save
+      await this.form.waitFor({ state: "detached", timeout: 15_000 });
+    } catch {
+      // Best-effort: if it didn't detach, log and continue so tests can surface a clear failure later
+      console.warn("[TuneEditor] form did not detach after save (continuing)");
+    }
+    await this.page.waitForTimeout(500);
     return response;
   }
 }

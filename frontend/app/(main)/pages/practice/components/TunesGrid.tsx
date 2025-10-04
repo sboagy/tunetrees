@@ -1,4 +1,24 @@
 import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  horizontalListSortingStrategy,
+  SortableContext,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { Row, Table as TanstackTable } from "@tanstack/react-table";
+import { flexRender } from "@tanstack/react-table";
+import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
   Table,
   TableBody,
   TableCell,
@@ -7,33 +27,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Row, Table as TanstackTable } from "@tanstack/react-table";
-import { flexRender } from "@tanstack/react-table";
-import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  arrayMove,
-  horizontalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { getColorForEvaluation } from "../quality-list";
 import { updateCurrentTuneInDb } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
+import { usePlaylist } from "./CurrentPlaylistProvider";
 import { useTune } from "./CurrentTuneContext";
 import { useMainPaneView } from "./MainPaneViewContext";
 import { get_columns } from "./TuneColumns";
-import { tableContext, saveTableState } from "./TunesTable";
+import { saveTableState, tableContext } from "./TunesTable";
 
 type Props = {
   table: TanstackTable<ITuneOverview>;
@@ -43,11 +44,16 @@ type Props = {
   onRowClickCallback?: (newTune: number) => void;
   getStyleForSchedulingState?: (
     reviewDate: string | null,
+    tuneId?: number,
   ) => string | undefined;
   lapsedCount?: number | null;
   currentCount?: number | null;
   futureCount?: number | null;
   newCount?: number | null;
+  onFooterDoubleClick?: () => void;
+  reviewedTodayCount?: number | null;
+  toBePracticedCount?: number | null;
+  reviewedCount?: number | null;
 };
 
 const TunesGrid = ({
@@ -61,6 +67,10 @@ const TunesGrid = ({
   currentCount,
   futureCount,
   newCount,
+  onFooterDoubleClick,
+  reviewedTodayCount,
+  toBePracticedCount,
+  reviewedCount,
 }: Props) => {
   const {
     currentTune,
@@ -86,7 +96,7 @@ const TunesGrid = ({
   // Listen for explicit sorting change events to ensure the virtualizer resets consistently
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const handler = (e: Event) => {
+    const handler = (_e: Event) => {
       // const detail = (e as CustomEvent<unknown>).detail;
       // console.warn("TunesGrid event tt-sorting-changed", detail);
       const el = tableBodyRef.current;
@@ -122,6 +132,13 @@ const TunesGrid = ({
         handler as EventListener,
       );
     };
+  }, []);
+
+  // Also re-render when column visibility changes (headers/leaf columns changed)
+  useEffect(() => {
+    const handler = () => setTableStateTick((t) => t + 1);
+    window.addEventListener("tt-visibility-changed", handler);
+    return () => window.removeEventListener("tt-visibility-changed", handler);
   }, []);
 
   // Subscribe to table state changes to trigger a lightweight re-render when sorting/order/filters update
@@ -675,6 +692,13 @@ const TunesGrid = ({
                             {/* Resizer */}
                             {header.column.getCanResize() && (
                               <div
+                                role="separator"
+                                aria-orientation="vertical"
+                                aria-label={`Resize ${header.column.id} column`}
+                                aria-valuemin={50}
+                                aria-valuemax={800}
+                                aria-valuenow={header.column.getSize?.() ?? 140}
+                                tabIndex={0}
                                 onMouseDown={makeEnhancedResizeHandler(
                                   header.getResizeHandler(),
                                 )}
@@ -715,6 +739,13 @@ const TunesGrid = ({
                           height: `${virtualRow.size}px`, // Set the height of the row
                         }}
                         data-row-id={row.original.id}
+                        data-testid={
+                          row.original.has_staged
+                            ? `staged-row-${row.original.id}`
+                            : row.original.completed_at
+                              ? `completed-row-${row.original.id}`
+                              : undefined
+                        }
                         // className={`absolute h-16 cursor-pointer w-full ${
                         //   currentTune === row.original.id
                         //     ? "outline outline-2 outline-blue-500"
@@ -722,12 +753,12 @@ const TunesGrid = ({
                         // } ${getColorForEvaluation(row.original.recall_eval || null)}`}
                         // className={`absolute h-16 cursor-pointer w-full ${getColorForEvaluation(row.original.recall_eval || null)}`}
                         className={`absolute cursor-pointer w-full 
-                        ${getStyleForSchedulingState ? getStyleForSchedulingState(row.original.scheduled || row.original.latest_review_date) : ""} 
+                        ${getStyleForSchedulingState ? getStyleForSchedulingState(row.original.scheduled || row.original.latest_due, row.original.id) : ""} 
                         ${
                           currentTune === row.original.id
                             ? "outline outline-blue-500"
                             : ""
-                        } ${getColorForEvaluation(row.original.recall_eval || null, false)}`}
+                        } ${getColorForEvaluation(row.original.recall_eval || null, false)} ${row.original.has_staged ? "ring-1 ring-amber-400/70 bg-amber-50 dark:bg-amber-900/20" : ""} ${row.original.completed_at ? "opacity-60" : ""}`}
                         onClick={handleRowClick.bind(null, row)}
                         onDoubleClick={() => handleRowDoubleClick(row)}
                         data-state={row.getIsSelected() && "selected"}
@@ -761,10 +792,24 @@ const TunesGrid = ({
           </div>
         </div>
         <Table className="hide-scrollbar ">
-          <TableFooter className="sticky bottom-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar">
+          <TableFooter
+            className="sticky bottom-0 bg-white dark:bg-gray-800 z-10 hide-scrollbar"
+            onDoubleClick={() => onFooterDoubleClick?.()}
+            data-testid="tt-table-footer"
+          >
             <TableRow id="tt-tunes-grid-footer">
               <TableCell
-                colSpan={get_columns(userId, playlistId, tablePurpose).length}
+                colSpan={
+                  get_columns(
+                    userId,
+                    playlistId,
+                    tablePurpose,
+                    undefined,
+                    undefined,
+                    undefined,
+                    usePlaylist()?.srAlgType ?? null,
+                  ).length
+                }
                 className="h-12"
               >
                 <div
@@ -773,10 +818,17 @@ const TunesGrid = ({
                 >
                   {table.getFilteredSelectedRowModel().rows.length} of{" "}
                   {table.getFilteredRowModel().rows.length} row(s) selected.
-                  {lapsedCount !== undefined && `, lapsed: ${lapsedCount}`}
-                  {currentCount !== undefined && `, current: ${currentCount}`}
+                  {lapsedCount !== undefined && `, overdue: ${lapsedCount}`}
+                  {currentCount !== undefined && `, due: ${currentCount}`}
                   {futureCount !== undefined && `, future: ${futureCount}`}
-                  {newCount !== undefined && `, new: ${newCount}`}
+                  {/* Queue-specific metrics (present for Practice tab) */}
+                  {newCount !== undefined && `, queue size: ${newCount}`}
+                  {reviewedTodayCount !== undefined &&
+                    `, submitted: ${reviewedTodayCount}`}
+                  {reviewedCount !== undefined &&
+                    `, reviewed: ${reviewedCount}`}
+                  {toBePracticedCount !== undefined &&
+                    `, toPractice: ${toBePracticedCount}`}
                 </div>
               </TableCell>
             </TableRow>

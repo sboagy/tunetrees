@@ -66,7 +66,7 @@ export const viewSettingsDefault = {
         visible: false,
         enabled: true, // is this column enabled at all for this table?
       },
-      review_date: {
+      due: {
         sort_direction: null, // null, "asc", "desc"
         visible: false,
         enabled: true, // is this column enabled at all for this table?

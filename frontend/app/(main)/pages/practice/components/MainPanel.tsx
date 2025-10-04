@@ -8,6 +8,7 @@ import { useSession, getSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import { usePlaylist } from "./CurrentPlaylistProvider";
+import { logVerbose } from "@/lib/logging";
 import { useTune } from "./CurrentTuneContext";
 import "./MainPanel.css";
 import { useMainPaneView } from "./MainPaneViewContext";
@@ -24,7 +25,8 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
   const { currentTune } = useTune();
   const sidebarRef = useRef<ImperativePanelHandle>(null);
   const { currentPlaylist: currentPlaylistId } = usePlaylist();
-  console.log(
+  const [isClient, setIsClient] = useState(false);
+  logVerbose(
     `LF1 render MainPanel: playlistId=${currentPlaylistId}, userId=${userId}`,
   );
 
@@ -39,18 +41,19 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
   };
 
   const { status } = useSession();
-  console.log("MainPanel ===> MainPanel.tsx:53 ~ status", status);
+  logVerbose("MainPanel status", status);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
     const refreshSession = async () => {
       if (status === "unauthenticated") {
-        console.log("MainPanel ===> Forcing session refresh...");
+        logVerbose("MainPanel forcing session refresh...");
         setIsRefreshing(true); // Indicate that the session is being refreshed
         try {
           const newSession = await getSession();
           if (newSession) {
-            console.log("MainPanel ===> Session refreshed:", newSession);
+            logVerbose("MainPanel session refreshed", newSession);
           } else {
             console.error("MainPanel ===> Failed to refresh session.");
           }
@@ -83,6 +86,10 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
     return <div>Not authenticated</div>;
   }
 
+  if (!isClient) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="main-panel">
       <ResizablePanelGroup direction="horizontal">
@@ -91,7 +98,9 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
           className={"sidebar flex flex-col overflow-y-auto"} // Add overflow-y-auto for vertical scrolling
           collapsedSize={0} // Set collapsed size to 0
           collapsible={true} // Enable collapsing
-          defaultSize={25} // Use current width
+          // NOTE: Keep sidebar at 24% so remaining panel can naturally flex to ~76%.
+          // We removed explicit 100% default on the content panel below to avoid layout total > 100% warnings.
+          defaultSize={24}
           minSize={12} // Adjust minimum size based on collapsed state
           // maxSize={35} // Adjust maximum size based on collapsed state
         >
@@ -107,10 +116,11 @@ const MainPanel: React.FC<IMainPanelProps> = ({ userId }) => {
         />
         <ResizablePanel
           className="content-panel flex-grow"
-          collapsedSize={0} // Set collapsed size to 0
-          collapsible={true} // Enable collapsing
-          defaultSize={100} // Use current width
-          minSize={65}
+          collapsedSize={0}
+          collapsible={true}
+          // Removed explicit defaultSize (previously 100) so library can auto-calc remaining space.
+          // Setting minSize ensures it won't collapse too small when sidebar is expanded.
+          minSize={70}
         >
           <div className="flex flex-col h-full">
             {currentView === "tabs" ? (

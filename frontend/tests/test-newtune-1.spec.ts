@@ -1,14 +1,15 @@
-import { setTestDefaults } from "../test-scripts/set-test-defaults";
+import { expect, test } from "@playwright/test";
+import { checkHealth } from "@/test-scripts/check-servers";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { TuneEditorPageObject } from "@/test-scripts/tune-editor.po";
-import { expect, test } from "@playwright/test";
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import {
-  logTestStart,
-  logTestEnd,
-  logBrowserContextStart,
   logBrowserContextEnd,
+  logBrowserContextStart,
+  logTestEnd,
+  logTestStart,
 } from "../test-scripts/test-logging";
 
 test.use({
@@ -23,27 +24,16 @@ test.beforeEach(async ({ page }, testInfo) => {
   logTestStart(testInfo);
   logBrowserContextStart();
   console.log(`===> ${testInfo.file}, ${testInfo.title} <===`);
-
-  // Add this at the start to see ALL requests
-  // await page.route("**", async (route) => {
-  //   const url = route.request().url();
-  //   console.log("===> route.request().url() <=== url: ", url);
-  //   if (url.includes("thesession.org")) {
-  //     console.log("DETECTED thesession.org URL:", url);
-  //   }
-  //   await route.continue();
-  // });
-
-  // doConsolelogs(page, testInfo);
-  // await page.waitForTimeout(1);
   await setTestDefaults(page);
   await applyNetworkThrottle(page);
+  await checkHealth();
 });
 
 test.afterEach(async ({ page }, testInfo) => {
   // After each test is run in this set, restore the backend to its original state.
   await restartBackend();
   await page.waitForTimeout(1_000);
+  await checkHealth();
   logBrowserContextEnd();
   logTestEnd(testInfo);
 });
@@ -51,26 +41,24 @@ test.afterEach(async ({ page }, testInfo) => {
 test.describe.serial("Add Tune Tests", () => {
   test("test-newtune-1", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
+
     await ttPO.gotoMainPage();
 
-    await ttPO.navigateToRepertoireTab();
-
     // await page.waitForTimeout(1000 * 200);
-
-    await ttPO.tabsMenuButton.click();
-    await ttPO.tabsMenuCatalogChoice.click();
+    await ttPO.clickWithTimeAfter(ttPO.tabsMenuButton);
+    await ttPO.clickWithTimeAfter(ttPO.tabsMenuCatalogChoice);
     await expect(ttPO.catalogTab).toBeVisible();
-    await ttPO.catalogTab.click();
+    await ttPO.clickWithTimeAfter(ttPO.catalogTab);
 
-    // await page.waitForTimeout(60_000 * 60);
-
+    // await for the tab to be change
+    await expect(ttPO.addToRepertoireButton).toBeAttached();
     await expect(ttPO.addToRepertoireButton).toBeVisible();
 
-    await ttPO.addTuneButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.addTuneButton);
 
-    // await ttPO.newTuneButton.waitFor({ state: "visible" });
-    await ttPO.newTuneButton.isEnabled();
-    await ttPO.newTuneButton.click();
+    await ttPO.page.getByText("Select Genre:").isVisible();
+
+    await ttPO.clickWithTimeAfter(ttPO.newTuneButton);
 
     // await page.getByTestId("tt-tune-editor-title-input").click();
 
@@ -78,15 +66,26 @@ test.describe.serial("Add Tune Tests", () => {
     // See https://github.com/axios/axios/issues/6761
     for (const formField of ttPO.sampleSiBheagSiMhorShort) {
       await ttPO.doFormFieldValueMod(formField);
+      const value = await formField.locator.inputValue();
+      if (formField.select_modification) {
+        expect(value.toLowerCase()).toBe(formField.modification.toLowerCase());
+      } else {
+        expect(value).toBe(formField.modification);
+      }
       // await formField.locator.fill(formField.modification);
-      await page.waitForTimeout(50);
+      await page.waitForTimeout(100);
     }
+    await page.waitForTimeout(1000);
 
     await ttPO.pressSave();
 
     await ttPO.waitForTablePopulationToStart();
 
     const tuneTitle = ttPO.sampleSiBheagSiMhorShort[ttPO.iffTitle].modification;
+
+    await ttPO.tableStatus.waitFor({ state: "visible" });
+    await expect(ttPO.tableStatus).toContainText("0 of 489");
+    await page.waitForTimeout(2000);
 
     await ttPO.navigateToTune(tuneTitle);
 
@@ -102,30 +101,29 @@ test.describe.serial("Add Tune Tests", () => {
 
   test("test-import-1", async ({ page }) => {
     const ttPO = new TuneEditorPageObject(page);
+
     await ttPO.gotoMainPage();
 
-    await ttPO.navigateToRepertoireTab();
-
-    await expect(ttPO.addTuneButton).toBeVisible();
-
-    await ttPO.addTuneButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.addTuneButton);
 
     await ttPO.addtuneUrlOrTitleInput.fill("https://thesession.org/tunes/248"); // Tam Lin
 
-    await ttPO.addtuneButtonImport.click();
+    await ttPO.clickWithTimeAfter(ttPO.addtuneButtonImport);
+
+    const selectSettingHeading = page.getByRole("heading", {
+      name: "Select a Setting",
+    });
+    await selectSettingHeading.waitFor({ state: "visible" });
 
     // const setting2Locator = page.getByRole("radio", { name: "Setting 2" });
     // const setting2Locator = page.getByText("Setting 2");
     const setting2Locator = page.getByText("Setting 2", { exact: true });
 
-    await setting2Locator.waitFor({ state: "visible" });
-    await setting2Locator.click();
+    await ttPO.clickWithTimeAfter(setting2Locator);
 
-    await ttPO.selectSettingButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.selectSettingButton);
 
-    await ttPO.tuneEditorSubmitButton.waitFor({ state: "visible" });
-
-    await ttPO.tuneEditorSubmitButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.tuneEditorSubmitButton);
 
     const currentTuneTitleLocator = page.locator("#current-tune-title");
     await currentTuneTitleLocator.waitFor({ state: "visible" });

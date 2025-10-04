@@ -363,3 +363,11 @@ migration_temp/target_schema.sql
 migration_temp/tunetrees_migrated.sqlite3
 server-action-refactor-plan.md
 tunetrees_test.sqlite3-journal
+.reset_test_db.lock
+frontend/playwright-reports-ci
+fsrs_fixup_report_apply.txt
+fsrs_fixup_report.txt
+# For now, ignore my personal todo.md, especially since changing it will cause
+# unnecessary commits.
+todo.md
+tunetrees_test_clean_with_queue.sqlite3

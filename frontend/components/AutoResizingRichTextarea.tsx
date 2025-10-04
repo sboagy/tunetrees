@@ -1,10 +1,10 @@
 "use client";
 
 import parse from "html-react-parser";
+import dynamic from "next/dynamic";
 // import type { Jodit } from "jodit";
 import { useTheme } from "next-themes";
-import dynamic from "next/dynamic";
-import type React from "react";
+import type { CSSProperties, HTMLAttributes } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./AutoResizingRichTextarea.css";
 // type JoditConfig = Partial<Jodit["options"]>;
@@ -17,26 +17,29 @@ const JoditEditor = dynamic(
 );
 // import JoditEditor from "jodit-react";
 
-interface IAutoResizingRichTextareaProps {
+interface IAutoResizingRichTextareaProps
+  extends Omit<HTMLAttributes<HTMLDivElement>, "onChange"> {
   id: string;
   value: string;
   onChange: (content: string) => void;
   placeholder?: string;
   className?: string;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
   readOnly?: boolean;
 }
 
-const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
+function AutoResizingRichTextarea({
   id,
   value,
   onChange,
   className,
   style,
   readOnly = false,
-}) => {
+  ...restProps
+}: IAutoResizingRichTextareaProps) {
   const [editorValue, setEditorValue] = useState(value);
   const editorRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // Convert plain text to HTML if necessary
@@ -74,6 +77,7 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
       // Focus points need to be explicitly set for Jodit 5.x
       defaultMode: 1, // 1 = WYSIWYG mode
       enter: "p" as const, // Explicitly set the type to "p"
+      autofocus: true,
 
       // Completely disable all UI elements you don't need
       statusbar: false,
@@ -120,8 +124,32 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
     [id, isDarkMode],
   );
 
+  // Mark the wrapper as ready once the editor mounts to help E2E tests
+  useEffect(() => {
+    const markReady = () => {
+      try {
+        if (!containerRef.current) return;
+        const hasEditor =
+          !!containerRef.current.querySelector(".jodit-wysiwyg");
+        if (hasEditor) {
+          containerRef.current.setAttribute("data-editor-ready", "true");
+          window.dispatchEvent(
+            new CustomEvent("tt-rich-editor-ready", {
+              detail: { id },
+            }),
+          );
+        }
+      } catch {
+        // ignore
+      }
+    };
+    const t = window.setTimeout(markReady, 0);
+    return () => window.clearTimeout(t);
+  }, [id]);
+
   return (
     <div
+      ref={containerRef}
       className={`jodit-wrapper ${readOnly ? "read-only" : ""}`}
       style={{
         ...style,
@@ -130,6 +158,7 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
         border: readOnly ? "none" : "1px solid #ccc",
         borderRadius: "4px",
       }}
+      {...restProps}
     >
       {readOnly ? (
         <div className={className}>{parse(editorValue)}</div>
@@ -149,6 +178,6 @@ const AutoResizingRichTextarea: React.FC<IAutoResizingRichTextareaProps> = ({
       )}
     </div>
   );
-};
+}
 
 export default AutoResizingRichTextarea;

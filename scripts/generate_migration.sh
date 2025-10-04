@@ -48,14 +48,14 @@ echo -e "${YELLOW}This script generates a new Alembic migration based on your mo
 echo ""
 echo "Before running this:"
 echo "1. Make schema changes directly in tunetrees_test_clean.sqlite3 using database tools"
-echo "2. Regenerate SQLAlchemy models: sqlacodegen_v2 sqlite:///tunetrees_test_clean.sqlite3 > tunetrees/models/tunetrees.py"
+echo "2. Regenerate SQLAlchemy models: ./scripts/sqlacodegen.sh"
 echo "3. Test your changes locally"
 echo ""
 
 read -p "Have you made schema changes and regenerated SQLAlchemy models? (y/n): " changes_ready
 if [[ "$changes_ready" != "y" && "$changes_ready" != "Y" ]]; then
     echo "Please make your schema changes and regenerate models first, then run this script again."
-    echo "Remember: sqlacodegen_v2 sqlite:///tunetrees_test_clean.sqlite3 > tunetrees/models/tunetrees.py"
+    echo "Remember: ./scripts/sqlacodegen.sh "
     exit 1
 fi
 

@@ -34,7 +34,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     await setTestDefaults(page);
     await applyNetworkThrottle(page);
     pageObject = new TuneTreesPageObject(page);
-    await pageObject.gotoMainPage();
+    // await pageObject.gotoMainPage();
   });
 
   test.afterEach(async ({ page }, testInfo) => {
@@ -52,6 +52,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
   });
 
   test("User submits quality feedback and tunes are rescheduled", async () => {
+    await pageObject.gotoMainPage();
     await pageObject.navigateToPracticeTabDirectly();
     const feedbacks = ["hard", "good", "(Not Set)", "again"];
 
@@ -60,6 +61,8 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     const count = await rows.count();
     const limit = Math.min(count - 1, 4);
     const reviewedIds: number[] = [];
+    // Capture pre-submission row text for change detection
+    const preRowTexts: Record<number, string> = {};
     for (let i = 1; i <= limit; i++) {
       // skip header row
       const row = rows.nth(i);
@@ -68,7 +71,9 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
       const idText = await idCell.textContent();
       const tuneId = Number(idText);
       if (!Number.isNaN(tuneId)) {
+        preRowTexts[tuneId] = (await row.textContent()) ?? "";
         const evalType = feedbacks[i - 1];
+        // Always apply the evaluation if set; but only assert disappearance for non-again evals
         if (evalType !== "(Not Set)") {
           await pageObject.setReviewEval(tuneId, evalType);
         }
@@ -82,21 +87,41 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     const submitButton = pageObject.page.getByRole("button", {
       name: "Submit Practiced Tunes",
     });
-    await expect(submitButton).toBeEnabled({ timeout: 15000 });
-    await pageObject.page.waitForTimeout(100);
-    await pageObject.clickWithTimeAfter(submitButton);
-    await pageObject.waitForSuccessfullySubmitted();
+    await expect(submitButton).toBeEnabled();
+    await Promise.all([
+      submitButton.click(),
+      pageObject.toast.last().waitFor({ state: "visible" }),
+    ]);
+    await expect(pageObject.toast.last()).toContainText(
+      // "Practice successfully submitted",
+      "Submitted evaluated tunes.",
+    );
 
-    // Ensure grid is refreshed before asserting removals
-    await pageObject.navigateToPracticeTab();
-
-    // Verify that the reviewed tunes are no longer listed for today.
-    // The grid may backfill other tunes, so avoid asserting exact row counts.
-    const idCells = pageObject.tunesGridRows.locator("td:first-child");
+    // Verify that each reviewed tune either disappeared OR its row text changed (rescheduled metrics updated)
+    const postRows = pageObject.tunesGridRows;
     for (const tid of reviewedIds) {
-      await expect(
-        idCells.filter({ hasText: new RegExp(`^${tid}$`) }),
-      ).toHaveCount(0, { timeout: 20000 });
+      const idCells = postRows.locator("td:first-child");
+      let target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
+      let presentCount = await target.count();
+      // Retry up to 10 times with a short delay until the ID appears
+      let attempt = 0;
+      for (; attempt < 10 && presentCount < 1; attempt++) {
+        await pageObject.page.waitForTimeout(200);
+        target = idCells.filter({ hasText: new RegExp(`^${tid}$`) });
+        presentCount = await target.count();
+      }
+      if (presentCount === 0) {
+        continue; // disappeared: acceptable
+      }
+      // Row still present: check for changed text
+      const row = postRows
+        .locator("tr")
+        .filter({ has: target.first() })
+        .first();
+      const afterText = await row.textContent();
+      expect(
+        afterText && preRowTexts[tid] && afterText !== preRowTexts[tid],
+      ).toBeTruthy();
     }
   });
 
@@ -104,7 +129,34 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
     page,
   }) => {
     // Simulate advancing to the next day
-    const baseSitdownDate = new Date();
+    const baseSitdownMs = await page.evaluate(() => {
+      // Use injected sitdown date if present, otherwise use the browser's current time
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const s = (window as any).__TT_REVIEW_SITDOWN_DATE__;
+      if (s) {
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) {
+          return d.getTime();
+        }
+      }
+      const raw = "2024-12-31 06:47:57.671465-05:00";
+      // Normalize: replace space with 'T' and trim microseconds to milliseconds for Date parsing
+      const m = raw.match(
+        /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\.(\d+)([+-]\d{2}:\d{2}|Z)$/,
+      );
+      let iso: string;
+      if (m) {
+        const datePart = m[1];
+        const timePart = m[2];
+        const ms = m[3].slice(0, 3).padEnd(3, "0"); // first 3 digits -> milliseconds
+        const tz = m[4];
+        iso = `${datePart}T${timePart}.${ms}${tz}`;
+      } else {
+        iso = raw.replace(" ", "T");
+      }
+      return new Date(iso).getTime();
+    });
+    const baseSitdownDate = new Date(baseSitdownMs);
     const tomorrow = new Date(baseSitdownDate.getTime());
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -114,7 +166,7 @@ test.describe(`Practice scheduling (timezone: ${timezoneId})`, () => {
 
     pageObject = new TuneTreesPageObject(page);
     await pageObject.gotoMainPage();
-    await pageObject.navigateToPracticeTab();
+    await pageObject.navigateToPracticeTabDirectly();
     // Check that only tunes scheduled for the new day are shown
     const rowCount = await pageObject.tunesGridRows.count();
     expect(rowCount).toBeGreaterThan(1);

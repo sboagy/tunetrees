@@ -22,7 +22,7 @@ const formSchema = z.object({
   easiness: z.number().nullable(),
   interval: z.number().nullable(),
   repetitions: z.number().nullable(),
-  review_date: z.string().nullable(),
+  due: z.string().nullable(),
   backup_practiced: z.string().nullable(),
   external_ref: z.string().nullable(),
   notes_private: z.string().nullable(),

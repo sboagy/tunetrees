@@ -42,5 +42,6 @@
         "**/tree-*",
         "**/test_stashed_folder",
         "alembic/versions/*.py"
-    ]
+    ],
+    "python.analysis.targetPythonVersion": "3.11"
 }

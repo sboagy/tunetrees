@@ -118,8 +118,6 @@ test.skip("scheduled column drives practice availability", async ({ page }) => {
     "🔍 Validating that scheduled column controls practice availability",
   );
 
-  await ttPO.gotoMainPage();
-
   // Check repertoire tab to see total tunes
   await ttPO.navigateToRepertoireTab();
   await expect(ttPO.tunesGrid).toBeVisible();

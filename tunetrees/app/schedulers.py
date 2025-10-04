@@ -1,13 +1,14 @@
-from datetime import datetime
-from typing import Optional, Tuple, Dict, Any
-from fsrs import Card, Rating, State, Scheduler, ReviewLog
-from supermemo2 import sm_two
+import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional, Tuple
 
+from fsrs import Card, Rating, ReviewLog, Scheduler, State
+from rich.console import Console
+from rich.table import Table
+from supermemo2 import sm_two
 
 from tunetrees.models.quality import NEW, RESCHEDULED
 from tunetrees.models.tunetrees_pydantic import AlgorithmType
-from datetime import timedelta
-
 
 # For maximum compatibility with all type checkers, alias to Dict[str, Any]
 ReviewResultDict = Dict[str, Any]
@@ -72,11 +73,12 @@ class SpacedRepetitionScheduler:
         easiness: float,
         interval: int,
         repetitions: int,
-        practiced: datetime,
+        sitdown_date: datetime,
+        sr_scheduled_date: datetime,
         stability: Optional[float] = None,
         difficulty: Optional[float] = None,
         step: Optional[int] = None,
-        last_review: Optional[datetime] = None,
+        last_practiced: Optional[datetime] = None,
     ) -> ReviewResultDict:
         raise NotImplementedError
 
@@ -99,14 +101,11 @@ class SM2Scheduler(SpacedRepetitionScheduler):
             "quality": quality,
             "easiness": result["easiness"],
             "difficulty": None,
+            "stability": None,
             "interval": result["interval"],
             "step": None,
             "repetitions": result["repetitions"],
-            "review_datetime": (
-                str(result["review_datetime"])
-                if "review_datetime" in result
-                else str(practiced)
-            ),
+            "due": (str(result["due"]) if "due" in result else str(practiced)),
             "review_duration": None,
         }
 
@@ -116,14 +115,15 @@ class SM2Scheduler(SpacedRepetitionScheduler):
         easiness: float,
         interval: int,
         repetitions: int,
-        practiced: datetime,
+        sitdown_date: datetime,
+        sr_scheduled_date: datetime,
         stability: Optional[float] = None,
         difficulty: Optional[float] = None,
         step: Optional[int] = None,
-        last_review: Optional[datetime] = None,
+        last_practiced: Optional[datetime] = None,
     ) -> ReviewResultDict:
-        _ = (stability, difficulty, step, last_review)
-        result = sm_two.review(quality, easiness, interval, repetitions, practiced)
+        _ = (stability, difficulty, step, last_practiced, sr_scheduled_date)
+        result = sm_two.review(quality, easiness, interval, repetitions, sitdown_date)
         return {
             "id": None,
             "quality": quality,
@@ -132,11 +132,7 @@ class SM2Scheduler(SpacedRepetitionScheduler):
             "interval": result["interval"],
             "step": None,
             "repetitions": result["repetitions"],
-            "review_datetime": (
-                str(result["review_datetime"])
-                if "review_datetime" in result
-                else str(practiced)
-            ),
+            "due": (str(result["due"]) if "due" in result else str(sitdown_date)),
             "review_duration": None,
         }
 
@@ -194,19 +190,109 @@ class FSRScheduler(SpacedRepetitionScheduler):
         # due: The date and time when the card is due next.
         # last_review: The date and time of the card's last review.
         card = Card(state=state, difficulty=1.0, stability=1.0, due=practiced, step=0)
-        rating = self._quality_to_fsrs_rating(quality)
+        rating = self._quality4_to_fsrs_rating(quality)
         card_reviewed, review_log = self.scheduler.review_card(
             card, rating, review_datetime=practiced
         )
         card_reviewed.due = practiced  # Ensure the due date is set to the sitdown date
-        return self._review_result(card_reviewed, review_log)
+        result = self._review_result(card_reviewed, review_log)
+        result["repetitions"] = 1
+        return result
 
     @staticmethod
     def _e_factor_to_difficulty(e_factor: float) -> float:
-        normalized_e = (e_factor - 1.3) / (2.5 - 1.3)
+        """
+        Transforms an SM-2 E-Factor to an FSRS Difficulty (D), handling out-of-range values.
+
+        Args:
+            e_factor: The E-Factor value from SM-2 (float).
+
+        Returns:
+            The corresponding Difficulty (D) value for FSRS (int between 1 and 10).
+        """
+        # Clip the e_factor to the valid range [1.3, 2.5]
+        clipped_e_factor = max(1.3, min(e_factor, 2.5))
+
+        normalized_e = (clipped_e_factor - 1.3) / (2.5 - 1.3)
         inverted_e = 1 - normalized_e
         d = 1 + inverted_e * 9
         return float(round(d))
+
+    def log_future_reviews(
+        self, card: Card, quality: int, num_simulations: int = 10
+    ) -> None:
+        if os.environ.get("LOG_FUTURE_REVIEWS", "").lower() not in (
+            "1",
+            "true",
+            "yes",
+        ):
+            return
+        card_simulated = Card(
+            state=card.state,
+            step=card.step,
+            stability=card.stability,
+            difficulty=card.difficulty,
+            due=card.due,
+            last_review=card.last_review,
+        )
+
+        table = Table(title="FSRS Simulation Results")
+        table.add_column("Quality", justify="right")
+        table.add_column("Step", justify="right")
+        table.add_column("State")
+        table.add_column("Step #")
+        table.add_column("Stability", justify="right")
+        table.add_column("Difficulty", justify="right")
+        table.add_column("Due")
+        table.add_column("Last Review")
+
+        # Add initial state
+        table.add_row(
+            str(quality),
+            "0",
+            str(card_simulated.state),
+            str(card_simulated.step),
+            (
+                f"{card_simulated.stability:.4f}"
+                if card_simulated.stability is not None
+                else "-"
+            ),
+            (
+                f"{card_simulated.difficulty:.4f}"
+                if card_simulated.difficulty is not None
+                else "-"
+            ),
+            str(card_simulated.due),
+            str(card_simulated.last_review) if card_simulated.last_review else "-",
+        )
+
+        for i in range(num_simulations):
+            card_simulated.last_review = card_simulated.due
+            last_review_str = str(card_simulated.due)
+            card_simulated, review_log = self.scheduler.review_card(
+                card_simulated, Rating.Easy
+            )
+            table.add_row(
+                str(review_log.rating.__int__() - 1),
+                str(i + 1),
+                str(card_simulated.state),
+                str(card_simulated.step),
+                (
+                    f"{card_simulated.stability:.4f}"
+                    if card_simulated.stability is not None
+                    else "-"
+                ),
+                (
+                    f"{card_simulated.difficulty:.4f}"
+                    if card_simulated.difficulty is not None
+                    else "-"
+                ),
+                str(card_simulated.due),
+                last_review_str,
+            )
+
+        console = Console()
+        console.print(table)
 
     def review(
         self,
@@ -214,14 +300,23 @@ class FSRScheduler(SpacedRepetitionScheduler):
         easiness: float,
         interval: int,
         repetitions: int,
-        practiced: datetime,
+        sitdown_date: datetime,
+        sr_scheduled_date: datetime,
         stability: Optional[float] = None,
         difficulty: Optional[float] = None,
         step: Optional[int] = None,
-        last_review: Optional[datetime] = None,
+        last_practiced: Optional[datetime] = None,
     ) -> ReviewResultDict:
-        # Use all arguments to avoid linter/type checker warnings
-        _ = (easiness, interval, repetitions, stability, difficulty, step, last_review)
+        # Arguments intentionally not being used, to avoid linter/type checker warnings
+        _ = (
+            easiness,
+            interval,
+            repetitions,
+            # stability,
+            # difficulty,
+            # step,
+            # last_practiced,
+        )
         if difficulty is None or difficulty == 0.0:
             if easiness > 0:
                 difficulty = FSRScheduler._e_factor_to_difficulty(easiness)
@@ -234,12 +329,21 @@ class FSRScheduler(SpacedRepetitionScheduler):
             step=step,
             stability=stability if stability is not None else 1.0,
             difficulty=difficulty,
-            due=practiced,
-            last_review=last_review,
+            due=sr_scheduled_date,
+            last_review=last_practiced,
         )
-        rating = self._quality_to_fsrs_rating(quality)
-        card_reviewed, review_log = self.scheduler.review_card(card, rating)
-        return self._review_result(card_reviewed, review_log)
+        rating = self._quality4_to_fsrs_rating(quality)
+        # Pass the practiced timestamp as the due to ensure the review log
+        # reflects the actual time of review (not the next due date)
+        card_reviewed, review_log = self.scheduler.review_card(
+            card, rating, review_datetime=sitdown_date
+        )
+        result = self._review_result(card_reviewed, review_log)
+        result["repetitions"] = repetitions + 1
+
+        self.log_future_reviews(card_reviewed, quality)
+
+        return result
 
     @staticmethod
     def _quality_to_fsrs_rating(quality_int: int) -> Rating:
@@ -263,6 +367,20 @@ class FSRScheduler(SpacedRepetitionScheduler):
             raise ValueError(f"Unexpected quality value: {quality_int}")
 
     @staticmethod
+    def _quality4_to_fsrs_rating(quality_int: int) -> Rating:
+        """Convert 4-value quality value to FSRS Rating."""
+        if quality_int == 0:
+            return Rating.Again
+        elif quality_int == 1:
+            return Rating.Hard
+        elif quality_int == 2:
+            return Rating.Good
+        elif quality_int == 3:
+            return Rating.Easy
+        else:
+            raise ValueError(f"Unexpected quality value: {quality_int}")
+
+    @staticmethod
     def _difficulty_to_e_factor(d: float) -> float:
         normalized_d = (d - 1) / 9
         inverted_d = 1 - normalized_d
@@ -271,6 +389,15 @@ class FSRScheduler(SpacedRepetitionScheduler):
 
     @staticmethod
     def _review_result(card_reviewed: Card, review_log: ReviewLog) -> ReviewResultDict:
+        # Attributes:
+        #     card_id: The id of the card. Defaults to the epoch milliseconds of when the card was created.
+        #     state: The card's current learning state.
+        #     step: The card's current learning or relearning step or None if the card is in the Review state.
+        #     stability: Core mathematical parameter used for future scheduling.
+        #     difficulty: Core mathematical parameter used for future scheduling.
+        #     due: The date and time when the card is due next.
+        #     last_review: The date and time of the card's last review.
+
         return {
             "id": getattr(card_reviewed, "card_id", None),
             "quality": review_log.rating,
@@ -279,12 +406,15 @@ class FSRScheduler(SpacedRepetitionScheduler):
                 if card_reviewed.difficulty is not None
                 else 0
             ),
+            "state": getattr(card_reviewed, "state", None),
+            # "interval": getattr(card_reviewed, "interval", 0),
+            "step": getattr(card_reviewed, "step", 0),
+            "stability": getattr(card_reviewed, "stability", 1.0),
             "difficulty": (
                 card_reviewed.difficulty if card_reviewed.difficulty is not None else 0
             ),
-            "interval": getattr(card_reviewed, "interval", 0),
-            "step": getattr(card_reviewed, "step", 0),
-            "repetitions": getattr(card_reviewed, "repetitions", 0),
-            "review_datetime": str(card_reviewed.due),
+            # "repetitions": getattr(card_reviewed, "repetitions", 0),
+            # Return the actual review timestamp; fall back to last_review or due
+            "due": str(card_reviewed.due),
             "review_duration": review_log.review_duration if review_log else None,
         }

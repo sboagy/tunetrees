@@ -270,7 +270,7 @@ erDiagram
         REAL easiness
         INTEGER interval
         INTEGER repetitions
-        TEXT review_date
+        TEXT due
         TEXT backup_practiced
         REAL stability
         INTEGER elapsed_days
@@ -362,26 +362,11 @@ Since SQLite can't directly have descriptions for the fields, this is arguably t
 
 ##### practice_record
 
-This associates the current state of practice, unique to tune/playlist/user.
+See the [Practice Record Schema](docs/practice_flow.md#practice-record-schema-reference) in `docs/practice_flow.md`.
 
-| Type    | Name             | Description                                                                                             |
-| ------- | ---------------- | ------------------------------------------------------------------------------------------------------- |
-| INTEGER | id               | Primary key, autoincrement                                                                              |
-| INTEGER | playlist_ref     | References the playlist (`playlist.playlist_id`)                                                        |
-| INTEGER | tune_ref         | References the tune (`tune.id`)                                                                         |
-| TEXT    | practiced        | Date/time or string indicating when the practice occurred                                               |
-| INTEGER | quality          | Quality rating of the practice session                                                                  |
-| REAL    | easiness         | Easiness factor for spaced repetition, when using SM2                                                   |
-| INTEGER | interval         | Interval (days) until next review                                                                       |
-| INTEGER | repetitions      | Number of times this tune has been reviewed                                                             |
-| TEXT    | review_date      | Scheduled date for next review (maybe should be called Due)                                             |
-| TEXT    | backup_practiced | Backup of practice date/time or notes (deprecated, not needed given `practice_history` table)           |
-| REAL    | stability        | Stability metric for spaced repetition, when using FSRS                                                 |
-| INTEGER | elapsed_days     | Days elapsed since last review                                                                          |
-| INTEGER | lapses           | Number of times the tune was forgotten                                                                  |
-| INTEGER | state            | Enum representing the learning state (one of Learning = 1, Review = 2, Relearning = 3, or null/0 = NEW) |
-| REAL    | difficulty       | Difficulty metric for the tune, when using FSRS                                                         |
-| INTEGER | step             | Current learning or relearning step or None if the tune is in the Review state                          |
+##### daily_practice_queue
+
+See the [Daily Practice Queue Schema Reference](docs/practice_flow.md#daily-practice-queue-schema-reference) in `docs/practice_flow.md`.
 
 ### 1.6. Alternatives or Potential Technology Evolution
 
@@ -408,7 +393,7 @@ pip install "sqlacodegen-v2 ~= 0.1.4"
 Then, generate the `tunetrees.py` python file which will contain the TuneTrees ORM code.
 
 ```bash
-sqlacodegen_v2 sqlite:///tunetrees_test_clean.sqlite3 > tunetrees/models/tunetrees.py
+./scripts/sqlacodegen.sh
 ```
 
 Then remove the extra `from sqlalchemy.orm.base import Mapped` line from the generated code.
@@ -670,10 +655,6 @@ found in `.github/workflows/playwright.yml`.
 `tunetrees_test_clean.sqlite3` (checked in) is the base test database, and is copied into
 `tunetrees_test.sqlite3` (transient, git ignored) for every test.
 
-Stability of using this test database relies on setting the environment variable
-`TT_REVIEW_SITDOWN_DATE` on the frontend, which must be specified in Coordinated Universal Time (UTC).  
-This value should be set to `2024-12-31 16:47:57.671465+00:00`.
-
 ### 4.3. React/Next Frontend Testing
 
 Unit Testing, Integration Testing, Visual Regression Testing, and Accessibility Testing
@@ -689,7 +670,6 @@ Page Object object model for TuneTrees, abstracting many of the components for u
 tests.
 
 Stability of Playwright testing relies on setting the environment variable for the frontend to
-`TT_REVIEW_SITDOWN_DATE`, which must be specified in Coordinated Universal Time (UTC).  
 This value should be set to `2024-12-31 16:47:57.671465+00:00`.
 
 ##### 4.3.1.2. Test Cookies

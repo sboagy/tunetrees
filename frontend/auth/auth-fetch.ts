@@ -17,6 +17,25 @@ import type {
 
 const _baseURL = process.env.TT_API_BASE_URL;
 
+/**
+ * Simple fetch wrapper that rejects if response headers don't arrive within timeoutMs.
+ * Uses AbortController to abort the request after timeout.
+ */
+async function fetchWithTimeout(
+  url: string,
+  opts: RequestInit = {},
+  timeoutMs = 10_000,
+) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal, ...opts });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 export async function updateUserInDatabase(
   userId: number,
   user4db: Partial<IUser>,
@@ -40,14 +59,26 @@ export async function getUserExtendedByEmailFromDb(
   email: string,
 ): Promise<IUser | null> {
   const path = `${_baseURL}/auth/get-user-by-email/${email}`;
-  const res = await fetch(path, {
-    method: "GET",
-    headers: {
-      Authorization: process.env.REMOTE_AUTH_RPC_TOKEN ?? "",
-      Accept: "application/json",
-    },
-  });
-  return (await res.json()) as IUser;
+  try {
+    const res = await fetchWithTimeout(
+      path,
+      {
+        method: "GET",
+        headers: {
+          Authorization: process.env.REMOTE_AUTH_RPC_TOKEN ?? "",
+          Accept: "application/json",
+        },
+      },
+      7000, // 7s header timeout for auth RPC
+    );
+    return (await res.json()) as IUser;
+  } catch (error) {
+    console.error(
+      "auth-fetch:getUserExtendedByEmailFromDb fetch error:",
+      error,
+    );
+    throw error;
+  }
 }
 
 export async function createUserInDatabase(user: IUser): Promise<IUser> {

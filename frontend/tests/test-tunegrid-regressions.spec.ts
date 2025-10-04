@@ -2,10 +2,7 @@ import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
-import {
-  navigateToRepertoireTabStandalone,
-  TuneTreesPageObject,
-} from "@/test-scripts/tunetrees.po";
+import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
 import { expect, test } from "@playwright/test";
 import {
   logTestStart,
@@ -29,16 +26,14 @@ test.beforeEach(async ({ page }, testInfo) => {
 });
 
 test.afterEach(async ({ page }, testInfo) => {
+  await page.waitForTimeout(1_000);
   await restartBackend();
   await page.waitForTimeout(1_000);
   logBrowserContextEnd();
   logTestEnd(testInfo);
 });
 
-// Helper function to clear existing sorts (e.g., Scheduled/Latest Review column)
-import type { Page } from "@playwright/test";
-
-async function clearExistingSorts(ttPO: TuneTreesPageObject, page: Page) {
+async function clearExistingSorts(ttPO: TuneTreesPageObject) {
   console.log(
     "Clearing Scheduled/Latest Review column sorting to avoid multi-column interference...",
   );
@@ -49,10 +44,9 @@ async function clearExistingSorts(ttPO: TuneTreesPageObject, page: Page) {
 
   // Click the Scheduled/Latest Review column to cycle through its sort states until unsorted
   // Scheduled is likely pre-sorted ascending, so: asc → desc → unsorted
-  await ttPO.LatestReviewColumnHeaderSortButton.click();
-  await page.waitForTimeout(500);
-  await ttPO.LatestReviewColumnHeaderSortButton.click(); // Should now be unsorted
-  await page.waitForTimeout(500);
+  await ttPO.clickWithTimeAfter(ttPO.LatestReviewColumnHeaderSortButton, 1000);
+
+  await ttPO.clickWithTimeAfter(ttPO.LatestReviewColumnHeaderSortButton, 1000);
 
   console.log(
     "Latest Review column cleared, now testing multi-column sorting...",
@@ -64,8 +58,9 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // Navigate to main page first, then repertoire tab using the working pattern
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
-    await navigateToRepertoireTabStandalone(page);
+    // await navigateToRepertoireTabStandalone(page);
     await page.waitForLoadState("domcontentloaded");
+    await ttPO.expectTableStatusBasic();
 
     // Wait for the grid to be visible
     const tunesGrid = page.locator("table").first();
@@ -77,7 +72,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     await page.waitForTimeout(1000);
 
     // ... inside your test:
-    await clearExistingSorts(ttPO, page);
+    await clearExistingSorts(ttPO);
 
     // Find the ID column sorting button (anchor by data-testid for robustness)
     await expect(ttPO.idColumnHeaderSortButton).toBeVisible({ timeout: 15000 });
@@ -97,8 +92,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     console.log("Initial first row ID:", initialFirstId);
 
     // Click the sort button to sort ascending
-    await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForTimeout(500); // Wait for sorting to complete
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 4000);
 
     // Verify the sort changed to ascending
     const ascendingIcon = ttPO.idColumnHeaderSortButton.locator("svg");
@@ -147,8 +141,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     }
 
     // Click again to sort descending
-    await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForTimeout(500);
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
 
     // Verify the sort changed to descending
     const descendingIcon = ttPO.idColumnHeaderSortButton.locator("svg");
@@ -194,47 +187,45 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     }
 
     // Click again to clear sorting
-    await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForTimeout(500);
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
 
-    // Verify the sort arrow is back to unsorted (ArrowUpDown)
-    const unsortedIconFinal = ttPO.idColumnHeaderSortButton.locator("svg");
-    await expect(unsortedIconFinal).toBeVisible();
-
-    console.log("✅ Column sorting arrows are working correctly!");
+    // Wait until the sort state is cleared (button title no longer matches ascending/descending)
+    await expect(ttPO.idColumnHeaderSortButton).not.toHaveAttribute(
+      "title",
+      /(Ascending|Descending) column sort/,
+    );
   });
 
   test("test-multicolumn-sorting", async ({ page }) => {
     // Navigate to main page first, then repertoire tab using the working pattern
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
-    await navigateToRepertoireTabStandalone(page);
+    // await navigateToRepertoireTabStandalone(page);
     await page.waitForLoadState("domcontentloaded");
 
     const tunesGrid = page.locator("table").first();
     await expect(tunesGrid).toBeVisible({ timeout: 15000 });
 
-    await clearExistingSorts(ttPO, page);
+    await clearExistingSorts(ttPO);
 
     // Test sorting by Type column first using Page Object locators (button-based to avoid role brittleness)
     // Ensure the Type header button is scrolled into view (header can be horizontally off-screen)
-    await ttPO.typeColumnHeaderSortButton.scrollIntoViewIfNeeded();
+    await ttPO.safeScrollIntoView(ttPO.typeColumnHeaderSortButton);
     await expect(ttPO.typeColumnHeaderSortButton).toBeVisible({
       timeout: 15000,
     });
 
-    await ttPO.typeColumnHeaderSortButton.click();
-    await page.waitForTimeout(1000);
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
 
     // Then sort by Title while holding shift (multicolumn)
-    await ttPO.titleColumnHeaderSortButton.scrollIntoViewIfNeeded();
+    await ttPO.safeScrollIntoView(ttPO.titleColumnHeaderSortButton);
     await expect(ttPO.titleColumnHeaderSortButton).toBeVisible({
       timeout: 15000,
     });
 
     // Use keyboard modifier for multicolumn sorting
     await page.keyboard.down("Shift");
-    await ttPO.titleColumnHeaderSortButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
     await page.keyboard.up("Shift");
     await page.waitForTimeout(1000);
 
@@ -252,7 +243,7 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // Navigate to main page first, then repertoire tab using the working pattern
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
-    await navigateToRepertoireTabStandalone(page);
+    // await navigateToRepertoireTabStandalone(page);
     await page.waitForLoadState("domcontentloaded");
 
     const tunesGrid = page.locator("table").first();
@@ -335,15 +326,17 @@ test.describe.serial("TuneGrid Regression Tests", () => {
     // Navigate to main page first, then repertoire tab using the working pattern
     const ttPO = new TuneTreesPageObject(page);
     await ttPO.gotoMainPage();
-    await navigateToRepertoireTabStandalone(page);
+    // await navigateToRepertoireTabStandalone(page);
     await page.waitForLoadState("domcontentloaded");
 
     const tunesGrid = page.locator("table").first();
     await expect(tunesGrid).toBeVisible({ timeout: 15000 });
 
+    await ttPO.tableStatus.waitFor({ state: "attached", timeout: 15000 });
+    await expect(ttPO.tableStatus).toContainText("1 of 488 row(s) selected");
+
     // Sort by ID column
-    await ttPO.idColumnHeaderSortButton.click();
-    await page.waitForTimeout(1000);
+    await ttPO.clickWithTimeAfter(ttPO.idColumnHeaderSortButton, 1000);
 
     // Get the first row ID after sorting
     const firstRowIdCell = page

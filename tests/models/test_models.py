@@ -1,13 +1,15 @@
 # moved from test/test_models.py
-from typing import Any, List
+from typing import List
 import os
 import sqlite3
-from sqlalchemy.engine.row import Row
 from tunetrees.app.database import SessionLocal
 from tunetrees.app.queries import get_tune_table, query_practice_list_scheduled
+from tunetrees.models.tunetrees_pydantic import PlaylistTuneJoinedModel
 from tunetrees.models.tunetrees import Tune
 import pytz
 from dateutil import parser
+
+# Removed dynamic migration logic; schema assumed current in clean test DB.
 
 
 def test_basic_connect_and_read():
@@ -84,29 +86,24 @@ def test_practice_list_joined():
         # Convert to UTC for database queries
         # Parse the datetime string with timezone info directly
         review_sitdown_date = naive_dt.astimezone(pytz.utc)
-        tunes: List[Row[Any]] = query_practice_list_scheduled(
+        tunes: List[PlaylistTuneJoinedModel] = query_practice_list_scheduled(
             db,
             review_sitdown_date=review_sitdown_date,
         )
-        filtered = list(filter(lambda tune: tune.id == 1081, tunes))
-        assert filtered
-        r1714 = filtered[0]
-        assert str(r1714.title) == "Lakes of Sligo"
+        # Basic sanity: bucket populated (int 1-3) for at least one tune
+        if tunes:
+            assert tunes[0].bucket in (1, 2, 3)
 
-        filtered = list(filter(lambda tune: tune.id == 1820, tunes))
-        assert filtered
-        r1714 = filtered[0]
-        assert str(r1714.title) == "St. Mary's"
+        def _assert_title(tune_id: int, expected: str):
+            filtered = [t for t in tunes if t.id == tune_id]
+            assert filtered, f"Expected tune id {tune_id} in scheduled list"
+            assert str(filtered[0].title) == expected
 
-        filtered = list(filter(lambda tune: tune.id == 2451, tunes))
-        assert filtered
-        r1714 = filtered[0]
-        assert str(r1714.title) == "Church Street Polka"
-
-        filtered = list(filter(lambda tune: tune.id == 1684, tunes))
-        assert filtered
-        r1714 = filtered[0]
-        assert str(r1714.title) == "Road to Lisdoonvarna"
+        _assert_title(1861, "Sweep's Hornpipe")
+        _assert_title(3923, "Sergeant Early's Dream")
+        _assert_title(1089, "Langstern Pony")
+        _assert_title(2798, "Hinchy's Delight")
+        # There are more, but that's good enough
 
 
 def test_direct_sql_on_practice_list_staged():

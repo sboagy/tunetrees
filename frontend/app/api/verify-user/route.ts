@@ -35,66 +35,74 @@ const _baseURL = process.env.NEXT_BASE_URL; // For frontend callback URLs
 const _apiBaseURL = process.env.TT_API_BASE_URL; // For backend API calls
 
 export async function GET(req: NextRequest) {
-  console.log("GET request for verify-user: ", req);
-  const token = req.nextUrl.searchParams.get("token");
-  const email = req.nextUrl.searchParams.get("email");
+  try {
+    console.log("GET request for verify-user: ", req);
+    const token = req.nextUrl.searchParams.get("token");
+    const email = req.nextUrl.searchParams.get("email");
 
-  if (!email) {
-    return NextResponse.json(
-      { message: "Missing email for user verification" },
-      { status: 400 },
-    );
-  }
-  if (token) {
-    await signIn("token-credential", {
-      email,
-      token,
-      callbackUrl: `${_baseURL}/auth/login`,
-    });
-  } else {
-    const password = req.nextUrl.searchParams.get("password");
-    if (!password) {
+    if (!email) {
       return NextResponse.json(
-        { message: "Missing password or verification token for user" },
+        { message: "Missing email for user verification" },
         { status: 400 },
       );
     }
-    await signIn("credentials", {
-      email,
-      password,
-      callbackUrl: `${_baseURL}/auth/login`,
-    });
-  }
+    if (token) {
+      // Prevent server-side redirect; allow this API to return JSON for the client dialog
+      await signIn("token-credential", {
+        email,
+        token,
+        callbackUrl: `${_baseURL}/auth/login`,
+        redirect: false,
+      });
+    } else {
+      const password = req.nextUrl.searchParams.get("password");
+      if (!password) {
+        return NextResponse.json(
+          { message: "Missing password or verification token for user" },
+          { status: 400 },
+        );
+      }
+      await signIn("credentials", {
+        email,
+        password,
+        callbackUrl: `${_baseURL}/auth/login`,
+        redirect: false,
+      });
+    }
 
-  const user = await getUserExtendedByEmail(email);
+    const user = await getUserExtendedByEmail(email);
 
-  if (!user) {
-    return NextResponse.json(
-      { message: `User not found for email: ${email}` },
-      { status: 404 },
-    );
-  }
+    if (!user) {
+      return NextResponse.json(
+        { message: `User not found for email: ${email}` },
+        { status: 404 },
+      );
+    }
 
-  if (user.emailVerified === null) {
-    user.emailVerified = new Date();
-    const userPatch: IUser = {
-      id: Number(user.id),
-      email_verified: formatDateForEmailVerification(user.emailVerified),
-    };
+    if (user.emailVerified === null) {
+      user.emailVerified = new Date();
+      const userPatch: IUser = {
+        id: Number(user.id),
+        email_verified: formatDateForEmailVerification(user.emailVerified),
+      };
 
-    const stringifyUser = JSON.stringify(userPatch);
+      const stringifyUser = JSON.stringify(userPatch);
 
-    const updateUserResponse = await axios.patch(
-      `${_apiBaseURL}/auth/update-user/${user.id}`,
-      stringifyUser,
-      {
-        headers: {
-          "Content-Type": "application/json",
+      const updateUserResponse = await axios.patch(
+        `${_apiBaseURL}/auth/update-user/${user.id}`,
+        stringifyUser,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      },
-    );
-    console.log("update_user_response: ", updateUserResponse);
-  }
+      );
+      console.log("update_user_response: ", updateUserResponse);
+    }
 
-  return NextResponse.json({ message: "ok" }, { status: 200 });
+    return NextResponse.json({ message: "ok" }, { status: 200 });
+  } catch (error) {
+    console.error("verify-user error:", error);
+    return NextResponse.json({ message: "invalid" }, { status: 401 });
+  }
 }

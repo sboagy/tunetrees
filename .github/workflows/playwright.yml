@@ -4,7 +4,8 @@ on:
   push:
     branches: [main, master]
   pull_request:
-    branches: [main, master]
+    branches:
+      - "**"
 
 jobs:
   test:
@@ -58,6 +59,30 @@ jobs:
         run: npm run test:unit
         working-directory: frontend
 
+      # Backend is started/stopped by Playwright global-setup/teardown. No manual uvicorn here.
+
+      - name: Build frontend for CI
+        if: always()
+        run: |
+          mkdir -p test-results
+          npm run build 2>&1 | tee test-results/frontend-build.log
+        working-directory: frontend
+        env:
+          # Ensure Next.js embeds necessary env when building (for NEXT_PUBLIC_* and server rendering)
+          NEXT_BASE_URL: http://localhost:3000
+          TT_API_BASE_URL: http://localhost:8000
+          AUTH_URL: http://localhost:3000
+          AUTH_TRUST_HOST: true
+          NEXT_PUBLIC_MOCK_EXTERNAL_APIS: true
+          NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION: true
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          TUNETREES_FRONTEND_LOG: test-results/frontend.log
+
+      # Frontend will be started by Playwright webServer. We only build here for logs/verification.
+
+      # Health wait is handled by Playwright webServer configuration.
+
       - name: Debug environment
         run: |
           echo "CI=$CI"
@@ -78,13 +103,12 @@ jobs:
       #   run: wait-on https://localhost:3000
       #   working-directory: frontend
 
-      - name: Run Frontend Playwright tests
-        # run: npx playwright test --project=chromium --grep "test-practice-1-2"
-        run: npx playwright test --project=chromium --reporter=list
+      - name: "Phase 1: Login and save cookies"
         working-directory: frontend
         env:
-          NEXT_BASE_URL: ${{ vars.NEXT_BASE_URL }}
-          TT_API_BASE_URL: ${{ vars.TT_API_BASE_URL }}
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          NEXT_BASE_URL: http://localhost:3000
+          TT_API_BASE_URL: http://localhost:8000
           AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}
@@ -97,24 +121,66 @@ jobs:
           GITHUB_CLIENT_SECRET: ${{ secrets.GGITHUB_CLIENT_SECRET }}
           TT_AUTH_SENDGRID_API_KEY: ${{ secrets.TT_AUTH_SENDGRID_API_KEY }}
           CI: true
-          STORAGE_STATE_TEST1: ${{ secrets.STORAGE_STATE_TEST1 }}
+          STORAGE_STATE_TEST1: test-scripts/storageStateSboagyLogin.json
           TEST1_LOGIN_USER_EMAIL: ${{ secrets.TEST1_LOGIN_USER_EMAIL }}
           TEST1_LOGIN_USER_PASSWORD: ${{ secrets.TEST1_LOGIN_USER_PASSWORD }}
-
           TEST2_LOGIN_USER_EMAIL: ${{ secrets.TEST2_LOGIN_USER_EMAIL }}
           TEST2_LOGIN_USER_PASSWORD: ${{ secrets.TEST2_LOGIN_USER_PASSWORD }}
           TEST2_LOGIN_USER_NAME: ${{ secrets.TEST2_LOGIN_USER_NAME }}
           TEST2_LOGIN_GMAIL_PW: ${{ secrets.TEST2_LOGIN_GMAIL_PW }}
-
-          # TT_REVIEW_SITDOWN_DATE must be specified in Coordinated Universal Time (UTC).
-          TT_REVIEW_SITDOWN_DATE: 2024-12-31 16:47:57.671465+00:00
+          NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION: true
+          NEXT_PUBLIC_MOCK_EXTERNAL_APIS: true
           THROTTLE_MAX: 0
           AUTH_TRUST_HOST: true
-          # ...add other test-specific environment variables as needed
+        run: |
+          chmod +x scripts/ci-login-save-cookies.sh
+          ./scripts/ci-login-save-cookies.sh
 
+      - name: "Phase 2: Run Frontend Playwright tests (full suite)"
+        working-directory: frontend
+        shell: bash
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          NEXT_BASE_URL: http://localhost:3000
+          TT_API_BASE_URL: http://localhost:8000
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}
+          AUTH_GITHUB_SECRET: ${{ secrets.AUTH_GITHUB_SECRET }}
+          AUTH_GOOGLE_ID: ${{ secrets.AUTH_GOOGLE_ID }}
+          AUTH_GOOGLE_SECRET: ${{ secrets.AUTH_GOOGLE_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GITHUB_CLIENT_ID: ${{ secrets.GGITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.GGITHUB_CLIENT_SECRET }}
+          TT_AUTH_SENDGRID_API_KEY: ${{ secrets.TT_AUTH_SENDGRID_API_KEY }}
+          CI: true
+          STORAGE_STATE_TEST1: test-scripts/storageStateSboagyLogin.json
+          TEST1_LOGIN_USER_EMAIL: ${{ secrets.TEST1_LOGIN_USER_EMAIL }}
+          TEST1_LOGIN_USER_PASSWORD: ${{ secrets.TEST1_LOGIN_USER_PASSWORD }}
+          TEST2_LOGIN_USER_EMAIL: ${{ secrets.TEST2_LOGIN_USER_EMAIL }}
+          TEST2_LOGIN_USER_PASSWORD: ${{ secrets.TEST2_LOGIN_USER_PASSWORD }}
+          TEST2_LOGIN_USER_NAME: ${{ secrets.TEST2_LOGIN_USER_NAME }}
+          TEST2_LOGIN_GMAIL_PW: ${{ secrets.TEST2_LOGIN_GMAIL_PW }}
+          NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION: true
+          NEXT_PUBLIC_MOCK_EXTERNAL_APIS: true
+          THROTTLE_MAX: 0
+          AUTH_TRUST_HOST: true
+        run: |
+          mkdir -p test-results
+          set -o pipefail
+          npx playwright test --project=chromium --reporter=list 2>&1 | tee test-results/playwright-phase2.log
+      # Stop handled by Playwright; no manual kill needed.
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: playwright-report
-          path: frontend/test-results/
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+            frontend/test-results/fastapi.log
+            frontend/test-results/frontend.log
+            frontend/test-results/frontend-build.log
+            frontend/test-results/playwright-phase1.log
+            frontend/test-results/playwright-phase2.log
           retention-days: 30

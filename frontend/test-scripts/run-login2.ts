@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { fileURLToPath } from "node:url";
 
-import type { Cookie, Page } from "@playwright/test";
+import { expect, type Cookie, type Page } from "@playwright/test";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const __filename = fileURLToPath(import.meta.url);
@@ -22,28 +22,45 @@ export async function runLoginStandalone(
     throw new Error("No login credentials found");
   }
 
-  await page.getByRole("button", { name: "Sign in" }).click();
-  const userEmailLocator = page.getByTestId("user_email");
-  await userEmailLocator.fill(user || "");
-  await userEmailLocator.press("Tab");
-  const passwordEntryBox = page.getByTestId("user_password");
-  await passwordEntryBox.fill(pw || "");
-  const signInButton = page.getByRole("button", {
-    name: "Sign In",
-    exact: true,
-  });
-  await passwordEntryBox.press("Tab");
-
-  await page.waitForFunction(
-    (button) => {
-      const btn = button as HTMLButtonElement;
-      return !btn.disabled;
-    },
-    await signInButton.elementHandle(),
-    { timeout: 5000 }, // Increased timeout for CSRF token fetch
-  );
+  const signInButton = page.getByRole("button", { name: "Sign in" });
+  await expect(signInButton).toBeAttached();
+  await expect(signInButton).toBeVisible();
+  await expect(signInButton).toBeEnabled();
 
   await signInButton.click();
+
+  const userEmailLocator = page.getByTestId("user_email");
+  await expect(userEmailLocator).toBeAttached();
+  await expect(userEmailLocator).toBeVisible();
+  // await userEmailLocator.isEnabled();
+
+  await userEmailLocator.fill(user || "");
+  await userEmailLocator.press("Tab");
+
+  const passwordEntryBox = page.getByTestId("user_password");
+  await expect(passwordEntryBox).toBeVisible();
+  // await passwordEntryBox.isEnabled();
+
+  await passwordEntryBox.fill(pw || "");
+  await page.waitForTimeout(100);
+  await passwordEntryBox.press("Tab");
+
+  // await page.waitForFunction(
+  //   (button) => {
+  //     const btn = button as HTMLButtonElement;
+  //     return !btn.disabled;
+  //   },
+  //   await signInButton.elementHandle(),
+  //   { timeout: 20000 }, // Increased timeout for CSRF token fetch
+  // );
+
+  const loginSubmitButton = page.getByTestId("login-submit-button");
+  await expect(loginSubmitButton).toBeAttached();
+  await expect(loginSubmitButton).toBeVisible();
+  await expect(loginSubmitButton).toBeEnabled();
+
+  await loginSubmitButton.click();
+  await page.waitForTimeout(500);
 
   let sessionCookie: Cookie | undefined;
   for (let i = 0; i < 30; i++) {

@@ -42,6 +42,8 @@ services:
       NEXTAUTH_URL: https://tunetrees.com
       # NEXT_PUBLIC_TT_BASE_URL: https://tunetrees.com
       NEXTAUTH_URL_INTERNAL: http://frontend:3000
+      # Enable detailed client/table persistence tracing (set to 1 temporarily when diagnosing state resets)
+      NEXT_PUBLIC_TABLE_STATE_TRACE: "1"
     ports:
       - 3000:3000
     networks:

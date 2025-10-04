@@ -59,6 +59,11 @@ mkdir -p "$PLAYWRIGHT_OUTPUT_DIR_ABS_PATH"
 # Generate timestamp for unique folder naming
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
+# Strip any leading standalone "--" (npm run passes one when forwarding args)
+while [ $# -gt 0 ] && [ "$1" = "--" ]; do
+  shift
+done
+
 # Determine output subdirectory name
 if [ $# -eq 0 ]; then
   # No arguments - use timestamp only
@@ -122,8 +127,13 @@ unset NEXTAUTH_SECRET
 # Make sure we're not running in NODE_ENV=production and that we have mock email confirmation enabled
 cd "$FRONTEND_DIR_ABS_PATH"
 npx dotenv -f .env.local -- bash -c '
+PLAYWRIGHT_HEADLESS=true \
 NODE_ENV=development \
 NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION=true \
+AUTH_TRUST_HOST=true \
+AUTH_URL=https://localhost:3000 \
+NEXT_BASE_URL=https://localhost:3000 \
+TT_API_BASE_URL=http://localhost:8000 \
 npx playwright test '"$REPORTER_ARG"' '"$TEST_FILE_ARG"' '"$PLAYWRIGHT_ARGS"' \
 | tee "'"$OUTPUT_DIR"'/playwright.log"
 '

@@ -1,3 +1,9 @@
+import { type ChildProcess, spawn } from "node:child_process";
+import fs from "node:fs";
+import fsPromises from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import axios from "axios";
 import {
   testDatabasePath,
   tunetreesBackendDeployBaseDir,
@@ -5,12 +11,6 @@ import {
   venvLibDir,
 } from "@/test-scripts/paths-for-tests";
 import { setFastapiProcess } from "@/test-scripts/process-store";
-import axios from "axios";
-import { type ChildProcess, spawn } from "node:child_process";
-import fs from "node:fs";
-import fsPromises from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import globalTeardown from "./global-teardown";
 import { setupDatabase } from "./setup-database";
 
@@ -40,9 +40,28 @@ async function globalSetup() {
 
   const serverPreUp = await checkServer();
   if (serverPreUp) {
-    console.log("Server is already up and running.");
-    return;
+    console.log(
+      "Server is already up and running. Killing it before continuing.",
+    );
+    try {
+      const pid = await fs.promises.readFile(pidFilePath, "utf-8");
+      if (pid && !Number.isNaN(Number(pid))) {
+        process.kill(Number(pid), "SIGTERM");
+        // Wait for process to exit
+        for (let i = 0; i < 10; i++) {
+          const stillUp = await checkServer();
+          if (!stillUp) break;
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+    } catch (error) {
+      console.warn("Could not kill running FastAPI server:", error);
+    }
   }
+  // if (serverPreUp) {
+  //   console.log("Server is already up and running.");
+  //   return;
+  // }
 
   await setupDatabase();
 
@@ -152,9 +171,9 @@ export const NO_PID = 0;
 export const INVALID_PID = -1;
 
 async function restartBackendHard() {
-  console.warn(
-    "Failed to update reloadTriggerFile. Attempting fallback strategy.",
-  );
+  // console.warn(
+  //   "Failed to update reloadTriggerFile. Attempting fallback strategy.",
+  // );
   await globalTeardown();
   // Make sure the server is down
   for (let i = 0; i < 10; i++) {
@@ -163,12 +182,24 @@ async function restartBackendHard() {
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
   await globalSetup();
+
+  // Signal the frontend to clear table-state caches before the next test
+  try {
+    console.log("Signaling test cache epoch increment.");
+    await axios.post("http://localhost:3000/api/test-flags/cache-epoch");
+  } catch {
+    // endpoint may not be available; ignore
+  }
 }
 
-export async function restartBackend() {
+export async function restartBackend(restartHard = true) {
+  // Brief pause to let filesystem/process state settle before attempting restart
+  const waitMs = process.env.CI === "true" ? 2000 : 1000;
+  await new Promise((resolve) => setTimeout(resolve, waitMs));
+
   // In CI, perform a full stop -> copy -> start cycle to avoid copying
   // the SQLite DB while the server has it open (which can corrupt the file).
-  if (process.env.CI === "true") {
+  if (process.env.CI === "true" || restartHard) {
     await restartBackendHard();
     return;
   }
@@ -201,6 +232,8 @@ export async function restartBackend() {
       try {
         const response = await axios.get("http://localhost:8000/hello/test");
         if (response.status === 200) {
+          console.log("Signaling test cache epoch increment.");
+          await axios.post("http://localhost:3000/api/test-flags/cache-epoch");
           serverReady = true;
           break;
         }

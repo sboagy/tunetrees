@@ -1,8 +1,8 @@
 import type { TableState, Table as TanstackTable } from "@tanstack/react-table";
 import { useEffect } from "react";
-import { createOrUpdateTableState } from "../settings";
 import type { ITuneOverview, TablePurpose } from "../types";
 import { useTune } from "./CurrentTuneContext";
+import { tableStateCacheService } from "./table-state-cache";
 
 /**
  * Custom hook to save the state of a table when the user navigates away from the page.
@@ -22,17 +22,16 @@ export const useSaveTableState = (
   useEffect(() => {
     const saveTableStateAsync = (eventString: string) => {
       console.debug(
-        `LF6 useSaveTableState: calling createOrUpdateTableState in ${eventString} for tablePurpose: ${tablePurpose}, currentTune=${currentTune}`,
+        `LF6 useSaveTableState: calling immediate flush in ${eventString} for tablePurpose: ${tablePurpose}, currentTune=${currentTune}`,
       );
       const tableState: TableState = table.getState();
       console.log("===> use-save-table-state.ts:29 ~ ");
-      void createOrUpdateTableState(
+      // Use immediate flush for critical events
+      void tableStateCacheService.flushImmediate(
         userId,
-        "full",
         tablePurpose,
         playlistId,
         tableState,
-        currentTune,
       );
     };
 
@@ -79,14 +78,18 @@ export const useSaveTableState = (
         );
       }
 
-      // Component Cleanup: The component's cleanup function in the useEffect hook ensures
-      // that the state is saved when the component is unmounted, which happens when
-      // switching tabs within the app.
-      // console.debug(
-      //   "LF6 useSaveTableState cleanup for tablePurpose: ",
-      //   tablePurpose,
-      // );
-      // saveTableStateAsync("cleanup");
+      // Component Cleanup: Ensure any cached changes are flushed when component unmounts
+      console.debug(
+        "LF6 useSaveTableState cleanup for tablePurpose: ",
+        tablePurpose,
+      );
+      // Flush any pending changes immediately on cleanup
+      void tableStateCacheService.flushImmediate(
+        userId,
+        tablePurpose,
+        playlistId,
+        table.getState(),
+      );
     };
   }, [table, userId, tablePurpose, playlistId, currentTune]);
 };

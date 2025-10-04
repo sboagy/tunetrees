@@ -27,7 +27,7 @@ test.afterEach(async ({ page }, testInfo) => {
 test.describe("Auth Loading States", () => {
   test("login form shows loading state during submission", async ({ page }) => {
     // Navigate to login page
-    await page.goto("https://localhost:3000/auth/login", {
+    await page.goto("/auth/login", {
       waitUntil: "domcontentloaded", // More reliable than networkidle in CI
     });
     await page.waitForLoadState("domcontentloaded");
@@ -85,7 +85,7 @@ test.describe("Auth Loading States", () => {
     page,
   }) => {
     // Navigate to signup page
-    await page.goto("https://localhost:3000/auth/newuser", {
+    await page.goto("/auth/newuser", {
       waitUntil: "domcontentloaded", // More reliable than networkidle in CI
     });
     await page.waitForLoadState("domcontentloaded");
@@ -125,7 +125,7 @@ test.describe("Auth Loading States", () => {
 
   test("social login buttons show loading states", async ({ page }) => {
     // Navigate to login page
-    await page.goto("https://localhost:3000/auth/login", {
+    await page.goto("/auth/login", {
       waitUntil: "domcontentloaded", // More reliable than networkidle in CI
     });
     await page.waitForLoadState("domcontentloaded");

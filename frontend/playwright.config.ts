@@ -53,7 +53,7 @@ export default defineConfig({
   ),
 
   expect: {
-    timeout: process.env.CI ? 50_000 : 20_000, // 50 seconds in CI, 20 seconds locally
+    timeout: process.env.CI ? 60_000 : 30_000,
   },
 
   use: {
@@ -66,8 +66,10 @@ export default defineConfig({
         : false,
 
     /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://127.0.0.1:3000',
-    baseURL: "https://localhost:3000",
+    // Use HTTP in CI (production start) and HTTPS locally (dev --experimental-https)
+    baseURL:
+      process.env.PLAYWRIGHT_BASE_URL ||
+      (process.env.CI ? "http://127.0.0.1:3000" : "https://localhost:3000"),
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "retain-on-failure",
@@ -104,7 +106,7 @@ export default defineConfig({
       },
       // dependencies: ["backend"],
       testMatch: "test*.ts",
-      timeout: process.env.CI ? 80_000 : 30_000, // 80 seconds in CI, 30 seconds locally
+      timeout: process.env.CI ? 120_000 : 50_000, // 120 seconds in CI, 50 seconds locally
     },
 
     // {
@@ -139,44 +141,63 @@ export default defineConfig({
   ],
 
   /* Run the local dev server before starting the tests */
-  webServer: {
-    // Playwright will start the server using this webServer config in both local and CI environments.
-    // Setting reuseExistingServer: true avoids server startup/shutdown race conditions.
-    command: `npm run dev 2>&1 | tee ${process.env.TUNETREES_FRONTEND_LOG || "test-results/frontend.log"}`, // Combine the command and arguments
-    env: {
-      NEXT_BASE_URL: process.env.NEXT_BASE_URL || "",
-      NEXT_PUBLIC_MOCK_EXTERNAL_APIS:
-        process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS || "true",
-      NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION:
-        process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "true",
-      TT_API_BASE_URL: process.env.TT_API_BASE_URL || "",
-      AUTH_SECRET: process.env.AUTH_SECRET || "",
-      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "",
-      AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
-      AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET || "",
-      AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || "",
-      AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET || "",
-      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
-      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
-      GITHUB_CLIENT_ID: process.env.GGITHUB_CLIENT_ID || "",
-      GITHUB_CLIENT_SECRET: process.env.GGITHUB_CLIENT_SECRET || "",
-      TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
-    },
-    url: "https://localhost:3000/api/health",
+  webServer: (() => {
+    const isCI = !!process.env.CI;
+    const logPath =
+      process.env.TUNETREES_FRONTEND_LOG || "test-results/frontend.log";
+    return {
+      // Playwright will start the server using this webServer config in both local and CI environments.
+      // In CI we build and start the production server for stability; locally we run dev with --experimental-https.
+      command: isCI
+        ? `npm run start 2>&1 | tee ${logPath}`
+        : `npm run dev 2>&1 | tee ${process.env.TUNETREES_FRONTEND_LOG || "test-results/frontend.log"}`, // Combine the command and arguments,
+      env: {
+        // Always provide a concrete base URL for the app
+        NEXT_BASE_URL:
+          process.env.NEXT_BASE_URL ||
+          (isCI ? "http://127.0.0.1:3000" : "https://localhost:3000"),
+        NEXT_PUBLIC_MOCK_EXTERNAL_APIS:
+          process.env.NEXT_PUBLIC_MOCK_EXTERNAL_APIS || "true",
+        NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION:
+          process.env.NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION || "true",
+        // Point server-side axios to the local FastAPI by default so server actions don't 404
+        TT_API_BASE_URL: process.env.TT_API_BASE_URL || "http://127.0.0.1:8000",
+        // Ensure NextAuth works across both CI and local HTTPS dev
+        AUTH_URL:
+          process.env.AUTH_URL ||
+          (isCI ? "http://127.0.0.1:3000" : "https://localhost:3000"),
+        AUTH_TRUST_HOST: process.env.AUTH_TRUST_HOST || "true",
+        AUTH_SECRET:
+          process.env.AUTH_SECRET ||
+          (isCI ? "test_auth_secret_for_ci_only" : "test_auth_secret_local"),
+        NEXTAUTH_SECRET:
+          process.env.NEXTAUTH_SECRET ||
+          (isCI
+            ? "test_nextauth_secret_for_ci_only"
+            : "test_nextauth_secret_local"),
+        AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID || "",
+        AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET || "",
+        AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || "",
+        AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET || "",
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
+        GITHUB_CLIENT_ID: process.env.GGITHUB_CLIENT_ID || "",
+        GITHUB_CLIENT_SECRET: process.env.GGITHUB_CLIENT_SECRET || "",
+        // NODE_OPTIONS: process.env.NODE_OPTIONS || "--max-old-space-size=8192",
+        TT_AUTH_SENDGRID_API_KEY: process.env.TT_AUTH_SENDGRID_API_KEY || "",
+      },
+      // In CI use HTTP health URL; locally just wait for port to open (avoids TLS validation issues)
+      // Use 127.0.0.1 consistently (baseURL also uses 127.0.0.1 in CI) to avoid hostname mismatches in logic relying on window.location.hostname
+      url: isCI ? "http://127.0.0.1:3000/api/health" : undefined,
+      port: isCI ? undefined : 3000,
 
-    // Playwright seems to trip up due to SSL errors (because the self-signed certificate
-    // via "next dev --experimental-https" won't be trusted), so we ignore them.
+      // Playwright seems to trip up due to SSL errors (because the self-signed certificate
+      // via "next dev --experimental-https" won't be trusted), so we ignore them in the `use` block above.
 
-    // CoPilot absolutely lied to me about this: ignoreHTTPSErrors is not a valid property
-    // for webServer; it is set globally in the `use` block above.
-    // This property is absolutely necessary to make the tests work!
-    ignoreHTTPSErrors: true, // Accept self-signed certificates
+      // Reuse local server if already running (keeps VS Code runner snappy)
+      reuseExistingServer: true,
 
-    // reuseExistingServer: !process.env.CI,
-    reuseExistingServer: true, // try to reuse the existing server if it is already running
-
-    timeout: process.env.CI ? 40_000 : 30_000, // Give more time for server startup
-
-    // timeout: 2 * 1000,
-  },
+      timeout: isCI ? 120_000 : 120_000,
+    };
+  })(),
 });

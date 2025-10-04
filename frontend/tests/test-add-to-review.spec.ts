@@ -1,14 +1,14 @@
-import { setTestDefaults } from "../test-scripts/set-test-defaults";
+import { expect, test } from "@playwright/test";
 import { restartBackend } from "@/test-scripts/global-setup";
 import { applyNetworkThrottle } from "@/test-scripts/network-utils";
 import { getStorageState } from "@/test-scripts/storage-state";
 import { TuneTreesPageObject } from "@/test-scripts/tunetrees.po";
-import { expect, test } from "@playwright/test";
+import { setTestDefaults } from "../test-scripts/set-test-defaults";
 import {
-  logTestStart,
-  logTestEnd,
-  logBrowserContextStart,
   logBrowserContextEnd,
+  logBrowserContextStart,
+  logTestEnd,
+  logTestStart,
 } from "../test-scripts/test-logging";
 
 test.use({
@@ -59,7 +59,7 @@ test.describe.serial("Add to Review Tests", () => {
 
     await expect(foxhunterRow).toBeVisible({ timeout: 10000 });
 
-    await foxhunterRow.click();
+    await ttPO.clickWithTimeAfter(foxhunterRow);
 
     // Click the checkbox for Foxhunter's Reel
     // const foxhunterCheckbox = foxhunterRow.locator('input[type="checkbox"]');
@@ -67,15 +67,16 @@ test.describe.serial("Add to Review Tests", () => {
     const foxhunterCheckbox = foxhunterRow.getByTestId("tt-row-checkbox");
     // await expect(foxhunterCheckbox).toBeVisible();
     await foxhunterCheckbox.check();
+    await page.waitForTimeout(2000);
 
     // Clear the filter to see all tunes again
     await ttPO.filterInput.clear();
+    await page.waitForTimeout(500);
+
     // Rely on status assertion below instead of fixed sleep
 
     // Verify that 2 tunes are now selected (assuming Sweep's Hornpipe was already selected)
-    await expect(ttPO.tableStatus).toContainText("2 of 488 row(s) selected", {
-      timeout: 10000,
-    });
+    await expect(ttPO.tableStatus).toContainText("2 of 488 row(s) selected");
 
     // Click the "Add To Review" button
     await expect(ttPO.addToReviewButton).toBeVisible();
@@ -86,12 +87,12 @@ test.describe.serial("Add to Review Tests", () => {
     page.on("pageerror", (error) => {
       errors.push(error.message);
     });
-
-    await ttPO.addToReviewButton.click();
+    await ttPO.clickWithTimeAfter(ttPO.addToReviewButton);
 
     if (errors.length > 0) {
       console.log("❌ Frontend errors detected:", errors);
     }
+    await page.waitForTimeout(100);
 
     // Check that no rows are selected (the actual count may vary)
     await expect(ttPO.tableStatus).toContainText("0 of", {

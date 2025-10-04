@@ -1,10 +1,5 @@
 "use client";
 
-import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
-import RowGoalComboBox from "@/app/(main)/pages/practice/components/RowGoalComboBox";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { transformToDatetimeLocalForDisplay } from "@/lib/date-utils";
 import type { CheckedState } from "@radix-ui/react-checkbox";
 import type {
   CellContext,
@@ -17,6 +12,15 @@ import type {
 } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useState } from "react";
+import RowGoalComboBox from "@/app/(main)/pages/practice/components/RowGoalComboBox";
+import RecallEvalComboBox from "@/app/(main)/pages/practice/components/RowRecallEvalComboBox";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { transformToDatetimeLocalForDisplay } from "@/lib/date-utils";
+import {
+  getQualityListForGoalAndTechnique,
+  lookupQualityItem,
+} from "../quality-lists";
 import { updateTableStateInDb } from "../settings";
 import type {
   ITuneOverview,
@@ -24,6 +28,7 @@ import type {
   TunesGridColumnGeneralType,
 } from "../types";
 import "./TuneColumns.css";
+import { logVerbose } from "@/lib/logging";
 import { saveTableState } from "./TunesTable";
 
 // =================================================================================================
@@ -130,7 +135,7 @@ function sortableHeader(
           const next: "none" | "asc" | "desc" =
             current === "none" ? "asc" : current === "asc" ? "desc" : "none";
           // Debug log to help diagnose headless behavior
-          console.log(
+          logVerbose(
             `sortableHeader click: column=${column.id} current=${current} -> next=${next}`,
           );
           if (next === "none") {
@@ -179,6 +184,7 @@ export function get_columns(
   onRecallEvalChange?: (tuneId: number, newValue: string) => void,
   setTunesRefreshId?: (newRefreshId: number) => void,
   onGoalChange?: (tuneId: number, newValue: string | null) => void,
+  srAlgType?: "FSRS" | "SM2" | null,
 ): ColumnDef<ITuneOverview, TunesGridColumnGeneralType>[] {
   const determineHeaderCheckedState = (
     table: TanstackTable<ITuneOverview>,
@@ -195,7 +201,7 @@ export function get_columns(
         ? false
         : "indeterminate";
 
-    console.log(
+    logVerbose(
       `LF6: selectionHeader->determineHeaderCheckedState: selectedCount=${selectedCount}, ` +
         `rowCount=${rowCount} noneSelected=${noneSelected}, allSelected=${allSelected}, ` +
         `checkedState=${checkedState}`,
@@ -248,7 +254,7 @@ export function get_columns(
   // };
 
   function selectionHeader<TData, TValue>(
-    column: Column<TData, TValue>,
+    _column: Column<TData, TValue>,
     table: TanstackTable<ITuneOverview>,
   ) {
     // console.log("column: ", column);
@@ -322,10 +328,19 @@ export function get_columns(
     );
   }
 
+  // Map bucket numeric value to user-friendly label
+  const bucketLabel = (bucket?: number | null): string => {
+    if (bucket === 1) return "Due Today";
+    if (bucket === 2) return "Recently Lapsed";
+    if (bucket === 3) return "Backfill";
+    return ""; // Future / not in snapshot
+  };
+
   const columns: ExtendedColumnDef<
     ITuneOverview,
     TunesGridColumnGeneralType
   >[] = [
+    // Selection or evaluation column handled later; Bucket column placed early for practice mode
     {
       id: "id",
       header: ({ column, table }) => sortableHeader(column, table, "Id"),
@@ -341,6 +356,45 @@ export function get_columns(
       minSize: 80,
       meta: { headerLabel: "Id" },
     },
+    ...(purpose === "practice"
+      ? [
+          {
+            id: "bucket",
+            accessorKey: "bucket",
+            header: ({ column, table }) => (
+              <div
+                className="flex items-center"
+                data-testid="col-bucket-header"
+              >
+                {sortableHeader(
+                  column as Column<ITuneOverview, unknown>,
+                  table,
+                  "Bucket",
+                )}
+              </div>
+            ),
+            cell: ({ row }) => {
+              const b = (row.original as unknown as { bucket?: number | null })
+                .bucket;
+              const label = bucketLabel(b);
+              return (
+                <div
+                  className="truncate max-w-[10rem]"
+                  title={label}
+                  data-testid={`cell-bucket-${row.original.id}`}
+                >
+                  {label}
+                </div>
+              );
+            },
+            enableSorting: true,
+            sortingFn: numericSortingFn,
+            size: 140,
+            minSize: 110,
+            meta: { headerLabel: "Bucket" },
+          } as ColumnDef<ITuneOverview, TunesGridColumnGeneralType>,
+        ]
+      : []),
     "practice" === purpose
       ? {
           accessorKey: "recall_eval",
@@ -349,15 +403,57 @@ export function get_columns(
           enableHiding: false,
           cell: (
             info: CellContext<ITuneOverview, TunesGridColumnGeneralType>,
-          ) => (
-            <RecallEvalComboBox
-              info={info}
-              userId={userId}
-              playlistId={playlistId}
-              purpose={purpose}
-              onRecallEvalChange={onRecallEvalChange}
-            />
-          ),
+          ) => {
+            const completed = Boolean(info.row.original.completed_at);
+            const qualityList = getQualityListForGoalAndTechnique(
+              info.row.original.goal,
+              info.row.original.latest_technique,
+            );
+            const stored = info.row.original.recall_eval;
+            let label = "(Not Set)";
+            if (stored) {
+              label =
+                qualityList.find((q) => q.value === stored)?.label2 ?? stored;
+            } else {
+              // Try numeric/latest fields (server-side submitted values)
+              const latestQuality = info.row.original.latest_quality;
+              const latestEasiness = info.row.original.latest_easiness;
+              if (latestQuality !== null && latestQuality !== undefined) {
+                const found = lookupQualityItem(latestQuality, qualityList);
+                if (found) label = found.label2;
+              } else if (
+                latestEasiness !== null &&
+                latestEasiness !== undefined
+              ) {
+                const rounded = Math.round(latestEasiness);
+                const found = lookupQualityItem(rounded, qualityList);
+                if (found) label = found.label2;
+              }
+            }
+
+            if (completed) {
+              return (
+                <div
+                  className="truncate"
+                  title={label}
+                  data-testid={`tt-recal-eval-static-${info.row.original.id}`}
+                >
+                  {label}
+                </div>
+              );
+            }
+
+            return (
+              <RecallEvalComboBox
+                info={info}
+                userId={userId}
+                playlistId={playlistId}
+                purpose={purpose}
+                onRecallEvalChange={onRecallEvalChange}
+                readOnly={Boolean(info.row.original.completed_at)}
+              />
+            );
+          },
           accessorFn: (row) => row.recall_eval,
           size: 284,
           minSize: 260,
@@ -380,13 +476,22 @@ export function get_columns(
       accessorKey: "title",
       header: ({ column, table }) => sortableHeader(column, table, "Title"),
       cell: (info: CellContext<ITuneOverview, TunesGridColumnGeneralType>) => {
-        const favoriteUrl = info.row.original.favorite_url;
-        return favoriteUrl ? (
-          <a href={favoriteUrl} target="_blank" rel="noopener noreferrer">
-            {info.getValue()}
+        const original = info.row.original;
+        const rawValue = info.getValue();
+        const titleText = typeof rawValue === "string" ? rawValue : "";
+        const href =
+          original.favorite_url ||
+          original.external_ref ||
+          `https://www.irishtune.info/tune/${original.id}/`;
+        return (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid={`title-link-${original.id}`}
+          >
+            {titleText}
           </a>
-        ) : (
-          info.getValue()
         );
       },
       enableSorting: true,
@@ -527,7 +632,7 @@ export function get_columns(
     >[] = [
       {
         id: "scheduled",
-        accessorFn: (row) => row.scheduled || row.latest_review_date || "",
+        accessorFn: (row) => row.scheduled || row.latest_due || "",
         header: ({ column, table }) =>
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
@@ -586,14 +691,14 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Prev Goal",
+            "Latest Goal",
           ),
         cell: (info) => {
           return info.getValue();
         },
         enableSorting: true,
         enableHiding: true,
-        meta: { headerLabel: "Prev Goal" },
+        meta: { headerLabel: "Latest Goal" },
         size: 130,
         minSize: 110,
       },
@@ -603,14 +708,14 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Prev Alg",
+            "Alg",
           ),
         cell: (info) => {
           return info.getValue() ?? "sm2";
         },
         enableSorting: true,
         enableHiding: true,
-        meta: { headerLabel: "Prev Alg" },
+        meta: { headerLabel: "Alg" },
         size: 130,
         minSize: 110,
       },
@@ -620,7 +725,7 @@ export function get_columns(
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Prev Qual",
+            "Qual",
           ),
         cell: (info) => {
           return info.getValue();
@@ -629,42 +734,61 @@ export function get_columns(
         enableHiding: true,
         size: 12 * 9, // Approximate width for 11 characters
         minSize: 90,
-        meta: { headerLabel: "Prev Qual" },
+        meta: { headerLabel: "Qual" },
       },
       {
-        accessorKey: "latest_easiness",
+        accessorKey:
+          srAlgType === "FSRS" ? "latest_stability" : "latest_interval",
         header: ({ column, table }) =>
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "Easiness",
+            srAlgType === "FSRS" ? "Stability" : "Interval",
           ),
         cell: (info) => {
-          const value = info.getValue() as number | null;
-          return value ? value.toFixed(2) : "";
-        },
-        enableSorting: true,
-        enableHiding: true,
-        size: 14 * 8, // Approximate width for 11 characters
-        minSize: 90,
-        meta: { headerLabel: "Easiness" },
-      },
-      {
-        accessorKey: "latest_interval",
-        header: ({ column, table }) =>
-          sortableHeader(
-            column as Column<ITuneOverview, unknown>,
-            table,
-            "Interval",
-          ),
-        cell: (info) => {
-          return info.getValue();
+          const original = info.row.original;
+          const rawValue =
+            srAlgType === "FSRS"
+              ? original.latest_stability
+              : original.latest_interval;
+          return rawValue !== null && rawValue !== undefined
+            ? rawValue.toFixed(2)
+            : "";
         },
         enableSorting: true,
         enableHiding: true,
         size: 13 * 8, // Approximate width for 11 characters
         minSize: 90,
-        meta: { headerLabel: "Interval" },
+        meta: { headerLabel: srAlgType === "FSRS" ? "Stability" : "Interval" },
+      },
+      {
+        // Adaptive column: shows Difficulty for FSRS playlists, Easiness for SM2 playlists (re-uses persisted id 'latest_easiness')
+        accessorKey: "latest_easiness",
+        header: ({ column, table }) =>
+          sortableHeader(
+            column as Column<ITuneOverview, unknown>,
+            table,
+            srAlgType === "FSRS" ? "Difficulty" : "Easiness",
+          ),
+        cell: (info) => {
+          const original = info.row.original;
+          const rawValue =
+            srAlgType === "FSRS"
+              ? original.latest_difficulty
+              : original.latest_easiness;
+          return rawValue !== null && rawValue !== undefined
+            ? rawValue.toFixed(2)
+            : "";
+        },
+        enableSorting: true,
+        enableHiding: true,
+        sortingFn: numericSortingFn,
+        size: 14 * 8, // Approximate width for 11 characters
+        minSize: 90,
+        meta: {
+          headerLabel: srAlgType === "FSRS" ? "Difficulty" : "Easiness",
+          type: srAlgType === "FSRS" ? "difficulty" : "easiness",
+        },
       },
       {
         accessorKey: "latest_repetitions",
@@ -684,12 +808,12 @@ export function get_columns(
         meta: { headerLabel: "Repetitions" },
       },
       {
-        accessorKey: "latest_review_date",
+        accessorKey: "latest_due",
         header: ({ column, table }) =>
           sortableHeader(
             column as Column<ITuneOverview, unknown>,
             table,
-            "SR Scheduled",
+            "Due",
           ),
         cell: (info) => {
           return transformToDatetimeLocalForDisplay(info.getValue() as string);
@@ -699,7 +823,7 @@ export function get_columns(
         size: 160,
         minSize: 150,
         sortingFn: datetimeTextSortingFn,
-        meta: { headerLabel: "SR Scheduled" },
+        meta: { headerLabel: "Due" },
       },
       // {
       //   accessorKey: "backup_practiced",

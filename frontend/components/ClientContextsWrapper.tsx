@@ -13,64 +13,102 @@ import { TunesProviderScheduled } from "@/app/(main)/pages/practice/components/T
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import "@radix-ui/themes/styles.css";
+import { useEffect } from "react";
 import { GenreProvider } from "./GenreContext";
 import { Toaster } from "./ui/toaster";
 
 // import Footer from "./Footer";
 // import Header from "./Header";
 
-import { useEffect } from "react";
+// Note: no hooks currently required here after moving initSitdownDateHelpers to render path.
+import { useSession } from "next-auth/react";
 
-const fetchWithTimeout = (url: string, options = {}, timeout = 3000) => {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
-    clearTimeout(id),
-  );
-};
-
-const loadTestBrowserProperties = () => {
-  const nodeEnv = process.env.NODE_ENV;
-  if (typeof window !== "undefined" && nodeEnv === "development") {
-    fetchWithTimeout("/test-browser.properties", {}, 600000)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch test-browser.properties");
-        return res.text();
-      })
-      .then((text) => {
-        const lines = text.split("\n");
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith("#")) continue;
-          const [key, ...rest] = trimmed.split("=");
-          const value = rest.join("=").trim();
-          if (key === "TT_REVIEW_SITDOWN_DATE" && value) {
-            if (typeof window.__TT_REVIEW_SITDOWN_DATE__ === "undefined") {
-              window.__TT_REVIEW_SITDOWN_DATE__ = value;
-            }
-            if (!window.localStorage.getItem("TT_REVIEW_SITDOWN_DATE")) {
-              window.localStorage.setItem("TT_REVIEW_SITDOWN_DATE", value);
-            }
-          }
-          // Add more keys as needed
+// Inject global helper (URL param now handled via SSR bootstrap script on practice page).
+function initSitdownDateHelpers() {
+  if (typeof window === "undefined") return;
+  const w = window as typeof window & {
+    __TT_REVIEW_SITDOWN_DATE__?: string;
+    __TT_SET_SITDOWN_DATE__?: (iso: string, manual?: boolean) => void;
+  };
+  if (!w.__TT_SET_SITDOWN_DATE__) {
+    w.__TT_SET_SITDOWN_DATE__ = (iso: string, manual = true) => {
+      try {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) {
+          console.warn("[SitdownHelper] Invalid date supplied", iso);
+          return;
         }
-      })
-      .catch((error) => {
-        if (error.name === "AbortError") {
-          console.warn("Fetch for test-browser.properties timed out");
+        w.__TT_REVIEW_SITDOWN_DATE__ = iso;
+        window.localStorage.setItem("TT_REVIEW_SITDOWN_DATE", iso);
+        if (manual) {
+          window.localStorage.setItem("TT_REVIEW_SITDOWN_MANUAL", "true");
+        } else {
+          window.localStorage.removeItem("TT_REVIEW_SITDOWN_MANUAL");
         }
-        // else ignore or handle other errors
-      });
+        window.dispatchEvent(new Event("tt-sitdown-updated"));
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[SitdownHelper] set", { iso, manual });
+        }
+      } catch (error) {
+        console.warn("[SitdownHelper] failed", error);
+      }
+    };
   }
-};
+}
 
 const ClientContextsWrapper = ({ children }: React.PropsWithChildren) => {
+  const { data: session } = useSession();
+  const userId = session?.user?.id
+    ? Number.parseInt(session.user.id)
+    : undefined;
+  // Defer helper side-effects (URL param parsing & event dispatch) until after initial
+  // render to avoid React warning: "Cannot update a component while rendering a different component".
+  // Parent wrapper effect runs before child provider effects, so SitDownDateProvider
+  // still sees the initialized globals during its own mount effect.
   useEffect(() => {
-    loadTestBrowserProperties();
+    initSitdownDateHelpers();
+  }, []);
+
+  // Test-only: clear any window-scoped table-state caches if the test cookie is set.
+  // This runs before child providers, so children won't read stale window.__TT_TABLE_LAST__ snapshots.
+  useEffect(() => {
+    const maybeClearByCookie = () => {
+      try {
+        const cookieStr = document.cookie || "";
+        const match = cookieStr.match(/(?:^|;\s*)TT_CLEAR_TABLE_STATE=([^;]+)/);
+        if (!match) return;
+        const epochStr = decodeURIComponent(match[1] ?? "");
+        const cookieEpoch = Number.parseInt(epochStr, 10);
+        if (!Number.isFinite(cookieEpoch)) return;
+        const w = window as typeof window & {
+          __TT_TABLE_LAST__?: Record<string, unknown>;
+          __TT_TABLE_VERSION__?: Record<string, number>;
+          __ttScrollLast?: Record<string, number>;
+          __TT_HYDRATING__?: Record<string, boolean>;
+          __TT_CACHE_CLEAR_EPOCH_LAST__?: number;
+        };
+        const lastCleared = w.__TT_CACHE_CLEAR_EPOCH_LAST__ ?? 0;
+        if (cookieEpoch <= lastCleared) return;
+        // Clear window-scoped caches used by TunesTable
+        try {
+          w.__TT_TABLE_LAST__ = {};
+          w.__TT_TABLE_VERSION__ = {} as Record<string, number>;
+          w.__ttScrollLast = {} as Record<string, number>;
+          w.__TT_HYDRATING__ = {} as Record<string, boolean>;
+          w.__TT_CACHE_CLEAR_EPOCH_LAST__ = cookieEpoch;
+        } catch {
+          // ignore
+        }
+      } catch {
+        // ignore
+      }
+    };
+    maybeClearByCookie();
+    return () => {};
   }, []);
   return (
     <SitDownDateProvider>
-      <CurrentPlaylistProvider>
+      <CurrentPlaylistProvider userId={userId}>
         <MainPaneViewProvider>
           <TuneDataRefreshProvider>
             <CurrentTuneProvider>

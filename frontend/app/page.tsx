@@ -2,7 +2,19 @@ import { Blockquote, Flex, Heading, Text } from "@radix-ui/themes";
 import { auth } from "auth";
 import { redirect } from "next/navigation";
 
-export default async function index() {
+// NOTE: We preserve any existing query parameters (not just tt_sitdown) when redirecting
+// an authenticated user from the root (/) to /home so that feature flags or
+// dev/testing query overrides (e.g. ?tt_sitdown=2025-09-05) are not lost.
+// If future logic adds additional root logic, ensure this redirect logic stays intact.
+// Accept standard Next.js App Router searchParams shape (record of strings/arrays).
+type TRawSearchParamsRoot = Record<string, string | string[] | undefined>;
+
+export default async function index({
+  searchParams,
+}: {
+  // Align with Next.js 15 PageProps constraint (Promise | undefined)
+  searchParams?: Promise<TRawSearchParamsRoot>;
+}) {
   const session = await auth();
   if (!session?.user) {
     return (
@@ -41,6 +53,29 @@ export default async function index() {
         </Text>
       </Flex>
     );
+  }
+  // Reconstruct query string (if any) and forward to /home.
+  // searchParams is a Map-like (URLSearchParams) in Next 15 can be iterated via Object.entries after spread.
+  let resolvedSearchParams: TRawSearchParamsRoot | undefined;
+  if (searchParams) {
+    try {
+      resolvedSearchParams = await searchParams;
+    } catch {
+      resolvedSearchParams = undefined;
+    }
+  }
+  if (resolvedSearchParams && Object.keys(resolvedSearchParams).length > 0) {
+    const sp = new URLSearchParams();
+    for (const [key, value] of Object.entries(resolvedSearchParams)) {
+      if (value === undefined || value === null) continue;
+      if (Array.isArray(value)) {
+        for (const v of value) sp.append(key, v);
+      } else {
+        sp.set(key, value);
+      }
+    }
+    const qs = sp.toString();
+    return redirect(qs ? `/home?${qs}` : "/home");
   }
   return redirect("/home");
 }

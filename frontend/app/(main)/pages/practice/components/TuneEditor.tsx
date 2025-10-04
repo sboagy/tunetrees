@@ -1,6 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -11,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import {
   transformToDatetimeLocalForInput,
@@ -18,20 +24,20 @@ import {
 } from "@/lib/date-utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ScrollArea } from "@radix-ui/themes";
-import { Save, XCircle } from "lucide-react";
+import { Save, XCircle, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { ERROR_PLAYLIST_TUNE } from "../mocks";
 import {
   createPlaylistTuneAction,
-  createPracticeRecordAction,
   deleteTuneAction,
   getAllGenresAction,
+  getPlaylistByIdAction,
   getPlaylistTuneOverviewAction,
   getTuneTypesByGenreAction,
   updatePlaylistTunesAction,
-  updatePracticeRecordAction,
+  upsertPracticeRecordAction,
   updateTuneInPlaylistFromTuneOverviewAction,
 } from "../actions/practice-actions";
 import { updateCurrentTuneInDb } from "../settings";
@@ -100,11 +106,13 @@ const formSchema = z.object({
   latest_quality: z.number().int().nullable().optional(), // practice_record.quality
   latest_easiness: z.number().nullable().optional(), // practice_record.easiness
   latest_difficulty: z.number().nullable().optional(), // practice_record.difficulty
+  latest_stability: z.number().nullable().optional(), // practice_record.stability (FSRS)
   latest_interval: z.number().nullable().optional(), // practice_record.interval
   latest_step: z.number().nullable().optional(), // practice_record.step
   latest_repetitions: z.number().nullable().optional(), // practice_record.repetitions
-  review_date: z.string().nullable().optional(), // practice_record.review_date
-  backup_practiced: z.string().nullable().optional(), // practice_record.review_date
+  latest_state: z.number().int().nullable().optional(), // practice_record.state (FSRS)
+  due: z.string().nullable().optional(), // practice_record.due
+  backup_practiced: z.string().nullable().optional(), // practice_record.due
   note_private: z.string().nullable().optional(), // not used
   note_public: z.string().nullable().optional(), // not used
   tags: z.string().nullable().optional(),
@@ -154,6 +162,9 @@ export default function TuneEditor({
   const { setCurrentView } = useMainPaneView();
   const { importUrl, setImportUrl } = useImportUrl();
   const [publicMode, setPublicMode] = useState<boolean>(false);
+  // Algorithm preference still controls which section opens by default
+  const [fsrsOpen, setFsrsOpen] = useState<boolean>(true);
+  const [sm2Open, setSm2Open] = useState<boolean>(false);
 
   // Track original practice record values to detect changes
   const [originalPracticeData, setOriginalPracticeData] = useState<{
@@ -161,11 +172,13 @@ export default function TuneEditor({
     quality?: number | null;
     easiness?: number | null;
     difficulty?: number | null;
+    stability?: number | null;
     interval?: number | null;
     step?: number | null;
     repetitions?: number | null;
-    review_date?: string | null;
+    due?: string | null;
     backup_practiced?: string | null;
+    state?: number | null;
   } | null>(null);
 
   const { tunes: repertoireTunes } = useRepertoireTunes();
@@ -236,6 +249,40 @@ export default function TuneEditor({
     void fetchGenres();
   }, []);
 
+  // Load playlist to determine algorithm preference for default collapsible state
+  useEffect(() => {
+    const loadPlaylistAlg = async () => {
+      try {
+        const playlist = await getPlaylistByIdAction(playlistId);
+        if ("detail" in playlist) return;
+        const alg = (playlist.sr_alg_type || "FSRS").toUpperCase();
+        if (alg.includes("SM2")) {
+          setSm2Open(true);
+          setFsrsOpen(false);
+        } else {
+          setFsrsOpen(true);
+          setSm2Open(false);
+        }
+      } catch {
+        // default already set
+      }
+    };
+    void loadPlaylistAlg();
+  }, [playlistId]);
+
+  // Prefer latest technique from practice record to decide which collapsible is open
+  useEffect(() => {
+    const tech = tune?.latest_technique?.toUpperCase();
+    if (!tech) return;
+    if (tech.includes("SM2")) {
+      setSm2Open(true);
+      setFsrsOpen(false);
+    } else if (tech.includes("FSRS")) {
+      setFsrsOpen(true);
+      setSm2Open(false);
+    }
+  }, [tune?.latest_technique]);
+
   const [tuneTypeList, setTuneTypeList] = useState<ITuneType[]>([]);
 
   useEffect(() => {
@@ -263,10 +310,13 @@ export default function TuneEditor({
               latest_practiced: transformToDatetimeLocalForInput(
                 tuneOverview.latest_practiced as string,
               ),
-              review_date: transformToDatetimeLocalForInput(
-                tuneOverview.latest_review_date as string, // Historical review date from practice_record
+              // Show latest_due for now (historical), until playlist-level scheduled editing is wired.
+              due: transformToDatetimeLocalForInput(
+                (tuneOverview.latest_due as string) || "",
               ),
               // learned: transformToDatetimeLocal(tuneOverview.learned as string),
+              latest_stability: tuneOverview.latest_stability ?? null,
+              latest_state: tuneOverview.latest_state ?? null,
             });
 
             // Store original practice record values for change detection
@@ -276,11 +326,13 @@ export default function TuneEditor({
               quality: tuneOverview.latest_quality,
               easiness: tuneOverview.latest_easiness,
               difficulty: tuneOverview.latest_difficulty,
+              stability: tuneOverview.latest_stability ?? null,
               interval: tuneOverview.latest_interval,
               step: tuneOverview.latest_step,
               repetitions: tuneOverview.latest_repetitions,
-              review_date: tuneOverview.latest_review_date, // Historical review date from practice_record
+              due: tuneOverview.latest_due, // Historical review date from practice_record
               backup_practiced: tuneOverview.latest_backup_practiced,
+              state: tuneOverview.latest_state ?? null,
             });
           } else {
             console.error(
@@ -353,58 +405,36 @@ export default function TuneEditor({
   async function savePracticeRecordPart(
     data: z.infer<typeof formSchema>,
   ): Promise<boolean> {
+    // Ensure UTC formatting for datetime fields before sending to API
+    const practicedUtc = transformToDatetimeUtcForDB(
+      data.latest_practiced ?? "",
+    );
+    const reviewDateUtc = transformToDatetimeUtcForDB(data.due ?? "");
+
     const practiceRecord: Partial<IPracticeRecord> = {
-      practiced: data.latest_practiced ?? "",
+      practiced: practicedUtc,
       quality: data.latest_quality ?? 0,
       easiness: data.latest_easiness ?? 0,
       difficulty: data.latest_difficulty ?? 0,
+      stability: data.latest_stability ?? 0,
       interval: data.latest_interval ?? 0,
       step: data.latest_step ?? 0,
       repetitions: data.latest_repetitions ?? 0,
-      review_date: data.review_date ?? "",
-      // tags: z.string().nullable().optional(),
+      due: reviewDateUtc,
+      state: data.latest_state ?? undefined,
     };
 
-    // Try to update the latest practice record first
-    const responsePracticeRecordUpdate = await updatePracticeRecordAction(
+    const response = await upsertPracticeRecordAction(
       tuneId,
       playlistId,
       practiceRecord,
     );
-    if ("detail" in responsePracticeRecordUpdate) {
-      console.log(
-        "Failed to update latest practice record:",
-        responsePracticeRecordUpdate.detail,
+    if ("detail" in response) {
+      console.error("Failed to upsert practice record:", response.detail);
+      handleError(
+        `Failed to save practice record: ${typeof response.detail === "string" ? response.detail : "Unknown error"}`,
       );
-      // If update failed (likely 404 - no record exists), create a new one
-      const practiceRecord2: Partial<IPracticeRecord> = {
-        tune_ref: tuneId,
-        playlist_ref: playlistId,
-        practiced: data.latest_practiced ?? "",
-        quality: data.latest_quality ?? 0,
-        easiness: data.latest_easiness ?? 0,
-        difficulty: data.latest_difficulty ?? 0,
-        interval: data.latest_interval ?? 0,
-        step: data.latest_step ?? 0,
-        repetitions: data.latest_repetitions ?? 0,
-        review_date: data.review_date ?? "",
-      };
-      const responsePracticeRecordUpdate2 = await createPracticeRecordAction(
-        tuneId,
-        playlistId,
-        practiceRecord2,
-      );
-      if ("detail" in responsePracticeRecordUpdate2) {
-        console.error(
-          "Failed to create practice record:",
-          responsePracticeRecordUpdate2.detail,
-        );
-        handleError(
-          `Failed to create practice record: ${typeof responsePracticeRecordUpdate2.detail === "string" ? responsePracticeRecordUpdate2.detail : "Unknown error"}`,
-        );
-        // Don't close the editor on error
-        return true;
-      }
+      return true;
     }
     return false;
   }
@@ -422,6 +452,12 @@ export default function TuneEditor({
       return false; // No original data to compare against
     }
 
+    // Helper: treat undefined and empty-string as null for comparison
+    const norm = (v: unknown): unknown => {
+      if (v === "" || v === undefined) return null;
+      return v;
+    };
+
     // For datetime fields, compare the UTC values (currentData already has UTC conversion)
     // Map form field names to originalPracticeData field names
     const datetimeFieldMappings = [
@@ -430,19 +466,14 @@ export default function TuneEditor({
         originalField: "practiced" as const,
       },
       {
-        formField: "review_date" as const,
-        originalField: "review_date" as const,
+        formField: "due" as const,
+        originalField: "due" as const,
       },
     ];
 
     for (const { formField, originalField } of datetimeFieldMappings) {
-      const currentUtcValue = currentData[formField];
-      const originalUtcValue = originalPracticeData[originalField];
-
-      // Handle null/undefined equivalence
-      if ((currentUtcValue === null) !== (originalUtcValue === null)) {
-        return true;
-      }
+      const currentUtcValue = norm(currentData[formField]);
+      const originalUtcValue = norm(originalPracticeData[originalField]);
 
       if (currentUtcValue !== originalUtcValue) {
         return true;
@@ -465,6 +496,10 @@ export default function TuneEditor({
         originalField: "difficulty" as const,
       },
       {
+        formField: "latest_stability" as const,
+        originalField: "stability" as const,
+      },
+      {
         formField: "latest_interval" as const,
         originalField: "interval" as const,
       },
@@ -480,18 +515,15 @@ export default function TuneEditor({
         formField: "backup_practiced" as const,
         originalField: "backup_practiced" as const,
       },
+      {
+        formField: "latest_state" as const,
+        originalField: "state" as const,
+      },
     ];
 
     return nonDatetimeFieldMappings.some(({ formField, originalField }) => {
-      const currentValue = currentData[formField];
-      const originalValue = originalPracticeData[originalField];
-
-      // Handle null/undefined equivalence
-      if ((currentValue === null) !== (originalValue === null)) {
-        return true;
-      }
-
-      // Compare actual values
+      const currentValue = norm(currentData[formField]);
+      const originalValue = norm(originalPracticeData[originalField]);
       return currentValue !== originalValue;
     });
   };
@@ -516,13 +548,14 @@ export default function TuneEditor({
     const practicedUtc = transformToDatetimeUtcForDB(
       data.latest_practiced ?? "",
     );
-    const reviewDateUtc = transformToDatetimeUtcForDB(data.review_date ?? "");
+    const reviewDateUtc = transformToDatetimeUtcForDB(data.due ?? "");
 
     const dataLocal = {
       ...data,
       deleted: false,
       practiced: practicedUtc,
-      review_date: reviewDateUtc,
+      latest_practiced: practicedUtc, // keep change detection aligned with UTC
+      due: reviewDateUtc,
     };
 
     const result = await updateTuneInPlaylistFromTuneOverviewAction(
@@ -578,7 +611,7 @@ export default function TuneEditor({
     triggerCurrentTuneUpdate();
   };
 
-  const handleCancel = async () => {
+  const handleCancel = useCallback(async () => {
     // tune.deleted = true indicates this is a new tune, so it's
     // safe and proper to delete on cancel.
     if (tune?.deleted === true) {
@@ -592,7 +625,19 @@ export default function TuneEditor({
     }
     setImportUrl(null);
     setCurrentView("tabs");
-  };
+  }, [tune?.deleted, tuneId, handleError, setImportUrl, setCurrentView]);
+
+  // Escape-to-cancel handler
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        void handleCancel();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleCancel]);
 
   if (isGenresLoading) {
     return <div>Loading...</div>;
@@ -675,6 +720,10 @@ export default function TuneEditor({
 
     return instructions;
   }
+
+  // Collapsible toggle chevron rotations
+  const sm2ChevronRotation = sm2Open ? "rotate(90deg)" : "rotate(0deg)";
+  const fsrsChevronRotation = fsrsOpen ? "rotate(90deg)" : "rotate(0deg)";
 
   const onGenreChange = async (
     e: React.ChangeEvent<HTMLSelectElement>,
@@ -761,6 +810,15 @@ export default function TuneEditor({
         }}
         aria-label="Tune Editor scrollable region"
       >
+        {tune.has_staged ? (
+          <Alert data-testid="tt-tune-editor-staged-warning" className="mb-4">
+            <AlertTitle>Staged changes present</AlertTitle>
+            <AlertDescription>
+              Only committed values are editable and visible; staged values are
+              not.
+            </AlertDescription>
+          </Alert>
+        ) : null}
         <Form {...form}>
           <form
             onSubmit={(e) => {
@@ -1060,7 +1118,7 @@ export default function TuneEditor({
                   <div className="items-center my-4 tune-form-item-style w-3/5">
                     <hr className="flex-grow border-t border-gray-300" />
                     <span className="px-4 text-gray-500">
-                      Most Recent Practice Record
+                      {`Most Recent Practice Record (${(tune.latest_technique ?? "SM2").toUpperCase()})`}
                     </span>
                     <hr className="flex-grow border-t border-gray-300" />
                   </div>
@@ -1113,153 +1171,223 @@ export default function TuneEditor({
                       </FormItem>
                     )}
                   />
-                  {/* <FormField
-                  control={form.control}
-                  name="Quality"
-                  render={({ field }) => (
-                    <FormItem className="tune-form-item-style" data-testid="tt-tune-editor-quality">
-                    <FormLabel className="tune-form-label-style">
-                    <em>Quality:</em>{" "}
-                    </FormLabel>
+                  {/* SM2 Section: Easiness, Interval */}
+                  <Collapsible
+                    open={sm2Open}
+                    onOpenChange={setSm2Open}
+                    data-testid="tt-sm2-section"
+                  >
+                    <div className="tune-form-item-style my-2">
+                      <div className="tune-form-label-style flex items-center justify-end">
+                        <CollapsibleTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex items-center gap-2 bg-transparent px-0 py-0 text-sm font-medium text-foreground hover:opacity-80 focus:outline-none"
+                            data-testid="tt-sm2-toggle"
+                            aria-expanded={sm2Open}
+                          >
+                            SM2 Fields
+                            <ChevronRight
+                              className="h-4 w-4"
+                              style={{
+                                transform: sm2ChevronRotation,
+                                transition: "transform 0.2s ease-in-out",
+                              }}
+                            />
+                          </button>
+                        </CollapsibleTrigger>
+                      </div>
+                      <div className="tune-form-control-style" />
+                    </div>
+                    <CollapsibleContent forceMount>
+                      <FormField
+                        control={form.control}
+                        name="latest_easiness"
+                        render={({ field }) => (
+                          <FormItem
+                            className="tune-form-item-style"
+                            data-testid="tt-tune-editor-easiness"
+                          >
+                            <FormLabel className="tune-form-label-style">
+                              <em>Easiness:</em>{" "}
+                            </FormLabel>
 
-                    <Select
-                    onValueChange={(value) =>
-                    field.onChange(Number.parseInt(value))
-                    }
-                    value={
-                    qualityList
-                      .find(
-                      (item) =>
-                      item.int_value.toString() === field.value ||
-                      item.value === field.value,
-                      )
-                      ?.int_value.toString() || ""
-                    }
-                    >
-                    <FormControl className="tune-form-control-style">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select quality" />
-                    </SelectTrigger>
-                    </FormControl>
+                            <FormControl className="tune-form-control-style">
+                              <Input
+                                type="number"
+                                {...field}
+                                value={field.value?.toString() || ""}
+                                onChange={(e) =>
+                                  field.onChange(e.target.valueAsNumber)
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
 
-                    <SelectContent>
-                    {qualityList.map((item) => (
-                      <SelectItem
-                      key={item.int_value}
-                      value={item.int_value.toString()}
-                      >
-                      {item.label}
-                      </SelectItem>
-                    ))}
-                    </SelectContent>
-                    </Select>
-                    </FormItem>
-                  )}
-                  /> */}
+                      <FormField
+                        control={form.control}
+                        name="latest_interval"
+                        render={({ field }) => (
+                          <FormItem
+                            className="tune-form-item-style"
+                            data-testid="tt-tune-editor-interval"
+                          >
+                            <FormLabel className="tune-form-label-style">
+                              <em>Interval:</em>{" "}
+                            </FormLabel>
 
-                  <FormField
-                    control={form.control}
-                    name="latest_easiness"
-                    render={({ field }) => (
-                      <FormItem
-                        className="tune-form-item-style"
-                        data-testid="tt-tune-editor-easiness"
-                      >
-                        <FormLabel className="tune-form-label-style">
-                          <em>Easiness:</em>{" "}
-                        </FormLabel>
+                            <FormControl className="tune-form-control-style">
+                              <Input
+                                type="number"
+                                {...field}
+                                value={field.value?.toString() || ""}
+                                onChange={(e) =>
+                                  field.onChange(e.target.valueAsNumber)
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
 
-                        <FormControl className="tune-form-control-style">
-                          <Input
-                            type="number"
-                            {...field}
-                            value={field.value?.toString() || ""}
-                            onChange={(e) =>
-                              field.onChange(e.target.valueAsNumber)
-                            }
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  {/* FSRS Section: Difficulty, Stability, Step, State */}
+                  <Collapsible
+                    open={fsrsOpen}
+                    onOpenChange={setFsrsOpen}
+                    data-testid="tt-fsrs-section"
+                  >
+                    <div className="tune-form-item-style my-2">
+                      <div className="tune-form-label-style flex items-center justify-end">
+                        <CollapsibleTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex items-center gap-2 bg-transparent px-0 py-0 text-sm font-medium text-foreground hover:opacity-80 focus:outline-none"
+                            data-testid="tt-fsrs-toggle"
+                            aria-expanded={fsrsOpen}
+                          >
+                            FSRS Fields
+                            <ChevronRight
+                              className="h-4 w-4"
+                              style={{
+                                transform: fsrsChevronRotation,
+                                transition: "transform 0.2s ease-in-out",
+                              }}
+                            />
+                          </button>
+                        </CollapsibleTrigger>
+                      </div>
+                      <div className="tune-form-control-style" />
+                    </div>
+                    <CollapsibleContent forceMount>
+                      <FormField
+                        control={form.control}
+                        name="latest_difficulty"
+                        render={({ field }) => (
+                          <FormItem
+                            className="tune-form-item-style"
+                            data-testid="tt-tune-editor-difficulty"
+                          >
+                            <FormLabel className="tune-form-label-style">
+                              <em>Difficulty:</em>{" "}
+                            </FormLabel>
 
-                  <FormField
-                    control={form.control}
-                    name="latest_difficulty"
-                    render={({ field }) => (
-                      <FormItem
-                        className="tune-form-item-style"
-                        data-testid="tt-tune-editor-difficulty"
-                      >
-                        <FormLabel className="tune-form-label-style">
-                          <em>Difficulty:</em>{" "}
-                        </FormLabel>
+                            <FormControl className="tune-form-control-style">
+                              <Input
+                                type="number"
+                                {...field}
+                                value={field.value?.toString() || ""}
+                                onChange={(e) =>
+                                  field.onChange(e.target.valueAsNumber)
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
 
-                        <FormControl className="tune-form-control-style">
-                          <Input
-                            type="number"
-                            {...field}
-                            value={field.value?.toString() || ""}
-                            onChange={(e) =>
-                              field.onChange(e.target.valueAsNumber)
-                            }
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                      <FormField
+                        control={form.control}
+                        name="latest_stability"
+                        render={({ field }) => (
+                          <FormItem
+                            className="tune-form-item-style"
+                            data-testid="tt-tune-editor-stability"
+                          >
+                            <FormLabel className="tune-form-label-style">
+                              <em>Stability:</em>{" "}
+                            </FormLabel>
 
-                  <FormField
-                    control={form.control}
-                    name="latest_interval"
-                    render={({ field }) => (
-                      <FormItem
-                        className="tune-form-item-style"
-                        data-testid="tt-tune-editor-interval"
-                      >
-                        <FormLabel className="tune-form-label-style">
-                          <em>Interval:</em>{" "}
-                        </FormLabel>
+                            <FormControl className="tune-form-control-style">
+                              <Input
+                                type="number"
+                                {...field}
+                                value={field.value?.toString() || ""}
+                                onChange={(e) =>
+                                  field.onChange(e.target.valueAsNumber)
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
 
-                        <FormControl className="tune-form-control-style">
-                          <Input
-                            type="number"
-                            {...field}
-                            value={field.value?.toString() || ""}
-                            onChange={(e) =>
-                              field.onChange(e.target.valueAsNumber)
-                            }
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                      <FormField
+                        control={form.control}
+                        name="latest_step"
+                        render={({ field }) => (
+                          <FormItem
+                            className="tune-form-item-style"
+                            data-testid="tt-tune-editor-step"
+                          >
+                            <FormLabel className="tune-form-label-style">
+                              <em>Step:</em>{" "}
+                            </FormLabel>
 
-                  <FormField
-                    control={form.control}
-                    name="latest_step"
-                    render={({ field }) => (
-                      <FormItem
-                        className="tune-form-item-style"
-                        data-testid="tt-tune-editor-step"
-                      >
-                        <FormLabel className="tune-form-label-style">
-                          <em>Step:</em>{" "}
-                        </FormLabel>
+                            <FormControl className="tune-form-control-style">
+                              <Input
+                                type="number"
+                                {...field}
+                                value={field.value?.toString() || ""}
+                                onChange={(e) =>
+                                  field.onChange(e.target.valueAsNumber)
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
 
-                        <FormControl className="tune-form-control-style">
-                          <Input
-                            type="number"
-                            {...field}
-                            value={field.value?.toString() || ""}
-                            onChange={(e) =>
-                              field.onChange(e.target.valueAsNumber)
-                            }
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                      <FormField
+                        control={form.control}
+                        name="latest_state"
+                        render={({ field }) => (
+                          <FormItem
+                            className="tune-form-item-style"
+                            data-testid="tt-tune-editor-state"
+                          >
+                            <FormLabel className="tune-form-label-style">
+                              <em>State:</em>{" "}
+                            </FormLabel>
+
+                            <FormControl className="tune-form-control-style">
+                              <Input
+                                type="number"
+                                {...field}
+                                value={field.value?.toString() || ""}
+                                onChange={(e) =>
+                                  field.onChange(e.target.valueAsNumber)
+                                }
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
 
                   <FormField
                     control={form.control}
@@ -1289,23 +1417,34 @@ export default function TuneEditor({
 
                   <FormField
                     control={form.control}
-                    name="review_date"
+                    name="due"
                     render={({ field }) => (
                       <FormItem
                         className="tune-form-item-style"
-                        data-testid="tt-tune-editor-review_date"
+                        data-testid="tt-tune-editor-due"
                       >
                         <FormLabel className="tune-form-label-style">
                           <em>Scheduled:</em>{" "}
                         </FormLabel>
-
-                        <FormControl className="tune-form-control-style">
-                          <Input
-                            type="datetime-local"
-                            {...field}
-                            value={field.value as string}
-                          />
-                        </FormControl>
+                        <div className="flex items-center gap-2 tune-form-control-style">
+                          <FormControl className="flex-1">
+                            <Input
+                              type="datetime-local"
+                              {...field}
+                              value={field.value || ""}
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => form.setValue("due", null)}
+                            data-testid="tt-tune-editor-scheduled-clear"
+                            title="Clear scheduled date"
+                          >
+                            Clear
+                          </Button>
+                        </div>
                       </FormItem>
                     )}
                   />

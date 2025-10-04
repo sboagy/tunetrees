@@ -136,20 +136,36 @@ test.describe("Password Reset Integration Tests", () => {
     await page.goto("/auth/login");
     await page.waitForLoadState("domcontentloaded");
 
-    const forgotPasswordLink = page.locator('a[href="/auth/password-reset"]');
-    await forgotPasswordLink.click();
+    // Use accessible role-based locator and ensure visibility before clicking
+    const forgotPasswordLink = page.getByRole("link", {
+      name: /forgot password\?/i,
+    });
+    await expect(forgotPasswordLink).toBeVisible({ timeout: 10_000 });
+    await Promise.all([
+      page.waitForURL("**/auth/password-reset", { timeout: 15_000 }),
+      forgotPasswordLink.click(),
+    ]);
 
     // Step 2: Request password reset for known user
     await page.waitForLoadState("domcontentloaded");
-    const emailInput = page.locator('input[type="email"]');
+    const emailInput = page.getByRole("textbox", { name: /email address/i });
     const submitButton = page.locator('button[type="submit"]');
 
+    await expect(emailInput).toBeVisible({ timeout: 10_000 });
     await emailInput.fill("sboagy@example.com"); // Known test user
-    await submitButton.isEnabled();
-    await page.waitForTimeout(1000);
-    await submitButton.click();
-    await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(1000);
+    await expect(submitButton).toBeEnabled({ timeout: 10_000 });
+
+    // Click and wait for the API response that triggers the success UI state
+    await Promise.all([
+      page.waitForResponse(
+        (resp) =>
+          resp.url().includes("/api/auth/password-reset") &&
+          resp.request().method() === "POST" &&
+          [200, 400].includes(resp.status()),
+        { timeout: 15_000 },
+      ),
+      submitButton.click(),
+    ]);
 
     // Step 3: Verify success message
     await expect(

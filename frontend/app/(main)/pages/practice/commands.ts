@@ -21,6 +21,76 @@ interface IPracticeFeedbackProps {
   playlist_id: string;
 }
 
+// New lightweight single-tune staging submit (stage=true). Optimistic UI updates should occur before calling.
+export const stagePracticeFeedback = async (
+  playlistId: number,
+  tuneId: number,
+  feedback: string,
+  sitdownDate: Date,
+  goal: string | null = null,
+): Promise<boolean> => {
+  try {
+    if (!baseURL) return false;
+    if (!sitdownDate || Number.isNaN(sitdownDate.getTime())) return false;
+    const url = `${baseURL}/tunetrees/practice/submit_feedbacks/${playlistId}`;
+    const body: Record<string, ITuneUpdate> = {
+      [String(tuneId)]: { feedback, goal },
+    };
+    await axios({
+      method: "post",
+      url,
+      data: body,
+      params: {
+        sitdown_date: convertToPythonUTCString(sitdownDate.toISOString()),
+        stage: true,
+      },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error("stagePracticeFeedback error", error);
+    return false;
+  }
+};
+
+// Clear (delete) staged feedback/evaluation for a single tune (if supported by backend).
+// Fallback: return false if API not present (caller will still clear locally).
+export const clearStagedPracticeFeedback = async (
+  playlistId: number,
+  tuneId: number,
+): Promise<boolean> => {
+  try {
+    if (!baseURL) return false;
+    // Assuming backend exposes DELETE /tunetrees/practice/staged/{playlistId}/{tuneId}
+    const url = `${baseURL}/tunetrees/practice/staged/${playlistId}/${tuneId}`;
+    await axios.delete(url, { headers: { Accept: "application/json" } });
+    return true;
+  } catch (error) {
+    console.warn("clearStagedPracticeFeedback error (non-fatal)", error);
+    return false;
+  }
+};
+
+// Commit all staged feedbacks for a playlist.
+export const commitStagedPractice = async (
+  playlistId: number,
+): Promise<{ status: string; count?: number } | null> => {
+  try {
+    if (!baseURL) return null;
+    const url = `${baseURL}/tunetrees/practice/commit_staged/${playlistId}`;
+    const resp = await axios.post(url, undefined, {
+      headers: { Accept: "application/json" },
+    });
+    return resp.data as { status: string; count?: number };
+  } catch (error) {
+    console.error("commitStagedPractice error", error);
+    return null;
+  }
+};
+
 // DEADCODE: Dead code?
 export const submitPracticeFeedback = async ({
   id,
@@ -76,6 +146,13 @@ interface IPracticeFeedbacksProps {
   sitdownDate: Date;
 }
 
+interface ISubmitFeedbacksResponse {
+  status: string;
+  staged?: boolean;
+  count?: number;
+  [k: string]: unknown;
+}
+
 export const submitPracticeFeedbacks = async (
   props: IPracticeFeedbacksProps,
 ): Promise<string> => {
@@ -113,8 +190,13 @@ export const submitPracticeFeedbacks = async (
         "Content-Type": "application/json",
       },
     });
-    console.log("Feedbacks submitted successfully:", response.data);
-    return response.data as string;
+    const data = response.data as ISubmitFeedbacksResponse | string;
+    if (typeof data === "string") {
+      console.log("Feedbacks submitted (string response):", data);
+      return data;
+    }
+    console.log("Feedbacks submitted successfully:", data);
+    return data.status || "ok";
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error("Axios error:", error.response?.data || error.message);
@@ -129,7 +211,7 @@ export const submitPracticeFeedbacks = async (
 };
 
 export interface ITuneScheduleUpdate {
-  review_date: string;
+  due: string;
 }
 
 interface IPracticeSchedulesProps {

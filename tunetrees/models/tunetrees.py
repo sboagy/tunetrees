@@ -23,6 +23,44 @@ Base = declarative_base()
 metadata = Base.metadata
 
 
+class DailyPracticeQueue(Base):
+    __tablename__ = "daily_practice_queue"
+    __table_args__ = (
+        UniqueConstraint("user_ref", "playlist_ref", "window_start_utc", "tune_ref"),
+        Index("idx_queue_generated_at", "generated_at"),
+        Index("idx_queue_user_playlist_active", "user_ref", "playlist_ref", "active"),
+        Index("idx_queue_user_playlist_bucket", "user_ref", "playlist_ref", "bucket"),
+        Index(
+            "idx_queue_user_playlist_window",
+            "user_ref",
+            "playlist_ref",
+            "window_start_utc",
+        ),
+    )
+
+    user_ref = mapped_column(Integer, nullable=False)
+    playlist_ref = mapped_column(Integer, nullable=False)
+    window_start_utc = mapped_column(Text, nullable=False)
+    window_end_utc = mapped_column(Text, nullable=False)
+    tune_ref = mapped_column(Integer, nullable=False)
+    bucket = mapped_column(Integer, nullable=False)
+    order_index = mapped_column(Integer, nullable=False)
+    snapshot_coalesced_ts = mapped_column(Text, nullable=False)
+    generated_at = mapped_column(Text, nullable=False)
+    id = mapped_column(Integer, primary_key=True)
+    mode = mapped_column(Text)
+    queue_date = mapped_column(Text)
+    scheduled_snapshot = mapped_column(Text)
+    latest_due_snapshot = mapped_column(Text)
+    acceptable_delinquency_window_snapshot = mapped_column(Integer)
+    tz_offset_minutes_snapshot = mapped_column(Integer)
+    completed_at = mapped_column(Text)
+    exposures_required = mapped_column(Integer)
+    exposures_completed = mapped_column(Integer, server_default=text("0"))
+    outcome = mapped_column(Text)
+    active = mapped_column(Boolean, server_default=text("1"))
+
+
 class Genre(Base):
     __tablename__ = "genre"
 
@@ -57,14 +95,16 @@ t_practice_list_joined = Table(
     Column("learned", Text),
     Column("goal", Text),
     Column("scheduled", Text),
+    Column("latest_state", Integer),
     Column("latest_practiced", Text),
     Column("latest_quality", Integer),
     Column("latest_easiness", Float),
     Column("latest_difficulty", Float),
     Column("latest_interval", Integer),
+    Column("latest_stability", Float),
     Column("latest_step", Integer),
     Column("latest_repetitions", Integer),
-    Column("latest_review_date", Text),
+    Column("latest_due", Text),
     Column("latest_goal", Text),
     Column("latest_technique", Text),
     Column("tags", NullType),
@@ -90,23 +130,25 @@ t_practice_list_staged = Table(
     Column("private_for", Integer),
     Column("deleted", Boolean),
     Column("learned", Text),
-    Column("goal", Text),
+    Column("goal", NullType),
     Column("scheduled", Text),
     Column("user_ref", Integer),
     Column("playlist_id", Integer),
     Column("instrument", Text),
     Column("playlist_deleted", Boolean),
-    Column("latest_practiced", Text),
-    Column("latest_quality", Integer),
-    Column("latest_easiness", Float),
-    Column("latest_difficulty", Float),
-    Column("latest_interval", Integer),
-    Column("latest_step", Integer),
-    Column("latest_repetitions", Integer),
-    Column("latest_review_date", Text),
-    Column("latest_backup_practiced", Text),
-    Column("latest_goal", Text),
-    Column("latest_technique", Text),
+    Column("latest_state", NullType),
+    Column("latest_practiced", NullType),
+    Column("latest_quality", NullType),
+    Column("latest_easiness", NullType),
+    Column("latest_difficulty", NullType),
+    Column("latest_stability", NullType),
+    Column("latest_interval", NullType),
+    Column("latest_step", NullType),
+    Column("latest_repetitions", NullType),
+    Column("latest_due", NullType),
+    Column("latest_backup_practiced", NullType),
+    Column("latest_goal", NullType),
+    Column("latest_technique", NullType),
     Column("tags", NullType),
     Column("purpose", Text),
     Column("note_private", Text),
@@ -115,6 +157,7 @@ t_practice_list_staged = Table(
     Column("notes", NullType),
     Column("favorite_url", Text),
     Column("has_override", NullType),
+    Column("has_staged", NullType),
 )
 
 
@@ -158,9 +201,6 @@ class User(Base):
     )
     prefs_spaced_repetition: Mapped[List["PrefsSpacedRepetition"]] = relationship(
         "PrefsSpacedRepetition", uselist=True, back_populates="user"
-    )
-    prefs_scheduling_options: Mapped[List["PrefsSchedulingOptions"]] = relationship(
-        "PrefsSchedulingOptions", uselist=True, back_populates="user"
     )
     session: Mapped[List["Session"]] = relationship(
         "Session", uselist=True, back_populates="user"
@@ -281,6 +321,20 @@ class Playlist(Base):
     )
 
 
+class PrefsSchedulingOptions(User):
+    __tablename__ = "prefs_scheduling_options"
+
+    acceptable_delinquency_window = mapped_column(
+        Integer, nullable=False, server_default=text("21")
+    )
+    user_id = mapped_column(ForeignKey("user.id"), primary_key=True)
+    min_reviews_per_day = mapped_column(Integer)
+    max_reviews_per_day = mapped_column(Integer)
+    days_per_week = mapped_column(Integer)
+    weekly_rules = mapped_column(Text)
+    exceptions = mapped_column(Text)
+
+
 class PrefsSpacedRepetition(Base):
     __tablename__ = "prefs_spaced_repetition"
 
@@ -295,22 +349,6 @@ class PrefsSpacedRepetition(Base):
 
     user: Mapped[Optional["User"]] = relationship(
         "User", back_populates="prefs_spaced_repetition"
-    )
-
-
-class PrefsSchedulingOptions(Base):
-    __tablename__ = "prefs_scheduling_options"
-
-    user_id = mapped_column(ForeignKey("user.id"), primary_key=True)
-    acceptable_delinquency_window = mapped_column(Integer, server_default=text("21"))
-    min_reviews_per_day = mapped_column(Integer)
-    max_reviews_per_day = mapped_column(Integer)
-    days_per_week = mapped_column(Integer)
-    weekly_rules = mapped_column(Text)
-    exceptions = mapped_column(Text)
-
-    user: Mapped[Optional["User"]] = relationship(
-        "User", back_populates="prefs_scheduling_options"
     )
 
 
@@ -335,6 +373,8 @@ class TabGroupMainState(Base):
     )
     playlist_id = mapped_column(Integer)
     tab_spec = mapped_column(Text)
+    practice_show_submitted = mapped_column(Integer, server_default=text("0"))
+    practice_mode_flashcard = mapped_column(Integer, server_default=text("0"))
 
     user: Mapped["User"] = relationship("User", back_populates="tab_group_main_state")
 
@@ -452,7 +492,7 @@ class PracticeRecord(Base):
     easiness = mapped_column(Float)
     interval = mapped_column(Integer)
     repetitions = mapped_column(Integer)
-    review_date = mapped_column(Text)
+    due = mapped_column(Text)
     backup_practiced = mapped_column(Text)
     stability = mapped_column(Float)
     elapsed_days = mapped_column(Integer)
@@ -526,6 +566,19 @@ class TableTransientData(Base):
     note_private = mapped_column(Text)
     note_public = mapped_column(Text)
     recall_eval = mapped_column(Text)
+    practiced = mapped_column(Text)
+    quality = mapped_column(Integer)
+    easiness = mapped_column(Float)
+    difficulty = mapped_column(Float)
+    interval = mapped_column(Integer)
+    step = mapped_column(Integer)
+    repetitions = mapped_column(Integer)
+    due = mapped_column(Text)
+    backup_practiced = mapped_column(Text)
+    goal = mapped_column(Text)
+    technique = mapped_column(Text)
+    stability = mapped_column(Float)
+    state = mapped_column(Integer, server_default=text("2"))
 
     playlist: Mapped[Optional["Playlist"]] = relationship(
         "Playlist", back_populates="table_transient_data"
