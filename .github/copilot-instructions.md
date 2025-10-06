@@ -1,352 +1,606 @@
-# GitHub Copilot: Repository Instructions
+# GitHub Copilot: TuneTrees SolidJS PWA Rewrite Instructions
 
-Audience and intent
+**Effective Date:** October 4, 2025  
+**Branch:** `feat/pwa1`  
+**Status:** Active Development - Phase 0 (Project Setup)
 
-- This file guides Copilot’s code suggestions for the TuneTrees repo. Optimize for correctness, safety, and speed. Prefer minimal diffs and existing patterns.
-- Respond with short, actionable output. Provide complete, runnable code with only necessary imports. Avoid boilerplate and new abstractions unless required.
+> **⚠️ IMPORTANT:** This repository is undergoing a complete architecture rewrite.
+>
+> - **New Stack:** SolidJS + TypeScript + Supabase + SQLite WASM (this file)
+> - **Legacy Stack:** Next.js + Python/FastAPI (see `legacy/.github/copilot-instructions.md`)
 
-Top ten rules (read first)
+---
 
-1. Never ever commit and/or push code without specifically asking for permission first.
-2.
-3. Strict TypeScript: no `any`; interfaces start with `I*`. Keep client code thin; server components fetch data.
-4. Never import Server Actions into client bundles. Client components should call Server Actions indirectly.
-5. Database: SQLAlchemy 2.0 only: use `select(Model).where(...)` and session patterns in `tunetrees/app`.Batch DB queries; avoid N+1 (use `.in_(...)` and fetch related data upfront). PracticeRecord uniqueness is sacred: `(tune_ref, playlist_ref, practiced)` must be unique. Use model helpers that stamp a fresh timestamp; never reuse timestamps.
-6. Follow existing page patterns for settings and scheduling options (server `page.tsx` → thin client form → Server Actions → queries module).
-7. Testing: Playwright E2E in `frontend/tests/`. Always run via provided scripts (`npm run test:ui` or `npm run test:ui:single <test-file-pattern>`, avoid `./run-playwright-tests.sh [test-file-pattern]`) unless special circumstances arise, and not raw `npx playwright test` unless very special circumstances. Use storage state auth helpers. Page Objects: `frontend/test-scripts/tunetrees.po.ts` etc. For backend logic add/modify pytest tests in `tests/` (root) mirroring module paths. Playwright tests use storage state, Page Objects, `ttPO.gotoMainPage()` first, and `data-testid` locators.
-8. Add minimal tests for new behavior (happy path + 1–2 edges). Keep tests stable and readable.
-9. Quality Gates: Before commits run (frontend): `npm run lint && npm run biome_lint && npm run type-check && npx prettier --write <changed files>`. Backend: `python -m ruff check tunetrees/ && python -m ruff format tunetrees/` plus pytest if logic changed. No warnings permitted. Never commit unformatted code.
-10. Prefer MCP tools (Memory, Playwright, GitHub) when available. If unavailable, pause and ask to start them.
+## Audience & Intent
 
-Architecture snapshot
+This file guides Copilot's code suggestions for the **new SolidJS PWA** rewrite. Optimize for:
 
-- Backend: FastAPI (`tunetrees/app`), SQLAlchemy 2.0 models in `tunetrees/app/models.py`, scheduling logic (FSRS/SM2) in `tunetrees/app/schedule.py`, app init in `tunetrees/app/main.py`.
-- Frontend: Next.js App Router (`frontend/app`), strict TypeScript, Tailwind + Headless UI, NextAuth v5 config in `frontend/auth.ts`.
-- Tests: Backend pytest under `tests/`; Frontend E2E Playwright under `frontend/tests/` with helpers in `frontend/test-scripts/`.
+- **Offline-first** architecture
+- **Reactive** programming with Solid signals
+- **Type safety** (strict TypeScript, no `any`)
+- **Performance** (60 FPS, sub-3s load times)
+- **Clean, minimal code** that follows SolidJS best practices
 
-Patterns to copy
+Respond with short, actionable output. Provide complete, runnable code with only necessary imports. Avoid boilerplate and new abstractions unless required.
 
-- Settings pages: server `page.tsx` does `auth()` + server-only queries → thin Client form → Server Actions wrapping query calls.
-- API calls: queries module uses axios with `TT_API_BASE_URL` (no extra path segments added).
-- Scheduling review flow: `update_practice_feedbacks()` → `_process_single_tune_feedback()` → `get_prefs_spaced_repetition()` → FSRS/SM2 calc → create new `PracticeRecord` (unique timestamp) → FSRS optimization every ~50 reviews.
-- Playwright: storage state auth, use Page Objects, `ttPO.gotoMainPage()` first, and `data-testid` selectors.
+---
 
-Backend rules
+## Top 10 Rules (Read First)
 
-- Use SQLAlchemy 2.0 style. Example commit pattern:
-  ```python
-  try:
-      db.commit()
-  # GitHub Copilot: Repository Instructions (Consolidated)
-  except Exception as e:
-      db.rollback()
-      raise
-  ```
-- Strict TS: no `any`. New interfaces use `I*` prefix; reuse existing types when possible.
-- Add `data-testid` to new interactive UI and update Page Objects when selectors change.
-- `practice_record` unique key `(tune_ref, playlist_ref, practiced)`.
-- Always create new practice rows via helpers that stamp a fresh `practiced` timestamp.
-- See `.github/instructions/database.instructions.md` for additional rules and safety guidance.
+1. **Never commit/push code** without explicit permission.
+2. **Strict TypeScript:** No `any` types. Use strict mode. Interfaces prefix with `I*`.
+3. **SolidJS Reactivity:** Use signals (`createSignal`), effects (`createEffect`), memos (`createMemo`). Avoid unnecessary re-renders.
+4. **Offline-First:** All reads from local SQLite WASM. Writes queue to Supabase sync layer.
+5. **Supabase Auth:** Replace NextAuth patterns with Supabase Auth SDK. Use SolidJS context for user state.
+6. **Drizzle ORM:** Type-safe queries. No raw SQL unless absolutely necessary.
+7. **shadcn-solid + Kobalte:** Port React components to Solid equivalents. Use `@kobalte/core` primitives.
+8. **No React Patterns:** Avoid `useEffect`, `useState`, etc. Learn SolidJS equivalents.
+9. **Quality Gates:** Run `npm run typecheck && npm run lint && npm run format` before commits.
+10. **Reference Legacy:** When porting features, reference `legacy/` code for business logic, not framework patterns.
 
-Scheduling specifics
+---
 
-- Algorithms: FSRS + SM2. Ratings map 0–5 to Again/Hard/Good/Easy for FSRS.
-- FSRS parameter optimization triggers approximately every 50 reviews; weights must be JSON-serializable.
+## Stack Overview
 
-Testing
+### **Frontend**
 
-See `.github/instructions/testing.instructions.md` for detailed guidelines. Key points:
+- **Framework:** SolidJS 1.8+ with TypeScript 5.x (strict mode)
+- **Build Tool:** Vite 5.x
+- **Routing:** `@solidjs/router`
+- **UI Components:** shadcn-solid (port of shadcn/ui)
+- **UI Primitives:** `@kobalte/core` (Solid port of Radix UI)
+- **Styling:** Tailwind CSS 4.x
+- **Icons:** Lucide Solid
+- **Data Grids:** `@tanstack/solid-table` + `@tanstack/solid-virtual`
 
-- Use provided scripts: `npm run test:ui` or `npm run test:ui:single <test-file-pattern>`. Avoid raw `npx playwright test` unless special circumstances arise.
-- Use storage state auth helpers.
-- Use Page Objects: `frontend/test-scripts/tunetrees.po.ts` etc.
-- Normally call `ttPO.gotoMainPage()` first.
-- Prefer `data-testid` selectors.
-- Add minimal tests for new behavior (happy path + 1–2 edge cases).
+### **Backend & Auth**
 
-Quality gates (no warnings allowed)
+- **Auth:** Supabase Auth (email/password, OAuth)
+- **Cloud Database:** Supabase PostgreSQL
+- **Realtime:** Supabase Realtime (websocket-based sync)
 
-MCP tools
+### **Local Storage**
 
-- Playwright MCP: run focused E2E via standard helpers and storage state; always use Page Objects and `data-testid` selectors.
-- Memory MCP: persist and recall repo norms, decisions, flaky areas, and gotchas. After major changes, store a short observation.
-- Availability check: If any MCP tool isn’t accessible, stop and ask for it to be started before proceeding with tasks that depend on it. If you must fall back (e.g., to local git), state the fallback and ask for confirmation first.
+- **Database:** SQLite WASM (`sql.js` or `wa-sqlite`)
+- **ORM:** Drizzle ORM with TypeScript
+- **Sync:** Custom sync layer (Supabase ↔ SQLite)
 
-Danger zones (avoid these)
+### **Scheduling**
 
-- Reusing a `practiced` timestamp (breaks uniqueness constraint).
-- Importing Server Actions into client bundles.
-- Client-side fetching where server queries exist.
-  When details are missing
-- Infer 1–2 reasonable assumptions from nearby patterns and proceed; document assumptions briefly in a code comment.
-- Don’t restate unchanged plans. Provide only the delta.
-- Produce complete, runnable edits with minimal imports. Avoid `any` and maintain existing public APIs.
-- Use up to 3 gitmojis; order by impact. Split unrelated changes.
-- Branch prefixes: `feat/`, `fix/`, `refactor/`, etc., short kebab-case; optional issue suffix (e.g., `feat/sched-algo-235`).
-  References (open these first)
-- DB rules: `.github/instructions/database.instructions.md`
+- **Algorithm:** `ts-fsrs` (client-side FSRS implementation)
+- **Fallback:** SM2 algorithm (from legacy Python logic)
 
-That’s it. Follow patterns, keep TS strict, protect DB uniqueness, batch queries, add small tests, pass all linters, and leverage MCP tools. If MCP isn’t running, pause and ask to start it.
+### **External Libraries**
 
-### Stack
+- **Music Notation:** `abcjs` (wrapped in Solid component)
+- **Rich Text Editor:** `jodit` (wrapped in Solid component)
 
-### Golden rules
+### **PWA**
 
-- SQLAlchemy 2.0 only: `select(Model).where(...)`.
+- **Plugin:** `vite-plugin-pwa`
+- **Service Worker:** Workbox-based
+- **Deployment:** Cloudflare Pages
 
-### Copy these patterns
+---
 
-- Playwright: storage state auth, Page Objects, `ttPO.gotoMainPage()` first, prefer `data-testid` selectors.
+## Architecture Principles
 
-- Add minimal tests for new behavior (happy path + 1–2 edges); prefer `data-testid` in UI.
+### **Offline-First Model**
 
-- Direct DB writes that bypass helpers.
+```
+User Action → SQLite WASM (immediate) → Sync Queue → Supabase (background)
+                     ↓
+              Supabase Realtime → SQLite WASM (updates from other clients)
+```
 
-### References
+**Key Points:**
 
-- DB rules: `.github/instructions/database.instructions.md`
-- UI rules: `.github/instructions/ui-development.instructions.md`, `frontend/UI_STYLE_GUIDE2.md`
-- Core code: `tunetrees/app/schedule.py`, `tunetrees/app/models.py`, `tunetrees/app/main.py`
-- Tests: `frontend/tests/`, `frontend/test-scripts/`, `tests/`
+- All UI reads from local SQLite (fast, always available)
+- Writes save locally first, then sync asynchronously
+- Conflict resolution: last-write-wins with user override option
+- Service worker handles background sync
 
-### MCP tools (use when available)
+### **Data Flow**
 
-- Memory MCP: persist and recall repo norms, decisions, flaky areas, and gotchas. After major changes, store a short observation. When missing or not reachable, pause and ask to start the Memory MCP server.
-- Playwright MCP: run focused E2E tests via standard helpers and storage state; prefer Page Objects and `data-testid` selectors. If unavailable, ask to start it; do not fall back to raw `npx playwright test`.
-- GitHub MCP (preferred for git): use to push files, create/update PRs, and fetch PR context. If unavailable, state that you’ll fall back to local git and ask for confirmation.
+```typescript
+// ✅ Correct SolidJS pattern
+import { createSignal, createResource } from "solid-js";
+import { db } from "@/lib/db/client";
+import { tunes } from "@/lib/db/schema";
 
-Availability check: If any MCP tool above is not accessible, stop and request it be started before proceeding with actions that depend on it.
+export function TunesList() {
+  const [tunes] = createResource(async () => {
+    return await db.select().from(tunes).all();
+  });
 
-### Implementation hygiene
+  return (
+    <Show when={!tunes.loading} fallback={<p>Loading...</p>}>
+      <For each={tunes()}>{(tune) => <div>{tune.title}</div>}</For>
+    </Show>
+  );
+}
 
-- Provide runnable, minimal changes with necessary imports and types only.
-- Keep surface area small; prefer extending existing modules over new abstractions.
-- Note assumptions briefly in comments when non-obvious.
+// ❌ WRONG - Don't use React patterns
+// import { useState, useEffect } from 'react'; // NO!
+```
 
-### Commit/branching
+### **State Management**
 
-Follow these naming conventions for Git branches to maintain consistency and enable automated workflows. Based on industry standards like GitFlow, GitHub Flow, and conventional commits.
+- **Local Component State:** `createSignal`
+- **Derived State:** `createMemo`
+- **Side Effects:** `createEffect`
+- **Global State:** SolidJS Context API
+- **URL State:** `useSearchParams` from `@solidjs/router`
 
-**Format**: `{type}/{brief-description}` or `{type}/{brief-description}-{issue-number}`
+---
 
-**Primary Types** (following conventional commits):
+## Code Patterns
 
-- `feat/` or `feature/` - New features or enhancements
-- `fix/` or `bugfix/` - Bug fixes and hotfixes
-- `docs/` - Documentation-only changes
-- `style/` - Code style/formatting changes (no logic changes)
-- `refactor/` - Code refactoring without feature changes
-- `test/` - Adding or modifying tests
-- `chore/` - Maintenance, dependencies, tooling
-- `perf/` - Performance improvements
-- `ci/` - CI/CD configuration changes
+### **1. Supabase Auth Integration**
 
-**Additional Types** (for workflow management):
+```typescript
+// src/lib/supabase/client.ts
+import { createClient } from "@supabase/supabase-js";
 
-- `release/` - Release preparation branches
-- `hotfix/` - Critical production fixes
-- `experiment/` - Experimental or spike work
+export const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
-**Guidelines**:
+// src/lib/auth/AuthContext.tsx
+import {
+  createContext,
+  useContext,
+  createSignal,
+  ParentComponent,
+} from "solid-js";
+import { supabase } from "@/lib/supabase/client";
 
-- **Use kebab-case** (hyphens) for descriptions - industry standard
-- **Keep concise but descriptive** - aim for 2-4 words
-- **Include issue numbers** when applicable for traceability
-- **Lowercase only** for consistency across platforms
-- **20-character limit** - keep total branch name under 20 characters using abbreviations when needed
+interface AuthState {
+  user: () => User | null;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+}
 
-**Examples**:
+const AuthContext = createContext<AuthState>();
+
+export const AuthProvider: ParentComponent = (props) => {
+  const [user, setUser] = createSignal<User | null>(null);
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    setUser(session?.user ?? null);
+  });
+
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, signIn, signOut }}>
+      {props.children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext)!;
+```
+
+### **2. Drizzle ORM Queries**
+
+```typescript
+// src/lib/db/schema.ts
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+
+export const users = sqliteTable("user", {
+  id: integer("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  name: text("name"),
+});
+
+export const playlists = sqliteTable("playlist", {
+  id: integer("id").primaryKey(),
+  user_ref: integer("user_ref").references(() => users.id),
+  instrument: text("instrument"),
+  genre: text("genre"),
+});
+
+// src/lib/db/queries.ts
+import { db } from "./client";
+import { playlists, users } from "./schema";
+import { eq, and } from "drizzle-orm";
+
+export async function getPlaylistsForUser(userId: number) {
+  return await db
+    .select()
+    .from(playlists)
+    .where(eq(playlists.user_ref, userId))
+    .all();
+}
+
+// ✅ Batch queries to avoid N+1
+export async function getPlaylistsWithUserInfo(userId: number) {
+  return await db
+    .select()
+    .from(playlists)
+    .leftJoin(users, eq(playlists.user_ref, users.id))
+    .where(eq(playlists.user_ref, userId))
+    .all();
+}
+```
+
+### **3. External Library Wrappers**
+
+```typescript
+// src/components/AbcNotation.tsx
+import { createEffect, onCleanup, Component } from "solid-js";
+import abcjs from "abcjs";
+
+interface AbcNotationProps {
+  notation: string;
+  responsive?: boolean;
+}
+
+export const AbcNotation: Component<AbcNotationProps> = (props) => {
+  let containerRef: HTMLDivElement;
+
+  createEffect(() => {
+    if (containerRef && props.notation) {
+      abcjs.renderAbc(containerRef, props.notation, {
+        responsive: props.responsive ?? "resize",
+      });
+    }
+  });
+
+  onCleanup(() => {
+    // Cleanup if needed
+  });
+
+  return <div ref={containerRef!} class="abc-notation" />;
+};
+```
+
+### **4. TanStack Solid Table**
+
+```typescript
+// src/components/TunesTable.tsx
+import { createSolidTable, flexRender } from "@tanstack/solid-table";
+import { For } from "solid-js";
+
+export function TunesTable(props: { data: Tune[] }) {
+  const table = createSolidTable({
+    get data() {
+      return props.data;
+    },
+    columns: [
+      { accessorKey: "title", header: "Title" },
+      { accessorKey: "type", header: "Type" },
+      { accessorKey: "mode", header: "Mode" },
+    ],
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <table>
+      <thead>
+        <For each={table.getHeaderGroups()}>
+          {(headerGroup) => (
+            <tr>
+              <For each={headerGroup.headers}>
+                {(header) => (
+                  <th>
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext()
+                    )}
+                  </th>
+                )}
+              </For>
+            </tr>
+          )}
+        </For>
+      </thead>
+      <tbody>
+        <For each={table.getRowModel().rows}>
+          {(row) => (
+            <tr>
+              <For each={row.getVisibleCells()}>
+                {(cell) => (
+                  <td>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                )}
+              </For>
+            </tr>
+          )}
+        </For>
+      </tbody>
+    </table>
+  );
+}
+```
+
+---
+
+## Migration from Legacy
+
+### **DO Port:**
+
+- ✅ Business logic (scheduling algorithms, validation rules)
+- ✅ Database schema structure (adapt to Drizzle)
+- ✅ UI layouts and designs (adapt to SolidJS)
+- ✅ Test scenarios (adapt to Solid Testing Library)
+- ✅ Tailwind classes (mostly 1:1)
+
+### **DON'T Port:**
+
+- ❌ React hooks (`useState`, `useEffect`, `useContext`)
+- ❌ Next.js patterns (Server Components, Server Actions)
+- ❌ FastAPI routes (replaced by Supabase)
+- ❌ NextAuth logic (replaced by Supabase Auth)
+- ❌ SQLAlchemy queries (rewrite with Drizzle)
+
+### **Reference Guide**
+
+| Legacy (React/Next.js)             | New (SolidJS)                     |
+| ---------------------------------- | --------------------------------- |
+| `useState`                         | `createSignal`                    |
+| `useEffect`                        | `createEffect`                    |
+| `useMemo`                          | `createMemo`                      |
+| `useContext`                       | `createContext` + `useContext`    |
+| `useCallback`                      | Not needed (functions are stable) |
+| `useRef`                           | Direct variable assignment        |
+| `{condition && <Component />}`     | `<Show when={condition}>`         |
+| `array.map(item => <Component />)` | `<For each={array}>`              |
+| React Router                       | `@solidjs/router`                 |
+| Radix UI                           | `@kobalte/core`                   |
+| shadcn/ui                          | `shadcn-solid`                    |
+
+---
+
+## Testing Strategy
+
+### **Unit Tests**
+
+- **Tool:** Vitest + `@solidjs/testing-library`
+- **Coverage:** Component logic, utility functions, Drizzle queries
+
+```typescript
+// src/lib/utils.test.ts
+import { describe, it, expect } from "vitest";
+import { formatTuneTitle } from "./utils";
+
+describe("formatTuneTitle", () => {
+  it("capitalizes first letter", () => {
+    expect(formatTuneTitle("banish misfortune")).toBe("Banish Misfortune");
+  });
+});
+```
+
+### **E2E Tests**
+
+- **Tool:** Playwright (reuse existing patterns from `legacy/frontend/tests/`)
+- **Focus:** Critical user flows (login, practice session, tune editing)
+
+```typescript
+// tests/login.spec.ts
+import { test, expect } from "@playwright/test";
+
+test("user can log in with email/password", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("test@example.com");
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Sign In" }).click();
+  await expect(page).toHaveURL("/practice");
+});
+```
+
+---
+
+## Quality Gates
+
+### **Pre-Commit Checks**
 
 ```bash
-feat/user-auth               # New authentication system (abbreviated)
-feat/spaced-rep-123          # Feature with issue reference (abbreviated)
-fix/login-redirect-bug       # Bug fix
-fix/db-conn-456              # Bug fix with issue number (abbreviated)
-docs/api-docs                # Documentation update (abbreviated)
-refactor/sched-algo          # Code refactoring (abbreviated)
-test/e2e-playlist-mgmt       # Test additions (abbreviated)
-chore/update-deps            # Maintenance work (abbreviated)
-perf/optimize-query-456      # Performance improvement
-hotfix/critical-fix-789      # Critical production fix
-release/v2.1.0               # Release preparation
-experiment/new-ui-framework  # Experimental work
+npm run typecheck  # TypeScript strict mode check
+npm run lint       # ESLint
+npm run format     # Prettier
+npm run test       # Unit tests
 ```
 
-**Branch Management**:
+### **Pre-Push Checks**
 
 ```bash
-# Create and switch to new branch
-git checkout -b feat/user-authentication
-
-# Create branch from specific commit/branch
-git checkout -b hotfix/critical-fix main
-
-# Push and set upstream tracking
-git push -u origin feat/user-authentication
-
-# Create branch with issue reference
-git checkout -b fix/login-redirect-456
+npm run build      # Production build
+npm run test:e2e   # Playwright tests
 ```
 
-**Integration Patterns**:
+### **No Warnings Allowed**
 
-- **Feature branches**: `feat/` → merge to `main` via PR
-- **Hotfixes**: `hotfix/` → merge to `main` and `develop` if using GitFlow
-- **Release branches**: `release/` → merge to `main` and tag version
-- **Experiments**: `experiment/` → merge or delete based on outcome
+- Zero TypeScript errors
+- Zero ESLint warnings
+- All tests passing
+- Build succeeds
 
-This naming convention enables:
+---
 
-- **Conventional commits compatibility** for automated changelogs
-- **Semantic versioning integration** for automated releases
-- **GitHub/GitLab automation** with type-based workflow triggers
-- **Clear intent communication** through standardized type prefixes
-- **Issue tracking integration** via optional number suffixes
-- **Tool compatibility** with popular Git workflows and CI/CD systems
+## Danger Zones (Avoid These)
 
-### Commit Message Guidelines
+### **❌ Using React Patterns**
 
-**REQUIRED**: Always use gitmojis to lead commit messages for clear visual categorization.
+```typescript
+// ❌ WRONG
+import { useState } from "react";
+function Component() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
 
-You can use either the emoji (🎨) or the text code (`:art:`) - both are equivalent:
-
-**Core Development:**
-
-- 🎨 `:art:` - Improve structure/format of the code
-- ⚡️ `:zap:` - Improve performance
-- 🔥 `:fire:` - Remove code or files
-- 🐛 `:bug:` - Fix a bug
-- ✨ `:sparkles:` - Introduce new features
-- 📝 `:memo:` - Add or update documentation
-- 🚀 `:rocket:` - Deploy stuff
-- 🚑 `:ambulance:` - Critical hotfix
-- ♻️ `:recycle:` - Refactor code
-- 🏗️ `:building_construction:` - Make architectural changes
-
-**Dependencies & Build:**
-
-- ➕ `:heavy_plus_sign:` - Add or update dependencies
-- ➖ `:heavy_minus_sign:` - Remove a dependency
-- ⬆️ `:arrow_up:` - Upgrade a dependency
-- ⬇️ `:arrow_down:` - Downgrade a dependency
-- 🔨 `:hammer:` - Add or update build scripts
-- 📦 `:package:` - Add or update compiled files or packages
-
-**Database & Infrastructure:**
-
-- 🗃️ `:card_file_box:` - Perform database related changes
-- 🔊 `:loud_sound:` - Add or update logs
-- 🔇 `:mute:` - Remove logs
-
-**Frontend & UX:**
-
-- 📱 `:iphone:` - Work on responsive design
-- � `:lipstick:` - Add or update the UI and style files
-- �🚸 `:children_crossing:` - Improve user experience/usability
-- 🌐 `:globe_with_meridians:` - Internationalization (i18n)
-- ♿ `:wheelchair:` - Improve accessibility
-- 💫 `:dizzy:` - Add or update animations
-
-**Code Quality & Testing:**
-
-- ✅ `:white_check_mark:` - Add, update, or pass tests
-- 🧪 `:test_tube:` - Add or update tests
-- 💡 `:bulb:` - Add or update comments in source code
-- 🏷️ `:label:` - Add or update types
-- 🥅 `:goal_net:` - Catch errors
-- 🤡 `:clown_face:` - Mock things
-
-**Configuration & Maintenance:**
-
-- 🔧 `:wrench:` - Change configuration files
-- ⚙️ `:gear:` - Update CI/CD pipeline
-- 🩹 `:adhesive_bandage:` - Simple fix for a non-critical issue
-- 🧹 `:broom:` - Clean up code or files
-
-**Other:**
-
-- 💬 `:speech_balloon:` - Add or update text and literals
-- 👥 `:busts_in_silhouette:` - Add or update contributor(s)
-- 🔍 `:mag:` - Improve SEO
-- 🌱 `:seedling:` - Add or update seed files
-- 🚩 `:triangular_flag_on_post:` - Add, update, or remove feature flags
-- 🥚 `:egg:` - Add or update an easter egg
-- 🚧 `:construction:` - Work in progress
-- ⚠️ `:warning:` - Address warnings or introduce breaking changes
-- ↩️ `:leftwards_arrow_with_hook:` - Revert changes
-- ⏪ `:rewind:` - Revert previous commits
-- 🔖 `:bookmark:` - Release/Version tags
-- 🎉 `:tada:` - Begin a project
-
-**Commit Structure Best Practices:**
-
-- **Break commits into logical units** when possible (e.g., separate backend fixes, database changes, and frontend improvements)
-- **Each commit should have a single clear purpose** that can be described in the first line
-- **Use descriptive commit bodies** with bullet points for multiple changes
-- **Reference issues/PRs** when applicable
-- **Follow conventional commit format**: `<gitmoji> <type>: <description>`
-- **Always ask for user approval** before executing commits - present the proposed commit message(s) and wait for confirmation
-
-**Example Multi-Commit Approach:**
-
-```
-🔒 Fix authentication constraint violation in user endpoint
-🗃️ Update database schema for historical user tracking
-✨ Add frontend validation and improve user experience
+// ✅ CORRECT
+import { createSignal } from "solid-js";
+function Component() {
+  const [count, setCount] = createSignal(0);
+  return <button onClick={() => setCount(count() + 1)}>{count()}</button>;
+}
 ```
 
-This approach creates cleaner git history, easier code review, and safer rollback capabilities.
+### **❌ Directly Mutating Signals**
 
-### Gitmoji Selection Guidelines
+```typescript
+// ❌ WRONG
+const [user, setUser] = createSignal({ name: "Alice" });
+user().name = "Bob"; // DOESN'T TRIGGER REACTIVITY!
 
-**CRITICAL**: Always carefully examine the actual code changes before selecting gitmojis. Don't rely solely on file names or user descriptions.
+// ✅ CORRECT
+const [user, setUser] = createSignal({ name: "Alice" });
+setUser({ ...user(), name: "Bob" });
+```
 
-**Gitmoji Selection Process:**
+### **❌ Missing Cleanup in Effects**
 
-1. **Analyze the diff**: Read through the actual code changes line by line
-2. **Identify change types**: Look for patterns in the modifications (refer to the gitmoji categories in the Commit Message Guidelines section above)
-3. **Apply multiple gitmojis**: When changes span multiple categories, use multiple gitmojis in order of importance
-4. **Prioritize by impact**: Place the most significant change type first
+```typescript
+// ❌ WRONG
+createEffect(() => {
+  const interval = setInterval(() => console.log("tick"), 1000);
+  // Memory leak!
+});
 
-**Multiple Gitmoji Examples:**
+// ✅ CORRECT
+createEffect(() => {
+  const interval = setInterval(() => console.log("tick"), 1000);
+  onCleanup(() => clearInterval(interval));
+});
+```
+
+### **❌ Using `any` Types**
+
+```typescript
+// ❌ WRONG
+const data: any = await fetchTunes();
+
+// ✅ CORRECT
+interface Tune {
+  id: number;
+  title: string;
+  type: string;
+}
+const data: Tune[] = await fetchTunes();
+```
+
+---
+
+## File Organization
+
+```
+src/
+├── components/        # Reusable UI components
+│   ├── ui/           # shadcn-solid components
+│   ├── auth/         # Auth-related components
+│   └── layouts/      # Layout wrappers
+├── routes/           # SolidJS router pages
+│   ├── index.tsx     # Home page
+│   ├── login.tsx     # Login page
+│   └── practice/     # Practice pages
+├── lib/              # Utilities and core logic
+│   ├── db/           # Drizzle ORM (schema, client, queries)
+│   ├── supabase/     # Supabase client config
+│   ├── auth/         # Auth context and helpers
+│   └── utils/        # General utilities
+├── assets/           # Static assets
+└── types/            # TypeScript type definitions
+
+drizzle/
+└── schema.ts         # Database schema definitions
+
+public/               # Static files (served as-is)
+```
+
+---
+
+## Commit Conventions
+
+### **Gitmoji + Conventional Commits**
 
 ```bash
-# Database schema + frontend changes
-🗃️✨ Add user preferences table and settings UI
-
-# Bug fix + test addition
-🐛✅ Fix authentication timeout and add regression tests
-
-# Performance + refactoring + tests
-⚡️♻️🧪 Optimize query performance, refactor cache logic, and add benchmarks
-
-# UI + accessibility improvements
-💄♿ Update button styles and improve keyboard navigation
-
-# Configuration + dependency updates
-🔧⬆️ Update Docker config and upgrade Node.js dependencies
+✨ feat: Add user authentication with Supabase
+🐛 fix: Resolve sync conflict in practice records
+♻️ refactor: Convert Login component to SolidJS
+📝 docs: Update README with SolidJS setup instructions
+✅ test: Add E2E test for playlist creation
+🎨 style: Format code with Prettier
+⚡ perf: Optimize table rendering with virtual scrolling
 ```
 
-**Guidelines for Multiple Gitmojis:**
+### **Branch Naming**
 
-- **Maximum 3 gitmojis** per commit to maintain readability
-- **Order by significance**: Most important change first
-- **Related changes only**: Don't combine unrelated modifications
-- **Consider splitting**: If you need 4+ gitmojis, consider multiple commits
+- `feat/feature-name` - New features
+- `fix/bug-description` - Bug fixes
+- `refactor/what-changed` - Code refactoring
+- `docs/what-documented` - Documentation updates
 
-**Change Detection Checklist:**
+---
 
-- [ ] Are new files being created? (✨ `:sparkles:`)
-- [ ] Are bugs being fixed? (🐛 `:bug:`)
-- [ ] Are tests being added/modified? (✅ `:white_check_mark:` or 🧪 `:test_tube:`)
-- [ ] Are dependencies changing? (➕➖⬆️⬇️)
-- [ ] Are UI/styles being modified? (💄 `:lipstick:`)
-- [ ] Are database schemas changing? (🗃️ `:card_file_box:`)
-- [ ] Are configuration files being updated? (🔧 `:wrench:`)
-- [ ] Is code being refactored without functional changes? (♻️ `:recycle:`)
-- [ ] Are performance optimizations being made? (⚡️ `:zap:`)
-- [ ] Is documentation being updated? (📝 `:memo:`)
+## References
 
-### TL;DR
+### **Documentation**
 
-- Follow patterns, keep TS strict, protect DB uniqueness, batch queries, add tests, pass all linters, and use MCP tools. Ask to start MCP servers if they’re down.
+- [SolidJS Docs](https://www.solidjs.com/docs/latest)
+- [Supabase Docs](https://supabase.com/docs)
+- [Drizzle ORM Docs](https://orm.drizzle.team/)
+- [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs)
+- [Kobalte UI](https://kobalte.dev/)
+- [TanStack Solid Table](https://tanstack.com/table/latest/docs/framework/solid/solid-table)
+
+### **Project Instructions**
+
+- **UI Guidelines:** `.github/instructions/ui-development.instructions.md` - Table-centric design, navigation patterns, theming
+- **Database Rules:** `.github/instructions/database.instructions.md` - Schema, invariants, safety rules
+- **Testing Guidelines:** `.github/instructions/testing.instructions.md` - Playwright and unit test patterns
+
+### **Legacy Code**
+
+- **Backend Logic:** `legacy/tunetrees/app/schedule.py` - Scheduling algorithms
+- **Database Schema:** `legacy/tunetrees/models/tunetrees.py` - SQLAlchemy models
+- **Frontend Components:** `legacy/frontend/components/` - React UI patterns
+- **E2E Tests:** `legacy/frontend/tests/` - Test scenarios to port
+
+### **Migration Plan**
+
+- **Full Plan:** `_notes/solidjs-pwa-migration-plan.md`
+- **Phase 0 Checklist:** `_notes/phase-0-checklist.md`
+- **Migration Scripts:** `MIGRATION_SCRIPTS_README.md`
+
+---
+
+## When Details Are Missing
+
+1. **Infer from Legacy:** Check `legacy/` for similar patterns
+2. **Follow SolidJS Best Practices:** Consult official docs
+3. **Ask First:** If unclear, ask before implementing
+4. **Document Assumptions:** Add comments explaining choices
+
+---
+
+## Current Phase: Phase 0 (Project Setup)
+
+**Active Tasks:** (See `_notes/phase-0-checklist.md`)
+
+- [ ] Initialize SolidJS project with Vite
+- [ ] Set up Supabase account and project
+- [ ] Configure Drizzle ORM with SQLite WASM
+- [ ] Install core dependencies
+- [ ] Create initial project structure
+
+**Next Phase:** Phase 1 (Core Authentication)
+
+---
+
+**Last Updated:** October 4, 2025  
+**Maintained By:** GitHub Copilot (per user @sboagy)

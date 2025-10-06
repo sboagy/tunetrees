@@ -1,425 +1,81 @@
-_notes
-.gitconfig
-frontend/.next/
-ci-logs/
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 node_modules
+dist
+dist-ssr
+*.local
 
-# Schema analysis artifacts
-*_schema_*.sql
-schema_diff_*.txt
-production_backup_*.sqlite3
-tunetrees_production_backup_*.sqlite3
-tunetrees_production_manual.sqlite3
-tunetrees_test_emergency.sqlite3
-
-# Byte-compiled / optimized / DLL files
-__pycache__/**/*.*
-__pycache__
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-# lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/latest/usage/project/#working-with-version-control
-.pdm.toml
-.pdm-python
-.pdm-build/
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
-
-# ==== merged from JetBrains.gitignore ===
-# Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
-# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
-
-# User-specific stuff
-.idea/**/workspace.xml
-.idea/**/tasks.xml
-.idea/**/usage.statistics.xml
-.idea/**/dictionaries
-.idea/**/shelf
-
-# AWS User-specific
-.idea/**/aws.xml
-
-# Generated files
-.idea/**/contentModel.xml
-
-# Sensitive or high-churn files
-.idea/**/dataSources/
-.idea/**/dataSources.ids
-.idea/**/dataSources.local.xml
-.idea/**/sqlDataSources.xml
-.idea/**/dynamic.xml
-.idea/**/uiDesigner.xml
-.idea/**/dbnavigator.xml
-
-# Gradle
-.idea/**/gradle.xml
-.idea/**/libraries
-
-# Gradle and Maven with auto-import
-# When using Gradle or Maven with auto-import, you should exclude module files,
-# since they will be recreated, and may cause churn.  Uncomment if using
-# auto-import.
-# .idea/artifacts
-# .idea/compiler.xml
-# .idea/jarRepositories.xml
-# .idea/modules.xml
-# .idea/*.iml
-# .idea/modules
-# *.iml
-# *.ipr
-
-# CMake
-cmake-build-*/
-
-# Mongo Explorer plugin
-.idea/**/mongoSettings.xml
-
-# File-based project format
-*.iws
-
-# IntelliJ
-out/
-
-# mpeltonen/sbt-idea plugin
-.idea_modules/
-
-# JIRA plugin
-atlassian-ide-plugin.xml
-
-# Cursive Clojure plugin
-.idea/replstate.xml
-
-# SonarLint plugin
-.idea/sonarlint/
-
-# Crashlytics plugin (for Android Studio and IntelliJ)
-com_crashlytics_export_strings.xml
-crashlytics.properties
-crashlytics-build.properties
-fabric.properties
-
-# Editor-based Rest Client
-.idea/httpRequests
-
-# Android studio 3.1+ serialized cache file
-.idea/caches/build_file_checksums.ser
-
-scratch.txt
-scratch_*.txt
-scratch.json
-scratch.md
-
-archive
-
-# For right now, don't check in jetbrains workspace configuration
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
 .idea
-
-# But do check in the .vscode workspace configuration
-# .vscode
-
 .DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env
+# Python bytecode/cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+tunetrees_local_backup/**/*
+tunetrees_do_backup/**/*
+_notes/**/*
+.dbeaver/**/*
+.github/copilot-instructions-broken.md
+archive/emergency_fix_production_views.py
+archive/http_mcp_wrapper.py
+scratch*.*
+todo.md
+archive/debug-loading-test.js
+archive/**/*
+certbot-etc/**/*
+dhparam/localhost-key.pem
+dhparam/localhost.pem
+iti_import_output/dump_tunes.cvs
+legacy/frontend/playwright-output/**/*
+legacy/frontend/archive/**/*
+legacy/frontend/babel.config.js.bak
+legacy/frontend/tsconfig.json.bak
+mcp-memory/Dockerfile
+scratch/**/*
 
-# Some of scott's working files
-orig_nginx.conf
-scratch.md
-
-# Ignore my practice backups
-tunetrees_db_backup
-tunetrees_do_backup
-tunetrees_local_backup
-
-backup_practice*.sqlite
-backup_practice*.sqlite3
-tunetrees_*.sqlite3.bak
-test_*_migration.sqlite3
-tsconfig.json.bak
-babel.config.js.bak
-
-dhparam
-id_rsa_ttdroplet
-id_rsa_ttdroplet.pub
-
-certbot*
-
-.*.drawio.bkp
-design/.*.drawio.bkp
-tunetrees/__pycache__/__init__.cpython-312.pyc
-frontend/tests/example.spec.ts
-frontend/tests-examples/demo-todo-app.spec.ts
-frontend/storageState.json
-frontend/gists_bash.sh
-design/ui_grammar/UIGrammar.interp
-design/ui_grammar/UIGrammar.tokens
-design/ui_grammar/UIGrammarLexer.interp
-design/ui_grammar/UIGrammarLexer.py
-design/ui_grammar/UIGrammarLexer.tokens
-design/ui_grammar/UIGrammarListener.py
-design/ui_grammar/UIGrammarParser.py
-tunetrees_test.sqlite3
-tunetrees.sqlite3
-tunetrees_production.sqlite3
-tunetrees_actual_production.sqlite3
-prod_migration_temp.sqlite3
-temp_empty.sqlite3
-temp_production_baseline.sqlite3
-temp_production_for_baseline.sqlite3
-test_migration.sqlite3
-production_baseline.sqlite3
+.reset_test_db.lock
 fastapi.pid
-storageStateSboagyLogin.json
-storageState*.json
-tree-*.txt
-frontend/playwright-reports/** */
-frontend/playwright-reports/playwright*
-playwright-reports/
-playwright-reports/**/*
-scratch/request_from_axios.txt
-scratch/request_from_swagger.txt
-frontend/scratch/shark_request_from_client.txt
-frontend/scratch/shark_request_from_swagger.txt
-frontend/gists_misc.txt
-frontend/external_html_samples
-.dbeaver
+id_rsa_ttdroplet
 gist_prompt.txt
-frontend/saved_components.json
-frontend/gist_mermaid_ai.txt
-*.sqlite3-shm
-*.sqlite3-wal
+fsrs_fixup_report.txt
+fsrs_fixup_report_apply.txt
 current_requirements.txt
 compiled_requirements.txt
-frontend/test-scripts/storageStateSboagyLogin.b64
-iti_import_output
-frontend/public/test-browser.properties
-xtest_stashed_folder
-**/__pycache__
-**/__pycache__/**/*.*
-github-action-logs
-github-action-logs/**/*
-tunetrees_do.sqlite3
-playwright-output
-playwright-output/**/*.*
-mcp-memory/Dockerfile
-migration_temp/production_current.sqlite3
-migration_temp/production_schema.sql
-migration_temp/schema_differences.diff
-migration_temp/source_playlist_tune_columns.txt
-migration_temp/source_practice_record_columns.txt
-migration_temp/source_schema.sql
-migration_temp/target_playlist_tune_columns.txt
-migration_temp/target_practice_record_columns.txt
-migration_temp/target_schema.sql
-migration_temp/tunetrees_migrated.sqlite3
-server-action-refactor-plan.md
-tunetrees_test.sqlite3-journal
-.reset_test_db.lock
-frontend/playwright-reports-ci
-fsrs_fixup_report_apply.txt
-fsrs_fixup_report.txt
-# For now, ignore my personal todo.md, especially since changing it will cause
-# unnecessary commits.
-todo.md
+tunetrees_test_clean.sqlite3-shm
+tunetrees_test_clean.sqlite3-wal
 tunetrees_test_clean_with_queue.sqlite3
+legacy/**/*
+legacy
+iti_import_output
 
-# ============================================================================
-# SolidJS PWA Rewrite Additions
-# ============================================================================
+# Local/personal config files
+.gitconfig
+.npmrc
 
-# Build outputs
-/dist
-/.solid
-/.output
-/.vinxi
-/.vercel
+# Database files (local development)
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+!tunetrees_test_clean.sqlite3
 
-# SolidJS specific
-.solid/
-
-# Vite
-vite.config.ts.timestamp-*
-
-# Cloudflare
-.wrangler/
-wrangler.toml
-
-# SQLite WASM (local development)
-*.db
-*.db-shm
-*.db-wal
-
-# Drizzle ORM
-drizzle/
-
-# Package manager
-pnpm-lock.yaml
-yarn.lock
-.pnpm-store/
-
-# TypeScript
-*.tsbuildinfo
-
-# Environment
-.env.local
-.env.production.local
-.env.development.local
-
-# Supabase (local development)
-supabase/.branches
-supabase/.temp
-
-# Legacy code (keep in git, but IDE might generate files)
-legacy/node_modules/
-legacy/.next/
-legacy/dist/
-legacy/__pycache__/
+# Workspace-specific linter configs
+scripts/.eslintrc.json

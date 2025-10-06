@@ -4,7 +4,22 @@
 
 Two scripts are provided to help with the legacy code migration:
 
-### 1. `migrate-to-legacy.sh` - Move to Legacy Structure
+### 1. `migrate-to-legacy.5. **Get your API credentials:**
+
+**A. Get the anon public key:**
+
+- In left sidebar, click the **⚙️ Settings** icon (gear icon at bottom)
+- Click **"API Keys"** (has a "NEW" badge)
+- Under the **`anon` `public`** section, click **Copy** to copy the key
+  - It's a long string starting with `eyJ...`
+  - ⚠️ **DO NOT** copy the `service_role` key (marked as "secret" - that's for server-side only!)
+
+**B. Get the Project URL:**
+
+- In the same **Settings** menu, click **"Data API"**
+- You'll see your **Project URL** at the top (looks like `https://xxxxxxxxxxxxx.supabase.co`)
+- Alternatively, look at your browser's address bar - the URL contains your project reference:
+  - If you see `https://supabase.com/dashboard/project/xxxxxxxxxxxxx`, your Project URL is `https://xxxxxxxxxxxxx.supabase.co`ve to Legacy Structure
 
 **Purpose:** Reorganizes the repository to move existing Python/Next.js code into `legacy/` directory.
 
@@ -94,15 +109,20 @@ ls legacy/frontend
 ### 2. **Initialize SolidJS Project**
 
 ```bash
-# Option A: Using Vite (recommended for PWA)
+# Use Vite (REQUIRED for PWA architecture)
 npm create vite@latest . -- --template solid-ts
-
-# Option B: Using SolidStart (if you want SSR capabilities)
-npm create solid@latest
 
 # Install dependencies
 npm install
 ```
+
+> **⚠️ Why Vite, not SolidStart?**
+>
+> - **TuneTrees is a client-side PWA** - no server-side rendering needed
+> - **Offline-first architecture** - all data from local SQLite WASM
+> - **Static deployment** - Cloudflare Pages serves pre-built files
+> - **SolidStart** is for SSR (server-side rendering), which conflicts with our edge/static deployment model
+> - Vite gives us faster builds, simpler deployment, and perfect PWA support
 
 ### 3. **Set Up Initial Dependencies**
 
@@ -122,15 +142,35 @@ npm install -D drizzle-kit @tailwindcss/vite vite-plugin-pwa
 
 ### 4. **Configure Supabase**
 
-1. Go to [supabase.com](https://supabase.com)
-2. Create a new project
-3. Note your project URL and anon key
-4. Create `.env.local`:
+1. Go to [supabase.com](https://supabase.com) and sign up/log in
+2. Click **"New Project"** button
+3. Fill in project details:
+   - **Name:** `tunetrees` (or your preference)
+   - **Database Password:** Generate and save securely (you'll rarely need this)
+   - **Region:** Choose closest to you (e.g., `us-west-1`)
+   - Click **"Create new project"**
+4. Wait 2-3 minutes for provisioning to complete
+5. **Get your API credentials:**
+   - In left sidebar, click the **⚙️ Settings** icon (gear icon at bottom)
+   - In the Settings menu, click **"API Keys"** (has a "NEW" badge)
+   - You'll see the API settings page with:
+     - **Project URL:** Copy this (looks like `https://xxxxxxxxxxxxx.supabase.co`)
+     - **API Keys section:**
+       - Copy the **`anon` `public`** key (long string starting with `eyJ...`)
+       - ⚠️ **DO NOT** copy the `service_role` key (that's for server-side only, never expose it!)
+6. Create `.env.local` in your project root:
 
 ```env
-VITE_SUPABASE_URL=your-project-url
-VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4eHh4eHh4eHh4eHgiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY5...
 ```
+
+> **🔒 Security Note:**
+>
+> - The `anon` key is **safe to expose** in client-side code (it's public)
+> - Supabase uses Row-Level Security (RLS) policies to protect data
+> - Add `.env.local` to `.gitignore` (should already be there)
+> - Never commit the `service_role` key to git!
 
 ### 5. **Set Up Drizzle ORM**
 
@@ -141,7 +181,40 @@ touch drizzle/schema.ts
 touch drizzle.config.ts
 ```
 
-### 6. **Start Development**
+### 6. **(Optional) Connect DBeaver to Supabase Database**
+
+You can use DBeaver (or any PostgreSQL client) to directly access your Supabase database:
+
+1. **Get connection details from Supabase:**
+
+   - In Supabase dashboard: **Settings → Database**
+   - Under **Connection Info** section, note:
+     - **Host:** `db.xxxxxxxxxxxxx.supabase.co` (your project reference)
+     - **Port:** `5432` (standard PostgreSQL)
+     - **Database:** `postgres`
+     - **User:** `postgres`
+     - **Password:** The database password you created during project setup
+
+2. **Configure DBeaver:**
+
+   - Create **New Connection → PostgreSQL**
+   - Fill in the connection details from step 1
+   - **Enable SSL** (required by Supabase)
+   - Test connection
+
+3. **Use cases for direct database access:**
+   - 🔍 **Debugging** - When sync isn't working as expected
+   - 📊 **Analytics** - Running complex queries on production data
+   - 🛠️ **Schema verification** - Checking Drizzle migrations applied correctly
+   - 🚨 **Emergency fixes** - Manual data corrections when needed
+
+> **⚠️ Important:**
+>
+> - Direct database access bypasses Row Level Security (RLS) policies
+> - Use sparingly - normal development should go through SQLite WASM → Supabase sync layer
+> - Be careful with manual changes - they won't trigger RLS validation
+
+### 7. **Start Development**
 
 ```bash
 # Run dev server

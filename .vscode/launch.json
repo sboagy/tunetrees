@@ -5,170 +5,41 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
-            "name": "Python Debugger: FastAPI",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "uvicorn",
-            "envFile": "${workspaceFolder}/.env",
-            "env": {
-                "TUNETREES_DB": "${workspaceFolder}/tunetrees_test.sqlite3",
-                "TUNETREES_DEPLOY_BASE_DIR": "${workspaceFolder}",
-                "LOG_FUTURE_REVIEWS": "true",
-            },
-            "args": [
-                "tunetrees.api.main:app",
-                "--reload"
-            ],
-            "jinja": true,
-            "justMyCode": false
-        },
-        {
-            "name": "Python Debugger: FastAPI test",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "uvicorn",
-            "envFile": "${workspaceFolder}/.env",
-            "env": {
-                "TUNETREES_DB": "${workspaceFolder}/tunetrees_test.sqlite3",
-                "TUNETREES_DEPLOY_BASE_DIR": "${workspaceFolder}",
-                "LOG_FUTURE_REVIEWS": "true",
-                "LOG_LEVEL": "debug"
-                // "NODE_ENV": "production"
-            },
-            "args": [
-                "tunetrees.api.main:app",
-                "--reload",
-                "--log-level",
-                "debug"
-            ],
-            "jinja": true,
-            "preLaunchTask": "clean_and_stop",
-            "justMyCode": false
-        },
-        {
-            "name": "Python Debugger: Fixup Practice Records (FSRS + reps)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/scripts/fixup_practice_record_groups.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "args": [
-                "--html-output",
-                "fsrs_fixup_report_apply.html",
-                // "--limit",
-                // "5",
-                "--apply",
-                // "--nofixup"
-                // "--fsrsonly"
-                "--db",
-                "tunetrees_test_clean.sqlite3"
-            ],
-            "env": {
-                "TUNETREES_DB": "${workspaceFolder}/tunetrees_test_clean.sqlite3",
-                "PYTHONPATH": "${workspaceFolder}"
-            },
-            "justMyCode": true
-        },
-        {
-            "name": "Next: Node",
-            "request": "launch",
-            "runtimeArgs": [
-                "dev",
-                "--experimental-https"
-            ],
-            "runtimeExecutable": "next",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "type": "node",
-            "cwd": "${workspaceFolder}/frontend",
-            "envFile": "${workspaceFolder}/frontend/.env.local",
-            "env": {
-                "NODE_ENV": "development",
-                "NEXT_PUBLIC_MOCK_EMAIL_CONFIRMATION": "false"
-            }
-        },
-        {
             "type": "chrome",
             "request": "launch",
-            "name": "Next: Chrome",
-            "url": "https://localhost:3000/home?tt_sitdown=2024-12-31T06:47:57.671-05:00",
-            // "url": "http://localhost:3000/?tt_sitdown=2024-12-31T06:47:57.671-05:00",
-            // "url": "https://localhost:3000/home",
-            "webRoot": "${workspaceFolder}/frontend"
-        },
-        {
-            "name": "Launch",
-            "request": "launch",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "type": "node",
-            "preLaunchTask": "tsc: build - tsconfig.json",
-            "outFiles": [
-                "${workspaceFolder}/.next/**/*.js"
-            ],
-            "resolveSourceMapLocations": [
-                "${workspaceFolder}/.next/**/*",
-                "${workspaceFolder}/node_modules/**/*"
-            ]
-        },
-        {
-            "name": "Attach",
-            "port": 9229,
-            "request": "attach",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "type": "node",
-            "preLaunchTask": "tsc: build - tsconfig.json",
-            "outFiles": [
-                "${workspaceFolder}/.next/**/*.js"
-            ],
-            "resolveSourceMapLocations": [
-                "${workspaceFolder}/node_modules/**/*"
-            ]
+            "name": "Chrome Debug TuneTrees PWA App",
+            "url": "http://localhost:5173/", // Adjust if your Vite app runs on a different port
+            "webRoot": "/Users/sboag/gittt/tunetrees", // Adjust if your source code is in a different directory
+            "sourceMaps": true
         },
         {
             "type": "node",
             "request": "launch",
-            "name": "Run Login Script",
-            "program": "${workspaceFolder}/scripts/run-login.mts",
-            "runtimeExecutable": "node",
+            "name": "Run npm dev",
+            "cwd": "/Users/sboag/gittt/tunetrees",
+            "runtimeExecutable": "npm",
             "runtimeArgs": [
-                "--loader",
-                "ts-node/esm"
+                "run",
+                "dev"
             ],
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/frontend"
+            "env": {
+                "BROWSER": "none"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
         }
     ],
     "compounds": [
         {
-            "name": "Next: Full",
+            "name": "Run Dev + Chrome Debug",
             "configurations": [
-                "Next: Node",
-                "Next: Chrome"
-            ]
-        },
-        {
-            "name": "App: Backend + Frontend",
-            "configurations": [
-                "Python Debugger: FastAPI test",
-                "Next: Node",
-                "Next: Chrome"
+                "Run npm dev",
+                "Chrome Debug TuneTrees PWA App"
             ],
-            "stopAll": true,
+            "stopAll": true
         }
     ]
 }

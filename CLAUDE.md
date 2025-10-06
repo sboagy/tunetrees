@@ -1,10 +1,35 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **🏗️ ARCHITECTURE REWRITE IN PROGRESS**  
+> **Branch:** `feat/pwa1`  
+> **New Stack:** SolidJS + TypeScript + Supabase + SQLite WASM (see `.github/copilot-instructions.md`)  
+> **Legacy Stack:** Next.js + Python/FastAPI (see `legacy/` directory and `legacy/.github/copilot-instructions.md`)
 
-## Development Commands
+This file provides guidance for working with code in this repository during the migration from the legacy stack to the new SolidJS PWA.
 
-### Frontend (Next.js/React)
+## Quick Reference
+
+**For SolidJS PWA (new):** See `.github/copilot-instructions.md`  
+**For Legacy Stack:** See `legacy/.github/copilot-instructions.md`
+
+> **📝 Note on AGENTS.md:** Per [GitHub's August 2024 announcement](https://github.blog/changelog/2025-08-28-copilot-coding-agent-now-supports-agents-md-custom-instructions/), you can create `AGENTS.md` files for directory-specific instructions. The Copilot agent supports:
+>
+> - Root-level `AGENTS.md`
+> - Nested `AGENTS.md` files for specific project areas
+> - `.github/copilot-instructions.md` (this repo's primary instructions)
+> - `.github/instructions/**.instructions.md` for additional guidance
+> - `CLAUDE.md` and `GEMINI.md` for Claude/Gemini-specific hints
+>
+> Consider using `AGENTS.md` in subdirectories (e.g., `src/AGENTS.md`, `legacy/AGENTS.md`) when we need scoped instructions during Phase 1+.
+
+---
+
+## Legacy Development Commands (Reference Only)
+
+> **⚠️ These commands apply to the LEGACY stack in `legacy/` directory.**  
+> **For new SolidJS development, see Phase 0 checklist in `_notes/phase-0-checklist.md`**
+
+### Frontend (Next.js/React) - LEGACY
 
 - **Development**: `cd frontend && npm run dev` - Starts development server with HTTPS
 - **Build**: `cd frontend && npm run build` - Creates production build
@@ -13,14 +38,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Tests**: `cd frontend && npm test` - Runs Playwright E2E tests
 - **Format**: `cd frontend && npm run format` - Prettier formatting
 
-### Backend (FastAPI/Python)
+### Backend (FastAPI/Python) - LEGACY
 
 - **Development**: `uvicorn tunetrees.api.main:app --reload` - Starts FastAPI server
 - **Tests**: `pytest tests/ -v` - Runs backend tests
 - **Lint**: `black tunetrees/` and `ruff check --fix tunetrees/` - Code formatting and linting
 - **ORM Generation**: `scripts/sqlacodegen.sh` - Generates SQLAlchemy models
 
-### Docker
+### Docker - LEGACY
 
 - **Build All**: `docker buildx bake` - Builds both frontend and backend containers
 - **Build Frontend**: `docker buildx bake frontend`
@@ -29,9 +54,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Code Architecture
 
-### High-Level Structure
+### **NEW Stack (Active Development on `feat/pwa1`)**
 
-TuneTrees is a full-stack web application for helping folk musicians memorize tune repertoires using spaced repetition algorithms:
+TuneTrees is being rewritten as an **offline-first Progressive Web App**:
+
+- **Frontend**: SolidJS + TypeScript (strict mode)
+- **UI**: shadcn-solid + Kobalte + Tailwind CSS
+- **Backend/Auth**: Supabase (PostgreSQL + Auth + Realtime)
+- **Local Storage**: SQLite WASM + Drizzle ORM
+- **Scheduling**: ts-fsrs (client-side)
+- **Deployment**: Cloudflare Pages
+- **Data Grids**: @tanstack/solid-table + @tanstack/solid-virtual
+
+**See:** `.github/copilot-instructions.md` for detailed patterns
+
+### **LEGACY Stack (Preserved in `legacy/`)**
+
+The original full-stack application:
 
 - **Frontend**: Next.js 15 with React 19, TypeScript, Tailwind CSS, shadcn/ui components
 - **Backend**: FastAPI with SQLAlchemy, SQLite database, spaced repetition scheduling
@@ -39,85 +78,160 @@ TuneTrees is a full-stack web application for helping folk musicians memorize tu
 - **Testing**: Playwright for E2E, pytest for backend
 - **Deployment**: Docker containers with nginx proxy
 
+**See:** `legacy/.github/copilot-instructions.md` for legacy patterns
+
 ### Key Directories
 
-- `frontend/app/(main)/pages/practice/` - Main practice interface with tune management, scheduling, and practice sessions
-- `tunetrees/api/` - FastAPI routes and authentication
-- `tunetrees/app/` - Core business logic (database, queries, schedulers)
-- `tunetrees/models/` - SQLAlchemy ORM models (auto-generated)
-- `frontend/components/` - Reusable React components
-- `tests/` - Backend pytest tests
-- `frontend/tests/` - Playwright E2E tests
+**NEW Structure (Phase 0+):**
+
+- `src/` - SolidJS application root (to be created)
+  - `src/components/` - Reusable SolidJS components
+  - `src/routes/` - SolidJS router pages
+  - `src/lib/` - Core utilities (db, auth, utils)
+- `drizzle/` - Drizzle ORM schema definitions (to be created)
+- `public/` - Static assets for PWA
+- `_notes/` - Migration planning documents
+
+**LEGACY Structure (reference only):**
+
+- `legacy/frontend/` - Next.js/React application
+- `legacy/tunetrees/` - FastAPI backend
+- `legacy/tests/` - Backend pytest tests
+- `legacy/frontend/tests/` - Playwright E2E tests
 
 ### Database Management
 
-- **Schema Source**: `tunetrees_test_clean.sqlite3` (checked into git)
-- **Development DB**: `tunetrees.sqlite3` (local, git-ignored)
-- **Test DB**: `tunetrees_test.sqlite3` (auto-reset for each test run)
-- **ORM Models**: Auto-generated from schema using `./scripts/sqlacodegen.sh`
+**NEW Approach (SolidJS PWA):**
+
+- **Local Storage**: SQLite WASM in browser (indexed DB persistence)
+- **Cloud Sync**: Supabase PostgreSQL
+- **ORM**: Drizzle ORM with TypeScript type safety
+- **Schema**: Version-controlled in `drizzle/schema.ts`
+- **Migrations**: Drizzle Kit (to be configured)
+
+**LEGACY Approach (reference):**
+
+- Schema in `legacy/tunetrees_test_clean.sqlite3`
+- SQLAlchemy ORM models (auto-generated)
+- Direct schema management (no Alembic)
 
 ### Practice System
 
 The core functionality revolves around spaced repetition scheduling:
 
-- **Schedulers**: SM2 and FSRS algorithms for optimal review timing
-- **Practice Records**: Track learning progress with quality ratings
-- **Tune Management**: Catalog, repertoire, and scheduled practice views
-- **User Preferences**: Configurable scheduling options and algorithm parameters
+**NEW Implementation (SolidJS PWA):**
+
+- **Client-Side Scheduling**: `ts-fsrs` library (FSRS algorithm)
+- **Offline-First**: All scheduling calculations happen locally
+- **Sync**: Practice records sync to Supabase in background
+- **Fallback**: SM2 algorithm (ported from legacy Python)
+
+**Core Features (to be ported):**
+
+- Practice Records: Track learning progress with quality ratings
+- Tune Management: Catalog, repertoire, and scheduled practice views
+- User Preferences: Configurable scheduling parameters
+
+**Legacy Reference:**
+
+- See `legacy/tunetrees/app/schedule.py` for FSRS/SM2 algorithms
+- See `legacy/frontend/app/(main)/pages/practice/` for UI patterns
 
 ### Frontend Architecture
 
-- **App Router**: Next.js 15 app directory structure
-- **State Management**: React Context providers for practice session state
-- **Components**: Mix of custom components and shadcn/ui library
-- **Styling**: Tailwind CSS with custom theme support
-- **Authentication**: NextAuth.js integration with custom HTTP adapter
+**NEW (SolidJS PWA):**
+
+- **Routing**: `@solidjs/router` for client-side routing
+- **State Management**: SolidJS signals and context API
+- **Components**: shadcn-solid + Kobalte primitives
+- **Styling**: Tailwind CSS 4.x (same classes as legacy)
+- **Authentication**: Supabase Auth SDK
+- **Offline**: Service Worker + SQLite WASM
+
+**LEGACY (Next.js/React):**
+
+- App Router (Next.js 15)
+- React Context providers
+- shadcn/ui + Radix UI
+- NextAuth.js
 
 ### API Integration
 
-- **Frontend-Backend**: HTTP API calls using custom fetch utilities
-- **Authentication**: Session-based auth with NextAuth.js
-- **Real-time Updates**: Practice session state synchronized between frontend and backend
+**NEW (SolidJS PWA):**
+
+- **Local-First**: All reads from SQLite WASM (no HTTP for data access)
+- **Authentication**: Supabase Auth SDK (email/password + OAuth)
+- **Sync Layer**: Supabase Realtime for multi-device sync
+- **Conflict Resolution**: Last-write-wins with user override
+
+**LEGACY (Next.js/FastAPI):**
+
+- HTTP API calls to FastAPI backend
+- Session-based auth with NextAuth.js
+- Direct backend queries
 
 ## Testing Requirements
 
-### Environment Setup
+**NEW (SolidJS PWA):**
 
-- **Frontend Tests**: Use Playwright with headless mode in CI (`PLAYWRIGHT_HEADLESS=true`)
-- **Backend Tests**: Use pytest with automatic database reset per test
+- **Unit Tests**: Vitest + `@solidjs/testing-library`
+- **E2E Tests**: Playwright (reuse patterns from `legacy/frontend/tests/`)
+- **Test Commands**: TBD in Phase 0 (will be `npm run test`, `npm run test:e2e`)
 
-### Test Commands
+**LEGACY (reference):**
 
-- **Backend Only**: `pytest tests/ -v`
-- **Frontend Only**: `cd frontend && npm test`
-- **Reset Test DB**: `cp tunetrees_test_clean.sqlite3 tunetrees_test.sqlite3`
+- Backend: `pytest tests/ -v`
+- Frontend: `cd legacy/frontend && npm test`
+- Playwright with headless mode in CI
 
 ## Development Workflow
 
+**NEW (SolidJS PWA):**
+
 ### Making Database Changes
 
-1. Modify schema in `tunetrees_test_clean.sqlite3`
-2. Regenerate ORM: `./scripts/sqlacodegen.sh`
-3. Format code: `black tunetrees/models/tunetrees.py && ruff check --fix tunetrees/`
-4. Test changes with both backend and frontend tests
+1. Modify schema in `drizzle/schema.ts`
+2. Generate migrations: `npm run db:generate`
+3. Apply migrations: `npm run db:push` (local) or Drizzle Studio
+4. Test changes with Vitest unit tests
 
 ### Code Quality
 
-- **Python**: Use `black` and `ruff` for formatting and linting
-- **TypeScript/JavaScript**: Use ESLint with TypeScript and React rules
-- **Components**: Follow PascalCase naming for React components
-- **API Routes**: Follow REST conventions in FastAPI routes
+- **TypeScript**: Strict mode, no `any` types
+- **Linting**: ESLint + Prettier
+- **Pre-Commit**: `npm run typecheck && npm run lint && npm run format`
+- **Components**: PascalCase for SolidJS components
+- **Signals**: Use `createSignal`, `createEffect`, `createMemo`
 
 ### Practice Components Development
 
-When working on the practice interface, note that:
+When porting the practice interface:
 
-- Components in `frontend/app/(main)/pages/practice/components/` cannot import queries directly
-- Use action wrappers in `practice-actions.ts` for server communication
-- Practice state is managed through multiple React Context providers
-- The TuneGrid system supports different views (Catalog, Repertoire, Scheduled)
+- All data from local SQLite WASM (instant reads)
+- Use SolidJS signals for reactive state
+- Port TuneGrid views to SolidJS Table (@tanstack/solid-table)
+- Reference `legacy/frontend/app/(main)/pages/practice/` for UI patterns
+- Rewrite logic, not React patterns
+
+**LEGACY (reference):**
+
+- SQLAlchemy schema management
+- Python: `black` + `ruff`
+- React Context providers
+- Server Actions for data mutations
 
 ## UI Development Guidelines
+
+> **⚠️ CRITICAL:** See `.github/instructions/ui-development.instructions.md` for complete UI guidelines.
+>
+> **Key Requirements:**
+>
+> - **Table-centric UI** for primary data views (TanStack Solid Table) - NOT card-based layouts
+> - **Desktop & mobile equally important** - same functionality, different ergonomics
+> - **User-controlled theme** (light/dark/system) - NOT system-forced
+> - **Legacy app fidelity** - reference screenshots in `legacy/` for proven patterns
+
+> **⚠️ Note:** These guidelines apply to BOTH legacy and new implementations. The **design philosophy and Tailwind classes remain the same** when porting to SolidJS. Only the **framework patterns change** (React → SolidJS).
 
 ### Design Philosophy
 
@@ -190,8 +304,17 @@ Use React Hook Form + Zod with consistent form field structure:
 
 ## Important Notes
 
-- **No Database Migrations**: This project uses direct schema management instead of Alembic migrations
-- **SSL Development**: Frontend dev server uses HTTPS with self-signed certificates
-- **Monorepo Structure**: Frontend and backend are separate but related packages
-- **Production Deployment**: Uses Docker Compose with nginx proxy and Let's Encrypt certificates
-- **Test Isolation**: Backend tests use TestClient, frontend tests may use live server
+**NEW (SolidJS PWA):**
+
+- **Offline-First**: All reads from local SQLite WASM, no server required for core functionality
+- **Drizzle Migrations**: Schema versioning via Drizzle Kit (to be configured)
+- **PWA Deployment**: Cloudflare Pages with edge caching
+- **Phase 0 Status**: Project setup in progress (see `_notes/phase-0-checklist.md`)
+- **Reference Legacy**: Business logic in `legacy/` for porting (not framework patterns)
+
+**LEGACY (preserved in `legacy/`):**
+
+- No Alembic migrations (direct schema management)
+- SSL dev server (HTTPS with self-signed certs)
+- Docker Compose deployment
+- Monorepo structure (frontend + backend)

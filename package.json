@@ -1,0 +1,53 @@
+{
+  "name": "tunetrees",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "migrate:supabase": "tsx scripts/migrate-to-supabase.ts",
+    "migrate:production": "tsx scripts/migrate-production-to-supabase.ts",
+    "create:views": "tsx scripts/create-views-direct.ts",
+    "lint": "biome lint",
+    "format": "biome format",
+    "check": "biome check",
+    "fix": "biome check --write",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@biomejs/biome": "^2.1.2",
+    "@kobalte/core": "^0.13.11",
+    "@solidjs/router": "^0.15.3",
+    "@supabase/supabase-js": "^2.58.0",
+    "@tanstack/solid-table": "^8.21.3",
+    "abcjs": "^6.5.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.44.6",
+    "postgres": "^3.4.7",
+    "solid-js": "^1.9.9",
+    "sql.js": "^1.13.0",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss": "^4.1.14",
+    "tailwindcss-animate": "^1.0.7",
+    "ts-fsrs": "^5.2.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.1.2",
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.6.0",
+    "@types/sql.js": "^1.4.9",
+    "better-sqlite3": "^12.4.1",
+    "dotenv": "^17.2.3",
+    "drizzle-kit": "^0.31.5",
+    "shadcn-solid": "^0.7.7",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.7",
+    "vite-plugin-pwa": "^1.0.3",
+    "vite-plugin-solid": "^2.11.8"
+  }
+}
