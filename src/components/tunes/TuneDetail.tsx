@@ -12,6 +12,7 @@
 
 import { type Component, createSignal, Show } from "solid-js";
 import type { Tune } from "../../lib/db/types";
+import { AbcNotation } from "./AbcNotation";
 
 interface TuneDetailProps {
   /** The tune to display */
@@ -42,7 +43,6 @@ interface TuneDetailProps {
  * ```
  */
 export const TuneDetail: Component<TuneDetailProps> = (props) => {
-  const [showFullStructure, setShowFullStructure] = createSignal(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
 
   const handleEdit = () => {
@@ -63,18 +63,6 @@ export const TuneDetail: Component<TuneDetailProps> = (props) => {
 
   const handleClose = () => {
     props.onClose?.();
-  };
-
-  // Format structure for display (truncate if too long)
-  const displayStructure = () => {
-    const structure = props.tune.structure;
-    if (!structure) return null;
-
-    const maxLength = 200;
-    if (showFullStructure() || structure.length <= maxLength) {
-      return structure;
-    }
-    return `${structure.substring(0, maxLength)}...`;
   };
 
   return (
@@ -245,45 +233,34 @@ export const TuneDetail: Component<TuneDetailProps> = (props) => {
         </Show>
       </div>
 
-      {/* ABC Notation Structure */}
-      <Show when={props.tune.structure}>
+      {/* ABC Notation - Rendered from Incipit */}
+      <Show when={props.tune.incipit}>
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-              ABC Notation
-            </h2>
-            <Show when={(props.tune.structure?.length ?? 0) > 200}>
-              <button
-                type="button"
-                onClick={() => setShowFullStructure(!showFullStructure())}
-                class="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                {showFullStructure() ? "Show less" : "Show more"}
-              </button>
-            </Show>
-          </div>
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Music Notation
+          </h2>
 
-          <div class="font-mono text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 p-4 rounded-md overflow-x-auto whitespace-pre-wrap">
-            {displayStructure()}
-          </div>
+          {/* Render ABC notation */}
+          <AbcNotation
+            notation={`X:1\nT:${
+              props.tune.title || "Untitled"
+            }\nM:4/4\nL:1/8\nK:${props.tune.mode || "D"}\n${
+              props.tune.incipit
+            }`}
+            responsive={true}
+            showErrors={true}
+            class="mb-4"
+          />
 
-          {/* ABC Notation Preview */}
-          <div class="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-            <p class="text-sm text-yellow-800 dark:text-yellow-200">
-              📝 <strong>Note:</strong> ABC notation visual preview will be
-              available once{" "}
-              <code class="px-1 py-0.5 bg-yellow-100 dark:bg-yellow-900 rounded">
-                abcjs
-              </code>{" "}
-              library is installed.
-            </p>
-            <p class="text-xs text-yellow-700 dark:text-yellow-300 mt-2">
-              Run:{" "}
-              <code class="px-1 py-0.5 bg-yellow-100 dark:bg-yellow-900 rounded">
-                npm install abcjs
-              </code>
-            </p>
-          </div>
+          {/* Raw ABC Display (collapsible) */}
+          <details class="mt-4">
+            <summary class="cursor-pointer text-sm text-blue-600 dark:text-blue-400 hover:underline">
+              Show ABC Notation Source
+            </summary>
+            <div class="mt-2 font-mono text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 p-4 rounded-md overflow-x-auto">
+              <pre>{props.tune.incipit}</pre>
+            </div>
+          </details>
         </div>
       </Show>
 

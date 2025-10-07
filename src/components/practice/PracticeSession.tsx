@@ -25,6 +25,7 @@ import type { DueTuneEntry } from "../../lib/db/queries/practice";
 import { getDueTunes } from "../../lib/db/queries/practice";
 import { FSRS_QUALITY_MAP } from "../../lib/scheduling/fsrs-service";
 import { recordPracticeRating } from "../../lib/services/practice-recording";
+import { AbcNotation } from "../tunes/AbcNotation";
 
 /**
  * Practice Session Component
@@ -45,6 +46,7 @@ export const PracticeSession: Component<{
   const [error, setError] = createSignal<string | null>(null);
   const [practiceCount, setPracticeCount] = createSignal(0);
   const [submitting, setSubmitting] = createSignal(false);
+  const [showNotation, setShowNotation] = createSignal(true); // Toggle notation visibility
 
   // Load due tunes on mount
   createEffect(() => {
@@ -231,15 +233,32 @@ export const PracticeSession: Component<{
               </div>
             </div>
 
-            {/* ABC Notation Display */}
+            {/* ABC Notation Display - Rendered */}
             <Show when={tune().tune.incipit}>
               <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-                <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  ABC Notation
-                </h4>
-                <pre class="text-sm text-gray-800 dark:text-gray-200 font-mono overflow-x-auto">
-                  {tune().tune.incipit}
-                </pre>
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Music Notation
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowNotation(!showNotation())}
+                    class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {showNotation() ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <Show when={showNotation()}>
+                  <AbcNotation
+                    notation={`X:1\nT:${
+                      tune().tune.title || "Practice"
+                    }\nM:4/4\nL:1/8\nK:${tune().mode || "D"}\n${
+                      tune().tune.incipit
+                    }`}
+                    responsive={true}
+                    showErrors={false}
+                  />
+                </Show>
               </div>
             </Show>
 
