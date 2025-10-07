@@ -26,9 +26,30 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { getDueTunes } from "../db/queries/practice";
-import { dailyPracticeQueue, playlistTunes } from "../db/schema";
+import { dailyPracticeQueue, playlistTune, userProfile } from "../db/schema";
 import type { DailyPracticeQueue, NewDailyPracticeQueue } from "../db/types";
 import { queueSync } from "../sync/queue";
+
+/**
+ * Get user_profile.id from supabase_user_id (UUID)
+ * Returns null if user not found
+ */
+async function getUserProfileId(
+  db: SqliteDatabase,
+  supabaseUserId: string
+): Promise<number | null> {
+  const result = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.supabaseUserId, supabaseUserId))
+    .limit(1);
+
+  if (!result || result.length === 0) {
+    return null;
+  }
+
+  return result[0].id;
+}
 
 /**
  * Scheduling windows for bucket classification
@@ -210,6 +231,12 @@ export async function generateDailyPracticeQueue(
     tzOffsetMinutes = 0,
   } = options;
 
+  // Map UUID to integer user_profile.id
+  const userRef = await getUserProfileId(db, userId);
+  if (!userRef) {
+    throw new Error(`User not found: ${userId}`);
+  }
+
   // Compute scheduling windows
   const windows = computeSchedulingWindows(
     sitdownDate,
@@ -224,10 +251,10 @@ export async function generateDailyPracticeQueue(
       .from(dailyPracticeQueue)
       .where(
         and(
-          eq(dailyPracticeQueue.userRef, userId),
+          eq(dailyPracticeQueue.userRef, userRef),
           eq(dailyPracticeQueue.playlistRef, playlistId),
-          eq(dailyPracticeQueue.window_start_utc, windows.startTs),
-          eq(dailyPracticeQueue.active, true)
+          eq(dailyPracticeQueue.windowStartUtc, windows.startTs),
+          eq(dailyPracticeQueue.active, 1)
         )
       );
 
@@ -241,12 +268,12 @@ export async function generateDailyPracticeQueue(
   if (forceRegen) {
     await db
       .update(dailyPracticeQueue)
-      .set({ active: false })
+      .set({ active: 0 })
       .where(
         and(
-          eq(dailyPracticeQueue.userRef, userId),
+          eq(dailyPracticeQueue.userRef, userRef),
           eq(dailyPracticeQueue.playlistRef, playlistId),
-          eq(dailyPracticeQueue.window_start_utc, windows.startTs)
+          eq(dailyPracticeQueue.windowStartUtc, windows.startTs)
         )
       );
   }
@@ -279,25 +306,25 @@ export async function generateDailyPracticeQueue(
     }
 
     queueEntries.push({
-      user_ref: userId,
-      playlist_ref: playlistId,
+      userRef: userRef,
+      playlistRef: playlistId,
       mode: "per_day",
-      queue_date: windows.startTs.substring(0, 10), // YYYY-MM-DD
-      window_start_utc: windows.startTs,
-      window_end_utc: windows.endTs,
-      tune_ref: tune.tuneRef,
+      queueDate: windows.startTs.substring(0, 10), // YYYY-MM-DD
+      windowStartUtc: windows.startTs,
+      windowEndUtc: windows.endTs,
+      tuneRef: tune.tuneRef,
       bucket,
-      order_index: orderIndex,
-      snapshot_coalesced_ts: coalescedTs,
-      scheduled_snapshot: tune.scheduled,
-      latest_due_snapshot: tune.schedulingInfo?.due || null,
-      acceptable_delinquency_window_snapshot: delinquencyWindowDays,
-      tz_offset_minutes_snapshot: tzOffsetMinutes,
-      generated_at: now,
-      exposures_required: null,
-      exposures_completed: 0,
+      orderIndex: orderIndex,
+      snapshotCoalescedTs: coalescedTs,
+      scheduledSnapshot: tune.scheduled,
+      latestDueSnapshot: tune.schedulingInfo?.due || null,
+      acceptableDelinquencyWindowSnapshot: delinquencyWindowDays,
+      tzOffsetMinutesSnapshot: tzOffsetMinutes,
+      generatedAt: now,
+      exposuresRequired: null,
+      exposuresCompleted: 0,
       outcome: null,
-      active: true,
+      active: 1,
     });
   }
 
@@ -353,6 +380,12 @@ export async function refillPracticeQueue(
   count = 5,
   sitdownDate: Date = new Date()
 ): Promise<DailyPracticeQueue[]> {
+  // Map user UUID to integer ID
+  const userRef = await getUserProfileId(db, userId);
+  if (!userRef) {
+    throw new Error(`User profile not found for user: ${userId}`);
+  }
+
   if (count <= 0) {
     return [];
   }
@@ -365,10 +398,10 @@ export async function refillPracticeQueue(
     .from(dailyPracticeQueue)
     .where(
       and(
-        eq(dailyPracticeQueue.userRef, userId),
+        eq(dailyPracticeQueue.userRef, userRef),
         eq(dailyPracticeQueue.playlistRef, playlistId),
-        eq(dailyPracticeQueue.window_start_utc, windows.startTs),
-        eq(dailyPracticeQueue.active, true)
+        eq(dailyPracticeQueue.windowStartUtc, windows.startTs),
+        eq(dailyPracticeQueue.active, 1)
       )
     );
 
@@ -383,15 +416,15 @@ export async function refillPracticeQueue(
   // Query for backfill candidates (tunes not in queue, scheduled before window floor)
   const backfillCandidates = await db
     .select({
-      tune_ref: playlistTunes.tuneRef,
-      scheduled: playlistTunes.current,
+      tuneRef: playlistTune.tuneRef,
+      scheduled: playlistTune.current,
     })
-    .from(playlistTunes)
+    .from(playlistTune)
     .where(
       and(
-        eq(playlistTunes.playlistRef, playlistId),
-        eq(playlistTunes.deleted, false),
-        sql`${playlistTunes.current} < ${windows.windowFloorUtc.toISOString()}`
+        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.deleted, 0),
+        sql`${playlistTune.current} < ${windows.windowFloorUtc.toISOString()}`
       )
     )
     .limit(count + existingTuneIds.length); // Over-fetch to account for filtering
@@ -407,28 +440,28 @@ export async function refillPracticeQueue(
   }
 
   // Build new queue entries
-  const nextOrderIndex = Math.max(...existing.map((e) => e.order_index)) + 1;
+  const nextOrderIndex = Math.max(...existing.map((e) => e.orderIndex)) + 1;
   const now = new Date().toISOString();
   const newEntries: NewDailyPracticeQueue[] = newBackfill.map((tune, idx) => ({
-    user_ref: userId,
-    playlist_ref: playlistId,
+    userRef: userRef,
+    playlistRef: playlistId,
     mode: "per_day",
-    queue_date: windows.startTs.substring(0, 10),
-    window_start_utc: windows.startTs,
-    window_end_utc: windows.endTs,
-    tune_ref: tune.tuneRef,
+    queueDate: windows.startTs.substring(0, 10),
+    windowStartUtc: windows.startTs,
+    windowEndUtc: windows.endTs,
+    tuneRef: tune.tuneRef,
     bucket: 3, // Backfill bucket
-    order_index: nextOrderIndex + idx,
-    snapshot_coalesced_ts: tune.scheduled || windows.startTs,
-    scheduled_snapshot: tune.scheduled,
-    latest_due_snapshot: null,
-    acceptable_delinquency_window_snapshot: 7,
-    tz_offset_minutes_snapshot: 0,
-    generated_at: now,
-    exposures_required: null,
-    exposures_completed: 0,
+    orderIndex: nextOrderIndex + idx,
+    snapshotCoalescedTs: tune.scheduled || windows.startTs,
+    scheduledSnapshot: tune.scheduled,
+    latestDueSnapshot: null,
+    acceptableDelinquencyWindowSnapshot: 7,
+    tzOffsetMinutesSnapshot: 0,
+    generatedAt: now,
+    exposuresRequired: null,
+    exposuresCompleted: 0,
     outcome: null,
-    active: true,
+    active: 1,
   }));
 
   // Insert and sync
@@ -462,15 +495,21 @@ export async function getQueueBucketCounts(
   playlistId: number,
   windowStartUtc: string
 ): Promise<Record<number, number>> {
+  // Map user UUID to integer ID
+  const userRef = await getUserProfileId(db, userId);
+  if (!userRef) {
+    throw new Error(`User profile not found for user: ${userId}`);
+  }
+
   const queue = await db
     .select({ bucket: dailyPracticeQueue.bucket })
     .from(dailyPracticeQueue)
     .where(
       and(
-        eq(dailyPracticeQueue.userRef, userId),
+        eq(dailyPracticeQueue.userRef, userRef),
         eq(dailyPracticeQueue.playlistRef, playlistId),
-        eq(dailyPracticeQueue.window_start_utc, windowStartUtc),
-        eq(dailyPracticeQueue.active, true)
+        eq(dailyPracticeQueue.windowStartUtc, windowStartUtc),
+        eq(dailyPracticeQueue.active, 1)
       )
     );
 

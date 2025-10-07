@@ -32,7 +32,7 @@ __pycache__/
 *.pyd
 tunetrees_local_backup/**/*
 tunetrees_do_backup/**/*
-_notes/**/*
+_notes/tt_scratch*
 .dbeaver/**/*
 .github/copilot-instructions-broken.md
 archive/emergency_fix_production_views.py
@@ -86,3 +86,4 @@ scripts/.eslintrc.json
 .vscode/mcp.json
 Diagrams/playlist_diagram_legacy.erd
 Diagrams/playlist_diagram.erd
+lighthouse_localhost_4173-20251007T123110.json

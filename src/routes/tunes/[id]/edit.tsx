@@ -35,7 +35,9 @@ const EditTunePage: Component = () => {
     }
   );
 
-  const handleSave = async (tuneData: Partial<TuneEditorData>) => {
+  const handleSave = async (
+    tuneData: Partial<TuneEditorData>
+  ): Promise<number | undefined> => {
     const db = localDb();
     if (!db) {
       console.error("Database not initialized");
@@ -56,12 +58,13 @@ const EditTunePage: Component = () => {
         mode: tuneData.mode ?? undefined,
         structure: tuneData.structure ?? undefined,
         incipit: tuneData.incipit ?? undefined,
-        genre: tuneData.genre,
+        genre: tuneData.genre ?? undefined,
         privateFor: tuneData.privateFor ?? undefined,
       });
 
       // Navigate to tune details page
       navigate(`/tunes/${tuneId}`);
+      return tuneId;
     } catch (error) {
       console.error("Error updating tune:", error);
       throw error; // Let TuneEditor handle the error display

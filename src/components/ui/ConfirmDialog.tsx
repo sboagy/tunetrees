@@ -93,6 +93,9 @@ export const ConfirmDialog: Component<ConfirmDialogProps> = (props) => {
           ref={dialogRef}
           class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 transform transition-all"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
         >
           {/* Title */}
           <h2

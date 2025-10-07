@@ -89,9 +89,11 @@ export const PlaylistSelectorModal: Component<PlaylistSelectorModalProps> = (
 
   return (
     <Show when={props.isOpen}>
-      <div
-        class="fixed inset-0 z-40 bg-black/50 dark:bg-black/70"
+      <button
+        type="button"
+        class="fixed inset-0 z-40 bg-black/50 dark:bg-black/70 cursor-default"
         onClick={handleCancel}
+        aria-label="Close modal backdrop"
       />
       <div
         class="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800"
@@ -160,6 +162,7 @@ export const PlaylistSelectorModal: Component<PlaylistSelectorModalProps> = (
                           stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
+                          <title>Selected</title>
                           <path
                             stroke-linecap="round"
                             stroke-linejoin="round"

@@ -76,24 +76,24 @@ export class FSRSService {
 
   constructor(prefs: PrefsSpacedRepetition) {
     // Parse FSRS weights from JSON string (stored in database)
-    const weights = prefs.fsrs_weights
-      ? (JSON.parse(prefs.fsrs_weights) as number[])
+    const weights = prefs.fsrsWeights
+      ? (JSON.parse(prefs.fsrsWeights) as number[])
       : generatorParameters().w;
 
     // Parse learning/relearning steps (stored as minutes array, convert to step format)
-    const learningSteps = prefs.learning_steps
-      ? (JSON.parse(prefs.learning_steps) as number[]).map((m) => `${m}m`)
+    const learningSteps = prefs.learningSteps
+      ? (JSON.parse(prefs.learningSteps) as number[]).map((m) => `${m}m`)
       : ["1m", "10m"];
-    const relearningSteps = prefs.relearning_steps
-      ? (JSON.parse(prefs.relearning_steps) as number[]).map((m) => `${m}m`)
+    const relearningSteps = prefs.relearningSteps
+      ? (JSON.parse(prefs.relearningSteps) as number[]).map((m) => `${m}m`)
       : ["10m"];
 
     // Initialize ts-fsrs scheduler with user preferences
     this.scheduler = fsrs({
       w: weights,
-      request_retention: prefs.request_retention ?? 0.9,
-      maximum_interval: prefs.maximum_interval ?? 36500,
-      enable_fuzz: prefs.enable_fuzzing ?? true,
+      request_retention: prefs.requestRetention ?? 0.9,
+      maximum_interval: prefs.maximumInterval ?? 36500,
+      enable_fuzz: prefs.enableFuzzing ? Boolean(prefs.enableFuzzing) : true,
       enable_short_term: true, // Always enable for new cards
       learning_steps: learningSteps as `${number}${"m" | "h" | "d"}`[],
       relearning_steps: relearningSteps as `${number}${"m" | "h" | "d"}`[],

@@ -443,21 +443,32 @@ User expressed concern: "I don't see the UI structure coming together." Needed v
 
 ---
 
-### Phase 7: PWA & Offline Features 📋 NOT STARTED
+### Phase 7: PWA & Offline Features 🔄 IN PROGRESS
 
-**Goal:** Make it a true Progressive Web App
+**Status:** Task 1 (Service Worker) ✅ COMPLETE, Task 2 (Offline Indicator) ✅ COMPLETE (2/7 tasks)
 
-**Planned Features:**
+**Status:** Task 1 (Service Worker) ✅ COMPLETE, Task 2 (Offline Indicator) ✅ COMPLETE (2/7 tasks)
 
-- Service worker for offline support
-- Install prompt ("Add to Home Screen")
-- Offline indicator in UI
-- Sync status display (pending changes counter)
-- Push notifications (practice reminders)
-- App update notifications
-- Cache management
+**Completed Features:**
 
-**Why Later:** App needs to work well first, then optimize offline experience
+- ✅ Service worker with Workbox (vite-plugin-pwa)
+- ✅ Offline support (31 files precached including WASM + SQL)
+- ✅ PWA manifest (installable app)
+- ✅ Lighthouse Best Practices: 100/100
+- ✅ SQLite WASM offline initialization
+- ✅ Offline indicator integrated into TopNav (status badge with hover tooltip)
+- ✅ Real-time sync status monitoring (polls every 5 seconds)
+- ✅ Network status detection (online/offline events)
+
+**Next Tasks:**
+
+- 📋 Task 3: Install prompt ("Add to Home Screen")
+- 📋 Task 4: Sync status display enhancements (manual sync button)
+- 📋 Task 5: Cache management UI
+- 📋 Task 6: App update notifications
+- 📋 Task 7: Push notifications (practice reminders - DEFERRED)
+
+**Why Now:** PWA infrastructure complete, enhancing offline UX
 
 ---
 

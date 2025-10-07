@@ -76,6 +76,7 @@ export const BulkActionsBar: Component<BulkActionsBarProps> = (props) => {
                 viewBox="0 0 24 24"
                 aria-label="Playlist icon"
               >
+                <title>Add to Playlist</title>
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -99,6 +100,7 @@ export const BulkActionsBar: Component<BulkActionsBarProps> = (props) => {
                 viewBox="0 0 24 24"
                 aria-label="Tag icon"
               >
+                <title>Add Tags</title>
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -122,6 +124,7 @@ export const BulkActionsBar: Component<BulkActionsBarProps> = (props) => {
                 viewBox="0 0 24 24"
                 aria-label="Delete icon"
               >
+                <title>Delete</title>
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -145,6 +148,7 @@ export const BulkActionsBar: Component<BulkActionsBarProps> = (props) => {
                 viewBox="0 0 24 24"
                 aria-label="Export icon"
               >
+                <title>Export</title>
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -169,6 +173,7 @@ export const BulkActionsBar: Component<BulkActionsBarProps> = (props) => {
                 viewBox="0 0 24 24"
                 aria-label="Clear icon"
               >
+                <title>Clear Selection</title>
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"

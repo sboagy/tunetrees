@@ -32,6 +32,27 @@ export interface SearchTunesOptions {
 }
 
 /**
+ * Get user_profile.id from supabase_user_id (UUID)
+ * Returns null if user not found
+ */
+async function getUserProfileId(
+  db: SqliteDatabase,
+  supabaseUserId: string
+): Promise<number | null> {
+  const result = await db
+    .select({ id: schema.userProfile.id })
+    .from(schema.userProfile)
+    .where(eq(schema.userProfile.supabaseUserId, supabaseUserId))
+    .limit(1);
+
+  if (!result || result.length === 0) {
+    return null;
+  }
+
+  return result[0].id;
+}
+
+/**
  * Get a single tune by ID
  */
 export async function getTuneById(
@@ -41,7 +62,7 @@ export async function getTuneById(
   const result = await db
     .select()
     .from(schema.tune)
-    .where(and(eq(schema.tune.id, tuneId), eq(schema.tune.deleted, false)))
+    .where(and(eq(schema.tune.id, tuneId), eq(schema.tune.deleted, 0)))
     .limit(1);
 
   return result[0] || null;
@@ -55,7 +76,7 @@ export async function getAllTunes(db: SqliteDatabase): Promise<Tune[]> {
   return await db
     .select()
     .from(schema.tune)
-    .where(and(eq(schema.tune.deleted, false), isNull(schema.tune.privateFor)))
+    .where(and(eq(schema.tune.deleted, 0), isNull(schema.tune.privateFor)))
     .orderBy(asc(schema.tune.title));
 }
 
@@ -67,9 +88,17 @@ export async function getTunesForUser(
   db: SqliteDatabase,
   userId: string
 ): Promise<Tune[]> {
+  // Map UUID to integer user_profile.id
+  const userProfileId = await getUserProfileId(db, userId);
+
+  if (!userProfileId) {
+    // User not found, return only public tunes
+    return await getAllTunes(db);
+  }
+
   const userCondition = or(
     isNull(schema.tune.privateFor),
-    eq(schema.tune.privateFor, userId)
+    eq(schema.tune.privateFor, userProfileId)
   );
 
   if (!userCondition) {
@@ -79,7 +108,7 @@ export async function getTunesForUser(
   return await db
     .select()
     .from(schema.tune)
-    .where(and(eq(schema.tune.deleted, false), userCondition))
+    .where(and(eq(schema.tune.deleted, 0), userCondition))
     .orderBy(asc(schema.tune.title));
 }
 
@@ -96,17 +125,17 @@ export async function createTune(
   const [tune] = await db
     .insert(schema.tune)
     .values({
-      title: input.title,
+      title: input.title || null,
       type: input.type || null,
       mode: input.mode || null,
       structure: input.structure || null,
       incipit: input.incipit || null,
-      genre: input.genre ? parseInt(input.genre, 10) : null,
+      genre: input.genre || null,
       privateFor: input.privateFor || null,
-      deleted: false,
-      sync_version: 0,
-      last_modified_at: now,
-      device_id: deviceId,
+      deleted: 0,
+      syncVersion: 0,
+      lastModifiedAt: now,
+      deviceId: deviceId,
     })
     .returning();
 
@@ -129,8 +158,8 @@ export async function updateTune(
 
   // Build update object with only provided fields
   const updateData: Partial<Tune> = {
-    last_modified_at: now,
-    device_id: deviceId,
+    lastModifiedAt: now,
+    deviceId: deviceId,
   };
 
   if (input.title !== undefined) updateData.title = input.title;
@@ -139,8 +168,7 @@ export async function updateTune(
   if (input.structure !== undefined)
     updateData.structure = input.structure || null;
   if (input.incipit !== undefined) updateData.incipit = input.incipit || null;
-  if (input.genre !== undefined)
-    updateData.genre = input.genre ? parseInt(input.genre, 10) : null;
+  if (input.genre !== undefined) updateData.genre = input.genre || null;
   if (input.privateFor !== undefined)
     updateData.privateFor = input.privateFor || null;
 
@@ -169,9 +197,9 @@ export async function deleteTune(
   await db
     .update(schema.tune)
     .set({
-      deleted: true,
-      last_modified_at: now,
-      device_id: deviceId,
+      deleted: 1,
+      lastModifiedAt: now,
+      deviceId: deviceId,
     })
     .where(eq(schema.tune.id, tuneId));
 
