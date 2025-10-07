@@ -4,8 +4,10 @@
  * Displays a searchable, filterable, sortable table of tunes.
  * Features:
  * - TanStack Solid Table for information-dense display
- * - Search by title/incipit
- * - Filter by type, mode, genre
+ * - Advanced search and filtering with FilterBar
+ * - Search by title/incipit/structure
+ * - Multi-select filters for type, mode, genre
+ * - URL query param persistence
  * - Sortable columns
  * - Click rows to view details
  *
@@ -22,15 +24,18 @@ import {
 } from "@tanstack/solid-table";
 import {
   type Component,
+  createEffect,
   createMemo,
   createResource,
   createSignal,
   For,
   Show,
 } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getTunesForUser } from "../../lib/db/queries/tunes";
 import type { Tune } from "../../lib/db/types";
+import { FilterBar } from "./FilterBar";
 
 interface TuneListProps {
   /** Callback when a tune is selected */
@@ -49,13 +54,59 @@ interface TuneListProps {
  */
 export const TuneList: Component<TuneListProps> = (props) => {
   const { user, localDb } = useAuth();
-  const [searchQuery, setSearchQuery] = createSignal("");
-  const [filterType, setFilterType] = createSignal<string>("");
-  const [filterMode, setFilterMode] = createSignal<string>("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Helper to safely get string from searchParams
+  const getParam = (value: string | string[] | undefined): string => {
+    if (Array.isArray(value)) return value[0] || "";
+    return value || "";
+  };
+  
+  // Helper to safely get array from searchParams
+  const getParamArray = (value: string | string[] | undefined): string[] => {
+    if (!value) return [];
+    const str = Array.isArray(value) ? value[0] || "" : value;
+    return str.split(",").filter(Boolean);
+  };
+  
+  // Filter state from URL params
+  const [searchQuery, setSearchQuery] = createSignal(getParam(searchParams.q));
+  const [selectedTypes, setSelectedTypes] = createSignal<string[]>(
+    getParamArray(searchParams.types)
+  );
+  const [selectedModes, setSelectedModes] = createSignal<string[]>(
+    getParamArray(searchParams.modes)
+  );
+  const [selectedGenres, setSelectedGenres] = createSignal<string[]>(
+    getParamArray(searchParams.genres)
+  );
   const [sorting, setSorting] = createSignal<SortingState>([]);
 
-  // Fetch tunes from local database
-  const [tunes] = createResource(
+  // Sync filter state to URL params
+  createEffect(() => {
+    const params: Record<string, string> = {};
+    
+    if (searchQuery()) {
+      params.q = searchQuery();
+    }
+    
+    if (selectedTypes().length > 0) {
+      params.types = selectedTypes().join(",");
+    }
+    
+    if (selectedModes().length > 0) {
+      params.modes = selectedModes().join(",");
+    }
+    
+    if (selectedGenres().length > 0) {
+      params.genres = selectedGenres().join(",");
+    }
+    
+    setSearchParams(params, { replace: true });
+  });
+
+  // Fetch all tunes from local database
+  const [allTunes] = createResource(
     () => {
       const userId = user()?.id;
       const db = localDb();
@@ -69,29 +120,42 @@ export const TuneList: Component<TuneListProps> = (props) => {
 
   // Filter tunes based on search and filters
   const filteredTunes = createMemo(() => {
-    const allTunes = tunes() || [];
-    const query = searchQuery().toLowerCase();
-    const type = filterType();
-    const mode = filterMode();
+    const tunes = allTunes() || [];
+    const query = String(searchQuery()).trim().toLowerCase();
+    const types = selectedTypes();
+    const modes = selectedModes();
+    const genres = selectedGenres();
 
-    return allTunes.filter((tune: Tune) => {
+    return tunes.filter((tune: Tune) => {
       // Search filter
       if (query) {
         const matchesTitle = tune.title?.toLowerCase().includes(query);
         const matchesIncipit = tune.incipit?.toLowerCase().includes(query);
-        if (!matchesTitle && !matchesIncipit) {
+        const matchesStructure = tune.structure?.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesIncipit && !matchesStructure) {
           return false;
         }
       }
 
-      // Type filter
-      if (type && tune.type !== type) {
-        return false;
+      // Type filter (multi-select)
+      if (types.length > 0 && tune.type) {
+        if (!types.includes(tune.type)) {
+          return false;
+        }
       }
 
-      // Mode filter
-      if (mode && tune.mode !== mode) {
-        return false;
+      // Mode filter (multi-select)
+      if (modes.length > 0 && tune.mode) {
+        if (!modes.includes(tune.mode)) {
+          return false;
+        }
+      }
+
+      // Genre filter (multi-select)
+      if (genres.length > 0 && tune.genre) {
+        if (!genres.includes(tune.genre)) {
+          return false;
+        }
       }
 
       // Private filter
@@ -103,24 +167,41 @@ export const TuneList: Component<TuneListProps> = (props) => {
     });
   });
 
-  // Get unique types and modes for filter dropdowns
-  const tuneTypes = createMemo(() => {
-    const allTunes = tunes() || [];
+  // Get unique types, modes, and genres for filter dropdowns
+  const availableTypes = createMemo(() => {
+    const tunes = allTunes() || [];
     const types = new Set<string>();
-    allTunes.forEach((tune: Tune) => {
+    tunes.forEach((tune: Tune) => {
       if (tune.type) types.add(tune.type);
     });
     return Array.from(types).sort();
   });
 
-  const tuneModes = createMemo(() => {
-    const allTunes = tunes() || [];
+  const availableModes = createMemo(() => {
+    const tunes = allTunes() || [];
     const modes = new Set<string>();
-    allTunes.forEach((tune: Tune) => {
+    tunes.forEach((tune: Tune) => {
       if (tune.mode) modes.add(tune.mode);
     });
     return Array.from(modes).sort();
   });
+
+  const availableGenres = createMemo(() => {
+    const tunes = allTunes() || [];
+    const genres = new Set<string>();
+    tunes.forEach((tune: Tune) => {
+      if (tune.genre) genres.add(tune.genre);
+    });
+    return Array.from(genres).sort();
+  });
+
+  // Clear all filters
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setSelectedTypes([]);
+    setSelectedModes([]);
+    setSelectedGenres([]);
+  };
 
   // Define table columns
   const columns: ColumnDef<Tune>[] = [
@@ -245,88 +326,37 @@ export const TuneList: Component<TuneListProps> = (props) => {
 
   return (
     <div class="w-full">
-      {/* Search and Filter Bar */}
-      <div class="mb-4 space-y-3">
-        {/* Search Input */}
-        <div>
-          <label
-            for="tune-search"
-            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-          >
-            Search Tunes
-          </label>
-          <input
-            id="tune-search"
-            type="text"
-            value={searchQuery()}
-            onInput={(e) => setSearchQuery(e.currentTarget.value)}
-            placeholder="Search by title or incipit..."
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-          />
-        </div>
+      {/* Filter Bar */}
+      <FilterBar
+        searchQuery={searchQuery()}
+        onSearchChange={setSearchQuery}
+        selectedTypes={selectedTypes()}
+        onTypesChange={setSelectedTypes}
+        selectedModes={selectedModes()}
+        onModesChange={setSelectedModes}
+        selectedGenres={selectedGenres()}
+        onGenresChange={setSelectedGenres}
+        availableTypes={availableTypes()}
+        availableModes={availableModes()}
+        availableGenres={availableGenres()}
+        onClearFilters={handleClearFilters}
+      />
 
-        {/* Filter Dropdowns */}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Type Filter */}
-          <div>
-            <label
-              for="filter-type"
-              class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
-              Type
-            </label>
-            <select
-              id="filter-type"
-              value={filterType()}
-              onChange={(e) => setFilterType(e.currentTarget.value)}
-              class="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-            >
-              <option value="">All Types</option>
-              <For each={tuneTypes()}>
-                {(type) => <option value={type}>{type}</option>}
-              </For>
-            </select>
-          </div>
-
-          {/* Mode Filter */}
-          <div>
-            <label
-              for="filter-mode"
-              class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
-              Mode
-            </label>
-            <select
-              id="filter-mode"
-              value={filterMode()}
-              onChange={(e) => setFilterMode(e.currentTarget.value)}
-              class="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-            >
-              <option value="">All Modes</option>
-              <For each={tuneModes()}>
-                {(mode) => <option value={mode}>{mode}</option>}
-              </For>
-            </select>
-          </div>
-
-          {/* Results Count */}
-          <div class="flex items-end">
-            <div class="text-sm text-gray-600 dark:text-gray-400 pb-1.5">
-              <Show
-                when={!tunes.loading}
-                fallback={<span>Loading tunes...</span>}
-              >
-                Showing {filteredTunes().length} of {tunes()?.length || 0} tunes
-              </Show>
-            </div>
-          </div>
-        </div>
+      {/* Results Summary */}
+      <div class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+        <Show
+          when={!allTunes.loading}
+          fallback={<span>Loading tunes...</span>}
+        >
+          Showing <span class="font-semibold">{filteredTunes().length}</span> of{" "}
+          <span class="font-semibold">{allTunes()?.length || 0}</span> tunes
+        </Show>
       </div>
 
       {/* Table */}
       <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <Show
-          when={!tunes.loading}
+          when={!allTunes.loading}
           fallback={
             <div class="text-center py-12 bg-white dark:bg-gray-800">
               <div class="animate-spin h-12 w-12 mx-auto border-4 border-blue-600 border-t-transparent rounded-full" />

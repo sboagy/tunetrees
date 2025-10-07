@@ -7,11 +7,29 @@
  * @module lib/db/queries/tunes
  */
 
-import { and, asc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { queueSync } from "../../sync";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
 import type { CreateTuneInput, Tune } from "../types";
+
+/**
+ * Search and filter options for tunes
+ */
+export interface SearchTunesOptions {
+  /** Search query (searches title, incipit, structure) */
+  query?: string;
+  /** Filter by tune types (multi-select) */
+  types?: string[];
+  /** Filter by modes (multi-select) */
+  modes?: string[];
+  /** Filter by genres (multi-select) */
+  genres?: string[];
+  /** Filter by tags (multi-select) - tuple IDs will be checked against tag table */
+  tagIds?: number[];
+  /** Include user's private tunes */
+  userId?: string;
+}
 
 /**
  * Get a single tune by ID
@@ -180,4 +198,78 @@ function getDeviceId(): string {
     return deviceId;
   }
   return "server";
+}
+
+/**
+ * Search tunes with advanced filtering
+ *
+ * Searches across: title, incipit, structure
+ * Filters by: type, mode, genre
+ * Case-insensitive, uses SQL LIKE for fuzzy matching
+ *
+ * @param db - Database instance
+ * @param options - Search and filter options
+ * @returns Array of matching tunes
+ */
+export async function searchTunes(
+  db: SqliteDatabase,
+  options: SearchTunesOptions = {},
+): Promise<Tune[]> {
+  const { query, types, modes, genres, userId } = options;
+
+  // Build WHERE conditions
+  const conditions: ReturnType<typeof or | typeof and | typeof eq>[] = [
+    eq(schema.tune.deleted, 0), // SQLite uses 0/1 for boolean
+  ];
+
+  // User-specific filtering (public or user's private tunes)
+  if (userId) {
+    // Need to map UUID to integer user_profile.id
+    // For now, we'll filter by privateFor being null (public) or matching user
+    // This will need enhancement when we implement proper UUID mapping
+    conditions.push(
+      or(
+        isNull(schema.tune.privateFor),
+        eq(schema.tune.privateFor, userId as any) // FIXME: Need UUID to integer mapping
+      ) as any
+    );
+  } else {
+    // Only public tunes
+    conditions.push(isNull(schema.tune.privateFor));
+  }
+
+  // Search query (searches title, incipit, structure)
+  if (query?.trim()) {
+    const searchPattern = `%${query.toLowerCase()}%`;
+    conditions.push(
+      or(
+        like(schema.tune.title, searchPattern),
+        like(schema.tune.incipit, searchPattern),
+        like(schema.tune.structure, searchPattern)
+      ) as any
+    );
+  }
+
+  // Type filter (multi-select)
+  if (types && types.length > 0) {
+    conditions.push(inArray(schema.tune.type, types) as any);
+  }
+
+  // Mode filter (multi-select)
+  if (modes && modes.length > 0) {
+    conditions.push(inArray(schema.tune.mode, modes) as any);
+  }
+
+  // Genre filter (multi-select)
+  if (genres && genres.length > 0) {
+    conditions.push(inArray(schema.tune.genre, genres) as any);
+  }
+
+  // Execute query
+  return await db
+    .select()
+    .from(schema.tune)
+    .where(and(...conditions) as any)
+    .orderBy(asc(schema.tune.title))
+    .all();
 }
