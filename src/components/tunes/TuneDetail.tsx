@@ -1,7 +1,31 @@
 /**
  * Tune Detail Component
  *
- * Displays full tune information including:
+ * Displays full   const { user } = useAuth();
+  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+
+  // Load tags for this tune - reactive: refetches when tune.id or user changes
+  const [tuneTags] = createResource(
+    () => ({ tuneId: props.tune.id, userId: user()?.id }),
+    async (params) => {
+      if (!params.userId || !params.tuneId) return [];
+
+      const db = getDb();
+      const tags = await getTuneTags(db, params.tuneId, params.userId); // params.userId is already a UUID string
+      return tags.map((t) => t.tagText);
+    },
+  );
+
+  // Load references for this tune - reactive: refetches when tune.id or user changes
+  const [tuneReferences] = createResource(
+    () => ({ tuneId: props.tune.id, userId: user()?.id }),
+    async (params) => {
+      if (!params.userId || !params.tuneId) return [];
+
+      const db = getDb();
+      return await getReferencesByTune(db, params.tuneId, params.userId); // params.userId is UUID string
+    },
+  );on including:
  * - Title, type, mode, and metadata
  * - ABC notation preview (when abcjs is installed)
  * - References and notes
@@ -14,9 +38,11 @@ import { type Component, createResource, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getDb } from "@/lib/db/client-sqlite";
 import { getTuneTags } from "@/lib/db/queries/tags";
+import { getReferencesByTune } from "@/lib/db/queries/references";
 import type { Tune } from "../../lib/db/types";
 import { AbcNotation } from "./AbcNotation";
 import { TagList } from "./TagList";
+import { ReferenceList } from "../references/ReferenceList";
 
 interface TuneDetailProps {
   /** The tune to display */
@@ -59,7 +85,18 @@ export const TuneDetail: Component<TuneDetailProps> = (props) => {
       const db = getDb();
       const tags = await getTuneTags(db, params.tuneId, params.userId); // params.userId is already a UUID string
       return tags.map((t) => t.tagText);
-    },
+    }
+  );
+
+  // Load references for this tune - reactive: refetches when tune.id or user changes
+  const [tuneReferences] = createResource(
+    () => ({ tuneId: props.tune.id, userId: user()?.id }),
+    async (params) => {
+      if (!params.userId || !params.tuneId) return [];
+
+      const db = getDb();
+      return await getReferencesByTune(db, params.tuneId, params.userId); // params.userId is UUID string
+    }
   );
 
   const handleEdit = () => {
@@ -304,13 +341,26 @@ export const TuneDetail: Component<TuneDetailProps> = (props) => {
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
             References
+            <Show when={!tuneReferences.loading && tuneReferences()}>
+              <span class="text-sm font-normal text-gray-500 ml-2">
+                ({tuneReferences()!.length})
+              </span>
+            </Show>
           </h2>
-          <div class="text-sm text-gray-600 dark:text-gray-400 p-4 bg-gray-50 dark:bg-gray-900 rounded-md border-2 border-dashed border-gray-300 dark:border-gray-600">
-            <p>📚 References will be loaded from the database</p>
-            <p class="mt-2 text-xs">
-              Will display: URLs, book references, and other sources
-            </p>
-          </div>
+          <Show
+            when={!tuneReferences.loading}
+            fallback={
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                Loading references...
+              </p>
+            }
+          >
+            <ReferenceList
+              references={tuneReferences() || []}
+              groupByType={true}
+              showActions={false}
+            />
+          </Show>
         </div>
 
         {/* Notes Section */}
