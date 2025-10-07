@@ -12,6 +12,9 @@ import { MainLayout } from "./components/layout";
 import { AuthProvider } from "./lib/auth/AuthContext";
 import Home from "./routes/Home";
 import Login from "./routes/Login";
+import PlaylistsPage from "./routes/playlists";
+import EditPlaylistPage from "./routes/playlists/[id]/edit";
+import NewPlaylistPage from "./routes/playlists/new";
 import PracticeHistory from "./routes/practice/history";
 import TuneDetailsPage from "./routes/tunes/[id]";
 import EditTunePage from "./routes/tunes/[id]/edit";
@@ -59,6 +62,36 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <PracticeHistory />
+              </MainLayout>
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/playlists"
+          component={() => (
+            <ProtectedRoute>
+              <MainLayout>
+                <PlaylistsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/playlists/new"
+          component={() => (
+            <ProtectedRoute>
+              <MainLayout>
+                <NewPlaylistPage />
+              </MainLayout>
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/playlists/:id/edit"
+          component={() => (
+            <ProtectedRoute>
+              <MainLayout>
+                <EditPlaylistPage />
               </MainLayout>
             </ProtectedRoute>
           )}

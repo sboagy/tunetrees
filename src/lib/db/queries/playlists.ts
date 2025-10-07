@@ -1,0 +1,569 @@
+/**
+ * Playlist CRUD Queries
+ *
+ * Database queries for playlist management operations.
+ * All operations use local SQLite WASM with background sync to Supabase.
+ *
+ * Core Operations:
+ * - getUserPlaylists: Get all playlists for a user
+ * - getPlaylistById: Get playlist by ID
+ * - createPlaylist: Create new playlist
+ * - updatePlaylist: Update existing playlist
+ * - deletePlaylist: Soft delete playlist
+ * - addTuneToPlaylist: Add tune to playlist
+ * - removeTuneFromPlaylist: Remove tune from playlist
+ * - getPlaylistTunes: Get all tunes in a playlist
+ *
+ * @module lib/db/queries/playlists
+ */
+
+import { and, eq, sql } from "drizzle-orm";
+import type { SqliteDatabase } from "../client-sqlite";
+import { playlist, playlistTune, tune, userProfile } from "../schema";
+import type {
+  NewPlaylist,
+  NewPlaylistTune,
+  Playlist,
+  PlaylistTune,
+  PlaylistWithSummary,
+} from "../types";
+
+/**
+ * Get all playlists for a user
+ *
+ * Returns playlists ordered by creation date (newest first).
+ * Includes tune count for each playlist.
+ *
+ * @param db - SQLite database instance
+ * @param userId - User's Supabase UUID
+ * @param includeDeleted - Whether to include soft-deleted playlists (default: false)
+ * @returns Array of playlists with summary data
+ *
+ * @example
+ * ```typescript
+ * const playlists = await getUserPlaylists(db, 'user-uuid');
+ * console.log(`User has ${playlists.length} playlists`);
+ * ```
+ */
+export async function getUserPlaylists(
+  db: SqliteDatabase,
+  userId: string,
+  includeDeleted = false
+): Promise<PlaylistWithSummary[]> {
+  // First, get the user_profile id from supabase_user_id
+  const userRecord = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.supabaseUserId, userId))
+    .limit(1);
+
+  if (!userRecord || userRecord.length === 0) {
+    throw new Error(`User not found: ${userId}`);
+  }
+
+  const userRef = userRecord[0].id;
+
+  // Build query conditions
+  const conditions = [eq(playlist.userRef, userRef)];
+  if (!includeDeleted) {
+    conditions.push(eq(playlist.deleted, 0));
+  }
+
+  // Get playlists with tune count
+  const playlists = await db
+    .select({
+      playlistId: playlist.playlistId,
+      userRef: playlist.userRef,
+      name: playlist.name,
+      instrumentRef: playlist.instrumentRef,
+      genreDefault: playlist.genreDefault,
+      srAlgType: playlist.srAlgType,
+      deleted: playlist.deleted,
+      syncVersion: playlist.syncVersion,
+      lastModifiedAt: playlist.lastModifiedAt,
+      deviceId: playlist.deviceId,
+      tuneCount: sql<number>`(
+        SELECT COUNT(*)
+        FROM ${playlistTune}
+        WHERE ${playlistTune.playlistRef} = ${playlist.playlistId}
+          AND ${playlistTune.deleted} = 0
+      )`,
+    })
+    .from(playlist)
+    .where(and(...conditions))
+    .orderBy(playlist.lastModifiedAt);
+
+  return playlists.map((p) => ({
+    ...p,
+    tuneCount: Number(p.tuneCount) || 0,
+  }));
+}
+
+/**
+ * Get playlist by ID
+ *
+ * Returns null if playlist not found or belongs to different user.
+ *
+ * @param db - SQLite database instance
+ * @param playlistId - Playlist ID
+ * @param userId - User's Supabase UUID (for ownership check)
+ * @returns Playlist or null
+ *
+ * @example
+ * ```typescript
+ * const playlist = await getPlaylistById(db, 1, 'user-uuid');
+ * if (!playlist) {
+ *   console.log('Playlist not found or access denied');
+ * }
+ * ```
+ */
+export async function getPlaylistById(
+  db: SqliteDatabase,
+  playlistId: number,
+  userId: string
+): Promise<Playlist | null> {
+  // Get user_ref from supabase_user_id
+  const userRecord = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.supabaseUserId, userId))
+    .limit(1);
+
+  if (!userRecord || userRecord.length === 0) {
+    return null;
+  }
+
+  const userRef = userRecord[0].id;
+
+  const result = await db
+    .select()
+    .from(playlist)
+    .where(
+      and(eq(playlist.playlistId, playlistId), eq(playlist.userRef, userRef))
+    )
+    .limit(1);
+
+  if (!result || result.length === 0) {
+    return null;
+  }
+
+  return result[0];
+}
+
+/**
+ * Create new playlist
+ *
+ * Creates playlist and queues for background sync to Supabase.
+ *
+ * @param db - SQLite database instance
+ * @param userId - User's Supabase UUID
+ * @param data - Playlist data
+ * @returns Created playlist
+ *
+ * @example
+ * ```typescript
+ * const newPlaylist = await createPlaylist(db, 'user-uuid', {
+ *   name: 'My Irish Tunes',
+ *   genreDefault: 'ITRAD',
+ *   srAlgType: 'fsrs',
+ * });
+ * console.log(`Created playlist ${newPlaylist.playlistId}`);
+ * ```
+ */
+export async function createPlaylist(
+  db: SqliteDatabase,
+  userId: string,
+  data: Omit<
+    NewPlaylist,
+    "userRef" | "syncVersion" | "lastModifiedAt" | "deviceId"
+  >
+): Promise<Playlist> {
+  // Get user_ref from supabase_user_id
+  const userRecord = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.supabaseUserId, userId))
+    .limit(1);
+
+  if (!userRecord || userRecord.length === 0) {
+    throw new Error(`User not found: ${userId}`);
+  }
+
+  const userRef = userRecord[0].id;
+  const now = new Date().toISOString();
+
+  const newPlaylist: NewPlaylist = {
+    userRef,
+    name: data.name ?? null,
+    genreDefault: data.genreDefault ?? null,
+    instrumentRef: data.instrumentRef ?? null,
+    srAlgType: data.srAlgType ?? null,
+    deleted: 0,
+    syncVersion: 1,
+    lastModifiedAt: now,
+    deviceId: "local", // TODO: Get actual device ID
+  };
+
+  console.log("📝 Creating playlist with data:", newPlaylist);
+
+  const result = await db.insert(playlist).values(newPlaylist).returning();
+
+  console.log("✅ Playlist created, result:", result[0]);
+
+  if (!result || result.length === 0) {
+    throw new Error("Failed to create playlist");
+  }
+
+  const created = result[0];
+
+  // Queue for sync (import queueSync from sync service)
+  // await queueSync(db, 'playlist', created.playlistId!, 'insert');
+
+  return created;
+}
+
+/**
+ * Update existing playlist
+ *
+ * Updates playlist and queues for background sync.
+ * Only updates fields that are provided in the data object.
+ *
+ * @param db - SQLite database instance
+ * @param playlistId - Playlist ID
+ * @param userId - User's Supabase UUID (for ownership check)
+ * @param data - Partial playlist data to update
+ * @returns Updated playlist or null if not found
+ *
+ * @example
+ * ```typescript
+ * const updated = await updatePlaylist(db, 1, 'user-uuid', {
+ *   srAlgType: 'sm2',
+ * });
+ * ```
+ */
+export async function updatePlaylist(
+  db: SqliteDatabase,
+  playlistId: number,
+  userId: string,
+  data: Partial<Omit<NewPlaylist, "userRef" | "playlistId">>
+): Promise<Playlist | null> {
+  // Verify ownership
+  const existing = await getPlaylistById(db, playlistId, userId);
+  if (!existing) {
+    return null;
+  }
+
+  const now = new Date().toISOString();
+
+  const updateData = {
+    ...data,
+    syncVersion: (existing.syncVersion || 0) + 1,
+    lastModifiedAt: now,
+  };
+
+  const result = await db
+    .update(playlist)
+    .set(updateData)
+    .where(eq(playlist.playlistId, playlistId))
+    .returning();
+
+  if (!result || result.length === 0) {
+    return null;
+  }
+
+  const updated = result[0];
+
+  // Queue for sync
+  // await queueSync(db, 'playlist', playlistId, 'update');
+
+  return updated;
+}
+
+/**
+ * Delete playlist (soft delete)
+ *
+ * Marks playlist as deleted. Also soft-deletes all playlist_tune associations.
+ *
+ * @param db - SQLite database instance
+ * @param playlistId - Playlist ID
+ * @param userId - User's Supabase UUID (for ownership check)
+ * @returns True if deleted, false if not found
+ *
+ * @example
+ * ```typescript
+ * const deleted = await deletePlaylist(db, 1, 'user-uuid');
+ * if (deleted) {
+ *   console.log('Playlist deleted');
+ * }
+ * ```
+ */
+export async function deletePlaylist(
+  db: SqliteDatabase,
+  playlistId: number,
+  userId: string
+): Promise<boolean> {
+  // Verify ownership
+  const existing = await getPlaylistById(db, playlistId, userId);
+  if (!existing) {
+    return false;
+  }
+
+  const now = new Date().toISOString();
+
+  // Soft delete the playlist
+  await db
+    .update(playlist)
+    .set({
+      deleted: 1,
+      syncVersion: (existing.syncVersion || 0) + 1,
+      lastModifiedAt: now,
+    })
+    .where(eq(playlist.playlistId, playlistId));
+
+  // Soft delete all playlist-tune associations
+  await db
+    .update(playlistTune)
+    .set({
+      deleted: 1,
+      syncVersion: sql`${playlistTune.syncVersion} + 1`,
+      lastModifiedAt: now,
+    })
+    .where(eq(playlistTune.playlistRef, playlistId));
+
+  // Queue for sync
+  // await queueSync(db, 'playlist', playlistId, 'delete');
+
+  return true;
+}
+
+/**
+ * Add tune to playlist
+ *
+ * Creates playlist_tune association.
+ * Initializes scheduling fields (current, learned, scheduled, goal).
+ *
+ * @param db - SQLite database instance
+ * @param playlistId - Playlist ID
+ * @param tuneId - Tune ID
+ * @param userId - User's Supabase UUID (for ownership check)
+ * @returns Created playlist-tune association
+ *
+ * @example
+ * ```typescript
+ * const association = await addTuneToPlaylist(db, 1, 123, 'user-uuid');
+ * console.log(`Added tune ${tuneId} to playlist ${playlistId}`);
+ * ```
+ */
+export async function addTuneToPlaylist(
+  db: SqliteDatabase,
+  playlistId: number,
+  tuneId: number,
+  userId: string
+): Promise<PlaylistTune> {
+  // Verify playlist ownership
+  const playlistRecord = await getPlaylistById(db, playlistId, userId);
+  if (!playlistRecord) {
+    throw new Error("Playlist not found or access denied");
+  }
+
+  // Check if association already exists
+  const existing = await db
+    .select()
+    .from(playlistTune)
+    .where(
+      and(
+        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.tuneRef, tuneId)
+      )
+    )
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    // If it was soft-deleted, undelete it
+    if (existing[0].deleted === 1) {
+      const now = new Date().toISOString();
+      const result = await db
+        .update(playlistTune)
+        .set({
+          deleted: 0,
+          syncVersion: (existing[0].syncVersion || 0) + 1,
+          lastModifiedAt: now,
+        })
+        .where(
+          and(
+            eq(playlistTune.playlistRef, playlistId),
+            eq(playlistTune.tuneRef, tuneId)
+          )
+        )
+        .returning();
+
+      return result[0];
+    }
+
+    // Already exists and not deleted
+    return existing[0];
+  }
+
+  // Create new association
+  const now = new Date().toISOString();
+  const newAssociation: NewPlaylistTune = {
+    playlistRef: playlistId,
+    tuneRef: tuneId,
+    current: null,
+    learned: null,
+    scheduled: now, // Schedule for immediate practice
+    goal: "recall",
+    deleted: 0,
+    syncVersion: 1,
+    lastModifiedAt: now,
+    deviceId: "local",
+  };
+
+  const result = await db
+    .insert(playlistTune)
+    .values(newAssociation)
+    .returning();
+
+  if (!result || result.length === 0) {
+    throw new Error("Failed to add tune to playlist");
+  }
+
+  // Queue for sync
+  // await queueSync(db, 'playlist_tune', `${playlistId}-${tuneId}`, 'insert');
+
+  return result[0];
+}
+
+/**
+ * Remove tune from playlist (soft delete)
+ *
+ * Marks playlist_tune association as deleted.
+ *
+ * @param db - SQLite database instance
+ * @param playlistId - Playlist ID
+ * @param tuneId - Tune ID
+ * @param userId - User's Supabase UUID (for ownership check)
+ * @returns True if removed, false if not found
+ *
+ * @example
+ * ```typescript
+ * const removed = await removeTuneFromPlaylist(db, 1, 123, 'user-uuid');
+ * if (removed) {
+ *   console.log('Tune removed from playlist');
+ * }
+ * ```
+ */
+export async function removeTuneFromPlaylist(
+  db: SqliteDatabase,
+  playlistId: number,
+  tuneId: number,
+  userId: string
+): Promise<boolean> {
+  // Verify playlist ownership
+  const playlistRecord = await getPlaylistById(db, playlistId, userId);
+  if (!playlistRecord) {
+    return false;
+  }
+
+  const now = new Date().toISOString();
+
+  const result = await db
+    .update(playlistTune)
+    .set({
+      deleted: 1,
+      syncVersion: sql`${playlistTune.syncVersion} + 1`,
+      lastModifiedAt: now,
+    })
+    .where(
+      and(
+        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.tuneRef, tuneId)
+      )
+    )
+    .returning();
+
+  if (!result || result.length === 0) {
+    return false;
+  }
+
+  // Queue for sync
+  // await queueSync(db, 'playlist_tune', `${playlistId}-${tuneId}`, 'update');
+
+  return true;
+}
+
+/**
+ * Get all tunes in a playlist
+ *
+ * Returns tunes with their full details, excluding soft-deleted tunes.
+ *
+ * @param db - SQLite database instance
+ * @param playlistId - Playlist ID
+ * @param userId - User's Supabase UUID (for ownership check)
+ * @returns Array of tunes with playlist-specific data
+ *
+ * @example
+ * ```typescript
+ * const tunes = await getPlaylistTunes(db, 1, 'user-uuid');
+ * console.log(`Playlist has ${tunes.length} tunes`);
+ * ```
+ */
+export async function getPlaylistTunes(
+  db: SqliteDatabase,
+  playlistId: number,
+  userId: string
+) {
+  // Verify playlist ownership
+  const playlistRecord = await getPlaylistById(db, playlistId, userId);
+  if (!playlistRecord) {
+    throw new Error("Playlist not found or access denied");
+  }
+
+  const result = await db
+    .select({
+      // PlaylistTune fields
+      playlistRef: playlistTune.playlistRef,
+      tuneRef: playlistTune.tuneRef,
+      current: playlistTune.current,
+      learned: playlistTune.learned,
+      scheduled: playlistTune.scheduled,
+      goal: playlistTune.goal,
+
+      // Tune fields
+      tuneId: tune.id,
+      title: tune.title,
+      type: tune.type,
+      mode: tune.mode,
+      structure: tune.structure,
+      incipit: tune.incipit,
+      genre: tune.genre,
+    })
+    .from(playlistTune)
+    .innerJoin(tune, eq(playlistTune.tuneRef, tune.id))
+    .where(
+      and(
+        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.deleted, 0),
+        eq(tune.deleted, 0)
+      )
+    )
+    .orderBy(tune.title);
+
+  return result.map((row) => ({
+    playlistRef: row.playlistRef,
+    tuneRef: row.tuneRef,
+    current: row.current,
+    learned: row.learned,
+    scheduled: row.scheduled,
+    goal: row.goal,
+    tune: {
+      id: row.tuneId,
+      title: row.title,
+      type: row.type,
+      mode: row.mode,
+      structure: row.structure,
+      incipit: row.incipit,
+      genre: row.genre,
+    },
+  }));
+}

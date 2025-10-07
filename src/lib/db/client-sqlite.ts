@@ -34,7 +34,7 @@ const DB_VERSION_KEY = "tunetrees-db-version";
  * Current database schema version
  * Increment this when schema changes to force re-initialization
  */
-const CURRENT_DB_VERSION = 2; // Incremented to force migration with sync_queue table
+const CURRENT_DB_VERSION = 3; // Incremented to force migration with name and genre_default columns
 
 /**
  * Initialize SQLite WASM database
@@ -99,34 +99,46 @@ export async function initializeDb(
     sqliteDb = new SQL.Database();
     isNewDatabase = true;
 
-    // Apply schema from migration file
-    console.log("📋 Applying SQLite schema migration...");
+    // Apply schema migrations in order
+    console.log("📋 Applying SQLite schema migrations...");
+    const migrations = [
+      "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
+      "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
+    ];
+
     try {
-      const response = await fetch(
-        "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql"
-      );
-      if (!response.ok) {
-        throw new Error(
-          `Failed to load migration: ${response.status} ${response.statusText}`
+      for (const migrationPath of migrations) {
+        console.log(`📄 Loading migration: ${migrationPath}`);
+        const response = await fetch(migrationPath);
+        if (!response.ok) {
+          throw new Error(
+            `Failed to load migration ${migrationPath}: ${response.status} ${response.statusText}`
+          );
+        }
+        const migrationSql = await response.text();
+
+        // Split by statement breakpoint and execute each statement
+        const statements = migrationSql
+          .split("--> statement-breakpoint")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+
+        for (const statement of statements) {
+          if (statement && !statement.startsWith("--")) {
+            sqliteDb.run(statement);
+          }
+        }
+
+        console.log(
+          `✅ Applied ${statements.length} statements from ${migrationPath
+            .split("/")
+            .pop()}`
         );
       }
-      const migrationSql = await response.text();
 
-      // Split by statement breakpoint and execute each statement
-      const statements = migrationSql
-        .split("--> statement-breakpoint")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-
-      for (const statement of statements) {
-        if (statement && !statement.startsWith("--")) {
-          sqliteDb.run(statement);
-        }
-      }
-
-      console.log(`✅ Applied ${statements.length} migration statements`);
+      console.log(`✅ Applied all ${migrations.length} migrations`);
     } catch (error) {
-      console.error("❌ Failed to apply migration:", error);
+      console.error("❌ Failed to apply migrations:", error);
       throw new Error(
         `Database migration failed: ${
           error instanceof Error ? error.message : String(error)

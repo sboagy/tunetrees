@@ -48,7 +48,7 @@ export const userProfile = pgTable("user_profile", {
   phone: text("phone"),
   phoneVerified: timestamp("phone_verified"),
   acceptableDelinquencyWindow: integer("acceptable_delinquency_window").default(
-    21,
+    21
   ),
   deleted: boolean("deleted").default(false).notNull(),
 
@@ -96,7 +96,7 @@ export const genreTuneType = pgTable(
       .notNull()
       .references(() => tuneType.id),
   },
-  (t) => [primaryKey({ columns: [t.genreId, t.tuneTypeId] })],
+  (t) => [primaryKey({ columns: [t.genreId, t.tuneTypeId] })]
 );
 
 // ============================================================================
@@ -174,7 +174,7 @@ export const instrument = pgTable(
     unique().on(t.privateToUser, t.instrument),
     index("idx_instrument_instrument").on(t.instrument),
     index("idx_instrument_private_to_user").on(t.privateToUser),
-  ],
+  ]
 );
 
 // ============================================================================
@@ -194,14 +194,16 @@ export const playlist = pgTable(
     userRef: integer("user_ref")
       .notNull()
       .references(() => userProfile.id),
+    name: text("name"), // Playlist name (e.g., "My Irish Tunes")
     instrumentRef: integer("instrument_ref"),
+    genreDefault: text("genre_default").references(() => genre.id), // Default genre for this playlist
     srAlgType: text("sr_alg_type"), // 'SM2' | 'FSRS'
     deleted: boolean("deleted").default(false).notNull(),
 
     // Sync columns
     ...pgSyncColumns,
   },
-  (t) => [unique().on(t.userRef, t.instrumentRef)],
+  (t) => [unique().on(t.userRef, t.instrumentRef)]
 );
 
 /**
@@ -228,7 +230,7 @@ export const playlistTune = pgTable(
     // Sync columns
     ...pgSyncColumns,
   },
-  (t) => [primaryKey({ columns: [t.playlistRef, t.tuneRef] })],
+  (t) => [primaryKey({ columns: [t.playlistRef, t.tuneRef] })]
 );
 
 /**
@@ -272,10 +274,10 @@ export const practiceRecord = pgTable(
     index("idx_practice_record_tune_playlist_practiced").on(
       t.tuneRef,
       t.playlistRef,
-      t.practiced.desc(),
+      t.practiced.desc()
     ),
     index("idx_practice_record_practiced").on(t.practiced.desc()),
-  ],
+  ]
 );
 
 /**
@@ -301,7 +303,7 @@ export const dailyPracticeQueue = pgTable(
     scheduledSnapshot: text("scheduled_snapshot"),
     latestDueSnapshot: text("latest_due_snapshot"),
     acceptableDelinquencyWindowSnapshot: integer(
-      "acceptable_delinquency_window_snapshot",
+      "acceptable_delinquency_window_snapshot"
     ),
     tzOffsetMinutesSnapshot: integer("tz_offset_minutes_snapshot"),
     generatedAt: timestamp("generated_at").notNull(),
@@ -319,20 +321,20 @@ export const dailyPracticeQueue = pgTable(
     index("idx_queue_user_playlist_window").on(
       t.userRef,
       t.playlistRef,
-      t.windowStartUtc,
+      t.windowStartUtc
     ),
     index("idx_queue_user_playlist_active").on(
       t.userRef,
       t.playlistRef,
-      t.active,
+      t.active
     ),
     index("idx_queue_user_playlist_bucket").on(
       t.userRef,
       t.playlistRef,
-      t.bucket,
+      t.bucket
     ),
     index("idx_queue_generated_at").on(t.generatedAt),
-  ],
+  ]
 );
 
 // ============================================================================
@@ -368,12 +370,12 @@ export const note = pgTable(
       t.tuneRef,
       t.playlistRef,
       t.userRef,
-      t.public,
+      t.public
     ),
     index("idx_note_tune_user").on(t.tuneRef, t.userRef),
     check("chk_public_bool", sql`public IN (true, false)`),
     check("chk_favorite_bool", sql`favorite IN (true, false)`),
-  ],
+  ]
 );
 
 /**
@@ -407,7 +409,7 @@ export const reference = pgTable(
     check("check_ref_type", sql`ref_type IN ('website', 'audio', 'video')`),
     check("check_public", sql`public IN (true, false)`),
     check("check_favorite", sql`favorite IN (true, false)`),
-  ],
+  ]
 );
 
 /**
@@ -434,7 +436,7 @@ export const tag = pgTable(
     unique().on(t.userRef, t.tuneRef, t.tagText),
     index("idx_tag_user_ref_tag_text").on(t.userRef, t.tagText),
     index("idx_tag_user_ref_tune_ref").on(t.userRef, t.tuneRef),
-  ],
+  ]
 );
 
 // ============================================================================
@@ -466,7 +468,7 @@ export const prefsSpacedRepetition = pgTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.algType] }),
     check("check_name", sql`alg_type IN ('SM2', 'FSRS')`),
-  ],
+  ]
 );
 
 /**
@@ -519,9 +521,9 @@ export const tabGroupMainState = pgTable(
   () => [
     check(
       "check_name",
-      sql`which_tab IN ('scheduled', 'repertoire', 'catalog', 'analysis')`,
+      sql`which_tab IN ('scheduled', 'repertoire', 'catalog', 'analysis')`
     ),
-  ],
+  ]
 );
 
 /**
@@ -552,10 +554,10 @@ export const tableState = pgTable(
     }),
     check(
       "purpose_check",
-      sql`purpose IN ('practice', 'repertoire', 'catalog', 'analysis')`,
+      sql`purpose IN ('practice', 'repertoire', 'catalog', 'analysis')`
     ),
     check("screen_size_check", sql`screen_size IN ('small', 'full')`),
-  ],
+  ]
 );
 
 /**
@@ -596,7 +598,7 @@ export const tableTransientData = pgTable(
     // Sync columns
     ...pgSyncColumns,
   },
-  (t) => [primaryKey({ columns: [t.tuneId, t.userId, t.playlistId] })],
+  (t) => [primaryKey({ columns: [t.tuneId, t.userId, t.playlistId] })]
 );
 
 // ============================================================================

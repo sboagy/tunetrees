@@ -9,6 +9,7 @@
 
 import { useNavigate } from "@solidjs/router";
 import { type Component, createSignal, Show } from "solid-js";
+import { PlaylistSelector } from "../../components/playlists/PlaylistSelector";
 import { PracticeSession } from "../../components/practice";
 import { TuneList } from "../../components/tunes/TuneList";
 import { useAuth } from "../../lib/auth/AuthContext";
@@ -36,7 +37,9 @@ const PracticeIndex: Component = () => {
   const navigate = useNavigate();
   const { user, localDb } = useAuth();
   const [showPracticeSession, setShowPracticeSession] = createSignal(false);
-  const [selectedPlaylistId] = createSignal(1); // Default playlist (TODO: add playlist selector)
+  const [selectedPlaylistId, setSelectedPlaylistId] = createSignal<
+    number | null
+  >(null);
 
   const handleTuneSelect = (tune: Tune) => {
     navigate(`/tunes/${tune.id}`);
@@ -52,9 +55,22 @@ const PracticeIndex: Component = () => {
 
   return (
     <div class="p-6">
-      <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-        Welcome to Practice Mode! 🎶
-      </h2>
+      <div class="flex justify-between items-start mb-4">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+          Welcome to Practice Mode! 🎶
+        </h2>
+
+        {/* Playlist Selector */}
+        <div class="w-64">
+          <div class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Select Playlist
+          </div>
+          <PlaylistSelector
+            onPlaylistChange={setSelectedPlaylistId}
+            class="w-full"
+          />
+        </div>
+      </div>
 
       {/* User Info */}
       <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
@@ -117,10 +133,14 @@ const PracticeIndex: Component = () => {
       <Show
         when={!showPracticeSession()}
         fallback={
-          <PracticeSession
-            playlistId={selectedPlaylistId()}
-            onComplete={handlePracticeComplete}
-          />
+          <Show when={selectedPlaylistId()}>
+            {(playlistId) => (
+              <PracticeSession
+                playlistId={playlistId()}
+                onComplete={handlePracticeComplete}
+              />
+            )}
+          </Show>
         }
       >
         <div class="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800 mb-6">

@@ -174,7 +174,9 @@ export const playlist = sqliteTable(
     userRef: integer("user_ref")
       .notNull()
       .references(() => userProfile.id),
+    name: text("name"), // Playlist name (e.g., "My Irish Tunes")
     instrumentRef: integer("instrument_ref"),
+    genreDefault: text("genre_default").references(() => genre.id), // Default genre for this playlist
     srAlgType: text("sr_alg_type"),
     deleted: integer("deleted").default(0).notNull(),
 
