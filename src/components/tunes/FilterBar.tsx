@@ -12,7 +12,14 @@
  * @module components/tunes/FilterBar
  */
 
-import { type Component, createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import {
+  type Component,
+  createEffect,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+} from "solid-js";
 
 export interface FilterBarProps {
   /** Current search query */
@@ -58,13 +65,15 @@ export interface FilterBarProps {
  * ```
  */
 export const FilterBar: Component<FilterBarProps> = (props) => {
-  const [localSearchQuery, setLocalSearchQuery] = createSignal(props.searchQuery);
+  const [localSearchQuery, setLocalSearchQuery] = createSignal(
+    props.searchQuery
+  );
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
   // Debounced search handler
   createEffect(() => {
     const query = localSearchQuery();
-    
+
     // Clear previous timer
     if (debounceTimer) {
       clearTimeout(debounceTimer);
@@ -163,11 +172,17 @@ export const FilterBar: Component<FilterBarProps> = (props) => {
                       type="checkbox"
                       checked={props.selectedTypes.includes(type)}
                       onChange={() =>
-                        handleMultiSelect(props.selectedTypes, type, props.onTypesChange)
+                        handleMultiSelect(
+                          props.selectedTypes,
+                          type,
+                          props.onTypesChange
+                        )
                       }
                       class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
-                    <span class="text-sm text-gray-900 dark:text-white">{type}</span>
+                    <span class="text-sm text-gray-900 dark:text-white">
+                      {type}
+                    </span>
                   </label>
                 )}
               </For>
@@ -196,11 +211,17 @@ export const FilterBar: Component<FilterBarProps> = (props) => {
                       type="checkbox"
                       checked={props.selectedModes.includes(mode)}
                       onChange={() =>
-                        handleMultiSelect(props.selectedModes, mode, props.onModesChange)
+                        handleMultiSelect(
+                          props.selectedModes,
+                          mode,
+                          props.onModesChange
+                        )
                       }
                       class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
-                    <span class="text-sm text-gray-900 dark:text-white">{mode}</span>
+                    <span class="text-sm text-gray-900 dark:text-white">
+                      {mode}
+                    </span>
                   </label>
                 )}
               </For>
@@ -229,11 +250,17 @@ export const FilterBar: Component<FilterBarProps> = (props) => {
                       type="checkbox"
                       checked={props.selectedGenres.includes(genre)}
                       onChange={() =>
-                        handleMultiSelect(props.selectedGenres, genre, props.onGenresChange)
+                        handleMultiSelect(
+                          props.selectedGenres,
+                          genre,
+                          props.onGenresChange
+                        )
                       }
                       class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
-                    <span class="text-sm text-gray-900 dark:text-white">{genre}</span>
+                    <span class="text-sm text-gray-900 dark:text-white">
+                      {genre}
+                    </span>
                   </label>
                 )}
               </For>
@@ -247,7 +274,8 @@ export const FilterBar: Component<FilterBarProps> = (props) => {
         <div class="flex items-center gap-2">
           <Show when={activeFilterCount() > 0}>
             <span class="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-sm font-medium">
-              {activeFilterCount()} {activeFilterCount() === 1 ? "filter" : "filters"} active
+              {activeFilterCount()}{" "}
+              {activeFilterCount() === 1 ? "filter" : "filters"} active
             </span>
           </Show>
 

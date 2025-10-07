@@ -36,7 +36,7 @@ export interface SearchTunesOptions {
  */
 export async function getTuneById(
   db: SqliteDatabase,
-  tuneId: number,
+  tuneId: number
 ): Promise<Tune | null> {
   const result = await db
     .select()
@@ -55,9 +55,7 @@ export async function getAllTunes(db: SqliteDatabase): Promise<Tune[]> {
   return await db
     .select()
     .from(schema.tune)
-    .where(
-      and(eq(schema.tune.deleted, false), isNull(schema.tune.privateFor)),
-    )
+    .where(and(eq(schema.tune.deleted, false), isNull(schema.tune.privateFor)))
     .orderBy(asc(schema.tune.title));
 }
 
@@ -67,11 +65,11 @@ export async function getAllTunes(db: SqliteDatabase): Promise<Tune[]> {
  */
 export async function getTunesForUser(
   db: SqliteDatabase,
-  userId: string,
+  userId: string
 ): Promise<Tune[]> {
   const userCondition = or(
     isNull(schema.tune.privateFor),
-    eq(schema.tune.privateFor, userId),
+    eq(schema.tune.privateFor, userId)
   );
 
   if (!userCondition) {
@@ -90,7 +88,7 @@ export async function getTunesForUser(
  */
 export async function createTune(
   db: SqliteDatabase,
-  input: CreateTuneInput,
+  input: CreateTuneInput
 ): Promise<Tune> {
   const now = new Date().toISOString();
   const deviceId = getDeviceId();
@@ -124,7 +122,7 @@ export async function createTune(
 export async function updateTune(
   db: SqliteDatabase,
   tuneId: number,
-  input: Partial<CreateTuneInput>,
+  input: Partial<CreateTuneInput>
 ): Promise<Tune> {
   const now = new Date().toISOString();
   const deviceId = getDeviceId();
@@ -142,9 +140,7 @@ export async function updateTune(
     updateData.structure = input.structure || null;
   if (input.incipit !== undefined) updateData.incipit = input.incipit || null;
   if (input.genre !== undefined)
-    updateData.genre = input.genre
-      ? parseInt(input.genre, 10)
-      : null;
+    updateData.genre = input.genre ? parseInt(input.genre, 10) : null;
   if (input.privateFor !== undefined)
     updateData.privateFor = input.privateFor || null;
 
@@ -165,7 +161,7 @@ export async function updateTune(
  */
 export async function deleteTune(
   db: SqliteDatabase,
-  tuneId: number,
+  tuneId: number
 ): Promise<void> {
   const now = new Date().toISOString();
   const deviceId = getDeviceId();
@@ -213,7 +209,7 @@ function getDeviceId(): string {
  */
 export async function searchTunes(
   db: SqliteDatabase,
-  options: SearchTunesOptions = {},
+  options: SearchTunesOptions = {}
 ): Promise<Tune[]> {
   const { query, types, modes, genres, userId } = options;
 
