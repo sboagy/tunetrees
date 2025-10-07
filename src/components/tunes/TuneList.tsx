@@ -34,11 +34,13 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
+import { addTuneToPlaylist } from "../../lib/db/queries/playlists";
 import { deleteTune, getTunesForUser } from "../../lib/db/queries/tunes";
 import type { Tune } from "../../lib/db/types";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { BulkActionsBar } from "./BulkActionsBar";
 import { FilterBar } from "./FilterBar";
+import { PlaylistSelectorModal } from "./PlaylistSelectorModal";
 
 interface TuneListProps {
   /** Callback when a tune is selected */
@@ -86,6 +88,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
   const [sorting, setSorting] = createSignal<SortingState>([]);
   const [rowSelection, setRowSelection] = createSignal<RowSelectionState>({});
   const [showDeleteDialog, setShowDeleteDialog] = createSignal(false);
+  const [showPlaylistModal, setShowPlaylistModal] = createSignal(false);
 
   // Sync filter state to URL params
   createEffect(() => {
@@ -371,13 +374,37 @@ export const TuneList: Component<TuneListProps> = (props) => {
     return filteredTunes().filter((tune) => selection[String(tune.id)]);
   });
 
-  // Bulk action handlers (placeholders)
+  // Bulk action handlers
   const handleAddToPlaylist = () => {
-    console.log(
-      "Add to playlist:",
-      selectedTunes().map((t) => t.title)
-    );
-    // TODO: Implement playlist selector modal
+    setShowPlaylistModal(true);
+  };
+
+  const handlePlaylistSelect = async (playlistId: number) => {
+    const tunes = selectedTunes();
+    const db = localDb();
+    const userId = user()?.id;
+
+    if (!db || !userId) {
+      console.error("Database or user not available");
+      return;
+    }
+
+    try {
+      // Add all selected tunes to the playlist
+      await Promise.all(
+        tunes.map((tune) => addTuneToPlaylist(db, playlistId, tune.id, userId))
+      );
+
+      // Clear selection and close modal
+      setRowSelection({});
+      setShowPlaylistModal(false);
+
+      // TODO: Show success toast notification
+      console.log(`Added ${tunes.length} tune(s) to playlist ${playlistId}`);
+    } catch (error) {
+      console.error("Failed to add tunes to playlist:", error);
+      // TODO: Show error toast notification
+    }
   };
 
   const handleAddTags = () => {
@@ -576,6 +603,14 @@ export const TuneList: Component<TuneListProps> = (props) => {
         variant="danger"
         onConfirm={handleDeleteConfirm}
         onCancel={() => setShowDeleteDialog(false)}
+      />
+
+      {/* Playlist Selector Modal */}
+      <PlaylistSelectorModal
+        isOpen={showPlaylistModal()}
+        tuneCount={selectedTunes().length}
+        onSelect={handlePlaylistSelect}
+        onCancel={() => setShowPlaylistModal(false)}
       />
     </div>
   );
