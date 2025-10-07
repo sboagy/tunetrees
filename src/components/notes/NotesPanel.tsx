@@ -66,7 +66,7 @@ export const NotesPanel: Component = () => {
       await createNote(db, {
         tuneRef: tuneId,
         noteText: newNoteContent(),
-        userRef: user()?.id ? parseInt(user()!.id) : undefined,
+        userRef: user()?.id ? parseInt(user()!.id, 10) : undefined,
         public: false,
       });
 
