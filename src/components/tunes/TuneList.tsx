@@ -14,12 +14,14 @@
  * @module components/tunes/TuneList
  */
 
+import { useSearchParams } from "@solidjs/router";
 import {
   type ColumnDef,
   createSolidTable,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  type RowSelectionState,
   type SortingState,
 } from "@tanstack/solid-table";
 import {
@@ -31,10 +33,10 @@ import {
   For,
   Show,
 } from "solid-js";
-import { useSearchParams } from "@solidjs/router";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getTunesForUser } from "../../lib/db/queries/tunes";
 import type { Tune } from "../../lib/db/types";
+import { BulkActionsBar } from "./BulkActionsBar";
 import { FilterBar } from "./FilterBar";
 
 interface TuneListProps {
@@ -55,20 +57,20 @@ interface TuneListProps {
 export const TuneList: Component<TuneListProps> = (props) => {
   const { user, localDb } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // Helper to safely get string from searchParams
   const getParam = (value: string | string[] | undefined): string => {
     if (Array.isArray(value)) return value[0] || "";
     return value || "";
   };
-  
+
   // Helper to safely get array from searchParams
   const getParamArray = (value: string | string[] | undefined): string[] => {
     if (!value) return [];
     const str = Array.isArray(value) ? value[0] || "" : value;
     return str.split(",").filter(Boolean);
   };
-  
+
   // Filter state from URL params
   const [searchQuery, setSearchQuery] = createSignal(getParam(searchParams.q));
   const [selectedTypes, setSelectedTypes] = createSignal<string[]>(
@@ -81,27 +83,28 @@ export const TuneList: Component<TuneListProps> = (props) => {
     getParamArray(searchParams.genres)
   );
   const [sorting, setSorting] = createSignal<SortingState>([]);
+  const [rowSelection, setRowSelection] = createSignal<RowSelectionState>({});
 
   // Sync filter state to URL params
   createEffect(() => {
     const params: Record<string, string> = {};
-    
+
     if (searchQuery()) {
       params.q = searchQuery();
     }
-    
+
     if (selectedTypes().length > 0) {
       params.types = selectedTypes().join(",");
     }
-    
+
     if (selectedModes().length > 0) {
       params.modes = selectedModes().join(",");
     }
-    
+
     if (selectedGenres().length > 0) {
       params.genres = selectedGenres().join(",");
     }
-    
+
     setSearchParams(params, { replace: true });
   });
 
@@ -205,6 +208,35 @@ export const TuneList: Component<TuneListProps> = (props) => {
 
   // Define table columns
   const columns: ColumnDef<Tune>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          checked={table.getIsAllRowsSelected()}
+          ref={(el) => {
+            if (el) {
+              el.indeterminate = table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected();
+            }
+          }}
+          onChange={table.getToggleAllRowsSelectedHandler()}
+          class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+          aria-label="Select all rows"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={row.getIsSelected()}
+          disabled={!row.getCanSelect()}
+          onChange={row.getToggleSelectedHandler()}
+          class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={`Select row ${row.id}`}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+      size: 50,
+    },
     {
       accessorKey: "id",
       header: "ID",
@@ -312,16 +344,60 @@ export const TuneList: Component<TuneListProps> = (props) => {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    enableRowSelection: true,
     state: {
       get sorting() {
         return sorting();
       },
+      get rowSelection() {
+        return rowSelection();
+      },
     },
     onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
+    getRowId: (row) => String(row.id),
   });
 
   const handleRowClick = (tune: Tune) => {
     props.onTuneSelect?.(tune);
+  };
+
+  // Get selected tunes
+  const selectedTunes = createMemo(() => {
+    const selection = rowSelection();
+    return filteredTunes().filter((tune) => selection[String(tune.id)]);
+  });
+
+  // Bulk action handlers (placeholders)
+  const handleAddToPlaylist = () => {
+    console.log("Add to playlist:", selectedTunes().map(t => t.title));
+    // TODO: Implement playlist selector modal
+  };
+
+  const handleAddTags = () => {
+    console.log("Add tags:", selectedTunes().map(t => t.title));
+    // TODO: Implement tag input modal
+  };
+
+  const handleDelete = () => {
+    console.log("Delete tunes:", selectedTunes().map(t => t.title));
+    // TODO: Implement delete confirmation modal
+  };
+
+  const handleExport = () => {
+    const tunes = selectedTunes();
+    const dataStr = JSON.stringify(tunes, null, 2);
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `tunetrees-export-${new Date().toISOString().split("T")[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClearSelection = () => {
+    setRowSelection({});
   };
 
   return (
@@ -342,12 +418,19 @@ export const TuneList: Component<TuneListProps> = (props) => {
         onClearFilters={handleClearFilters}
       />
 
+      {/* Bulk Actions Bar */}
+      <BulkActionsBar
+        selectedTunes={selectedTunes()}
+        onAddToPlaylist={handleAddToPlaylist}
+        onAddTags={handleAddTags}
+        onDelete={handleDelete}
+        onExport={handleExport}
+        onClearSelection={handleClearSelection}
+      />
+
       {/* Results Summary */}
       <div class="mb-3 text-sm text-gray-600 dark:text-gray-400">
-        <Show
-          when={!allTunes.loading}
-          fallback={<span>Loading tunes...</span>}
-        >
+        <Show when={!allTunes.loading} fallback={<span>Loading tunes...</span>}>
           Showing <span class="font-semibold">{filteredTunes().length}</span> of{" "}
           <span class="font-semibold">{allTunes()?.length || 0}</span> tunes
         </Show>
