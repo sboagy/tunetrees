@@ -34,8 +34,9 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { getTunesForUser } from "../../lib/db/queries/tunes";
+import { deleteTune, getTunesForUser } from "../../lib/db/queries/tunes";
 import type { Tune } from "../../lib/db/types";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { BulkActionsBar } from "./BulkActionsBar";
 import { FilterBar } from "./FilterBar";
 
@@ -84,6 +85,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
   );
   const [sorting, setSorting] = createSignal<SortingState>([]);
   const [rowSelection, setRowSelection] = createSignal<RowSelectionState>({});
+  const [showDeleteDialog, setShowDeleteDialog] = createSignal(false);
 
   // Sync filter state to URL params
   createEffect(() => {
@@ -109,7 +111,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
   });
 
   // Fetch all tunes from local database
-  const [allTunes] = createResource(
+  const [allTunes, { mutate: mutateAllTunes }] = createResource(
     () => {
       const userId = user()?.id;
       const db = localDb();
@@ -216,7 +218,8 @@ export const TuneList: Component<TuneListProps> = (props) => {
           checked={table.getIsAllRowsSelected()}
           ref={(el) => {
             if (el) {
-              el.indeterminate = table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected();
+              el.indeterminate =
+                table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected();
             }
           }}
           onChange={table.getToggleAllRowsSelectedHandler()}
@@ -370,18 +373,51 @@ export const TuneList: Component<TuneListProps> = (props) => {
 
   // Bulk action handlers (placeholders)
   const handleAddToPlaylist = () => {
-    console.log("Add to playlist:", selectedTunes().map(t => t.title));
+    console.log(
+      "Add to playlist:",
+      selectedTunes().map((t) => t.title)
+    );
     // TODO: Implement playlist selector modal
   };
 
   const handleAddTags = () => {
-    console.log("Add tags:", selectedTunes().map(t => t.title));
+    console.log(
+      "Add tags:",
+      selectedTunes().map((t) => t.title)
+    );
     // TODO: Implement tag input modal
   };
 
   const handleDelete = () => {
-    console.log("Delete tunes:", selectedTunes().map(t => t.title));
-    // TODO: Implement delete confirmation modal
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    const tunes = selectedTunes();
+    const db = localDb();
+
+    if (!db) {
+      console.error("Database not available");
+      return;
+    }
+
+    try {
+      // Delete all selected tunes
+      await Promise.all(tunes.map((tune) => deleteTune(db, tune.id)));
+
+      // Clear selection and close dialog
+      setRowSelection({});
+      setShowDeleteDialog(false);
+
+      // Update the list by re-fetching
+      const userId = user()?.id;
+      if (userId && db) {
+        const updatedTunes = await getTunesForUser(db, userId);
+        mutateAllTunes(updatedTunes);
+      }
+    } catch (error) {
+      console.error("Failed to delete tunes:", error);
+    }
   };
 
   const handleExport = () => {
@@ -391,7 +427,9 @@ export const TuneList: Component<TuneListProps> = (props) => {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `tunetrees-export-${new Date().toISOString().split("T")[0]}.json`;
+    link.download = `tunetrees-export-${
+      new Date().toISOString().split("T")[0]
+    }.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -526,6 +564,19 @@ export const TuneList: Component<TuneListProps> = (props) => {
           </Show>
         </Show>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog()}
+        title="Delete Tunes?"
+        message={`Are you sure you want to delete ${selectedTunes().length} ${
+          selectedTunes().length === 1 ? "tune" : "tunes"
+        }? This action cannot be undone.`}
+        confirmText="Delete"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setShowDeleteDialog(false)}
+      />
     </div>
   );
 };
