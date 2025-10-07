@@ -10,6 +10,7 @@ import { Route, Router } from "@solidjs/router";
 import { ProtectedRoute } from "./components/auth";
 import { MainLayout } from "./components/layout";
 import { AuthProvider } from "./lib/auth/AuthContext";
+import { CurrentTuneProvider } from "./lib/context/CurrentTuneContext";
 import Home from "./routes/Home";
 import Login from "./routes/Login";
 import PlaylistsPage from "./routes/playlists";
@@ -47,86 +48,88 @@ import NewTunePage from "./routes/tunes/new";
 function App() {
   return (
     <AuthProvider>
-      {/* <ThemeDebugger /> */}
-      <Router>
-        {/* Public Routes */}
-        <Route path="/login" component={Login} />
+      <CurrentTuneProvider>
+        {/* <ThemeDebugger /> */}
+        <Router>
+          {/* Public Routes */}
+          <Route path="/login" component={Login} />
 
-        {/* Main App - Home with MainLayout + tabs */}
-        <Route path="/" component={Home} />
+          {/* Main App - Home with MainLayout + tabs */}
+          <Route path="/" component={Home} />
 
-        {/* Protected Sub-routes - Wrapped in MainLayout */}
-        <Route
-          path="/practice/history"
-          component={() => (
-            <ProtectedRoute>
-              <MainLayout>
-                <PracticeHistory />
-              </MainLayout>
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/playlists"
-          component={() => (
-            <ProtectedRoute>
-              <MainLayout>
-                <PlaylistsPage />
-              </MainLayout>
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/playlists/new"
-          component={() => (
-            <ProtectedRoute>
-              <MainLayout>
-                <NewPlaylistPage />
-              </MainLayout>
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/playlists/:id/edit"
-          component={() => (
-            <ProtectedRoute>
-              <MainLayout>
-                <EditPlaylistPage />
-              </MainLayout>
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/tunes/new"
-          component={() => (
-            <ProtectedRoute>
-              <MainLayout>
-                <NewTunePage />
-              </MainLayout>
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/tunes/:id/edit"
-          component={() => (
-            <ProtectedRoute>
-              <MainLayout>
-                <EditTunePage />
-              </MainLayout>
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/tunes/:id"
-          component={() => (
-            <ProtectedRoute>
-              <MainLayout>
-                <TuneDetailsPage />
-              </MainLayout>
-            </ProtectedRoute>
-          )}
-        />
-      </Router>
+          {/* Protected Sub-routes - Wrapped in MainLayout */}
+          <Route
+            path="/practice/history"
+            component={() => (
+              <ProtectedRoute>
+                <MainLayout>
+                  <PracticeHistory />
+                </MainLayout>
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/playlists"
+            component={() => (
+              <ProtectedRoute>
+                <MainLayout>
+                  <PlaylistsPage />
+                </MainLayout>
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/playlists/new"
+            component={() => (
+              <ProtectedRoute>
+                <MainLayout>
+                  <NewPlaylistPage />
+                </MainLayout>
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/playlists/:id/edit"
+            component={() => (
+              <ProtectedRoute>
+                <MainLayout>
+                  <EditPlaylistPage />
+                </MainLayout>
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/tunes/new"
+            component={() => (
+              <ProtectedRoute>
+                <MainLayout>
+                  <NewTunePage />
+                </MainLayout>
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/tunes/:id/edit"
+            component={() => (
+              <ProtectedRoute>
+                <MainLayout>
+                  <EditTunePage />
+                </MainLayout>
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/tunes/:id"
+            component={() => (
+              <ProtectedRoute>
+                <MainLayout>
+                  <TuneDetailsPage />
+                </MainLayout>
+              </ProtectedRoute>
+            )}
+          />
+        </Router>
+      </CurrentTuneProvider>
     </AuthProvider>
   );
 }

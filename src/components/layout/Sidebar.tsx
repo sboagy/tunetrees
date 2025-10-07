@@ -12,6 +12,7 @@
  */
 
 import { type Component, Show } from "solid-js";
+import { NotesPanel } from "@/components/notes/NotesPanel";
 
 /**
  * Sidebar Component Props
@@ -30,6 +31,8 @@ interface SidebarProps {
  * - Notes section (practice notes)
  * - Responsive (auto-collapse on mobile)
  * - State persists across reloads
+ *
+ * Note: Uses CurrentTuneContext to track which tune's data to display
  *
  * @example
  * ```tsx
@@ -97,11 +100,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
               <span>Notes</span>
             </h3>
             <div class="text-sm text-gray-600 dark:text-gray-400">
-              {/* TODO: Load and display notes for current practice session */}
-              <p class="italic">No notes yet</p>
-              <p class="text-xs mt-1 text-gray-500">
-                Practice notes will appear here
-              </p>
+              <NotesPanel />
             </div>
           </section>
         </div>

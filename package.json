@@ -26,6 +26,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.44.6",
+    "jodit": "^4.6.13",
+    "jodit-react": "^5.2.26",
     "postgres": "^3.4.7",
     "solid-js": "^1.9.9",
     "sql.js": "^1.13.0",

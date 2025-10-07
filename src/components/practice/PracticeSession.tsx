@@ -21,6 +21,7 @@
 
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
+import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import type { DueTuneEntry } from "../../lib/db/queries/practice";
 import { getDueTunes } from "../../lib/db/queries/practice";
 import { FSRS_QUALITY_MAP } from "../../lib/scheduling/fsrs-service";
@@ -40,6 +41,8 @@ export const PracticeSession: Component<{
   onComplete?: () => void;
 }> = (props) => {
   const { user, localDb } = useAuth();
+  const { setCurrentTuneId } = useCurrentTune();
+
   const [dueTunes, setDueTunes] = createSignal<DueTuneEntry[]>([]);
   const [currentIndex, setCurrentIndex] = createSignal(0);
   const [loading, setLoading] = createSignal(true);
@@ -47,6 +50,17 @@ export const PracticeSession: Component<{
   const [practiceCount, setPracticeCount] = createSignal(0);
   const [submitting, setSubmitting] = createSignal(false);
   const [showNotation, setShowNotation] = createSignal(true); // Toggle notation visibility
+
+  // Update current tune ID whenever the current tune changes
+  createEffect(() => {
+    const tunes = dueTunes();
+    const index = currentIndex();
+    if (tunes.length > 0 && index < tunes.length) {
+      setCurrentTuneId(tunes[index].tune.id);
+    } else {
+      setCurrentTuneId(null);
+    }
+  });
 
   // Load due tunes on mount
   createEffect(() => {
