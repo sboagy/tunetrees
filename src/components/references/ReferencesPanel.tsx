@@ -7,32 +7,28 @@
  * @module components/references/ReferencesPanel
  */
 
-import {
-  type Component,
-  createResource,
-  createSignal,
-  Show,
-} from "solid-js";
+import { type Component, createResource, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
 import { getDb } from "@/lib/db/client-sqlite";
 import {
-  type Reference,
   type CreateReferenceData,
-  getReferencesByTune,
   createReference,
-  updateReference,
   deleteReference,
+  getReferencesByTune,
+  type Reference,
+  updateReference,
 } from "@/lib/db/queries/references";
-import { ReferenceList } from "./ReferenceList";
 import { ReferenceForm, type ReferenceFormData } from "./ReferenceForm";
+import { ReferenceList } from "./ReferenceList";
 
 export const ReferencesPanel: Component = () => {
   const { currentTuneId } = useCurrentTune();
   const { user } = useAuth();
 
   const [isAdding, setIsAdding] = createSignal(false);
-  const [editingReference, setEditingReference] = createSignal<Reference | null>(null);
+  const [editingReference, setEditingReference] =
+    createSignal<Reference | null>(null);
 
   // Load references for current tune
   const [references, { refetch }] = createResource(

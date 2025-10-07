@@ -57,7 +57,9 @@ function getTypeLabel(refType: string | null): string {
 /**
  * Group references by type
  */
-function groupReferencesByType(references: Reference[]): Map<string, Reference[]> {
+function groupReferencesByType(
+  references: Reference[]
+): Map<string, Reference[]> {
   const groups = new Map<string, Reference[]>();
 
   for (const ref of references) {
@@ -112,7 +114,12 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
         </Show>
 
         {/* URL (if title exists and is different) */}
-        <Show when={itemProps.reference.title && itemProps.reference.title !== itemProps.reference.url}>
+        <Show
+          when={
+            itemProps.reference.title &&
+            itemProps.reference.title !== itemProps.reference.url
+          }
+        >
           <a
             href={itemProps.reference.url}
             target="_blank"
@@ -185,19 +192,25 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
       <Show when={props.references.length === 0}>
         <div class="text-center py-8 text-gray-500 dark:text-gray-400">
           <p class="text-sm italic">No references yet</p>
-          <p class="text-xs mt-1">Add links to videos, sheet music, or articles</p>
+          <p class="text-xs mt-1">
+            Add links to videos, sheet music, or articles
+          </p>
         </div>
       </Show>
 
       {/* Grouped by type */}
       <Show when={props.groupByType && props.references.length > 0}>
-        <For each={Array.from(groupReferencesByType(props.references).entries())}>
+        <For
+          each={Array.from(groupReferencesByType(props.references).entries())}
+        >
           {([type, refs]) => (
             <div>
               <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                 <span>{getTypeIcon(type)}</span>
                 <span>{getTypeLabel(type)}</span>
-                <span class="text-xs font-normal text-gray-500">({refs.length})</span>
+                <span class="text-xs font-normal text-gray-500">
+                  ({refs.length})
+                </span>
               </h4>
               <div class="space-y-2">
                 <For each={refs}>

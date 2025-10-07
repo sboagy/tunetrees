@@ -37,12 +37,12 @@
 import { type Component, createResource, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getDb } from "@/lib/db/client-sqlite";
-import { getTuneTags } from "@/lib/db/queries/tags";
 import { getReferencesByTune } from "@/lib/db/queries/references";
+import { getTuneTags } from "@/lib/db/queries/tags";
 import type { Tune } from "../../lib/db/types";
+import { ReferenceList } from "../references/ReferenceList";
 import { AbcNotation } from "./AbcNotation";
 import { TagList } from "./TagList";
-import { ReferenceList } from "../references/ReferenceList";
 
 interface TuneDetailProps {
   /** The tune to display */

@@ -7,12 +7,12 @@
  * @module components/references/ReferenceForm
  */
 
-import { type Component, createSignal, createEffect } from "solid-js";
+import { type Component, createEffect, createSignal } from "solid-js";
 import type { Reference } from "@/lib/db/queries/references";
 import {
-  isValidUrl,
   detectReferenceType,
   extractTitleFromUrl,
+  isValidUrl,
 } from "@/lib/db/queries/references";
 
 interface ReferenceFormProps {
@@ -71,7 +71,9 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
         setTitle(suggestedTitle);
       }
     } else if (currentUrl) {
-      setUrlError("Please enter a valid URL (must start with http:// or https://)");
+      setUrlError(
+        "Please enter a valid URL (must start with http:// or https://)"
+      );
     }
   });
 

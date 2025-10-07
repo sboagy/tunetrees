@@ -119,10 +119,7 @@ export async function getReferenceById(
     .select()
     .from(schema.reference)
     .where(
-      and(
-        eq(schema.reference.id, referenceId),
-        eq(schema.reference.deleted, 0)
-      )
+      and(eq(schema.reference.id, referenceId), eq(schema.reference.deleted, 0))
     )
     .all();
 
