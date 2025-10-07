@@ -55,5 +55,13 @@
         "**/venv": true,
         "**/dist": true,
         "**/build": true
+    },
+    "chat.mcp.serverSampling": {
+        "tunetrees/.vscode/mcp.json: playwright-test": {
+            "allowedModels": [
+                "copilot/gpt-4.1",
+                "copilot/claude-sonnet-4.5"
+            ]
+        }
     }
 }
