@@ -19,14 +19,21 @@ import {
   For,
   Show,
 } from "solid-js";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { getDb } from "@/lib/db/client-sqlite";
+import {
+  addTagToTune,
+  getTuneTags,
+  removeTagFromTune,
+} from "@/lib/db/queries/tags";
 import type { Tune } from "../../lib/db/types";
+import { TagInput } from "./TagInput";
 
 /**
  * Extended tune data for editor (includes practice record and override fields)
  */
 export interface TuneEditorData extends Tune {
   // Additional fields from practice records and overrides
-  genre?: string;
   request_public?: boolean;
   learned?: string;
   practiced?: string;
@@ -45,8 +52,10 @@ export interface TuneEditorData extends Tune {
 interface TuneEditorProps {
   /** Tune to edit (undefined for new tune) */
   tune?: TuneEditorData;
-  /** Callback when save is requested */
-  onSave?: (tuneData: Partial<TuneEditorData>) => void | Promise<void>;
+  /** Callback when save is requested (should return tune ID for new tunes) */
+  onSave?: (
+    tuneData: Partial<TuneEditorData>
+  ) => Promise<number | undefined> | undefined;
   /** Callback when cancel is requested */
   onCancel?: () => void;
   /** Show all FSRS/SM2 fields (collapsed by default) */
@@ -85,6 +94,8 @@ const TUNE_TYPES = [
  * ```
  */
 export const TuneEditor: Component<TuneEditorProps> = (props) => {
+  const { user } = useAuth();
+
   // Form state signals
   const [genre, setGenre] = createSignal(props.tune?.genre || "");
   const [title, setTitle] = createSignal(props.tune?.title || "");
@@ -92,40 +103,41 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   const [structure, setStructure] = createSignal(props.tune?.structure || "");
   const [mode, setMode] = createSignal(props.tune?.mode || "");
   const [incipit, setIncipit] = createSignal(props.tune?.incipit || "");
+  const [selectedTags, setSelectedTags] = createSignal<string[]>([]);
   const [requestPublic, setRequestPublic] = createSignal(
-    props.tune?.request_public || false,
+    props.tune?.request_public || false
   );
 
   // User/Repertoire specific fields
   const [learned, setLearned] = createSignal(props.tune?.learned || "");
   const [practiced, setPracticed] = createSignal(props.tune?.practiced || "");
   const [quality, setQuality] = createSignal<number | null>(
-    props.tune?.quality || null,
+    props.tune?.quality || null
   );
   const [notes, setNotes] = createSignal(props.tune?.notes_private || "");
 
   // FSRS fields (collapsible)
   const [difficulty, setDifficulty] = createSignal<number | null>(
-    props.tune?.difficulty || null,
+    props.tune?.difficulty || null
   );
   const [stability, setStability] = createSignal<number | null>(
-    props.tune?.stability || null,
+    props.tune?.stability || null
   );
   const [step, setStep] = createSignal<number | null>(props.tune?.step || null);
   const [state, setState] = createSignal<number | null>(
-    props.tune?.state || null,
+    props.tune?.state || null
   );
   const [repetitions, setRepetitions] = createSignal<number | null>(
-    props.tune?.repetitions || null,
+    props.tune?.repetitions || null
   );
   const [due, setDue] = createSignal(props.tune?.due || "");
 
   // SM2 fields (collapsible)
   const [easiness, setEasiness] = createSignal<number | null>(
-    props.tune?.easiness || null,
+    props.tune?.easiness || null
   );
   const [interval, setInterval] = createSignal<number | null>(
-    props.tune?.interval || null,
+    props.tune?.interval || null
   );
 
   // UI state
@@ -133,6 +145,18 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   const [fsrsOpen, setFsrsOpen] = createSignal(false);
   const [isSaving, setIsSaving] = createSignal(false);
   const [errors, setErrors] = createSignal<Record<string, string>>({});
+
+  // Load existing tags if editing a tune
+  createEffect(async () => {
+    if (props.tune?.id) {
+      const currentUser = user();
+      if (!currentUser?.id) return;
+
+      const db = getDb();
+      const tags = await getTuneTags(db, props.tune.id, currentUser.id);
+      setSelectedTags(tags.map((t) => t.tagText));
+    }
+  });
 
   // ABC notation preview
   let abcPreviewRef: HTMLDivElement | undefined;
@@ -195,7 +219,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
       structure: structure() || undefined,
       mode: mode() || undefined,
       incipit: incipit() || undefined,
-      private_for: props.tune?.private_for || undefined,
+      privateFor: props.tune?.privateFor || undefined,
       request_public: requestPublic(),
       learned: learned() || undefined,
       practiced: practiced() || undefined,
@@ -212,7 +236,44 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     };
 
     try {
-      await props.onSave?.(tuneData);
+      // Save tune data and get tune ID (for new tunes) or undefined (for edits)
+      const result = await props.onSave?.(tuneData);
+      const tuneId = typeof result === "number" ? result : props.tune?.id;
+
+      // Save tags if we have a tune ID and tags to save
+      if (tuneId && selectedTags().length > 0) {
+        const currentUser = user();
+        if (currentUser?.id) {
+          const db = getDb();
+          const supabaseUserId = currentUser.id; // This is a UUID string
+
+          // Get current tags from database
+          const existingTags = await getTuneTags(db, tuneId, supabaseUserId);
+          const existingTagTexts = new Set(existingTags.map((t) => t.tagText));
+          const newTagTexts = new Set(selectedTags());
+
+          // Add new tags
+          for (const tagText of newTagTexts) {
+            if (!existingTagTexts.has(tagText)) {
+              await addTagToTune(db, tuneId, supabaseUserId, tagText);
+            }
+          }
+
+          // Remove deleted tags (only for existing tunes)
+          if (props.tune?.id) {
+            for (const tag of existingTags) {
+              if (!newTagTexts.has(tag.tagText)) {
+                await removeTagFromTune(
+                  db,
+                  tuneId,
+                  supabaseUserId,
+                  tag.tagText
+                );
+              }
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error("Save error:", error);
       setErrors({ submit: "Failed to save tune. Please try again." });
@@ -228,10 +289,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
   // Chevron rotation for collapsible sections
   const sm2ChevronRotation = createMemo(() =>
-    sm2Open() ? "rotate(90deg)" : "rotate(0deg)",
+    sm2Open() ? "rotate(90deg)" : "rotate(0deg)"
   );
   const fsrsChevronRotation = createMemo(() =>
-    fsrsOpen() ? "rotate(90deg)" : "rotate(0deg)",
+    fsrsOpen() ? "rotate(90deg)" : "rotate(0deg)"
   );
 
   return (
@@ -402,6 +463,24 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                 <div class="border border-gray-200 dark:border-gray-700 rounded-md p-3 bg-gray-50 dark:bg-gray-900">
                   <div ref={abcPreviewRef} class="abc-preview" />
                 </div>
+              </div>
+            </div>
+
+            {/* Tags */}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300 pt-2">
+                Tags:
+              </span>
+              <div class="md:col-span-2">
+                <TagInput
+                  selectedTags={selectedTags()}
+                  onTagsChange={setSelectedTags}
+                  placeholder="Add tags for organization..."
+                  disabled={isSaving()}
+                />
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Press Enter to add a tag, or select from existing tags
+                </p>
               </div>
             </div>
 
@@ -700,7 +779,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                           value={repetitions() ?? ""}
                           onInput={(e) =>
                             setRepetitions(
-                              e.currentTarget.valueAsNumber || null,
+                              e.currentTarget.valueAsNumber || null
                             )
                           }
                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"

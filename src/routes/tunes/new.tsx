@@ -20,7 +20,9 @@ const NewTunePage: Component = () => {
   const navigate = useNavigate();
   const { localDb } = useAuth();
 
-  const handleSave = async (tuneData: Partial<TuneEditorData>) => {
+  const handleSave = async (
+    tuneData: Partial<TuneEditorData>
+  ): Promise<number> => {
     const db = localDb();
     if (!db) {
       console.error("Database not initialized");
@@ -35,12 +37,15 @@ const NewTunePage: Component = () => {
         mode: tuneData.mode ?? undefined,
         structure: tuneData.structure ?? undefined,
         incipit: tuneData.incipit ?? undefined,
-        genre: tuneData.genre,
+        genre: tuneData.genre ?? undefined,
         privateFor: undefined, // TODO: Add privacy controls in UI
       });
 
       // Navigate to the newly created tune's detail page
       navigate(`/tunes/${newTune.id}`);
+
+      // Return the new tune ID so TuneEditor can save tags
+      return newTune.id;
     } catch (error) {
       console.error("Error creating tune:", error);
       throw error; // Let TuneEditor handle the error display

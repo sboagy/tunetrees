@@ -10,9 +10,13 @@
  * @module components/tunes/TuneDetail
  */
 
-import { type Component, createSignal, Show } from "solid-js";
+import { type Component, createResource, createSignal, Show } from "solid-js";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { getDb } from "@/lib/db/client-sqlite";
+import { getTuneTags } from "@/lib/db/queries/tags";
 import type { Tune } from "../../lib/db/types";
 import { AbcNotation } from "./AbcNotation";
+import { TagList } from "./TagList";
 
 interface TuneDetailProps {
   /** The tune to display */
@@ -43,7 +47,20 @@ interface TuneDetailProps {
  * ```
  */
 export const TuneDetail: Component<TuneDetailProps> = (props) => {
+  const { user } = useAuth();
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+
+  // Load tags for this tune - reactive: refetches when tune.id or user changes
+  const [tuneTags] = createResource(
+    () => ({ tuneId: props.tune.id, userId: user()?.id }),
+    async (params) => {
+      if (!params.userId || !params.tuneId) return [];
+
+      const db = getDb();
+      const tags = await getTuneTags(db, params.tuneId, params.userId); // params.userId is already a UUID string
+      return tags.map((t) => t.tagText);
+    },
+  );
 
   const handleEdit = () => {
     props.onEdit?.(props.tune);
@@ -197,6 +214,23 @@ export const TuneDetail: Component<TuneDetailProps> = (props) => {
               </dd>
             </div>
           </Show>
+
+          {/* Tags */}
+          <div class="md:col-span-2">
+            <dt class="text-sm font-medium text-gray-600 dark:text-gray-400">
+              Tags
+            </dt>
+            <dd class="mt-1">
+              <Show
+                when={!tuneTags.loading}
+                fallback={
+                  <span class="text-xs text-gray-400">Loading tags...</span>
+                }
+              >
+                <TagList tags={tuneTags() || []} variant="primary" size="md" />
+              </Show>
+            </dd>
+          </div>
 
           {/* Privacy Status */}
           <div>
