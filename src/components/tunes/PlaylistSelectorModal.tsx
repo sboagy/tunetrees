@@ -1,5 +1,10 @@
-import { type Component, createSignal, For, Show } from "solid-js";
-import { createResource } from "solid-js";
+import {
+  type Component,
+  createResource,
+  createSignal,
+  For,
+  Show,
+} from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getUserPlaylists } from "@/lib/db/queries/playlists";
 import type { PlaylistWithSummary } from "@/lib/db/types";
@@ -147,9 +152,7 @@ export const PlaylistSelectorModal: Component<PlaylistSelectorModalProps> = (
                         </div>
                       </div>
                       <Show
-                        when={
-                          selectedPlaylistId() === playlistItem.playlistId
-                        }
+                        when={selectedPlaylistId() === playlistItem.playlistId}
                       >
                         <svg
                           class="h-5 w-5 text-blue-500 dark:text-blue-400"

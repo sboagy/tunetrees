@@ -11,7 +11,7 @@
  * @module components/ui/ConfirmDialog
  */
 
-import { type Component, Show, onMount, onCleanup } from "solid-js";
+import { type Component, onCleanup, onMount, Show } from "solid-js";
 
 interface ConfirmDialogProps {
   /** Whether the dialog is open */
