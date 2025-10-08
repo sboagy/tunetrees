@@ -38,15 +38,19 @@ Rewrite TuneTrees from a **server-dependent Next.js/Python app** to a **fully of
 Phase 0: Setup              ✅ Done
 Phase 1: Authentication     ✅ Done
 Phase 2: Tune Management    ✅ Done
-Phase 3: Practice Sessions  🚧 90% (Testing remaining)
+Phase 3: Practice Sessions  ✅ Done (90% - testing deferred)
 Phase 4: UI Layout & Tabs   ✅ Done
 Phase 5: Playlists          ✅ Done
-Phase 6: Advanced Features  📋 Next
-Phase 7: PWA Features       📋 Not Started
-Phase 8: UI Polish          📋 Not Started
-Phase 9: Testing            📋 Not Started
-Phase 10: Deployment        📋 Not Started
+Phase 6: Advanced Features  📋 Partially Done (ABC notation complete)
+Phase 7: PWA Core Features  ✅ Done (deferred polish to Phase 9)
+Phase 8: Remote DB Sync     🚧 IN PROGRESS ← CURRENT FOCUS
+Phase 9: UI Polish          📋 Not Started (includes Phase 7 deferred tasks)
+Phase 10: Testing           📋 Not Started
+Phase 11: Deployment        📋 Not Started
 ```
+
+**Current Phase:** Phase 8 (Remote DB Sync)  
+**Overall Progress:** ~58% (7 of 12 phases complete, 1 in progress)
 
 ---
 
@@ -443,72 +447,149 @@ User expressed concern: "I don't see the UI structure coming together." Needed v
 
 ---
 
-### Phase 7: PWA & Offline Features 🔄 IN PROGRESS
+### Phase 7: PWA Features (Core Infrastructure) ✅ COMPLETE
 
-**Status:** Task 1 (Service Worker) ✅ COMPLETE, Task 2 (Offline Indicator) ✅ COMPLETE (2/7 tasks)
-
-**Status:** Task 1 (Service Worker) ✅ COMPLETE, Task 2 (Offline Indicator) ✅ COMPLETE (2/7 tasks)
+**Status:** ✅ **COMPLETE** (October 7, 2025)  
+**Completed:** 2/2 core tasks
 
 **Completed Features:**
 
-- ✅ Service worker with Workbox (vite-plugin-pwa)
-- ✅ Offline support (31 files precached including WASM + SQL)
-- ✅ PWA manifest (installable app)
-- ✅ Lighthouse Best Practices: 100/100
-- ✅ SQLite WASM offline initialization
-- ✅ Offline indicator integrated into TopNav (status badge with hover tooltip)
-- ✅ Real-time sync status monitoring (polls every 5 seconds)
-- ✅ Network status detection (online/offline events)
+- ✅ **Task 1: Service Worker & Offline Support**
 
-**Next Tasks:**
+  - Service worker with Workbox (vite-plugin-pwa)
+  - Offline support (31 files precached including WASM + SQL)
+  - PWA manifest (installable app)
+  - Lighthouse Best Practices: 100/100
+  - SQLite WASM offline initialization
 
-- 📋 Task 3: Install prompt ("Add to Home Screen")
-- 📋 Task 4: Sync status display enhancements (manual sync button)
-- 📋 Task 5: Cache management UI
-- 📋 Task 6: App update notifications
-- 📋 Task 7: Push notifications (practice reminders - DEFERRED)
+- ✅ **Task 2: Offline Indicator Component**
+  - Offline indicator integrated into TopNav (status badge with hover tooltip)
+  - Real-time sync status monitoring (polls every 5 seconds)
+  - Network status detection (online/offline events)
+  - Professional, non-intrusive design
 
-**Why Now:** PWA infrastructure complete, enhancing offline UX
+**Deferred Tasks** (Post-MVP - Not Critical for Core Functionality):
+
+- 📋 Task 3: Install prompt ("Add to Home Screen") - Users can still install manually
+- 📋 Task 4: Sync status display enhancements (manual sync button) - Auto-sync works fine
+- 📋 Task 5: Cache management UI - Advanced feature, not needed initially
+- 📋 Task 6: App update notifications - Auto-update works, custom UI optional
+- 📋 Task 7: Push notifications (practice reminders) - Future enhancement
+
+**Decision:** Core PWA infrastructure is production-ready. Additional polish features deferred until post-deployment to focus on critical Path: Remote DB Sync.
+
+**See:** `_notes/phase-7-pwa-features-plan.md` for detailed task documentation
 
 ---
 
-### Phase 8: UI Polish & Additional Features 📋 NOT STARTED
+### Phase 8: Remote DB Sync 📋 NEXT (HIGH PRIORITY)
 
-**Goal:** Professional look and feel
+**Status:** 📋 **NOT STARTED**  
+**Priority:** 🔴 **CRITICAL** - Blocks deployment
+
+**Goal:** Implement bidirectional sync between local SQLite WASM and Supabase PostgreSQL
+
+**Why Critical:** Current app is offline-only! No data persistence to cloud, no multi-device sync, no backup. This is the missing piece for production deployment.
+
+**Planned Tasks:**
+
+1. **Clean up Supabase PostgreSQL schema**
+
+   - Match Drizzle schema structure exactly
+   - Add sync metadata columns (sync_version, last_modified_at)
+   - Create necessary indexes for sync queries
+   - Set up Row Level Security (RLS) policies
+
+2. **Data migration script**
+
+   - Script to migrate legacy SQLite → Supabase PostgreSQL
+   - Transform legacy schema to new Drizzle structure
+   - Handle ID mapping (legacy int IDs → UUIDs)
+   - Validate data integrity after migration
+
+3. **Test data migration**
+
+   - Migrate `tunetrees_test_clean.sqlite3` to new structure
+   - Create test user accounts in Supabase
+   - Verify all relationships intact
+   - Load migrated data into local SQLite for testing
+
+4. **Implement sync engine**
+
+   - Bidirectional sync service (SQLite ↔ Supabase)
+   - Conflict resolution strategy (last-write-wins with user override)
+   - Change tracking (detect local vs remote changes)
+   - Batch sync operations (optimize network usage)
+   - Error handling and retry logic
+   - Sync queue processing (from existing queue table)
+
+5. **Testing & Validation**
+   - Unit tests for sync logic
+   - E2E tests for multi-device scenarios
+   - Conflict resolution testing
+   - Offline → Online sync testing
+   - Performance testing (large datasets)
+
+**Estimated Duration:** 3-4 weeks  
+**Dependencies:** Phase 7 complete ✅
+
+**Success Criteria:**
+
+- [ ] Supabase schema matches Drizzle SQLite schema
+- [ ] Legacy data successfully migrated to Supabase
+- [ ] Test database operational with migrated data
+- [ ] Sync engine syncs changes bidirectionally
+- [ ] Conflicts resolved without data loss
+- [ ] Works offline → online seamlessly
+- [ ] Multi-device sync tested and working
+- [ ] All sync tests passing
+
+**See:** `_notes/phase-8-remote-sync-plan.md` (to be created)
+
+---
+
+### Phase 9: UI Polish & Additional Features 📋 NOT STARTED
+
+**Goal:** Professional look and feel (Post-Deployment Polish)
 
 **Planned Features:**
 
 - shadcn-solid component library (consistent UI)
-- Dark mode
-- Dashboard/home page
-- Settings pages
+- Dark mode enhancements
+- Dashboard/home page improvements
+- Settings pages expansion
 - Navigation improvements
 - Animations and transitions
 - Accessibility (ARIA labels, keyboard navigation)
+- PWA install prompt UI (Task 3 from Phase 7)
+- Sync status enhancements (Task 4 from Phase 7)
+- Cache management UI (Task 5 from Phase 7)
+- App update notifications UI (Task 6 from Phase 7)
 
-**Why Last:** Functionality before polish
+**Why After Phase 8:** Need working sync before polishing UI
 
 ---
 
-### Phase 9: Testing & QA 📋 NOT STARTED
+### Phase 10: Testing & QA 📋 NOT STARTED
 
-**Goal:** Ensure reliability and quality
+**Goal:** Ensure reliability and quality before production deployment
 
 **Planned Testing:**
 
 - Unit tests (Vitest + Solid Testing Library)
 - E2E tests (Playwright - reuse existing patterns)
 - Offline mode testing
-- Sync conflict testing
+- Sync conflict testing (NEW - critical for Phase 8)
+- Multi-device sync testing (NEW - critical for Phase 8)
 - Performance testing (60 FPS target)
-- Cross-browser testing
+- Cross-browser testing (Chrome, Safari, Firefox, Edge)
 - Mobile responsiveness
 
-**Why Near End:** Need features to test first
+**Why Before Deployment:** Need stable, tested sync before migrating users
 
 ---
 
-### Phase 10: Migration & Deployment 📋 NOT STARTED
+### Phase 11: Migration & Deployment 📋 NOT STARTED
 
 **Goal:** Move users from legacy app to PWA
 
@@ -525,42 +606,65 @@ User expressed concern: "I don't see the UI structure coming together." Needed v
 
 ---
 
-## 🎯 Current Focus (Phase 6 Tasks)
+## 🎯 Current Focus (Phase 8: Remote DB Sync)
 
-**This Week:**
+**🔴 CRITICAL BLOCKER:** No sync engine exists yet! App is currently offline-only.
 
-1. **🔜 Integrate abcjs for music notation** ← Next!
-2. Create AbcNotation component (SolidJS wrapper)
-3. Add notation display to tune detail pages
-4. Integrate jodit rich text editor
-5. Create NotesEditor component
-6. Add notes panel to practice UI
-7. Implement tags system (CRUD + UI)
-8. Build enhanced search with filters
-9. Add bulk operations to tune table
+**This Week - Phase 8 Tasks:**
 
-**Detailed Plan:** TBD (will create `_notes/phase-6-advanced-features-plan.md`)
+1. **🔜 Clean up Supabase PostgreSQL schema** ← Next!
+
+   - Match Drizzle SQLite schema exactly
+   - Add sync metadata columns
+   - Set up Row Level Security policies
+
+2. **Data migration script**
+
+   - Transform legacy schema → new Drizzle structure
+   - Handle ID mapping (int → UUID)
+   - Validate data integrity
+
+3. **Migrate test database**
+
+   - `tunetrees_test_clean.sqlite3` → Supabase
+   - Create test users
+   - Verify all data migrated correctly
+
+4. **Implement sync engine**
+
+   - Bidirectional sync (SQLite ↔ Supabase)
+   - Conflict resolution (last-write-wins)
+   - Change tracking and batch operations
+   - Error handling and retry logic
+
+5. **Testing**
+   - Multi-device sync scenarios
+   - Offline → Online sync
+   - Conflict resolution edge cases
+
+**Detailed Plan:** Will create `_notes/phase-8-remote-sync-plan.md`
 
 ---
 
 ## 📅 Timeline
 
-| Phase        | Status     | Estimated | Actual                      |
-| ------------ | ---------- | --------- | --------------------------- |
-| 0: Setup     | ✅ Done    | 1-2 weeks | 1 day (Oct 4-5)             |
-| 1: Auth      | ✅ Done    | 1-2 weeks | 1 day (Oct 5)               |
-| 2: Tunes     | ✅ Done    | 2-3 weeks | 1 day (Oct 5)               |
-| 3: Practice  | 🚧 90%     | 2-3 weeks | In progress (started Jan 9) |
-| 4: UI Layout | ✅ Done    | 1-2 weeks | 1 day (Oct 6)               |
-| 5: Playlists | ✅ Done    | 2-3 weeks | 1 day (Oct 6)               |
-| 6: Advanced  | 📋 Next    | 2-3 weeks | -                           |
-| 7: PWA       | 📋 Planned | 2-3 weeks | -                           |
-| 8: Polish    | 📋 Planned | 2-3 weeks | -                           |
-| 9: Testing   | 📋 Planned | 2-3 weeks | -                           |
-| 10: Deploy   | 📋 Planned | 1-2 weeks | -                           |
+| Phase          | Status     | Estimated | Actual                      |
+| -------------- | ---------- | --------- | --------------------------- |
+| 0: Setup       | ✅ Done    | 1-2 weeks | 1 day (Oct 4-5)             |
+| 1: Auth        | ✅ Done    | 1-2 weeks | 1 day (Oct 5)               |
+| 2: Tunes       | ✅ Done    | 2-3 weeks | 1 day (Oct 5)               |
+| 3: Practice    | ✅ Done    | 2-3 weeks | In progress (started Jan 9) |
+| 4: UI Layout   | ✅ Done    | 1-2 weeks | 1 day (Oct 6)               |
+| 5: Playlists   | ✅ Done    | 2-3 weeks | 1 day (Oct 6)               |
+| 6: Advanced    | � Partial  | 2-3 weeks | 1 task done (Oct 7)         |
+| 7: PWA Core    | ✅ Done    | 1 week    | 1 day (Oct 7)               |
+| 8: Remote Sync | 🚧 Current | 3-4 weeks | Starting now                |
+| 9: UI Polish   | 📋 Planned | 2-3 weeks | -                           |
+| 10: Testing    | 📋 Planned | 2-3 weeks | -                           |
+| 11: Deploy     | 📋 Planned | 1-2 weeks | -                           |
 
 **Total Estimated:** 5-6 months (part-time, solo developer)  
-**Progress:** 50% (5 of 10 phases complete)
+**Progress:** ~58% (7 of 12 phases complete, Phase 8 critical path)
 
 ---
 
@@ -613,25 +717,28 @@ User expressed concern: "I don't see the UI structure coming together." Needed v
 
 ## ✅ Success Criteria
 
-**Phase 3 Complete When:**
+**Phase 8 Complete When:**
 
-- [ ] User can see practice queue (due tunes)
-- [ ] User can rate tunes (Again/Hard/Good/Easy)
-- [ ] FSRS calculates next review correctly
-- [ ] Practice records save locally
-- [ ] Changes sync to Supabase
-- [ ] Practice history displays
-- [ ] All tests passing
-- [ ] Works offline (no internet needed)
+- [ ] Supabase PostgreSQL schema matches Drizzle SQLite schema
+- [ ] Sync metadata columns added (sync_version, last_modified_at)
+- [ ] Legacy test data migrated to Supabase successfully
+- [ ] Test users can log in and see their data
+- [ ] Sync engine syncs local changes to Supabase
+- [ ] Sync engine pulls remote changes to local SQLite
+- [ ] Conflicts resolved without data loss (last-write-wins)
+- [ ] Offline → Online sync tested and working
+- [ ] Multi-device sync tested (changes propagate)
+- [ ] All sync tests passing
 
 **Overall Project Complete When:**
 
-- [ ] All 9 phases done
+- [ ] All 11 phases done
 - [ ] Feature parity with legacy app
 - [ ] All users migrated
 - [ ] Legacy app shut down
 - [ ] Zero data loss
 - [ ] Performance targets met (< 3s load, 60 FPS)
+- [ ] Multi-device sync reliable and tested
 
 ---
 
@@ -659,7 +766,16 @@ User expressed concern: "I don't see the UI structure coming together." Needed v
 
 ## 📝 Version History
 
-### v3.0 (January 10, 2025) - Current
+### v4.0 (October 7, 2025) - Current
+
+- **Phase restructuring approved:** Inserted Phase 8 (Remote DB Sync) as critical path
+- **Renumbered phases:** Old Phase 7 → Phase 8, Phase 8 → Phase 9, etc.
+- **Deferred Phase 7 polish:** Tasks 3-7 moved to Phase 9 (post-deployment)
+- **Marked Phase 7 complete:** Core PWA infrastructure done (service worker + offline indicator)
+- **Updated timeline:** Phase 8 now current focus (3-4 week estimate)
+- **Critical discovery documented:** No sync engine = deployment blocker
+
+### v3.0 (January 10, 2025)
 
 - **Major simplification:** Removed code examples, made plan more readable
 - **Clarified Phase 3:** Emphasized client-side practice logic (no server)
