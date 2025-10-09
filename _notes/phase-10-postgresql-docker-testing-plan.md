@@ -53,24 +53,27 @@
 
 ```typescript
 // src/lib/sync/conflicts.test.ts
-import { describe, it, expect } from 'vitest';
-import { detectConflict, resolveConflict } from './conflicts';
+import { describe, it, expect } from "vitest";
+import { detectConflict, resolveConflict } from "./conflicts";
 
-describe('Conflict Detection', () => {
-  it('detects conflict when sync_version differs', () => {
-    const local = { sync_version: 5, last_modified_at: new Date('2025-01-01') };
-    const remote = { sync_version: 6, last_modified_at: new Date('2025-01-02') };
-    
+describe("Conflict Detection", () => {
+  it("detects conflict when sync_version differs", () => {
+    const local = { sync_version: 5, last_modified_at: new Date("2025-01-01") };
+    const remote = {
+      sync_version: 6,
+      last_modified_at: new Date("2025-01-02"),
+    };
+
     const conflict = detectConflict(local, remote);
     expect(conflict).toBe(true);
   });
-  
-  it('resolves conflict with last-write-wins', () => {
-    const local = { data: 'old', last_modified_at: new Date('2025-01-01') };
-    const remote = { data: 'new', last_modified_at: new Date('2025-01-02') };
-    
+
+  it("resolves conflict with last-write-wins", () => {
+    const local = { data: "old", last_modified_at: new Date("2025-01-01") };
+    const remote = { data: "new", last_modified_at: new Date("2025-01-02") };
+
     const resolved = resolveConflict(local, remote);
-    expect(resolved.data).toBe('new'); // Remote is newer
+    expect(resolved.data).toBe("new"); // Remote is newer
   });
 });
 ```
@@ -100,46 +103,54 @@ describe('Conflict Detection', () => {
 
 ```typescript
 // tests/sync-integration.spec.ts
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test('sync cycle: local → postgres → local', async ({ page, context }) => {
+test("sync cycle: local → postgres → local", async ({ page, context }) => {
   // Device A: Create tune
-  await page.goto('/catalog');
-  await page.getByRole('button', { name: 'Add Tune' }).click();
-  await page.getByLabel('Title').fill('Test Tune');
-  await page.getByRole('button', { name: 'Save' }).click();
-  
+  await page.goto("/catalog");
+  await page.getByRole("button", { name: "Add Tune" }).click();
+  await page.getByLabel("Title").fill("Test Tune");
+  await page.getByRole("button", { name: "Save" }).click();
+
   // Wait for sync to complete
   await page.waitForSelector('[data-sync-status="synced"]');
-  
+
   // Device B: Open in new context (simulates different device)
   const deviceB = await context.newPage();
-  await deviceB.goto('/catalog');
-  
+  await deviceB.goto("/catalog");
+
   // Verify tune appears on Device B
-  await expect(deviceB.getByText('Test Tune')).toBeVisible();
+  await expect(deviceB.getByText("Test Tune")).toBeVisible();
 });
 
-test('conflict resolution: last-write-wins', async ({ page, context }) => {
+test("conflict resolution: last-write-wins", async ({ page, context }) => {
   // Device A: Edit tune offline
-  await page.goto('/catalog/1/edit');
-  await page.evaluate(() => navigator.serviceWorker.ready.then(reg => reg.active?.postMessage({ type: 'GO_OFFLINE' })));
-  await page.getByLabel('Title').fill('Device A Version');
-  await page.getByRole('button', { name: 'Save' }).click();
-  
+  await page.goto("/catalog/1/edit");
+  await page.evaluate(() =>
+    navigator.serviceWorker.ready.then((reg) =>
+      reg.active?.postMessage({ type: "GO_OFFLINE" })
+    )
+  );
+  await page.getByLabel("Title").fill("Device A Version");
+  await page.getByRole("button", { name: "Save" }).click();
+
   // Device B: Edit same tune (online)
   const deviceB = await context.newPage();
-  await deviceB.goto('/catalog/1/edit');
-  await deviceB.getByLabel('Title').fill('Device B Version');
-  await deviceB.getByRole('button', { name: 'Save' }).click();
-  
+  await deviceB.goto("/catalog/1/edit");
+  await deviceB.getByLabel("Title").fill("Device B Version");
+  await deviceB.getByRole("button", { name: "Save" }).click();
+
   // Device A: Go online and sync
-  await page.evaluate(() => navigator.serviceWorker.ready.then(reg => reg.active?.postMessage({ type: 'GO_ONLINE' })));
+  await page.evaluate(() =>
+    navigator.serviceWorker.ready.then((reg) =>
+      reg.active?.postMessage({ type: "GO_ONLINE" })
+    )
+  );
   await page.waitForSelector('[data-sync-status="synced"]');
-  
+
   // Verify last-write-wins (Device B should win if it saved later)
   await page.reload();
-  await expect(page.getByLabel('Title')).toHaveValue(/Device [AB] Version/);
+  await expect(page.getByLabel("Title")).toHaveValue(/Device [AB] Version/);
 });
 ```
 
@@ -156,7 +167,7 @@ jobs:
   integration-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    
+
     # Add PostgreSQL Docker service
     services:
       postgres:
@@ -172,33 +183,33 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
-      
+
       - name: Seed PostgreSQL with test data
         run: npm run seed:test-db
         env:
           DATABASE_URL: postgresql://tunetrees_test:test_password_123@localhost:5432/tunetrees_test
-          VITE_SUPABASE_URL: http://localhost:54321  # Mock URL (not used in tests)
+          VITE_SUPABASE_URL: http://localhost:54321 # Mock URL (not used in tests)
           SUPABASE_SERVICE_ROLE_KEY: mock-key-for-migration-script
-      
+
       - name: Run Playwright integration tests
         run: npx playwright test --project=chromium
         env:
           DATABASE_URL: postgresql://tunetrees_test:test_password_123@localhost:5432/tunetrees_test
           CI: true
-      
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -218,29 +229,30 @@ jobs:
 **Script:** `scripts/seed-test-database.ts`
 
 ```typescript
-import { config } from 'dotenv';
-import postgres from 'postgres';
-import BetterSqlite3 from 'better-sqlite3';
-import { migrateDatabase } from './migrate-production-to-supabase';
+import { config } from "dotenv";
+import postgres from "postgres";
+import BetterSqlite3 from "better-sqlite3";
+import { migrateDatabase } from "./migrate-production-to-supabase";
 
 config();
 
 // Use environment variable or default to local Docker instance
-const DATABASE_URL = process.env.DATABASE_URL || 
-  'postgresql://tunetrees_test:test_password_123@localhost:5432/tunetrees_test';
+const DATABASE_URL =
+  process.env.DATABASE_URL ||
+  "postgresql://tunetrees_test:test_password_123@localhost:5432/tunetrees_test";
 
 // Use test database file (smaller than production)
-const SQLITE_DB_PATH = './tunetrees_test_clean.sqlite3';
+const SQLITE_DB_PATH = "./tunetrees_test_clean.sqlite3";
 
 async function seedTestDatabase() {
-  console.log('🌱 Seeding PostgreSQL test database...');
+  console.log("🌱 Seeding PostgreSQL test database...");
   console.log(`📁 Source: ${SQLITE_DB_PATH}`);
-  console.log(`🐘 Target: ${DATABASE_URL.replace(/:[^:]*@/, ':***@')}`);
-  
+  console.log(`🐘 Target: ${DATABASE_URL.replace(/:[^:]*@/, ":***@")}`);
+
   // Reuse existing migration logic
   await migrateDatabase(SQLITE_DB_PATH, DATABASE_URL);
-  
-  console.log('✅ Test database seeded successfully!');
+
+  console.log("✅ Test database seeded successfully!");
 }
 
 seedTestDatabase().catch(console.error);
@@ -287,9 +299,9 @@ export function createMockSupabaseClient(postgresConnectionString: string) {
 // playwright.config.ts
 export default defineConfig({
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: "http://localhost:4173",
     // Inject mock Supabase client in CI mode
-    storageState: process.env.CI ? 'tests/mock-auth-state.json' : undefined,
+    storageState: process.env.CI ? "tests/mock-auth-state.json" : undefined,
   },
 });
 ```
@@ -310,34 +322,36 @@ export default defineConfig({
 **File:** `playwright.config.ts`
 
 ```typescript
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: "./tests",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  
+
   use: {
-    baseURL: 'http://localhost:4173',
-    trace: 'on-first-retry',
-    
+    baseURL: "http://localhost:4173",
+    trace: "on-first-retry",
+
     // Inject PostgreSQL connection in CI
-    extraHTTPHeaders: process.env.CI ? {
-      'X-Database-URL': process.env.DATABASE_URL,
-    } : {},
+    extraHTTPHeaders: process.env.CI
+      ? {
+          "X-Database-URL": process.env.DATABASE_URL,
+        }
+      : {},
   },
-  
+
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
-  
+
   webServer: {
-    command: 'npm run preview',
+    command: "npm run preview",
     port: 4173,
     reuseExistingServer: !process.env.CI,
   },
@@ -363,16 +377,19 @@ export default defineConfig({
 **Test Scenarios:**
 
 1. **Basic Sync Cycle**
+
    - Create tune → Wait for sync → Verify in PostgreSQL
    - Update tune → Wait for sync → Verify changes
    - Delete tune → Wait for sync → Verify deletion
 
 2. **Multi-Device Sync**
+
    - Device A creates tune → Device B sees update
    - Device B edits tune → Device A sees changes
    - Both devices offline → Both edit → Resolve conflicts
 
 3. **Offline → Online Sync**
+
    - Go offline → Create 5 tunes → Go online → Verify all sync
    - Check sync queue processes in order
    - Verify retry logic on failed syncs
@@ -471,13 +488,13 @@ chmod +x scripts/test-with-docker.sh
 
 ## 📊 Testing Matrix
 
-| Test Type | Database | Tool | Speed | Run Frequency | CI Step |
-|-----------|----------|------|-------|---------------|---------|
-| **Unit Tests** | SQLite in-memory | Vitest | 1-5s | Every commit | ✅ Always |
-| **Component Tests** | None (mocked) | Vitest + Testing Library | 5-10s | Every commit | ✅ Always |
-| **Sync Logic Tests** | SQLite in-memory | Vitest | 1-5s | Every commit | ✅ Always |
-| **E2E Integration** | PostgreSQL Docker + SQLite WASM | Playwright | 2-5min | PR + main | ✅ CI only |
-| **Manual Testing** | Supabase Production | Browser | N/A | Pre-deploy | ⏭️ Manual |
+| Test Type            | Database                        | Tool                     | Speed  | Run Frequency | CI Step    |
+| -------------------- | ------------------------------- | ------------------------ | ------ | ------------- | ---------- |
+| **Unit Tests**       | SQLite in-memory                | Vitest                   | 1-5s   | Every commit  | ✅ Always  |
+| **Component Tests**  | None (mocked)                   | Vitest + Testing Library | 5-10s  | Every commit  | ✅ Always  |
+| **Sync Logic Tests** | SQLite in-memory                | Vitest                   | 1-5s   | Every commit  | ✅ Always  |
+| **E2E Integration**  | PostgreSQL Docker + SQLite WASM | Playwright               | 2-5min | PR + main     | ✅ CI only |
+| **Manual Testing**   | Supabase Production             | Browser                  | N/A    | Pre-deploy    | ⏭️ Manual  |
 
 ---
 
