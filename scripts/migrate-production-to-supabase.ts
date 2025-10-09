@@ -40,6 +40,7 @@
 import { createClient } from "@supabase/supabase-js";
 import BetterSqlite3 from "better-sqlite3";
 import * as dotenv from "dotenv";
+import postgres from "postgres";
 
 // Load environment variables
 dotenv.config({ path: ".env.local" });
@@ -54,12 +55,19 @@ const MIGRATION_DEVICE_ID = "data-migration-2025-10-05";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const DATABASE_URL = process.env.DATABASE_URL; // Direct Postgres connection string
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   console.error("❌ Missing Supabase credentials!");
   console.error(
-    "Set VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local",
+    "Set VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"
   );
+  process.exit(1);
+}
+
+if (!DATABASE_URL) {
+  console.error("❌ Missing DATABASE_URL!");
+  console.error("Set DATABASE_URL in .env.local for direct Postgres access");
   process.exit(1);
 }
 
@@ -98,6 +106,12 @@ console.log();
 
 const sqlite = new BetterSqlite3(SQLITE_DB_PATH, { readonly: true });
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// Create direct Postgres connection for TRUNCATE operations
+// Suppress NOTICE messages for cleaner output
+const sql = postgres(DATABASE_URL, {
+  onnotice: () => {}, // Suppress CASCADE notices
+});
 
 // User ID mapping: SQLite integer ID → { intId: preserved integer, uuid: Supabase auth UUID }
 const userIdMapping = new Map<number, { intId: number; uuid: string }>();
@@ -142,12 +156,11 @@ async function cleanupSupabaseTables() {
   console.log("\n🧹 Phase 0: Cleaning Up Supabase Tables");
   console.log(`=${"=".repeat(59)}`);
   console.log(
-    "\n⚠️  This will DELETE all existing data in Supabase to ensure clean migration.",
+    "\n⚠️  This will DELETE all existing data in Supabase to ensure clean migration."
   );
   console.log("Deleting in dependency order (children first)...\n");
 
   const tablesToClean = [
-    // Delete children first (FK dependencies)
     "practice_record",
     "daily_practice_queue",
     "playlist_tune",
@@ -155,6 +168,9 @@ async function cleanupSupabaseTables() {
     "reference",
     "tag",
     "tune_override",
+    "table_transient_data",
+    "table_state",
+    "tab_group_main_state",
     "playlist",
     "tune",
     "prefs_spaced_repetition",
@@ -168,14 +184,11 @@ async function cleanupSupabaseTables() {
 
   for (const table of tablesToClean) {
     try {
-      const { error } = await supabase.from(table).delete().neq("id", 0); // Delete all rows
-      if (error) {
-        console.error(`✗ Error cleaning ${table}:`, error);
-      } else {
-        console.log(`✓ Cleaned ${table}`);
-      }
-    } catch (err) {
-      console.error(`✗ Failed to clean ${table}:`, err);
+      // Use direct Postgres connection to run TRUNCATE
+      await sql`TRUNCATE TABLE ${sql(table)} CASCADE`;
+      console.log(`✓ Cleaned ${table}`);
+    } catch (err: any) {
+      console.error(`✗ Failed to clean ${table}:`, err.message);
     }
   }
 
@@ -207,20 +220,20 @@ async function migrateUsers() {
         console.log(
           `✓ User ${user.id} (${
             user.email
-          }) → Using existing UUID ${TARGET_USER_UUID!}`,
+          }) → Using existing UUID ${TARGET_USER_UUID!}`
         );
       } else {
         // Check if auth user already exists by email
         const { data: existingUsers } = await supabase.auth.admin.listUsers();
         const existingUser = existingUsers?.users.find(
-          (u: any) => u.email === user.email,
+          (u: any) => u.email === user.email
         );
 
         if (existingUser) {
           // User already exists from previous migration run
           supabaseAuthUserId = existingUser.id;
           console.log(
-            `✓ User ${user.id} (${user.email}) → Using existing UUID ${supabaseAuthUserId} (already exists)`,
+            `✓ User ${user.id} (${user.email}) → Using existing UUID ${supabaseAuthUserId} (already exists)`
           );
         } else {
           // Create new Supabase auth user
@@ -244,14 +257,14 @@ async function migrateUsers() {
           if (authError) {
             console.error(
               `✗ Failed to create auth user for ${user.email}:`,
-              authError,
+              authError
             );
             continue;
           }
 
           supabaseAuthUserId = authUser.user!.id;
           console.log(
-            `✓ User ${user.id} (${user.email}) → Created new UUID ${supabaseAuthUserId}`,
+            `✓ User ${user.id} (${user.email}) → Created new UUID ${supabaseAuthUserId}`
           );
         }
       }
@@ -277,13 +290,13 @@ async function migrateUsers() {
           },
           {
             onConflict: "supabase_user_id", // Prevent duplicates
-          },
+          }
         );
 
       if (profileError) {
         console.error(
           `✗ Failed to insert user_profile for ${user.email}:`,
-          profileError,
+          profileError
         );
         continue;
       }
@@ -302,7 +315,7 @@ async function migrateUsers() {
   console.log(
     `   User ID mapping: ${Array.from(userIdMapping.entries())
       .map(([k, v]) => `${k}→${v.intId}`)
-      .join(", ")}`,
+      .join(", ")}`
   );
 }
 
@@ -367,14 +380,14 @@ async function migrateReferenceData() {
   if (genreTuneTypes.length > 0) {
     // Skip orphaned BluesBallad reference (tune type doesn't exist)
     const validGenreTuneTypes = genreTuneTypes.filter(
-      (gtt: any) => gtt.tune_type_id !== "BluesBallad",
+      (gtt: any) => gtt.tune_type_id !== "BluesBallad"
     );
 
     if (validGenreTuneTypes.length < genreTuneTypes.length) {
       console.log(
         `⚠️  Skipped ${
           genreTuneTypes.length - validGenreTuneTypes.length
-        } orphaned genre-tune type relationships`,
+        } orphaned genre-tune type relationships`
       );
     }
 
@@ -390,7 +403,7 @@ async function migrateReferenceData() {
       console.error("Error migrating genre_tune_type:", error);
     } else {
       console.log(
-        `✓ Migrated ${validGenreTuneTypes.length} genre-tune type relationships`,
+        `✓ Migrated ${validGenreTuneTypes.length} genre-tune type relationships`
       );
     }
   }
@@ -430,10 +443,11 @@ async function migrateReferenceData() {
       const { data, error } = await supabase
         .from("instrument")
         .insert({
+          id: inst.id,
+          private_to_user: inst.private_to_user || null,
           instrument: instrumentName,
           description: inst.description || null,
           genre_default: inst.genre_default || null,
-          private_to_user: inst.private_to_user || null,
           deleted: false,
           sync_version: 1,
           last_modified_at: now(),
@@ -500,7 +514,7 @@ async function migrateTunes() {
       console.log(
         `✓ Migrated ${Math.min(i + BATCH_SIZE, supabaseTunes.length)}/${
           supabaseTunes.length
-        } tunes`,
+        } tunes`
       );
     }
   }
@@ -567,15 +581,24 @@ async function migratePlaylists() {
   console.log(`Found ${playlists.length} playlists\n`);
 
   const supabasePlaylists = playlists.map((p) => {
-    // Lookup instrument_ref from instrument name (TEXT → INTEGER)
-    const instrumentRef = p.instrument
-      ? instrumentMapping.get(p.instrument)
-      : null;
+    // Validate instrument_ref - must exist in instrument table
+    let instrumentRef = p.instrument_ref || null;
+    if (instrumentRef !== null) {
+      const instrumentExists = sqlite
+        .prepare("SELECT id FROM instrument WHERE id = ? AND deleted = 0")
+        .get(instrumentRef);
+      if (!instrumentExists) {
+        console.log(
+          `⚠️  Playlist ${p.playlist_id} references invalid instrument ${instrumentRef}, setting to null`
+        );
+        instrumentRef = null;
+      }
+    }
 
     return {
       playlist_id: p.playlist_id,
       user_ref: p.user_ref, // Integer ID preserved
-      instrument_ref: instrumentRef || null,
+      instrument_ref: instrumentRef,
       sr_alg_type: p.sr_alg_type || null,
       deleted: false,
       sync_version: 1,
@@ -621,12 +644,12 @@ async function migratePlaylistTunes() {
     console.log(
       `⚠️  Skipped ${
         playlistTunes.length - validPlaylistTunes.length
-      } playlist-tune relationships referencing deleted tunes`,
+      } playlist-tune relationships referencing deleted tunes`
     );
   }
 
   console.log(
-    `Found ${validPlaylistTunes.length} playlist-tune relationships\n`,
+    `Found ${validPlaylistTunes.length} playlist-tune relationships\n`
   );
 
   const supabasePlaylistTunes = validPlaylistTunes.map((pt: any) => ({
@@ -655,7 +678,7 @@ async function migratePlaylistTunes() {
       console.log(
         `✓ Migrated ${Math.min(i + BATCH_SIZE, supabasePlaylistTunes.length)}/${
           supabasePlaylistTunes.length
-        } relationships`,
+        } relationships`
       );
     }
   }
@@ -714,8 +737,8 @@ async function migratePracticeRecords() {
       console.log(
         `✓ Migrated ${Math.min(
           i + BATCH_SIZE,
-          supabasePracticeRecords.length,
-        )}/${supabasePracticeRecords.length} records`,
+          supabasePracticeRecords.length
+        )}/${supabasePracticeRecords.length} records`
       );
     }
   }
@@ -802,7 +825,7 @@ async function migrateReferences() {
       console.log(
         `✓ Migrated ${Math.min(i + BATCH_SIZE, supabaseReferences.length)}/${
           supabaseReferences.length
-        } references`,
+        } references`
       );
     }
   }
@@ -876,7 +899,7 @@ async function migratePreferences() {
       console.error("Error migrating SR prefs:", error);
     } else {
       console.log(
-        `✓ Migrated ${supabaseSRPrefs.length} spaced repetition preferences`,
+        `✓ Migrated ${supabaseSRPrefs.length} spaced repetition preferences`
       );
     }
   }
@@ -908,7 +931,7 @@ async function migratePreferences() {
       console.error("Error migrating scheduling prefs:", error);
     } else {
       console.log(
-        `✓ Migrated ${supabaseSchedPrefs.length} scheduling preferences`,
+        `✓ Migrated ${supabaseSchedPrefs.length} scheduling preferences`
       );
     }
   }
@@ -984,19 +1007,198 @@ async function migrateDailyPracticeQueue() {
       migrated += batch.length;
       console.log(
         `✓ Batch ${i / batchSize + 1}/${Math.ceil(
-          queueRecords.length / batchSize,
-        )}: Migrated ${batch.length} queue records`,
+          queueRecords.length / batchSize
+        )}: Migrated ${batch.length} queue records`
       );
     }
   }
 
   console.log(
-    `\n✅ Daily practice queue migration complete: ${migrated} migrated, ${errors} errors`,
+    `\n✅ Daily practice queue migration complete: ${migrated} migrated, ${errors} errors`
   );
 }
 
 // ============================================================================
-// Phase 13: Create Database Views
+// Phase 13: Migrate UI State Tables
+// ============================================================================
+
+async function migrateUIStateTables() {
+  console.log("\n📊 Phase 13: Migrating UI State Tables");
+  console.log(`=${"=".repeat(59)}`);
+
+  // Tab Group Main State
+  console.log("\nMigrating tab_group_main_state...");
+  const tabGroupStates = sqlite
+    .prepare("SELECT * FROM tab_group_main_state WHERE user_id != -1")
+    .all() as any[];
+  if (tabGroupStates.length > 0) {
+    // Filter out invalid user references (user_id=-1 or users that don't exist)
+    const validTabGroupStates = tabGroupStates.filter((state: any) => {
+      if (state.user_id <= 0) return false; // Skip user_id <= 0
+      const userExists = sqlite
+        .prepare("SELECT id FROM user WHERE id = ? AND deleted = 0")
+        .get(state.user_id);
+      return userExists !== undefined;
+    });
+
+    if (validTabGroupStates.length < tabGroupStates.length) {
+      console.log(
+        `⚠️  Skipped ${
+          tabGroupStates.length - validTabGroupStates.length
+        } tab group states with invalid user references`
+      );
+    }
+
+    const supabaseTabGroupStates = validTabGroupStates.map((state: any) => ({
+      id: state.id,
+      user_id: state.user_id,
+      which_tab: state.which_tab || "practice",
+      playlist_id: state.playlist_id || null,
+      tab_spec: state.tab_spec || null,
+      practice_show_submitted:
+        state.practice_show_submitted === 1 ||
+        state.practice_show_submitted === true
+          ? 1
+          : 0,
+      practice_mode_flashcard:
+        state.practice_mode_flashcard === 1 ||
+        state.practice_mode_flashcard === true
+          ? 1
+          : 0,
+      sync_version: 1,
+      last_modified_at: now(),
+      device_id: MIGRATION_DEVICE_ID,
+    }));
+
+    const { error } = await supabase
+      .from("tab_group_main_state")
+      .upsert(supabaseTabGroupStates, { onConflict: "id" });
+
+    if (error) {
+      console.error("Error migrating tab_group_main_state:", error);
+    } else {
+      console.log(
+        `✓ Migrated ${supabaseTabGroupStates.length} tab group states (${validTabGroupStates.length} valid of ${tabGroupStates.length} total)`
+      );
+    }
+  } else {
+    console.log("No tab group states to migrate");
+  }
+
+  // Table State
+  console.log("\nMigrating table_state...");
+  const tableStates = sqlite
+    .prepare("SELECT * FROM table_state")
+    .all() as any[];
+
+  if (tableStates.length > 0) {
+    // Filter out table_state records that reference deleted playlists or users
+    const validTableStates = tableStates.filter((state: any) => {
+      // Check if playlist exists and is not deleted
+      const playlistExists = sqlite
+        .prepare(
+          "SELECT playlist_id FROM playlist WHERE playlist_id = ? AND deleted = 0"
+        )
+        .get(state.playlist_id);
+
+      // Check if user exists and is not deleted
+      const userExists = sqlite
+        .prepare("SELECT id FROM user WHERE id = ? AND deleted = 0")
+        .get(state.user_id);
+
+      return playlistExists !== undefined && userExists !== undefined;
+    });
+
+    if (validTableStates.length < tableStates.length) {
+      console.log(
+        `⚠️  Skipped ${
+          tableStates.length - validTableStates.length
+        } table states with invalid playlist/user references`
+      );
+    }
+
+    const supabaseTableStates = validTableStates.map((state) => ({
+      user_id: state.user_id,
+      screen_size: state.screen_size,
+      purpose: state.purpose,
+      playlist_id: state.playlist_id,
+      settings: state.settings || null,
+      current_tune: state.current_tune || null,
+      sync_version: 1,
+      last_modified_at: now(),
+      device_id: MIGRATION_DEVICE_ID,
+    }));
+
+    const { error } = await supabase
+      .from("table_state")
+      .upsert(supabaseTableStates, {
+        onConflict: "user_id,screen_size,purpose,playlist_id",
+      });
+
+    if (error) {
+      console.error("Error migrating table_state:", error);
+    } else {
+      console.log(`✓ Migrated ${supabaseTableStates.length} table states`);
+    }
+  } else {
+    console.log("No table states to migrate");
+  }
+
+  // Table Transient Data (usually empty, but include for completeness)
+  console.log("\nMigrating table_transient_data...");
+  const tableTransientData = sqlite
+    .prepare("SELECT * FROM table_transient_data")
+    .all() as any[];
+
+  if (tableTransientData.length > 0) {
+    const supabaseTableTransientData = tableTransientData.map((data) => ({
+      user_id: data.user_id,
+      tune_id: data.tune_id,
+      playlist_id: data.playlist_id,
+      purpose: data.purpose || null,
+      note_private: data.note_private || null,
+      note_public: data.note_public || null,
+      recall_eval: data.recall_eval || null,
+      practiced: sqliteTimestampToPostgres(data.practiced),
+      quality: data.quality || null,
+      easiness: data.easiness || null,
+      difficulty: data.difficulty || null,
+      interval: data.interval || null,
+      step: data.step || null,
+      repetitions: data.repetitions || null,
+      due: sqliteTimestampToPostgres(data.due),
+      backup_practiced: sqliteTimestampToPostgres(data.backup_practiced),
+      goal: data.goal || null,
+      technique: data.technique || null,
+      stability: data.stability || null,
+      state: data.state || null,
+      sync_version: 1,
+      last_modified_at: now(),
+      device_id: MIGRATION_DEVICE_ID,
+    }));
+
+    const { error } = await supabase
+      .from("table_transient_data")
+      .upsert(supabaseTableTransientData, {
+        onConflict: "tune_id,user_id,playlist_id",
+      });
+
+    if (error) {
+      console.error("Error migrating table_transient_data:", error);
+    } else {
+      console.log(
+        `✓ Migrated ${supabaseTableTransientData.length} table transient data records`
+      );
+    }
+  } else {
+    console.log("No table transient data to migrate");
+  }
+
+  console.log("\n✅ UI state tables migration complete");
+}
+
+// ============================================================================
+// Phase 14: Create Database Views
 // ============================================================================
 
 /**
@@ -1016,22 +1218,22 @@ function convertSqliteToPostgres(sqliteSql: string): string {
       // Replace SQLite's subquery pattern for "latest record" with PostgreSQL's DISTINCT ON
       .replace(
         /INNER JOIN \(\s*SELECT\s+tune_ref,\s+playlist_ref,\s+MAX\(id\)\s+[aA][sS]\s+max_id\s+FROM\s+practice_record\s+GROUP BY\s+tune_ref,\s+playlist_ref\s*\)\s+latest\s+ON\s+pr\.tune_ref\s*=\s*latest\.tune_ref\s+AND\s+pr\.playlist_ref\s*=\s*latest\.playlist_ref\s+AND\s+pr\.id\s*=\s*latest\.max_id/gi,
-        "",
+        ""
       )
       // Clean up the practice_record subquery to use DISTINCT ON
       .replace(
         /\(\s*SELECT\s+pr\.\*\s+FROM\s+practice_record\s+pr\s+\)\s+pr\s+ON/gi,
-        "(SELECT DISTINCT ON (tune_ref, playlist_ref) pr.* FROM practice_record pr ORDER BY tune_ref, playlist_ref, id DESC) pr ON",
+        "(SELECT DISTINCT ON (tune_ref, playlist_ref) pr.* FROM practice_record pr ORDER BY tune_ref, playlist_ref, id DESC) pr ON"
       )
       .replace(
         /\(\s*SELECT\s+pr\.\*\s+FROM\s+practice_record\s+pr\s+\)\s+practice_record\s+ON/gi,
-        "(SELECT DISTINCT ON (tune_ref, playlist_ref) pr.* FROM practice_record pr ORDER BY tune_ref, playlist_ref, id DESC) practice_record ON",
+        "(SELECT DISTINCT ON (tune_ref, playlist_ref) pr.* FROM practice_record pr ORDER BY tune_ref, playlist_ref, id DESC) practice_record ON"
       )
   );
 }
 
 async function createViews() {
-  console.log("\n📊 Phase 13: Creating Database Views");
+  console.log("\n📊 Phase 14: Creating Database Views");
   console.log(`=${"=".repeat(59)}`);
 
   // Extract view definitions from SQLite
@@ -1043,7 +1245,7 @@ async function createViews() {
     WHERE type='view' 
     AND name IN ('view_playlist_joined', 'practice_list_joined', 'practice_list_staged')
     ORDER BY name
-  `,
+  `
     )
     .all() as { name: string; sql: string }[];
 
@@ -1054,7 +1256,7 @@ async function createViews() {
 
   console.log(`Found ${viewsQuery.length} views in SQLite`);
 
-  // Convert and create views using Supabase client
+  // Convert and create views using direct Postgres connection
   let created = 0;
   let errors = 0;
 
@@ -1063,36 +1265,11 @@ async function createViews() {
       // Convert SQLite SQL to PostgreSQL
       const postgresSql = convertSqliteToPostgres(view.sql);
 
-      // Drop view if exists (using Supabase client to execute raw SQL)
-      const dropSql = `DROP VIEW IF EXISTS ${view.name} CASCADE;`;
-
-      // Try to execute via RPC first (if available)
-      const { error: dropError } = await supabase.rpc("exec_sql", {
-        sql: dropSql,
-      });
-
-      // If RPC not available, try direct query
-      if (dropError) {
-        // Fallback: use postgres driver directly via Supabase
-        await supabase.from("_sql_exec").select().eq("sql", dropSql);
-      }
+      // Drop view if exists
+      await sql.unsafe(`DROP VIEW IF EXISTS ${view.name} CASCADE;`);
 
       // Create the view
-      const { error: createError } = await supabase.rpc("exec_sql", {
-        sql: postgresSql,
-      });
-
-      if (createError) {
-        // Try fallback method
-        const { error: fallbackError } = await supabase
-          .from("_sql_exec")
-          .select()
-          .eq("sql", postgresSql);
-
-        if (fallbackError) {
-          throw createError;
-        }
-      }
+      await sql.unsafe(postgresSql);
 
       console.log(`✓ Created view: ${view.name}`);
       created++;
@@ -1108,12 +1285,12 @@ async function createViews() {
 
   if (errors > 0) {
     console.log(
-      "\n⚠️  Some views could not be created automatically. Please run the SQL above in Supabase Studio SQL Editor.",
+      "\n⚠️  Some views could not be created automatically. Please run the SQL above in Supabase Studio SQL Editor."
     );
   }
 
   console.log(
-    `\n✅ Database views migration complete: ${created} created, ${errors} manual`,
+    `\n✅ Database views migration complete: ${created} created, ${errors} manual`
   );
 }
 
@@ -1139,6 +1316,9 @@ async function verifyMigration() {
     { sqlite: "note", supabase: "note" },
     { sqlite: "reference", supabase: "reference" },
     { sqlite: "tag", supabase: "tag" },
+    { sqlite: "tab_group_main_state", supabase: "tab_group_main_state" },
+    { sqlite: "table_state", supabase: "table_state" },
+    { sqlite: "table_transient_data", supabase: "table_transient_data" },
   ];
 
   console.log("\nRecord Counts:");
@@ -1181,8 +1361,8 @@ async function verifyMigration() {
 
     console.log(
       `${icon} ${sqliteTable.padEnd(20)} SQLite: ${String(
-        sqliteCount.count,
-      ).padStart(6)}  PostgreSQL: ${String(supabaseCount).padStart(6)}`,
+        sqliteCount.count
+      ).padStart(6)}  PostgreSQL: ${String(supabaseCount).padStart(6)}`
     );
   }
 
@@ -1193,17 +1373,17 @@ async function verifyMigration() {
   } else {
     console.log("\n⚠️  Some record counts don't match.");
     console.log(
-      "\n📋 Review the output above (scroll up in your terminal) to see which tables have mismatches.",
+      "\n📋 Review the output above (scroll up in your terminal) to see which tables have mismatches."
     );
     console.log("\nExpected differences:");
     console.log(
-      "  • instrument: SQLite may have deleted instruments (e.g., SQLite: 8, PostgreSQL: 7)",
+      "  • instrument: SQLite may have deleted instruments (e.g., SQLite: 8, PostgreSQL: 7)"
     );
     console.log(
-      "  • playlist_tune: Deleted tune references filtered out (e.g., SQLite: 544, PostgreSQL: 522)",
+      "  • playlist_tune: Deleted tune references filtered out (e.g., SQLite: 544, PostgreSQL: 522)"
     );
     console.log(
-      "\n💡 All other tables should match exactly since we cleared them before migration.",
+      "\n💡 All other tables should match exactly since we cleared them before migration."
     );
   }
 
@@ -1238,7 +1418,8 @@ async function main() {
     await migrateTags(); // Phase 10: Tags
     await migratePreferences(); // Phase 11: User preferences
     await migrateDailyPracticeQueue(); // Phase 12: Daily practice queue
-    await createViews(); // Phase 13: Create database views
+    await migrateUIStateTables(); // Phase 13: UI state tables (tab_group_main_state, table_state, table_transient_data)
+    await createViews(); // Phase 14: Create database views
 
     const allMatch = await verifyMigration();
 
@@ -1259,6 +1440,7 @@ async function main() {
     process.exit(1);
   } finally {
     sqlite.close();
+    await sql.end(); // Close Postgres connection pool
   }
 }
 

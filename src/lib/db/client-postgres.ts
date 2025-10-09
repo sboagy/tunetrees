@@ -9,31 +9,32 @@
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as relations from "../../../drizzle/relations";
-import * as schema from "../../../drizzle/schema-postgres";
+import * as relations from "../../../drizzle/migrations/postgres/relations";
+// Use the latest schema from drizzle-kit pull
+import * as schema from "../../../drizzle/migrations/postgres/schema";
 
 /**
  * PostgreSQL connection instance
  *
  * Configuration:
- * - Connection pooling enabled
- * - Max 10 connections (suitable for browser environment)
- * - Idle timeout: 30 seconds
+ * - max: 1 connection (browser environment, no connection pooling needed)
+ * - idle_timeout: 20 seconds (close idle connections quickly)
+ * - connect_timeout: 10 seconds (fail fast if Supabase unreachable)
  */
-const connectionString = import.meta.env.DATABASE_URL;
+const connectionString = import.meta.env.VITE_SUPABASE_DATABASE_URL;
 
 if (!connectionString) {
   throw new Error(
-    "DATABASE_URL environment variable is required. " +
-      "Please add it to your .env.local file.",
+    "VITE_SUPABASE_DATABASE_URL environment variable is required. " +
+      "Please add it to your .env file with your Supabase connection string."
   );
 }
 
 // Create PostgreSQL connection
 const client = postgres(connectionString, {
-  max: 10, // Max connections in pool
-  idle_timeout: 30, // Close idle connections after 30s
-  connect_timeout: 10, // Connection timeout in seconds
+  max: 1, // Single connection for browser
+  idle_timeout: 20,
+  connect_timeout: 10,
 });
 
 /**

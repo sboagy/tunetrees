@@ -35,8 +35,7 @@ export type SyncableTable =
   | "tag"
   | "practice_record"
   | "daily_practice_queue"
-  | "tune_override"
-  | "user_annotation_set";
+  | "tune_override";
 
 /**
  * Queue a change for sync

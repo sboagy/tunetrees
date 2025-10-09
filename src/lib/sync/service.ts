@@ -3,45 +3,105 @@
  *
  * Handles background synchronization between local SQLite and Supabase.
  * Implements:
- * - Push: Upload local changes to Supabase
- * - Pull: Download remote changes from Supabase
+ * - Push: Upload local changes to Supabase (via SyncEngine)
+ * - Pull: Download remote changes from Supabase (via SyncEngine)
+ * - Realtime: Live sync via Supabase Realtime subscriptions
  * - Conflict resolution: Last-write-wins with user override option
  *
  * @module lib/sync/service
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SqliteDatabase } from "../db/client-sqlite";
-import {
-  getPendingSyncItems,
-  markSynced,
-  type SyncableTable,
-  updateSyncStatus,
-} from "./queue";
+import { SyncEngine } from "./engine";
+import type { SyncableTable } from "./queue";
+import { type RealtimeConfig, RealtimeManager } from "./realtime";
 
 /**
- * Sync result
+ * Sync result (compatible with SyncEngine)
  */
 export interface SyncResult {
-  pushed: number;
-  pulled: number;
-  failed: number;
+  success: boolean;
+  itemsSynced: number;
+  itemsFailed: number;
+  conflicts: number;
   errors: string[];
+  timestamp: string;
+}
+
+/**
+ * Sync Service Configuration
+ */
+export interface SyncServiceConfig {
+  userId: number | null;
+  realtimeEnabled?: boolean;
+  syncIntervalMs?: number;
+  onSyncComplete?: (result: SyncResult) => void;
+  onRealtimeConnected?: () => void;
+  onRealtimeDisconnected?: () => void;
+  onRealtimeError?: (error: Error) => void;
 }
 
 /**
  * Sync Service
  *
  * Manages bidirectional sync between local SQLite and Supabase.
+ * Uses SyncEngine for push/pull and RealtimeManager for live updates.
  */
 export class SyncService {
   private db: SqliteDatabase;
-  private supabase: SupabaseClient;
+  private syncEngine: SyncEngine;
+  private realtimeManager: RealtimeManager | null = null;
+  private config: SyncServiceConfig;
   private isSyncing = false;
+  private syncIntervalId: number | null = null;
 
-  constructor(db: SqliteDatabase, supabase: SupabaseClient) {
+  constructor(db: SqliteDatabase, config: SyncServiceConfig) {
     this.db = db;
-    this.supabase = supabase;
+    this.config = config;
+
+    // Initialize sync engine
+    this.syncEngine = new SyncEngine(this.db, config.userId ?? 0, {
+      batchSize: 100,
+      maxRetries: 3,
+      timeoutMs: 30000,
+    });
+
+    // Initialize Realtime if enabled
+    if (config.realtimeEnabled && config.userId) {
+      this.initializeRealtime();
+    }
+  }
+
+  /**
+   * Initialize Supabase Realtime subscriptions
+   */
+  private initializeRealtime(): void {
+    const tables: SyncableTable[] = [
+      "tune",
+      "playlist",
+      "playlist_tune",
+      "note",
+      "reference",
+      "tag",
+      "practice_record",
+      "daily_practice_queue",
+      "tune_override",
+    ];
+
+    const realtimeConfig: RealtimeConfig = {
+      enabled: true,
+      tables,
+      userId: this.config.userId,
+      onConnected: this.config.onRealtimeConnected,
+      onDisconnected: this.config.onRealtimeDisconnected,
+      onError: this.config.onRealtimeError,
+      onSync: (tableName) => {
+        console.log(`[SyncService] Realtime sync completed for ${tableName}`);
+      },
+    };
+
+    this.realtimeManager = new RealtimeManager(this.syncEngine, realtimeConfig);
+    void this.realtimeManager.start();
   }
 
   /**
@@ -63,174 +123,152 @@ export class SyncService {
 
     this.isSyncing = true;
 
-    const result: SyncResult = {
-      pushed: 0,
-      pulled: 0,
-      failed: 0,
-      errors: [],
-    };
-
     try {
-      // Push local changes to Supabase
-      const pushResult = await this.pushChanges();
-      result.pushed = pushResult.success;
-      result.failed += pushResult.failed;
-      result.errors.push(...pushResult.errors);
+      // Use SyncEngine's bidirectional sync
+      const result = await this.syncEngine.sync();
 
-      // Pull remote changes from Supabase
-      // TODO: Implement pull logic in next iteration
-      // const pullResult = await this.pullChanges();
-      // result.pulled = pullResult.count;
+      // Notify callback
+      this.config.onSyncComplete?.(result);
 
       return result;
     } catch (error) {
       console.error("Sync error:", error);
-      result.errors.push(
-        error instanceof Error ? error.message : "Unknown sync error"
-      );
-      return result;
+      const errorResult: SyncResult = {
+        success: false,
+        itemsSynced: 0,
+        itemsFailed: 0,
+        conflicts: 0,
+        errors: [error instanceof Error ? error.message : "Unknown sync error"],
+        timestamp: new Date().toISOString(),
+      };
+      return errorResult;
     } finally {
       this.isSyncing = false;
     }
   }
 
   /**
-   * Push local changes to Supabase
-   *
-   * @returns Number of successfully pushed items
+   * Push local changes to Supabase only
    */
-  private async pushChanges(): Promise<{
-    success: number;
-    failed: number;
-    errors: string[];
-  }> {
-    const result = { success: 0, failed: 0, errors: [] as string[] };
-
-    // Get pending sync items
-    const items = await getPendingSyncItems(this.db);
-
-    if (items.length === 0) {
-      return result;
+  public async syncUp(): Promise<SyncResult> {
+    if (this.isSyncing) {
+      throw new Error("Sync already in progress");
     }
 
-    // Process each item
-    for (const item of items) {
-      try {
-        // Mark as syncing
-        await updateSyncStatus(this.db, item.id, "syncing");
+    this.isSyncing = true;
 
-        // Sync to Supabase based on operation
-        switch (item.operation) {
-          case "insert":
-          case "update":
-            await this.upsertToSupabase(
-              item.tableName as SyncableTable,
-              item.data ? JSON.parse(item.data) : {}
-            );
-            break;
-
-          case "delete":
-            await this.deleteFromSupabase(
-              item.tableName as SyncableTable,
-              item.recordId
-            );
-            break;
-
-          default:
-            throw new Error(`Unknown operation: ${item.operation}`);
-        }
-
-        // Mark as synced and remove from queue
-        await markSynced(this.db, item.id);
-        result.success++;
-      } catch (error) {
-        console.error(`Failed to sync item ${item.id}:`, error);
-        const errorMsg =
-          error instanceof Error ? error.message : "Unknown error";
-        result.errors.push(`Item ${item.id}: ${errorMsg}`);
-
-        // Mark as failed (with retry logic)
-        await updateSyncStatus(this.db, item.id, "failed", errorMsg);
-        result.failed++;
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Upsert record to Supabase
-   */
-  private async upsertToSupabase(
-    tableName: SyncableTable,
-    data: Record<string, unknown>
-  ): Promise<void> {
-    const { error } = await this.supabase.from(tableName).upsert(data);
-
-    if (error) {
-      throw new Error(`Supabase upsert error: ${error.message}`);
+    try {
+      return await this.syncEngine.syncUp();
+    } finally {
+      this.isSyncing = false;
     }
   }
 
   /**
-   * Delete record from Supabase (soft delete)
+   * Pull remote changes from Supabase only
    */
-  private async deleteFromSupabase(
-    tableName: SyncableTable,
-    recordId: string
-  ): Promise<void> {
-    // Soft delete: set deleted = true
-    const { error } = await this.supabase
-      .from(tableName)
-      .update({ deleted: true })
-      .eq("id", recordId);
+  public async syncDown(): Promise<SyncResult> {
+    if (this.isSyncing) {
+      throw new Error("Sync already in progress");
+    }
 
-    if (error) {
-      throw new Error(`Supabase delete error: ${error.message}`);
+    this.isSyncing = true;
+
+    try {
+      return await this.syncEngine.syncDown();
+    } finally {
+      this.isSyncing = false;
     }
   }
 
   /**
-   * Pull changes from Supabase
-   * TODO: Implement in next iteration
-   *
-   * Implementation plan:
-   * 1. Get last sync timestamp for each table
-   * 2. Query Supabase for changes since last sync
-   * 3. Apply changes to local SQLite
-   * 4. Handle conflicts (last-write-wins)
+   * Start automatic background sync
    */
-  // Commented out until implementation is complete
-  // private async pullChanges(): Promise<{ count: number }> {
-  //   return { count: 0 };
-  // }
+  public startAutoSync(): void {
+    if (this.syncIntervalId) {
+      console.warn("[SyncService] Auto sync already running");
+      return;
+    }
+
+    const intervalMs = this.config.syncIntervalMs ?? 30000; // Default 30s
+
+    // Initial sync
+    void this.sync();
+
+    // Periodic sync
+    this.syncIntervalId = window.setInterval(() => {
+      void this.sync();
+    }, intervalMs);
+
+    console.log(`[SyncService] Auto sync started (interval: ${intervalMs}ms)`);
+  }
+
+  /**
+   * Stop automatic background sync
+   */
+  public stopAutoSync(): void {
+    if (this.syncIntervalId) {
+      clearInterval(this.syncIntervalId);
+      this.syncIntervalId = null;
+      console.log("[SyncService] Auto sync stopped");
+    }
+  }
+
+  /**
+   * Start Realtime subscriptions
+   */
+  public async startRealtime(): Promise<void> {
+    if (!this.realtimeManager) {
+      this.initializeRealtime();
+    }
+    await this.realtimeManager?.start();
+  }
+
+  /**
+   * Stop Realtime subscriptions
+   */
+  public async stopRealtime(): Promise<void> {
+    await this.realtimeManager?.stop();
+  }
+
+  /**
+   * Get Realtime status
+   */
+  public getRealtimeStatus(): string {
+    return this.realtimeManager?.getStatus() ?? "disabled";
+  }
+
+  /**
+   * Cleanup resources
+   */
+  public async destroy(): Promise<void> {
+    this.stopAutoSync();
+    await this.stopRealtime();
+  }
 }
 
 /**
- * Start background sync worker
+ * Start background sync worker (deprecated - use SyncService directly)
  *
+ * @deprecated Use SyncService class with startAutoSync() instead
  * @param db - SQLite database instance
- * @param supabase - Supabase client
- * @param intervalMs - Sync interval in milliseconds (default: 30 seconds)
- * @returns Function to stop the worker
+ * @param config - Sync service configuration
+ * @returns SyncService instance with cleanup function
  */
 export function startSyncWorker(
   db: SqliteDatabase,
-  supabase: SupabaseClient,
-  intervalMs = 30000
-): () => void {
-  const syncService = new SyncService(db, supabase);
+  config: SyncServiceConfig
+): { service: SyncService; stop: () => void } {
+  const syncService = new SyncService(db, config);
 
-  // Initial sync
-  void syncService.sync();
+  // Start auto sync
+  syncService.startAutoSync();
 
-  // Periodic sync
-  const intervalId = setInterval(() => {
-    void syncService.sync();
-  }, intervalMs);
-
-  // Return cleanup function
-  return () => {
-    clearInterval(intervalId);
+  // Return service and cleanup function
+  return {
+    service: syncService,
+    stop: () => {
+      syncService.stopAutoSync();
+    },
   };
 }

@@ -23,9 +23,9 @@
  * This script was an attempt to automate step 3, but regex isn't the right tool.
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import { fileURLToPath } from "url";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -188,7 +188,7 @@ function convert(): void {
 
   // Write output
   fs.writeFileSync(OUTPUT_FILE, content, "utf-8");
-  console.log("\nWritten: " + OUTPUT_FILE);
+  console.log(`\nWritten: ${OUTPUT_FILE}`);
 
   console.log("\nConversion complete!");
   console.log("\nNext Steps:");

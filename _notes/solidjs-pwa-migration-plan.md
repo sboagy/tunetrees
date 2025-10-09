@@ -1,9 +1,9 @@
 # TuneTrees PWA Migration Plan
 
 **Created:** October 4, 2025  
-**Last Updated:** October 6, 2025  
-**Current Phase:** Phase 5 Complete → Phase 6 Next  
-**Overall Progress:** 50% Complete (5 of 10 phases done)
+**Last Updated:** October 8, 2025  
+**Current Phase:** Phase 8 (Remote DB Sync) - 80% Complete → Testing Next  
+**Overall Progress:** 75% Complete (Phases 0-7 done, Phase 8 in progress)
 
 ---
 
@@ -15,7 +15,15 @@ Rewrite TuneTrees from a **server-dependent Next.js/Python app** to a **fully of
 
 | Aspect             | Legacy                   | PWA                                             |
 | ------------------ | ------------------------ | ----------------------------------------------- |
-| **Backend**        | Python FastAPI + SQLite  | No backend (Supabase for sync only)             |
+| **Backend**     | 6: Advanced    | ✅ Partial  | 2-3 weeks | 1 task done (Oct 7)         |
+| 7: PWA Core    | ✅ Done    | 1 week    | 1 day (Oct 7)               |
+| 8: Remote Sync | 🚧 80% Done | 3-4 weeks | Oct 7-8 (testing remains)   |
+| 9: UI Polish   | 📋 Planned | 2-3 weeks | -                           |
+| 10: Testing    | 📋 Planned | 2-3 weeks | -                           |
+| 11: Deploy     | 📋 Planned | 1-2 weeks | -                           |
+
+**Total Estimated:** 5-6 months (part-time, solo developer)  
+**Progress:** ~75% (7 of 12 phases complete, Phase 8 nearly done)on FastAPI + SQLite  | No backend (Supabase for sync only)             |
 | **Frontend**       | Next.js (React)          | SolidJS                                         |
 | **Data**           | Server database          | SQLite WASM (browser) + Supabase (cloud backup) |
 | **Practice Logic** | Server-side              | Client-side (ts-fsrs library)                   |
@@ -50,7 +58,7 @@ Phase 11: Deployment        📋 Not Started
 ```
 
 **Current Phase:** Phase 8 (Remote DB Sync)  
-**Overall Progress:** ~58% (7 of 12 phases complete, 1 in progress)
+**Overall Progress:** ~75% (7 of 12 phases complete, Phase 8 at 80%)
 
 ---
 
@@ -608,41 +616,45 @@ User expressed concern: "I don't see the UI structure coming together." Needed v
 
 ## 🎯 Current Focus (Phase 8: Remote DB Sync)
 
-**🔴 CRITICAL BLOCKER:** No sync engine exists yet! App is currently offline-only.
+**Status:** � **80% COMPLETE** - Sync engine implemented, testing next!
 
-**This Week - Phase 8 Tasks:**
+**Completed This Week - Phase 8 Tasks:**
 
-1. **🔜 Clean up Supabase PostgreSQL schema** ← Next!
+1. **✅ Clean up Supabase PostgreSQL schema**
 
-   - Match Drizzle SQLite schema exactly
-   - Add sync metadata columns
-   - Set up Row Level Security policies
+   - Schema already matched Drizzle perfectly!
+   - All sync metadata columns present
+   - RLS policies configured (65 policies)
 
-2. **Data migration script**
+2. **✅ Data migration script**
 
-   - Transform legacy schema → new Drizzle structure
-   - Handle ID mapping (int → UUID)
-   - Validate data integrity
+   - Created `scripts/migrate-production-to-supabase.ts` (1470 lines)
+   - Handles all schema differences (boolean→int4, etc.)
+   - TRUNCATE-based cleanup for safe re-runs
+   - All 19 tables + 3 views migrated
 
-3. **Migrate test database**
+3. **✅ Migrate production database**
 
-   - `tunetrees_test_clean.sqlite3` → Supabase
-   - Create test users
-   - Verify all data migrated correctly
+   - `tunetrees_production_manual.sqlite3` → Supabase ✅
+   - 534 tunes, 23,896 practice records, 522 playlist-tune relationships
+   - All foreign key relationships intact
+   - Verification passed
 
-4. **Implement sync engine**
+4. **✅ Implement sync engine**
 
-   - Bidirectional sync (SQLite ↔ Supabase)
-   - Conflict resolution (last-write-wins)
-   - Change tracking and batch operations
-   - Error handling and retry logic
+   - `src/lib/sync/engine.ts` (500 lines) - syncUp/syncDown
+   - `src/lib/sync/conflicts.ts` (230 lines) - conflict resolution
+   - `src/lib/sync/realtime.ts` (250 lines) - Supabase Realtime
+   - Unit tests created (engine.test.ts, conflicts.test.ts)
+   - Background worker integration complete
 
-5. **Testing**
+5. **📋 Testing** ← NEXT!
    - Multi-device sync scenarios
    - Offline → Online sync
    - Conflict resolution edge cases
+   - Integration tests with real Supabase
 
-**Detailed Plan:** Will create `_notes/phase-8-remote-sync-plan.md`
+**Detailed Plan:** `_notes/phase-8-remote-sync-plan.md`
 
 ---
 

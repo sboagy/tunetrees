@@ -30,6 +30,25 @@
                 "reveal": "always",
                 "panel": "shared"
             }
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Run npm migrate:production",
+            "cwd": "/Users/sboag/gittt/tunetrees",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "migrate:production"
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "BROWSER": "none"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
         }
     ],
     "compounds": [
