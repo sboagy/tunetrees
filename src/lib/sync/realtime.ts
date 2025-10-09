@@ -19,6 +19,10 @@ import { supabase } from "@/lib/supabase/client";
 import type { SyncEngine } from "./engine";
 import type { SyncableTable } from "./queue";
 
+// Debug flag for realtime logging
+const REALTIME_DEBUG = import.meta.env.VITE_SYNC_DEBUG === 'true';
+const realtimeLog = (...args: any[]) => REALTIME_DEBUG && console.log(...args);
+
 export interface RealtimeConfig {
   enabled: boolean;
   tables: SyncableTable[];
@@ -88,7 +92,7 @@ export class RealtimeManager {
 
       this.state.status = "connected";
       this.config.onConnected?.();
-      console.log("[Realtime] All subscriptions active");
+      realtimeLog("[Realtime All subscriptions active");
     } catch (error) {
       this.state.status = "error";
       const err = error instanceof Error ? error : new Error(String(error));
@@ -102,7 +106,7 @@ export class RealtimeManager {
    * Stop all Realtime subscriptions
    */
   async stop(): Promise<void> {
-    console.log("[Realtime] Stopping all subscriptions");
+    realtimeLog("[Realtime Stopping all subscriptions");
 
     for (const [tableName, channel] of this.state.channels.entries()) {
       await supabase.removeChannel(channel);
@@ -260,7 +264,7 @@ export class RealtimeManager {
    * Manually reconnect (useful after network recovery)
    */
   async reconnect(): Promise<void> {
-    console.log("[Realtime] Reconnecting...");
+    realtimeLog("[Realtime Reconnecting...");
     await this.stop();
     await this.start();
   }

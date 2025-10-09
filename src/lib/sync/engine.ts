@@ -20,6 +20,10 @@ import {
   updateSyncStatus,
 } from "./queue";
 
+// Debug flag for sync logging (set VITE_SYNC_DEBUG=true in .env to enable)
+const SYNC_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
+const syncLog = (...args: any[]) => SYNC_DEBUG && console.log(...args);
+
 /**
  * Sync result for tracking what happened during sync
  */
@@ -102,14 +106,14 @@ export class SyncEngine {
 
     try {
       // Step 1: Push local changes to Supabase
-      console.log("[SyncEngine] Starting syncUp...");
+      syncLog("[SyncEngine] Starting syncUp...");
       const upResult = await this.syncUp();
       totalSynced += upResult.itemsSynced;
       totalFailed += upResult.itemsFailed;
       errors.push(...upResult.errors);
 
       // Step 2: Pull remote changes to local
-      console.log("[SyncEngine] Starting syncDown...");
+      syncLog("[SyncEngine] Starting syncDown...");
       const downResult = await this.syncDown();
       totalSynced += downResult.itemsSynced;
       totalConflicts += downResult.conflicts;
@@ -160,7 +164,7 @@ export class SyncEngine {
       );
 
       if (pendingItems.length === 0) {
-        console.log("[SyncEngine] No pending items to sync");
+        syncLog("[SyncEngine] No pending items to sync");
         return {
           success: true,
           itemsSynced: 0,
@@ -242,7 +246,7 @@ export class SyncEngine {
       // For now, we'll implement a simple full sync for user's data
       // TODO: Optimize with incremental sync using last_modified_at timestamps
 
-      console.log("[SyncEngine] Pulling changes from Supabase...");
+      syncLog("[SyncEngine] Pulling changes from Supabase...");
 
       // Sync each table (in dependency order to avoid FK violations)
       const tablesToSync: SyncableTable[] = [
@@ -377,7 +381,7 @@ export class SyncEngine {
    * @returns Number of records synced
    */
   private async syncTableDown(tableName: SyncableTable): Promise<number> {
-    console.log(`[SyncEngine] Syncing table: ${tableName}`);
+    syncLog(`[SyncEngine] Syncing table: ${tableName}`);
 
     const localTable = this.getLocalTable(tableName);
     if (!localTable) {
@@ -442,7 +446,7 @@ export class SyncEngine {
     }
 
     if (!remoteRecords || remoteRecords.length === 0) {
-      console.log(`[SyncEngine] No records found for table ${tableName}`);
+      syncLog(`[SyncEngine] No records found for table ${tableName}`);
       return 0;
     }
 
@@ -572,7 +576,7 @@ export class SyncEngine {
       }
     }
 
-    console.log(
+    syncLog(
       `[SyncEngine] Synced ${filteredRecords.length} records from ${tableName}`
     );
     return remoteRecords.length;

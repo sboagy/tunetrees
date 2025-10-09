@@ -34,7 +34,11 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { addTuneToPlaylist } from "../../lib/db/queries/playlists";
+import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import {
+  addTuneToPlaylist,
+  getPlaylistTunes,
+} from "../../lib/db/queries/playlists";
 import { deleteTune, getTunesForUser } from "../../lib/db/queries/tunes";
 import type { Tune } from "../../lib/db/types";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -47,6 +51,8 @@ interface TuneListProps {
   onTuneSelect?: (tune: Tune) => void;
   /** Show only user's private tunes */
   privateOnly?: boolean;
+  /** Filter by current playlist (default: false - shows all tunes) */
+  filterByPlaylist?: boolean;
 }
 
 /**
@@ -59,6 +65,7 @@ interface TuneListProps {
  */
 export const TuneList: Component<TuneListProps> = (props) => {
   const { user, localDb } = useAuth();
+  const { currentPlaylistId } = useCurrentPlaylist();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Helper to safely get string from searchParams
@@ -114,14 +121,38 @@ export const TuneList: Component<TuneListProps> = (props) => {
   });
 
   // Fetch all tunes from local database
+  // If filterByPlaylist=true and a playlist is selected, fetch only tunes in that playlist
+  // Otherwise, fetch all tunes for the user
   const [allTunes, { mutate: mutateAllTunes }] = createResource(
     () => {
       const userId = user()?.id;
       const db = localDb();
-      return userId && db ? { userId, db } : null;
+      const playlistId = props.filterByPlaylist ? currentPlaylistId() : null;
+      return userId && db ? { userId, db, playlistId } : null;
     },
     async (params) => {
       if (!params) return [];
+
+      // If filterByPlaylist is enabled and playlist is selected, get tunes from that playlist
+      if (params.playlistId) {
+        const playlistTunes = await getPlaylistTunes(
+          params.db,
+          params.playlistId,
+          params.userId
+        );
+        // Transform to Tune[] format by extracting the nested tune object
+        return playlistTunes.map((pt) => ({
+          ...pt.tune,
+          // Add the missing Tune fields with default values
+          deleted: 0,
+          syncVersion: 0,
+          lastModifiedAt: new Date().toISOString(),
+          deviceId: null,
+          privateFor: null,
+        }));
+      }
+
+      // Otherwise, get all user's tunes
       return await getTunesForUser(params.db, params.userId);
     }
   );

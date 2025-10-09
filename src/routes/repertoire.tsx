@@ -80,7 +80,7 @@ const RepertoirePage: Component = () => {
             </div>
           }
         >
-          <TuneList onTuneSelect={handleTuneSelect} />
+          <TuneList onTuneSelect={handleTuneSelect} filterByPlaylist={true} />
         </Show>
       </div>
     </div>

@@ -7,15 +7,24 @@
  * @module components/layout/TopNav
  */
 
-import { A } from "@solidjs/router";
+import { useNavigate } from "@solidjs/router";
 import {
   type Component,
   createEffect,
+  createMemo,
+  createResource,
   createSignal,
+  For,
   onCleanup,
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
+import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { getUserPlaylists } from "../../lib/db/queries/playlists";
+import {
+  getSelectedPlaylistId,
+  setSelectedPlaylistId,
+} from "../../lib/services/playlist-service";
 import { getSyncQueueStats } from "../../lib/sync/queue";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
@@ -24,12 +33,194 @@ import { ThemeSwitcher } from "./ThemeSwitcher";
  *
  * Features:
  * - App logo and branding
- * - User email display
+ * - Playlist selector dropdown
+ * - User menu dropdown
  * - Theme switcher
- * - Logout button
  * - Network/sync status indicator
  * - Responsive design
  */
+
+/**
+ * Playlist Dropdown Component
+ *
+ * Dropdown for selecting active playlist with "Manage Playlists..." option
+ */
+const PlaylistDropdown: Component = () => {
+  const navigate = useNavigate();
+  const { user, localDb } = useAuth();
+  const { currentPlaylistId, setCurrentPlaylistId } = useCurrentPlaylist();
+  const [showDropdown, setShowDropdown] = createSignal(false);
+
+  // Fetch user playlists
+  const [playlists] = createResource(async () => {
+    const db = localDb();
+    const userId = user()?.id;
+    if (!db || !userId) return [];
+    return await getUserPlaylists(db, userId);
+  });
+
+  // Load selected playlist from localStorage on mount
+  createEffect(() => {
+    const userId = user()?.id;
+    const playlistsList = playlists();
+    if (!userId || !playlistsList) return;
+
+    const storedId = getSelectedPlaylistId(userId);
+
+    if (storedId) {
+      setCurrentPlaylistId(storedId);
+    } else if (playlistsList.length > 0) {
+      // Default to first playlist
+      const firstId = playlistsList[0].playlistId;
+      setCurrentPlaylistId(firstId);
+      setSelectedPlaylistId(userId, firstId);
+    }
+  });
+
+  const handlePlaylistSelect = (playlistId: number) => {
+    const userId = user()?.id;
+    if (!userId) return;
+
+    setCurrentPlaylistId(playlistId);
+    setSelectedPlaylistId(userId, playlistId);
+    setShowDropdown(false);
+  };
+
+  const handleManagePlaylists = () => {
+    setShowDropdown(false);
+    navigate("/playlists");
+  };
+
+  const selectedPlaylist = createMemo(() => {
+    const id = currentPlaylistId();
+    const playlistsList = playlists();
+    if (!id || !playlistsList) return null;
+    return playlistsList.find((p) => p.playlistId === id);
+  });
+
+  return (
+    <div class="relative">
+      <button
+        type="button"
+        onClick={() => setShowDropdown(!showDropdown())}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+        aria-label="Select playlist"
+        aria-expanded={showDropdown()}
+      >
+        <span class="hidden md:inline font-medium">
+          {selectedPlaylist()?.name ||
+            `Playlist ${selectedPlaylist()?.playlistId || ""}`}
+        </span>
+        <span class="md:hidden">📋</span>
+        <svg
+          class="w-4 h-4 transition-transform"
+          classList={{ "rotate-180": showDropdown() }}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </button>
+
+      {/* Dropdown Menu */}
+      <Show when={showDropdown()}>
+        <div class="absolute left-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+          <div class="py-2">
+            {/* Playlists List */}
+            <Show
+              when={!playlists.loading && playlists()}
+              fallback={
+                <div class="px-4 py-2 text-sm text-gray-500">
+                  Loading playlists...
+                </div>
+              }
+            >
+              <For each={playlists()}>
+                {(playlist) => (
+                  <button
+                    type="button"
+                    class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between"
+                    classList={{
+                      "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300":
+                        currentPlaylistId() === playlist.playlistId,
+                    }}
+                    onClick={() => handlePlaylistSelect(playlist.playlistId)}
+                  >
+                    <div class="flex-1">
+                      <div class="font-medium">
+                        {playlist.name || `Playlist ${playlist.playlistId}`}
+                      </div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">
+                        {playlist.tuneCount} tune
+                        {playlist.tuneCount !== 1 ? "s" : ""}
+                        {playlist.genreDefault && ` • ${playlist.genreDefault}`}
+                      </div>
+                    </div>
+                    <Show when={currentPlaylistId() === playlist.playlistId}>
+                      <svg
+                        class="w-4 h-4 text-blue-600 dark:text-blue-400"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                    </Show>
+                  </button>
+                )}
+              </For>
+            </Show>
+
+            {/* Divider */}
+            <div class="border-t border-gray-200 dark:border-gray-700 my-2" />
+
+            {/* Manage Playlists */}
+            <button
+              type="button"
+              class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+              onClick={handleManagePlaylists}
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              Manage Playlists...
+            </button>
+          </div>
+        </div>
+      </Show>
+    </div>
+  );
+};
+
 export const TopNav: Component = () => {
   const { user, localDb, signOut } = useAuth();
   const [isOnline, setIsOnline] = createSignal(navigator.onLine);
@@ -113,23 +304,8 @@ export const TopNav: Component = () => {
               </span>
             </a>
 
-            {/* Navigation Links */}
-            <div class="hidden md:flex items-center gap-1">
-              <A
-                href="/playlists"
-                class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-                activeClass="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-              >
-                📋 Playlists
-              </A>
-              <A
-                href="/practice/history"
-                class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-                activeClass="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-              >
-                📊 History
-              </A>
-            </div>
+            {/* Playlist Selector */}
+            <PlaylistDropdown />
           </div>
 
           {/* User Info + Theme + Logout */}
