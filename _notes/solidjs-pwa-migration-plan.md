@@ -13,22 +13,30 @@ Rewrite TuneTrees from a **server-dependent Next.js/Python app** to a **fully of
 
 ### What's Changing
 
-| Aspect             | Legacy                   | PWA                                             |
-| ------------------ | ------------------------ | ----------------------------------------------- |
-| **Backend**     | 6: Advanced    | ✅ Partial  | 2-3 weeks | 1 task done (Oct 7)         |
+| Aspect         | Legacy      | PWA        |
+| -------------- | ----------- | ---------- | ------------------------- | ------------------- |
+| **Backend**    | 6: Advanced | ✅ Partial | 2-3 weeks                 | 1 task done (Oct 7) |
+| 7: PWA Core    | ✅ Don| 6: Advanced    | ✅ Partial  | 2-3 weeks | 1 task done (Oct 7)         |
 | 7: PWA Core    | ✅ Done    | 1 week    | 1 day (Oct 7)               |
 | 8: Remote Sync | 🚧 80% Done | 3-4 weeks | Oct 7-8 (testing remains)   |
 | 9: UI Polish   | 📋 Planned | 2-3 weeks | -                           |
-| 10: Testing    | 📋 Planned | 2-3 weeks | -                           |
+| 10: Testing    | 📋 Planned | 2-3 weeks | - (PG Docker CI ready)      |
 | 11: Deploy     | 📋 Planned | 1-2 weeks | -                           |
 
 **Total Estimated:** 5-6 months (part-time, solo developer)  
-**Progress:** ~75% (7 of 12 phases complete, Phase 8 nearly done)on FastAPI + SQLite  | No backend (Supabase for sync only)             |
-| **Frontend**       | Next.js (React)          | SolidJS                                         |
-| **Data**           | Server database          | SQLite WASM (browser) + Supabase (cloud backup) |
-| **Practice Logic** | Server-side              | Client-side (ts-fsrs library)                   |
-| **Offline**        | None (requires internet) | Full offline support                            |
-| **Deployment**     | Digital Ocean VPS        | Cloudflare Pages (static)                       |
+**Progress:** ~75% (7 of 12 phases complete, Phase 8 nearly done) week     | 1 day (Oct 7)             |
+| 8: Remote Sync | 🚧 80% Done | 3-4 weeks  | Oct 7-8 (testing remains) |
+| 9: UI Polish   | 📋 Planned  | 2-3 weeks  | -                         |
+| 10: Testing    | 📋 Planned  | 2-3 weeks  | -                         |
+| 11: Deploy     | 📋 Planned  | 1-2 weeks  | -                         |
+
+**Total Estimated:** 5-6 months (part-time, solo developer)  
+**Progress:** ~75% (7 of 12 phases complete, Phase 8 nearly done)on FastAPI + SQLite | No backend (Supabase for sync only) |
+| **Frontend** | Next.js (React) | SolidJS |
+| **Data** | Server database | SQLite WASM (browser) + Supabase (cloud backup) |
+| **Practice Logic** | Server-side | Client-side (ts-fsrs library) |
+| **Offline** | None (requires internet) | Full offline support |
+| **Deployment** | Digital Ocean VPS | Cloudflare Pages (static) |
 
 ### Why This Matters
 
@@ -582,16 +590,51 @@ User expressed concern: "I don't see the UI structure coming together." Needed v
 
 **Goal:** Ensure reliability and quality before production deployment
 
+**Status:** 📋 **PLANNED** - Two-tier testing strategy with PostgreSQL Docker for CI
+
+**Testing Strategy:**
+
+**Tier 1: Unit Tests (Fast)**
+- Vitest + Solid Testing Library
+- SQLite WASM (in-memory, no Docker)
+- Run on every commit (< 5 seconds)
+- Focus: Sync logic, FSRS algorithm, UI components
+
+**Tier 2: Integration Tests (Comprehensive)**
+- Playwright E2E tests
+- PostgreSQL Docker + SQLite WASM
+- Run on PR + main branch (2-5 minutes)
+- Focus: Full sync cycle, multi-device scenarios, conflict resolution
+
+**Why PostgreSQL Docker?**
+- ✅ No Supabase test instance needed (cost, cleanup, parallel test issues)
+- ✅ Tests real PostgreSQL features (DISTINCT ON, etc.)
+- ✅ GitHub Actions native Docker support
+- ✅ Reuses existing migration script for seeding
+- ✅ Easy cleanup (destroy container after tests)
+
 **Planned Testing:**
 
-- Unit tests (Vitest + Solid Testing Library)
-- E2E tests (Playwright - reuse existing patterns)
-- Offline mode testing
-- Sync conflict testing (NEW - critical for Phase 8)
-- Multi-device sync testing (NEW - critical for Phase 8)
-- Performance testing (60 FPS target)
-- Cross-browser testing (Chrome, Safari, Firefox, Edge)
-- Mobile responsiveness
+- Unit tests (sync queue, conflict detection, FSRS calculations)
+- E2E tests (Playwright with PostgreSQL Docker)
+- Offline mode testing (service worker simulation)
+- Sync conflict testing (last-write-wins verification)
+- Multi-device sync testing (simulated with multiple browser contexts)
+- Performance testing (60 FPS target, < 3s load time)
+- Cross-browser testing (Chrome in CI, Safari/Firefox/Edge manual)
+- Mobile responsiveness (Playwright device emulation)
+
+**Implementation Plan:**
+
+See detailed plan: **`_notes/phase-10-postgresql-docker-testing-plan.md`**
+
+**Key Tasks:**
+1. Create test seed script (reuse migration script)
+2. Add PostgreSQL service to GitHub Actions workflow
+3. Mock Supabase client for CI tests (skip Realtime)
+4. Create sync integration tests (multi-device, conflicts)
+5. Enhance unit tests for sync logic (100% coverage goal)
+6. Add local Docker testing script for developers
 
 **Why Before Deployment:** Need stable, tested sync before migrating users
 
