@@ -246,6 +246,19 @@ export class SyncEngine {
 
       // Sync each table (in dependency order to avoid FK violations)
       const tablesToSync: SyncableTable[] = [
+        // Reference data first (no dependencies, shared across users)
+        "genre",
+        "tune_type",
+        "genre_tune_type",
+        "instrument",
+
+        // User preferences
+        "prefs_scheduling_options",
+        "prefs_spaced_repetition",
+        "table_state",
+        "tab_group_main_state",
+
+        // User data (with dependencies)
         "playlist",
         "tune",
         "playlist_tune",
@@ -371,34 +384,55 @@ export class SyncEngine {
       throw new Error(`Local table not found: ${tableName}`);
     }
 
+    // Define reference data tables (shared across all users, no user_id filter)
+    const referenceDataTables: SyncableTable[] = [
+      "genre",
+      "tune_type",
+      "genre_tune_type",
+      "instrument",
+    ];
+
+    const isReferenceData = referenceDataTables.includes(tableName);
+
     // Build query based on table structure
     // NOTE: RLS policies should filter, but we add explicit filters for safety
     let query = this.supabase.from(tableName).select("*");
 
-    // Apply user filter based on table structure
-    switch (tableName) {
-      case "tune":
-        // tune uses private_for (NULL = public, integer = private to that user)
-        // Only sync tunes that are private to this user
-        query = query.eq("private_for", this.userId);
-        break;
+    // Skip user filtering for reference data (shared across all users)
+    if (!isReferenceData) {
+      // Apply user filter based on table structure
+      switch (tableName) {
+        case "tune":
+          // tune uses private_for (NULL = public, integer = private to that user)
+          // Only sync tunes that are private to this user
+          query = query.eq("private_for", this.userId);
+          break;
 
-      case "playlist_tune":
-        // playlist_tune links via playlist_ref
-        // We need to join with playlist table to filter by user
-        // For now, fetch all via RLS and filter client-side
-        // RLS policy should handle this via playlist ownership
-        break;
+        case "playlist_tune":
+          // playlist_tune links via playlist_ref
+          // We need to join with playlist table to filter by user
+          // For now, fetch all via RLS and filter client-side
+          // RLS policy should handle this via playlist ownership
+          break;
 
-      case "practice_record":
-        // practice_record links via playlist_ref
-        // RLS policy should handle this via playlist ownership
-        break;
+        case "practice_record":
+          // practice_record links via playlist_ref
+          // RLS policy should handle this via playlist ownership
+          break;
 
-      default:
-        // Most tables use user_ref column directly
-        query = query.eq("user_ref", this.userId);
-        break;
+        // User preference tables use user_id as primary key
+        case "prefs_scheduling_options":
+        case "prefs_spaced_repetition":
+        case "table_state":
+        case "tab_group_main_state":
+          query = query.eq("user_id", this.userId);
+          break;
+
+        default:
+          // Most tables use user_ref column directly
+          query = query.eq("user_ref", this.userId);
+          break;
+      }
     }
 
     const { data: remoteRecords, error } = await query;
@@ -415,21 +449,43 @@ export class SyncEngine {
     // Additional client-side filter for safety (in case RLS doesn't work as expected)
     let filteredRecords = remoteRecords;
 
-    // For tables with user_ref, double-check ownership
-    if (
-      tableName !== "tune" &&
-      tableName !== "playlist_tune" &&
-      tableName !== "practice_record"
-    ) {
-      filteredRecords = remoteRecords.filter((record) => {
-        if ("user_ref" in record && record.user_ref !== this.userId) {
-          console.warn(
-            `[SyncEngine] Filtered out record ${record.id} from ${tableName} (wrong user_ref: ${record.user_ref})`
-          );
-          return false;
-        }
-        return true;
-      });
+    // Skip filtering for reference data (no user ownership)
+    if (!isReferenceData) {
+      // User preference tables use user_id
+      const userPrefTables = [
+        "prefs_scheduling_options",
+        "prefs_spaced_repetition",
+        "table_state",
+        "tab_group_main_state",
+      ];
+
+      if (userPrefTables.includes(tableName)) {
+        filteredRecords = remoteRecords.filter((record) => {
+          if ("user_id" in record && record.user_id !== this.userId) {
+            console.warn(
+              `[SyncEngine] Filtered out record from ${tableName} (wrong user_id: ${record.user_id})`
+            );
+            return false;
+          }
+          return true;
+        });
+      }
+      // For tables with user_ref, double-check ownership
+      else if (
+        tableName !== "tune" &&
+        tableName !== "playlist_tune" &&
+        tableName !== "practice_record"
+      ) {
+        filteredRecords = remoteRecords.filter((record) => {
+          if ("user_ref" in record && record.user_ref !== this.userId) {
+            console.warn(
+              `[SyncEngine] Filtered out record ${record.id} from ${tableName} (wrong user_ref: ${record.user_ref})`
+            );
+            return false;
+          }
+          return true;
+        });
+      }
     }
 
     if (filteredRecords.length === 0) {
@@ -449,11 +505,49 @@ export class SyncEngine {
         let conflictTarget: any[];
 
         switch (tableName) {
+          // Reference data tables
+          case "genre":
+          case "tune_type":
+            // Use 'id' which is text primary key
+            conflictTarget = [localTable.id];
+            break;
+          case "genre_tune_type":
+            // Composite key: genreId + tuneTypeId
+            conflictTarget = [localTable.genreId, localTable.tuneTypeId];
+            break;
+          case "instrument":
+            // Use 'id' (integer primary key)
+            conflictTarget = [localTable.id];
+            break;
+
+          // User preferences (use userId as primary key)
+          case "prefs_scheduling_options":
+            conflictTarget = [localTable.userId];
+            break;
+          case "prefs_spaced_repetition":
+            // Composite key: userId + algType
+            conflictTarget = [localTable.userId, localTable.algType];
+            break;
+          case "table_state":
+            // Composite key: userId + screenSize + purpose + playlistId
+            conflictTarget = [
+              localTable.userId,
+              localTable.screenSize,
+              localTable.purpose,
+              localTable.playlistId,
+            ];
+            break;
+          case "tab_group_main_state":
+            // Uses auto-increment id as PK (not composite)
+            conflictTarget = [localTable.id];
+            break;
+
+          // User data tables
           case "playlist":
             conflictTarget = [localTable.playlistId];
             break;
           case "playlist_tune":
-            // Composite key: playlist_ref + tune_ref
+            // Composite key: playlistRef + tuneRef
             conflictTarget = [localTable.playlistRef, localTable.tuneRef];
             break;
           default:
@@ -492,6 +586,19 @@ export class SyncEngine {
    */
   private getLocalTable(tableName: SyncableTable): any {
     const tableMap: Record<SyncableTable, any> = {
+      // Reference data
+      genre: localSchema.genre,
+      tune_type: localSchema.tuneType,
+      genre_tune_type: localSchema.genreTuneType,
+      instrument: localSchema.instrument,
+
+      // User preferences
+      prefs_scheduling_options: localSchema.prefsSchedulingOptions,
+      prefs_spaced_repetition: localSchema.prefsSpacedRepetition,
+      table_state: localSchema.tableState,
+      tab_group_main_state: localSchema.tabGroupMainState,
+
+      // User data
       tune: localSchema.tune,
       playlist: localSchema.playlist,
       playlist_tune: localSchema.playlistTune,

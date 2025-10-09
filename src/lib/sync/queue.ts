@@ -27,6 +27,17 @@ export type SyncStatus = "pending" | "syncing" | "synced" | "failed";
  * Table names that can be synced
  */
 export type SyncableTable =
+  // Reference data (shared across users, read-only for non-admins)
+  | "genre"
+  | "tune_type"
+  | "genre_tune_type"
+  | "instrument"
+  // User preferences
+  | "prefs_scheduling_options"
+  | "prefs_spaced_repetition"
+  | "table_state"
+  | "tab_group_main_state"
+  // User data (existing)
   | "tune"
   | "playlist"
   | "playlist_tune"

@@ -142,11 +142,14 @@ export const ThemeSwitcher: Component = () => {
     <button
       type="button"
       onClick={cycleTheme}
-      class="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300"
-      title={`Theme: ${getLabel()} - Click to cycle`}
+      class="flex items-center justify-center w-9 h-9 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300 group relative"
+      aria-label={`Theme: ${getLabel()} - Click to cycle`}
     >
       {getIcon()}
-      <span class="text-sm font-medium">{getLabel()}</span>
+      {/* Tooltip */}
+      <span class="absolute bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+        {getLabel()}
+      </span>
     </button>
   );
 };

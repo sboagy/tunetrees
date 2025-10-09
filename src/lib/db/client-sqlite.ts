@@ -399,6 +399,20 @@ async function deleteFromIndexedDB(key: string): Promise<void> {
 }
 
 /**
+ * Get the raw SQLite WASM instance (for debugging/admin tools)
+ *
+ * @returns The sql.js Database instance or null if not initialized
+ * @example
+ * ```typescript
+ * const sqliteDb = await getSqliteInstance();
+ * const result = sqliteDb.exec("SELECT * FROM tune LIMIT 10;");
+ * ```
+ */
+export async function getSqliteInstance(): Promise<SqlJsDatabase | null> {
+  return sqliteDb;
+}
+
+/**
  * Export schema for convenient imports
  */
 export { schema, relations };

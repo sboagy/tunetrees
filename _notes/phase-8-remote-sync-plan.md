@@ -433,16 +433,19 @@ Implement bidirectional synchronization between local SQLite WASM (browser) and 
 **What Was Done:**
 
 1. **Fixed Field Name Transformation** ✅
+
    - Added snake_case ↔ camelCase conversion in `transformRemoteToLocal()` and `transformLocalToRemote()`
    - Supabase returns snake_case JSON keys, Drizzle expects camelCase properties
    - Fixed NULL constraint errors in daily_practice_queue sync
 
 2. **Fixed Async Effect Pattern** ✅
+
    - Wrapped async logic in IIFE with try-finally to ensure `setLoading(false)` always runs
    - Fixed race condition where database initialization could hang
    - Added guard to prevent double initialization
 
 3. **Fixed Primary Key Handling** ✅
+
    - Added table-specific primary key logic for `onConflictDoUpdate`
    - `playlist` uses `playlistId` (not `id`)
    - `playlist_tune` uses composite key `[playlistRef, tuneRef]`
@@ -462,6 +465,7 @@ Implement bidirectional synchronization between local SQLite WASM (browser) and 
    - Network status shows "Synced" in UI
 
 **Deferred for Phase 10:**
+
 - Comprehensive E2E testing (multi-device scenarios)
 - Conflict resolution testing
 - Performance testing with large datasets

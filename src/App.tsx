@@ -11,6 +11,7 @@ import { ProtectedRoute } from "./components/auth";
 import { MainLayout } from "./components/layout";
 import { AuthProvider } from "./lib/auth/AuthContext";
 import { CurrentTuneProvider } from "./lib/context/CurrentTuneContext";
+import DatabaseBrowser from "./routes/debug/db";
 import Home from "./routes/Home";
 import Login from "./routes/Login";
 import PlaylistsPage from "./routes/playlists";
@@ -56,6 +57,18 @@ function App() {
 
           {/* Main App - Home with MainLayout + tabs */}
           <Route path="/" component={Home} />
+
+          {/* Debug/Admin Routes */}
+          <Route
+            path="/debug/db"
+            component={() => (
+              <ProtectedRoute>
+                <MainLayout>
+                  <DatabaseBrowser />
+                </MainLayout>
+              </ProtectedRoute>
+            )}
+          />
 
           {/* Protected Sub-routes - Wrapped in MainLayout */}
           <Route

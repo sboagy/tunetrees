@@ -14,14 +14,14 @@ Rewrite TuneTrees from a **server-dependent Next.js/Python app** to a **fully of
 ### What's Changing
 
 | Aspect         | Legacy      | PWA         |
-| -------------- | ----------- | ----------- | ------------------------- | ------------------- | ------------------- |
-| **Backend**    | 6: Advanced | ✅ Partial  | 2-3 weeks                 | 1 task done (Oct 7) |
-| 7: PWA Core    | ✅ Don      | 6: Advanced | ✅ Partial                | 2-3 weeks           | 1 task done (Oct 7) |
-| 7: PWA Core    | ✅ Done     | 1 week      | 1 day (Oct 7)             |
-| 8: Remote Sync | ✅ Done     | 3-4 weeks   | Oct 7-9 (core complete)   |
-| 9: UI Polish   | � Started  | 2-3 weeks   | Oct 9+ (ad-hoc)           |
-| 10: Testing    | 📋 Planned  | 2-3 weeks   | - (PG Docker CI ready)    |
-| 11: Deploy     | 📋 Planned  | 1-2 weeks   | -                         |
+| -------------- | ----------- | ----------- | ----------------------- | ------------------- | ------------------- |
+| **Backend**    | 6: Advanced | ✅ Partial  | 2-3 weeks               | 1 task done (Oct 7) |
+| 7: PWA Core    | ✅ Don      | 6: Advanced | ✅ Partial              | 2-3 weeks           | 1 task done (Oct 7) |
+| 7: PWA Core    | ✅ Done     | 1 week      | 1 day (Oct 7)           |
+| 8: Remote Sync | ✅ Done     | 3-4 weeks   | Oct 7-9 (core complete) |
+| 9: UI Polish   | � Started   | 2-3 weeks   | Oct 9+ (ad-hoc)         |
+| 10: Testing    | 📋 Planned  | 2-3 weeks   | - (PG Docker CI ready)  |
+| 11: Deploy     | 📋 Planned  | 1-2 weeks   | -                       |
 
 **Total Estimated:** 5-6 months (part-time, solo developer)  
 **Progress:** ~80% (8 of 12 phases complete, Phase 9 starting) week | 1 day (Oct 7) |
