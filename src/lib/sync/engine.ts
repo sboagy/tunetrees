@@ -9,10 +9,8 @@
  * @module lib/sync/engine
  */
 
-import { eq } from "drizzle-orm";
-import * as remoteSchema from "../../../drizzle/migrations/postgres/schema";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import * as localSchema from "../../../drizzle/schema-sqlite";
-import { db as pgDb } from "../db/client-postgres";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type { SyncQueueItem } from "../db/types";
 import {
@@ -70,16 +68,19 @@ const DEFAULT_CONFIG: SyncConfig = {
  */
 export class SyncEngine {
   private localDb: SqliteDatabase;
+  private supabase: SupabaseClient;
   private userId: number;
   private config: SyncConfig;
   private lastSyncTimestamp: string | null = null;
 
   constructor(
     localDb: SqliteDatabase,
+    supabase: SupabaseClient,
     userId: number,
     config: Partial<SyncConfig> = {}
   ) {
     this.localDb = localDb;
+    this.supabase = supabase;
     this.userId = userId;
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -310,41 +311,46 @@ export class SyncEngine {
       `[SyncEngine] Processing ${operation} on ${tableName}:${recordId}`
     );
 
-    // Get the remote table reference
-    const remoteTable = this.getRemoteTable(tableName as SyncableTable);
-    if (!remoteTable) {
-      throw new Error(`Unknown table: ${tableName}`);
-    }
-
     // Parse data if present
     const recordData = data ? JSON.parse(data) : null;
 
     switch (operation) {
-      case "insert":
+      case "insert": {
         if (!recordData) {
           throw new Error("INSERT operation requires data");
         }
-        await pgDb.insert(remoteTable).values(recordData);
+        // Transform camelCase (local) → snake_case (Supabase)
+        const remoteData = this.transformLocalToRemote(recordData);
+        const { error } = await this.supabase
+          .from(tableName)
+          .insert(remoteData);
+        if (error) throw error;
         break;
+      }
 
-      case "update":
+      case "update": {
         if (!recordData) {
           throw new Error("UPDATE operation requires data");
         }
-        // Update using primary key (id for most tables)
-        await pgDb
-          .update(remoteTable)
-          .set(recordData)
-          .where(eq(remoteTable.id, Number(recordId)));
+        // Transform camelCase (local) → snake_case (Supabase)
+        const remoteData = this.transformLocalToRemote(recordData);
+        const { error } = await this.supabase
+          .from(tableName)
+          .update(remoteData)
+          .eq("id", Number(recordId));
+        if (error) throw error;
         break;
+      }
 
-      case "delete":
+      case "delete": {
         // Soft delete: set deleted flag
-        await pgDb
-          .update(remoteTable)
-          .set({ deleted: true })
-          .where(eq(remoteTable.id, Number(recordId)));
+        const { error } = await this.supabase
+          .from(tableName)
+          .update({ deleted: true })
+          .eq("id", Number(recordId));
+        if (error) throw error;
         break;
+      }
 
       default:
         throw new Error(`Unknown operation: ${operation}`);
@@ -360,38 +366,112 @@ export class SyncEngine {
   private async syncTableDown(tableName: SyncableTable): Promise<number> {
     console.log(`[SyncEngine] Syncing table: ${tableName}`);
 
-    const remoteTable = this.getRemoteTable(tableName);
     const localTable = this.getLocalTable(tableName);
-
-    if (!remoteTable || !localTable) {
-      throw new Error(`Table not found: ${tableName}`);
+    if (!localTable) {
+      throw new Error(`Local table not found: ${tableName}`);
     }
 
-    // Query remote records for this user
-    const remoteRecords = await pgDb
-      .select()
-      .from(remoteTable)
-      .where(eq(remoteTable.userRef, this.userId));
+    // Build query based on table structure
+    // NOTE: RLS policies should filter, but we add explicit filters for safety
+    let query = this.supabase.from(tableName).select("*");
 
-    if (remoteRecords.length === 0) {
+    // Apply user filter based on table structure
+    switch (tableName) {
+      case "tune":
+        // tune uses private_for (NULL = public, integer = private to that user)
+        // Only sync tunes that are private to this user
+        query = query.eq("private_for", this.userId);
+        break;
+
+      case "playlist_tune":
+        // playlist_tune links via playlist_ref
+        // We need to join with playlist table to filter by user
+        // For now, fetch all via RLS and filter client-side
+        // RLS policy should handle this via playlist ownership
+        break;
+
+      case "practice_record":
+        // practice_record links via playlist_ref
+        // RLS policy should handle this via playlist ownership
+        break;
+
+      default:
+        // Most tables use user_ref column directly
+        query = query.eq("user_ref", this.userId);
+        break;
+    }
+
+    const { data: remoteRecords, error } = await query;
+
+    if (error) {
+      throw new Error(`Failed to fetch ${tableName}: ${error.message}`);
+    }
+
+    if (!remoteRecords || remoteRecords.length === 0) {
       console.log(`[SyncEngine] No records found for table ${tableName}`);
+      return 0;
+    }
+
+    // Additional client-side filter for safety (in case RLS doesn't work as expected)
+    let filteredRecords = remoteRecords;
+
+    // For tables with user_ref, double-check ownership
+    if (
+      tableName !== "tune" &&
+      tableName !== "playlist_tune" &&
+      tableName !== "practice_record"
+    ) {
+      filteredRecords = remoteRecords.filter((record) => {
+        if ("user_ref" in record && record.user_ref !== this.userId) {
+          console.warn(
+            `[SyncEngine] Filtered out record ${record.id} from ${tableName} (wrong user_ref: ${record.user_ref})`
+          );
+          return false;
+        }
+        return true;
+      });
+    }
+
+    if (filteredRecords.length === 0) {
+      console.log(
+        `[SyncEngine] All records filtered out for table ${tableName}`
+      );
       return 0;
     }
 
     // Upsert into local database
     // SQLite upsert: INSERT OR REPLACE
-    for (const record of remoteRecords) {
+    for (const record of filteredRecords) {
       try {
+        const transformed = this.transformRemoteToLocal(record);
+
+        // Determine conflict target based on table structure
+        let conflictTarget: any[];
+
+        switch (tableName) {
+          case "playlist":
+            conflictTarget = [localTable.playlistId];
+            break;
+          case "playlist_tune":
+            // Composite key: playlist_ref + tune_ref
+            conflictTarget = [localTable.playlistRef, localTable.tuneRef];
+            break;
+          default:
+            // Most tables use 'id' as primary key
+            conflictTarget = [localTable.id];
+            break;
+        }
+
         await this.localDb
           .insert(localTable)
-          .values(this.transformRemoteToLocal(record))
+          .values(transformed)
           .onConflictDoUpdate({
-            target: [localTable.id],
-            set: this.transformRemoteToLocal(record),
+            target: conflictTarget,
+            set: transformed,
           });
       } catch (error) {
         console.error(
-          `[SyncEngine] Failed to upsert record ${record.id} in ${tableName}:`,
+          `[SyncEngine] Failed to upsert record in ${tableName}:`,
           error
         );
         throw error;
@@ -399,32 +479,9 @@ export class SyncEngine {
     }
 
     console.log(
-      `[SyncEngine] Synced ${remoteRecords.length} records from ${tableName}`
+      `[SyncEngine] Synced ${filteredRecords.length} records from ${tableName}`
     );
     return remoteRecords.length;
-  }
-
-  /**
-   * Get remote table reference by name
-   *
-   * @param tableName - Table name
-   * @returns Remote schema table or null
-   */
-  private getRemoteTable(tableName: SyncableTable): any {
-    const tableMap: Record<SyncableTable, any> = {
-      tune: remoteSchema.tune,
-      playlist: remoteSchema.playlist,
-      playlist_tune: remoteSchema.playlistTune,
-      note: remoteSchema.note,
-      reference: remoteSchema.reference,
-      tag: remoteSchema.tag,
-      practice_record: remoteSchema.practiceRecord,
-      daily_practice_queue: remoteSchema.dailyPracticeQueue,
-      tune_override: remoteSchema.tuneOverride,
-      // user_annotation_set: removed - not in schema
-    };
-
-    return tableMap[tableName] || null;
   }
 
   /**
@@ -452,27 +509,66 @@ export class SyncEngine {
   /**
    * Transform remote (PostgreSQL) record to local (SQLite) format
    *
-   * Handles type conversions:
-   * - timestamp (PostgreSQL) → text (SQLite ISO 8601)
-   * - boolean (PostgreSQL) → integer (SQLite 0/1)
-   * - uuid (PostgreSQL) → text (SQLite)
+   * Handles:
+   * 1. Field name conversion: snake_case (Supabase API) → camelCase (Drizzle)
+   * 2. Type conversions:
+   *    - timestamp (PostgreSQL) → text (SQLite ISO 8601)
+   *    - boolean (PostgreSQL) → integer (SQLite 0/1)
+   *    - uuid (PostgreSQL) → text (SQLite)
    *
-   * @param record - Remote record
-   * @returns Transformed record for local DB
+   * @param record - Remote record from Supabase (snake_case keys)
+   * @returns Transformed record for local DB (camelCase keys)
    */
   private transformRemoteToLocal(record: any): any {
-    const transformed = { ...record };
+    const transformed: any = {};
 
-    // Convert timestamps to ISO 8601 strings
-    for (const key of Object.keys(transformed)) {
-      const value = transformed[key];
+    // Convert snake_case to camelCase and apply type conversions
+    for (const [key, value] of Object.entries(record)) {
+      // Convert snake_case to camelCase
+      const camelKey = key.replace(/_([a-z])/g, (_, letter) =>
+        letter.toUpperCase()
+      );
 
+      // Apply type conversions
       if (value instanceof Date) {
-        transformed[key] = value.toISOString();
+        transformed[camelKey] = value.toISOString();
       } else if (typeof value === "boolean") {
-        // Convert boolean to integer (0/1)
-        transformed[key] = value ? 1 : 0;
+        transformed[camelKey] = value ? 1 : 0;
+      } else {
+        transformed[camelKey] = value;
       }
+    }
+
+    return transformed;
+  }
+
+  /**
+   * Transform local (SQLite) record to remote (PostgreSQL) format
+   *
+   * Handles:
+   * 1. Field name conversion: camelCase (Drizzle) → snake_case (Supabase API)
+   * 2. Type conversions:
+   *    - integer 0/1 (SQLite boolean) → boolean (PostgreSQL)
+   *
+   * @param record - Local record from SQLite (camelCase keys)
+   * @returns Transformed record for Supabase (snake_case keys)
+   */
+  private transformLocalToRemote(record: any): any {
+    const transformed: any = {};
+
+    // Convert camelCase to snake_case
+    for (const [key, value] of Object.entries(record)) {
+      // Convert camelCase to snake_case
+      const snakeKey = key.replace(
+        /[A-Z]/g,
+        (letter) => `_${letter.toLowerCase()}`
+      );
+
+      // Note: We don't convert booleans back here because:
+      // 1. SQLite stores booleans as integers (0/1)
+      // 2. Supabase/PostgreSQL accepts integers for boolean columns
+      // 3. The conversion happens automatically on the PostgreSQL side
+      transformed[snakeKey] = value;
     }
 
     return transformed;
@@ -497,14 +593,16 @@ export class SyncEngine {
  * Create a sync engine instance
  *
  * @param localDb - Local SQLite database
+ * @param supabase - Supabase client
  * @param userId - Current user ID
  * @param config - Optional sync configuration
  * @returns SyncEngine instance
  */
 export function createSyncEngine(
   localDb: SqliteDatabase,
+  supabase: SupabaseClient,
   userId: number,
   config?: Partial<SyncConfig>
 ): SyncEngine {
-  return new SyncEngine(localDb, userId, config);
+  return new SyncEngine(localDb, supabase, userId, config);
 }

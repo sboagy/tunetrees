@@ -25,7 +25,7 @@ import {
 } from "../db/client-sqlite";
 import { supabase } from "../supabase/client";
 
-// import { startSyncWorker } from "../sync"; // TODO: Re-enable when RLS policies are configured
+import { startSyncWorker } from "../sync";
 
 /**
  * Authentication state interface
@@ -103,10 +103,22 @@ export const AuthProvider: ParentComponent = (props) => {
   let stopSyncWorker: (() => void) | null = null;
   let autoPersistCleanup: (() => void) | null = null;
 
+  // Track if database is being initialized to prevent double initialization
+  let isInitializing = false;
+
   /**
    * Initialize local database for authenticated user
    */
   async function initializeLocalDatabase(userId: string) {
+    // Prevent double initialization
+    if (isInitializing || localDb()) {
+      console.log(
+        "⏭️  Skipping database initialization (already initialized or in progress)"
+      );
+      return;
+    }
+
+    isInitializing = true;
     try {
       console.log(`🔧 Initializing local database for user ${userId}...`);
 
@@ -116,14 +128,36 @@ export const AuthProvider: ParentComponent = (props) => {
       // Set up auto-persistence (store cleanup for later)
       autoPersistCleanup = setupAutoPersist();
 
-      // TODO: Start sync worker once RLS policies are configured in Supabase
-      // Currently disabled to prevent RLS policy violation errors
-      // stopSyncWorker = startSyncWorker(db, supabase, 30000);
-      console.log("⚠️  Sync worker disabled (RLS policies not configured)");
+      // Get user's integer ID from user_profile table (user_ref columns use integer IDs)
+      const { data: userProfile, error } = await supabase
+        .from("user_profile")
+        .select("id")
+        .eq("supabase_user_id", userId)
+        .single();
+
+      if (error || !userProfile) {
+        console.error("❌ Failed to get user profile:", error);
+        throw new Error("User profile not found in database");
+      }
+
+      const userIntId = userProfile.id;
+      console.log(`👤 User integer ID: ${userIntId} (UUID: ${userId})`);
+
+      // Start sync worker (now uses Supabase JS client, browser-compatible)
+      const syncWorker = startSyncWorker(db, {
+        supabase,
+        userId: userIntId,
+        realtimeEnabled: true,
+        syncIntervalMs: 30000, // Sync every 30 seconds
+      });
+      stopSyncWorker = syncWorker.stop;
+      console.log("🔄 Sync worker started");
 
       console.log("✅ Local database ready");
     } catch (error) {
       console.error("❌ Failed to initialize local database:", error);
+    } finally {
+      isInitializing = false;
     }
   }
 
@@ -156,19 +190,27 @@ export const AuthProvider: ParentComponent = (props) => {
   /**
    * Check for existing session on mount
    */
-  createEffect(async () => {
-    const {
-      data: { session: existingSession },
-    } = await supabase.auth.getSession();
+  createEffect(() => {
+    // Wrap async logic inside effect (SolidJS effects can't be async)
+    void (async () => {
+      try {
+        const {
+          data: { session: existingSession },
+        } = await supabase.auth.getSession();
 
-    setSession(existingSession);
-    setUser(existingSession?.user ?? null);
+        setSession(existingSession);
+        setUser(existingSession?.user ?? null);
 
-    if (existingSession?.user) {
-      await initializeLocalDatabase(existingSession.user.id);
-    }
-
-    setLoading(false);
+        if (existingSession?.user) {
+          await initializeLocalDatabase(existingSession.user.id);
+        }
+      } catch (error) {
+        console.error("❌ Error during session initialization:", error);
+      } finally {
+        // Always set loading to false, even if initialization fails
+        setLoading(false);
+      }
+    })();
   });
 
   /**
@@ -183,9 +225,9 @@ export const AuthProvider: ParentComponent = (props) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
-      if (event === "SIGNED_IN" && newSession?.user) {
-        await initializeLocalDatabase(newSession.user.id);
-      } else if (event === "SIGNED_OUT") {
+      // Only clear database on sign out
+      // Database initialization happens in the session check effect above
+      if (event === "SIGNED_OUT") {
         await clearLocalDatabase();
       }
     });

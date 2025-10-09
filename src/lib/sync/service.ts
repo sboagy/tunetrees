@@ -11,6 +11,7 @@
  * @module lib/sync/service
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { SyncEngine } from "./engine";
 import type { SyncableTable } from "./queue";
@@ -32,6 +33,7 @@ export interface SyncResult {
  * Sync Service Configuration
  */
 export interface SyncServiceConfig {
+  supabase: SupabaseClient;
   userId: number | null;
   realtimeEnabled?: boolean;
   syncIntervalMs?: number;
@@ -60,11 +62,16 @@ export class SyncService {
     this.config = config;
 
     // Initialize sync engine
-    this.syncEngine = new SyncEngine(this.db, config.userId ?? 0, {
-      batchSize: 100,
-      maxRetries: 3,
-      timeoutMs: 30000,
-    });
+    this.syncEngine = new SyncEngine(
+      this.db,
+      config.supabase,
+      config.userId ?? 0,
+      {
+        batchSize: 100,
+        maxRetries: 3,
+        timeoutMs: 30000,
+      }
+    );
 
     // Initialize Realtime if enabled
     if (config.realtimeEnabled && config.userId) {

@@ -79,7 +79,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
       },
       devOptions: {
-        enabled: true, // Enable PWA in development
+        enabled: false, // Disable PWA in development (causes caching issues)
         type: "module",
       },
     }),
