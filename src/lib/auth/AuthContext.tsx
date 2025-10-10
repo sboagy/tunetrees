@@ -144,10 +144,12 @@ export const AuthProvider: ParentComponent = (props) => {
       console.log(`👤 User integer ID: ${userIntId} (UUID: ${userId})`);
 
       // Start sync worker (now uses Supabase JS client, browser-compatible)
+      // Realtime is disabled by default to reduce console noise during development
+      // Set VITE_REALTIME_ENABLED=true in .env.local to enable live sync
       const syncWorker = startSyncWorker(db, {
         supabase,
         userId: userIntId,
-        realtimeEnabled: true,
+        realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
         syncIntervalMs: 30000, // Sync every 30 seconds
       });
       stopSyncWorker = syncWorker.stop;

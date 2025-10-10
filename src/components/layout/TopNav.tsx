@@ -225,8 +225,8 @@ export const TopNav: Component = () => {
   const { user, localDb, signOut } = useAuth();
   const [isOnline, setIsOnline] = createSignal(navigator.onLine);
   const [pendingCount, setPendingCount] = createSignal(0);
-  const [showDetails, setShowDetails] = createSignal(false);
   const [showUserMenu, setShowUserMenu] = createSignal(false);
+  const [showDbMenu, setShowDbMenu] = createSignal(false);
 
   // Monitor online/offline status
   createEffect(() => {
@@ -260,18 +260,6 @@ export const TopNav: Component = () => {
     const interval = setInterval(updateSyncCount, 5000);
     onCleanup(() => clearInterval(interval));
   });
-
-  const statusColor = () => {
-    if (!isOnline()) return "text-yellow-600 dark:text-yellow-400";
-    if (pendingCount() > 0) return "text-blue-600 dark:text-blue-400";
-    return "text-green-600 dark:text-green-400";
-  };
-
-  const statusIcon = () => {
-    if (!isOnline()) return "⚠️";
-    if (pendingCount() > 0) return "🔄";
-    return "✓";
-  };
 
   const statusText = () => {
     if (!isOnline() && pendingCount() > 0) {
@@ -310,59 +298,157 @@ export const TopNav: Component = () => {
 
           {/* User Info + Theme + Logout */}
           <div class="flex items-center gap-4">
-            {/* Network/Sync Status Indicator */}
+            {/* Database/Sync Status Dropdown */}
             <div class="relative">
               <button
                 type="button"
-                class={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${statusColor()} bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600`}
-                aria-label={`Network status: ${statusText()}`}
-                onMouseEnter={() => setShowDetails(true)}
-                onMouseLeave={() => setShowDetails(false)}
-                onFocus={() => setShowDetails(true)}
-                onBlur={() => setShowDetails(false)}
+                onClick={() => setShowDbMenu(!showDbMenu())}
+                onBlur={() => setTimeout(() => setShowDbMenu(false), 200)}
+                class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                aria-label="Database and sync status"
+                aria-expanded={showDbMenu()}
               >
-                <span class="text-sm">{statusIcon()}</span>
-                <span class="hidden sm:inline">{statusText()}</span>
+                {/* Database Icon */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <ellipse cx="12" cy="5" rx="9" ry="3" />
+                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                  <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
+                </svg>
+
+                {/* Status indicator badge */}
+                <Show
+                  when={isOnline() && pendingCount() === 0}
+                  fallback={
+                    <span class="text-yellow-500" title="Warning">
+                      ⚠️
+                    </span>
+                  }
+                >
+                  <span class="text-green-500" title="Synced">
+                    ✓
+                  </span>
+                </Show>
               </button>
 
-              {/* Tooltip on hover */}
-              <Show when={showDetails()}>
-                <div class="absolute right-0 top-full mt-2 w-56 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
-                  <div class="space-y-2 text-xs">
-                    <div class="flex items-center justify-between">
-                      <span class="text-gray-600 dark:text-gray-400">
-                        Connection:
-                      </span>
-                      <span
-                        class={`font-medium ${
-                          isOnline()
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-yellow-600 dark:text-yellow-400"
-                        }`}
-                      >
-                        {isOnline() ? "Online" : "Offline"}
-                      </span>
-                    </div>
-                    <Show when={pendingCount() > 0}>
-                      <div class="flex items-center justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">
-                          Pending:
-                        </span>
-                        <span class="font-medium text-blue-600 dark:text-blue-400">
-                          {pendingCount()} change
-                          {pendingCount() === 1 ? "" : "s"}
-                        </span>
+              {/* Dropdown Menu */}
+              <Show when={showDbMenu()}>
+                <div class="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                  <div class="py-2">
+                    {/* Database Status Section */}
+                    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                      <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+                        Database Status
+                      </h3>
+                      <div class="space-y-2">
+                        {/* Local DB Status */}
+                        <div class="flex items-start gap-2">
+                          <Show
+                            when={localDb()}
+                            fallback={
+                              <span class="text-yellow-500 text-sm">⏳</span>
+                            }
+                          >
+                            <span class="text-green-500 text-sm">✓</span>
+                          </Show>
+                          <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              Local Database
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                              {localDb()
+                                ? "Initialized and ready"
+                                : "Initializing..."}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Sync Status */}
+                        <div class="flex items-start gap-2">
+                          <Show
+                            when={isOnline() && pendingCount() === 0}
+                            fallback={
+                              <span class="text-yellow-500 text-sm">
+                                {isOnline() ? "🔄" : "⚠️"}
+                              </span>
+                            }
+                          >
+                            <span class="text-green-500 text-sm">✓</span>
+                          </Show>
+                          <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {statusText()}
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                              {!isOnline() &&
+                                "Changes will sync when reconnected"}
+                              {isOnline() &&
+                                pendingCount() === 0 &&
+                                "All changes synced to Supabase"}
+                              {isOnline() &&
+                                pendingCount() > 0 &&
+                                `${pendingCount()} change${
+                                  pendingCount() === 1 ? "" : "s"
+                                } syncing...`}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Connection Status */}
+                        <div class="flex items-start gap-2">
+                          <span
+                            class={`text-sm ${
+                              isOnline() ? "text-green-500" : "text-yellow-500"
+                            }`}
+                          >
+                            {isOnline() ? "🌐" : "📴"}
+                          </span>
+                          <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              Network
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                              {isOnline() ? "Online" : "Offline"}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </Show>
-                    <div class="pt-2 border-t border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
-                      {!isOnline() && "Changes will sync when reconnected"}
-                      {isOnline() &&
-                        pendingCount() === 0 &&
-                        "All changes synced"}
-                      {isOnline() &&
-                        pendingCount() > 0 &&
-                        "Syncing in background..."}
                     </div>
+
+                    {/* Database Browser (Dev Mode Only) */}
+                    <Show when={import.meta.env.DEV}>
+                      <a
+                        href="/debug/db"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                        onClick={() => setShowDbMenu(false)}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        Database Browser (Dev)
+                      </a>
+                    </Show>
                   </div>
                 </div>
               </Show>
@@ -402,16 +488,39 @@ export const TopNav: Component = () => {
 
                   {/* Dropdown Menu */}
                   <Show when={showUserMenu()}>
-                    <div class="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                    <div class="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
                       <div class="py-2">
-                        {/* User Name/Email Header */}
-                        <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                          <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {u().user_metadata?.name || "User"}
-                          </div>
-                          <div class="text-xs text-gray-500 dark:text-gray-400">
-                            {u().email}
-                          </div>
+                        {/* User Information */}
+                        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                          <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                            User Information
+                          </h3>
+                          <dl class="space-y-1.5 text-sm">
+                            <div class="flex gap-2">
+                              <dt class="font-medium text-gray-600 dark:text-gray-400">
+                                Email:
+                              </dt>
+                              <dd class="text-gray-900 dark:text-gray-100 break-all">
+                                {u().email}
+                              </dd>
+                            </div>
+                            <div class="flex gap-2">
+                              <dt class="font-medium text-gray-600 dark:text-gray-400">
+                                Name:
+                              </dt>
+                              <dd class="text-gray-900 dark:text-gray-100">
+                                {u().user_metadata?.name || "Not set"}
+                              </dd>
+                            </div>
+                            <div class="flex gap-2">
+                              <dt class="font-medium text-gray-600 dark:text-gray-400">
+                                User ID:
+                              </dt>
+                              <dd class="text-gray-700 dark:text-gray-300 font-mono text-xs break-all">
+                                {u().id}
+                              </dd>
+                            </div>
+                          </dl>
                         </div>
 
                         {/* Menu Items */}
@@ -477,37 +586,6 @@ export const TopNav: Component = () => {
                   </Show>
                 </div>
               )}
-            </Show>
-
-            {/* Debug Database Browser (Dev Mode Only) */}
-            <Show when={import.meta.env.DEV}>
-              <a
-                href="/debug/db"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="flex items-center justify-center w-9 h-9 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group relative"
-                aria-label="Open Database Browser"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="w-5 h-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <ellipse cx="12" cy="5" rx="9" ry="3" />
-                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                  <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
-                </svg>
-                {/* Tooltip */}
-                <span class="absolute bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  DB Browser
-                </span>
-              </a>
             </Show>
 
             <ThemeSwitcher />
