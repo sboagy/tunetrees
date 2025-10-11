@@ -82,7 +82,101 @@ frontend/app/(main)/pages/practice/components/TunesTable.tsx
 frontend/app/(main)/pages/practice/components/use-save-table-state.ts
 ```
 
-TunesGrid.tsx is the superclass for each of TunesGridScheduled, TunesGridRepertoire, and TunesGridCatalog. The table creation itself is done in TunesTable.tsx in the TunesTableComponent function around lines 496-530.
+This diagram shows the relationships of the main classes associated with the grids:
+
+```mermaid
+graph TB
+    %% Data Sources
+    PracticeQueue["`**Practice Queue**
+    • Snapshot scheduling
+    • Bucket classification`"]
+
+    PracticeStaged["`**practice_list_staged**
+    • Staging support
+    • Goal management`"]
+
+    TuneTable["`**tune table**
+    • All available tunes
+    • Catalog source`"]
+
+    %% Context Providers
+    ScheduledContext["`**useScheduledTunes**
+    • Queue entries & staging`"]
+
+    RepertoireContext["`**useRepertoireTunes**
+    • Repertoire list & stats`"]
+
+    CatalogContext["`**useCatalogTunes**
+    • Catalog & search`"]
+
+    %% Grid Components
+    GridScheduled["`**TunesGridScheduled**
+    Practice Tab`"]
+
+    GridRepertoire["`**TunesGridRepertoire**
+    Repertoire Tab`"]
+
+    GridCatalog["`**TunesGridCatalog**
+    Catalog Tab`"]
+
+    %% Core Shared Hook & Components
+    UseTunesTable["`**useTunesTable() Hook**
+    • Creates Tanstack instance
+    • Returns TunesGrid JSX
+    • State persistence`"]
+
+    TunesGrid["`**TunesGrid**
+    • Virtual scrolling
+    • Interactions`"]
+
+    TuneColumns["`**TuneColumns**
+    • Column definitions
+    • Cell renderers`"]
+
+    %% Features
+    TableState["`**Table State**
+    • Persisted config`"]
+
+    VirtualScroll["`**Virtual Scrolling**
+    • Performance`"]
+
+    DragDrop["`**Drag & Drop**
+    • Column reorder`"]
+
+    %% Connections
+    PracticeQueue --> ScheduledContext
+    PracticeStaged --> RepertoireContext
+    TuneTable --> CatalogContext
+
+    ScheduledContext --> GridScheduled
+    RepertoireContext --> GridRepertoire
+    CatalogContext --> GridCatalog
+
+    GridScheduled -.->|"calls"| UseTunesTable
+    GridRepertoire -.->|"calls"| UseTunesTable
+    GridCatalog -.->|"calls"| UseTunesTable
+
+    UseTunesTable -->|"returns"| TunesGrid
+    TunesGrid --> TuneColumns
+    TunesGrid --> TableState
+    TunesGrid --> VirtualScroll
+    TunesGrid --> DragDrop
+
+    %% Colors
+    classDef dataSource fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000
+    classDef contextProvider fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
+    classDef gridComponent fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px,color:#000
+    classDef coreComponent fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
+    classDef feature fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000
+
+    class PracticeQueue,PracticeStaged,TuneTable dataSource
+    class ScheduledContext,RepertoireContext,CatalogContext contextProvider
+    class GridScheduled,GridRepertoire,GridCatalog gridComponent
+    class UseTunesTable,TunesGrid,TuneColumns coreComponent
+    class TableState,VirtualScroll,DragDrop feature
+```
+
+The table creation itself is done in TunesTable.tsx in the TunesTableComponent function around lines 496-530.
 
 ### Architecture Flow
 
