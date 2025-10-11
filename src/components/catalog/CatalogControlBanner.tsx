@@ -1,49 +1,271 @@
 /**
- * Catalog Control Banner Component
+ * Catalog Toolbar Component
  *
- * Control banner for the Catalog tab with action buttons.
+ * Toolbar for the Catalog tab with complete controls.
+ * Layout matches design: Add To Repertoire | Filter textbox | Filters | Add Tune | Delete Tunes | Columns
  *
  * Features:
- * - Add Tune button
- * - Additional catalog controls (future expansion)
- * - Responsive design
+ * - Add To Repertoire button with icon
+ * - Responsive filter textbox (min-width 12ch)
+ * - Combined filter dropdown
+ * - Add Tune button with + icon
+ * - Delete Tunes button with trash icon
+ * - Columns dropdown
+ * - Tooltips for all controls
+ * - Responsive text labels
  *
- * @module components/catalog/CatalogControlBanner
+ * @module components/catalog/CatalogToolbar
  */
 
 import { useNavigate } from "@solidjs/router";
 import type { Component } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
+import type { PlaylistWithSummary } from "../../lib/db/types";
+import { CombinedFilterDropdown } from "./CombinedFilterDropdown";
 
-export const CatalogControlBanner: Component = () => {
+export interface CatalogToolbarProps {
+  /** Search query */
+  searchQuery: string;
+  /** Search change handler */
+  onSearchChange: (query: string) => void;
+  /** Selected types */
+  selectedTypes: string[];
+  /** Types change handler */
+  onTypesChange: (types: string[]) => void;
+  /** Selected modes */
+  selectedModes: string[];
+  /** Modes change handler */
+  onModesChange: (modes: string[]) => void;
+  /** Selected genres */
+  selectedGenres: string[];
+  /** Genres change handler */
+  onGenresChange: (genres: string[]) => void;
+  /** Selected playlist IDs */
+  selectedPlaylistIds: number[];
+  /** Playlist IDs change handler */
+  onPlaylistIdsChange: (playlistIds: number[]) => void;
+  /** Available types */
+  availableTypes: string[];
+  /** Available modes */
+  availableModes: string[];
+  /** Available genres */
+  availableGenres: string[];
+  /** Available playlists */
+  availablePlaylists: PlaylistWithSummary[];
+  /** Selected rows count for Delete button state */
+  selectedRowsCount?: number;
+}
+
+export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const navigate = useNavigate();
+  const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
+  let columnsDropdownRef: HTMLDivElement | undefined;
+
+  // Handle click outside to close columns dropdown
+  const handleClickOutside = (event: MouseEvent) => {
+    if (
+      columnsDropdownRef &&
+      !columnsDropdownRef.contains(event.target as Node)
+    ) {
+      setShowColumnsDropdown(false);
+    }
+  };
+
+  // Setup click outside listener
+  createEffect(() => {
+    if (showColumnsDropdown()) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  });
+
+  const handleAddToRepertoire = () => {
+    alert("Add To Repertoire - Not yet implemented");
+  };
 
   const handleAddTune = () => {
     navigate("/tunes/new");
   };
 
+  const handleDeleteTunes = () => {
+    alert("Delete Tunes - Not yet implemented");
+  };
+
+  const handleColumnsToggle = () => {
+    setShowColumnsDropdown(!showColumnsDropdown());
+  };
+
   return (
-    <div class="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-12">
-        {/* Left side - label */}
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-600 dark:text-gray-400 hidden sm:inline">
-            Catalog Controls
-          </span>
+    <div class="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-3">
+      <div class="flex items-center gap-3">
+        {/* Add To Repertoire button */}
+        <button
+          type="button"
+          onClick={handleAddToRepertoire}
+          title="Add selected tunes to repertoire"
+          class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors whitespace-nowrap"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+            />
+          </svg>
+          <span class="hidden lg:inline">Add To Repertoire</span>
+          <span class="lg:hidden hidden sm:inline">Add To Rep</span>
+        </button>
+
+        {/* Filter textbox - responsive width */}
+        <div class="relative flex-1 min-w-0">
+          <input
+            type="text"
+            value={props.searchQuery}
+            onInput={(e) => props.onSearchChange(e.currentTarget.value)}
+            placeholder="Filter"
+            title="Search/filter tunes by title, incipit, or structure"
+            class="w-full px-4 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[12ch]"
+            style="min-width: 12ch"
+          />
+          <svg
+            class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
         </div>
 
-        {/* Right side - action buttons */}
-        <div class="flex items-center gap-2">
+        {/* Combined filter dropdown */}
+        <CombinedFilterDropdown
+          availableTypes={props.availableTypes}
+          selectedTypes={props.selectedTypes}
+          onTypesChange={props.onTypesChange}
+          availableModes={props.availableModes}
+          selectedModes={props.selectedModes}
+          onModesChange={props.onModesChange}
+          availableGenres={props.availableGenres}
+          selectedGenres={props.selectedGenres}
+          onGenresChange={props.onGenresChange}
+          availablePlaylists={props.availablePlaylists}
+          selectedPlaylistIds={props.selectedPlaylistIds}
+          onPlaylistIdsChange={props.onPlaylistIdsChange}
+        />
+
+        {/* Add Tune button */}
+        <button
+          type="button"
+          onClick={handleAddTune}
+          title="Add a new tune"
+          class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors whitespace-nowrap"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          <span class="hidden lg:inline">Add Tune</span>
+          <span class="lg:hidden">Add</span>
+        </button>
+
+        {/* Delete Tunes button */}
+        <button
+          type="button"
+          onClick={handleDeleteTunes}
+          title="Delete selected tunes"
+          disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
+          class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors whitespace-nowrap"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H9a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+          <span class="hidden lg:inline">Delete Tunes</span>
+          <span class="lg:hidden">Delete</span>
+        </button>
+
+        {/* Columns dropdown */}
+        <div class="relative" ref={columnsDropdownRef!}>
           <button
             type="button"
-            onClick={handleAddTune}
-            class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
+            onClick={handleColumnsToggle}
+            title="Show/hide columns"
+            class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors whitespace-nowrap"
           >
-            <span>➕</span>
-            <span class="hidden sm:inline">Add Tune</span>
-            <span class="sm:hidden">Add</span>
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+              />
+            </svg>
+            <span class="hidden lg:inline">Columns</span>
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
           </button>
 
-          {/* Future: Add more control buttons here (Import, Export, etc.) */}
+          {/* Columns dropdown menu */}
+          {showColumnsDropdown() && (
+            <div class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
+              <div class="p-2 text-sm text-gray-500 dark:text-gray-400">
+                Column visibility controls - Not yet implemented
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

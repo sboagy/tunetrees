@@ -4,4 +4,7 @@
  * @module components/catalog
  */
 
-export { CatalogControlBanner } from "./CatalogControlBanner";
+export { CatalogToolbar } from "./CatalogToolbar";
+export { CombinedFilterDropdown } from "./CombinedFilterDropdown";
+export { CompactFilterDropdown } from "./CompactFilterDropdown";
+export { FilterPanel } from "./FilterPanel";
