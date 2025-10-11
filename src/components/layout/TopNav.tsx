@@ -21,12 +21,25 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { getUserPlaylists } from "../../lib/db/queries/playlists";
+import type { PlaylistWithSummary } from "../../lib/db/types";
 import {
   getSelectedPlaylistId,
   setSelectedPlaylistId,
 } from "../../lib/services/playlist-service";
 import { getSyncQueueStats } from "../../lib/sync/queue";
 import { ThemeSwitcher } from "./ThemeSwitcher";
+
+// Helper function to get display name for a playlist
+const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
+  // If name exists and is not empty, use it
+  if (playlist.name?.trim()) {
+    return playlist.name.trim();
+  }
+
+  // Otherwise use instrument + id format
+  const instrument = playlist.instrumentName || "Unknown";
+  return `${instrument} (${playlist.playlistId})`;
+};
 
 /**
  * Top Navigation Component
@@ -47,16 +60,59 @@ import { ThemeSwitcher } from "./ThemeSwitcher";
  */
 const PlaylistDropdown: Component = () => {
   const navigate = useNavigate();
-  const { user, localDb } = useAuth();
+  const { user, localDb, syncVersion } = useAuth();
   const { currentPlaylistId, setCurrentPlaylistId } = useCurrentPlaylist();
   const [showDropdown, setShowDropdown] = createSignal(false);
 
   // Fetch user playlists
-  const [playlists] = createResource(async () => {
-    const db = localDb();
-    const userId = user()?.id;
-    if (!db || !userId) return [];
-    return await getUserPlaylists(db, userId);
+  const [playlists] = createResource(
+    () => {
+      const db = localDb();
+      const userId = user()?.id;
+      const version = syncVersion(); // Triggers refetch when sync completes
+      console.log("🔍 TOPNAV playlists dependency function called:", {
+        hasDb: !!db,
+        userId,
+        syncVersion: version,
+        timestamp: new Date().toISOString(),
+      });
+      return db && userId ? { db, userId, version } : null;
+    },
+    async (params) => {
+      console.log("🔍 TOPNAV playlists fetcher called:", {
+        hasParams: !!params,
+        syncVersion: params?.version,
+        timestamp: new Date().toISOString(),
+      });
+      if (!params) return [];
+
+      try {
+        const result = await getUserPlaylists(params.db, params.userId);
+        console.log(
+          "🔍 TOPNAV playlists fetcher result:",
+          result.length,
+          "playlists:",
+          result.map((p) => ({ id: p.playlistId, name: p.name }))
+        );
+        return result;
+      } catch (error) {
+        console.error("🔍 TOPNAV playlists fetcher ERROR:", error);
+        return [];
+      }
+    }
+  );
+
+  // Additional debug effect to track playlists changes
+  createEffect(() => {
+    const playlistsList = playlists();
+    const loading = playlists.loading;
+    console.log("🔍 TOPNAV playlists effect - playlists changed:", {
+      loading,
+      playlistsLength: playlistsList?.length || 0,
+      playlists:
+        playlistsList?.map((p) => ({ id: p.playlistId, name: p.name })) || [],
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // Load selected playlist from localStorage on mount
@@ -109,8 +165,9 @@ const PlaylistDropdown: Component = () => {
         aria-expanded={showDropdown()}
       >
         <span class="hidden md:inline font-medium">
-          {selectedPlaylist()?.name ||
-            `Playlist ${selectedPlaylist()?.playlistId || ""}`}
+          {selectedPlaylist()
+            ? getPlaylistDisplayName(selectedPlaylist()!)
+            : "No Playlist"}
         </span>
         <span class="md:hidden">📋</span>
         <svg
@@ -156,7 +213,7 @@ const PlaylistDropdown: Component = () => {
                   >
                     <div class="flex-1">
                       <div class="font-medium">
-                        {playlist.name || `Playlist ${playlist.playlistId}`}
+                        {getPlaylistDisplayName(playlist)}
                       </div>
                       <div class="text-xs text-gray-500 dark:text-gray-400">
                         {playlist.tuneCount} tune
