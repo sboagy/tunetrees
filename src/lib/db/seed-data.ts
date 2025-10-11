@@ -14,6 +14,7 @@ import type { Database as SqlJsDatabase } from "sql.js";
  *
  * Creates:
  * - Test user
+ * - Sample genres and tune types (reference data)
  * - Sample tunes
  * - Test playlist
  * - Playlist-tune relationships
@@ -25,6 +26,9 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
 
   try {
     const now = new Date().toISOString();
+
+    // Seed reference data first
+    seedReferenceData(db);
 
     // Create user_profile entry
     // Note: We need to insert and get the auto-generated ID
@@ -83,6 +87,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
         mode: "Dmixolydian",
         structure: "AABB",
         incipit: "D2E FGA | B2A AFD",
+        genre: "irish", // Use genre ID, not name
       },
       {
         id: 2,
@@ -91,6 +96,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
         mode: "Gmajor",
         structure: "AABB",
         incipit: "G3 GAB | d2d dBd",
+        genre: "irish",
       },
       {
         id: 3,
@@ -99,6 +105,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
         mode: "Dmajor",
         structure: "AABB",
         incipit: "A2d d2e | f2e dcA",
+        genre: "irish",
       },
       {
         id: 4,
@@ -107,6 +114,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
         mode: "Dmajor",
         structure: "AABB",
         incipit: "D2F AFA | d2e fed",
+        genre: "scottish",
       },
       {
         id: 5,
@@ -115,6 +123,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
         mode: "Eminor",
         structure: "AABB",
         incipit: "E2B B2A | B2c d2B",
+        genre: "irish",
       },
     ];
 
@@ -133,7 +142,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
           sync_version,
           last_modified_at
         ) 
-        VALUES (?, ?, ?, ?, ?, ?, 'Irish Traditional', 0, 1, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, ?)
       `,
         [
           tune.id,
@@ -142,6 +151,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
           tune.mode,
           tune.structure,
           tune.incipit,
+          tune.genre, // Now using genre ID
           now,
         ]
       );
@@ -167,4 +177,51 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
     console.error("❌ Failed to seed database:", error);
     throw error;
   }
+}
+
+/**
+ * Seed reference data (genres, tune types, etc.)
+ * This provides the lookup tables that tunes reference
+ */
+function seedReferenceData(db: SqlJsDatabase): void {
+  console.log("🌱 Seeding reference data...");
+
+  // Seed genres
+  const genres = [
+    { id: "irish", name: "Irish Traditional" },
+    { id: "scottish", name: "Scottish Traditional" },
+    { id: "bluegrass", name: "Bluegrass" },
+    { id: "old-time", name: "Old Time" },
+    { id: "french", name: "French/Quebecois" },
+  ];
+
+  for (const genre of genres) {
+    db.run(`INSERT OR IGNORE INTO genre (id, name) VALUES (?, ?)`, [
+      genre.id,
+      genre.name,
+    ]);
+  }
+
+  // Seed tune types
+  const tuneTypes = [
+    { id: "jig", name: "Jig" },
+    { id: "reel", name: "Reel" },
+    { id: "hornpipe", name: "Hornpipe" },
+    { id: "strathspey", name: "Strathspey" },
+    { id: "march", name: "March" },
+    { id: "waltz", name: "Waltz" },
+    { id: "polka", name: "Polka" },
+    { id: "air", name: "Air" },
+  ];
+
+  for (const tuneType of tuneTypes) {
+    db.run(`INSERT OR IGNORE INTO tune_type (id, name) VALUES (?, ?)`, [
+      tuneType.id,
+      tuneType.name,
+    ]);
+  }
+
+  console.log(
+    `✅ Seeded ${genres.length} genres and ${tuneTypes.length} tune types`
+  );
 }

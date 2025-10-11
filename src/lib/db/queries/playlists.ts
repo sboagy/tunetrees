@@ -19,7 +19,13 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import type { SqliteDatabase } from "../client-sqlite";
-import { playlist, playlistTune, tune, userProfile } from "../schema";
+import {
+  instrument,
+  playlist,
+  playlistTune,
+  tune,
+  userProfile,
+} from "../schema";
 import type {
   NewPlaylist,
   NewPlaylistTune,
@@ -69,13 +75,14 @@ export async function getUserPlaylists(
     conditions.push(eq(playlist.deleted, 0));
   }
 
-  // Get playlists with tune count
+  // Get playlists with tune count and instrument names
   const playlists = await db
     .select({
       playlistId: playlist.playlistId,
       userRef: playlist.userRef,
       name: playlist.name,
       instrumentRef: playlist.instrumentRef,
+      instrumentName: instrument.instrument,
       genreDefault: playlist.genreDefault,
       srAlgType: playlist.srAlgType,
       deleted: playlist.deleted,
@@ -90,12 +97,14 @@ export async function getUserPlaylists(
       )`,
     })
     .from(playlist)
+    .leftJoin(instrument, eq(playlist.instrumentRef, instrument.id))
     .where(and(...conditions))
     .orderBy(playlist.lastModifiedAt);
 
   return playlists.map((p) => ({
     ...p,
     tuneCount: Number(p.tuneCount) || 0,
+    instrumentName: p.instrumentName || undefined, // Convert null to undefined
   }));
 }
 

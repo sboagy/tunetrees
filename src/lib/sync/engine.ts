@@ -256,6 +256,9 @@ export class SyncEngine {
         "genre_tune_type",
         "instrument",
 
+        // User profiles (critical for FK relationships)
+        "user_profile",
+
         // User preferences
         "prefs_scheduling_options",
         "prefs_spaced_repetition",
@@ -407,9 +410,18 @@ export class SyncEngine {
       // Apply user filter based on table structure
       switch (tableName) {
         case "tune":
-          // tune uses private_for (NULL = public, integer = private to that user)
-          // Only sync tunes that are private to this user
-          query = query.eq("private_for", this.userId);
+          // For catalog, sync ALL tunes (public + private to this user)
+          // NULL = public (available to all), user_id = private to that user
+          console.log(
+            `[SyncEngine] Syncing ALL tunes (public + private for user ${this.userId})`
+          );
+          query = query.or(`private_for.is.null,private_for.eq.${this.userId}`);
+          break;
+
+        case "user_profile":
+          // For user_profile, only sync the current user's profile
+          // Note: this.userId is the integer ID, but we need to get the supabase_user_id
+          // For now, let RLS handle this (user can only see their own profile)
           break;
 
         case "playlist_tune":
@@ -524,6 +536,12 @@ export class SyncEngine {
             conflictTarget = [localTable.id];
             break;
 
+          // User profiles
+          case "user_profile":
+            // Use 'id' (integer primary key)
+            conflictTarget = [localTable.id];
+            break;
+
           // User preferences (use userId as primary key)
           case "prefs_scheduling_options":
             conflictTarget = [localTable.userId];
@@ -595,6 +613,9 @@ export class SyncEngine {
       tune_type: localSchema.tuneType,
       genre_tune_type: localSchema.genreTuneType,
       instrument: localSchema.instrument,
+
+      // User profiles
+      user_profile: localSchema.userProfile,
 
       // User preferences
       prefs_scheduling_options: localSchema.prefsSchedulingOptions,

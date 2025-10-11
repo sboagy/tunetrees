@@ -43,6 +43,9 @@ interface AuthState {
   /** Local SQLite database instance (null if not initialized) */
   localDb: Accessor<SqliteDatabase | null>;
 
+  /** Sync version - increments when sync completes (triggers UI updates) */
+  syncVersion: Accessor<number>;
+
   /** Sign in with email and password */
   signIn: (
     email: string,
@@ -98,6 +101,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const [session, setSession] = createSignal<Session | null>(null);
   const [loading, setLoading] = createSignal(true);
   const [localDb, setLocalDb] = createSignal<SqliteDatabase | null>(null);
+  const [syncVersion, setSyncVersion] = createSignal(0);
 
   // Sync worker cleanup function
   let stopSyncWorker: (() => void) | null = null;
@@ -122,7 +126,7 @@ export const AuthProvider: ParentComponent = (props) => {
     try {
       console.log(`🔧 Initializing local database for user ${userId}...`);
 
-      const db = await initializeSqliteDb(userId);
+      const db = await initializeSqliteDb();
       setLocalDb(db);
 
       // Set up auto-persistence (store cleanup for later)
@@ -151,6 +155,14 @@ export const AuthProvider: ParentComponent = (props) => {
         userId: userIntId,
         realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
         syncIntervalMs: 30000, // Sync every 30 seconds
+        onSyncComplete: () => {
+          console.log("🔄 Sync completed, incrementing sync version");
+          setSyncVersion((prev) => {
+            const newVersion = prev + 1;
+            console.log(`🔄 Sync version changed: ${prev} -> ${newVersion}`);
+            return newVersion;
+          });
+        },
       });
       stopSyncWorker = syncWorker.stop;
       console.log("🔄 Sync worker started");
@@ -300,6 +312,7 @@ export const AuthProvider: ParentComponent = (props) => {
     session,
     loading,
     localDb,
+    syncVersion,
     signIn,
     signUp,
     signInWithOAuth,

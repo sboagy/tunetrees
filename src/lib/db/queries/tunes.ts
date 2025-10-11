@@ -82,33 +82,18 @@ export async function getAllTunes(db: SqliteDatabase): Promise<Tune[]> {
 
 /**
  * Get all tunes for a user (includes public and user's private tunes)
- * @param userId - Supabase Auth user UUID
+ * @param userId - Supabase Auth user UUID (unused in catalog mode)
  */
 export async function getTunesForUser(
   db: SqliteDatabase,
-  userId: string
+  _userId: string
 ): Promise<Tune[]> {
-  // Map UUID to integer user_profile.id
-  const userProfileId = await getUserProfileId(db, userId);
-
-  if (!userProfileId) {
-    // User not found, return only public tunes
-    return await getAllTunes(db);
-  }
-
-  const userCondition = or(
-    isNull(schema.tune.privateFor),
-    eq(schema.tune.privateFor, userProfileId)
-  );
-
-  if (!userCondition) {
-    return [];
-  }
-
+  // For catalog view, return ALL non-deleted tunes regardless of private_for
+  // Catalog should show everything - filtering by user is for other views
   return await db
     .select()
     .from(schema.tune)
-    .where(and(eq(schema.tune.deleted, 0), userCondition))
+    .where(eq(schema.tune.deleted, 0))
     .orderBy(asc(schema.tune.title));
 }
 

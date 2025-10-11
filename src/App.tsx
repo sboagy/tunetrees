@@ -6,7 +6,7 @@
  * @module App
  */
 
-import { Route, Router } from "@solidjs/router";
+import { Route, Router, useNavigate } from "@solidjs/router";
 import { ProtectedRoute } from "./components/auth";
 import { MainLayout } from "./components/layout";
 import { AuthProvider } from "./lib/auth/AuthContext";
@@ -59,6 +59,40 @@ function App() {
 
             {/* Main App - Home with MainLayout + tabs */}
             <Route path="/" component={Home} />
+
+            {/* Tab Route Redirects - Redirect to home with tab parameter */}
+            <Route
+              path="/practice"
+              component={() => {
+                const navigate = useNavigate();
+                navigate("/?tab=practice", { replace: true });
+                return null;
+              }}
+            />
+            <Route
+              path="/repertoire"
+              component={() => {
+                const navigate = useNavigate();
+                navigate("/?tab=repertoire", { replace: true });
+                return null;
+              }}
+            />
+            <Route
+              path="/catalog"
+              component={() => {
+                const navigate = useNavigate();
+                navigate("/?tab=catalog", { replace: true });
+                return null;
+              }}
+            />
+            <Route
+              path="/analysis"
+              component={() => {
+                const navigate = useNavigate();
+                navigate("/?tab=analysis", { replace: true });
+                return null;
+              }}
+            />
 
             {/* Debug/Admin Routes */}
             <Route

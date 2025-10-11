@@ -32,6 +32,8 @@ export type SyncableTable =
   | "tune_type"
   | "genre_tune_type"
   | "instrument"
+  // User profiles (critical for auth and FK relationships)
+  | "user_profile"
   // User preferences
   | "prefs_scheduling_options"
   | "prefs_spaced_repetition"

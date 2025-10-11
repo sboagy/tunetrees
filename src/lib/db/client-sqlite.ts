@@ -13,7 +13,6 @@ import initSqlJs from "sql.js";
 import * as relations from "../../../drizzle/relations";
 import * as schema from "../../../drizzle/schema-sqlite";
 import { initializeViews } from "./init-views";
-import { seedDatabase } from "./seed-data";
 
 /**
  * SQLite WASM instance
@@ -53,12 +52,10 @@ const CURRENT_DB_VERSION = 3; // Incremented to force migration with name and ge
  * ```typescript
  * import { initializeDb } from '@/lib/db/client-sqlite';
  *
- * const db = await initializeDb(user.id);
+ * const db = await initializeDb();
  * ```
  */
-export async function initializeDb(
-  userId?: string
-): Promise<ReturnType<typeof drizzle>> {
+export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
   if (drizzleDb) {
     return drizzleDb;
   }
@@ -75,8 +72,6 @@ export async function initializeDb(
   const storedVersion = await loadFromIndexedDB(DB_VERSION_KEY);
   const storedVersionNum =
     storedVersion && storedVersion.length > 0 ? storedVersion[0] : 0;
-
-  let isNewDatabase = false;
 
   // Check if we need to recreate the database due to version mismatch
   if (existingData && storedVersionNum === CURRENT_DB_VERSION) {
@@ -97,7 +92,6 @@ export async function initializeDb(
     }
 
     sqliteDb = new SQL.Database();
-    isNewDatabase = true;
 
     // Apply schema migrations in order
     console.log("📋 Applying SQLite schema migrations...");
@@ -179,13 +173,7 @@ export async function initializeDb(
     console.error("❌ Failed to create sync_queue table:", error);
   }
 
-  // Seed with test data if new database and userId provided
-  if (isNewDatabase && userId) {
-    seedDatabase(sqliteDb, userId);
-    // Persist the seeded data
-    await persistDb();
-  }
-
+  // Database is ready - sync will handle populating with real data from Supabase
   console.log("✅ SQLite WASM database ready");
 
   return drizzleDb;
