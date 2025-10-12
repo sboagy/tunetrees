@@ -94,6 +94,17 @@ export function getDefaultTableState(
       baseState.columnVisibility = {
         id: false,
         incipit: false,
+        latest_quality: false,
+        latest_easiness: false,
+        latest_stability: false,
+        latest_interval: false,
+        latest_due: false,
+        tags: false,
+        purpose: false,
+        note_private: false,
+        note_public: false,
+        has_override: false,
+        has_staged: false,
       };
       baseState.sorting = [{ id: "title", desc: false }]; // Sort by title
       break;

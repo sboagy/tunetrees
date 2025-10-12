@@ -246,13 +246,423 @@ export function getCatalogColumns(
 
 /**
  * Get column definitions for Repertoire grid
- * TODO: Implement with staging indicators and goal editor
+ * Shows practice-related fields from practice_list_staged view
  */
 export function getRepertoireColumns(
   callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
-  // For now, return catalog columns - will extend in next phase
-  return getCatalogColumns(callbacks);
+  const catalogColumns = getCatalogColumns(callbacks);
+
+  // Add practice-related columns after the basic tune columns
+  const practiceColumns: ColumnDef<any>[] = [
+    // Learned status
+    {
+      accessorKey: "learned",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Learned" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value === 1 ? (
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+            ✓ Learned
+          </span>
+        ) : (
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+            Learning
+          </span>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    },
+
+    // Goal
+    {
+      accessorKey: "goal",
+      header: ({ column }) => <SortableHeader column={column} title="Goal" />,
+      cell: (info) => {
+        const value = (info.getValue() as string) || "recall";
+        const colors = {
+          recall:
+            "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200",
+          notes:
+            "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200",
+          technique:
+            "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200",
+          backup:
+            "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200",
+        };
+        const colorClass =
+          colors[value as keyof typeof colors] || colors.recall;
+        return (
+          <span
+            class={`inline-flex items-center px-2 py-0.5 rounded text-xs ${colorClass}`}
+          >
+            {value}
+          </span>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    },
+
+    // Scheduled
+    {
+      accessorKey: "scheduled",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Scheduled" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value === 1 ? (
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+            ✓ Yes
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    },
+
+    // Latest Practiced
+    {
+      accessorKey: "latest_practiced",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Last Practiced" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        if (!value) return <span class="text-gray-400">Never</span>;
+
+        const date = new Date(value);
+        const now = new Date();
+        const diffDays = Math.floor(
+          (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        let color = "text-gray-600 dark:text-gray-400";
+        if (diffDays < 7) color = "text-green-600 dark:text-green-400";
+        else if (diffDays < 30) color = "text-yellow-600 dark:text-yellow-400";
+        else color = "text-red-600 dark:text-red-400";
+
+        return (
+          <span class={`text-sm ${color}`} title={date.toLocaleDateString()}>
+            {diffDays === 0
+              ? "Today"
+              : diffDays === 1
+              ? "Yesterday"
+              : diffDays < 30
+              ? `${diffDays}d ago`
+              : `${Math.floor(diffDays / 30)}mo ago`}
+          </span>
+        );
+      },
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+    },
+
+    // Recall Eval (transient field - editable)
+    {
+      accessorKey: "recall_eval",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Recall Eval" />
+      ),
+      cell: (info) => {
+        const value = (info.getValue() as string) || "";
+        const ratings = {
+          "": "—",
+          again: "Again",
+          hard: "Hard",
+          good: "Good",
+          easy: "Easy",
+        };
+        const colors = {
+          "": "text-gray-400",
+          again: "text-red-600 dark:text-red-400",
+          hard: "text-orange-600 dark:text-orange-400",
+          good: "text-green-600 dark:text-green-400",
+          easy: "text-blue-600 dark:text-blue-400",
+        };
+        return (
+          <span
+            class={`text-sm font-medium ${
+              colors[value as keyof typeof colors] || "text-gray-400"
+            }`}
+          >
+            {ratings[value as keyof typeof ratings] || value}
+          </span>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    },
+
+    // Latest Quality
+    {
+      accessorKey: "latest_quality",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Quality" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value !== null ? (
+          <span class="text-sm text-gray-600 dark:text-gray-400">{value}</span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 80,
+      minSize: 60,
+      maxSize: 100,
+    },
+
+    // Latest Easiness
+    {
+      accessorKey: "latest_easiness",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Easiness" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value !== null ? (
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {value.toFixed(2)}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 90,
+      minSize: 70,
+      maxSize: 110,
+    },
+
+    // Latest Stability
+    {
+      accessorKey: "latest_stability",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Stability" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value !== null ? (
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {value.toFixed(1)}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 90,
+      minSize: 70,
+      maxSize: 110,
+    },
+
+    // Latest Interval
+    {
+      accessorKey: "latest_interval",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Interval" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value !== null ? (
+          <span class="text-sm text-gray-600 dark:text-gray-400">{value}d</span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 80,
+      minSize: 60,
+      maxSize: 100,
+    },
+
+    // Latest Due
+    {
+      accessorKey: "latest_due",
+      header: ({ column }) => <SortableHeader column={column} title="Due" />,
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        if (!value) return <span class="text-gray-400">—</span>;
+
+        const date = new Date(value);
+        const now = new Date();
+        const diffDays = Math.floor(
+          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        let color = "text-gray-600 dark:text-gray-400";
+        if (diffDays < 0) color = "text-red-600 dark:text-red-400"; // Overdue
+        else if (diffDays === 0)
+          color = "text-orange-600 dark:text-orange-400"; // Due today
+        else if (diffDays <= 7)
+          color = "text-yellow-600 dark:text-yellow-400"; // Due soon
+        else color = "text-green-600 dark:text-green-400"; // Future
+
+        return (
+          <span class={`text-sm ${color}`} title={date.toLocaleDateString()}>
+            {diffDays < 0
+              ? `${Math.abs(diffDays)}d overdue`
+              : diffDays === 0
+              ? "Today"
+              : `${diffDays}d`}
+          </span>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 130,
+    },
+
+    // Tags
+    {
+      accessorKey: "tags",
+      header: ({ column }) => <SortableHeader column={column} title="Tags" />,
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        return value ? (
+          <span
+            class="text-xs text-gray-500 dark:text-gray-400 truncate block max-w-xs"
+            title={value}
+          >
+            {value}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 150,
+      minSize: 100,
+      maxSize: 250,
+    },
+
+    // Purpose (transient)
+    {
+      accessorKey: "purpose",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Purpose" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        return value ? (
+          <span
+            class="text-sm text-gray-600 dark:text-gray-400 truncate block max-w-xs"
+            title={value}
+          >
+            {value}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 120,
+      minSize: 100,
+      maxSize: 200,
+    },
+
+    // Note Private (transient)
+    {
+      accessorKey: "note_private",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Private Note" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        return value ? (
+          <span
+            class="text-xs text-purple-600 dark:text-purple-400 truncate block max-w-xs"
+            title={value}
+          >
+            🔒 {value}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 150,
+      minSize: 100,
+      maxSize: 250,
+    },
+
+    // Note Public (transient)
+    {
+      accessorKey: "note_public",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Public Note" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        return value ? (
+          <span
+            class="text-xs text-blue-600 dark:text-blue-400 truncate block max-w-xs"
+            title={value}
+          >
+            {value}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 150,
+      minSize: 100,
+      maxSize: 250,
+    },
+
+    // Has Override
+    {
+      accessorKey: "has_override",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Override" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value === 1 ? (
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+            ✓ Override
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    },
+
+    // Has Staged
+    {
+      accessorKey: "has_staged",
+      header: ({ column }) => <SortableHeader column={column} title="Staged" />,
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value === 1 ? (
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
+            ✓ Staged
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 90,
+      minSize: 70,
+      maxSize: 110,
+    },
+  ];
+
+  // Insert practice columns after Structure (index 7) and before Status
+  return [
+    ...catalogColumns.slice(0, 7), // select, id, title, type, mode, structure, incipit
+    ...practiceColumns,
+    catalogColumns[7], // status (private_for)
+  ];
 }
 
 /**

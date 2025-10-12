@@ -6,7 +6,7 @@
 
 export * from "./TuneColumns";
 export { TunesGridCatalog } from "./TunesGridCatalog";
+export { TunesGridRepertoire } from "./TunesGridRepertoire";
 export * from "./table-state-persistence";
 export * from "./types";
-// export { TunesGridRepertoire } from "./TunesGridRepertoire"; // TODO
 // export { TunesGridScheduled } from "./TunesGridScheduled"; // TODO

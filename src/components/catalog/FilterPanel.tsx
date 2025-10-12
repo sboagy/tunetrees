@@ -251,6 +251,8 @@ export interface FilterPanelProps {
     genres?: boolean;
     playlists?: boolean;
   };
+  /** Hide playlist filter (for Repertoire tab where playlist is implied) */
+  hidePlaylistFilter?: boolean;
 }
 
 export const FilterPanel: Component<FilterPanelProps> = (props) => {
@@ -381,15 +383,23 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
     props.onTypesChange([]);
     props.onModesChange([]);
     props.onGenresChange([]);
-    props.onPlaylistIdsChange([]);
+    if (!props.hidePlaylistFilter) {
+      props.onPlaylistIdsChange([]);
+    }
   };
 
   // Get total selected count
-  const totalSelected = () =>
-    props.selectedTypes.length +
-    props.selectedModes.length +
-    props.selectedGenres.length +
-    props.selectedPlaylistIds.length;
+  const totalSelected = () => {
+    const playlistCount = props.hidePlaylistFilter
+      ? 0
+      : props.selectedPlaylistIds.length;
+    return (
+      props.selectedTypes.length +
+      props.selectedModes.length +
+      props.selectedGenres.length +
+      playlistCount
+    );
+  };
 
   return (
     <div class="relative" ref={panelRef}>
@@ -506,16 +516,19 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                   loading={props.loading?.genres}
                 />
 
-                <FilterDropdown
-                  title="Playlist"
-                  items={props.availablePlaylists}
-                  selectedItems={props.selectedPlaylistIds}
-                  onSelectionChange={(selected) =>
-                    props.onPlaylistIdsChange(selected as number[])
-                  }
-                  loading={props.loading?.playlists}
-                  isPlaylist={true}
-                />
+                {/* Playlist filter - only shown when not hidden */}
+                <Show when={!props.hidePlaylistFilter}>
+                  <FilterDropdown
+                    title="Playlist"
+                    items={props.availablePlaylists}
+                    selectedItems={props.selectedPlaylistIds}
+                    onSelectionChange={(selected) =>
+                      props.onPlaylistIdsChange(selected as number[])
+                    }
+                    loading={props.loading?.playlists}
+                    isPlaylist={true}
+                  />
+                </Show>
 
                 {/* Clear all button */}
                 <Show when={totalSelected() > 0}>
@@ -562,15 +575,18 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                     )}
                   </For>
 
-                  <For each={props.selectedPlaylistIds}>
-                    {(playlistId) => (
-                      <FilterChip
-                        label={getPlaylistNameById(playlistId)}
-                        onRemove={() => removePlaylist(playlistId)}
-                        type="playlist"
-                      />
-                    )}
-                  </For>
+                  {/* Playlist chips - only shown when playlist filter not hidden */}
+                  <Show when={!props.hidePlaylistFilter}>
+                    <For each={props.selectedPlaylistIds}>
+                      {(playlistId) => (
+                        <FilterChip
+                          label={getPlaylistNameById(playlistId)}
+                          onRemove={() => removePlaylist(playlistId)}
+                          type="playlist"
+                        />
+                      )}
+                    </For>
+                  </Show>
                 </div>
               </Show>
             </div>

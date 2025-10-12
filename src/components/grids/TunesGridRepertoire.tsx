@@ -1,15 +1,16 @@
 /**
- * Tunes Grid Catalog Component
+ * Tunes Grid Repertoire Component
  *
- * Table-centric grid for browsing the entire tune catalog.
+ * Table-centric grid for browsing tunes in the current repertoire (playlist).
  * Features:
  * - Sticky header with frozen columns while scrolling
  * - Virtual scrolling for performance with large datasets
  * - Sortable, resizable, hideable columns
  * - Row selection
  * - State persistence (column order, sizes, scroll position)
+ * - Uses practice_list_staged view data (via getPlaylistTunes)
  *
- * @module components/grids/TunesGridCatalog
+ * @module components/grids/TunesGridRepertoire
  */
 
 import {
@@ -24,7 +25,6 @@ import {
   type VisibilityState,
 } from "@tanstack/solid-table";
 import { createVirtualizer } from "@tanstack/solid-virtual";
-import { eq } from "drizzle-orm";
 import { GripVertical } from "lucide-solid";
 import {
   type Component,
@@ -39,8 +39,7 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
-import { getPlaylistTunes } from "../../lib/db/queries/playlists";
-import { getTunesForUser } from "../../lib/db/queries/tunes";
+import { getPlaylistTunesStaged } from "../../lib/db/queries/playlists";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
 import { getColumns } from "./TuneColumns";
@@ -51,8 +50,8 @@ import {
 } from "./table-state-persistence";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
-export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
-  const { localDb, syncVersion } = useAuth();
+export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
+  const { localDb, syncVersion, user } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -65,7 +64,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
 
   // Load persisted state
   const loadedState = loadTableState(stateKey());
-  const initialState = mergeWithDefaults(loadedState, "catalog");
+  const initialState = mergeWithDefaults(loadedState, "repertoire");
 
   // Table state signals
   const [sorting, setSorting] = createSignal<SortingState>(
@@ -93,100 +92,68 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   const [isDragging, setIsDragging] = createSignal(false);
   const [draggedColumn, setDraggedColumn] = createSignal<string | null>(null);
 
-  // Fetch tunes data
-  const [tunes] = createResource(
+  // Fetch tunes in current playlist from practice_list_staged view
+  const [playlistTunesData] = createResource(
     () => {
       const db = localDb();
-      const userId = useAuth().user()?.id;
+      const userId = user()?.id;
+      const playlistId = currentPlaylistId();
       const version = syncVersion(); // Triggers refetch when sync completes
-      return db && userId ? { db, userId, version } : null;
-    },
-    async (params) => {
-      if (!params) return [];
-      return await getTunesForUser(params.db, params.userId);
-    }
-  );
-
-  // Fetch tunes from selected playlists (when playlist filter is active)
-  const [playlistTunes] = createResource(
-    () => {
-      const db = localDb();
-      const userId = useAuth().user()?.id;
-      const playlistIds = props.selectedPlaylistIds || [];
-      return db && userId && playlistIds.length > 0
-        ? { db, userId, playlistIds }
+      return db && userId && playlistId
+        ? { db, userId, playlistId, version }
         : null;
     },
     async (params) => {
       if (!params) return [];
-
-      // Fetch tunes from all selected playlists
-      const allPlaylistTunes: Tune[] = [];
-      for (const playlistId of params.playlistIds) {
-        try {
-          const playlistData = await getPlaylistTunes(
-            params.db,
-            playlistId,
-            params.userId
-          );
-          // getPlaylistTunes returns PlaylistTuneWithDetails[], but we need the tune data
-          // Let's extract the tune IDs and fetch them separately
-          const tuneIds = playlistData.map((pt) => pt.tuneRef);
-          const playlistTuneData = await Promise.all(
-            tuneIds.map(async (tuneId) => {
-              const result = await params.db
-                .select()
-                .from(schema.tune)
-                .where(eq(schema.tune.id, tuneId))
-                .limit(1);
-              return result[0];
-            })
-          );
-          allPlaylistTunes.push(...playlistTuneData.filter(Boolean));
-        } catch (error) {
-          console.warn(
-            `Failed to fetch tunes for playlist ${playlistId}:`,
-            error
-          );
-        }
-      }
-
-      // Remove duplicates (same tune could be in multiple selected playlists)
-      const uniqueTunes = allPlaylistTunes.filter(
-        (tune, index, arr) => arr.findIndex((t) => t.id === tune.id) === index
+      return await getPlaylistTunesStaged(
+        params.db,
+        params.playlistId,
+        params.userId
       );
-
-      return uniqueTunes;
     }
   );
 
-  // Apply client-side filtering
-  // Type Contract: Input is Tune[], Output is Tune[], filtered by search/type/mode/genre/playlist
-  const filteredTunes = createMemo<Tune[]>(() => {
-    // Determine base tune set: if playlist filter is active, use playlist tunes, otherwise all tunes
-    const baseTunes: Tune[] =
-      props.selectedPlaylistIds && props.selectedPlaylistIds.length > 0
-        ? playlistTunes() || []
-        : tunes() || [];
+  // Fetch all genres for proper genre names
+  const [allGenres] = createResource(
+    () => {
+      const db = localDb();
+      const version = syncVersion(); // Triggers refetch when sync completes
+      return db ? { db, version } : null;
+    },
+    async (params) => {
+      if (!params) return [];
+      const result = await params.db.select().from(schema.genre).all();
+      return result;
+    }
+  );
 
+  // Transform practice_list_staged data to match the grid's expectations
+  // The data is already in ITuneOverview format from the view
+  const tunes = createMemo<ITuneOverview[]>(() => {
+    return playlistTunesData() || [];
+  });
+
+  // Apply client-side filtering (no playlist filter needed - that's implicit)
+  const filteredTunes = createMemo<ITuneOverview[]>(() => {
+    const baseTunes = tunes();
     const query = props.searchQuery?.trim().toLowerCase() || "";
     const types = props.selectedTypes || [];
     const modes = props.selectedModes || [];
     const genreNames = props.selectedGenreNames || [];
-    const allGenres = props.allGenres || [];
+    const allGenresList = allGenres() || [];
 
     // Map selected genre names to genre IDs for filtering
-    const genreIds: string[] = [];
+    const genreIds: number[] = [];
     if (genreNames.length > 0) {
       genreNames.forEach((genreName) => {
-        const genre = allGenres.find((g) => g.name === genreName);
+        const genre = allGenresList.find((g) => g.name === genreName);
         if (genre) {
-          genreIds.push(genre.id);
+          genreIds.push(Number(genre.id));
         }
       });
     }
 
-    return baseTunes.filter((tune: Tune): boolean => {
+    return baseTunes.filter((tune: ITuneOverview): boolean => {
       // Search filter
       if (query) {
         const matchesTitle = tune.title?.toLowerCase().includes(query);
@@ -212,8 +179,8 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
       }
 
       // Genre filter (using mapped IDs)
-      if (genreIds.length > 0 && tune.genre) {
-        if (!genreIds.includes(tune.genre)) {
+      if (genreIds.length > 0 && tune.genre_ref) {
+        if (!genreIds.includes(tune.genre_ref)) {
           return false;
         }
       }
@@ -224,7 +191,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
 
   // Column definitions
   const columns = createMemo(() =>
-    getColumns("catalog", {
+    getColumns("repertoire", {
       onRecallEvalChange: props.onRecallEvalChange,
       onGoalChange: props.onGoalChange,
     })
@@ -519,34 +486,21 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           </button>
         </div>
       </Show>
+
       {/* Loading state */}
-      <Show
-        when={
-          tunes.loading ||
-          (props.selectedPlaylistIds &&
-            props.selectedPlaylistIds.length > 0 &&
-            playlistTunes.loading)
-        }
-      >
+      <Show when={playlistTunesData.loading}>
         <div class="flex-1 flex items-center justify-center">
           <div class="text-center">
             <div class="animate-spin h-12 w-12 mx-auto border-4 border-blue-600 border-t-transparent rounded-full" />
             <p class="mt-4 text-gray-600 dark:text-gray-400">
-              Loading catalog...
+              Loading repertoire...
             </p>
           </div>
         </div>
       </Show>
+
       {/* Table container with virtualization */}
-      <Show
-        when={
-          !tunes.loading &&
-          (!props.selectedPlaylistIds ||
-            props.selectedPlaylistIds.length === 0 ||
-            !playlistTunes.loading) &&
-          filteredTunes().length > 0
-        }
-      >
+      <Show when={!playlistTunesData.loading && filteredTunes().length > 0}>
         <div
           ref={(el) => {
             containerRef = el;
@@ -720,39 +674,23 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           <div class="text-sm text-gray-600 dark:text-gray-400">
             <span>
               {filteredTunes().length}{" "}
-              {filteredTunes().length === 1 ? "tune" : "tunes"}
-              {props.selectedPlaylistIds &&
-                props.selectedPlaylistIds.length > 0 && (
-                  <span class="ml-1 text-gray-500 dark:text-gray-500">
-                    in selected{" "}
-                    {props.selectedPlaylistIds.length === 1
-                      ? "playlist"
-                      : "playlists"}
-                  </span>
-                )}
+              {filteredTunes().length === 1 ? "tune" : "tunes"} in repertoire
             </span>
           </div>
         </div>
-      </Show>{" "}
+      </Show>
+
       {/* Empty state */}
-      <Show
-        when={
-          !tunes.loading &&
-          (!props.selectedPlaylistIds ||
-            props.selectedPlaylistIds.length === 0 ||
-            !playlistTunes.loading) &&
-          filteredTunes().length === 0
-        }
-      >
+      <Show when={!playlistTunesData.loading && filteredTunes().length === 0}>
         <div class="flex-1 flex items-center justify-center">
           <div class="text-center">
             <p class="text-lg text-gray-600 dark:text-gray-400">
-              No tunes found
+              No tunes in repertoire
             </p>
             <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">
-              {props.selectedPlaylistIds && props.selectedPlaylistIds.length > 0
-                ? "No tunes in selected playlists match your filters"
-                : "The catalog is empty"}
+              {tunes().length > 0
+                ? "No tunes match your filters"
+                : "Add tunes to your repertoire from the Catalog tab"}
             </p>
           </div>
         </div>

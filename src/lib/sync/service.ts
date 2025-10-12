@@ -55,7 +55,8 @@ export class SyncService {
   private realtimeManager: RealtimeManager | null = null;
   private config: SyncServiceConfig;
   private isSyncing = false;
-  private syncIntervalId: number | null = null;
+  private syncIntervalId: number | null = null; // For syncUp interval
+  private syncDownIntervalId: number | null = null; // For syncDown interval
 
   constructor(db: SqliteDatabase, config: SyncServiceConfig) {
     this.db = db;
@@ -190,6 +191,10 @@ export class SyncService {
 
   /**
    * Start automatic background sync
+   *
+   * Strategy:
+   * - syncDown: Once on startup, then every 20 minutes (pull remote changes - rare)
+   * - syncUp: Every 5 minutes (push local changes - frequent)
    */
   public startAutoSync(): void {
     if (this.syncIntervalId) {
@@ -197,17 +202,31 @@ export class SyncService {
       return;
     }
 
-    const intervalMs = this.config.syncIntervalMs ?? 30000; // Default 30s
+    // Sync intervals
+    const syncUpIntervalMs = this.config.syncIntervalMs ?? 300000; // 5 minutes (push local changes)
+    const syncDownIntervalMs = 20 * 60 * 1000; // 20 minutes (pull remote changes)
 
-    // Initial sync
-    void this.sync();
+    // Initial syncDown on startup (immediate)
+    console.log("[SyncService] Running initial syncDown on startup...");
+    void this.syncDown();
 
-    // Periodic sync
+    // Periodic syncUp (frequent - push local changes to server)
     this.syncIntervalId = window.setInterval(() => {
-      void this.sync();
-    }, intervalMs);
+      console.log("[SyncService] Running periodic syncUp...");
+      void this.syncUp();
+    }, syncUpIntervalMs);
 
-    console.log(`[SyncService] Auto sync started (interval: ${intervalMs}ms)`);
+    // Periodic syncDown (infrequent - pull remote changes from server)
+    this.syncDownIntervalId = window.setInterval(() => {
+      console.log("[SyncService] Running periodic syncDown...");
+      void this.syncDown();
+    }, syncDownIntervalMs);
+
+    console.log(
+      `[SyncService] Auto sync started:`,
+      `syncUp every ${syncUpIntervalMs / 1000}s,`,
+      `syncDown every ${syncDownIntervalMs / 1000}s`
+    );
   }
 
   /**
@@ -217,8 +236,12 @@ export class SyncService {
     if (this.syncIntervalId) {
       clearInterval(this.syncIntervalId);
       this.syncIntervalId = null;
-      console.log("[SyncService] Auto sync stopped");
     }
+    if (this.syncDownIntervalId) {
+      clearInterval(this.syncDownIntervalId);
+      this.syncDownIntervalId = null;
+    }
+    console.log("[SyncService] Auto sync stopped (both syncUp and syncDown)");
   }
 
   /**

@@ -40,10 +40,13 @@ export interface ColumnVisibilityMenuProps {
 export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
   props
 ) => {
+  let menuRef: HTMLDivElement | undefined;
+
   const [dropdownStyle, setDropdownStyle] = createSignal<{
     top: string;
     left?: string;
     right?: string;
+    maxHeight?: string;
   }>({ top: "0px" });
 
   // Calculate dropdown position based on trigger button
@@ -51,38 +54,76 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
     if (props.triggerRef && props.isOpen) {
       const rect = props.triggerRef.getBoundingClientRect();
       const dropdownWidth = 256; // w-64 = 16rem = 256px
-      const dropdownMaxHeight = 384; // max-h-96 = 24rem = 384px
+      const dropdownMaxHeight = 1000; // Max height we'd like, will constrain to viewport
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      const gap = 4;
+      const gap = 8;
+      const padding = 16; // Padding from viewport edges
 
       // On mobile, center the dropdown
       const isMobile = viewportWidth < 640; // sm breakpoint
 
       if (isMobile) {
         // Center horizontally, position below button or above if no room
-        const spaceBelow = viewportHeight - rect.bottom;
-        const spaceAbove = rect.top;
+        const spaceBelow = viewportHeight - rect.bottom - padding;
+        const spaceAbove = rect.top - padding;
+
+        // Calculate actual max height based on available space
+        const availableHeight = Math.max(spaceBelow, spaceAbove);
+        const actualMaxHeight = Math.min(
+          dropdownMaxHeight,
+          availableHeight - gap
+        );
 
         setDropdownStyle({
           top:
             spaceBelow > dropdownMaxHeight || spaceBelow > spaceAbove
               ? `${rect.bottom + gap}px`
-              : `${rect.top - dropdownMaxHeight - gap}px`,
-          left: `${Math.max(8, (viewportWidth - dropdownWidth) / 2)}px`,
+              : `${Math.max(padding, rect.top - actualMaxHeight - gap)}px`,
+          left: `${Math.max(padding, (viewportWidth - dropdownWidth) / 2)}px`,
+          maxHeight: `${actualMaxHeight}px`,
         });
       } else {
-        // Desktop: align with button, favor right side
+        // Desktop: check both horizontal and vertical space
+        const spaceBelow = viewportHeight - rect.bottom - padding;
+        const spaceAbove = rect.top - padding;
         const wouldOverflowRight = rect.right > viewportWidth - dropdownWidth;
 
+        // Calculate actual max height based on available space
+        const availableHeight = Math.max(spaceBelow, spaceAbove);
+        const actualMaxHeight = Math.min(
+          dropdownMaxHeight,
+          availableHeight - gap
+        );
+
+        // Determine vertical position (prefer below, but use above if more space)
+        let top: string;
+        if (spaceBelow >= actualMaxHeight) {
+          // Enough space below
+          top = `${rect.bottom + gap}px`;
+        } else if (spaceAbove >= actualMaxHeight) {
+          // Not enough space below, but enough above
+          top = `${rect.top - actualMaxHeight - gap}px`;
+        } else if (spaceBelow > spaceAbove) {
+          // Not enough space either way, use below
+          top = `${rect.bottom + gap}px`;
+        } else {
+          // Not enough space either way, use above
+          top = `${Math.max(padding, rect.top - actualMaxHeight - gap)}px`;
+        }
+
         setDropdownStyle({
-          top: `${rect.bottom + gap}px`,
+          top,
           left: wouldOverflowRight
             ? undefined
-            : `${rect.right - dropdownWidth}px`,
+            : `${Math.min(
+                rect.right - dropdownWidth,
+                viewportWidth - dropdownWidth - padding
+              )}px`,
           right: wouldOverflowRight
-            ? `${viewportWidth - rect.right}px`
+            ? `${Math.max(padding, viewportWidth - rect.right)}px`
             : undefined,
+          maxHeight: `${actualMaxHeight}px`,
         });
       }
     }
@@ -92,6 +133,33 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
   createEffect(() => {
     if (props.isOpen) {
       updatePosition();
+    }
+  });
+
+  // Click outside to close
+  createEffect(() => {
+    if (props.isOpen) {
+      const handleClickOutside = (e: MouseEvent) => {
+        const target = e.target as Node;
+
+        // Check if click is inside menu or trigger button
+        const isInsideMenu = menuRef?.contains(target);
+        const isInsideTrigger = props.triggerRef?.contains(target);
+
+        // Only close if click is truly outside
+        if (!isInsideMenu && !isInsideTrigger) {
+          props.onClose();
+        }
+      };
+
+      // Use setTimeout to avoid closing immediately when opening
+      setTimeout(() => {
+        document.addEventListener("click", handleClickOutside, false); // Use bubble phase instead
+      }, 100);
+
+      onCleanup(() => {
+        document.removeEventListener("click", handleClickOutside, false);
+      });
     }
   });
 
@@ -123,14 +191,31 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
       mode: "Mode",
       structure: "Structure",
       incipit: "Incipit",
+      private_for: "Status",
       genre: "Genre",
       learned: "Learned",
+      goal: "Goal",
       scheduled: "Scheduled",
+      latest_practiced: "Last Practiced",
+      recall_eval: "Recall Eval",
+      latest_quality: "Quality",
+      latest_easiness: "Easiness",
+      latest_stability: "Stability",
+      latest_interval: "Interval",
+      latest_due: "Due",
       tags: "Tags",
+      purpose: "Purpose",
+      note_private: "Private Note",
+      note_public: "Public Note",
+      has_override: "Override",
+      has_staged: "Staged",
       notes: "Notes",
       favorite_url: "Favorite URL",
     };
-    return nameMap[columnId] || columnId;
+    return (
+      nameMap[columnId] ||
+      columnId.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+    );
   };
 
   // Handle "Show All" button
@@ -157,8 +242,12 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
     <Show when={props.isOpen}>
       <Portal>
         <div
-          class="fixed w-64 bg-white dark:bg-gray-800 border border-gray-200/30 dark:border-gray-700/30 rounded-md shadow-lg z-[100] max-h-96 overflow-y-auto"
-          style={dropdownStyle()}
+          ref={menuRef}
+          class="fixed w-64 bg-white dark:bg-gray-800 border border-gray-200/30 dark:border-gray-700/30 rounded-md shadow-lg z-[100] overflow-y-auto"
+          style={{
+            ...dropdownStyle(),
+            "max-height": dropdownStyle().maxHeight,
+          }}
         >
           {/* Header */}
           <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200/30 dark:border-gray-700/30 px-3 py-2">
@@ -194,12 +283,25 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
           <div class="p-2">
             <For each={getToggleableColumns()}>
               {(column) => (
-                <label class="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded transition-colors">
+                <button
+                  type="button"
+                  class="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded transition-colors w-full text-left"
+                  onClick={(e) => {
+                    // Stop event completely before it reaches click-outside handler
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+
+                    // Toggle column visibility
+                    column.toggleVisibility();
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={column.getIsVisible()}
-                    onChange={column.getToggleVisibilityHandler()}
-                    class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer"
+                    readOnly
+                    tabIndex={-1}
+                    class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer pointer-events-none"
                   />
                   <span class="text-gray-700 dark:text-gray-300 flex-1">
                     {getColumnDisplayName(column.id)}
@@ -209,7 +311,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
                       Hidden
                     </span>
                   </Show>
-                </label>
+                </button>
               )}
             </For>
           </div>

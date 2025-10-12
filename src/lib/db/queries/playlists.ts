@@ -576,3 +576,57 @@ export async function getPlaylistTunes(
     },
   }));
 }
+
+/**
+ * Get tunes from practice_list_staged view for a playlist
+ *
+ * Returns comprehensive tune data including practice records and staging data.
+ * This is the proper data source for the Repertoire tab.
+ *
+ * @param db - SQLite database instance
+ * @param playlistId - Playlist ID
+ * @param userId - User's Supabase UUID (for ownership check)
+ * @returns Array of tune overview records from practice_list_staged view
+ *
+ * @example
+ * ```typescript
+ * const tunes = await getPlaylistTunesStaged(db, 1, 'user-uuid');
+ * console.log(`Repertoire has ${tunes.length} tunes`);
+ * ```
+ */
+export async function getPlaylistTunesStaged(
+  db: SqliteDatabase,
+  playlistId: number,
+  userId: string
+) {
+  // Verify playlist ownership
+  const playlistRecord = await getPlaylistById(db, playlistId, userId);
+  if (!playlistRecord) {
+    throw new Error("Playlist not found or access denied");
+  }
+
+  // Get user_ref from supabase_user_id
+  const userRecord = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.supabaseUserId, userId))
+    .limit(1);
+
+  if (!userRecord || userRecord.length === 0) {
+    throw new Error(`User not found: ${userId}`);
+  }
+
+  const userRef = userRecord[0].id;
+
+  // Query the practice_list_staged view directly
+  const result = await db.all<any>(sql`
+    SELECT * FROM practice_list_staged
+    WHERE playlist_id = ${playlistId}
+      AND user_ref = ${userRef}
+      AND deleted = 0
+      AND playlist_deleted = 0
+    ORDER BY title
+  `);
+
+  return result;
+}

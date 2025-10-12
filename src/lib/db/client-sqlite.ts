@@ -277,7 +277,7 @@ export function setupAutoPersist(): () => void {
   });
 
   // Periodic persistence (every 30 seconds)
-  const intervalId = setInterval(persistHandler, 30000);
+  const intervalId = setInterval(persistHandler, 300000);
 
   // Return cleanup function
   return () => {

@@ -4,4 +4,4 @@
  * @module components/repertoire
  */
 
-export { RepertoireControlBanner } from "./RepertoireControlBanner";
+export { RepertoireToolbar } from "./RepertoireToolbar";
