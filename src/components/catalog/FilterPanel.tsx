@@ -218,6 +218,10 @@ const FilterDropdown: Component<{
 };
 
 export interface FilterPanelProps {
+  /** Search query */
+  searchQuery: string;
+  /** Search change handler */
+  onSearchChange: (query: string) => void;
   /** Available types */
   availableTypes: string[];
   /** Selected types */
@@ -251,8 +255,67 @@ export interface FilterPanelProps {
 
 export const FilterPanel: Component<FilterPanelProps> = (props) => {
   const [isExpanded, setIsExpanded] = createSignal(false);
+  const [panelStyle, setPanelStyle] = createSignal<{
+    top: string;
+    left?: string;
+    right?: string;
+  }>({ top: "0px" });
   let panelRef: HTMLDivElement | undefined;
   let buttonRef: HTMLButtonElement | undefined;
+
+  // Calculate panel position based on trigger button
+  const updatePosition = () => {
+    if (buttonRef && isExpanded()) {
+      const rect = buttonRef.getBoundingClientRect();
+      const panelWidth = 384; // min-w-96 = 24rem = 384px
+      const viewportWidth = window.innerWidth;
+      const gap = 4;
+
+      // On mobile, make it full width with padding
+      const isMobile = viewportWidth < 768; // md breakpoint
+
+      if (isMobile) {
+        // Full width on mobile with padding
+        setPanelStyle({
+          top: `${rect.bottom + gap}px`,
+          left: "8px",
+          right: "8px",
+        });
+      } else {
+        // Desktop: align with button, check for overflow
+        const wouldOverflowRight = rect.left + panelWidth > viewportWidth;
+
+        setPanelStyle({
+          top: `${rect.bottom + gap}px`,
+          left: wouldOverflowRight ? undefined : `${rect.left}px`,
+          right: wouldOverflowRight
+            ? `${viewportWidth - rect.right}px`
+            : undefined,
+        });
+      }
+    }
+  };
+
+  // Update position when opened or window resizes
+  createEffect(() => {
+    if (isExpanded()) {
+      updatePosition();
+    }
+  });
+
+  onCleanup(() => {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    }
+  });
+
+  createEffect(() => {
+    if (isExpanded()) {
+      window.addEventListener("resize", updatePosition);
+      window.addEventListener("scroll", updatePosition, true);
+    }
+  });
 
   // Handle click outside to close panel
   const handleClickOutside = (event: MouseEvent) => {
@@ -336,13 +399,13 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
         type="button"
         onClick={() => setIsExpanded(!isExpanded())}
         title="Open filter options"
-        class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors whitespace-nowrap"
+        class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
         aria-label="Filter options"
         aria-expanded={isExpanded()}
         aria-haspopup="true"
       >
         <svg
-          class="w-4 h-4"
+          class="w-3.5 h-3.5 flex-shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -355,14 +418,14 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
             d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
           />
         </svg>
-        <span>Filters</span>
+        <span class="hidden sm:inline">Filters</span>
         <Show when={totalSelected() > 0}>
-          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-medium">
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-medium">
             {totalSelected()}
           </span>
         </Show>
         <svg
-          class={`w-4 h-4 transition-transform ${
+          class={`w-3.5 h-3.5 hidden sm:inline transition-transform ${
             isExpanded() ? "rotate-180" : ""
           }`}
           fill="none"
@@ -384,17 +447,35 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
         <Portal>
           <div
             data-filter-panel="true"
-            class="fixed p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-[9999] min-w-96"
-            style={{
-              left: buttonRef
-                ? `${buttonRef.getBoundingClientRect().left}px`
-                : "1rem",
-              top: buttonRef
-                ? `${buttonRef.getBoundingClientRect().bottom + 4}px`
-                : "5rem",
-            }}
+            class="fixed p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-[9999] md:min-w-96"
+            style={panelStyle()}
           >
             <div class="space-y-3">
+              {/* Search input - only shown on mobile when hidden from toolbar */}
+              <div class="relative md:hidden">
+                <input
+                  type="text"
+                  value={props.searchQuery}
+                  onInput={(e) => props.onSearchChange(e.currentTarget.value)}
+                  placeholder="Search tunes..."
+                  class="w-full px-3 py-1.5 pl-9 border border-gray-300/50 dark:border-gray-600/50 rounded-sm bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <svg
+                  class="absolute left-2.5 top-2 w-4 h-4 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+
               {/* Filter dropdown buttons row */}
               <div class="flex items-center gap-2 flex-wrap">
                 <FilterDropdown

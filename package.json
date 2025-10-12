@@ -37,6 +37,8 @@
     "drizzle-orm": "^0.44.6",
     "jodit": "^4.6.13",
     "jodit-react": "^5.2.26",
+    "loglevel": "^1.9.2",
+    "lucide-solid": "^0.545.0",
     "solid-js": "^1.9.9",
     "sql.js": "^1.13.0",
     "tailwind-merge": "^3.3.1",

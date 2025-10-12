@@ -18,9 +18,11 @@
  */
 
 import { useNavigate } from "@solidjs/router";
+import type { Table } from "@tanstack/solid-table";
 import type { Component } from "solid-js";
-import { createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import type { PlaylistWithSummary } from "../../lib/db/types";
+import { ColumnVisibilityMenu } from "./ColumnVisibilityMenu";
 import { FilterPanel } from "./FilterPanel";
 
 export interface CatalogToolbarProps {
@@ -54,12 +56,15 @@ export interface CatalogToolbarProps {
   availablePlaylists: PlaylistWithSummary[];
   /** Selected rows count for Delete button state */
   selectedRowsCount?: number;
+  /** Table instance for column visibility control */
+  table?: Table<any>;
 }
 
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const navigate = useNavigate();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
+  let columnsButtonRef: HTMLButtonElement | undefined;
 
   // Handle click outside to close columns dropdown
   const handleClickOutside = (event: MouseEvent) => {
@@ -98,19 +103,19 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   };
 
   return (
-    <div class="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+    <div class="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200/30 dark:border-gray-700/30">
       {/* Main toolbar */}
-      <div class="px-4 sm:px-6 lg:px-8 py-3">
-        <div class="flex items-center gap-3">
+      <div class="px-2 sm:px-3 lg:px-4 py-1.5">
+        <div class="flex items-center gap-1.5 sm:gap-2">
           {/* Add To Repertoire button */}
           <button
             type="button"
             onClick={handleAddToRepertoire}
             title="Add selected tunes to repertoire"
-            class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors whitespace-nowrap"
+            class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
           >
             <svg
-              class="w-4 h-4"
+              class="w-3.5 h-3.5 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -123,23 +128,14 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
               />
             </svg>
-            <span class="hidden lg:inline">Add To Repertoire</span>
-            <span class="lg:hidden hidden sm:inline">Add To Rep</span>
+            <span class="hidden md:inline">Add To Repertoire</span>
+            <span class="hidden sm:inline md:hidden">Add To Rep</span>
           </button>
 
-          {/* Filter textbox - responsive width */}
-          <div class="relative flex-1 min-w-0">
-            <input
-              type="text"
-              value={props.searchQuery}
-              onInput={(e) => props.onSearchChange(e.currentTarget.value)}
-              placeholder="Filter"
-              title="Search/filter tunes by title, incipit, or structure"
-              class="w-full px-4 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[12ch]"
-              style="min-width: 12ch"
-            />
+          {/* Search input - visible on larger screens, hidden on mobile (moves to FilterPanel) */}
+          <div class="relative hidden md:flex items-center flex-1 min-w-[12ch] max-w-xs">
             <svg
-              class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
+              class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-gray-500 pointer-events-none"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -152,10 +148,19 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
+            <input
+              type="text"
+              placeholder="Search tunes..."
+              value={props.searchQuery}
+              onInput={(e) => props.onSearchChange(e.currentTarget.value)}
+              class="w-full px-3 py-1.5 pl-9 text-sm bg-white dark:bg-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+            />
           </div>
 
-          {/* FilterPanel - positioned right after filter textbox */}
+          {/* FilterPanel - search shows inside on mobile */}
           <FilterPanel
+            searchQuery={props.searchQuery}
+            onSearchChange={props.onSearchChange}
             availableTypes={props.availableTypes}
             selectedTypes={props.selectedTypes}
             onTypesChange={props.onTypesChange}
@@ -175,10 +180,10 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             type="button"
             onClick={handleAddTune}
             title="Add a new tune"
-            class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors whitespace-nowrap"
+            class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
           >
             <svg
-              class="w-4 h-4"
+              class="w-3.5 h-3.5 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -191,8 +196,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            <span class="hidden lg:inline">Add Tune</span>
-            <span class="lg:hidden">Add</span>
+            <span class="hidden sm:inline">Add Tune</span>
           </button>
 
           {/* Delete Tunes button */}
@@ -201,10 +205,10 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             onClick={handleDeleteTunes}
             title="Delete selected tunes"
             disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
-            class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors whitespace-nowrap"
+            class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
           >
             <svg
-              class="w-4 h-4"
+              class="w-3.5 h-3.5 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -217,20 +221,20 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H9a1 1 0 00-1 1v3M4 7h16"
               />
             </svg>
-            <span class="hidden lg:inline">Delete Tunes</span>
-            <span class="lg:hidden">Delete</span>
+            <span class="hidden sm:inline">Delete</span>
           </button>
 
           {/* Columns dropdown */}
           <div class="relative" ref={columnsDropdownRef!}>
             <button
+              ref={columnsButtonRef!}
               type="button"
               onClick={handleColumnsToggle}
               title="Show/hide columns"
-              class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors whitespace-nowrap"
+              class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
             >
               <svg
-                class="w-4 h-4"
+                class="w-3.5 h-3.5 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -245,7 +249,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
               </svg>
               <span class="hidden lg:inline">Columns</span>
               <svg
-                class="w-4 h-4"
+                class="w-3.5 h-3.5 hidden lg:inline"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -260,14 +264,15 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
               </svg>
             </button>
 
-            {/* Columns dropdown menu */}
-            {showColumnsDropdown() && (
-              <div class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
-                <div class="p-2 text-sm text-gray-500 dark:text-gray-400">
-                  Column visibility controls - Not yet implemented
-                </div>
-              </div>
-            )}
+            {/* Column visibility menu */}
+            <Show when={props.table}>
+              <ColumnVisibilityMenu
+                table={props.table!}
+                isOpen={showColumnsDropdown()}
+                onClose={() => setShowColumnsDropdown(false)}
+                triggerRef={columnsButtonRef}
+              />
+            </Show>
           </div>
         </div>
       </div>
