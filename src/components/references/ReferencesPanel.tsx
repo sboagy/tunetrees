@@ -7,6 +7,7 @@
  * @module components/references/ReferencesPanel
  */
 
+import { Link, Plus } from "lucide-solid";
 import { type Component, createResource, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
@@ -128,27 +129,32 @@ export const ReferencesPanel: Component = () => {
 
   return (
     <div class="references-panel">
-      {/* Header with Add Reference button */}
-      <div class="flex items-center justify-between mb-3">
-        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
-          {references()?.length || 0}{" "}
-          {references()?.length === 1 ? "reference" : "references"}
-        </h4>
+      {/* Header with icon and Add Reference button */}
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-1.5">
+          <Link class="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+          <h4 class="text-xs font-medium text-gray-700 dark:text-gray-300">
+            {references()?.length || 0}{" "}
+            {references()?.length === 1 ? "reference" : "references"}
+          </h4>
+        </div>
         <Show when={currentTuneId() && !isAdding() && !editingReference()}>
           <button
             type="button"
             onClick={() => setIsAdding(true)}
-            class="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50"
+            title="Add new reference"
           >
-            + Add Reference
+            <Plus class="w-2.5 h-2.5" />
+            Add
           </button>
         </Show>
       </div>
 
       {/* Add reference form */}
       <Show when={isAdding()}>
-        <div class="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <h5 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+        <div class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30">
+          <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
             Add New Reference
           </h5>
           <ReferenceForm
@@ -161,8 +167,8 @@ export const ReferencesPanel: Component = () => {
       {/* Edit reference form */}
       <Show when={editingReference()}>
         {(ref) => (
-          <div class="mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <h5 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+          <div class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30">
+            <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Edit Reference
             </h5>
             <ReferenceForm
@@ -176,14 +182,14 @@ export const ReferencesPanel: Component = () => {
 
       {/* No tune selected */}
       <Show when={!currentTuneId()}>
-        <p class="text-sm italic text-gray-500 dark:text-gray-400">
+        <p class="text-xs italic text-gray-500 dark:text-gray-400">
           Select a tune to view references
         </p>
       </Show>
 
       {/* Loading state */}
       <Show when={references.loading}>
-        <p class="text-sm text-gray-500 dark:text-gray-400">
+        <p class="text-xs text-gray-500 dark:text-gray-400">
           Loading references...
         </p>
       </Show>

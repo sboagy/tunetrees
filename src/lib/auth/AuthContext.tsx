@@ -23,6 +23,7 @@ import {
   type SqliteDatabase,
   setupAutoPersist,
 } from "../db/client-sqlite";
+import { log } from "../logger";
 import { supabase } from "../supabase/client";
 
 import { startSyncWorker } from "../sync";
@@ -116,15 +117,15 @@ export const AuthProvider: ParentComponent = (props) => {
   async function initializeLocalDatabase(userId: string) {
     // Prevent double initialization
     if (isInitializing || localDb()) {
-      console.log(
-        "⏭️  Skipping database initialization (already initialized or in progress)"
+      log.debug(
+        "Skipping database initialization (already initialized or in progress)"
       );
       return;
     }
 
     isInitializing = true;
     try {
-      console.log(`🔧 Initializing local database for user ${userId}...`);
+      log.info("Initializing local database for user", userId);
 
       const db = await initializeSqliteDb();
       setLocalDb(db);
@@ -140,36 +141,41 @@ export const AuthProvider: ParentComponent = (props) => {
         .single();
 
       if (error || !userProfile) {
-        console.error("❌ Failed to get user profile:", error);
+        log.error("Failed to get user profile:", error);
         throw new Error("User profile not found in database");
       }
 
       const userIntId = userProfile.id;
-      console.log(`👤 User integer ID: ${userIntId} (UUID: ${userId})`);
+      log.debug("User integer ID:", userIntId, "UUID:", userId);
 
       // Start sync worker (now uses Supabase JS client, browser-compatible)
       // Realtime is disabled by default to reduce console noise during development
       // Set VITE_REALTIME_ENABLED=true in .env.local to enable live sync
-      const syncWorker = startSyncWorker(db, {
-        supabase,
-        userId: userIntId,
-        realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
-        syncIntervalMs: 30000, // Sync every 30 seconds
-        onSyncComplete: () => {
-          console.log("🔄 Sync completed, incrementing sync version");
-          setSyncVersion((prev) => {
-            const newVersion = prev + 1;
-            console.log(`🔄 Sync version changed: ${prev} -> ${newVersion}`);
-            return newVersion;
-          });
-        },
-      });
-      stopSyncWorker = syncWorker.stop;
-      console.log("🔄 Sync worker started");
+      // Set VITE_DISABLE_SYNC=true to completely disable sync (useful for testing seed data)
+      if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
+        const syncWorker = startSyncWorker(db, {
+          supabase,
+          userId: userIntId,
+          realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
+          syncIntervalMs: 30000, // Sync every 30 seconds
+          onSyncComplete: () => {
+            log.debug("Sync completed, incrementing sync version");
+            setSyncVersion((prev) => {
+              const newVersion = prev + 1;
+              log.debug("Sync version changed:", prev, "->", newVersion);
+              return newVersion;
+            });
+          },
+        });
+        stopSyncWorker = syncWorker.stop;
+        log.info("Sync worker started");
+      } else {
+        log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
+      }
 
-      console.log("✅ Local database ready");
+      log.info("Local database ready");
     } catch (error) {
-      console.error("❌ Failed to initialize local database:", error);
+      log.error("Failed to initialize local database:", error);
     } finally {
       isInitializing = false;
     }
@@ -190,14 +196,14 @@ export const AuthProvider: ParentComponent = (props) => {
       if (stopSyncWorker) {
         stopSyncWorker();
         stopSyncWorker = null;
-        console.log("⏹️  Sync worker stopped");
+        log.info("Sync worker stopped");
       }
 
       await clearSqliteDb();
       setLocalDb(null);
-      console.log("🗑️  Local database cleared");
+      log.info("Local database cleared");
     } catch (error) {
-      console.error("❌ Failed to clear local database:", error);
+      log.error("Failed to clear local database:", error);
     }
   }
 
@@ -219,7 +225,7 @@ export const AuthProvider: ParentComponent = (props) => {
           await initializeLocalDatabase(existingSession.user.id);
         }
       } catch (error) {
-        console.error("❌ Error during session initialization:", error);
+        log.error("Error during session initialization:", error);
       } finally {
         // Always set loading to false, even if initialization fails
         setLoading(false);
@@ -234,7 +240,7 @@ export const AuthProvider: ParentComponent = (props) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log("🔐 Auth state changed:", event);
+      log.info("Auth state changed:", event);
 
       setSession(newSession);
       setUser(newSession?.user ?? null);

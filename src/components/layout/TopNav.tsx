@@ -22,6 +22,7 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { getUserPlaylists } from "../../lib/db/queries/playlists";
 import type { PlaylistWithSummary } from "../../lib/db/types";
+import { log } from "../../lib/logger";
 import {
   getSelectedPlaylistId,
   setSelectedPlaylistId,
@@ -70,33 +71,26 @@ const PlaylistDropdown: Component = () => {
       const db = localDb();
       const userId = user()?.id;
       const version = syncVersion(); // Triggers refetch when sync completes
-      console.log("🔍 TOPNAV playlists dependency function called:", {
+      log.debug("TOPNAV playlists dependency:", {
         hasDb: !!db,
         userId,
         syncVersion: version,
-        timestamp: new Date().toISOString(),
       });
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
-      console.log("🔍 TOPNAV playlists fetcher called:", {
+      log.debug("TOPNAV playlists fetcher:", {
         hasParams: !!params,
         syncVersion: params?.version,
-        timestamp: new Date().toISOString(),
       });
       if (!params) return [];
 
       try {
         const result = await getUserPlaylists(params.db, params.userId);
-        console.log(
-          "🔍 TOPNAV playlists fetcher result:",
-          result.length,
-          "playlists:",
-          result.map((p) => ({ id: p.playlistId, name: p.name }))
-        );
+        log.debug("TOPNAV playlists result:", result.length, "playlists");
         return result;
       } catch (error) {
-        console.error("🔍 TOPNAV playlists fetcher ERROR:", error);
+        log.error("TOPNAV playlists fetch error:", error);
         return [];
       }
     }
@@ -106,12 +100,11 @@ const PlaylistDropdown: Component = () => {
   createEffect(() => {
     const playlistsList = playlists();
     const loading = playlists.loading;
-    console.log("🔍 TOPNAV playlists effect - playlists changed:", {
+    log.debug("TOPNAV playlists changed:", {
       loading,
-      playlistsLength: playlistsList?.length || 0,
+      count: playlistsList?.length || 0,
       playlists:
         playlistsList?.map((p) => ({ id: p.playlistId, name: p.name })) || [],
-      timestamp: new Date().toISOString(),
     });
   });
 
@@ -309,7 +302,7 @@ export const TopNav: Component = () => {
         const stats = await getSyncQueueStats(db);
         setPendingCount(stats.pending + stats.syncing);
       } catch (error) {
-        console.error("Failed to get sync queue stats:", error);
+        log.error("Failed to get sync queue stats:", error);
       }
     };
 
@@ -587,7 +580,7 @@ export const TopNav: Component = () => {
                           onClick={() => {
                             setShowUserMenu(false);
                             // TODO: Open user settings modal
-                            console.log("User Settings clicked");
+                            log.debug("User Settings clicked");
                           }}
                         >
                           <svg

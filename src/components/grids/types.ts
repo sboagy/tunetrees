@@ -115,6 +115,11 @@ export interface IGridBaseProps {
   onRecallEvalChange?: (tuneId: number, newValue: string) => void;
   onGoalChange?: (tuneId: number, newValue: string | null) => void;
   onSelectionChange?: (selectedCount: number) => void;
+  // Table instance callback
+  onTableReady?: (table: any) => void;
+  // Column visibility
+  columnVisibility?: IColumnVisibility;
+  onColumnVisibilityChange?: (visibility: IColumnVisibility) => void;
   // Search and filter props
   searchQuery?: string;
   selectedTypes?: string[];

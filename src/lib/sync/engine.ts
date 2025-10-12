@@ -13,6 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import * as localSchema from "../../../drizzle/schema-sqlite";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type { SyncQueueItem } from "../db/types";
+import { log } from "../logger";
 import {
   getPendingSyncItems,
   markSynced,
@@ -22,7 +23,8 @@ import {
 
 // Debug flag for sync logging (set VITE_SYNC_DEBUG=true in .env to enable)
 const SYNC_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
-const syncLog = (...args: any[]) => SYNC_DEBUG && console.log(...args);
+const syncLog = (...args: any[]) =>
+  SYNC_DEBUG && log.debug("[SyncEngine]", ...args);
 
 /**
  * Sync result for tracking what happened during sync
@@ -129,7 +131,7 @@ export class SyncEngine {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error("[SyncEngine] Sync failed:", errorMsg);
+      log.error("[SyncEngine] Sync failed:", errorMsg);
       errors.push(errorMsg);
 
       return {
@@ -175,9 +177,7 @@ export class SyncEngine {
         };
       }
 
-      console.log(
-        `[SyncEngine] Processing ${pendingItems.length} pending items`
-      );
+      log.info(`[SyncEngine] Processing ${pendingItems.length} pending items`);
 
       // Process each item
       for (const item of pendingItems) {
@@ -188,10 +188,7 @@ export class SyncEngine {
         } catch (error) {
           const errorMsg =
             error instanceof Error ? error.message : String(error);
-          console.error(
-            `[SyncEngine] Failed to sync item ${item.id}:`,
-            errorMsg
-          );
+          log.error(`[SyncEngine] Failed to sync item ${item.id}:`, errorMsg);
 
           // Update item status based on retry count
           if (item.attempts >= this.config.maxRetries) {
@@ -215,7 +212,7 @@ export class SyncEngine {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error("[SyncEngine] syncUp failed:", errorMsg);
+      log.error("[SyncEngine] syncUp failed:", errorMsg);
       errors.push(errorMsg);
 
       return {
@@ -284,7 +281,7 @@ export class SyncEngine {
         } catch (error) {
           const errorMsg =
             error instanceof Error ? error.message : String(error);
-          console.error(
+          log.error(
             `[SyncEngine] Failed to sync table ${tableName}:`,
             errorMsg
           );
@@ -305,7 +302,7 @@ export class SyncEngine {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error("[SyncEngine] syncDown failed:", errorMsg);
+      log.error("[SyncEngine] syncDown failed:", errorMsg);
       errors.push(errorMsg);
 
       return {
@@ -327,7 +324,7 @@ export class SyncEngine {
   private async processQueueItem(item: SyncQueueItem): Promise<void> {
     const { tableName, recordId, operation, data } = item;
 
-    console.log(
+    log.info(
       `[SyncEngine] Processing ${operation} on ${tableName}:${recordId}`
     );
 
@@ -412,7 +409,7 @@ export class SyncEngine {
         case "tune":
           // For catalog, sync ALL tunes (public + private to this user)
           // NULL = public (available to all), user_id = private to that user
-          console.log(
+          log.info(
             `[SyncEngine] Syncing ALL tunes (public + private for user ${this.userId})`
           );
           query = query.or(`private_for.is.null,private_for.eq.${this.userId}`);
@@ -478,7 +475,7 @@ export class SyncEngine {
       if (userPrefTables.includes(tableName)) {
         filteredRecords = remoteRecords.filter((record) => {
           if ("user_id" in record && record.user_id !== this.userId) {
-            console.warn(
+            log.warn(
               `[SyncEngine] Filtered out record from ${tableName} (wrong user_id: ${record.user_id})`
             );
             return false;
@@ -494,7 +491,7 @@ export class SyncEngine {
       ) {
         filteredRecords = remoteRecords.filter((record) => {
           if ("user_ref" in record && record.user_ref !== this.userId) {
-            console.warn(
+            log.warn(
               `[SyncEngine] Filtered out record ${record.id} from ${tableName} (wrong user_ref: ${record.user_ref})`
             );
             return false;
@@ -505,9 +502,7 @@ export class SyncEngine {
     }
 
     if (filteredRecords.length === 0) {
-      console.log(
-        `[SyncEngine] All records filtered out for table ${tableName}`
-      );
+      log.debug(`[SyncEngine] All records filtered out for table ${tableName}`);
       return 0;
     }
 
@@ -586,7 +581,7 @@ export class SyncEngine {
             set: transformed,
           });
       } catch (error) {
-        console.error(
+        log.error(
           `[SyncEngine] Failed to upsert record in ${tableName}:`,
           error
         );

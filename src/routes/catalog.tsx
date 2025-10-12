@@ -14,6 +14,7 @@
  */
 
 import { useNavigate, useSearchParams } from "@solidjs/router";
+import type { Table } from "@tanstack/solid-table";
 import {
   type Component,
   createEffect,
@@ -30,6 +31,7 @@ import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
 import { getUserPlaylists } from "../lib/db/queries/playlists";
 import { getTunesForUser } from "../lib/db/queries/tunes";
 import * as schema from "../lib/db/schema";
+import { log } from "../lib/logger";
 
 /**
  * Catalog Page Component
@@ -78,6 +80,11 @@ const CatalogPage: Component = () => {
   // Track selected rows count from grid
   const [selectedRowsCount, setSelectedRowsCount] = createSignal(0);
 
+  // Track table instance for column visibility control
+  const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
+    null
+  );
+
   // Sync filter state to URL params
   createEffect(() => {
     const params: Record<string, string> = {};
@@ -111,7 +118,7 @@ const CatalogPage: Component = () => {
       const db = localDb();
       const userId = user()?.id;
       const version = syncVersion(); // Triggers refetch when sync completes
-      console.log("🔍 CATALOG allTunes dependency function called:", {
+      log.debug("CATALOG allTunes dependency:", {
         hasDb: !!db,
         userId,
         syncVersion: version,
@@ -119,17 +126,13 @@ const CatalogPage: Component = () => {
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
-      console.log("🔍 CATALOG allTunes fetcher called:", {
+      log.debug("CATALOG allTunes fetcher:", {
         hasParams: !!params,
         syncVersion: params?.version,
       });
       if (!params) return [];
       const result = await getTunesForUser(params.db, params.userId);
-      console.log(
-        "🔍 CATALOG allTunes fetcher result:",
-        result.length,
-        "tunes"
-      );
+      log.debug("CATALOG allTunes result:", result.length, "tunes");
       return result;
     }
   );
@@ -140,7 +143,7 @@ const CatalogPage: Component = () => {
       const db = localDb();
       const userId = user()?.id;
       const version = syncVersion(); // Triggers refetch when sync completes
-      console.log("🔍 CATALOG userPlaylists dependency function called:", {
+      log.debug("CATALOG userPlaylists dependency:", {
         hasDb: !!db,
         userId,
         syncVersion: version,
@@ -148,17 +151,13 @@ const CatalogPage: Component = () => {
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
-      console.log("🔍 CATALOG userPlaylists fetcher called:", {
+      log.debug("CATALOG userPlaylists fetcher:", {
         hasParams: !!params,
         syncVersion: params?.version,
       });
       if (!params) return [];
       const result = await getUserPlaylists(params.db, params.userId);
-      console.log(
-        "🔍 CATALOG userPlaylists fetcher result:",
-        result.length,
-        "playlists"
-      );
+      log.debug("CATALOG userPlaylists result:", result.length, "playlists");
       return result;
     }
   );
@@ -168,24 +167,20 @@ const CatalogPage: Component = () => {
     () => {
       const db = localDb();
       const version = syncVersion(); // Triggers refetch when sync completes
-      console.log("🔍 CATALOG allGenres dependency function called:", {
+      log.debug("CATALOG allGenres dependency:", {
         hasDb: !!db,
         syncVersion: version,
       });
       return db ? { db, version } : null;
     },
     async (params) => {
-      console.log("🔍 CATALOG allGenres fetcher called:", {
+      log.debug("CATALOG allGenres fetcher:", {
         hasParams: !!params,
         syncVersion: params?.version,
       });
       if (!params) return [];
       const result = await params.db.select().from(schema.genre).all();
-      console.log(
-        "🔍 CATALOG allGenres fetcher result:",
-        result.length,
-        "genres"
-      );
+      log.debug("CATALOG allGenres result:", result.length, "genres");
       return result;
     }
   );
@@ -213,21 +208,15 @@ const CatalogPage: Component = () => {
     const tunes = allTunes() || [];
     const genres = allGenres() || [];
 
-    console.log("🔍 DEBUG availableGenres:", {
+    log.debug("CATALOG availableGenres:", {
       tunesCount: tunes.length,
       genresCount: genres.length,
       isLoading: allGenres.loading,
-      firstFewGenres: genres
-        .slice(0, 3)
-        .map((g) => ({ id: g.id, name: g.name })),
-      firstFewTuneGenres: tunes
-        .slice(0, 5)
-        .map((t) => ({ title: t.title, genre: t.genre })),
     });
 
     // If genres are still loading, return empty array
     if (allGenres.loading || genres.length === 0) {
-      console.log("🔍 EARLY RETURN: loading or no genres");
+      log.debug("CATALOG availableGenres: loading or no genres");
       return [];
     }
 
@@ -237,7 +226,7 @@ const CatalogPage: Component = () => {
       if (tune.genre) genreIds.add(tune.genre);
     });
 
-    console.log("🔍 Genre IDs from tunes:", Array.from(genreIds));
+    log.debug("CATALOG Genre IDs from tunes:", Array.from(genreIds));
 
     // Map genre IDs to genre names
     const genreNames: string[] = [];
@@ -245,17 +234,15 @@ const CatalogPage: Component = () => {
       const genre = genres.find((g) => g.id === genreId);
       if (genre?.name) {
         genreNames.push(genre.name);
-        console.log(`🔍 FOUND genre: ${genreId} -> ${genre.name}`);
+        log.debug(`CATALOG Found genre: ${genreId} -> ${genre.name}`);
       } else {
-        console.log(`🔍 NOT FOUND genre ID: "${genreId}" (not in genre table)`);
-        console.log(
-          `🔍 Available genre IDs:`,
-          genres.map((g) => g.id)
-        );
+        log.warn(`CATALOG Genre ID not found: "${genreId}"`, {
+          availableIds: genres.map((g) => g.id),
+        });
       }
     });
 
-    console.log("🔍 Final genre names:", genreNames);
+    log.debug("CATALOG Final genre names:", genreNames);
     return genreNames.sort();
   });
 
@@ -284,11 +271,12 @@ const CatalogPage: Component = () => {
           availableGenres={availableGenres()}
           availablePlaylists={userPlaylists() || []}
           selectedRowsCount={selectedRowsCount()}
+          table={tableInstance() || undefined}
         />
       </Show>
 
-      {/* Grid */}
-      <div class="flex-1 overflow-hidden">
+      {/* Grid wrapper - overflow-hidden constrains grid height, padding provides spacing */}
+      <div class="flex-1 overflow-hidden p-4 md:p-6">
         <Show when={user()}>
           <TunesGridCatalog
             userId={Number.parseInt(user()!.id)}
@@ -302,6 +290,7 @@ const CatalogPage: Component = () => {
             selectedPlaylistIds={selectedPlaylistIds()}
             onTuneSelect={handleTuneSelect}
             onSelectionChange={setSelectedRowsCount}
+            onTableReady={setTableInstance}
           />
         </Show>
       </div>

@@ -21,9 +21,11 @@ import {
   getSortedRowModel,
   type RowSelectionState,
   type SortingState,
+  type VisibilityState,
 } from "@tanstack/solid-table";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { eq } from "drizzle-orm";
+import { GripVertical } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -36,6 +38,7 @@ import {
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getPlaylistTunes } from "../../lib/db/queries/playlists";
 import { getTunesForUser } from "../../lib/db/queries/tunes";
 import * as schema from "../../lib/db/schema";
@@ -51,6 +54,7 @@ import type { IGridBaseProps, ITuneOverview } from "./types";
 export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   const { localDb, syncVersion } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
+  const { setCurrentTuneId } = useCurrentTune();
 
   // State persistence key
   const stateKey = createMemo(() => ({
@@ -74,6 +78,20 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   const [columnOrder, setColumnOrder] = createSignal<ColumnOrderState>(
     initialState.columnOrder || []
   );
+  const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
+    props.columnVisibility || initialState.columnVisibility || {}
+  );
+
+  // Sync column visibility changes to parent
+  createEffect(() => {
+    if (props.onColumnVisibilityChange) {
+      props.onColumnVisibilityChange(columnVisibility());
+    }
+  });
+
+  // Track dragging state for column reordering
+  const [isDragging, setIsDragging] = createSignal(false);
+  const [draggedColumn, setDraggedColumn] = createSignal<string | null>(null);
 
   // Fetch tunes data
   const [tunes] = createResource(
@@ -238,12 +256,23 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
       get columnOrder() {
         return columnOrder();
       },
+      get columnVisibility() {
+        return columnVisibility();
+      },
     },
     onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
     onColumnSizingChange: setColumnSizing,
     onColumnOrderChange: setColumnOrder,
+    onColumnVisibilityChange: setColumnVisibility,
     getRowId: (row) => String(row.id),
+  });
+
+  // Notify parent of table instance
+  createEffect(() => {
+    if (props.onTableReady) {
+      props.onTableReady(table);
+    }
   });
 
   // Container ref for virtualization
@@ -267,10 +296,164 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
       sorting: sorting(),
       columnSizing: columnSizing(),
       columnOrder: columnOrder(),
+      columnVisibility: columnVisibility(),
       scrollTop: containerRef?.scrollTop || 0,
     };
     saveTableState(stateKey(), state);
   });
+
+  // Handle column drag and drop for reordering
+  const handleDragStart = (e: DragEvent, columnId: string) => {
+    setIsDragging(true);
+    setDraggedColumn(columnId);
+    e.dataTransfer!.effectAllowed = "move";
+    e.dataTransfer!.setData("text/plain", columnId);
+  };
+
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = "move";
+  };
+
+  const handleDrop = (e: DragEvent, targetColumnId: string) => {
+    e.preventDefault();
+    const sourceColumnId = draggedColumn();
+
+    if (sourceColumnId && sourceColumnId !== targetColumnId) {
+      const currentOrder = columnOrder();
+      const allColumns = table.getAllLeafColumns().map((c) => c.id);
+
+      // Use current order if exists, otherwise use default column order
+      const orderToUse = currentOrder.length > 0 ? currentOrder : allColumns;
+
+      const sourceIndex = orderToUse.indexOf(sourceColumnId);
+      const targetIndex = orderToUse.indexOf(targetColumnId);
+
+      if (sourceIndex !== -1 && targetIndex !== -1) {
+        const newOrder = [...orderToUse];
+        newOrder.splice(sourceIndex, 1);
+        newOrder.splice(targetIndex, 0, sourceColumnId);
+        setColumnOrder(newOrder);
+      }
+    }
+
+    setIsDragging(false);
+    setDraggedColumn(null);
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    setDraggedColumn(null);
+  };
+
+  // Touch handlers for mobile drag-and-drop
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let hasMoved = false;
+
+  const handleTouchStart = (e: TouchEvent, columnId: string) => {
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    hasMoved = false;
+    setDraggedColumn(columnId);
+    setIsDragging(false); // Don't set dragging true until we've actually moved
+
+    // Add document-level touch move and end listeners
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+    document.addEventListener("touchend", handleTouchEnd);
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!draggedColumn()) return;
+
+    const touch = e.touches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartX);
+    const deltaY = Math.abs(touch.clientY - touchStartY);
+
+    // Only start dragging if moved more than 10px (to distinguish from scroll)
+    if (!hasMoved && (deltaX > 10 || deltaY > 10)) {
+      // If vertical movement is greater, it's a scroll - cancel drag
+      if (deltaY > deltaX) {
+        setDraggedColumn(null);
+        setIsDragging(false);
+        document.removeEventListener("touchmove", handleTouchMove);
+        document.removeEventListener("touchend", handleTouchEnd);
+        return;
+      }
+      // Horizontal movement - start dragging
+      hasMoved = true;
+      setIsDragging(true);
+    }
+
+    // Only prevent scrolling if we're actively dragging
+    if (hasMoved) {
+      e.preventDefault();
+
+      // Clear all previous hover classes
+      document.querySelectorAll("th").forEach((th) => {
+        th.classList.remove("bg-blue-50", "dark:bg-blue-900/20");
+      });
+
+      // Find which column we're over
+      const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      const th = element?.closest("th");
+      if (th) {
+        const columnId = th.getAttribute("data-column-id");
+        if (columnId && columnId !== draggedColumn()) {
+          // Visual feedback: add hover class
+          th.classList.add("bg-blue-50", "dark:bg-blue-900/20");
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: TouchEvent) => {
+    if (!draggedColumn()) return;
+
+    // Only perform reorder if we actually dragged
+    if (hasMoved) {
+      const touch = e.changedTouches[0];
+      const element = document.elementFromPoint(touch.clientX, touch.clientY);
+      const th = element?.closest("th");
+
+      let finalTargetId: string | undefined;
+      if (th) {
+        finalTargetId = th.getAttribute("data-column-id") || undefined;
+      }
+
+      if (finalTargetId && draggedColumn() !== finalTargetId) {
+        const sourceColumnId = draggedColumn()!;
+        const currentOrder = columnOrder();
+        const allColumns = table.getAllLeafColumns().map((c) => c.id);
+        const orderToUse = currentOrder.length > 0 ? currentOrder : allColumns;
+
+        const sourceIndex = orderToUse.indexOf(sourceColumnId);
+        const targetIndex = orderToUse.indexOf(finalTargetId);
+
+        if (sourceIndex !== -1 && targetIndex !== -1) {
+          const newOrder = [...orderToUse];
+          newOrder.splice(sourceIndex, 1);
+          newOrder.splice(targetIndex, 0, sourceColumnId);
+          setColumnOrder(newOrder);
+        }
+      }
+    }
+
+    // Clean up
+    setIsDragging(false);
+    setDraggedColumn(null);
+    hasMoved = false;
+
+    // Remove hover classes from all headers
+    document.querySelectorAll("th").forEach((th) => {
+      th.classList.remove("bg-blue-50", "dark:bg-blue-900/20");
+    });
+
+    // Remove document-level listeners
+    document.removeEventListener("touchmove", handleTouchMove);
+    document.removeEventListener("touchend", handleTouchEnd);
+  };
 
   // Restore scroll position
   onMount(() => {
@@ -280,10 +463,32 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   });
 
   // Handle row click
+  let clickTimeout: ReturnType<typeof setTimeout> | null = null;
+  let clickCount = 0;
+
   const handleRowClick = (tune: Tune): void => {
-    // Cast to ITuneOverview for compatibility with the interface
-    // This is safe because the callback only uses the 'id' field
-    props.onTuneSelect?.(tune as unknown as ITuneOverview);
+    clickCount++;
+
+    if (clickTimeout) {
+      clearTimeout(clickTimeout);
+    }
+
+    if (clickCount === 1) {
+      // Single click: wait to see if it becomes a double click
+      clickTimeout = setTimeout(() => {
+        // Single click confirmed: set current tune
+        setCurrentTuneId(tune.id);
+        clickCount = 0;
+      }, 250);
+    } else if (clickCount === 2) {
+      // Double click: open tune editor via callback
+      clickCount = 0;
+      if (clickTimeout) {
+        clearTimeout(clickTimeout);
+      }
+      // Cast to ITuneOverview for compatibility with the interface
+      props.onTuneSelect?.(tune as unknown as ITuneOverview);
+    }
   };
 
   // Get selected tunes count
@@ -314,7 +519,6 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           </button>
         </div>
       </Show>
-
       {/* Loading state */}
       <Show
         when={
@@ -333,7 +537,6 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           </div>
         </div>
       </Show>
-
       {/* Table container with virtualization */}
       <Show
         when={
@@ -345,9 +548,11 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
         }
       >
         <div
-          ref={containerRef}
-          class="flex-1 overflow-auto relative"
-          style={{ height: "100%" }}
+          ref={(el) => {
+            containerRef = el;
+          }}
+          class="flex-1 overflow-auto relative touch-pan-y"
+          style={{ "touch-action": "pan-y" }}
         >
           <table
             class="w-full border-collapse"
@@ -361,23 +566,77 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
                     <For each={headerGroup.headers}>
                       {(header) => (
                         <th
-                          class="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 relative"
+                          data-column-id={header.column.id}
+                          class={`px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 relative group ${
+                            draggedColumn() === header.column.id
+                              ? "opacity-50"
+                              : ""
+                          } ${
+                            isDragging() && draggedColumn() !== header.column.id
+                              ? "bg-blue-50 dark:bg-blue-900/20"
+                              : ""
+                          }`}
                           style={{ width: `${header.getSize()}px` }}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, header.column.id)}
                         >
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                          <div class="flex items-center gap-0 justify-between">
+                            {/* Main content area */}
+                            <span class="flex items-center gap-1 flex-1 min-w-0">
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                            </span>
 
-                          {/* Resize handle */}
+                            {/* Drag handle - available on all columns except select/actions */}
+                            <Show
+                              when={
+                                header.column.id !== "select" &&
+                                header.column.id !== "actions"
+                              }
+                            >
+                              <button
+                                type="button"
+                                draggable={true}
+                                onDragStart={(e) =>
+                                  handleDragStart(e, header.column.id)
+                                }
+                                onDragEnd={handleDragEnd}
+                                onTouchStart={(e) =>
+                                  handleTouchStart(e, header.column.id)
+                                }
+                                class="cursor-grab active:cursor-grabbing flex-shrink-0 p-0.5 border-0 bg-transparent"
+                                aria-label={`Drag to reorder ${
+                                  header.column.columnDef.header as string
+                                } column`}
+                              >
+                                <GripVertical
+                                  size={14}
+                                  class="text-gray-400 dark:text-gray-500 opacity-50 md:opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                />
+                              </button>
+                            </Show>
+                          </div>
+
+                          {/* Resize handle - improved visibility and event handling */}
                           <Show when={header.column.getCanResize()}>
                             <button
                               type="button"
-                              class="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-blue-500 opacity-0 hover:opacity-100"
-                              onMouseDown={header.getResizeHandler()}
-                              onTouchStart={header.getResizeHandler()}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                header.getResizeHandler()(e);
+                              }}
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                                header.getResizeHandler()(e);
+                              }}
+                              class="resize-handle absolute top-0 right-0 w-4 h-full cursor-col-resize select-none touch-none group/resize bg-transparent border-0 p-0 z-10"
                               aria-label={`Resize ${header.id} column`}
-                            />
+                            >
+                              {/* Visual indicator - more prominent */}
+                              <div class="absolute top-0 right-0 w-1 h-full bg-gray-300 dark:bg-gray-600 group-hover/resize:bg-blue-500 dark:group-hover/resize:bg-blue-400 group-hover/resize:w-1.5 transition-all pointer-events-none" />
+                            </button>
                           </Show>
                         </th>
                       )}
@@ -450,8 +709,26 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
             </tbody>
           </table>
         </div>
-      </Show>
 
+        {/* Footer with tune count */}
+        <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2 flex-shrink-0">
+          <div class="text-sm text-gray-600 dark:text-gray-400">
+            <span>
+              {filteredTunes().length}{" "}
+              {filteredTunes().length === 1 ? "tune" : "tunes"}
+              {props.selectedPlaylistIds &&
+                props.selectedPlaylistIds.length > 0 && (
+                  <span class="ml-1 text-gray-500 dark:text-gray-500">
+                    in selected{" "}
+                    {props.selectedPlaylistIds.length === 1
+                      ? "playlist"
+                      : "playlists"}
+                  </span>
+                )}
+            </span>
+          </div>
+        </div>
+      </Show>{" "}
       {/* Empty state */}
       <Show
         when={

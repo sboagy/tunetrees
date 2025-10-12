@@ -37,13 +37,37 @@ interface MainLayoutProps {
  */
 export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false);
+  const [sidebarWidth, setSidebarWidth] = createSignal(320); // Default 320px
 
-  // TODO: Load sidebar collapse state from localStorage or DB
+  // Load sidebar state from localStorage on mount
   onMount(() => {
-    const savedState = localStorage.getItem("sidebar-collapsed");
-    if (savedState === "true") {
+    const savedCollapsed = localStorage.getItem("sidebar-collapsed");
+    if (savedCollapsed === "true") {
       setSidebarCollapsed(true);
     }
+
+    const savedWidth = localStorage.getItem("sidebar-width");
+    if (savedWidth) {
+      const width = Number.parseInt(savedWidth, 10);
+      if (!Number.isNaN(width) && width >= 240 && width <= 600) {
+        setSidebarWidth(width);
+      }
+    }
+
+    // Auto-collapse on mobile
+    const checkMobile = () => {
+      const isMobile = window.innerWidth < 768; // md breakpoint
+      if (isMobile && !sidebarCollapsed()) {
+        setSidebarCollapsed(true);
+      }
+    };
+
+    // Check on mount
+    checkMobile();
+
+    // Check on resize
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   });
 
   const handleSidebarToggle = () => {
@@ -51,6 +75,13 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
     setSidebarCollapsed(newState);
     // Save state to localStorage
     localStorage.setItem("sidebar-collapsed", String(newState));
+    // TODO: Save to tab_group_main_state table
+  };
+
+  const handleSidebarWidthChangeEnd = (width: number) => {
+    // Update state and save to localStorage when drag ends
+    setSidebarWidth(width);
+    localStorage.setItem("sidebar-width", String(width));
     // TODO: Save to tab_group_main_state table
   };
 
@@ -64,6 +95,11 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
         <Sidebar
           collapsed={sidebarCollapsed()}
           onToggle={handleSidebarToggle}
+          width={sidebarWidth()}
+          onWidthChange={() => {}} // No-op during drag
+          onWidthChangeEnd={handleSidebarWidthChangeEnd}
+          minWidth={240}
+          maxWidth={600}
         />
 
         {/* Main Content Area */}
@@ -71,8 +107,8 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
           {/* Tab Navigation */}
           <TabBar activeTab={props.activeTab} onTabChange={props.onTabChange} />
 
-          {/* Tab Content */}
-          <div class="flex-1 overflow-auto p-4 md:p-6">{props.children}</div>
+          {/* Tab Content - Remove overflow-auto to let child components handle scrolling */}
+          <div class="flex-1 overflow-hidden">{props.children}</div>
         </div>
       </div>
     </div>

@@ -176,6 +176,20 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
   // Database is ready - sync will handle populating with real data from Supabase
   console.log("✅ SQLite WASM database ready");
 
+  // DEBUG: Check what data exists in tune table
+  const tuneCount = sqliteDb.exec("SELECT COUNT(*) as count FROM tune");
+  const count = Number(tuneCount[0]?.values[0]?.[0] || 0);
+  console.log(
+    `🔍 DEBUG: Found ${count} tunes in database after initialization`
+  );
+
+  if (count > 0) {
+    const sampleTunes = sqliteDb.exec(
+      "SELECT id, title, genre FROM tune LIMIT 5"
+    );
+    console.log("🔍 DEBUG: Sample tunes:", sampleTunes[0]?.values || []);
+  }
+
   return drizzleDb;
 }
 
