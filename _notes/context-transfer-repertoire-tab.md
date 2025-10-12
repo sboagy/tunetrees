@@ -19,6 +19,7 @@ The TuneTrees SolidJS PWA rewrite is progressing well through Phase 9 (UI Polish
 ### ✅ Major Accomplishments
 
 1. **Enhanced Sidebar** (`src/components/layout/Sidebar.tsx`)
+
    - Horizontally resizable (240-600px with drag handle)
    - Touch support for mobile
    - Performance optimized (RAF throttling, local state, deferred persistence)
@@ -27,11 +28,13 @@ The TuneTrees SolidJS PWA rewrite is progressing well through Phase 9 (UI Polish
    - Smooth 60fps resize performance
 
 2. **TuneInfoHeader Component** (`src/components/sidebar/TuneInfoHeader.tsx`)
+
    - Displays current tune title, type, mode, genre, structure
    - Loading and empty states
    - Reactive to CurrentTuneContext changes
 
 3. **Grid Improvements** (`src/components/grids/TunesGridCatalog.tsx`)
+
    - Single-click sets current tune (updates sidebar)
    - Double-click opens tune editor
    - Footer with tune count
@@ -40,6 +43,7 @@ The TuneTrees SolidJS PWA rewrite is progressing well through Phase 9 (UI Polish
    - Touch support for mobile drag/resize
 
 4. **Filter Panel** (`src/components/catalog/FilterPanel.tsx`)
+
    - Separate dropdowns for Type, Mode, Genre, Playlist
    - Filter chips for selected items
    - Mobile-responsive search integration
@@ -59,6 +63,7 @@ nothing to commit, working tree clean
 ```
 
 **Recent commits:**
+
 1. `7172c4a` - ✨ Catalog tab UI polish - sidebar resize, icons, and grid improvements
 2. `42b78e0` - ⬆️ Fix drizzle-kit version regression + catalog UI polish
 3. `9b06cb9` - 🧹 Remove dev-dist build artifacts
@@ -70,6 +75,7 @@ nothing to commit, working tree clean
 ### **Stack & Technologies**
 
 **Frontend:**
+
 - **SolidJS** v1.9.9 - Reactive UI framework
 - **TypeScript** 5.9.3 (strict mode)
 - **Vite** 7.1.7 - Build tool
@@ -80,12 +86,14 @@ nothing to commit, working tree clean
 - **Tailwind CSS** 4.1.14 - Styling
 
 **Backend & Data:**
+
 - **Supabase** - Remote PostgreSQL + Auth + Realtime
 - **SQLite WASM** (sql.js) - Local offline storage
 - **Drizzle ORM** v0.44.6 - Type-safe database queries
 - **Sync Engine** - Bidirectional sync (SQLite ↔ Supabase)
 
 **Data Status:**
+
 - ✅ 500+ tunes synced
 - ✅ 1,000+ practice records
 - ✅ 515 notes
@@ -145,25 +153,27 @@ The Repertoire tab shows **all tunes in the user's current playlist** (active re
 
 ### **Key Differences from Catalog**
 
-| Feature | Catalog Tab | Repertoire Tab |
-|---------|-------------|----------------|
-| **Data Source** | All tunes (public + user's private) | Tunes in current playlist only |
-| **Filter Panel** | Type, Mode, Genre, Playlist | Type, Mode, Genre (no Playlist filter) |
-| **Add To Repertoire** | Available (adds to playlist) | ❌ Not shown (already in repertoire) |
-| **Remove From Repertoire** | ❌ Not shown | ✅ Available (removes from playlist) |
-| **Toolbar Actions** | Add Tune, Delete Tunes | Add Tune, Remove From Repertoire, Delete Tunes |
-| **Footer Text** | "X tunes in selected playlists" | "X tunes in repertoire" |
-| **Default State** | No playlist filter active | Current playlist always filtered |
+| Feature                    | Catalog Tab                         | Repertoire Tab                                 |
+| -------------------------- | ----------------------------------- | ---------------------------------------------- |
+| **Data Source**            | All tunes (public + user's private) | Tunes in current playlist only                 |
+| **Filter Panel**           | Type, Mode, Genre, Playlist         | Type, Mode, Genre (no Playlist filter)         |
+| **Add To Repertoire**      | Available (adds to playlist)        | ❌ Not shown (already in repertoire)           |
+| **Remove From Repertoire** | ❌ Not shown                        | ✅ Available (removes from playlist)           |
+| **Toolbar Actions**        | Add Tune, Delete Tunes              | Add Tune, Remove From Repertoire, Delete Tunes |
+| **Footer Text**            | "X tunes in selected playlists"     | "X tunes in repertoire"                        |
+| **Default State**          | No playlist filter active           | Current playlist always filtered               |
 
 ### **Database Query**
 
 **Catalog uses:**
+
 ```typescript
 // All tunes for user (public + private)
 await getTunesForUser(db, userId);
 ```
 
 **Repertoire should use:**
+
 ```typescript
 // Only tunes in current playlist
 await getPlaylistTunes(db, playlistId);
@@ -182,6 +192,7 @@ await getPlaylistTunes(db, playlistId);
 **Based on:** `src/components/catalog/CatalogToolbar.tsx`
 
 **Changes needed:**
+
 1. Remove "Add To Repertoire" button
 2. Add "Remove From Repertoire" button (enabled when rows selected)
 3. Remove Playlist filter from FilterPanel (playlist is implied)
@@ -189,6 +200,7 @@ await getPlaylistTunes(db, playlistId);
 5. Add proper aria-labels and tooltips
 
 **Example structure:**
+
 ```typescript
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   return (
@@ -215,6 +227,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 **Based on:** `src/components/grids/TunesGridCatalog.tsx`
 
 **Changes needed:**
+
 1. Use `getPlaylistTunes()` instead of `getTunesForUser()`
 2. Update footer text: `{filteredTunes().length} {filteredTunes().length === 1 ? "tune" : "tunes"} in repertoire`
 3. Remove playlist filtering logic (currentPlaylistId is the filter)
@@ -228,6 +241,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
    - Touch support
 
 **Data loading pattern:**
+
 ```typescript
 const [tunes] = createResource(
   () => {
@@ -235,7 +249,9 @@ const [tunes] = createResource(
     const userId = user()?.id;
     const playlistId = currentPlaylistId();
     const version = syncVersion();
-    return db && userId && playlistId ? { db, userId, playlistId, version } : null;
+    return db && userId && playlistId
+      ? { db, userId, playlistId, version }
+      : null;
   },
   async (params) => {
     if (!params) return [];
@@ -251,6 +267,7 @@ const [tunes] = createResource(
 **Based on:** `src/routes/catalog.tsx`
 
 **Changes needed:**
+
 1. Import RepertoireToolbar and TunesGridRepertoire
 2. Remove playlist filter state (selectedPlaylistIds)
 3. Keep Type, Mode, Genre, Search filter state
@@ -259,32 +276,33 @@ const [tunes] = createResource(
 6. Ensure CurrentPlaylistContext is being used
 
 **Example structure:**
+
 ```typescript
 const RepertoirePage: Component = () => {
   const { user, localDb, syncVersion } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
-  
+
   // Filter state (no playlist filter)
   const [searchQuery, setSearchQuery] = createSignal(getParam(searchParams.q));
   const [selectedTypes, setSelectedTypes] = createSignal<string[]>(/*...*/);
   const [selectedModes, setSelectedModes] = createSignal<string[]>(/*...*/);
   const [selectedGenres, setSelectedGenres] = createSignal<string[]>(/*...*/);
-  
+
   const [selectedRowsCount, setSelectedRowsCount] = createSignal(0);
   const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(null);
-  
+
   // Fetch tunes in current playlist
   const [playlistTunes] = createResource(/*...*/);
-  
+
   // Available filter options
   const availableTypes = createMemo(() => /*...*/);
   const availableModes = createMemo(() => /*...*/);
   const availableGenres = createMemo(() => /*...*/);
-  
+
   const handleRemoveFromRepertoire = async () => {
     // TODO: Implement removal logic
   };
-  
+
   return (
     <div class="flex flex-col h-full">
       <RepertoireToolbar
@@ -303,7 +321,7 @@ const RepertoirePage: Component = () => {
         table={tableInstance() || undefined}
         onRemoveFromRepertoire={handleRemoveFromRepertoire}
       />
-      
+
       <div class="flex-1 overflow-hidden p-4 md:p-6">
         <TunesGridRepertoire
           userId={Number.parseInt(user()!.id)}
@@ -328,6 +346,7 @@ const RepertoirePage: Component = () => {
 **File:** `tests/repertoire-toolbar.spec.ts`
 
 **Test cases:**
+
 1. Toolbar renders with correct buttons
 2. "Remove From Repertoire" button is disabled when no rows selected
 3. "Remove From Repertoire" button is enabled when rows are selected
@@ -353,14 +372,18 @@ const [tunes] = createResource(
 
 // ✅ CORRECT - Use createMemo for derived state
 const filteredTunes = createMemo(() => {
-  return tunes()?.filter(tune => {
-    // Filter logic
-  }) || [];
+  return (
+    tunes()?.filter((tune) => {
+      // Filter logic
+    }) || []
+  );
 });
 
 // ✅ CORRECT - Use createEffect for side effects
 createEffect(() => {
-  const params = { /* ... */ };
+  const params = {
+    /* ... */
+  };
   setSearchParams(params);
 });
 
@@ -381,14 +404,19 @@ const [tunes] = createResource(
     const playlistId = currentPlaylistId();
     return playlistId ? { db: localDb(), playlistId } : null;
   },
-  async (params) => { /* ... */ }
+  async (params) => {
+    /* ... */
+  }
 );
 ```
 
 ### **3. Grid State Persistence**
 
 ```typescript
-import { saveTableState, loadTableState } from "@/components/grids/state-persistence";
+import {
+  saveTableState,
+  loadTableState,
+} from "@/components/grids/state-persistence";
 
 // State persistence key
 const stateKey = createMemo(() => ({
@@ -423,7 +451,7 @@ const handleDrag = (e: MouseEvent) => {
   if (rafId !== null) {
     cancelAnimationFrame(rafId);
   }
-  
+
   rafId = requestAnimationFrame(() => {
     // Update local state only (fast)
     setLocalValue(newValue);
@@ -531,14 +559,14 @@ const data: Tune[] = await fetchTunes();
 ```typescript
 test("repertoire tab shows only current playlist tunes", async ({ page }) => {
   await page.goto("/repertoire");
-  
+
   // Wait for grid to load
   await page.waitForSelector('[data-grid="repertoire"]');
-  
+
   // Verify tune count
-  const footer = await page.textContent('[data-footer]');
+  const footer = await page.textContent("[data-footer]");
   expect(footer).toContain("tunes in repertoire");
-  
+
   // Verify no playlist filter in toolbar
   const playlistFilter = await page.$('[aria-label*="Playlist"]');
   expect(playlistFilter).toBeNull();
@@ -577,12 +605,14 @@ npm run test       # Unit tests (when added)
 ### **MUST READ**
 
 1. **`_notes/tunes_grids_specification.md`**
+
    - Complete grid requirements
    - Data sources and views
    - Column definitions
    - Advanced features spec
 
 2. **`_notes/catalog-grid-advanced-features.md`**
+
    - Implementation details for drag-drop, resize, column visibility
    - Code patterns and examples
    - Performance optimizations
@@ -595,16 +625,19 @@ npm run test       # Unit tests (when added)
 ### **Reference Implementations**
 
 1. **`src/routes/catalog.tsx`**
+
    - Overall page structure
    - Filter state management
    - Resource loading patterns
 
 2. **`src/components/catalog/CatalogToolbar.tsx`**
+
    - Toolbar layout and buttons
    - FilterPanel integration
    - Responsive design
 
 3. **`src/components/grids/TunesGridCatalog.tsx`**
+
    - Grid implementation
    - Column definitions
    - Virtual scrolling
@@ -654,16 +687,19 @@ npm run dev
 ### **Immediate Actions**
 
 1. **Read Reference Files**
+
    - Review `_notes/tunes_grids_specification.md` for grid requirements
    - Review `src/routes/catalog.tsx` for page structure
    - Review `src/components/catalog/CatalogToolbar.tsx` for toolbar patterns
 
 2. **Create Components**
+
    - Create `src/components/repertoire/` directory
    - Implement `RepertoireToolbar.tsx`
    - Implement `src/components/grids/TunesGridRepertoire.tsx`
 
 3. **Update Route**
+
    - Enhance `src/routes/repertoire.tsx`
    - Integrate new components
    - Implement filter logic
@@ -703,6 +739,7 @@ npm run dev
 **Ready to push:** Yes (but can continue local development)
 
 **Recent commits:**
+
 - `7172c4a` - Catalog tab UI polish (sidebar, grid, icons)
 - `42b78e0` - drizzle-kit fix + documentation
 - `9b06cb9` - Remove dev-dist artifacts
@@ -720,7 +757,7 @@ npm run dev
 ✅ Touch support for mobile  
 ✅ Performance optimizations (60fps drag)  
 ✅ State persistence to localStorage  
-✅ lucide-solid icons throughout  
+✅ lucide-solid icons throughout
 
 ### **What to Carry Forward**
 
