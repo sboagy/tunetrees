@@ -34,6 +34,7 @@ export interface DueTuneEntry {
   mode: string | null;
   structure: string | null;
   scheduled: string | null;
+  latest_practiced: string | null;
   tune: Tune;
   schedulingInfo?: TuneSchedulingInfo;
 }
@@ -162,6 +163,7 @@ export async function getDueTunes(
         mode: row.mode,
         structure: row.structure,
         scheduled: null,
+        latest_practiced: row.latest_practiced,
         tune: {
           id: row.tuneRef,
           title: row.title,
@@ -200,6 +202,7 @@ export async function getDueTunes(
         mode: row.mode,
         structure: row.structure,
         scheduled: nextReview,
+        latest_practiced: row.latest_practiced,
         tune: {
           id: row.tuneRef,
           title: row.title,
