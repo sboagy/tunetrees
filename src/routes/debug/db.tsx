@@ -27,8 +27,8 @@ export default function DatabaseBrowser(): ReturnType<Component> {
   const [executionTime, setExecutionTime] = createSignal<number>(0);
 
   // Get table list for quick access
-  const [tables] = createResource(async () => {
-    if (!localDb()) return [];
+  const [tables] = createResource(localDb, async (db) => {
+    if (!db) return [];
     const sqliteDb = await getSqliteInstance();
     if (!sqliteDb) return [];
 
@@ -98,8 +98,12 @@ export default function DatabaseBrowser(): ReturnType<Component> {
     setQuery(sql);
   };
 
-  const browseTable = (tableName: string) => {
-    setQuery(`SELECT * FROM ${tableName} LIMIT 100;`);
+  const browseTable = async (tableName: string) => {
+    const sql = `SELECT * FROM ${tableName} LIMIT 100;`;
+    setQuery(sql);
+    // Execute query immediately after setting it
+    // Use setTimeout to ensure the query signal has updated
+    setTimeout(() => executeQuery(), 0);
   };
 
   return (

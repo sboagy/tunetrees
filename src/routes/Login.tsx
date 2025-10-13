@@ -42,13 +42,22 @@ const Login: Component = () => {
     <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 sm:px-6 lg:px-8">
       <div class="max-w-md w-full space-y-8">
         {/* Logo/Branding */}
-        <div class="text-center">
-          <h1 class="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">
-            🎵 TuneTrees
-          </h1>
-          <p class="text-gray-600 dark:text-gray-400">
-            Practice smarter, not harder
-          </p>
+        <div class="flex items-center justify-center gap-4">
+          <img
+            src="/logo4.png"
+            alt="TuneTrees Logo"
+            width="48"
+            height="48"
+            class="h-24 w-24 object-contain"
+          />
+          <div class="text-left">
+            <span class="text-5xl font-bold leading-tight dark:text-blue-400">
+              TuneTrees
+            </span>
+            <p class="m-2 text-2xl text-gray-600 dark:text-gray-400">
+              Practice smarter, not harder
+            </p>
+          </div>
         </div>
 
         {/* Login Form */}
