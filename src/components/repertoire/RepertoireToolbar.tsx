@@ -24,6 +24,21 @@ import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
+import {
+  TOOLBAR_BUTTON_BASE,
+  TOOLBAR_BUTTON_DANGER,
+  TOOLBAR_BUTTON_GROUP_CLASSES,
+  TOOLBAR_BUTTON_NEUTRAL_ALT,
+  TOOLBAR_BUTTON_PRIMARY,
+  TOOLBAR_BUTTON_SUCCESS,
+  TOOLBAR_BUTTON_WARNING,
+  TOOLBAR_CONTAINER_CLASSES,
+  TOOLBAR_ICON_SIZE,
+  TOOLBAR_INNER_CLASSES,
+  TOOLBAR_SEARCH_CONTAINER,
+  TOOLBAR_SEARCH_ICON,
+  TOOLBAR_SEARCH_INPUT,
+} from "../grids/shared-toolbar-styles";
 
 export interface RepertoireToolbarProps {
   /** Search query */
@@ -87,19 +102,19 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   };
 
   return (
-    <div class="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200/30 dark:border-gray-700/30">
+    <div class={TOOLBAR_CONTAINER_CLASSES}>
       {/* Main toolbar */}
-      <div class="px-2 sm:px-3 lg:px-4 py-1.5">
-        <div class="flex items-center gap-1.5 sm:gap-2">
+      <div class={TOOLBAR_INNER_CLASSES}>
+        <div class={TOOLBAR_BUTTON_GROUP_CLASSES}>
           {/* Add To Review button - left-most */}
           <button
             type="button"
             onClick={handleAddToReview}
             title="Add selected tunes to practice review queue"
-            class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_PRIMARY}`}
           >
             <svg
-              class="w-3.5 h-3.5 flex-shrink-0"
+              class={TOOLBAR_ICON_SIZE}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -117,9 +132,9 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           </button>
 
           {/* Search input - visible on larger screens, hidden on mobile (moves to FilterPanel) */}
-          <div class="relative hidden md:flex items-center flex-1 min-w-[12ch] max-w-xs">
+          <div class={TOOLBAR_SEARCH_CONTAINER}>
             <svg
-              class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-gray-500 pointer-events-none"
+              class={TOOLBAR_SEARCH_ICON}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -137,7 +152,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
               placeholder="Search tunes..."
               value={props.searchQuery}
               onInput={(e) => props.onSearchChange(e.currentTarget.value)}
-              class="w-full px-3 py-1.5 pl-9 text-sm bg-white dark:bg-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+              class={TOOLBAR_SEARCH_INPUT}
             />
           </div>
 
@@ -165,10 +180,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             type="button"
             onClick={handleAddTune}
             title="Add a new tune"
-            class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
           >
             <svg
-              class="w-3.5 h-3.5 flex-shrink-0"
+              class={TOOLBAR_ICON_SIZE}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -190,10 +205,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             onClick={handleRemoveFromRepertoire}
             title="Remove selected tunes from repertoire"
             disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
-            class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-orange-600 dark:text-orange-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_WARNING}`}
           >
             <svg
-              class="w-3.5 h-3.5 flex-shrink-0"
+              class={TOOLBAR_ICON_SIZE}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -216,10 +231,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             onClick={handleDeleteTunes}
             title="Delete selected tunes"
             disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
-            class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_DANGER}`}
           >
             <svg
-              class="w-3.5 h-3.5 flex-shrink-0"
+              class={TOOLBAR_ICON_SIZE}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -244,10 +259,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
               title="Show/hide columns"
               data-testid="repertoire-columns-button"
               aria-expanded={showColumnsDropdown()}
-              class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
+              class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
             >
               <svg
-                class="w-3.5 h-3.5 flex-shrink-0"
+                class={TOOLBAR_ICON_SIZE}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

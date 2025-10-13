@@ -22,6 +22,20 @@ import type { Table } from "@tanstack/solid-table";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, Show } from "solid-js";
 import type { PlaylistWithSummary } from "../../lib/db/types";
+import {
+  TOOLBAR_BUTTON_BASE,
+  TOOLBAR_BUTTON_DANGER,
+  TOOLBAR_BUTTON_GROUP_CLASSES,
+  TOOLBAR_BUTTON_NEUTRAL_ALT,
+  TOOLBAR_BUTTON_PRIMARY,
+  TOOLBAR_BUTTON_SUCCESS,
+  TOOLBAR_CONTAINER_CLASSES,
+  TOOLBAR_ICON_SIZE,
+  TOOLBAR_INNER_CLASSES,
+  TOOLBAR_SEARCH_CONTAINER,
+  TOOLBAR_SEARCH_ICON,
+  TOOLBAR_SEARCH_INPUT,
+} from "../grids/shared-toolbar-styles";
 import { ColumnVisibilityMenu } from "./ColumnVisibilityMenu";
 import { FilterPanel } from "./FilterPanel";
 
@@ -103,19 +117,19 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   };
 
   return (
-    <div class="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200/30 dark:border-gray-700/30">
+    <div class={TOOLBAR_CONTAINER_CLASSES}>
       {/* Main toolbar */}
-      <div class="px-2 sm:px-3 lg:px-4 py-1.5">
-        <div class="flex items-center gap-1.5 sm:gap-2">
+      <div class={TOOLBAR_INNER_CLASSES}>
+        <div class={TOOLBAR_BUTTON_GROUP_CLASSES}>
           {/* Add To Repertoire button */}
           <button
             type="button"
             onClick={handleAddToRepertoire}
             title="Add selected tunes to repertoire"
-            class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_PRIMARY}`}
           >
             <svg
-              class="w-3.5 h-3.5 flex-shrink-0"
+              class={TOOLBAR_ICON_SIZE}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -133,9 +147,9 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
           </button>
 
           {/* Search input - visible on larger screens, hidden on mobile (moves to FilterPanel) */}
-          <div class="relative hidden md:flex items-center flex-1 min-w-[12ch] max-w-xs">
+          <div class={TOOLBAR_SEARCH_CONTAINER}>
             <svg
-              class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-gray-500 pointer-events-none"
+              class={TOOLBAR_SEARCH_ICON}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -153,7 +167,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
               placeholder="Search tunes..."
               value={props.searchQuery}
               onInput={(e) => props.onSearchChange(e.currentTarget.value)}
-              class="w-full px-3 py-1.5 pl-9 text-sm bg-white dark:bg-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+              class={TOOLBAR_SEARCH_INPUT}
             />
           </div>
 
@@ -180,10 +194,10 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             type="button"
             onClick={handleAddTune}
             title="Add a new tune"
-            class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
           >
             <svg
-              class="w-3.5 h-3.5 flex-shrink-0"
+              class={TOOLBAR_ICON_SIZE}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -205,10 +219,10 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             onClick={handleDeleteTunes}
             title="Delete selected tunes"
             disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
-            class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_DANGER}`}
           >
             <svg
-              class="w-3.5 h-3.5 flex-shrink-0"
+              class={TOOLBAR_ICON_SIZE}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -231,10 +245,10 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
               type="button"
               onClick={handleColumnsToggle}
               title="Show/hide columns"
-              class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
+              class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
             >
               <svg
-                class="w-3.5 h-3.5 flex-shrink-0"
+                class={TOOLBAR_ICON_SIZE}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

@@ -25,6 +25,7 @@ import {
 } from "solid-js";
 import { CatalogToolbar } from "../components/catalog";
 import { TunesGridCatalog } from "../components/grids";
+import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
@@ -275,8 +276,8 @@ const CatalogPage: Component = () => {
         />
       </Show>
 
-      {/* Grid wrapper - overflow-hidden constrains grid height, padding provides spacing */}
-      <div class="flex-1 overflow-hidden p-4 md:p-6">
+      {/* Grid wrapper - overflow-hidden constrains grid height */}
+      <div class={GRID_CONTENT_CONTAINER}>
         <Show when={user()}>
           <TunesGridCatalog
             userId={Number.parseInt(user()!.id)}

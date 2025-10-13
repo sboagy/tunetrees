@@ -20,6 +20,7 @@ import {
   Show,
 } from "solid-js";
 import { TunesGridRepertoire } from "../components/grids";
+import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
 import { RepertoireToolbar } from "../components/repertoire";
 import { useAuth } from "../lib/auth/AuthContext";
@@ -254,8 +255,8 @@ const RepertoirePage: Component = () => {
         />
       </Show>
 
-      {/* Grid wrapper - overflow-hidden constrains grid height, padding provides spacing */}
-      <div class="flex-1 overflow-hidden p-4 md:p-6">
+      {/* Grid wrapper - overflow-hidden constrains grid height */}
+      <div class={GRID_CONTENT_CONTAINER}>
         <Show when={user() && currentPlaylistId()}>
           <TunesGridRepertoire
             userId={Number.parseInt(user()!.id, 10)}
