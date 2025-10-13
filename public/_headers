@@ -1,0 +1,22 @@
+/*
+  # Security headers
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  
+  # Cache control for service worker
+  Cache-Control: public, max-age=0, must-revalidate
+
+/assets/*
+  # Long cache for static assets (Vite adds hashes to filenames)
+  Cache-Control: public, max-age=31536000, immutable
+
+/registerSW.js
+  # Don't cache the service worker registration script
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/*.wasm
+  # Cache WASM files (SQLite)
+  Cache-Control: public, max-age=31536000, immutable
+  Content-Type: application/wasm

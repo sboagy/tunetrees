@@ -729,11 +729,11 @@ export class SyncEngine {
     failed: number;
     total: number;
   }> {
-    if (!this.db) {
+    if (!this.localDb) {
       // Return empty stats if db not initialized
       return { pending: 0, syncing: 0, failed: 0, total: 0 };
     }
-    return await getSyncQueueStats(this.db);
+    return await getSyncQueueStats(this.localDb);
   }
 
   /**

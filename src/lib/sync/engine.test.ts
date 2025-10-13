@@ -28,12 +28,29 @@ vi.mock("../db/client-postgres", () => ({
 
 describe("SyncEngine", () => {
   let mockLocalDb: SqliteDatabase;
+  let mockSupabase: any;
   let syncEngine: SyncEngine;
   const userId = 123;
 
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
+
+    // Mock Supabase client
+    mockSupabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            order: vi.fn(() => ({
+              limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
+            })),
+          })),
+        })),
+        insert: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        update: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        delete: vi.fn(() => Promise.resolve({ data: null, error: null })),
+      })),
+    };
 
     // Mock local database
     mockLocalDb = {
@@ -44,7 +61,7 @@ describe("SyncEngine", () => {
     } as unknown as SqliteDatabase;
 
     // Create sync engine
-    syncEngine = new SyncEngine(mockLocalDb, userId, {
+    syncEngine = new SyncEngine(mockLocalDb, mockSupabase, userId, {
       batchSize: 10,
       maxRetries: 3,
       timeoutMs: 5000,

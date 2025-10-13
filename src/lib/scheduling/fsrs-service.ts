@@ -251,6 +251,7 @@ export class FSRSService {
     playlistRef: number
   ): NewPracticeRecord {
     return {
+      lastModifiedAt: new Date().toISOString(),
       tuneRef: input.tuneRef,
       playlistRef: playlistRef,
       practiced: input.practiced.toISOString(),

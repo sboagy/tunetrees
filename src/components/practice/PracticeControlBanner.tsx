@@ -303,6 +303,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             {/* Columns menu */}
             <Show when={showColumnsDropdown() && props.table}>
               <ColumnVisibilityMenu
+                isOpen={showColumnsDropdown()}
                 table={props.table!}
                 onClose={() => setShowColumnsDropdown(false)}
                 triggerRef={columnsButtonRef}

@@ -306,6 +306,7 @@ export async function generateDailyPracticeQueue(
     }
 
     queueEntries.push({
+      lastModifiedAt: now,
       userRef: userRef,
       playlistRef: playlistId,
       mode: "per_day",
@@ -443,6 +444,7 @@ export async function refillPracticeQueue(
   const nextOrderIndex = Math.max(...existing.map((e) => e.orderIndex)) + 1;
   const now = new Date().toISOString();
   const newEntries: NewDailyPracticeQueue[] = newBackfill.map((tune, idx) => ({
+    lastModifiedAt: now,
     userRef: userRef,
     playlistRef: playlistId,
     mode: "per_day",

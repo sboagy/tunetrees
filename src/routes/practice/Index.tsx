@@ -35,9 +35,6 @@ const PracticeIndex: Component = () => {
   const { user, localDb } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
 
-  // Track column visibility state
-  const [columnVisibility, setColumnVisibility] = createSignal({});
-
   // Track evaluations count and table instance for toolbar
   const [evaluationsCount, setEvaluationsCount] = createSignal(0);
   const [showSubmitted, setShowSubmitted] = createSignal(false);
@@ -96,8 +93,6 @@ const PracticeIndex: Component = () => {
                 userId={1} // TODO: Get actual user ID from user_profile
                 playlistId={playlistId()}
                 tablePurpose="scheduled"
-                columnVisibility={columnVisibility()}
-                onColumnVisibilityChange={setColumnVisibility}
                 onRecallEvalChange={handleRecallEvalChange}
                 onGoalChange={handleGoalChange}
                 onEvaluationsCountChange={setEvaluationsCount}

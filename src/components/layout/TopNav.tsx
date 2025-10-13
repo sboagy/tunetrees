@@ -66,19 +66,33 @@ const PlaylistDropdown: Component = () => {
   const [showDropdown, setShowDropdown] = createSignal(false);
 
   // Fetch user playlists
+  // Fetch immediately if data exists in SQLite, don't wait for sync
+  // syncVersion is still tracked as a dependency to trigger refetch after sync
   const [playlists] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
       const version = syncVersion(); // Triggers refetch when sync completes
+
+      console.log("🔍 [TopNav] Playlists dependency check:", {
+        hasDb: !!db,
+        userId,
+        userObject: user(),
+        syncVersion: version,
+        shouldFetch: !!(db && userId),
+      });
       log.debug("TOPNAV playlists dependency:", {
         hasDb: !!db,
         userId,
         syncVersion: version,
       });
+
+      // Fetch if database and user are ready
+      // Will return empty array on first login, then refetch when sync completes (version increments)
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
+      console.log("📋 [TopNav] Fetching playlists with params:", params);
       log.debug("TOPNAV playlists fetcher:", {
         hasParams: !!params,
         syncVersion: params?.version,
@@ -86,10 +100,16 @@ const PlaylistDropdown: Component = () => {
       if (!params) return [];
 
       try {
+        console.log(
+          "🔄 [TopNav] Calling getUserPlaylists with userId:",
+          params.userId
+        );
         const result = await getUserPlaylists(params.db, params.userId);
+        console.log("✅ [TopNav] Got playlists:", result.length, result);
         log.debug("TOPNAV playlists result:", result.length, "playlists");
         return result;
       } catch (error) {
+        console.error("❌ [TopNav] Playlist fetch error:", error);
         log.error("TOPNAV playlists fetch error:", error);
         return [];
       }

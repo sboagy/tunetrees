@@ -174,6 +174,26 @@ export const AuthProvider: ParentComponent = (props) => {
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
         log.info("Sync worker started");
+
+        // Perform initial sync down to populate local database with user's data
+        log.info("Performing initial syncDown on login...");
+        try {
+          const result = await syncWorker.service.syncDown();
+          log.info("Initial syncDown completed:", result);
+          // Increment sync version to trigger UI updates
+          setSyncVersion((prev) => {
+            const newVersion = prev + 1;
+            log.debug(
+              "Sync version changed after initial sync:",
+              prev,
+              "->",
+              newVersion
+            );
+            return newVersion;
+          });
+        } catch (error) {
+          log.error("Initial syncDown failed:", error);
+        }
       } else {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
       }
@@ -228,12 +248,14 @@ export const AuthProvider: ParentComponent = (props) => {
         setUser(existingSession?.user ?? null);
 
         if (existingSession?.user) {
-          await initializeLocalDatabase(existingSession.user.id);
+          // Initialize database in background (don't block loading state)
+          void initializeLocalDatabase(existingSession.user.id);
         }
       } catch (error) {
         log.error("Error during session initialization:", error);
       } finally {
-        // Always set loading to false, even if initialization fails
+        // Set loading to false to allow UI to render
+        // Database initialization continues in background
         setLoading(false);
       }
     })();
@@ -251,8 +273,12 @@ export const AuthProvider: ParentComponent = (props) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
-      // Only clear database on sign out
-      // Database initialization happens in the session check effect above
+      // Initialize database on sign in (in background, don't block)
+      if (event === "SIGNED_IN" && newSession?.user) {
+        void initializeLocalDatabase(newSession.user.id);
+      }
+
+      // Clear database on sign out
       if (event === "SIGNED_OUT") {
         await clearLocalDatabase();
       }

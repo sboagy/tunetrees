@@ -23,6 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env.production
+.env.local
+
+# Cloudflare
+.wrangler/
+.dev.vars
+wrangler.toml.backup
 # Test artifacts and reports
 test-results/
 playwright-report/

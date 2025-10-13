@@ -312,7 +312,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   });
 
   // Handle row click to set current tune
-  const handleRowClick = (tune: (typeof tunes)[0]) => {
+  const handleRowClick = (tune: ReturnType<typeof tunes>[0]) => {
     setCurrentTuneId(tune.tune_id);
     if (props.onTuneSelect) {
       props.onTuneSelect(tune as any);

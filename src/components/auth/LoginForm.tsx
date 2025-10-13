@@ -9,6 +9,7 @@
  * @module components/auth/LoginForm
  */
 
+import { Eye, EyeOff } from "lucide-solid";
 import { type Component, createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 
@@ -44,6 +45,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
   const [name, setName] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
   const [isSubmitting, setIsSubmitting] = createSignal(false);
+  const [showPassword, setShowPassword] = createSignal(false);
 
   /**
    * Handle email/password form submission
@@ -78,7 +80,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
         const { error: signUpError } = await signUp(
           emailVal,
           passwordVal,
-          nameVal,
+          nameVal
         );
         if (signUpError) {
           setError(signUpError.message);
@@ -202,17 +204,29 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
           >
             Password
           </label>
-          <input
-            id="password"
-            type="password"
-            value={password()}
-            onInput={(e) => setPassword(e.currentTarget.value)}
-            placeholder="••••••••"
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-            disabled={isSubmitting() || loading()}
-            required
-            minlength="6"
-          />
+          <div class="relative">
+            <input
+              id="password"
+              type={showPassword() ? "text" : "password"}
+              value={password()}
+              onInput={(e) => setPassword(e.currentTarget.value)}
+              placeholder="••••••••"
+              class="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              disabled={isSubmitting() || loading()}
+              required
+              minlength="6"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword())}
+              class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
+              aria-label={showPassword() ? "Hide password" : "Show password"}
+            >
+              <Show when={showPassword()} fallback={<Eye class="w-5 h-5" />}>
+                <EyeOff class="w-5 h-5" />
+              </Show>
+            </button>
+          </div>
         </div>
 
         {/* Submit Button */}

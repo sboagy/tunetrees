@@ -166,7 +166,12 @@ export class SyncService {
     this.isSyncing = true;
 
     try {
-      return await this.syncEngine.syncUp();
+      const result = await this.syncEngine.syncUp();
+
+      // Notify callback (same as sync() method)
+      this.config.onSyncComplete?.(result);
+
+      return result;
     } finally {
       this.isSyncing = false;
     }
@@ -183,7 +188,12 @@ export class SyncService {
     this.isSyncing = true;
 
     try {
-      return await this.syncEngine.syncDown();
+      const result = await this.syncEngine.syncDown();
+
+      // Notify callback (same as sync() method)
+      this.config.onSyncComplete?.(result);
+
+      return result;
     } finally {
       this.isSyncing = false;
     }

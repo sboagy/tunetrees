@@ -63,8 +63,13 @@ export async function getUserPlaylists(
     .where(eq(userProfile.supabaseUserId, userId))
     .limit(1);
 
+  // Return empty array if user_profile not found yet (before initial sync completes)
+  // This is normal on first login before syncDown populates the table
   if (!userRecord || userRecord.length === 0) {
-    throw new Error(`User not found: ${userId}`);
+    console.log(
+      `⚠️ User profile not found yet for ${userId}, returning empty playlists`
+    );
+    return [];
   }
 
   const userRef = userRecord[0].id;

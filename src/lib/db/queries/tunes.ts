@@ -34,8 +34,10 @@ export interface SearchTunesOptions {
 /**
  * Get user_profile.id from supabase_user_id (UUID)
  * Returns null if user not found
+ *
+ * NOTE: Currently unused but kept for potential future use
  */
-async function getUserProfileId(
+/* async function getUserProfileId(
   db: SqliteDatabase,
   supabaseUserId: string
 ): Promise<number | null> {
@@ -50,7 +52,7 @@ async function getUserProfileId(
   }
 
   return result[0].id;
-}
+} */
 
 /**
  * Get a single tune by ID

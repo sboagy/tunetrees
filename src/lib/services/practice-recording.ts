@@ -113,6 +113,7 @@ export async function recordPracticeRating(
     const dueStr = schedule.nextDue.toISOString();
 
     const newRecord: NewPracticeRecord = {
+      lastModifiedAt: new Date().toISOString(),
       playlistRef: input.playlistRef,
       tuneRef: input.tuneRef,
       practiced: practicedDateStr,
