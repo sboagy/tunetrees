@@ -87,7 +87,7 @@ export function getDefaultTableState(
         incipit: false, // Hide incipit by default
         structure: false, // Hide structure by default
       };
-      baseState.sorting = [{ id: "latest_due", desc: false }]; // Sort by due date
+      baseState.sorting = [{ id: "scheduled", desc: false }]; // Sort by scheduled date
       break;
 
     case "repertoire":

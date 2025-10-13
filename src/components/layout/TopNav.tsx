@@ -272,7 +272,7 @@ const PlaylistDropdown: Component = () => {
 };
 
 export const TopNav: Component = () => {
-  const { user, localDb, signOut } = useAuth();
+  const { user, localDb, signOut, forceSyncDown } = useAuth();
   const [isOnline, setIsOnline] = createSignal(navigator.onLine);
   const [pendingCount, setPendingCount] = createSignal(0);
   const [showUserMenu, setShowUserMenu] = createSignal(false);
@@ -604,6 +604,56 @@ export const TopNav: Component = () => {
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Force Sync Down Button */}
+                    <div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          console.log(
+                            "🔄 [Force Sync Down] Button clicked - starting sync..."
+                          );
+                          try {
+                            await forceSyncDown();
+                            console.log(
+                              "✅ [Force Sync Down] Sync completed successfully"
+                            );
+                          } catch (error) {
+                            console.error(
+                              "❌ [Force Sync Down] Sync failed:",
+                              error
+                            );
+                          }
+                        }}
+                        class="w-full px-4 py-2 text-left text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-2 rounded-md font-medium"
+                        disabled={!isOnline()}
+                        classList={{
+                          "opacity-50 cursor-not-allowed": !isOnline(),
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                          <polyline points="7 10 12 15 17 10" />
+                          <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        Force Sync Down
+                        {!isOnline() && (
+                          <span class="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                            (Offline)
+                          </span>
+                        )}
+                      </button>
                     </div>
 
                     {/* Database Browser (Dev Mode Only) */}

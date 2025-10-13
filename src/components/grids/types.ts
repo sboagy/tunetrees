@@ -115,6 +115,9 @@ export interface IGridBaseProps {
   onRecallEvalChange?: (tuneId: number, newValue: string) => void;
   onGoalChange?: (tuneId: number, newValue: string | null) => void;
   onSelectionChange?: (selectedCount: number) => void;
+  // Practice toolbar callbacks
+  onEvaluationsCountChange?: (count: number) => void;
+  onTableInstanceChange?: (table: any) => void;
   // Table instance callback
   onTableReady?: (table: any) => void;
   // Column visibility

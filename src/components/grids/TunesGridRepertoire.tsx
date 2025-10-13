@@ -42,6 +42,15 @@ import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getPlaylistTunesStaged } from "../../lib/db/queries/playlists";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
+import {
+  CELL_CLASSES,
+  CONTAINER_CLASSES,
+  getHeaderCellClasses,
+  HEADER_CLASSES,
+  ROW_CLASSES,
+  TABLE_CLASSES,
+  TBODY_CLASSES,
+} from "./shared-grid-styles";
 import { getColumns } from "./TuneColumns";
 import {
   loadTableState,
@@ -505,15 +514,15 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
           ref={(el) => {
             containerRef = el;
           }}
-          class="flex-1 overflow-auto relative touch-pan-y"
+          class={CONTAINER_CLASSES}
           style={{ "touch-action": "pan-y" }}
         >
           <table
-            class="w-full border-collapse"
+            class={TABLE_CLASSES}
             style={{ width: `${table.getCenterTotalSize()}px` }}
           >
             {/* Sticky header */}
-            <thead class="sticky top-0 z-10 bg-gray-100 dark:bg-gray-800 border-b border-gray-300 dark:border-gray-600">
+            <thead class={HEADER_CLASSES}>
               <For each={table.getHeaderGroups()}>
                 {(headerGroup) => (
                   <tr>
@@ -521,15 +530,18 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
                       {(header) => (
                         <th
                           data-column-id={header.column.id}
-                          class={`px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 relative group ${
-                            draggedColumn() === header.column.id
-                              ? "opacity-50"
-                              : ""
-                          } ${
-                            isDragging() && draggedColumn() !== header.column.id
-                              ? "bg-blue-50 dark:bg-blue-900/20"
-                              : ""
-                          }`}
+                          class={getHeaderCellClasses(
+                            `${
+                              draggedColumn() === header.column.id
+                                ? "opacity-50"
+                                : ""
+                            } ${
+                              isDragging() &&
+                              draggedColumn() !== header.column.id
+                                ? "bg-blue-50 dark:bg-blue-900/20"
+                                : ""
+                            }`
+                          )}
                           style={{ width: `${header.getSize()}px` }}
                           onDragOver={handleDragOver}
                           onDrop={(e) => handleDrop(e, header.column.id)}
@@ -601,7 +613,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
             </thead>
 
             {/* Virtualized body */}
-            <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody class={TBODY_CLASSES}>
               {/* Spacer for virtual scrolling offset */}
               <Show when={rowVirtualizer().getVirtualItems().length > 0}>
                 <tr
@@ -621,7 +633,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
 
                   return (
                     <tr
-                      class="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                      class={ROW_CLASSES}
                       classList={{
                         get ["border-t-2 border-b-2 border-blue-500"]() {
                           return currentTuneId() === row.original.id;
@@ -633,7 +645,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
                       <For each={row.getVisibleCells()}>
                         {(cell) => (
                           <td
-                            class="px-3 py-2 text-sm border-r border-gray-100 dark:border-gray-800"
+                            class={CELL_CLASSES}
                             style={{ width: `${cell.column.getSize()}px` }}
                           >
                             {flexRender(

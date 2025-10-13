@@ -7,6 +7,7 @@
 
 import type { ColumnDef } from "@tanstack/solid-table";
 import { type Component, Show } from "solid-js";
+import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
 /**
@@ -667,13 +668,226 @@ export function getRepertoireColumns(
 
 /**
  * Get column definitions for Scheduled/Practice grid
- * TODO: Implement with recall eval editor and scheduling indicators
+ * Includes embedded RecallEvalComboBox in Evaluation column
  */
 export function getScheduledColumns(
   callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
-  // For now, return catalog columns - will extend in next phase
-  return getCatalogColumns(callbacks);
+  const baseColumns = getCatalogColumns(callbacks);
+
+  // Practice-specific columns with Evaluation
+  const practiceSpecificColumns: ColumnDef<any>[] = [
+    // Bucket (Due Today, Lapsed, Backfill)
+    {
+      id: "bucket",
+      accessorFn: (row) => row.bucket || "Due Today",
+      header: ({ column }) => <SortableHeader column={column} title="Bucket" />,
+      cell: (info) => {
+        const value = (info.getValue() as string) || "Due Today";
+        const colors: Record<string, string> = {
+          "Due Today":
+            "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200",
+          Lapsed:
+            "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200",
+          Backfill:
+            "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200",
+        };
+        const colorClass =
+          colors[value] ||
+          "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400";
+        return (
+          <span
+            class={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}
+          >
+            {value}
+          </span>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    },
+
+    // Evaluation (RecallEvalComboBox) - embedded editor
+    {
+      id: "evaluation",
+      accessorFn: (row) => row.recall_eval || "",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Evaluation" />
+      ),
+      cell: (info) => {
+        const row = info.row.original;
+        const tuneId = row.tune?.id || row.tuneRef || row.id;
+        const currentEval = info.getValue() as string;
+
+        return (
+          <RecallEvalComboBox
+            tuneId={tuneId}
+            value={currentEval}
+            onChange={(value) => {
+              if (callbacks?.onRecallEvalChange) {
+                callbacks.onRecallEvalChange(tuneId, value);
+              }
+            }}
+          />
+        );
+      },
+      size: 220,
+      minSize: 180,
+      maxSize: 280,
+      enableSorting: false, // Can't sort interactive controls
+    },
+
+    // Goal
+    {
+      id: "goal",
+      accessorFn: (row) => row.goal || row.latest_goal || "recall",
+      header: ({ column }) => <SortableHeader column={column} title="Goal" />,
+      cell: (info) => {
+        const value = (info.getValue() as string) || "recall";
+        const colors: Record<string, string> = {
+          recall:
+            "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200",
+          notes:
+            "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200",
+          technique:
+            "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200",
+          backup:
+            "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200",
+        };
+        const colorClass = colors[value] || colors.recall;
+        return (
+          <span
+            class={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}
+          >
+            {value}
+          </span>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    },
+  ];
+
+  // Combine: select, id, practice-specific, then core tune columns
+  return [
+    baseColumns[0], // select checkbox
+    baseColumns[1], // id
+    ...practiceSpecificColumns, // Bucket, Evaluation, Goal
+    baseColumns[2], // title
+    baseColumns[4], // type
+    baseColumns[6], // structure
+    baseColumns[7], // status (private_for)
+    // Add scheduling columns from repertoire
+    {
+      id: "scheduled",
+      accessorFn: (row) => row.scheduled,
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Scheduled" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        if (!value) return <span class="text-gray-400">—</span>;
+
+        const date = new Date(value);
+        const now = new Date();
+        const diffDays = Math.floor(
+          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        let color = "text-gray-600 dark:text-gray-400";
+        if (diffDays < 0) color = "text-red-600 dark:text-red-400";
+        else if (diffDays === 0) color = "text-orange-600 dark:text-orange-400";
+        else if (diffDays <= 7) color = "text-yellow-600 dark:text-yellow-400";
+        else color = "text-green-600 dark:text-green-400";
+
+        const label =
+          diffDays === 0
+            ? "Today"
+            : diffDays === -1
+            ? "Yesterday"
+            : diffDays < 0
+            ? `${Math.abs(diffDays)}d overdue`
+            : diffDays === 1
+            ? "Tomorrow"
+            : `In ${diffDays}d`;
+
+        return (
+          <span
+            class={`text-sm font-medium ${color}`}
+            title={date.toLocaleDateString()}
+          >
+            {label}
+          </span>
+        );
+      },
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+    },
+    {
+      id: "latest_practiced",
+      accessorFn: (row) => row.latest_practiced,
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Last Practiced" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        if (!value) return <span class="text-gray-400">Never</span>;
+
+        const date = new Date(value);
+        const now = new Date();
+        const diffDays = Math.floor(
+          (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        let color = "text-gray-600 dark:text-gray-400";
+        if (diffDays < 7) color = "text-green-600 dark:text-green-400";
+        else if (diffDays < 30) color = "text-yellow-600 dark:text-yellow-400";
+        else color = "text-red-600 dark:text-red-400";
+
+        const label =
+          diffDays === 0
+            ? "Today"
+            : diffDays === 1
+            ? "Yesterday"
+            : diffDays < 30
+            ? `${diffDays}d ago`
+            : `${Math.floor(diffDays / 30)}mo ago`;
+
+        return (
+          <span class={`text-sm ${color}`} title={date.toLocaleDateString()}>
+            {label}
+          </span>
+        );
+      },
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+    },
+    {
+      id: "latest_stability",
+      accessorFn: (row) =>
+        row.latest_stability ?? row.schedulingInfo?.stability,
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Stability" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value !== null ? (
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {value.toFixed(2)}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 90,
+      minSize: 70,
+      maxSize: 110,
+    },
+  ];
 }
 
 /**
