@@ -388,7 +388,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
       <div
         ref={containerRef}
         class={CONTAINER_CLASSES}
-        style={{ position: "relative", "touch-action": "pan-y" }}
+        style={{ position: "relative", "touch-action": "pan-x pan-y" }}
       >
         <Show
           when={!dueTunesData.loading}

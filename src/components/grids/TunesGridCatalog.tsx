@@ -561,7 +561,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
             containerRef = el;
           }}
           class={CONTAINER_CLASSES}
-          style={{ "touch-action": "pan-y" }}
+          style={{ "touch-action": "pan-x pan-y" }}
         >
           <table
             class={TABLE_CLASSES}
