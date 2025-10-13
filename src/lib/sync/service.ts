@@ -194,7 +194,7 @@ export class SyncService {
    *
    * Strategy:
    * - syncDown: Once on startup, then every 20 minutes (pull remote changes - rare)
-   * - syncUp: Every 5 minutes (push local changes - frequent)
+   * - syncUp: Every 5 minutes (push local changes - frequent, only if changes pending)
    */
   public startAutoSync(): void {
     if (this.syncIntervalId) {
@@ -211,9 +211,32 @@ export class SyncService {
     void this.syncDown();
 
     // Periodic syncUp (frequent - push local changes to server)
-    this.syncIntervalId = window.setInterval(() => {
-      console.log("[SyncService] Running periodic syncUp...");
-      void this.syncUp();
+    // Only runs if there are pending changes to avoid unnecessary network calls
+    this.syncIntervalId = window.setInterval(async () => {
+      try {
+        // Safety check: ensure database is initialized
+        if (!this.db) {
+          console.warn(
+            "[SyncService] Database not initialized yet, skipping syncUp check"
+          );
+          return;
+        }
+
+        // Check if there are pending changes before syncing
+        const stats = await this.syncEngine.getSyncQueueStats();
+        const hasPendingChanges = stats.pending > 0 || stats.syncing > 0;
+
+        if (hasPendingChanges) {
+          console.log(
+            `[SyncService] Running periodic syncUp (${stats.pending} pending changes)...`
+          );
+          await this.syncUp();
+        } else {
+          // Silent - no need to log when there's nothing to sync
+        }
+      } catch (error) {
+        console.error("[SyncService] Error checking sync queue:", error);
+      }
     }, syncUpIntervalMs);
 
     // Periodic syncDown (infrequent - pull remote changes from server)
@@ -224,8 +247,8 @@ export class SyncService {
 
     console.log(
       `[SyncService] Auto sync started:`,
-      `syncUp every ${syncUpIntervalMs / 1000}s,`,
-      `syncDown every ${syncDownIntervalMs / 1000}s`
+      `syncUp every ${syncUpIntervalMs / 1000}s (only if changes pending),`,
+      `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`
     );
   }
 

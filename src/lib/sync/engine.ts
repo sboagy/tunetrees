@@ -16,6 +16,7 @@ import type { SyncQueueItem } from "../db/types";
 import { log } from "../logger";
 import {
   getPendingSyncItems,
+  getSyncQueueStats,
   markSynced,
   type SyncableTable,
   updateSyncStatus,
@@ -243,6 +244,9 @@ export class SyncEngine {
       // For now, we'll implement a simple full sync for user's data
       // TODO: Optimize with incremental sync using last_modified_at timestamps
 
+      console.log(
+        "🔽 [SyncEngine] Starting syncDown - pulling changes from Supabase..."
+      );
       syncLog("[SyncEngine] Pulling changes from Supabase...");
 
       // Sync each table (in dependency order to avoid FK violations)
@@ -276,11 +280,14 @@ export class SyncEngine {
 
       for (const tableName of tablesToSync) {
         try {
+          console.log(`   📥 Syncing table: ${tableName}...`);
           const tableSynced = await this.syncTableDown(tableName);
+          console.log(`   ✓ ${tableName}: ${tableSynced} records`);
           synced += tableSynced;
         } catch (error) {
           const errorMsg =
             error instanceof Error ? error.message : String(error);
+          console.error(`   ✗ ${tableName}: ${errorMsg}`);
           log.error(
             `[SyncEngine] Failed to sync table ${tableName}:`,
             errorMsg
@@ -292,6 +299,15 @@ export class SyncEngine {
       // Update last sync timestamp
       this.lastSyncTimestamp = startTime;
 
+      console.log(
+        `✅ [SyncEngine] SyncDown completed - synced ${synced} records from ${tablesToSync.length} tables`,
+        {
+          success: errors.length === 0,
+          synced,
+          errors: errors.length,
+        }
+      );
+
       return {
         success: errors.length === 0,
         itemsSynced: synced,
@@ -302,6 +318,7 @@ export class SyncEngine {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("❌ [SyncEngine] syncDown failed:", errorMsg);
       log.error("[SyncEngine] syncDown failed:", errorMsg);
       errors.push(errorMsg);
 
@@ -699,6 +716,24 @@ export class SyncEngine {
     }
 
     return transformed;
+  }
+
+  /**
+   * Get sync queue statistics
+   *
+   * @returns Promise with pending, syncing, failed, and total counts
+   */
+  async getSyncQueueStats(): Promise<{
+    pending: number;
+    syncing: number;
+    failed: number;
+    total: number;
+  }> {
+    if (!this.db) {
+      // Return empty stats if db not initialized
+      return { pending: 0, syncing: 0, failed: 0, total: 0 };
+    }
+    return await getSyncQueueStats(this.db);
   }
 
   /**

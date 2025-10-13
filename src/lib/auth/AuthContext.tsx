@@ -26,7 +26,7 @@ import {
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
 
-import { startSyncWorker } from "../sync";
+import { type SyncService, startSyncWorker } from "../sync";
 
 /**
  * Authentication state interface
@@ -67,6 +67,9 @@ interface AuthState {
 
   /** Sign out and clear local data */
   signOut: () => Promise<void>;
+
+  /** Force sync down from Supabase (manual sync) */
+  forceSyncDown: () => Promise<void>;
 }
 
 /**
@@ -104,8 +107,9 @@ export const AuthProvider: ParentComponent = (props) => {
   const [localDb, setLocalDb] = createSignal<SqliteDatabase | null>(null);
   const [syncVersion, setSyncVersion] = createSignal(0);
 
-  // Sync worker cleanup function
+  // Sync worker cleanup function and service instance
   let stopSyncWorker: (() => void) | null = null;
+  let syncServiceInstance: SyncService | null = null;
   let autoPersistCleanup: (() => void) | null = null;
 
   // Track if database is being initialized to prevent double initialization
@@ -168,6 +172,7 @@ export const AuthProvider: ParentComponent = (props) => {
           },
         });
         stopSyncWorker = syncWorker.stop;
+        syncServiceInstance = syncWorker.service;
         log.info("Sync worker started");
       } else {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
@@ -196,6 +201,7 @@ export const AuthProvider: ParentComponent = (props) => {
       if (stopSyncWorker) {
         stopSyncWorker();
         stopSyncWorker = null;
+        syncServiceInstance = null;
         log.info("Sync worker stopped");
       }
 
@@ -313,6 +319,52 @@ export const AuthProvider: ParentComponent = (props) => {
     setLoading(false);
   };
 
+  /**
+   * Force sync down from Supabase (manual sync)
+   */
+  const forceSyncDown = async () => {
+    if (!syncServiceInstance) {
+      console.warn("⚠️ [ForceSyncDown] Sync service not available");
+      log.warn("Sync service not available");
+      return;
+    }
+
+    try {
+      console.log("🔄 [ForceSyncDown] Starting sync down from Supabase...");
+      log.info("Forcing sync down from Supabase...");
+
+      const result = await syncServiceInstance.syncDown();
+
+      console.log("✅ [ForceSyncDown] Sync down completed:", {
+        success: result.success,
+        itemsSynced: result.itemsSynced,
+        itemsFailed: result.itemsFailed,
+        conflicts: result.conflicts,
+        errors: result.errors,
+      });
+      log.info("Force sync down completed:", result);
+
+      // Increment sync version to trigger UI updates
+      setSyncVersion((prev) => {
+        const newVersion = prev + 1;
+        console.log(
+          `🔄 [ForceSyncDown] Sync version updated: ${prev} → ${newVersion}`
+        );
+        log.debug(
+          "Sync version changed after force sync:",
+          prev,
+          "->",
+          newVersion
+        );
+        return newVersion;
+      });
+    } catch (error) {
+      console.error("❌ [ForceSyncDown] Sync down failed:", error);
+      log.error("Force sync down failed:", error);
+      throw error;
+    }
+  };
+
   const authState: AuthState = {
     user,
     session,
@@ -323,6 +375,7 @@ export const AuthProvider: ParentComponent = (props) => {
     signUp,
     signInWithOAuth,
     signOut,
+    forceSyncDown,
   };
 
   return (
