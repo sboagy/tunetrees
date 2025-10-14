@@ -7,6 +7,7 @@ const execAsync = promisify(exec);
 
 const authFile = "e2e/.auth/alice.json";
 const ALICE_EMAIL = "alice.test@tunetrees.test";
+const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD; // Default to null, it's an error if not specified
 const AUTH_EXPIRY_MINUTES = 50; // Consider auth stale after 50 minutes (tokens typically expire at 60 min)
 
 /**
@@ -95,7 +96,7 @@ setup("authenticate as Alice", async ({ page }) => {
   // Fill in Alice's credentials
   console.log("⏳ Filling credentials for alice.test@tunetrees.test...");
   await page.getByLabel("Email").fill("alice.test@tunetrees.test");
-  await page.locator("input#password").fill("TestPassword123!");
+  await page.locator("input#password").fill(ALICE_PASSWORD);
 
   // Click sign in button
   await page.getByRole("button", { name: "Sign In" }).click();

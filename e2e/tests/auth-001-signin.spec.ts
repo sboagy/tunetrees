@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+const ALICE_EMAIL = "alice.test@tunetrees.test";
+const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD; // Default to null, it's an error if not specified;
+
 /**
  * AUTH-001: Sign in with valid credentials
  * Priority: Critical
@@ -38,8 +41,8 @@ test.describe("AUTH-001: User Authentication", () => {
     await page.goto("http://localhost:5173/login");
 
     // Fill in Alice's credentials
-    await page.getByLabel("Email").fill("alice.test@tunetrees.test");
-    await page.locator("input#password").fill("TestPassword123!");
+    await page.getByLabel("Email").fill(ALICE_EMAIL);
+    await page.locator("input#password").fill(ALICE_PASSWORD);
 
     // Click Sign In button
     await page.getByRole("button", { name: "Sign In" }).click();
@@ -50,7 +53,7 @@ test.describe("AUTH-001: User Authentication", () => {
     });
 
     // Wait for user email to appear in TopNav (confirms logged in)
-    await expect(page.getByText("alice.test@tunetrees.test")).toBeVisible({
+    await expect(page.getByText(ALICE_EMAIL)).toBeVisible({
       timeout: 10000,
     });
 
@@ -67,7 +70,7 @@ test.describe("AUTH-001: User Authentication", () => {
     await page.goto("http://localhost:5173/login");
 
     // Try to sign in with wrong password
-    await page.getByLabel("Email").fill("alice.test@tunetrees.test");
+    await page.getByLabel("Email").fill(ALICE_EMAIL);
     await page.locator("input#password").fill("WrongPassword123!");
     await page.getByRole("button", { name: "Sign In" }).click();
 

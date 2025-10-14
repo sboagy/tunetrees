@@ -1,7 +1,7 @@
 # Test Plan: Alice Test User Sign-In and Data Population
 
 **Test User:** alice.test@tunetrees.test  
-**Password:** TestPassword123!  
+**Password:** SomePasswordForTesting  
 **User Profile ID:** 9001  
 **Test Data:**
 
@@ -48,7 +48,7 @@
 1. Navigate to http://localhost:5173
 2. Verify redirect to `/login` page
 3. Enter email: `alice.test@tunetrees.test`
-4. Enter password: `TestPassword123!`
+4. Enter password: `SomePasswordForTesting`
 5. Click "Sign In" button
 6. Wait for authentication to complete
 
@@ -559,7 +559,7 @@ test.describe("Alice Sign-In Flow", () => {
 
   test("AUTH-001: Sign in with valid credentials", async ({ page }) => {
     await page.getByLabel("Email").fill("alice.test@tunetrees.test");
-    await page.getByLabel("Password").fill("TestPassword123!");
+    await page.getByLabel("Password").fill("SomePasswordForTesting");
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/");
     // Wait for sync to complete
@@ -607,10 +607,10 @@ test.describe("Alice Sign-In Flow", () => {
 - [ ] Scenario 7: Network Status ✅/❌
 - [ ] Scenario 8: User Menu ✅/❌
 
-**Test Date:** ****\_****  
-**Tester:** ****\_****  
-**Pass/Fail:** ****\_****  
-**Notes:** ****\_****
+**Test Date:** \***\*\_\*\***  
+**Tester:** \***\*\_\*\***  
+**Pass/Fail:** \***\*\_\*\***  
+**Notes:** \***\*\_\*\***
 
 ---
 

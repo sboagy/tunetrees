@@ -139,11 +139,11 @@ See `_notes/test-users.md` for detailed test user specifications.
 
 ### Quick Reference
 
-| User    | Email                       | Password         | Purpose                      |
-| ------- | --------------------------- | ---------------- | ---------------------------- |
-| Alice   | alice.test@tunetrees.test   | TestPassword123! | Primary test user, full data |
-| Bob     | bob.test@tunetrees.test     | TestPassword123! | Secondary user, catalog only |
-| Charlie | charlie.test@tunetrees.test | TestPassword123! | Edge cases, empty account    |
+| User    | Email                       | Password               | Purpose                      |
+| ------- | --------------------------- | ---------------------- | ---------------------------- |
+| Alice   | alice.test@tunetrees.test   | SomePasswordForTesting | Primary test user, full data |
+| Bob     | bob.test@tunetrees.test     | SomePasswordForTesting | Secondary user, catalog only |
+| Charlie | charlie.test@tunetrees.test | SomePasswordForTesting | Edge cases, empty account    |
 
 ---
 

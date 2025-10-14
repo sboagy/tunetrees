@@ -8,7 +8,7 @@ The `supabase/seed-test-users.sql` file has placeholder bcrypt hashes:
 encrypted_password: '$2a$10$YourBcryptHashHereForTestPassword123'
 ```
 
-These need to be replaced with **real bcrypt hashes** for the password `TestPassword123!`.
+These need to be replaced with **real bcrypt hashes** for the password `SomePasswordForTesting`.
 
 ## ✅ Recommended Solution: Use Supabase Admin API
 
@@ -89,7 +89,7 @@ npm install --save-dev bcryptjs @types/bcryptjs
 ### Step 2: Generate hashes
 
 ```bash
-npx tsx scripts/generate-bcrypt-hash.ts "TestPassword123!"
+npx tsx scripts/generate-bcrypt-hash.ts "SomePasswordForTesting"
 ```
 
 This outputs something like:
