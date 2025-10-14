@@ -294,6 +294,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               type="button"
               onClick={handleColumnsToggle}
               title="Show/hide columns"
+              data-testid="practice-columns-button"
               class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
             >
               <Columns size={14} />

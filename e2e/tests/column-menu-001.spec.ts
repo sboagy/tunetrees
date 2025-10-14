@@ -1,14 +1,19 @@
 import { expect, test } from "@playwright/test";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe("Column Visibility Menu", () => {
+  let ttPage: TuneTreesPage;
+
   test.beforeEach(async ({ page }) => {
-    await page.goto("http://localhost:4173");
+    ttPage = new TuneTreesPage(page);
+    await ttPage.goto();
+    await ttPage.waitForSync(2000);
     await page.waitForLoadState("networkidle");
   });
 
   test("should keep menu open when clicking checkbox", async ({ page }) => {
     // Navigate to Repertoire tab
-    await page.getByRole("tab", { name: "Repertoire" }).click();
+    await ttPage.repertoireTab.click();
     await page.waitForTimeout(1000);
 
     // Click the Columns button to open menu
@@ -27,13 +32,33 @@ test.describe("Column Visibility Menu", () => {
     // Log initial state
     console.log("Menu is visible");
 
-    // Find a checkbox and click it
-    const firstCheckbox = menu.locator('input[type="checkbox"]').first();
+    // Find the first button item that has a checkbox (skip "Show All" and "Hide All" buttons)
+    const allButtons = await menu.getByRole("button").all();
+    let firstButtonWithCheckbox = null;
+    let firstCheckbox = null;
+
+    for (const button of allButtons) {
+      const checkbox = button.locator('input[type="checkbox"]');
+      const hasCheckbox = (await checkbox.count()) > 0;
+      if (hasCheckbox) {
+        firstButtonWithCheckbox = button;
+        firstCheckbox = checkbox;
+        break;
+      }
+    }
+
+    if (!firstButtonWithCheckbox || !firstCheckbox) {
+      throw new Error("No button with checkbox found in menu");
+    }
+
+    await expect(firstButtonWithCheckbox).toBeVisible();
+    await expect(firstCheckbox).toBeVisible();
+
     const isCheckedBefore = await firstCheckbox.isChecked();
     console.log("Checkbox checked before:", isCheckedBefore);
 
-    // Click the checkbox
-    await firstCheckbox.click();
+    // Click the button (not the checkbox) to toggle
+    await firstButtonWithCheckbox.click();
     await page.waitForTimeout(500);
 
     // Check if menu is still visible
@@ -51,13 +76,11 @@ test.describe("Column Visibility Menu", () => {
 
   test("should close menu when clicking outside", async ({ page }) => {
     // Navigate to Repertoire tab
-    await page.getByRole("tab", { name: "Repertoire" }).click();
+    await ttPage.repertoireTab.click();
     await page.waitForTimeout(1000);
 
     // Click the Columns button to open menu
-    const columnsButton = page
-      .getByRole("button", { name: /columns/i })
-      .first();
+    const columnsButton = ttPage.columnsButton;
     await columnsButton.click();
     await page.waitForTimeout(500);
 

@@ -418,6 +418,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           >
             {/* Virtual scrolling table */}
             <table
+              data-testid="tunes-grid-practice"
               class={TABLE_CLASSES}
               style={{
                 width: `${table.getTotalSize()}px`,
@@ -435,6 +436,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
 
                           return (
                             <th
+                              data-testid={`ch-${header.column.id}`}
                               colSpan={header.colSpan}
                               class={getHeaderCellClasses(
                                 `${

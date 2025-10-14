@@ -81,6 +81,7 @@ export const TabBar: Component<TabBarProps> = (props) => {
             return (
               <button
                 type="button"
+                data-testid={`tab-${tab.id}`}
                 onClick={() => handleTabClick(tab)}
                 class={`px-3 sm:px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                   isActive()

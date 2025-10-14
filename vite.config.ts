@@ -10,6 +10,15 @@ export default defineConfig(() => {
   const showWorkboxLogs = process.env.VITE_WORKBOX_DEBUG === "true";
 
   return {
+    test: {
+      exclude: [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/e2e/**", // Exclude Playwright E2E tests
+        "**/legacy/**", // Exclude legacy code
+        "**/*.spec.ts", // Exclude Playwright test files (use .test.ts for Vitest)
+      ],
+    },
     plugins: [
       solid(),
       tailwindcss(),

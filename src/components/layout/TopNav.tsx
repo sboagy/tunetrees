@@ -168,7 +168,7 @@ const PlaylistDropdown: Component = () => {
   });
 
   return (
-    <div class="relative">
+    <div class="relative" data-testid="playlist-dropdown">
       <button
         type="button"
         onClick={() => setShowDropdown(!showDropdown())}
@@ -176,6 +176,7 @@ const PlaylistDropdown: Component = () => {
         class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
         aria-label="Select playlist"
         aria-expanded={showDropdown()}
+        data-testid="playlist-dropdown-button"
       >
         <span class="hidden md:inline font-medium">
           {selectedPlaylist()
@@ -203,7 +204,7 @@ const PlaylistDropdown: Component = () => {
       {/* Dropdown Menu */}
       <Show when={showDropdown()}>
         <div class="absolute left-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-          <div class="py-2">
+          <div class="py-2" data-testid="top-nav-manage-playlists-panel">
             {/* Playlists List */}
             <Show
               when={!playlists.loading && playlists()}
@@ -369,7 +370,7 @@ export const TopNav: Component = () => {
             {/* User Menu Dropdown */}
             <Show when={user()}>
               {(u) => (
-                <div class="relative">
+                <div class="relative" data-testid="user-menu-dropdown">
                   <button
                     type="button"
                     onClick={() => setShowUserMenu(!showUserMenu())}
@@ -377,6 +378,7 @@ export const TopNav: Component = () => {
                     class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                     aria-label="User menu"
                     aria-expanded={showUserMenu()}
+                    data-testid="user-menu-button"
                   >
                     <span class="hidden sm:inline font-medium">
                       {u().email}
@@ -400,7 +402,10 @@ export const TopNav: Component = () => {
 
                   {/* Dropdown Menu */}
                   <Show when={showUserMenu()}>
-                    <div class="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                    <div
+                      class="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
+                      data-testid="user-menu-panel"
+                    >
                       <div class="py-2">
                         {/* User Information */}
                         <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
@@ -501,7 +506,7 @@ export const TopNav: Component = () => {
             </Show>
 
             {/* Database/Sync Status Dropdown */}
-            <div class="relative">
+            <div class="relative" data-testid="database-status-dropdown">
               <button
                 type="button"
                 onClick={() => setShowDbMenu(!showDbMenu())}
@@ -509,6 +514,7 @@ export const TopNav: Component = () => {
                 class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                 aria-label="Database and sync status"
                 aria-expanded={showDbMenu()}
+                data-testid="database-status-button"
               >
                 {/* Database Icon */}
                 <svg
@@ -544,7 +550,10 @@ export const TopNav: Component = () => {
 
               {/* Dropdown Menu */}
               <Show when={showDbMenu()}>
-                <div class="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                <div
+                  class="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
+                  data-testid="database-dropdown-panel"
+                >
                   <div class="py-2">
                     {/* Database Status Section */}
                     <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">

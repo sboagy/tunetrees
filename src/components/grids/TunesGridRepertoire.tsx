@@ -518,6 +518,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
           style={{ "touch-action": "pan-x pan-y" }}
         >
           <table
+            data-testid="tunes-grid-repertoire"
             class={TABLE_CLASSES}
             style={{ width: `${table.getCenterTotalSize()}px` }}
           >
@@ -530,6 +531,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
                       {(header) => (
                         <th
                           data-column-id={header.column.id}
+                          data-testid={`ch-${header.column.id}`}
                           class={getHeaderCellClasses(
                             `${
                               draggedColumn() === header.column.id

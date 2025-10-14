@@ -1,24 +1,64 @@
-# E2E Tests for TuneTrees SolidJS PWA
+# E2E Tests for TuneTrees
 
-This directory contains end-to-end tests using Playwright for the TuneTrees application.
+This directory contains end-to-end tests for the TuneTrees application using Playwright.
+
+## Test Coverage
+
+Tests are based on the comprehensive test plan in `_notes/test-plan-alice-signin.md`.
+
+### Test Scenarios (8 Total)
+
+1. **AUTH-001** - User Authentication (`auth-001-signin.spec.ts`)
+2. **TOPNAV-001** - Playlist Dropdown (`topnav-001-playlist-dropdown.spec.ts`)
+3. **REPERTOIRE-001** - Repertoire Tab (`repertoire-001-tunes-display.spec.ts`)
+4. **CATALOG-001** - Catalog Tab (`catalog-001-all-tunes.spec.ts`)
+5. **PRACTICE-001** - Practice Tab (`practice-001-empty-state.spec.ts`)
+6. **TOPNAV-002** - Database Status (`topnav-002-database-status.spec.ts`)
+7. **TOPNAV-003** - User Menu (`topnav-003-user-menu.spec.ts`)
 
 ## Structure
 
 ```
 e2e/
-├── tests/              # Test files
-│   ├── catalog.spec.ts # Catalog page tests
-│   └── auth.spec.ts    # Authentication tests (skipped until implemented)
-├── helpers/            # Test utilities and page objects
-│   └── page-objects.ts # Page Object Model classes
-├── global-setup.ts     # Global setup (runs once before all tests)
-└── global-teardown.ts  # Global teardown (runs once after all tests)
+├── .auth/
+│   └── alice.json                       # Saved auth state (gitignored)
+├── setup/
+│   └── auth.setup.ts                    # Setup project (runs first, resets DB)
+├── tests/                               # Test files (see above)
+│   ├── auth-001-signin.spec.ts
+│   ├── topnav-001-playlist-dropdown.spec.ts
+│   ├── repertoire-001-tunes-display.spec.ts
+│   ├── catalog-001-all-tunes.spec.ts
+│   ├── practice-001-empty-state.spec.ts
+│   ├── topnav-002-database-status.spec.ts
+│   └── topnav-003-user-menu.spec.ts
+├── helpers/                             # Test utilities (legacy)
+├── global-setup.ts                      # Global setup
+└── global-teardown.ts                   # Global teardown
 ```
+
+## Prerequisites
+
+1. **Supabase Local** running: `supabase start`
+2. **Dev Server** running: `npm run dev`
+3. **Playwright** installed: `npx playwright install`
 
 ## Running Tests
 
 ```bash
-# Install Playwright browsers (first time only)
+# Run all tests (includes setup project)
+npx playwright test
+
+# Run with UI mode (recommended)
+npx playwright test --ui
+
+# Run specific test
+npx playwright test e2e/tests/auth-001-signin.spec.ts
+
+# Run specific browser
+npx playwright test --project=chromium
+
+# Debug mode
 npm run playwright:install
 
 # Run all E2E tests (headless)

@@ -112,6 +112,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             onClick={handleAddToReview}
             title="Add selected tunes to practice review queue"
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_PRIMARY}`}
+            data-testid="add-to-review-button"
           >
             <svg
               class={TOOLBAR_ICON_SIZE}
@@ -180,6 +181,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             type="button"
             onClick={handleAddTune}
             title="Add a new tune"
+            data-testid="repertoire-add-tune-button"
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
           >
             <svg
@@ -230,6 +232,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             type="button"
             onClick={handleDeleteTunes}
             title="Delete selected tunes"
+            data-testid="repertoire-delete-button"
             disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_DANGER}`}
           >

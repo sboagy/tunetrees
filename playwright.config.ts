@@ -1,14 +1,20 @@
 import { defineConfig, devices } from "@playwright/test";
-import dotenv from "dotenv";
-
-// Load environment variables from .env.local
-dotenv.config({ path: ".env.local" });
 
 /**
- * @see https://playwright.dev/docs/test-configuration
+ * Read environment variables from file.
+ * https://github.com/motdotla/dotenv
+ */
+// import dotenv from 'dotenv';
+// import path from 'path';
+// dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+/**
+ * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: "./e2e/tests", // More specific path
+  testMatch: /.*\.spec\.ts/,
+
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -18,48 +24,81 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: [["list"], ["junit", { outputFile: "test-results/junit.xml" }]],
+  reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: "http://localhost:5173",
+    /* Base URL to use in actions like `await page.goto('')`. */
+    // baseURL: 'http://localhost:3000',
+
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
-    /* Take screenshot on failure */
-    screenshot: "only-on-failure",
-    /* Record video on failure */
-    video: "retain-on-failure",
-    /* Global test timeout */
-    actionTimeout: 10000,
-    navigationTimeout: 30000,
   },
 
   /* Configure projects for major browsers */
   projects: [
+    // Setup project runs first for authenticated tests
+    {
+      name: "setup",
+      testDir: "./e2e/setup",
+      testMatch: /.*\.setup\.ts$/,
+    },
+
+    // Auth tests run independently (no setup dependency, test login flow)
+    {
+      name: "chromium-auth",
+      testDir: "./e2e/tests",
+      testMatch: /auth-.*\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: { cookies: [], origins: [] }, // Start unauthenticated
+      },
+    },
+
+    // Authenticated tests use saved state
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      testDir: "./e2e/tests",
+      testIgnore: /auth-.*\.spec\.ts/, // Exclude auth tests
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "e2e/.auth/alice.json",
+      },
+      dependencies: ["setup"],
     },
 
     {
       name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
+      use: {
+        ...devices["Desktop Firefox"],
+        storageState: "e2e/.auth/alice.json",
+      },
+      dependencies: ["setup"],
     },
 
     {
       name: "webkit",
-      use: { ...devices["Desktop Safari"] },
+      use: {
+        ...devices["Desktop Safari"],
+        storageState: "e2e/.auth/alice.json",
+      },
+      dependencies: ["setup"],
     },
 
     /* Test against mobile viewports. */
     {
       name: "Mobile Chrome",
-      use: { ...devices["Pixel 5"] },
+      testDir: "./e2e/tests",
+      testIgnore: /auth-.*\.spec\.ts/, // Exclude auth tests
+      use: {
+        ...devices["Pixel 5"],
+        storageState: "e2e/.auth/alice.json",
+      },
+      dependencies: ["setup"],
     },
-    {
-      name: "Mobile Safari",
-      use: { ...devices["iPhone 12"] },
-    },
+    // {
+    //   name: 'Mobile Safari',
+    //   use: { ...devices['iPhone 12'] },
+    // },
 
     /* Test against branded browsers. */
     // {
@@ -78,18 +117,5 @@ export default defineConfig({
     url: "http://localhost:5173",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
-  },
-
-  /* Global setup and teardown */
-  globalSetup: "./e2e/global-setup.ts",
-  globalTeardown: "./e2e/global-teardown.ts",
-
-  /* Output directories */
-  outputDir: "test-results/",
-
-  /* Expect configuration */
-  expect: {
-    /* Maximum time expect() should wait for the condition to be met. */
-    timeout: 5000,
   },
 });

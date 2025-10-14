@@ -126,6 +126,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             type="button"
             onClick={handleAddToRepertoire}
             title="Add selected tunes to repertoire"
+            data-testid="catalog-add-to-repertoire-button"
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_PRIMARY}`}
           >
             <svg
@@ -194,6 +195,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             type="button"
             onClick={handleAddTune}
             title="Add a new tune"
+            data-testid="catalog-add-tune-button"
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
           >
             <svg
@@ -218,6 +220,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             type="button"
             onClick={handleDeleteTunes}
             title="Delete selected tunes"
+            data-testid="catalog-delete-button"
             disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_DANGER}`}
           >
@@ -245,6 +248,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
               type="button"
               onClick={handleColumnsToggle}
               title="Show/hide columns"
+              data-testid="catalog-columns-button"
               class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
             >
               <svg

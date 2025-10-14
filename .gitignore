@@ -101,3 +101,9 @@ scripts/.eslintrc.json
 Diagrams/playlist_diagram_legacy.erd
 Diagrams/playlist_diagram.erd
 lighthouse_localhost_4173-20251007T123110.json
+
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
