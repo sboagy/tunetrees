@@ -154,9 +154,7 @@ export const ThemeSwitcher: Component<ThemeSwitcherProps> = (props) => {
       aria-label={`Theme: ${getLabel()} - Click to cycle`}
     >
       <span class="flex-shrink-0">{getIcon()}</span>
-      {props.showLabel && (
-        <span class="flex-1">Theme: {getLabel()}</span>
-      )}
+      {props.showLabel && <span class="flex-1">Theme: {getLabel()}</span>}
       {/* Tooltip - only show when label is hidden */}
       {!props.showLabel && (
         <span class="absolute bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
