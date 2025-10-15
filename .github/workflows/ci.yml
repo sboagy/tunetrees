@@ -60,6 +60,25 @@ jobs:
       - name: Verify Supabase CLI
         run: supabase --version
 
+      # 6a. Cache Supabase Docker Images
+      - name: Cache Supabase Docker Images
+        id: cache-docker-images
+        uses: actions/cache@v4
+        with:
+          path: ~/supabase-docker-images.tar
+          key: ${{ runner.os }}-supabase-docker-v1.200.0
+          restore-keys: |
+            ${{ runner.os }}-supabase-docker-
+
+      # 6b. Load Cached Docker Images
+      - name: Load Cached Docker Images
+        if: steps.cache-docker-images.outputs.cache-hit == 'true'
+        run: |
+          echo "📦 Loading cached Supabase Docker images..."
+          docker load -i ~/supabase-docker-images.tar
+          echo "✅ Cached images loaded"
+          docker images | grep supabase
+
       # 7. Start Supabase Local Stack (includes Docker Postgres)
       - name: Start Supabase Local Stack
         id: supabase
@@ -67,6 +86,15 @@ jobs:
           supabase start
           echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
           echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> $GITHUB_ENV
+
+      # 7a. Save Docker Images to Cache (if cache was missed)
+      - name: Save Docker Images to Cache
+        if: steps.cache-docker-images.outputs.cache-hit != 'true'
+        run: |
+          echo "💾 Saving Supabase Docker images to cache..."
+          docker images --format "{{.Repository}}:{{.Tag}}" | grep supabase | xargs docker save -o ~/supabase-docker-images.tar
+          echo "✅ Docker images saved to cache"
+          ls -lh ~/supabase-docker-images.tar
 
       # 8. Reset and Seed Database
       - name: Reset and Seed Database
