@@ -117,18 +117,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 14. Start Dev Server (background)
-      - name: Start Dev Server
-        run: npm run dev &
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
-
-      # 15. Wait for Dev Server
-      - name: Wait for Dev Server
-        run: npx wait-on http://localhost:5173 --timeout 60000
-
-      # 16. Run Playwright Tests
+      # 14. Run Playwright Tests (webServer in playwright.config.ts handles dev server)
       - name: Run Playwright Tests
         run: npm run test:e2e
         env:
@@ -137,7 +126,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 17. Upload Test Results
+      # 15. Upload Test Results
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
         if: always()
@@ -146,7 +135,7 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-      # 18. Upload Test Screenshots/Videos
+      # 16. Upload Test Screenshots/Videos
       - name: Upload Test Artifacts
         uses: actions/upload-artifact@v4
         if: failure()
@@ -155,7 +144,7 @@ jobs:
           path: test-results/
           retention-days: 7
 
-      # 19. Stop Supabase (cleanup)
+      # 17. Stop Supabase (cleanup)
       - name: Stop Supabase
         if: always()
         run: supabase stop --no-backup
