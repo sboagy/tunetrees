@@ -551,12 +551,12 @@ public/               # Static files (served as-is)
 
 ### **Documentation**
 
-- [SolidJS Docs](https://www.solidjs.com/docs/latest)
-- [Supabase Docs](https://supabase.com/docs)
-- [Drizzle ORM Docs](https://orm.drizzle.team/)
-- [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs)
-- [Kobalte UI](https://kobalte.dev/)
-- [TanStack Solid Table](https://tanstack.com/table/latest/docs/framework/solid/solid-table)
+- SolidJS Docs: https://www.solidjs.com/docs/latest
+- Supabase Docs: https://supabase.com/docs
+- Drizzle ORM Docs: https://orm.drizzle.team/
+- ts-fsrs: https://github.com/open-spaced-repetition/ts-fsrs
+- Kobalte UI: https://kobalte.dev/
+- TanStack Solid Table: https://tanstack.com/table/latest/docs/framework/solid/solid-table
 
 ### **Project Instructions**
 
