@@ -116,10 +116,8 @@ jobs:
           echo "📊 Environment check:"
           echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
           echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:0:20}..."
-          echo "🔍 Running only one catalog test for debugging..."
-          echo "�️  Removing stale auth file (each CI run has fresh Supabase instance)"
-          rm -f e2e/.auth/alice.json
-          npx playwright test e2e/tests/catalog-001-all-tunes.spec.ts --project=setup --project=chromium --grep "should display Catalog grid with many tunes" --reporter=list,html
+          echo "� Running full test suite (setup + chromium-auth + chromium + Mobile Chrome)"
+          npx playwright test --project=setup --project=chromium-auth --project=chromium --project="Mobile Chrome" --reporter=list,html
         env:
           ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
