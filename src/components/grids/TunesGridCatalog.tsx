@@ -108,28 +108,11 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
       const db = localDb();
       const userId = useAuth().user()?.id;
       const version = syncVersion(); // Triggers refetch when sync completes
-      console.log(
-        "🔍 TunesGridCatalog resource: db=",
-        !!db,
-        "userId=",
-        userId,
-        "version=",
-        version
-      );
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
-      if (!params) {
-        console.log("⚠️ TunesGridCatalog: No params, returning empty array");
-        return [];
-      }
-      console.log(
-        "🔍 TunesGridCatalog: Fetching tunes for user",
-        params.userId
-      );
-      const result = await getTunesForUser(params.db, params.userId);
-      console.log(`✅ TunesGridCatalog: Got ${result.length} tunes`);
-      return result;
+      if (!params) return [];
+      return await getTunesForUser(params.db, params.userId);
     }
   );
 

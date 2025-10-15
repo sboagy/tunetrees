@@ -371,39 +371,17 @@ export class TuneTreesPage {
    * Check if grid has content (for virtualized grids, check for cells)
    */
   async expectGridHasContent(grid: Locator) {
-    console.log("🔍 expectGridHasContent: Starting...");
-
     // Wait for grid to be visible first
     await expect(grid).toBeVisible({ timeout: 10000 });
-    console.log("✅ Grid is visible");
-
-    // Take screenshot for debugging
-    if (process.env.CI) {
-      await this.page.screenshot({
-        path: `grid-debug-${Date.now()}.png`,
-        fullPage: true,
-      });
-      console.log("📸 Screenshot captured");
-    }
-
-    // Log the grid HTML
-    const gridHtml = await grid.innerHTML();
-    console.log(`📄 Grid HTML length: ${gridHtml.length} chars`);
-    console.log(`📄 Grid HTML preview: ${gridHtml.substring(0, 500)}...`);
 
     // Check for table cells
     const cells = grid.locator("td");
-    console.log("🔍 Waiting for cells...");
 
     // Wait for at least one cell to appear (30s timeout)
     await expect(cells.first()).toBeVisible({ timeout: 30000 });
-    console.log("✅ First cell is visible");
 
     const cellCount = await cells.count();
-    console.log(`📊 Cell count: ${cellCount}`);
-
     expect(cellCount).toBeGreaterThan(0);
-    console.log("✅ expectGridHasContent: Success");
   }
 
   /**

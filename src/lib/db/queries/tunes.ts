@@ -90,28 +90,14 @@ export async function getTunesForUser(
   db: SqliteDatabase,
   _userId: string
 ): Promise<Tune[]> {
-  console.log("🔍 getTunesForUser: Starting query...");
-  try {
-    // For catalog view, return ALL non-deleted tunes regardless of private_for
-    // Catalog should show everything - filtering by user is for other views
-    const result = await db
-      .select()
-      .from(schema.tune)
-      .where(eq(schema.tune.deleted, 0))
-      .orderBy(asc(schema.tune.title));
-
-    console.log(`✅ getTunesForUser: Found ${result.length} tunes`);
-    if (result.length > 0) {
-      console.log(`📄 First tune: ${result[0].title} (ID: ${result[0].id})`);
-    }
-
-    return result;
-  } catch (error) {
-    console.error("❌ getTunesForUser failed:", error);
-    throw error;
-  }
+  // For catalog view, return ALL non-deleted tunes regardless of private_for
+  // Catalog should show everything - filtering by user is for other views
+  return await db
+    .select()
+    .from(schema.tune)
+    .where(eq(schema.tune.deleted, 0))
+    .orderBy(asc(schema.tune.title));
 }
-
 /**
  * Create a new tune
  */

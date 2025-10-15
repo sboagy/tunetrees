@@ -13,38 +13,14 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
   let ttPage: TuneTreesPage;
 
   test.beforeEach(async ({ page }) => {
-    // Capture console messages for debugging
-    page.on("console", (msg) => {
-      const type = msg.type();
-      const text = msg.text();
-      if (type === "error" || type === "warning") {
-        console.log(`🔴 Browser ${type}: ${text}`);
-      } else {
-        console.log(`📝 Browser ${type}: ${text}`);
-      }
-    });
-
-    // Capture page errors
-    page.on("pageerror", (error) => {
-      console.log(`❌ Page Error: ${error.message}`);
-      console.log(`Stack: ${error.stack}`);
-    });
-
     ttPage = new TuneTreesPage(page);
 
-    console.log("🚀 Navigating to app...");
     // Navigate to app and wait for sync
     await ttPage.goto();
-    console.log("✅ Page loaded");
-
-    console.log("⏳ Waiting for sync...");
     await ttPage.waitForSync(2000);
-    console.log("✅ Sync complete");
 
-    console.log("📑 Navigating to Catalog tab...");
     // Navigate to Catalog tab
     await ttPage.navigateToTab("catalog");
-    console.log("✅ Catalog tab active");
   });
   test("should display Catalog grid with many tunes", async () => {
     // Use Page Object to verify grid is visible and has content
