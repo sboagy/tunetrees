@@ -57,7 +57,10 @@ jobs:
       - name: Reset and Seed Database
         run: |
           echo "📊 Checking migrations..."
-          ls -la supabase/migrations/
+          pwd
+          ls -la supabase/ || echo "No supabase dir"
+          ls -la supabase/migrations/ || echo "No migrations dir"
+          find . -name "*.sql" -type f | head -20
           echo "🔄 Running db reset..."
           supabase db reset --debug
           echo "✅ Verifying tables exist..."
