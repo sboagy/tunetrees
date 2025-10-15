@@ -43,9 +43,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /usr/local/bin/supabase
-          key: ${{ runner.os }}-supabase-cli-${{ hashFiles('.github/workflows/ci.yml') }}
+          key: ${{ runner.os }}-supabase-cli-v1.200.0
           restore-keys: |
-            ${{ runner.os }}-supabase-cli-
+            ${{ runner.os }}-supabase-cli-v1.
 
       # 5. Install Supabase CLI (if not cached)
       - name: Install Supabase CLI
@@ -89,11 +89,27 @@ jobs:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 10. Install Playwright Browsers
+      # 10. Cache Playwright Browsers
+      - name: Cache Playwright Browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      # 11. Install Playwright Browsers
       - name: Install Playwright Browsers
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
 
-      # 11. Build Application
+      # 12. Install Playwright System Dependencies (if browsers were cached)
+      - name: Install Playwright System Dependencies
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # 13. Build Application
       - name: Build Application
         run: npm run build
         env:
@@ -101,18 +117,18 @@ jobs:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 12. Start Dev Server (background)
+      # 14. Start Dev Server (background)
       - name: Start Dev Server
         run: npm run dev &
         env:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 13. Wait for Dev Server
+      # 15. Wait for Dev Server
       - name: Wait for Dev Server
         run: npx wait-on http://localhost:5173 --timeout 60000
 
-      # 14. Run Playwright Tests
+      # 16. Run Playwright Tests
       - name: Run Playwright Tests
         run: npm run test:e2e
         env:
@@ -121,7 +137,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 15. Upload Test Results
+      # 17. Upload Test Results
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
         if: always()
@@ -130,7 +146,7 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-      # 16. Upload Test Screenshots/Videos
+      # 18. Upload Test Screenshots/Videos
       - name: Upload Test Artifacts
         uses: actions/upload-artifact@v4
         if: failure()
@@ -139,7 +155,7 @@ jobs:
           path: test-results/
           retention-days: 7
 
-      # 17. Stop Supabase (cleanup)
+      # 19. Stop Supabase (cleanup)
       - name: Stop Supabase
         if: always()
         run: supabase stop --no-backup
