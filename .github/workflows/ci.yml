@@ -109,18 +109,13 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      # 13. Build Application
-      - name: Build Application
-        run: npm run build
-        env:
-          # Use local Supabase URLs (from supabase start output)
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
-
-      # 14. Run Playwright Tests (webServer in playwright.config.ts handles dev server)
+      # 13. Run Playwright Tests (webServer in playwright.config.ts handles dev server)
       - name: Run Playwright Tests
         run: |
-          echo "🎭 Starting Playwright tests (this will start dev server first)..."
+          echo "🎭 Starting Playwright tests (dev server will start automatically)..."
+          echo "📊 Environment check:"
+          echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
+          echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:0:20}..."
           npx playwright test --project=setup --project=chromium-auth --project=chromium --project="Mobile Chrome" --reporter=list,html
         env:
           ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
@@ -128,7 +123,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 15. Upload Test Results
+      # 14. Upload Test Results
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
         if: always()
