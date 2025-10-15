@@ -11,6 +11,10 @@ import { type Component, createEffect, createSignal, onMount } from "solid-js";
 
 type ThemeMode = "light" | "dark" | "system";
 
+interface ThemeSwitcherProps {
+  showLabel?: boolean; // Show text label next to icon (default: false)
+}
+
 /**
  * Theme Switcher Component
  *
@@ -20,7 +24,7 @@ type ThemeMode = "light" | "dark" | "system";
  * - Persists theme mode to localStorage
  * - System mode follows OS preference automatically
  */
-export const ThemeSwitcher: Component = () => {
+export const ThemeSwitcher: Component<ThemeSwitcherProps> = (props) => {
   const [mode, setMode] = createSignal<ThemeMode>("system");
 
   // Get effective theme based on mode
@@ -142,14 +146,23 @@ export const ThemeSwitcher: Component = () => {
     <button
       type="button"
       onClick={cycleTheme}
-      class="flex items-center justify-center w-9 h-9 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300 group relative"
+      class="flex items-center gap-2 w-full px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300 group"
+      classList={{
+        "justify-center w-9 h-9 p-0": !props.showLabel,
+        "justify-start text-left text-sm": props.showLabel,
+      }}
       aria-label={`Theme: ${getLabel()} - Click to cycle`}
     >
-      {getIcon()}
-      {/* Tooltip */}
-      <span class="absolute bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-        {getLabel()}
-      </span>
+      <span class="flex-shrink-0">{getIcon()}</span>
+      {props.showLabel && (
+        <span class="flex-1">Theme: {getLabel()}</span>
+      )}
+      {/* Tooltip - only show when label is hidden */}
+      {!props.showLabel && (
+        <span class="absolute bottom-full mb-2 px-2 py-1 text-xs text-white bg-gray-900 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          {getLabel()}
+        </span>
+      )}
     </button>
   );
 };

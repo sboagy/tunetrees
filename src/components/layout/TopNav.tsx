@@ -473,6 +473,11 @@ export const TopNav: Component = () => {
                           User Settings
                         </button>
 
+                        {/* Theme Switcher */}
+                        <div class="w-full">
+                          <ThemeSwitcher showLabel={true} />
+                        </div>
+
                         <button
                           type="button"
                           class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
@@ -714,8 +719,6 @@ export const TopNav: Component = () => {
                 </div>
               </Show>
             </div>
-
-            <ThemeSwitcher />
           </div>
         </div>
       </div>
