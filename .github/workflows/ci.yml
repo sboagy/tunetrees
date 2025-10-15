@@ -55,7 +55,13 @@ jobs:
 
       # 6. Reset and Seed Database
       - name: Reset and Seed Database
-        run: supabase db reset
+        run: |
+          echo "📊 Checking migrations..."
+          ls -la supabase/migrations/
+          echo "🔄 Running db reset..."
+          supabase db reset --debug
+          echo "✅ Verifying tables exist..."
+          supabase db psql -c "\dt public.*" || echo "⚠️  No tables found!"
 
       # 6b. Create Test Users
       - name: Create Test Users
