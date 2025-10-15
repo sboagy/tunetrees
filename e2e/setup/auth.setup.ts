@@ -7,7 +7,7 @@ const execAsync = promisify(exec);
 
 const authFile = "e2e/.auth/alice.json";
 const ALICE_EMAIL = "alice.test@tunetrees.test";
-const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD; // Default to null, it's an error if not specified
+const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD; // Default to null, i.e. its an error if not specified
 const AUTH_EXPIRY_MINUTES = 50; // Consider auth stale after 50 minutes (tokens typically expire at 60 min)
 
 /**
@@ -96,6 +96,16 @@ setup("authenticate as Alice", async ({ page }) => {
   // Fill in Alice's credentials
   console.log("⏳ Filling credentials for alice.test@tunetrees.test...");
   await page.getByLabel("Email").fill("alice.test@tunetrees.test");
+  if (!ALICE_PASSWORD) {
+    if (!ALICE_PASSWORD) {
+      console.error(
+        "🛑 Missing ALICE_TEST_PASSWORD. Set ALICE_TEST_PASSWORD in your environment to run E2E tests."
+      );
+      throw new Error(
+        "ALICE_TEST_PASSWORD environment variable is not set. Export ALICE_TEST_PASSWORD or provide it in CI secrets."
+      );
+    }
+  }
   await page.locator("input#password").fill(ALICE_PASSWORD);
 
   // Click sign in button
