@@ -121,7 +121,7 @@ jobs:
       - name: Run Playwright Tests
         run: |
           echo "🎭 Starting Playwright tests (this will start dev server first)..."
-          npx playwright test --reporter=list,html
+          npx playwright test --project=setup --project=chromium-auth --project=chromium --project="Mobile Chrome" --reporter=list,html
         env:
           ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
