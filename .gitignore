@@ -46,6 +46,8 @@ __pycache__/
 *.pyd
 tunetrees_local_backup/**/*
 tunetrees_do_backup/**/*
+tunetrees_do_backup
+tunetrees_local_backup
 _notes/tt_scratch*
 .dbeaver/**/*
 .github/copilot-instructions-broken.md
