@@ -119,7 +119,9 @@ jobs:
 
       # 14. Run Playwright Tests (webServer in playwright.config.ts handles dev server)
       - name: Run Playwright Tests
-        run: npm run test:e2e
+        run: |
+          echo "🎭 Starting Playwright tests (this will start dev server first)..."
+          npx playwright test --reporter=list,html
         env:
           ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
