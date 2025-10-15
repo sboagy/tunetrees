@@ -107,3 +107,4 @@ lighthouse_localhost_4173-20251007T123110.json
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+/e2e/.auth/
