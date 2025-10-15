@@ -1,102 +1,119 @@
 name: CI - Tests
 
 on:
-    push:
-        branches: [main, feat/pwa1]
-    pull_request:
-        branches: [main]
+  push:
+    branches: [main, feat/pwa1]
+  pull_request:
+    branches: [main]
 
 # Cancel in-progress runs when new commit pushed
 concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-    test:
-        name: Run Playwright Tests
-        runs-on: ubuntu-latest
-        timeout-minutes: 15
+  test:
+    name: Run Playwright Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: vite_pwa_env
+    env:
+      SUPABASE_URL: ""
+      SUPABASE_ANON_KEY: ""
 
-        steps:
-            # 1. Checkout code
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            # 2. Setup Node.js
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20"
-                  cache: "npm"
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
 
-            # 3. Install dependencies
-            - name: Install dependencies
-              run: npm ci
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
 
-            # 4. Install Supabase CLI
-            - name: Install Supabase CLI
-              run: |
-                  curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
-                  sudo mv supabase /usr/local/bin/
+      # 4. Install Supabase CLI
+      - name: Install Supabase CLI
+        run: |
+          curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
+          sudo mv supabase /usr/local/bin/
 
-            # 5. Start Supabase Local Stack (includes Docker Postgres)
-            - name: Start Supabase Local Stack
-              run: supabase start
+      # 5. Start Supabase Local Stack (includes Docker Postgres)
+      - name: Start Supabase Local Stack
+        id: supabase
+        run: |
+          supabase start
+          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
+          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> $GITHUB_ENV
 
-            # 6. Reset and Seed Database
-            - name: Reset and Seed Database
-              run: supabase db reset
+      # 6. Reset and Seed Database
+      - name: Reset and Seed Database
+        run: supabase db reset
 
-            # 7. Install Playwright Browsers
-            - name: Install Playwright Browsers
-              run: npx playwright install --with-deps chromium
+      # 6b. Create Test Users
+      - name: Create Test Users
+        run: npx tsx scripts/setup-test-environment.ts
+        env:
+          ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-            # 8. Build Application
-            - name: Build Application
-              run: npm run build
-              env:
-                  # Use local Supabase URLs
-                  VITE_SUPABASE_URL: http://127.0.0.1:54321
-                  VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' }}
+      # 7. Install Playwright Browsers
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
 
-            # 9. Start Dev Server (background)
-            - name: Start Dev Server
-              run: npm run dev &
-              env:
-                  VITE_SUPABASE_URL: http://127.0.0.1:54321
-                  VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' }}
+      # 8. Build Application
+      - name: Build Application
+        run: npm run build
+        env:
+          # Use local Supabase URLs (from supabase start output)
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-            # 10. Wait for Dev Server
-            - name: Wait for Dev Server
-              run: npx wait-on http://localhost:5173 --timeout 60000
+      # 9. Start Dev Server (background)
+      - name: Start Dev Server
+        run: npm run dev &
+        env:
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-            # 11. Run Playwright Tests
-            - name: Run Playwright Tests
-              run: npm run test:e2e
-              env:
-                  DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-                  VITE_SUPABASE_URL: http://127.0.0.1:54321
-                  VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' }}
+      # 10. Wait for Dev Server
+      - name: Wait for Dev Server
+        run: npx wait-on http://localhost:5173 --timeout 60000
 
-            # 12. Upload Test Results
-            - name: Upload Playwright Report
-              uses: actions/upload-artifact@v4
-              if: always()
-              with:
-                  name: playwright-report
-                  path: playwright-report/
-                  retention-days: 30
+      # 11. Run Playwright Tests
+      - name: Run Playwright Tests
+        run: npm run test:e2e
+        env:
+          ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-            # 13. Upload Test Screenshots/Videos
-            - name: Upload Test Artifacts
-              uses: actions/upload-artifact@v4
-              if: failure()
-              with:
-                  name: test-results
-                  path: test-results/
-                  retention-days: 7
+      # 12. Upload Test Results
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
 
-            # 14. Stop Supabase (cleanup)
-            - name: Stop Supabase
-              if: always()
-              run: supabase stop --no-backup
+      # 13. Upload Test Screenshots/Videos
+      - name: Upload Test Artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+
+      # 14. Stop Supabase (cleanup)
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup
