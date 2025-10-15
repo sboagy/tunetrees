@@ -37,15 +37,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 4. Install Supabase CLI
+      # 4. Cache Supabase CLI
+      - name: Cache Supabase CLI
+        id: cache-supabase
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/supabase
+          key: ${{ runner.os }}-supabase-cli-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-supabase-cli-
+
+      # 5. Install Supabase CLI (if not cached)
       - name: Install Supabase CLI
+        if: steps.cache-supabase.outputs.cache-hit != 'true'
         run: |
-          rm -rf supabase
           curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
           sudo mv -f supabase /usr/local/bin/
-          supabase --version
 
-      # 5. Start Supabase Local Stack (includes Docker Postgres)
+      # 6. Verify Supabase CLI
+      - name: Verify Supabase CLI
+        run: supabase --version
+
+      # 7. Start Supabase Local Stack (includes Docker Postgres)
       - name: Start Supabase Local Stack
         id: supabase
         run: |
@@ -53,7 +66,7 @@ jobs:
           echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
           echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> $GITHUB_ENV
 
-      # 6. Reset and Seed Database
+      # 8. Reset and Seed Database
       - name: Reset and Seed Database
         run: |
           echo "📊 Checking migrations..."
@@ -66,7 +79,7 @@ jobs:
           echo "✅ Verifying tables exist..."
           supabase db psql -c "\dt public.*" || echo "⚠️  No tables found!"
 
-      # 6b. Create Test Users
+      # 9. Create Test Users
       - name: Create Test Users
         run: npx tsx scripts/setup-test-environment.ts
         env:
@@ -74,11 +87,11 @@ jobs:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 7. Install Playwright Browsers
+      # 10. Install Playwright Browsers
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      # 8. Build Application
+      # 11. Build Application
       - name: Build Application
         run: npm run build
         env:
@@ -86,18 +99,18 @@ jobs:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 9. Start Dev Server (background)
+      # 12. Start Dev Server (background)
       - name: Start Dev Server
         run: npm run dev &
         env:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 10. Wait for Dev Server
+      # 13. Wait for Dev Server
       - name: Wait for Dev Server
         run: npx wait-on http://localhost:5173 --timeout 60000
 
-      # 11. Run Playwright Tests
+      # 14. Run Playwright Tests
       - name: Run Playwright Tests
         run: npm run test:e2e
         env:
@@ -106,7 +119,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 12. Upload Test Results
+      # 15. Upload Test Results
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
         if: always()
@@ -115,7 +128,7 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-      # 13. Upload Test Screenshots/Videos
+      # 16. Upload Test Screenshots/Videos
       - name: Upload Test Artifacts
         uses: actions/upload-artifact@v4
         if: failure()
@@ -124,7 +137,7 @@ jobs:
           path: test-results/
           retention-days: 7
 
-      # 14. Stop Supabase (cleanup)
+      # 17. Stop Supabase (cleanup)
       - name: Stop Supabase
         if: always()
         run: supabase stop --no-backup
