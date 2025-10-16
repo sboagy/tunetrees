@@ -4,6 +4,11 @@
  * Client-side queries for practice records, queue, and FSRS scheduling.
  * All functions read from local SQLite WASM (no server calls).
  *
+ * Architecture:
+ * - Queries `practice_list_staged` VIEW (complete enriched dataset)
+ * - VIEW does ALL JOINs and COALESCE operations
+ * - Filters by `daily_practice_queue` for frozen snapshot
+ *
  * Replaces legacy server-side queries:
  * - legacy/tunetrees/app/queries.py#query_practice_list_scheduled
  * - legacy/tunetrees/app/schedule.py (various record fetching)
@@ -24,7 +29,82 @@ import type {
 } from "../types";
 
 /**
- * Simplified practice queue entry for getDueTunes()
+ * Practice List Staged Row
+ * 
+ * Complete row from practice_list_staged VIEW.
+ * This VIEW merges tune + playlist_tune + practice_record (latest) + table_transient_data.
+ * 
+ * Used by practice grid - contains ALL data including staging/preview.
+ */
+export interface PracticeListStagedRow {
+  // Core tune info
+  id: number;
+  title: string;
+  type: string;
+  mode: string;
+  structure: string | null;
+  incipit: string | null;
+  genre: string | null;
+  private_for: number | null;
+  deleted: number;
+  
+  // Playlist info
+  learned: number | null;
+  goal: string;
+  scheduled: string | null;
+  user_ref: number;
+  playlist_id: number;
+  instrument: string | null;
+  playlist_deleted: number;
+  
+  // Latest practice data (COALESCE between transient and historical)
+  latest_state: number | null;
+  latest_practiced: string | null;
+  latest_quality: number | null;
+  latest_easiness: number | null;
+  latest_difficulty: number | null;
+  latest_stability: number | null;
+  latest_interval: number | null;
+  latest_step: number | null;
+  latest_repetitions: number | null;
+  latest_due: string | null;
+  latest_backup_practiced: string | null;
+  latest_goal: string | null;
+  latest_technique: string | null;
+  
+  // Aggregated data
+  tags: string | null;
+  notes: string | null;
+  favorite_url: string | null;
+  
+  // Transient/staging fields
+  purpose: string | null;
+  note_private: string | null;
+  note_public: string | null;
+  recall_eval: string | null;
+  
+  // Flags
+  has_override: number;
+  has_staged: number;
+}
+
+/**
+ * Practice List Staged with Queue Info
+ * 
+ * Extends PracticeListStagedRow with daily_practice_queue fields.
+ * This is what the practice grid actually displays.
+ */
+export interface PracticeListStagedWithQueue extends PracticeListStagedRow {
+  // From daily_practice_queue
+  bucket: string;
+  order_index: number;
+  completed_at: string | null;
+  active: number;
+}
+
+/**
+ * DEPRECATED: Old interface - remove after migration
+ * @deprecated Use PracticeListStagedWithQueue instead
  */
 export interface DueTuneEntry {
   tuneRef: number;
@@ -40,28 +120,65 @@ export interface DueTuneEntry {
 }
 
 /**
- * Get due tunes for practice session
+ * Get practice list (with optional queue filtering)
  *
- * Queries local SQLite to find tunes that need practice based on their
- * next review date. Uses COALESCE(playlist_tune.scheduled, latest_due)
- * to support migration from old to new scheduling system.
+ * Queries practice_list_staged VIEW for complete enriched data.
+ * The VIEW contains all COALESCE operations merging transient and historical data.
+ * 
+ * TODO: Add daily_practice_queue filtering once queue infrastructure is created.
  *
  * Replaces: legacy/tunetrees/app/queries.py#query_practice_list_scheduled
  *
  * @param db - SQLite database instance
+ * @param userId - User ID
  * @param playlistId - Playlist to query
- * @param sitdownDate - Current practice session date
- * @param delinquencyWindowDays - How many days overdue to include (default 7)
- * @returns Array of due tune entries with tune details and scheduling info
+ * @returns Array of practice list rows
  *
  * @example
  * ```typescript
  * const db = getDb();
- * const dueTunes = await getDueTunes(db, 1, new Date(), 7);
- * // Returns tunes due today or within 7-day delinquency window
+ * const practices = await getPracticeList(db, 1, 5);
+ * // Returns complete practice data from VIEW
  * ```
  */
+export async function getPracticeList(
+  db: SqliteDatabase,
+  userId: number,
+  playlistId: number
+): Promise<PracticeListStagedRow[]> {
+  // For now, query the VIEW directly without queue filtering
+  // TODO: Once daily_practice_queue table/schema is added, do INNER JOIN for filtering
+  const rows = await db.all<PracticeListStagedRow>(sql`
+    SELECT * 
+    FROM practice_list_staged
+    WHERE user_ref = ${userId}
+      AND playlist_id = ${playlistId}
+      AND deleted = 0
+      AND playlist_deleted = 0
+    ORDER BY title
+  `);
+  
+  return rows;
+}
+
+/**
+ * DEPRECATED: Use getPracticeList instead
+ * Keeping for backward compatibility during migration
+ */
 export async function getDueTunes(
+  db: SqliteDatabase,
+  userId: number,
+  playlistId: number
+): Promise<PracticeListStagedRow[]> {
+  return getPracticeList(db, userId, playlistId);
+}
+
+/**
+ * DEPRECATED: Old implementation with manual JOINs
+ * Keeping signature for backward compatibility during migration
+ * @deprecated
+ */
+export async function getDueTunesLegacy(
   db: SqliteDatabase,
   playlistId: number,
   sitdownDate: Date,

@@ -133,29 +133,31 @@ WHERE
  * View 3: Practice List with Staged Data
  *
  * Extended practice view including transient/staged data from table_transient_data.
- * Used for practice sessions with uncommitted changes.
+ * Used for practice sessions with uncommitted changes (FSRS preview).
+ * 
+ * The VIEW does ALL JOINs and COALESCE operations - this IS the complete dataset.
+ * Grid queries this VIEW filtered by daily_practice_queue for frozen snapshot behavior.
  *
- * Note: table_transient_data table may not exist in PWA version.
- * This view is included for compatibility with legacy data migration.
+ * Note: Ported from PostgreSQL sql_scripts/view_practice_list_staged.sql
  */
 const PRACTICE_LIST_STAGED = `
 CREATE VIEW IF NOT EXISTS practice_list_staged AS
 SELECT
-  tune.id AS id,
+  tune.id,
   COALESCE(tune_override.title, tune.title) AS title,
   COALESCE(tune_override.type, tune.type) AS type,
   COALESCE(tune_override.structure, tune.structure) AS structure,
   COALESCE(tune_override.mode, tune.mode) AS mode,
   COALESCE(tune_override.incipit, tune.incipit) AS incipit,
-  COALESCE(tune_override.genre, tune.genre) AS genre_ref,
+  COALESCE(tune_override.genre, tune.genre) AS genre,
   tune.private_for,
   tune.deleted,
   playlist_tune.learned,
   COALESCE(td.goal, COALESCE(pr.goal, 'recall')) AS goal,
-  playlist_tune.current AS scheduled,
-  playlist.user_ref AS user_ref,
-  playlist.playlist_id AS playlist_id,
-  instrument.instrument AS instrument,
+  playlist_tune.scheduled,
+  playlist.user_ref,
+  playlist.playlist_id,
+  instrument.instrument,
   playlist_tune.deleted AS playlist_deleted,
   COALESCE(td.state, pr.state) AS latest_state,
   COALESCE(td.practiced, pr.practiced) AS latest_practiced,
@@ -176,10 +178,10 @@ SELECT
     WHERE tag.tune_ref = tune.id
       AND tag.user_ref = playlist.user_ref
   ) AS tags,
-  td.purpose AS purpose,
-  td.note_private AS note_private,
-  td.note_public AS note_public,
-  td.recall_eval AS recall_eval,
+  td.purpose,
+  td.note_private,
+  td.note_public,
+  td.recall_eval,
   (
     SELECT GROUP_CONCAT(note.note_text, ' ')
     FROM note
@@ -231,6 +233,7 @@ FROM
       AND pr.id = latest.max_id
   ) pr ON pr.tune_ref = tune.id
     AND pr.playlist_ref = playlist_tune.playlist_ref
+  LEFT JOIN tag ON tag.tune_ref = tune.id
   LEFT JOIN table_transient_data td ON td.tune_id = tune.id
     AND td.playlist_id = playlist_tune.playlist_ref
 WHERE

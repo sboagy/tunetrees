@@ -15,6 +15,48 @@ The current practice evaluation flow is incomplete:
 - ❌ Show Submitted filtering not using `completed_at` properly
 - ❌ Latest\_\* columns don't show preview data from staging
 
+## Architecture Correction (CRITICAL)
+
+**ISSUE:** Original plan created custom abstractions instead of following legacy architecture.
+
+### ✅ Correct Architecture (from Legacy):
+
+1. **`practice_list_staged` VIEW** (PostgreSQL → SQLite)
+   - Complete enriched dataset with ALL JOINs and COALESCE operations
+   - Merges: `tune` + `playlist_tune` + `practice_record` (latest) + `table_transient_data` (staging)
+   - Returns full rows with `latest_*` fields (COALESCE between staging and historical)
+   - **This IS the final dataset shown in grid**
+
+2. **`daily_practice_queue` TABLE**
+   - Frozen snapshot: which tunes to practice today
+   - Contains: `tune_ref`, `bucket`, `order_index`, `completed_at`, etc.
+   - Acts as **filter and ordering layer**
+
+3. **Grid Query Pattern:**
+   ```sql
+   SELECT pls.* 
+   FROM practice_list_staged pls
+   INNER JOIN daily_practice_queue dpq 
+     ON dpq.tune_ref = pls.id 
+     AND dpq.playlist_id = pls.playlist_id
+   WHERE dpq.user_ref = ? 
+     AND dpq.playlist_ref = ?
+     AND dpq.active = 1
+   ORDER BY dpq.bucket, dpq.order_index
+   ```
+
+### ❌ What NOT to Do:
+- ~~Create custom `DueTuneEntry` interface~~
+- ~~Write custom SQL with manual JOINs and COALESCE~~
+- ~~Duplicate VIEW logic in application code~~
+
+### ✅ What TO Do:
+1. Port `practice_list_staged` VIEW to SQLite
+2. Query the VIEW filtered by `daily_practice_queue`
+3. Use existing schema types from `drizzle/schema.ts`
+
+---
+
 ## Expected Behavior (from Legacy & Docs)
 
 ### When User Selects Evaluation (Staging)
@@ -51,7 +93,37 @@ The current practice evaluation flow is incomplete:
 - **false**: Filter out rows where `completed_at IS NOT NULL`
 - **true**: Show all rows, including completed
 
-## Implementation Checklist
+## Implementation Checklist (REVISED)
+
+### ✅ Task 0: Port practice_list_staged VIEW to SQLite
+
+**File:** `sql_scripts/view_practice_list_staged_sqlite.sql`
+
+**Changes from PostgreSQL:**
+
+1. Replace `DISTINCT ON (pr.tune_ref, pr.playlist_ref)` with subquery:
+   ```sql
+   LEFT JOIN (
+     SELECT pr.* FROM practice_record pr
+     INNER JOIN (
+       SELECT tune_ref, playlist_ref, MAX(id) as max_id
+       FROM practice_record
+       GROUP BY tune_ref, playlist_ref
+     ) latest ON pr.tune_ref = latest.tune_ref 
+            AND pr.playlist_ref = latest.playlist_ref 
+            AND pr.id = latest.max_id
+   ) pr ON pr.tune_ref = tune.id AND pr.playlist_ref = playlist_tune.playlist_ref
+   ```
+
+2. Replace `string_agg(tag.tag_text, ' ')` with `group_concat(tag.tag_text, ' ')`
+
+3. Remove PostgreSQL-specific casting (e.g., `'recall'::text` → `'recall'`)
+
+4. Test VIEW creation in SQLite
+
+**Then:** Create migration or add to initialization script to ensure VIEW exists.
+
+---
 
 ### ✅ Task 1: Create Practice Staging Service
 
@@ -118,43 +190,82 @@ export async function clearAllStagedForPlaylist(
 
 ---
 
-### ✅ Task 2: Update getDueTunes Query
+### ✅ Task 2: Rewrite getDueTunes to Query VIEW
 
 **File:** `src/lib/db/queries/practice/getDueTunes.ts`
 
-**Changes:**
+**DELETE:** Custom `DueTuneEntry` interface and manual SQL queries
 
-1. Add LEFT JOIN on `table_transient_data`:
+**REPLACE WITH:**
 
-```sql
-LEFT JOIN table_transient_data AS transient
-  ON transient.user_id = ?
-  AND transient.tune_id = tune.id
-  AND transient.playlist_id = ?
+```typescript
+import { db } from "@/lib/db/client";
+import type { DailyPracticeQueue } from "@/lib/db/schema";
+
+export interface PracticeListStagedRow {
+  // From VIEW - all fields from practice_list_staged
+  id: number;
+  title: string;
+  type: string;
+  mode: string;
+  incipit: string | null;
+  goal: string;
+  scheduled: string | null;
+  user_ref: number;
+  playlist_id: number;
+  instrument: string | null;
+  latest_practiced: string | null;
+  latest_quality: number | null;
+  latest_easiness: number | null;
+  latest_difficulty: number | null;
+  latest_stability: number | null;
+  latest_interval: number | null;
+  latest_step: number | null;
+  latest_repetitions: number | null;
+  latest_due: string | null;
+  latest_goal: string | null;
+  latest_technique: string | null;
+  recall_eval: string | null;
+  has_staged: number;
+  // From daily_practice_queue JOIN
+  bucket: string;
+  order_index: number;
+  completed_at: string | null;
+}
+
+export async function getDueTunes(
+  userId: number,
+  playlistId: number
+): Promise<PracticeListStagedRow[]> {
+  const query = `
+    SELECT 
+      pls.*,
+      dpq.bucket,
+      dpq.order_index,
+      dpq.completed_at
+    FROM practice_list_staged pls
+    INNER JOIN daily_practice_queue dpq 
+      ON dpq.tune_ref = pls.id 
+      AND dpq.playlist_id = pls.playlist_id
+    WHERE dpq.user_ref = ? 
+      AND dpq.playlist_ref = ?
+      AND dpq.active = 1
+    ORDER BY dpq.bucket, dpq.order_index
+  `;
+  
+  return db.all(query, [userId, playlistId]);
+}
 ```
 
-2. Use COALESCE for all latest\_\* fields:
-
-```sql
-COALESCE(transient.recall_eval, '') AS recall_eval,
-COALESCE(transient.practiced, pr.practiced) AS latest_practiced,
-COALESCE(transient.quality, pr.quality) AS latest_quality,
-COALESCE(transient.easiness, pr.easiness) AS latest_easiness,
-COALESCE(transient.difficulty, pr.difficulty) AS latest_difficulty,
-COALESCE(transient.stability, pr.stability) AS latest_stability,
-COALESCE(transient.interval, pr.interval) AS latest_interval,
-COALESCE(transient.repetitions, pr.repetitions) AS latest_repetitions,
-COALESCE(transient.goal, pt.goal, 'recall') AS latest_goal,
-COALESCE(transient.technique, pr.technique) AS latest_technique,
-COALESCE(transient.due, pr.due) AS latest_due
-```
-
-3. Add `daily_practice_queue.completed_at` to SELECT
-4. Return complete `DueTuneEntry` with all fields
+**Key Points:**
+- No custom JOINs - VIEW does everything
+- Filter by `daily_practice_queue` for frozen snapshot
+- Return complete enriched rows
+- Type matches VIEW output + queue fields
 
 ---
 
-### ✅ Task 3: Update DueTuneEntry Type
+### ✅ Task 3: Update Grid to Use New Query
 
 **File:** `src/lib/db/types.ts`
 
