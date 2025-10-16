@@ -83,9 +83,26 @@ export function getDefaultTableState(
   switch (purpose) {
     case "scheduled":
       baseState.columnVisibility = {
-        id: false, // Hide ID by default
-        incipit: false, // Hide incipit by default
-        structure: false, // Hide structure by default
+        // Show all practice-relevant columns by default
+        bucket: true,
+        evaluation: true,
+        goal: true,
+        type: true,
+        mode: true,
+        incipit: true,
+        private_for: true, // Status column
+        scheduled: true,
+        latest_practiced: true,
+        latest_goal: true,
+        latest_technique: true,
+        latest_quality: true,
+        latest_stability: true,
+        latest_easiness: true,
+        latest_repetitions: true,
+        latest_due: true,
+        // Hide less important columns
+        id: false,
+        structure: false,
       };
       baseState.sorting = [{ id: "scheduled", desc: false }]; // Sort by scheduled date
       break;

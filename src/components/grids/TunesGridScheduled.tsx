@@ -95,7 +95,10 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
 
   const initialState = {
     ...mergedState,
-    columnVisibility: filteredColumnVisibility,
+    columnVisibility: {
+      ...filteredColumnVisibility,
+      select: false, // Hide select/checkbox column for practice grid
+    },
   };
 
   // Table state signals
@@ -162,14 +165,39 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     {}
   );
 
+  // Provide clear evaluations callback to parent
+  createEffect(() => {
+    if (props.onClearEvaluationsReady) {
+      props.onClearEvaluationsReady(() => {
+        setEvaluations({});
+      });
+    }
+  });
+
+  // Helper function to check if a tune was practiced today
+  const wasPracticedToday = (latestPracticed: string | null): boolean => {
+    if (!latestPracticed) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const practicedDate = new Date(latestPracticed);
+    practicedDate.setHours(0, 0, 0, 0);
+    return practicedDate.getTime() === today.getTime();
+  };
+
   // Transform DueTuneEntry to match grid expectations
   // Add bucket classification
   const tunes = createMemo(() => {
     const data = dueTunesData() || [];
     const evals = evaluations();
 
+    // Filter out tunes practiced today if showSubmitted is false
+    const filteredData =
+      props.showSubmitted === false
+        ? data.filter((entry) => !wasPracticedToday(entry.latest_practiced))
+        : data;
+
     // Classify into buckets
-    return data.map((entry) => {
+    return filteredData.map((entry) => {
       let bucket: "Due Today" | "Lapsed" | "Backfill" = "Due Today";
 
       const now = new Date();
@@ -239,7 +267,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    enableRowSelection: true,
+    enableRowSelection: false,
     enableColumnResizing: true,
     columnResizeMode: "onChange",
     state: {

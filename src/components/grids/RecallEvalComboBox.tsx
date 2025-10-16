@@ -98,6 +98,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
       <button
         ref={buttonRef}
         type="button"
+        data-testid={`recall-eval-${props.tuneId}`}
         onClick={(e) => {
           e.stopPropagation(); // Prevent row click
           setIsOpen(!isOpen());

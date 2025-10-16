@@ -770,14 +770,14 @@ export function getScheduledColumns(
     },
   ];
 
-  // Combine: select, id, practice-specific, then core tune columns
+  // Combine: id, practice-specific, then core tune columns (no select checkbox for practice grid)
   return [
-    baseColumns[0], // select checkbox
     baseColumns[1], // id
     ...practiceSpecificColumns, // Bucket, Evaluation, Goal
     baseColumns[2], // title
-    baseColumns[4], // type
-    baseColumns[6], // structure
+    baseColumns[3], // type
+    baseColumns[4], // mode
+    baseColumns[6], // incipit
     baseColumns[7], // status (private_for)
     // Add scheduling columns from repertoire
     {
@@ -867,15 +867,80 @@ export function getScheduledColumns(
       maxSize: 150,
     },
     {
+      id: "latest_goal",
+      accessorFn: (row) => row.latest_goal,
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Latest Goal" />
+      ),
+      cell: (info) => {
+        const value = (info.getValue() as string) || "";
+        if (!value) return <span class="text-gray-400">—</span>;
+        const colors: Record<string, string> = {
+          recall:
+            "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200",
+          notes:
+            "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200",
+          technique:
+            "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200",
+          backup:
+            "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200",
+        };
+        const colorClass = colors[value] || "bg-gray-100 dark:bg-gray-700";
+        return (
+          <span
+            class={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}
+          >
+            {value}
+          </span>
+        );
+      },
+      size: 130,
+      minSize: 110,
+      maxSize: 150,
+    },
+    {
+      id: "latest_technique",
+      accessorFn: (row) => row.latest_technique ?? "sm2",
+      header: ({ column }) => <SortableHeader column={column} title="Alg" />,
+      cell: (info) => {
+        const value = (info.getValue() as string) || "sm2";
+        return (
+          <span class="text-sm font-mono text-gray-600 dark:text-gray-400">
+            {value}
+          </span>
+        );
+      },
+      size: 90,
+      minSize: 80,
+      maxSize: 110,
+    },
+    {
+      id: "latest_quality",
+      accessorFn: (row) => row.latest_quality,
+      header: ({ column }) => <SortableHeader column={column} title="Qual" />,
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value !== null ? (
+          <span class="text-sm text-gray-600 dark:text-gray-400">{value}</span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      sortingFn: numericSortingFn,
+      size: 90,
+      minSize: 70,
+      maxSize: 110,
+    },
+    {
       id: "latest_stability",
       accessorFn: (row) =>
-        row.latest_stability ?? row.schedulingInfo?.stability,
+        row.latest_stability ?? row.schedulingInfo?.stability ?? null,
       header: ({ column }) => (
         <SortableHeader column={column} title="Stability" />
       ),
       cell: (info) => {
-        const value = info.getValue() as number | null;
-        return value !== null ? (
+        const value = info.getValue() as number | null | undefined;
+        return value !== null && value !== undefined ? (
           <span class="text-sm text-gray-600 dark:text-gray-400">
             {value.toFixed(2)}
           </span>
@@ -883,9 +948,89 @@ export function getScheduledColumns(
           <span class="text-gray-400">—</span>
         );
       },
-      size: 90,
-      minSize: 70,
-      maxSize: 110,
+      sortingFn: numericSortingFn,
+      size: 104,
+      minSize: 90,
+      maxSize: 120,
+    },
+    {
+      id: "latest_easiness",
+      accessorFn: (row) => row.latest_difficulty ?? row.latest_easiness ?? null, // FSRS uses difficulty, SM2 uses easiness
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Easiness" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as number | null | undefined;
+        return value !== null && value !== undefined ? (
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {value.toFixed(2)}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      sortingFn: numericSortingFn,
+      size: 112,
+      minSize: 90,
+      maxSize: 130,
+    },
+    {
+      id: "latest_repetitions",
+      accessorFn: (row) => row.latest_repetitions,
+      header: ({ column }) => <SortableHeader column={column} title="Reps" />,
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value !== null ? (
+          <span class="text-sm text-gray-600 dark:text-gray-400">{value}</span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      sortingFn: numericSortingFn,
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    },
+    {
+      id: "latest_due",
+      accessorFn: (row) => row.latest_due,
+      header: ({ column }) => <SortableHeader column={column} title="Due" />,
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        if (!value) return <span class="text-gray-400">—</span>;
+
+        const date = new Date(value);
+        const now = new Date();
+        const diffDays = Math.floor(
+          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        let color = "text-gray-600 dark:text-gray-400";
+        if (diffDays < 0) color = "text-red-600 dark:text-red-400"; // Overdue
+        else if (diffDays === 0)
+          color = "text-orange-600 dark:text-orange-400"; // Due today
+        else if (diffDays <= 7)
+          color = "text-yellow-600 dark:text-yellow-400"; // Due soon
+        else color = "text-green-600 dark:text-green-400"; // Future
+
+        const label =
+          diffDays < 0
+            ? `${Math.abs(diffDays)}d overdue`
+            : diffDays === 0
+            ? "Today"
+            : diffDays === 1
+            ? "Tomorrow"
+            : `${diffDays}d`;
+
+        return (
+          <span class={`text-sm ${color}`} title={date.toLocaleDateString()}>
+            {label}
+          </span>
+        );
+      },
+      size: 160,
+      minSize: 130,
+      maxSize: 180,
     },
   ];
 }

@@ -15,6 +15,27 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Open Playwright Chromium - Practice",
+            "cwd": "/Users/sboag/gittt/tunetrees",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": [
+                "playwright",
+                "open",
+                "--browser=chromium",
+                "http://localhost:5173/?tab=practice"
+            ],
+            "console": "integratedTerminal",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "windows": {
+                "runtimeExecutable": "npx.cmd"
+            }
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Run npm dev",
             "cwd": "/Users/sboag/gittt/tunetrees",
             "runtimeExecutable": "npm",
@@ -57,6 +78,14 @@
             "configurations": [
                 "Run npm dev",
                 "Chrome Debug TuneTrees PWA App"
+            ],
+            "stopAll": true
+        },
+        {
+            "name": "Run Dev + Playwright Chromium Debug",
+            "configurations": [
+                "Run npm dev",
+                "Open Playwright Chromium - Practice"
             ],
             "stopAll": true
         }

@@ -34,6 +34,7 @@ import {
   TOOLBAR_INNER_CLASSES,
   TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
+import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 
 export interface PracticeControlBannerProps {
   /** Number of evaluations staged for submit */
@@ -101,6 +102,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
           {/* Submit button - enabled when evaluations > 0 */}
           <button
             type="button"
+            data-testid="submit-evaluations-button"
             onClick={handleSubmit}
             disabled={!props.evaluationsCount || props.evaluationsCount === 0}
             title={`Submit ${props.evaluationsCount || 0} practice evaluations`}
@@ -119,63 +121,21 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             </Show>
           </button>
 
-          {/* Display Submitted toggle */}
-          <button
-            type="button"
-            onClick={handleDisplaySubmittedToggle}
-            title="Toggle display of submitted practice records"
-            class={TOOLBAR_BUTTON_BASE}
-            classList={{
-              "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 border-green-200/50 dark:border-green-700/50":
-                props.showSubmitted,
-              "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200/50 dark:border-gray-700/50":
-                !props.showSubmitted,
-            }}
-          >
-            <Show
-              when={props.showSubmitted}
-              fallback={
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                  />
-                </svg>
-              }
+          {/* Show Submitted toggle - Switch component */}
+          <div class="flex items-center gap-3 px-3 py-1 rounded-md border border-gray-200/50 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <Switch
+              checked={props.showSubmitted ?? false}
+              onChange={handleDisplaySubmittedToggle}
+              data-testid="display-submitted-switch"
             >
-              <svg
-                class={TOOLBAR_ICON_SIZE}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.5 6.5m3.378 3.378l4.242 4.242M21 21l-5.6-5.6m0 0a10.05 10.05 0 01-2.025 1.025"
-                />
-              </svg>
-            </Show>
-            <span class="hidden md:inline">
-              {props.showSubmitted ? "Hide" : "Show"} Submitted
-            </span>
-          </button>
+              <SwitchControl>
+                <SwitchThumb />
+              </SwitchControl>
+              <SwitchLabel class="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none ml-2">
+                Show Submitted
+              </SwitchLabel>
+            </Switch>
+          </div>
 
           {/* Add Tunes button */}
           <button
@@ -287,6 +247,30 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
           {/* Spacer */}
           <div class={TOOLBAR_SPACER} />
 
+          {/* History button */}
+          <button
+            type="button"
+            onClick={() => navigate("/practice/history")}
+            title="View practice history"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
+          >
+            <svg
+              class={TOOLBAR_ICON_SIZE}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+              />
+            </svg>
+            <span class="hidden sm:inline">History</span>
+          </button>
+
           {/* Columns dropdown */}
           <div class="relative">
             <button
@@ -311,30 +295,6 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               />
             </Show>
           </div>
-
-          {/* History button */}
-          <button
-            type="button"
-            onClick={() => navigate("/practice/history")}
-            title="View practice history"
-            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
-          >
-            <svg
-              class={TOOLBAR_ICON_SIZE}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              />
-            </svg>
-            <span class="hidden sm:inline">History</span>
-          </button>
         </div>
       </div>
     </div>
