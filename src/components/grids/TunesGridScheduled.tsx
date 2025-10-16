@@ -6,8 +6,8 @@
  * - Sticky header with frozen columns
  * - Virtual scrolling for performance
  * - Embedded RecallEvalComboBox in Evaluation column
- * - Real-time feedback staging
- * - Uses getDueTunes() query
+ * - Real-time feedback staging with FSRS preview
+ * - Uses getPracticeList() query (practice_list_staged VIEW)
  *
  * @module components/grids/TunesGridScheduled
  */
@@ -37,7 +37,8 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
-import { getDueTunes } from "../../lib/db/queries/practice";
+import { getPracticeList } from "../../lib/db/queries/practice";
+import { stagePracticeEvaluation } from "../../lib/services/practice-staging";
 import {
   CELL_CLASSES,
   CONTAINER_CLASSES,
@@ -139,23 +140,23 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     }
   });
 
-  // Fetch due tunes from practice queue
+  // Fetch practice list from practice_list_staged VIEW
   const [dueTunesData] = createResource(
     () => {
       const db = localDb();
       const playlistId = currentPlaylistId();
       const version = syncVersion(); // Triggers refetch when sync completes
-      return db && playlistId ? { db, playlistId, version } : null;
+      return db && props.userId && playlistId 
+        ? { db, userId: props.userId, playlistId, version } 
+        : null;
     },
     async (params) => {
       if (!params) return [];
-      const sitdownDate = new Date(); // Current time
-      const delinquencyWindowDays = 7; // Show tunes due in last 7 days
-      return await getDueTunes(
+      // Query practice_list_staged VIEW (complete enriched data with COALESCE)
+      return await getPracticeList(
         params.db,
-        params.playlistId,
-        sitdownDate,
-        delinquencyWindowDays
+        params.userId,
+        params.playlistId
       );
     }
   );
@@ -184,8 +185,8 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     return practicedDate.getTime() === today.getTime();
   };
 
-  // Transform DueTuneEntry to match grid expectations
-  // Add bucket classification
+  // Transform PracticeListStagedRow to match grid expectations
+  // Add bucket classification and local evaluation state
   const tunes = createMemo(() => {
     const data = dueTunesData() || [];
     const evals = evaluations();
@@ -217,25 +218,44 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
 
       return {
         ...entry,
-        id: entry.tuneRef,
-        tune_id: entry.tuneRef,
+        tune_id: entry.id, // PracticeListStagedRow uses 'id' field
         bucket,
-        recall_eval: evals[entry.tuneRef] || "", // Get from local state
-        goal: "recall", // Default goal
-        latest_practiced: entry.latest_practiced || null,
-        latest_stability: entry.schedulingInfo?.stability || null,
-        latest_due: entry.schedulingInfo?.due || null,
+        // Override recall_eval with local state if user has made a selection
+        recall_eval: evals[entry.id] || entry.recall_eval || "",
+        // All latest_* fields already provided by VIEW via COALESCE
       };
     });
   });
 
   // Callback for recall evaluation changes
-  const handleRecallEvalChange = (tuneId: number, evaluation: string) => {
+  const handleRecallEvalChange = async (tuneId: number, evaluation: string) => {
     console.log(`Tune ${tuneId} recall eval changed to: ${evaluation}`);
-    // Update local state to trigger re-render
+    
+    // Update local state to trigger immediate re-render
     setEvaluations((prev) => ({ ...prev, [tuneId]: evaluation }));
-    // TODO: Stage feedback to table_transient_data or sync_queue
-    // TODO: Queue sync to Supabase
+    
+    // Stage to table_transient_data for FSRS preview
+    const db = localDb();
+    const playlistId = currentPlaylistId();
+    if (db && playlistId) {
+      try {
+        await stagePracticeEvaluation(
+          db,
+          playlistId,
+          tuneId,
+          evaluation,
+          "recall", // Default goal
+          "" // Default technique
+        );
+        // Grid will auto-refresh via syncVersion or we can manually trigger refetch
+        // For now, relying on local state update for immediate feedback
+        console.log(`✅ Staged FSRS preview for tune ${tuneId}`);
+      } catch (error) {
+        console.error(`❌ Failed to stage evaluation for tune ${tuneId}:`, error);
+      }
+    }
+    
+    // Notify parent component
     if (props.onRecallEvalChange) {
       props.onRecallEvalChange(tuneId, evaluation);
     }
