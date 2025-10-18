@@ -7,6 +7,7 @@
  */
 
 import { Route, Router, useNavigate } from "@solidjs/router";
+import { Toaster } from "solid-sonner";
 import { ProtectedRoute } from "./components/auth";
 import { MainLayout } from "./components/layout";
 import { AuthProvider } from "./lib/auth/AuthContext";
@@ -52,6 +53,8 @@ function App() {
     <AuthProvider>
       <CurrentPlaylistProvider>
         <CurrentTuneProvider>
+          {/* Toast notification provider */}
+          <Toaster position="top-right" richColors closeButton />
           {/* <ThemeDebugger /> */}
           <Router>
             {/* Public Routes */}

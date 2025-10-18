@@ -38,6 +38,7 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getPracticeList } from "../../lib/db/queries/practice";
+import { generateOrGetPracticeQueue } from "../../lib/services/practice-queue";
 import { stagePracticeEvaluation } from "../../lib/services/practice-staging";
 import {
   CELL_CLASSES,
@@ -57,7 +58,7 @@ import {
 import type { IGridBaseProps } from "./types";
 
 export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
-  const { localDb, syncVersion } = useAuth();
+  const { localDb, syncVersion, incrementSyncVersion } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -140,23 +141,87 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     }
   });
 
-  // Fetch practice list from practice_list_staged VIEW
+  // Generate/fetch daily practice queue (frozen snapshot)
+  // This must run BEFORE getPracticeList since the query JOINs with the queue
+  const [queueInitialized] = createResource(
+    () => {
+      const db = localDb();
+      const playlistId = currentPlaylistId();
+      const version = syncVersion(); // Triggers refetch when sync completes
+      return db && props.userId && playlistId
+        ? { db, userId: props.userId, playlistId, version }
+        : null;
+    },
+    async (params) => {
+      if (!params) return false;
+      try {
+        // Generate or fetch existing queue for today
+        await generateOrGetPracticeQueue(
+          params.db,
+          params.userId,
+          params.playlistId,
+          new Date(), // sitdown date
+          null, // timezone offset (use UTC)
+          "per_day", // mode
+          false // don't force regeneration (queue stable for the day)
+        );
+        return true;
+      } catch (error) {
+        console.error(
+          "[TunesGridScheduled] Queue initialization failed:",
+          error
+        );
+        return false;
+      }
+    }
+  );
+
+  // Fetch practice list from practice_list_staged VIEW (JOINed with queue)
+  // CRITICAL: Must wait for queueInitialized() to complete before fetching
+  // Otherwise grid queries before queue exists, gets 0 rows
   const [dueTunesData] = createResource(
     () => {
       const db = localDb();
       const playlistId = currentPlaylistId();
       const version = syncVersion(); // Triggers refetch when sync completes
-      return db && props.userId && playlistId 
-        ? { db, userId: props.userId, playlistId, version } 
+      const initialized = queueInitialized(); // Wait for queue to be ready
+
+      // Log dependencies for debugging
+      console.log(
+        `[TunesGridScheduled] dueTunesData deps: db=${!!db}, userId=${
+          props.userId
+        }, playlist=${playlistId}, version=${version}, queueInit=${initialized}`
+      );
+
+      // Only proceed if ALL dependencies are ready
+      return db && props.userId && playlistId && initialized
+        ? {
+            db,
+            userId: props.userId,
+            playlistId,
+            version,
+            queueReady: initialized,
+          }
         : null;
     },
     async (params) => {
-      if (!params) return [];
-      // Query practice_list_staged VIEW (complete enriched data with COALESCE)
+      if (!params) {
+        console.log(
+          `[TunesGridScheduled] dueTunesData: params null, returning empty`
+        );
+        return [];
+      }
+      const delinquencyWindowDays = 7; // Show tunes due in last 7 days
+      console.log(
+        `[TunesGridScheduled] Fetching practice list with queue (queueReady=${params.queueReady})`
+      );
+      // Query practice_list_staged VIEW INNER JOIN daily_practice_queue
+      // Queue provides frozen snapshot with bucket/order_index/completed_at
       return await getPracticeList(
         params.db,
         params.userId,
-        params.playlistId
+        params.playlistId,
+        delinquencyWindowDays
       );
     }
   );
@@ -165,6 +230,33 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   const [evaluations, setEvaluations] = createSignal<Record<number, string>>(
     {}
   );
+
+  // Initialize evaluations from existing staged data in database
+  createEffect(() => {
+    const data = dueTunesData();
+    if (data && data.length > 0) {
+      const initialEvals: Record<number, string> = {};
+      for (const entry of data) {
+        // Only include entries that have a staged recall_eval from database
+        if (entry.recall_eval && entry.recall_eval !== "") {
+          initialEvals[entry.id] = entry.recall_eval;
+        }
+      }
+      // Only update if there are staged evaluations and current state is empty
+      const currentEvals = evaluations();
+      if (
+        Object.keys(initialEvals).length > 0 &&
+        Object.keys(currentEvals).length === 0
+      ) {
+        console.log(
+          `📊 Initializing ${
+            Object.keys(initialEvals).length
+          } staged evaluations from database`
+        );
+        setEvaluations(initialEvals);
+      }
+    }
+  });
 
   // Provide clear evaluations callback to parent
   createEffect(() => {
@@ -175,53 +267,35 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     }
   });
 
-  // Helper function to check if a tune was practiced today
-  const wasPracticedToday = (latestPracticed: string | null): boolean => {
-    if (!latestPracticed) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const practicedDate = new Date(latestPracticed);
-    practicedDate.setHours(0, 0, 0, 0);
-    return practicedDate.getTime() === today.getTime();
-  };
-
-  // Transform PracticeListStagedRow to match grid expectations
-  // Add bucket classification and local evaluation state
+  // Transform PracticeListStagedWithQueue to match grid expectations
+  // Queue provides bucket, order_index, and completed_at
   const tunes = createMemo(() => {
     const data = dueTunesData() || [];
     const evals = evaluations();
 
-    // Filter out tunes practiced today if showSubmitted is false
+    // Filter by completed_at if showSubmitted is false
     const filteredData =
       props.showSubmitted === false
-        ? data.filter((entry) => !wasPracticedToday(entry.latest_practiced))
+        ? data.filter((entry) => !entry.completed_at)
         : data;
 
-    // Classify into buckets
+    // Map bucket integer to string for display
+    const bucketNames: Record<number, "Due Today" | "Lapsed" | "Backfill"> = {
+      1: "Due Today",
+      2: "Lapsed",
+      3: "Backfill",
+    };
+
     return filteredData.map((entry) => {
-      let bucket: "Due Today" | "Lapsed" | "Backfill" = "Due Today";
-
-      const now = new Date();
-      if (entry.scheduled) {
-        const dueDate = new Date(entry.scheduled);
-        const diffDays = Math.floor(
-          (now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        if (diffDays > 7) {
-          bucket = "Lapsed";
-        }
-      } else if (!entry.scheduled) {
-        // New tune or backfill
-        bucket = "Backfill";
-      }
-
       return {
         ...entry,
         tune_id: entry.id, // PracticeListStagedRow uses 'id' field
-        bucket,
+        bucket: bucketNames[entry.bucket] || "Due Today",
         // Override recall_eval with local state if user has made a selection
-        recall_eval: evals[entry.id] || entry.recall_eval || "",
+        // If tune_id is in evaluations (even if empty string), use that value
+        // Otherwise fall back to database value
+        recall_eval:
+          entry.id in evals ? evals[entry.id] : entry.recall_eval || "",
         // All latest_* fields already provided by VIEW via COALESCE
       };
     });
@@ -230,31 +304,49 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   // Callback for recall evaluation changes
   const handleRecallEvalChange = async (tuneId: number, evaluation: string) => {
     console.log(`Tune ${tuneId} recall eval changed to: ${evaluation}`);
-    
+
     // Update local state to trigger immediate re-render
+    // Store empty string explicitly when "(not set)" is selected
     setEvaluations((prev) => ({ ...prev, [tuneId]: evaluation }));
-    
-    // Stage to table_transient_data for FSRS preview
+
+    // Stage to table_transient_data for FSRS preview, or clear if "(not set)"
     const db = localDb();
     const playlistId = currentPlaylistId();
-    if (db && playlistId) {
+    if (db && playlistId && props.userId) {
       try {
-        await stagePracticeEvaluation(
-          db,
-          playlistId,
-          tuneId,
-          evaluation,
-          "recall", // Default goal
-          "" // Default technique
-        );
-        // Grid will auto-refresh via syncVersion or we can manually trigger refetch
-        // For now, relying on local state update for immediate feedback
-        console.log(`✅ Staged FSRS preview for tune ${tuneId}`);
+        if (evaluation === "") {
+          // Clear staged data when "(not set)" selected
+          const { clearStagedEvaluation } = await import(
+            "../../lib/services/practice-staging"
+          );
+          await clearStagedEvaluation(db, props.userId, tuneId, playlistId);
+          console.log(`🗑️  Cleared staged evaluation for tune ${tuneId}`);
+        } else {
+          // Stage FSRS preview for actual evaluations
+          await stagePracticeEvaluation(
+            db,
+            props.userId,
+            playlistId,
+            tuneId,
+            evaluation,
+            "recall", // Default goal
+            "fsrs" // FSRS is the default technique
+          );
+          console.log(`✅ Staged FSRS preview for tune ${tuneId}`);
+        }
+
+        // Increment sync version to trigger grid refresh
+        incrementSyncVersion();
       } catch (error) {
-        console.error(`❌ Failed to stage evaluation for tune ${tuneId}:`, error);
+        console.error(
+          `❌ Failed to ${
+            evaluation === "" ? "clear" : "stage"
+          } evaluation for tune ${tuneId}:`,
+          error
+        );
       }
     }
-    
+
     // Notify parent component
     if (props.onRecallEvalChange) {
       props.onRecallEvalChange(tuneId, evaluation);

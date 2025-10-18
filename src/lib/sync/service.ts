@@ -179,6 +179,10 @@ export class SyncService {
 
   /**
    * Pull remote changes from Supabase only
+   *
+   * CRITICAL: Before pulling remote changes, we must upload any pending local changes
+   * to avoid losing user data. If syncUp fails, we still proceed with syncDown to ensure
+   * the user gets the latest remote data.
    */
   public async syncDown(): Promise<SyncResult> {
     if (this.isSyncing) {
@@ -188,6 +192,25 @@ export class SyncService {
     this.isSyncing = true;
 
     try {
+      // IMPORTANT: Upload pending changes BEFORE downloading remote changes
+      // This prevents overwriting local changes with older remote data
+      const stats = await this.syncEngine.getSyncQueueStats();
+      if (stats.pending > 0) {
+        console.log(
+          `[SyncService] Uploading ${stats.pending} pending changes before syncDown...`
+        );
+        try {
+          await this.syncEngine.syncUp();
+          console.log("[SyncService] Pending changes uploaded successfully");
+        } catch (error) {
+          console.error(
+            "[SyncService] Failed to upload pending changes before syncDown:",
+            error
+          );
+          // Continue with syncDown anyway - user should see remote data even if upload failed
+        }
+      }
+
       const result = await this.syncEngine.syncDown();
 
       // Notify callback (same as sync() method)
@@ -217,6 +240,7 @@ export class SyncService {
     const syncDownIntervalMs = 20 * 60 * 1000; // 20 minutes (pull remote changes)
 
     // Initial syncDown on startup (immediate)
+    // This will automatically upload any pending changes first (see syncDown method)
     console.log("[SyncService] Running initial syncDown on startup...");
     void this.syncDown();
 

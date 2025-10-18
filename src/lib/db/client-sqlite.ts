@@ -12,7 +12,7 @@ import type { Database as SqlJsDatabase } from "sql.js";
 import initSqlJs from "sql.js";
 import * as relations from "../../../drizzle/relations";
 import * as schema from "../../../drizzle/schema-sqlite";
-import { initializeViews } from "./init-views";
+import { initializeViews, recreateViews } from "./init-views";
 
 /**
  * SQLite WASM instance
@@ -80,6 +80,13 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
     console.log(
       `✅ Loaded existing SQLite database from IndexedDB (v${CURRENT_DB_VERSION})`
     );
+
+    // CRITICAL: Always recreate views on load to ensure latest definitions
+    // View definitions can change between app versions without bumping DB_VERSION
+    drizzleDb = drizzle(sqliteDb, { schema: { ...schema, ...relations } });
+    console.log("🔄 Recreating views with latest definitions...");
+    await recreateViews(drizzleDb);
+    console.log("✅ Views recreated successfully");
   } else {
     // Create new database (either first time or version mismatch)
     if (existingData) {

@@ -47,6 +47,9 @@ interface AuthState {
   /** Sync version - increments when sync completes (triggers UI updates) */
   syncVersion: Accessor<number>;
 
+  /** Increment sync version to trigger UI refresh */
+  incrementSyncVersion: () => void;
+
   /** Sign in with email and password */
   signIn: (
     email: string,
@@ -161,7 +164,7 @@ export const AuthProvider: ParentComponent = (props) => {
           supabase,
           userId: userIntId,
           realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
-          syncIntervalMs: 30000, // Sync every 30 seconds
+          syncIntervalMs: 5000, // Sync every 5 seconds (fast upload of local changes)
           onSyncComplete: () => {
             log.debug("Sync completed, incrementing sync version");
             setSyncVersion((prev) => {
@@ -391,12 +394,28 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
+  /**
+   * Increment sync version to trigger UI refresh
+   * Call this after local database mutations (staging, deletions, etc.)
+   * to force grids and queries to refetch data
+   */
+  const incrementSyncVersion = () => {
+    setSyncVersion((prev) => {
+      const newVersion = prev + 1;
+      console.log(
+        `🔄 [incrementSyncVersion] Sync version updated: ${prev} → ${newVersion}`
+      );
+      return newVersion;
+    });
+  };
+
   const authState: AuthState = {
     user,
     session,
     loading,
     localDb,
     syncVersion,
+    incrementSyncVersion,
     signIn,
     signUp,
     signInWithOAuth,

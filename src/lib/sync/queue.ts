@@ -48,6 +48,7 @@ export type SyncableTable =
   | "tag"
   | "practice_record"
   | "daily_practice_queue"
+  | "table_transient_data" // Staging data for practice evaluations
   | "tune_override";
 
 /**

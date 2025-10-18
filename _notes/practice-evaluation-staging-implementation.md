@@ -22,35 +22,39 @@ The current practice evaluation flow is incomplete:
 ### ✅ Correct Architecture (from Legacy):
 
 1. **`practice_list_staged` VIEW** (PostgreSQL → SQLite)
+
    - Complete enriched dataset with ALL JOINs and COALESCE operations
    - Merges: `tune` + `playlist_tune` + `practice_record` (latest) + `table_transient_data` (staging)
    - Returns full rows with `latest_*` fields (COALESCE between staging and historical)
    - **This IS the final dataset shown in grid**
 
 2. **`daily_practice_queue` TABLE**
+
    - Frozen snapshot: which tunes to practice today
    - Contains: `tune_ref`, `bucket`, `order_index`, `completed_at`, etc.
    - Acts as **filter and ordering layer**
 
 3. **Grid Query Pattern:**
    ```sql
-   SELECT pls.* 
+   SELECT pls.*
    FROM practice_list_staged pls
-   INNER JOIN daily_practice_queue dpq 
-     ON dpq.tune_ref = pls.id 
+   INNER JOIN daily_practice_queue dpq
+     ON dpq.tune_ref = pls.id
      AND dpq.playlist_id = pls.playlist_id
-   WHERE dpq.user_ref = ? 
+   WHERE dpq.user_ref = ?
      AND dpq.playlist_ref = ?
      AND dpq.active = 1
    ORDER BY dpq.bucket, dpq.order_index
    ```
 
 ### ❌ What NOT to Do:
+
 - ~~Create custom `DueTuneEntry` interface~~
 - ~~Write custom SQL with manual JOINs and COALESCE~~
 - ~~Duplicate VIEW logic in application code~~
 
 ### ✅ What TO Do:
+
 1. Port `practice_list_staged` VIEW to SQLite
 2. Query the VIEW filtered by `daily_practice_queue`
 3. Use existing schema types from `drizzle/schema.ts`
@@ -102,6 +106,7 @@ The current practice evaluation flow is incomplete:
 **Changes from PostgreSQL:**
 
 1. Replace `DISTINCT ON (pr.tune_ref, pr.playlist_ref)` with subquery:
+
    ```sql
    LEFT JOIN (
      SELECT pr.* FROM practice_record pr
@@ -109,8 +114,8 @@ The current practice evaluation flow is incomplete:
        SELECT tune_ref, playlist_ref, MAX(id) as max_id
        FROM practice_record
        GROUP BY tune_ref, playlist_ref
-     ) latest ON pr.tune_ref = latest.tune_ref 
-            AND pr.playlist_ref = latest.playlist_ref 
+     ) latest ON pr.tune_ref = latest.tune_ref
+            AND pr.playlist_ref = latest.playlist_ref
             AND pr.id = latest.max_id
    ) pr ON pr.tune_ref = tune.id AND pr.playlist_ref = playlist_tune.playlist_ref
    ```
@@ -252,12 +257,13 @@ export async function getDueTunes(
       AND dpq.active = 1
     ORDER BY dpq.bucket, dpq.order_index
   `;
-  
+
   return db.all(query, [userId, playlistId]);
 }
 ```
 
 **Key Points:**
+
 - No custom JOINs - VIEW does everything
 - Filter by `daily_practice_queue` for frozen snapshot
 - Return complete enriched rows
@@ -825,3 +831,313 @@ CREATE TABLE daily_practice_queue (
 
 **Next Steps:**
 Start with Task 1 (create practice-staging.ts service) and work through the checklist sequentially.
+
+---
+
+## Implementation Summary: Daily Practice Queue
+
+**Implementation Date:** October 16, 2025  
+**Total Files Changed:** 10 files  
+**Status:** ✅ Complete - Queue system fully operational
+
+### Files Changed
+
+<table style="font-size: 0.85em; table-layout: fixed; width: 100%;">
+<thead>
+<tr>
+<th style="width: 180px; word-break: break-all;">File Path</th>
+<th>Description</th>
+<th style="width: 60px;">Lines</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+
+<tr>
+<td><code>src/lib/services/practice-queue.ts</code></td>
+<td><strong>NEW FILE</strong> - Daily practice queue generation service</td>
+<td>All (new)</td>
+<td>
+• Three-bucket algorithm (Q1: due today, Q2: lapsed, Q3: backfill disabled)<br>
+• UNIQUE constraint handling, capacity limiting (max 10/day)<br>
+• Race condition guard, window-based snapshots<br>
+<strong>Future:</strong> Enable Q3, add timezone support
+</td>
+</tr>
+
+<tr>
+<td><code>src/lib/services/practice-staging.ts</code></td>
+<td><strong>NEW FILE</strong> - Practice evaluation staging service</td>
+<td>All (new)</td>
+<td>
+• Stages evaluations to <code>table_transient_data</code><br>
+• Runs FSRS preview calculations<br>
+• Functions: <code>stagePracticeEvaluation()</code>, <code>clearStagedEvaluation()</code>, <code>mapEvaluationToRating()</code><br>
+• Integrates with FSRS service for preview metrics
+</td>
+</tr>
+
+<tr>
+<td><code>src/lib/services/practice-commit.ts</code></td>
+<td><strong>NEW FILE</strong> - Batch commit service</td>
+<td>All (new)</td>
+<td>
+• <code>commitStagedEvaluations()</code> batch operation<br>
+• Moves transient → practice_record<br>
+• Updates playlist_tune.scheduled, marks queue completed_at<br>
+• Deletes staging data, queues sync, handles errors
+</td>
+</tr>
+
+<tr>
+<td><code>src/lib/db/queries/practice.ts</code></td>
+<td>Added <code>getPracticeList()</code> and <code>getDueTunes()</code></td>
+<td>489</td>
+<td>
+• Queries <code>practice_list_staged</code> VIEW ⨝ <code>daily_practice_queue</code><br>
+• Fixed: <code>playlist_ref</code> → <code>playlist_id</code> (line 489)<br>
+• Returns <code>PracticeListStagedWithQueue</code> type<br>
+<strong>Future:</strong> Add delinquency window config
+</td>
+</tr>
+
+<tr>
+<td><code>src/lib/sync/engine.ts</code></td>
+<td>Re-added <code>daily_practice_queue</code> to sync</td>
+<td>265-279<br>635-647</td>
+<td>
+<strong>CRITICAL FIX:</strong> Queue syncs bidirectionally with Supabase<br>
+• Schema mapping: <code>daily_practice_queue: localSchema.dailyPracticeQueue</code><br>
+• Syncs 435 records on initial load<br>
+<strong>Future:</strong> Add conflict resolution for multi-device updates
+</td>
+</tr>
+
+<tr>
+<td><code>src/lib/sync/queue.ts</code></td>
+<td>Added to <code>SyncableTable</code> type union</td>
+<td>40-52</td>
+<td>Type safety for sync operations</td>
+</tr>
+
+<tr>
+<td><code>src/lib/sync/service.ts</code></td>
+<td>Added to realtime tables array</td>
+<td>87-96</td>
+<td>
+Enables real-time queue updates via Supabase subscriptions<br>
+<strong>Future:</strong> Handle regeneration conflicts from concurrent devices
+</td>
+</tr>
+
+<tr>
+<td><code>src/components/grids/ TunesGridScheduled.tsx</code></td>
+<td>Queue init, evaluation staging, filtering</td>
+<td>297<br>305-307<br>323</td>
+<td>
+<strong>Oct 17:</strong> Fixed "(Not Set)" bug - stores empty string explicitly<br>
+• Uses <code>in</code> operator to check presence in evaluations signal<br>
+• Added <code>queueInitialized</code> resource<br>
+• Calls <code>stagePracticeEvaluation()</code> on change<br>
+• Filters by <code>completed_at</code>, maps bucket integers
+</td>
+</tr>
+
+<tr>
+<td><code>src/components/grids/TuneColumns.tsx</code></td>
+<td>Evaluation column rendering + FSRS quality mapping</td>
+<td>730-780</td>
+<td>
+<strong>Oct 17:</strong> Fixed FSRS quality mapping 0-3 → 1-4 scale<br>
+• Rating: Again=1, Hard=2, Good=3, Easy=4<br>
+• Reordered: check quality+technique FIRST, then recall_eval text<br>
+• Shows static italic text for completed, editable combobox otherwise<br>
+• Supports SM2 vs FSRS display
+</td>
+</tr>
+
+<tr>
+<td><code>src/components/grids/ RecallEvalComboBox.tsx</code></td>
+<td>Fixed dropdown cutoff</td>
+<td>116</td>
+<td>
+<strong>Oct 17:</strong> Increased max-height 240px → 280px<br>
+• Prevents "Easy" option cutoff<br>
+• Moved from Tailwind class to inline style
+</td>
+</tr>
+
+<tr>
+<td><code>src/routes/practice/Index.tsx</code></td>
+<td>Submit handler + evaluations count tracking</td>
+<td>Handler</td>
+<td>
+• <code>handleSubmitEvaluations()</code> calls <code>commitStagedEvaluations()</code><br>
+• Manages evaluations count state<br>
+• Clears local state after submit<br>
+• Increments sync version, shows toast notification
+</td>
+</tr>
+
+<tr>
+<td><code>src/lib/db/schema/ dailyPracticeQueue.ts</code></td>
+<td><strong>NEW FILE</strong> - Drizzle ORM schema</td>
+<td>All (new)</td>
+<td>
+• 23 fields: userRef, playlistRef, tuneRef, bucket, orderIndex, windowStartUtc, completedAt, FSRS snapshots<br>
+• UNIQUE: (userRef, playlistRef, windowStartUtc, tuneRef)<br>
+• Indexed: user/playlist/window/bucket/active
+</td>
+</tr>
+
+<tr>
+<td><code>drizzle/migrations/sqlite/ 0000_lowly_obadiah_stane.sql</code></td>
+<td>Migration includes queue table</td>
+<td>N/A</td>
+<td>Table exists with all 23 columns, 3 indexes, UNIQUE constraint. No migration needed.</td>
+</tr>
+
+<tr>
+<td><code>src/lib/db/init-views.ts</code></td>
+<td><code>practice_list_staged</code> VIEW exists</td>
+<td>141-238</td>
+<td>
+• Complete dataset with COALESCE (staging ⊕ historical)<br>
+• Queue fields NOT in VIEW - JOINed separately in queries<br>
+<strong>Future:</strong> Consider adding queue fields to VIEW
+</td>
+</tr>
+
+<tr>
+<td><code>src/lib/services/practice-queue.ts</code></td>
+<td>Fixed race condition guard</td>
+<td>489</td>
+<td>
+• Changed <code>playlist_ref</code> → <code>playlist_id</code> (VIEW column name)<br>
+• Guard checks if <code>practice_list_staged</code> has data<br>
+• Returns empty array if DB not synced yet
+</td>
+</tr>
+
+</tbody>
+</table>
+
+### Key Implementation Details
+
+**Three-Bucket Algorithm:**
+
+- **Q1 (bucket=1):** Tunes due today `[windowStart, windowEnd)` - ASC order
+- **Q2 (bucket=2):** Recently lapsed `[windowFloor, windowStart)` - DESC order (most overdue first)
+- **Q3 (bucket=3):** Backfill tunes - **DISABLED** (would fill remaining capacity with new/unseen tunes)
+
+**Capacity Limiting:**
+
+- Default: 10 tunes per day (`DEFAULT_PREFS.maxReviewsPerDay`)
+- Q1 gets up to `maxReviews` tunes
+- Q2 fills remaining capacity: `Math.max(0, maxReviews - q1Count)`
+- Enforced via SQL `LIMIT` clauses in bucket queries
+
+**Queue Lifecycle:**
+
+1. Generated once per day at `windowStartUtc` (midnight UTC by default)
+2. Frozen for entire day - same queue regardless of practice progress
+3. Force regeneration available via `forceRegen` parameter (requires DELETE of old queue due to UNIQUE constraint)
+4. Syncs to Supabase for cross-device consistency
+5. `completed_at` timestamp marks submitted evaluations
+
+**Race Condition Protection:**
+
+- Guard checks `practice_list_staged` COUNT before generating queue
+- On fresh login, returns empty array if database not yet synced
+- `syncVersion` increment triggers grid reload after sync completes
+- Prevents "no such column" errors during initial page load
+
+### Testing Results
+
+✅ **Manual Testing:**
+
+- Queue generates correctly: 10 tunes (all Q2 "Lapsed" bucket)
+- Sync works: 435 records downloaded from Supabase
+- Race condition guard prevents errors on fresh login
+- Grid displays correct tune count (10 tunes due)
+- Bucket sorting correct (by overdue days: 2d → 7d)
+
+✅ **Production Logs:**
+
+```
+[PracticeQueue] Q1 (due today): 0 tunes
+[PracticeQueue] Q2 (recently lapsed): 10 tunes
+[PracticeQueue] Generating new queue: 10 candidate tunes (max: 10)
+[PracticeQueue] Generated queue: 10 rows persisted
+✓ daily_practice_queue: 435 records [synced from Supabase]
+```
+
+### Future Work Needed
+
+1. **Enable Q3 Backfill Bucket**
+
+   - Currently disabled (no new/unseen tunes)
+   - Need to define "backfill" criteria (never practiced? long intervals?)
+   - Add configuration for backfill percentage
+
+2. **Timezone Support**
+
+   - Currently uses UTC for all windows
+   - Add `tzOffsetMinutes` parameter to `generateOrGetPracticeQueue()`
+   - Store user timezone preference in `user_profile`
+
+3. **Queue Regeneration UI**
+
+   - Add "Regenerate Queue" button in practice tab toolbar
+   - Confirm dialog warning about resetting daily progress
+   - Show last generation timestamp
+
+4. **Cross-Device Conflict Resolution**
+
+   - Handle case where queue regenerated on one device while practicing on another
+   - Consider queue version numbers or timestamp-based merging
+   - Show notification if queue changed during active practice session
+
+5. **Queue Analytics**
+
+   - Track completion rates per bucket
+   - Show queue capacity utilization (10/10 tunes)
+   - Display average time per tune in queue
+
+6. **Delinquency Window Configuration**
+
+   - Currently hardcoded to 7 days in `getPracticeList()`
+   - Add to user preferences: `acceptableDelinquencyWindow`
+   - Allow per-playlist override
+
+7. **Testing Coverage**
+   - Add Playwright E2E test for queue generation
+   - Test force regeneration flow
+   - Test Show Submitted toggle with completed_at filtering
+   - Test queue sync across multiple browser tabs
+
+### Migration Notes
+
+**No migration needed** - The `daily_practice_queue` table already exists in the initial migration (`0000_lowly_obadiah_stane.sql`). All 23 columns, indexes, and UNIQUE constraint are present.
+
+**Backward Compatibility:**
+
+- Old Supabase queue data (435 rows) successfully syncs to SQLite
+- Queue fields match PostgreSQL schema (verified via sync success)
+- No breaking changes to existing practice_record workflow
+
+**Deployment Checklist:**
+
+- [x] Verify sync includes `daily_practice_queue` in engine.ts
+- [x] Verify schema mapping in engine.ts (lines 635-647)
+- [x] Verify realtime subscription in service.ts
+- [x] Test queue generation on fresh database
+- [x] Test queue sync from Supabase
+- [x] Verify completed_at filtering works
+- [ ] Add E2E tests for queue workflow
+- [ ] Document queue regeneration for users
+- [ ] Add queue status indicator in UI
+
+```
+
+```

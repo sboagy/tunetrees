@@ -30,10 +30,10 @@ import type {
 
 /**
  * Practice List Staged Row
- * 
+ *
  * Complete row from practice_list_staged VIEW.
  * This VIEW merges tune + playlist_tune + practice_record (latest) + table_transient_data.
- * 
+ *
  * Used by practice grid - contains ALL data including staging/preview.
  */
 export interface PracticeListStagedRow {
@@ -47,7 +47,7 @@ export interface PracticeListStagedRow {
   genre: string | null;
   private_for: number | null;
   deleted: number;
-  
+
   // Playlist info
   learned: number | null;
   goal: string;
@@ -56,7 +56,7 @@ export interface PracticeListStagedRow {
   playlist_id: number;
   instrument: string | null;
   playlist_deleted: number;
-  
+
   // Latest practice data (COALESCE between transient and historical)
   latest_state: number | null;
   latest_practiced: string | null;
@@ -71,18 +71,18 @@ export interface PracticeListStagedRow {
   latest_backup_practiced: string | null;
   latest_goal: string | null;
   latest_technique: string | null;
-  
+
   // Aggregated data
   tags: string | null;
   notes: string | null;
   favorite_url: string | null;
-  
+
   // Transient/staging fields
   purpose: string | null;
   note_private: string | null;
   note_public: string | null;
   recall_eval: string | null;
-  
+
   // Flags
   has_override: number;
   has_staged: number;
@@ -90,16 +90,15 @@ export interface PracticeListStagedRow {
 
 /**
  * Practice List Staged with Queue Info
- * 
+ *
  * Extends PracticeListStagedRow with daily_practice_queue fields.
  * This is what the practice grid actually displays.
  */
 export interface PracticeListStagedWithQueue extends PracticeListStagedRow {
   // From daily_practice_queue
-  bucket: string;
+  bucket: number;
   order_index: number;
   completed_at: string | null;
-  active: number;
 }
 
 /**
@@ -124,7 +123,11 @@ export interface DueTuneEntry {
  *
  * Queries practice_list_staged VIEW for complete enriched data.
  * The VIEW contains all COALESCE operations merging transient and historical data.
- * 
+ *
+ * Filters for:
+ * - Scheduled tunes (playlist_tune.scheduled IS NOT NULL)
+ * - Due for practice (scheduled <= today OR within delinquency window)
+ *
  * TODO: Add daily_practice_queue filtering once queue infrastructure is created.
  *
  * Replaces: legacy/tunetrees/app/queries.py#query_practice_list_scheduled
@@ -132,32 +135,91 @@ export interface DueTuneEntry {
  * @param db - SQLite database instance
  * @param userId - User ID
  * @param playlistId - Playlist to query
- * @returns Array of practice list rows
+ * @param delinquencyWindowDays - How many days overdue to include (default 7)
+ * @returns Array of practice list rows for scheduled/due tunes
+ *
+ * @example
+ * ```typescript
+ * const db = getDb();
+ * const practices = await getPracticeList(db, 1, 5, 7);
+ * // Returns scheduled tunes due today or within 7-day window
+ * ```
+ */
+/**
+ * Get practice list filtered by daily practice queue
+ *
+ * Queries practice_list_staged VIEW JOINed with daily_practice_queue.
+ * The queue provides the frozen snapshot of which tunes to practice today.
+ *
+ * Returns tunes in queue order (bucket, order_index) with completed_at tracking.
+ *
+ * @param db - SQLite database instance
+ * @param userId - User ID (from user_profile.id)
+ * @param playlistId - Playlist to query
+ * @param _delinquencyWindowDays - Unused (kept for API compatibility)
+ * @returns Array of practice list rows with queue info (bucket, order_index, completed_at)
  *
  * @example
  * ```typescript
  * const db = getDb();
  * const practices = await getPracticeList(db, 1, 5);
- * // Returns complete practice data from VIEW
+ * // Returns tunes from today's frozen queue snapshot
  * ```
  */
 export async function getPracticeList(
   db: SqliteDatabase,
   userId: number,
-  playlistId: number
-): Promise<PracticeListStagedRow[]> {
-  // For now, query the VIEW directly without queue filtering
-  // TODO: Once daily_practice_queue table/schema is added, do INNER JOIN for filtering
-  const rows = await db.all<PracticeListStagedRow>(sql`
-    SELECT * 
-    FROM practice_list_staged
-    WHERE user_ref = ${userId}
-      AND playlist_id = ${playlistId}
-      AND deleted = 0
-      AND playlist_deleted = 0
-    ORDER BY title
+  playlistId: number,
+  _delinquencyWindowDays: number = 7 // Kept for API compatibility
+): Promise<PracticeListStagedWithQueue[]> {
+  // Query practice_list_staged INNER JOIN daily_practice_queue
+  // Queue determines which tunes to practice and their ordering
+
+  // Debug: Check queue rows
+  const queueRows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) as count
+    FROM daily_practice_queue dpq
+    WHERE dpq.user_ref = ${userId}
+      AND dpq.playlist_ref = ${playlistId}
+      AND dpq.active = 1
   `);
-  
+  console.log(
+    `[getPracticeList] Queue has ${
+      queueRows[0]?.count || 0
+    } active rows for user=${userId}, playlist=${playlistId}`
+  );
+
+  // Debug: Check view rows
+  const viewRows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) as count
+    FROM practice_list_staged pls
+    WHERE pls.user_ref = ${userId}
+      AND pls.playlist_id = ${playlistId}
+  `);
+  console.log(
+    `[getPracticeList] View has ${
+      viewRows[0]?.count || 0
+    } rows for user=${userId}, playlist=${playlistId}`
+  );
+
+  const rows = await db.all<PracticeListStagedWithQueue>(sql`
+    SELECT 
+      pls.*,
+      dpq.bucket,
+      dpq.order_index,
+      dpq.completed_at
+    FROM practice_list_staged pls
+    INNER JOIN daily_practice_queue dpq 
+      ON dpq.tune_ref = pls.id
+    WHERE dpq.user_ref = ${userId}
+      AND dpq.playlist_ref = ${playlistId}
+      AND dpq.active = 1
+      AND DATE(dpq.window_start_utc) = DATE('now')
+    ORDER BY dpq.bucket ASC, dpq.order_index ASC
+  `);
+
+  console.log(`[getPracticeList] JOIN returned ${rows.length} rows`);
+
   return rows;
 }
 
@@ -168,9 +230,10 @@ export async function getPracticeList(
 export async function getDueTunes(
   db: SqliteDatabase,
   userId: number,
-  playlistId: number
-): Promise<PracticeListStagedRow[]> {
-  return getPracticeList(db, userId, playlistId);
+  playlistId: number,
+  delinquencyWindowDays: number = 7
+): Promise<PracticeListStagedWithQueue[]> {
+  return getPracticeList(db, userId, playlistId, delinquencyWindowDays);
 }
 
 /**

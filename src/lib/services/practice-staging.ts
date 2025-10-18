@@ -13,9 +13,10 @@
  * @module lib/services/practice-staging
  */
 
-import type { SqliteDatabase } from "../db/client-sqlite";
 import { sql } from "drizzle-orm";
-import { fsrs, Rating, type Card, createEmptyCard } from "ts-fsrs";
+import { type Card, createEmptyCard, fsrs, Rating } from "ts-fsrs";
+import { persistDb, type SqliteDatabase } from "../db/client-sqlite";
+import { queueSync } from "../sync/queue";
 
 /**
  * Preview metrics from FSRS calculation
@@ -88,7 +89,7 @@ async function getLatestPracticeRecord(
   }
 
   const record = result[0];
-  
+
   // Convert to FSRS Card format
   return {
     stability: record.stability ?? 0,
@@ -100,7 +101,9 @@ async function getLatestPracticeRecord(
     elapsed_days: record.elapsed_days ?? 0,
     scheduled_days: 0,
     learning_steps: 0, // Managed by FSRS
-    last_review: record.last_modified_at ? new Date(record.last_modified_at) : new Date(),
+    last_review: record.last_modified_at
+      ? new Date(record.last_modified_at)
+      : new Date(),
   };
 }
 
@@ -112,6 +115,7 @@ async function getLatestPracticeRecord(
  * with historical practice_record data for grid display.
  *
  * @param db - SQLite database instance
+ * @param userId - User ID
  * @param playlistId - Playlist ID
  * @param tuneId - Tune ID
  * @param evaluation - Recall evaluation ("again", "hard", "good", "easy")
@@ -121,12 +125,13 @@ async function getLatestPracticeRecord(
  *
  * @example
  * ```typescript
- * const preview = await stagePracticeEvaluation(db, 5, 123, "good");
+ * const preview = await stagePracticeEvaluation(db, 1, 5, 123, "good");
  * // Grid will now show preview.stability, preview.due, etc. in latest_* columns
  * ```
  */
 export async function stagePracticeEvaluation(
   db: SqliteDatabase,
+  userId: number,
   playlistId: number,
   tuneId: number,
   evaluation: string,
@@ -135,22 +140,26 @@ export async function stagePracticeEvaluation(
 ): Promise<FSRSPreviewMetrics> {
   // Get latest practice state
   const latestCard = await getLatestPracticeRecord(db, tuneId, playlistId);
-  
+
   // Initialize FSRS scheduler
   const f = fsrs();
-  
+
   // Convert evaluation to FSRS rating
   const rating = mapEvaluationToRating(evaluation);
-  
+
   // Calculate next review
   const now = new Date();
   const card: Card = latestCard ?? createEmptyCard(now);
   const schedulingCards = f.repeat(card, now);
-  
+
   // Access the specific rating result
-  const ratingKey = rating as Rating.Again | Rating.Hard | Rating.Good | Rating.Easy;
+  const ratingKey = rating as
+    | Rating.Again
+    | Rating.Hard
+    | Rating.Good
+    | Rating.Easy;
   const nextCard = schedulingCards[ratingKey].card;
-  
+
   // Extract preview metrics
   const preview: FSRSPreviewMetrics = {
     quality: rating,
@@ -166,10 +175,12 @@ export async function stagePracticeEvaluation(
     goal,
     technique,
   };
-  
+
   // UPSERT to table_transient_data
+  const lastModifiedAt = now.toISOString();
   await db.run(sql`
     INSERT INTO table_transient_data (
+      user_id,
       tune_id,
       playlist_id,
       quality,
@@ -183,8 +194,11 @@ export async function stagePracticeEvaluation(
       state,
       goal,
       technique,
-      recall_eval
+      recall_eval,
+      sync_version,
+      last_modified_at
     ) VALUES (
+      ${userId},
       ${tuneId},
       ${playlistId},
       ${preview.quality},
@@ -198,9 +212,11 @@ export async function stagePracticeEvaluation(
       ${preview.state},
       ${preview.goal},
       ${preview.technique},
-      ${evaluation}
+      ${evaluation},
+      1,
+      ${lastModifiedAt}
     )
-    ON CONFLICT(tune_id, playlist_id) DO UPDATE SET
+    ON CONFLICT(user_id, tune_id, playlist_id) DO UPDATE SET
       quality = excluded.quality,
       difficulty = excluded.difficulty,
       stability = excluded.stability,
@@ -212,11 +228,37 @@ export async function stagePracticeEvaluation(
       state = excluded.state,
       goal = excluded.goal,
       technique = excluded.technique,
-      recall_eval = excluded.recall_eval
+      recall_eval = excluded.recall_eval,
+      sync_version = excluded.sync_version,
+      last_modified_at = excluded.last_modified_at
   `);
-  
-  console.log(`✅ Staged evaluation for tune ${tuneId}: ${evaluation} (stability: ${preview.stability?.toFixed(2)}, due: ${preview.due})`);
-  
+
+  // Queue for sync to Supabase (so staging appears on other devices)
+  await queueSync(
+    db,
+    "table_transient_data",
+    `${userId}-${tuneId}-${playlistId}`, // Composite key as string
+    "update", // Always update (UPSERT behavior)
+    {
+      userId,
+      tuneId,
+      playlistId,
+      ...preview,
+      recallEval: evaluation,
+      syncVersion: 1,
+      lastModifiedAt,
+    }
+  );
+
+  // Persist database to IndexedDB immediately so page refresh shows staged data
+  await persistDb();
+
+  console.log(
+    `✅ Staged evaluation for tune ${tuneId}: ${evaluation} (stability: ${preview.stability?.toFixed(
+      2
+    )}, due: ${preview.due})`
+  );
+
   return preview;
 }
 
@@ -227,20 +269,34 @@ export async function stagePracticeEvaluation(
  * Grid will revert to showing historical practice_record data.
  *
  * @param db - SQLite database instance
+ * @param userId - User ID
  * @param tuneId - Tune ID
  * @param playlistId - Playlist ID
  */
 export async function clearStagedEvaluation(
   db: SqliteDatabase,
+  userId: number,
   tuneId: number,
   playlistId: number
 ): Promise<void> {
   await db.run(sql`
     DELETE FROM table_transient_data
-    WHERE tune_id = ${tuneId}
+    WHERE user_id = ${userId}
+      AND tune_id = ${tuneId}
       AND playlist_id = ${playlistId}
   `);
-  
+
+  // Queue deletion for sync to Supabase
+  await queueSync(
+    db,
+    "table_transient_data",
+    `${userId}-${tuneId}-${playlistId}`,
+    "delete"
+  );
+
+  // Persist database to IndexedDB immediately
+  await persistDb();
+
   console.log(`🗑️  Cleared staged evaluation for tune ${tuneId}`);
 }
 
@@ -260,6 +316,6 @@ export async function clearAllStagedForPlaylist(
     DELETE FROM table_transient_data
     WHERE playlist_id = ${playlistId}
   `);
-  
+
   console.log(`🗑️  Cleared all staged evaluations for playlist ${playlistId}`);
 }

@@ -29,6 +29,22 @@ const numericSortingFn = (rowA: any, rowB: any, columnId: string) => {
 };
 
 /**
+ * Format date for display (matches legacy app format)
+ */
+const formatDate = (dateStr: string): string => {
+  const date = new Date(dateStr);
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZoneName: "short",
+  });
+};
+
+/**
  * Sortable column header component
  */
 const SortableHeader: Component<{ column: any; title: string }> = (props) => {
@@ -341,32 +357,15 @@ export function getRepertoireColumns(
         const value = info.getValue() as string | null;
         if (!value) return <span class="text-gray-400">Never</span>;
 
-        const date = new Date(value);
-        const now = new Date();
-        const diffDays = Math.floor(
-          (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        let color = "text-gray-600 dark:text-gray-400";
-        if (diffDays < 7) color = "text-green-600 dark:text-green-400";
-        else if (diffDays < 30) color = "text-yellow-600 dark:text-yellow-400";
-        else color = "text-red-600 dark:text-red-400";
-
         return (
-          <span class={`text-sm ${color}`} title={date.toLocaleDateString()}>
-            {diffDays === 0
-              ? "Today"
-              : diffDays === 1
-              ? "Yesterday"
-              : diffDays < 30
-              ? `${diffDays}d ago`
-              : `${Math.floor(diffDays / 30)}mo ago`}
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {formatDate(value)}
           </span>
         );
       },
-      size: 120,
-      minSize: 100,
-      maxSize: 150,
+      size: 200,
+      minSize: 180,
+      maxSize: 250,
     },
 
     // Recall Eval (transient field - editable)
@@ -494,33 +493,15 @@ export function getRepertoireColumns(
         const value = info.getValue() as string | null;
         if (!value) return <span class="text-gray-400">—</span>;
 
-        const date = new Date(value);
-        const now = new Date();
-        const diffDays = Math.floor(
-          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        let color = "text-gray-600 dark:text-gray-400";
-        if (diffDays < 0) color = "text-red-600 dark:text-red-400"; // Overdue
-        else if (diffDays === 0)
-          color = "text-orange-600 dark:text-orange-400"; // Due today
-        else if (diffDays <= 7)
-          color = "text-yellow-600 dark:text-yellow-400"; // Due soon
-        else color = "text-green-600 dark:text-green-400"; // Future
-
         return (
-          <span class={`text-sm ${color}`} title={date.toLocaleDateString()}>
-            {diffDays < 0
-              ? `${Math.abs(diffDays)}d overdue`
-              : diffDays === 0
-              ? "Today"
-              : `${diffDays}d`}
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {formatDate(value)}
           </span>
         );
       },
-      size: 100,
-      minSize: 80,
-      maxSize: 130,
+      size: 200,
+      minSize: 180,
+      maxSize: 250,
     },
 
     // Tags
@@ -708,7 +689,7 @@ export function getScheduledColumns(
       maxSize: 120,
     },
 
-    // Evaluation (RecallEvalComboBox) - embedded editor
+    // Evaluation (RecallEvalComboBox or static text if completed)
     {
       id: "evaluation",
       accessorFn: (row) => row.recall_eval || "",
@@ -719,7 +700,82 @@ export function getScheduledColumns(
         const row = info.row.original;
         const tuneId = row.tune?.id || row.tuneRef || row.id;
         const currentEval = info.getValue() as string;
+        const completedAt = row.completed_at;
 
+        // If completed_at is set, show static text (tune already submitted)
+        if (completedAt) {
+          let label = "(Not Set)";
+          let colorClass = "text-gray-600 dark:text-gray-400";
+
+          // Check if we have quality data to display
+          if (row.latest_quality !== null && row.latest_quality !== undefined) {
+            const quality = row.latest_quality;
+            const technique = row.latest_technique || "fsrs"; // Default to FSRS if technique not set
+
+            if (technique === "sm2") {
+              // SM2 uses 0-5 scale
+              const sm2Labels: Record<number, string> = {
+                0: "Complete blackout",
+                1: "Incorrect response",
+                2: "Incorrect (easy to recall)",
+                3: "Correct (serious difficulty)",
+                4: "Correct (hesitation)",
+                5: "Perfect response",
+              };
+              const sm2Colors: Record<number, string> = {
+                0: "text-red-600 dark:text-red-400",
+                1: "text-red-600 dark:text-red-400",
+                2: "text-orange-600 dark:text-orange-400",
+                3: "text-yellow-600 dark:text-yellow-400",
+                4: "text-green-600 dark:text-green-400",
+                5: "text-blue-600 dark:text-blue-400",
+              };
+              label = sm2Labels[quality] || `Quality ${quality}`;
+              colorClass = sm2Colors[quality] || colorClass;
+            } else {
+              // FSRS uses 1-4 scale (Rating.Again=1, Rating.Hard=2, Rating.Good=3, Rating.Easy=4)
+              const fsrsLabels: Record<number, string> = {
+                1: "Again",
+                2: "Hard",
+                3: "Good",
+                4: "Easy",
+              };
+              const fsrsColors: Record<number, string> = {
+                1: "text-red-600 dark:text-red-400",
+                2: "text-orange-600 dark:text-orange-400",
+                3: "text-green-600 dark:text-green-400",
+                4: "text-blue-600 dark:text-blue-400",
+              };
+              label = fsrsLabels[quality] || `Quality ${quality}`;
+              colorClass = fsrsColors[quality] || colorClass;
+            }
+          }
+          // Fallback to recall_eval text if quality not available (shouldn't happen for completed tunes)
+          else if (currentEval) {
+            const fsrsLabels: Record<string, string> = {
+              again: "Again",
+              hard: "Hard",
+              good: "Good",
+              easy: "Easy",
+            };
+            const fsrsColors: Record<string, string> = {
+              again: "text-red-600 dark:text-red-400",
+              hard: "text-orange-600 dark:text-orange-400",
+              good: "text-green-600 dark:text-green-400",
+              easy: "text-blue-600 dark:text-blue-400",
+            };
+            label = fsrsLabels[currentEval] || currentEval;
+            colorClass = fsrsColors[currentEval] || colorClass;
+          }
+
+          return (
+            <span class={`text-sm ${colorClass} italic font-medium`}>
+              {label}
+            </span>
+          );
+        }
+
+        // Otherwise show editable combobox
         return (
           <RecallEvalComboBox
             tuneId={tuneId}
@@ -782,7 +838,8 @@ export function getScheduledColumns(
     // Add scheduling columns from repertoire
     {
       id: "scheduled",
-      accessorFn: (row) => row.scheduled,
+      // accessorFn: (row) => row.scheduled,
+      accessorFn: (row) => row.scheduled || row.latest_due || "",
       header: ({ column }) => (
         <SortableHeader column={column} title="Scheduled" />
       ),
@@ -836,35 +893,15 @@ export function getScheduledColumns(
         const value = info.getValue() as string | null;
         if (!value) return <span class="text-gray-400">Never</span>;
 
-        const date = new Date(value);
-        const now = new Date();
-        const diffDays = Math.floor(
-          (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        let color = "text-gray-600 dark:text-gray-400";
-        if (diffDays < 7) color = "text-green-600 dark:text-green-400";
-        else if (diffDays < 30) color = "text-yellow-600 dark:text-yellow-400";
-        else color = "text-red-600 dark:text-red-400";
-
-        const label =
-          diffDays === 0
-            ? "Today"
-            : diffDays === 1
-            ? "Yesterday"
-            : diffDays < 30
-            ? `${diffDays}d ago`
-            : `${Math.floor(diffDays / 30)}mo ago`;
-
         return (
-          <span class={`text-sm ${color}`} title={date.toLocaleDateString()}>
-            {label}
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {formatDate(value)}
           </span>
         );
       },
-      size: 120,
-      minSize: 100,
-      maxSize: 150,
+      size: 200,
+      minSize: 180,
+      maxSize: 250,
     },
     {
       id: "latest_goal",
@@ -999,38 +1036,15 @@ export function getScheduledColumns(
         const value = info.getValue() as string | null;
         if (!value) return <span class="text-gray-400">—</span>;
 
-        const date = new Date(value);
-        const now = new Date();
-        const diffDays = Math.floor(
-          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        let color = "text-gray-600 dark:text-gray-400";
-        if (diffDays < 0) color = "text-red-600 dark:text-red-400"; // Overdue
-        else if (diffDays === 0)
-          color = "text-orange-600 dark:text-orange-400"; // Due today
-        else if (diffDays <= 7)
-          color = "text-yellow-600 dark:text-yellow-400"; // Due soon
-        else color = "text-green-600 dark:text-green-400"; // Future
-
-        const label =
-          diffDays < 0
-            ? `${Math.abs(diffDays)}d overdue`
-            : diffDays === 0
-            ? "Today"
-            : diffDays === 1
-            ? "Tomorrow"
-            : `${diffDays}d`;
-
         return (
-          <span class={`text-sm ${color}`} title={date.toLocaleDateString()}>
-            {label}
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {formatDate(value)}
           </span>
         );
       },
-      size: 160,
-      minSize: 130,
-      maxSize: 180,
+      size: 200,
+      minSize: 180,
+      maxSize: 250,
     },
   ];
 }

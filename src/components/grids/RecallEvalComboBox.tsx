@@ -113,8 +113,8 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
       <Show when={isOpen()}>
         <div
           ref={dropdownRef}
-          class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-60 overflow-auto"
-          style="left: 32px;"
+          class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg overflow-auto"
+          style="left: 32px; max-height: 280px;"
         >
           {options.map((option) => (
             <button

@@ -271,10 +271,11 @@ export class SyncEngine {
         "tune",
         "playlist_tune",
         "practice_record",
+        "daily_practice_queue",
+        "table_transient_data", // Staging data for practice evaluations (syncs across devices)
         "note",
         "reference",
         "tag",
-        "daily_practice_queue",
         "tune_override",
       ];
 
@@ -368,21 +369,55 @@ export class SyncEngine {
         }
         // Transform camelCase (local) → snake_case (Supabase)
         const remoteData = this.transformLocalToRemote(recordData);
-        const { error } = await this.supabase
-          .from(tableName)
-          .update(remoteData)
-          .eq("id", Number(recordId));
-        if (error) throw error;
+
+        // Handle composite keys
+        if (tableName === "table_transient_data") {
+          // Composite key: userId + tuneId + playlistId (format: "1-1815-1")
+          // Use UPSERT for transient data - insert if not exists, update if exists
+          const [userId, tuneId, playlistId] = recordId.split("-").map(Number);
+
+          // Ensure composite key columns are in the data
+          remoteData.user_id = userId;
+          remoteData.tune_id = tuneId;
+          remoteData.playlist_id = playlistId;
+
+          const { error } = await this.supabase
+            .from(tableName)
+            .upsert(remoteData, {
+              onConflict: "user_id,tune_id,playlist_id",
+            });
+          if (error) throw error;
+        } else {
+          // Standard id column - regular UPDATE
+          const { error } = await this.supabase
+            .from(tableName)
+            .update(remoteData)
+            .eq("id", Number(recordId));
+          if (error) throw error;
+        }
         break;
       }
 
       case "delete": {
-        // Soft delete: set deleted flag
-        const { error } = await this.supabase
-          .from(tableName)
-          .update({ deleted: true })
-          .eq("id", Number(recordId));
-        if (error) throw error;
+        // Handle composite keys
+        if (tableName === "table_transient_data") {
+          // Composite key: userId + tuneId + playlistId (format: "1-1815-1")
+          const [userId, tuneId, playlistId] = recordId.split("-").map(Number);
+          const { error } = await this.supabase
+            .from(tableName)
+            .delete()
+            .eq("user_id", userId)
+            .eq("tune_id", tuneId)
+            .eq("playlist_id", playlistId);
+          if (error) throw error;
+        } else {
+          // Soft delete: set deleted flag
+          const { error } = await this.supabase
+            .from(tableName)
+            .update({ deleted: true })
+            .eq("id", Number(recordId));
+          if (error) throw error;
+        }
         break;
       }
 
@@ -455,6 +490,7 @@ export class SyncEngine {
         case "prefs_spaced_repetition":
         case "table_state":
         case "tab_group_main_state":
+        case "table_transient_data":
           query = query.eq("user_id", this.userId);
           break;
 
@@ -487,6 +523,7 @@ export class SyncEngine {
         "prefs_spaced_repetition",
         "table_state",
         "tab_group_main_state",
+        "table_transient_data",
       ];
 
       if (userPrefTables.includes(tableName)) {
@@ -575,6 +612,14 @@ export class SyncEngine {
             // Uses auto-increment id as PK (not composite)
             conflictTarget = [localTable.id];
             break;
+          case "table_transient_data":
+            // Composite key: userId + tuneId + playlistId
+            conflictTarget = [
+              localTable.userId,
+              localTable.tuneId,
+              localTable.playlistId,
+            ];
+            break;
 
           // User data tables
           case "playlist":
@@ -644,6 +689,7 @@ export class SyncEngine {
       tag: localSchema.tag,
       practice_record: localSchema.practiceRecord,
       daily_practice_queue: localSchema.dailyPracticeQueue,
+      table_transient_data: localSchema.tableTransientData,
       tune_override: localSchema.tuneOverride,
     };
 

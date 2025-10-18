@@ -313,6 +313,275 @@ export async function getPracticeStatistics(
 }
 
 /**
+ * Commit staged evaluations to practice records
+ *
+ * Converts all staged evaluations (from table_transient_data) that are part of
+ * the current practice queue into permanent practice_record entries.
+ *
+ * Workflow:
+ * 1. Fetch all staged evaluations from table_transient_data for current playlist
+ * 2. Filter to only include tunes in daily_practice_queue (current session)
+ * 3. For each staged evaluation:
+ *    - Create practice_record with unique practiced timestamp
+ *    - Update playlist_tune.current (next review date)
+ *    - Delete from table_transient_data
+ *    - Update daily_practice_queue.completed_at
+ * 4. Queue all changes for Supabase sync
+ * 5. Persist database to IndexedDB
+ *
+ * Replaces: legacy /practice/commit_staged/{playlist_id} endpoint
+ *
+ * @param db - SQLite database instance
+ * @param userId - User ID
+ * @param playlistId - Playlist ID
+ * @returns Result with count of committed evaluations
+ *
+ * @example
+ * ```typescript
+ * const result = await commitStagedEvaluations(db, 1, 5);
+ * if (result.success) {
+ *   console.log(`Committed ${result.count} evaluations`);
+ * }
+ * ```
+ */
+export async function commitStagedEvaluations(
+  db: SqliteDatabase,
+  userId: number,
+  playlistId: number
+): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    const { sql } = await import("drizzle-orm");
+    const { persistDb } = await import("../db/client-sqlite");
+
+    // 1. Fetch all staged evaluations from table_transient_data for this playlist
+    const stagedEvaluations = await db.all<{
+      tune_id: number;
+      quality: number;
+      difficulty: number;
+      stability: number;
+      interval: number;
+      step: number | null;
+      repetitions: number;
+      practiced: string;
+      due: string;
+      state: number;
+      goal: string;
+      technique: string;
+      recall_eval: string;
+      elapsed_days: number | null;
+      lapses: number | null;
+    }>(sql`
+      SELECT 
+        tune_id,
+        quality,
+        difficulty,
+        stability,
+        interval,
+        step,
+        repetitions,
+        practiced,
+        due,
+        state,
+        goal,
+        technique,
+        recall_eval
+      FROM table_transient_data
+      WHERE user_id = ${userId}
+        AND playlist_id = ${playlistId}
+        AND practiced IS NOT NULL
+    `);
+
+    if (stagedEvaluations.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    // 2. Get tune_ids that are in the current practice queue (filter to current session only)
+    const queueTuneIds = await db.all<{ tune_ref: number }>(sql`
+      SELECT DISTINCT tune_ref
+      FROM daily_practice_queue
+      WHERE user_ref = ${userId}
+        AND playlist_ref = ${playlistId}
+        AND DATE(window_start_utc) = DATE('now')
+    `);
+
+    const queueTuneIdSet = new Set(queueTuneIds.map((row) => row.tune_ref));
+
+    // 3. Filter staged evaluations to only include tunes in current queue
+    const evaluationsToCommit = stagedEvaluations.filter((eval_) =>
+      queueTuneIdSet.has(eval_.tune_id)
+    );
+
+    if (evaluationsToCommit.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    // 4. For each staged evaluation, create practice_record and update related tables
+    const committedTuneIds: number[] = [];
+    const now = new Date().toISOString();
+
+    for (const staged of evaluationsToCommit) {
+      // Ensure unique practiced timestamp (check if already exists)
+      let practicedTimestamp = staged.practiced;
+      let attempts = 0;
+      const maxAttempts = 60; // Prevent infinite loop
+
+      while (attempts < maxAttempts) {
+        const existing = await db.all<{ id: number }>(sql`
+          SELECT id FROM practice_record
+          WHERE tune_ref = ${staged.tune_id}
+            AND playlist_ref = ${playlistId}
+            AND practiced = ${practicedTimestamp}
+          LIMIT 1
+        `);
+
+        if (existing.length === 0) {
+          break; // Timestamp is unique
+        }
+
+        // Increment by 1 second to make unique
+        const dt = new Date(practicedTimestamp);
+        dt.setSeconds(dt.getSeconds() + 1);
+        practicedTimestamp = dt.toISOString();
+        attempts++;
+      }
+
+      if (attempts >= maxAttempts) {
+        throw new Error(
+          `Failed to find unique practiced timestamp for tune ${staged.tune_id} after ${maxAttempts} attempts`
+        );
+      }
+
+      // Insert practice_record
+      await db.run(sql`
+        INSERT INTO practice_record (
+          playlist_ref,
+          tune_ref,
+          practiced,
+          quality,
+          easiness,
+          interval,
+          repetitions,
+          due,
+          backup_practiced,
+          stability,
+          elapsed_days,
+          lapses,
+          state,
+          difficulty,
+          step,
+          goal,
+          technique,
+          last_modified_at
+        ) VALUES (
+          ${playlistId},
+          ${staged.tune_id},
+          ${practicedTimestamp},
+          ${staged.quality},
+          NULL,
+          ${staged.interval},
+          ${staged.repetitions},
+          ${staged.due},
+          NULL,
+          ${staged.stability},
+          ${staged.elapsed_days ?? null},
+          ${staged.lapses ?? 0},
+          ${staged.state},
+          ${staged.difficulty},
+          ${staged.step},
+          ${staged.goal},
+          ${staged.technique},
+          ${now}
+        )
+      `);
+
+      // Get the inserted record ID for sync queue
+      const insertedRecord = await db.all<{ id: number }>(sql`
+        SELECT id FROM practice_record
+        WHERE tune_ref = ${staged.tune_id}
+          AND playlist_ref = ${playlistId}
+          AND practiced = ${practicedTimestamp}
+        ORDER BY id DESC
+        LIMIT 1
+      `);
+
+      const recordId = insertedRecord[0]?.id;
+      if (recordId) {
+        await queueSync(db, "practice_record", recordId, "insert");
+      }
+
+      // Update playlist_tune.current (next review date)
+      await db.run(sql`
+        UPDATE playlist_tune
+        SET current = ${staged.due},
+            last_modified_at = ${now}
+        WHERE playlist_ref = ${playlistId}
+          AND tune_ref = ${staged.tune_id}
+      `);
+
+      await queueSync(
+        db,
+        "playlist_tune",
+        `${playlistId}-${staged.tune_id}`,
+        "update"
+      );
+
+      // Delete from table_transient_data
+      await db.run(sql`
+        DELETE FROM table_transient_data
+        WHERE user_id = ${userId}
+          AND tune_id = ${staged.tune_id}
+          AND playlist_id = ${playlistId}
+      `);
+
+      await queueSync(
+        db,
+        "table_transient_data",
+        `${userId}-${staged.tune_id}-${playlistId}`,
+        "delete"
+      );
+
+      // Mark queue item as completed
+      await db.run(sql`
+        UPDATE daily_practice_queue
+        SET completed_at = ${now}
+        WHERE user_ref = ${userId}
+          AND playlist_ref = ${playlistId}
+          AND tune_ref = ${staged.tune_id}
+          AND DATE(window_start_utc) = DATE('now')
+      `);
+
+      await queueSync(
+        db,
+        "daily_practice_queue",
+        `${userId}-${playlistId}-${staged.tune_id}`,
+        "update"
+      );
+
+      committedTuneIds.push(staged.tune_id);
+    }
+
+    // 5. Persist database to IndexedDB
+    await persistDb();
+
+    console.log(
+      `✅ Committed ${committedTuneIds.length} staged evaluations for playlist ${playlistId}`
+    );
+
+    return {
+      success: true,
+      count: committedTuneIds.length,
+    };
+  } catch (error) {
+    console.error("Error committing staged evaluations:", error);
+    return {
+      success: false,
+      count: 0,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+/**
  * Undo last practice rating
  *
  * Removes the most recent practice record and reverts playlist_tune.current

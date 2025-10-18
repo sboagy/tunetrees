@@ -14,14 +14,13 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { toast } from "solid-sonner";
 import { TunesGridScheduled } from "../../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
 import { PracticeControlBanner } from "../../components/practice";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
-import type { RecordPracticeInput } from "../../lib/db/types";
-import { FSRS_QUALITY_MAP } from "../../lib/scheduling/fsrs-service";
-import { batchRecordPracticeRatings } from "../../lib/services/practice-recording";
+import { commitStagedEvaluations } from "../../lib/services/practice-recording";
 
 /**
  * Practice Index Page Component
@@ -89,103 +88,74 @@ const PracticeIndex: Component = () => {
   // Handle submit evaluations
   const handleSubmitEvaluations = async () => {
     const db = localDb();
-    const userId = user()?.id;
     const playlistId = currentPlaylistId();
-    const table = tableInstance();
 
-    if (!db || !userId || !playlistId || !table) {
+    if (!db || !playlistId) {
       console.error("Missing required data for submit");
+      toast.error("Cannot submit: Missing database or playlist data");
       return;
     }
 
-    console.log(`Submitting ${evaluationsCount()} practice evaluations`);
+    // TODO: Get actual user ID from user_profile table
+    // For now, using hardcoded user ID 1 (same as grid)
+    const userId = 1;
+
+    const count = evaluationsCount();
+    if (count === 0) {
+      toast.warning("No evaluations to submit");
+      return;
+    }
+
+    console.log(
+      `Submitting ${count} staged evaluations for playlist ${playlistId}`
+    );
 
     try {
-      // Get all rows from table
-      const rows = table.getRowModel().rows;
-      const practiceInputs: RecordPracticeInput[] = [];
-      const practiceDate = new Date();
+      // Call new commit service
+      const result = await commitStagedEvaluations(db, userId, playlistId);
 
-      // Collect evaluations from rows
-      for (const row of rows) {
-        const tune = row.original;
-        const recallEval = tune.recall_eval;
-
-        if (!recallEval || recallEval === "") {
-          continue; // Skip tunes without evaluations
-        }
-
-        // Map evaluation string to FSRS quality number
-        let quality: number;
-        switch (recallEval.toLowerCase()) {
-          case "again":
-            quality = FSRS_QUALITY_MAP.AGAIN; // 1
-            break;
-          case "hard":
-            quality = FSRS_QUALITY_MAP.HARD; // 2
-            break;
-          case "good":
-            quality = FSRS_QUALITY_MAP.GOOD; // 3
-            break;
-          case "easy":
-            quality = FSRS_QUALITY_MAP.EASY; // 4
-            break;
-          default:
-            console.warn(
-              `Unknown evaluation: ${recallEval} for tune ${tune.tune_id}`
-            );
-            continue;
-        }
-
-        practiceInputs.push({
-          tuneRef: tune.tune_id,
-          playlistRef: playlistId,
-          quality,
-          practiced: practiceDate,
-          goal: tune.goal || "recall",
-          technique: undefined,
-        });
-      }
-
-      if (practiceInputs.length === 0) {
-        console.warn("No evaluations to submit");
-        return;
-      }
-
-      // Submit all practice ratings using batch service
-      const results = await batchRecordPracticeRatings(
-        db,
-        userId,
-        practiceInputs
-      );
-
-      // Count successes
-      const successCount = results.filter((r) => r.success).length;
-      const failCount = results.length - successCount;
-
-      console.log(
-        `Submit complete: ${successCount} succeeded, ${failCount} failed`
-      );
-
-      if (failCount > 0) {
-        console.error(
-          "Some submissions failed:",
-          results.filter((r) => !r.success)
+      if (result.success) {
+        // Success toast (auto-dismiss after 3 seconds)
+        toast.success(
+          `Successfully submitted ${result.count} evaluation${
+            result.count !== 1 ? "s" : ""
+          }`,
+          {
+            duration: 3000,
+          }
         );
+
+        // Clear evaluations in grid
+        if (clearEvaluationsCallback) {
+          clearEvaluationsCallback();
+        }
+
+        // Reset count
+        setEvaluationsCount(0);
+
+        console.log(
+          `✅ Submit complete: ${result.count} evaluations committed`
+        );
+      } else {
+        // Error toast (requires manual dismiss)
+        toast.error(
+          `Failed to submit evaluations: ${result.error || "Unknown error"}`,
+          {
+            duration: Number.POSITIVE_INFINITY, // Requires manual dismiss
+          }
+        );
+
+        console.error("Submit failed:", result.error);
       }
-
-      // Clear evaluations in grid
-      if (clearEvaluationsCallback) {
-        clearEvaluationsCallback();
-      }
-
-      // Reset count
-      setEvaluationsCount(0);
-
-      // Grid will automatically refresh when syncVersion increments
-      // (happens when background sync completes)
     } catch (error) {
-      console.error("Error submitting practice evaluations:", error);
+      // Unexpected error toast
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      toast.error(`Error during submit: ${errorMessage}`, {
+        duration: Number.POSITIVE_INFINITY,
+      });
+
+      console.error("Error submitting evaluations:", error);
     }
   };
 

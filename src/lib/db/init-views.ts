@@ -112,6 +112,7 @@ FROM
   LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
   LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
+    AND (tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref)
   LEFT JOIN (
     SELECT pr.*
     FROM practice_record pr
@@ -124,9 +125,6 @@ FROM
       AND pr.id = latest.max_id
   ) practice_record ON practice_record.tune_ref = tune.id
     AND practice_record.playlist_ref = playlist_tune.playlist_ref
-WHERE
-  tune_override.user_ref IS NULL
-  OR tune_override.user_ref = playlist.user_ref
 `;
 
 /**
@@ -134,7 +132,7 @@ WHERE
  *
  * Extended practice view including transient/staged data from table_transient_data.
  * Used for practice sessions with uncommitted changes (FSRS preview).
- * 
+ *
  * The VIEW does ALL JOINs and COALESCE operations - this IS the complete dataset.
  * Grid queries this VIEW filtered by daily_practice_queue for frozen snapshot behavior.
  *
@@ -220,6 +218,7 @@ FROM
   LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
   LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
+    AND (tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref)
   LEFT JOIN instrument ON instrument.id = playlist.instrument_ref
   LEFT JOIN (
     SELECT pr.*
@@ -233,12 +232,8 @@ FROM
       AND pr.id = latest.max_id
   ) pr ON pr.tune_ref = tune.id
     AND pr.playlist_ref = playlist_tune.playlist_ref
-  LEFT JOIN tag ON tag.tune_ref = tune.id
   LEFT JOIN table_transient_data td ON td.tune_id = tune.id
     AND td.playlist_id = playlist_tune.playlist_ref
-WHERE
-  tune_override.user_ref IS NULL
-  OR tune_override.user_ref = playlist.user_ref
 `;
 
 /**
