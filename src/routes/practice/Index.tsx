@@ -15,9 +15,11 @@ import {
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import { and, eq, gte, lt } from "drizzle-orm";
 import { TunesGridScheduled } from "../../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
 import { PracticeControlBanner } from "../../components/practice";
+import { dailyPracticeQueue } from "../../lib/db/schema";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { addTunesToQueue } from "../../lib/services/practice-queue";
@@ -62,6 +64,43 @@ const PracticeIndex: Component = () => {
   // Persist showSubmitted to localStorage on change
   createEffect(() => {
     localStorage.setItem(STORAGE_KEY, String(showSubmitted()));
+  });
+
+  // Queue Date state - persisted to localStorage
+  const QUEUE_DATE_STORAGE_KEY = "TT_PRACTICE_QUEUE_DATE";
+  const QUEUE_DATE_MANUAL_FLAG_KEY = "TT_PRACTICE_QUEUE_DATE_MANUAL";
+  const [queueDate, setQueueDate] = createSignal(new Date());
+
+  // Load queue date from localStorage on mount
+  onMount(() => {
+    const storedDate = localStorage.getItem(QUEUE_DATE_STORAGE_KEY);
+    const isManual = localStorage.getItem(QUEUE_DATE_MANUAL_FLAG_KEY) === "true";
+    
+    if (storedDate) {
+      const parsedDate = new Date(storedDate);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        // Check if date is in the past and not manually set
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        parsedDate.setHours(0, 0, 0, 0);
+        
+        if (!isManual && parsedDate < today) {
+          // Auto-advance to today (midnight rollover protection)
+          const now = new Date();
+          now.setHours(12, 0, 0, 0); // Set to noon
+          setQueueDate(now);
+          localStorage.setItem(QUEUE_DATE_STORAGE_KEY, now.toISOString());
+          console.log("Auto-advanced queue date to today");
+        } else {
+          setQueueDate(parsedDate);
+        }
+      }
+    }
+  });
+
+  // Persist queue date to localStorage on change
+  createEffect(() => {
+    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, queueDate().toISOString());
   });
 
   const [tableInstance, setTableInstance] = createSignal<any>(null);
@@ -209,6 +248,90 @@ const PracticeIndex: Component = () => {
     }
   };
 
+  // Handle queue date change
+  const handleQueueDateChange = (date: Date, isPreview: boolean) => {
+    console.log(`Queue date changed to: ${date.toISOString()}, preview: ${isPreview}`);
+    
+    // Set to noon to avoid timezone issues
+    const dateAtNoon = new Date(date);
+    dateAtNoon.setHours(12, 0, 0, 0);
+    
+    setQueueDate(dateAtNoon);
+    
+    // Set manual flag if not today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDay = new Date(dateAtNoon);
+    selectedDay.setHours(0, 0, 0, 0);
+    
+    const isToday = selectedDay.getTime() === today.getTime();
+    localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, isToday ? "false" : "true");
+    
+    // Trigger grid refresh
+    incrementSyncVersion();
+    
+    // Show appropriate message
+    const dateStr = dateAtNoon.toLocaleDateString();
+    if (isPreview) {
+      toast.info(`Previewing queue for ${dateStr} (changes won't be saved)`, {
+        duration: 4000,
+      });
+    } else {
+      toast.success(`Switched to queue for ${dateStr}`);
+    }
+  };
+
+  // Handle queue reset
+  const handleQueueReset = async () => {
+    const db = localDb();
+    const playlistId = currentPlaylistId();
+
+    if (!db || !playlistId) {
+      console.error("Missing required data for queue reset");
+      toast.error("Cannot reset queue: Missing database or playlist data");
+      return;
+    }
+
+    const userId = 1; // TODO: Get from user_profile
+
+    console.log(`Resetting active queue for playlist ${playlistId}`);
+
+    try {
+      // Delete all active queue entries for today
+      // This will force regeneration on next access
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      await db
+        .delete(dailyPracticeQueue)
+        .where(
+          and(
+            eq(dailyPracticeQueue.userRef, userId),
+            eq(dailyPracticeQueue.playlistRef, playlistId),
+            gte(dailyPracticeQueue.windowStartUtc, today.toISOString()),
+            lt(dailyPracticeQueue.windowStartUtc, tomorrow.toISOString())
+          )
+        )
+        .run();
+
+      toast.success("Queue reset successfully. It will be regenerated.");
+      console.log(`✅ Queue reset complete`);
+
+      // Trigger grid refresh to regenerate queue
+      incrementSyncVersion();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      toast.error(`Error resetting queue: ${errorMessage}`, {
+        duration: Number.POSITIVE_INFINITY,
+      });
+
+      console.error("Error resetting queue:", error);
+    }
+  };
+
   return (
     <div class="h-full flex flex-col">
       {/* Sticky Control Banner */}
@@ -216,6 +339,9 @@ const PracticeIndex: Component = () => {
         evaluationsCount={evaluationsCount()}
         onSubmitEvaluations={handleSubmitEvaluations}
         onAddTunes={handleAddTunes}
+        queueDate={queueDate()}
+        onQueueDateChange={handleQueueDateChange}
+        onQueueReset={handleQueueReset}
         showSubmitted={showSubmitted()}
         onShowSubmittedChange={setShowSubmitted}
         table={tableInstance()}

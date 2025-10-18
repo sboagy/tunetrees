@@ -2,26 +2,24 @@
  * Practice Control Banner Component
  *
  * Complete toolbar for the Practice tab with all action buttons.
- * Layout: Submit | Display Submitted | Add Tunes | Queue dropdown | Flashcard Mode | Columns | History
+ * Layout: Submit | Display Submitted | Add Tunes | Queue | Flashcard Mode | Columns
  *
  * Features:
  * - Submit button (enabled when evaluations > 0)
  * - Display Submitted toggle
  * - Add Tunes button
- * - Queue control dropdown (Today, Yesterday, Tomorrow, Custom Date, Reset)
+ * - Queue date selector (Yesterday, Today, Tomorrow, Custom Date, Reset)
  * - Flashcard Mode toggle
  * - Columns menu
- * - Practice History button
  * - Responsive design
  *
  * @module components/practice/PracticeControlBanner
  */
 
-import { useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import { Columns, Plus, Send } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import {
   TOOLBAR_BADGE,
@@ -32,10 +30,10 @@ import {
   TOOLBAR_CONTAINER_CLASSES,
   TOOLBAR_ICON_SIZE,
   TOOLBAR_INNER_CLASSES,
-  TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 import { AddTunesDialog } from "./AddTunesDialog";
+import { QueueDateSelector } from "./QueueDateSelector";
 
 export interface PracticeControlBannerProps {
   /** Number of evaluations staged for submit */
@@ -50,19 +48,23 @@ export interface PracticeControlBannerProps {
   table?: Table<any>;
   /** Handler for add tunes action */
   onAddTunes?: (count: number) => void;
+  /** Current queue date */
+  queueDate?: Date;
+  /** Handler for queue date selection */
+  onQueueDateChange?: (date: Date, isPreview: boolean) => void;
+  /** Handler for queue reset */
+  onQueueReset?: () => void;
 }
 
 export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   props
 ) => {
-  const navigate = useNavigate();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
-  const [showQueueDropdown, setShowQueueDropdown] = createSignal(false);
+  const [showQueueSelector, setShowQueueSelector] = createSignal(false);
   const [flashcardMode, setFlashcardMode] = createSignal(false);
   const [showAddTunesDialog, setShowAddTunesDialog] = createSignal(false);
 
   let columnsButtonRef: HTMLButtonElement | undefined;
-  let queueButtonRef: HTMLButtonElement | undefined;
 
   const handleSubmit = () => {
     if (props.onSubmitEvaluations) {
@@ -93,10 +95,16 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
     setShowAddTunesDialog(false);
   };
 
-  const handleQueueOption = (option: string) => {
-    console.log(`Queue option selected: ${option}`);
-    // TODO: Implement queue date filtering
-    setShowQueueDropdown(false);
+  const handleQueueDateSelect = (date: Date, isPreview: boolean = false) => {
+    if (props.onQueueDateChange) {
+      props.onQueueDateChange(date, isPreview);
+    }
+  };
+
+  const handleQueueReset = () => {
+    if (props.onQueueReset) {
+      props.onQueueReset();
+    }
   };
 
   const handleFlashcardToggle = () => {
@@ -136,7 +144,10 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
           </button>
 
           {/* Show Submitted toggle - Switch component */}
-          <div class="flex items-center gap-3 px-3 py-1 rounded-md border border-gray-200/50 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <div
+            class="flex items-center gap-3 px-3 py-1 rounded-md border border-gray-200/50 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="Show submitted evaluations in the practice grid"
+          >
             <Switch
               checked={props.showSubmitted ?? false}
               onChange={handleDisplaySubmittedToggle}
@@ -145,7 +156,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               <SwitchControl>
                 <SwitchThumb />
               </SwitchControl>
-              <SwitchLabel class="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none ml-2">
+              <SwitchLabel class="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none ml-2 hidden sm:inline">
                 Show Submitted
               </SwitchLabel>
             </Switch>
@@ -162,71 +173,43 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             <span class="hidden md:inline">Add Tunes</span>
           </button>
 
-          {/* Queue control dropdown */}
-          <div class="relative">
-            <button
-              ref={queueButtonRef}
-              type="button"
-              onClick={() => setShowQueueDropdown(!showQueueDropdown())}
-              title="Select practice queue date"
-              class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
+          {/* Queue control button */}
+          <button
+            type="button"
+            onClick={() => setShowQueueSelector(true)}
+            title="Select practice queue date"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
+          >
+            <svg
+              class={TOOLBAR_ICON_SIZE}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
             >
-              <svg
-                class={TOOLBAR_ICON_SIZE}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              <span class="hidden lg:inline">Queue</span>
-              <svg
-                class="w-3 h-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-
-            {/* Queue dropdown menu */}
-            <Show when={showQueueDropdown()}>
-              <div class="absolute top-full left-0 mt-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-20">
-                <For
-                  each={[
-                    "Today",
-                    "Yesterday",
-                    "Tomorrow",
-                    "Custom Date",
-                    "Reset",
-                  ]}
-                >
-                  {(option) => (
-                    <button
-                      type="button"
-                      onClick={() => handleQueueOption(option)}
-                      class="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-md last:rounded-b-md"
-                    >
-                      {option}
-                    </button>
-                  )}
-                </For>
-              </div>
-            </Show>
-          </div>
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+            <span class="hidden lg:inline">Queue</span>
+            <svg
+              class="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
 
           {/* Flashcard Mode toggle */}
           <button
@@ -256,33 +239,6 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               />
             </svg>
             <span class="hidden lg:inline">Flashcard</span>
-          </button>
-
-          {/* Spacer */}
-          <div class={TOOLBAR_SPACER} />
-
-          {/* History button */}
-          <button
-            type="button"
-            onClick={() => navigate("/practice/history")}
-            title="View practice history"
-            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
-          >
-            <svg
-              class={TOOLBAR_ICON_SIZE}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              />
-            </svg>
-            <span class="hidden sm:inline">History</span>
           </button>
 
           {/* Columns dropdown */}
@@ -317,6 +273,15 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
         isOpen={showAddTunesDialog()}
         onConfirm={handleAddTunesConfirm}
         onClose={handleAddTunesCancel}
+      />
+
+      {/* Queue Date Selector Dialog */}
+      <QueueDateSelector
+        isOpen={showQueueSelector()}
+        currentDate={props.queueDate || new Date()}
+        onSelectDate={handleQueueDateSelect}
+        onReset={handleQueueReset}
+        onClose={() => setShowQueueSelector(false)}
       />
     </div>
   );
