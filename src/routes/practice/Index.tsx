@@ -20,6 +20,7 @@ import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-st
 import { PracticeControlBanner } from "../../components/practice";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { addTunesToQueue } from "../../lib/services/practice-queue";
 import { commitStagedEvaluations } from "../../lib/services/practice-recording";
 
 /**
@@ -40,7 +41,7 @@ import { commitStagedEvaluations } from "../../lib/services/practice-recording";
  * ```
  */
 const PracticeIndex: Component = () => {
-  const { user, localDb } = useAuth();
+  const { user, localDb, incrementSyncVersion } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
 
   // Track evaluations count and table instance for toolbar
@@ -159,12 +160,62 @@ const PracticeIndex: Component = () => {
     }
   };
 
+  // Handle add tunes to queue
+  const handleAddTunes = async (count: number) => {
+    const db = localDb();
+    const playlistId = currentPlaylistId();
+
+    if (!db || !playlistId) {
+      console.error("Missing required data for add tunes");
+      toast.error("Cannot add tunes: Missing database or playlist data");
+      return;
+    }
+
+    // TODO: Get actual user ID from user_profile table
+    // For now, using hardcoded user ID 1 (same as grid)
+    const userId = 1;
+
+    console.log(
+      `Adding ${count} tunes to practice queue for playlist ${playlistId}`
+    );
+
+    try {
+      const added = await addTunesToQueue(db, userId, playlistId, count);
+
+      if (added.length > 0) {
+        toast.success(
+          `Added ${added.length} tune${added.length !== 1 ? "s" : ""} to queue`,
+          {
+            duration: 3000,
+          }
+        );
+
+        // Trigger grid refresh
+        incrementSyncVersion();
+
+        console.log(`✅ Added ${added.length} tunes to queue`);
+      } else {
+        toast.warning("No additional tunes available to add");
+        console.log("⚠️ No tunes added - backlog may be empty");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      toast.error(`Error adding tunes: ${errorMessage}`, {
+        duration: Number.POSITIVE_INFINITY,
+      });
+
+      console.error("Error adding tunes to queue:", error);
+    }
+  };
+
   return (
     <div class="h-full flex flex-col">
       {/* Sticky Control Banner */}
       <PracticeControlBanner
         evaluationsCount={evaluationsCount()}
         onSubmitEvaluations={handleSubmitEvaluations}
+        onAddTunes={handleAddTunes}
         showSubmitted={showSubmitted()}
         onShowSubmittedChange={setShowSubmitted}
         table={tableInstance()}

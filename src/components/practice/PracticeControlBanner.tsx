@@ -35,6 +35,7 @@ import {
   TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
+import { AddTunesDialog } from "./AddTunesDialog";
 
 export interface PracticeControlBannerProps {
   /** Number of evaluations staged for submit */
@@ -47,6 +48,8 @@ export interface PracticeControlBannerProps {
   onShowSubmittedChange?: (show: boolean) => void;
   /** Table instance for column visibility control */
   table?: Table<any>;
+  /** Handler for add tunes action */
+  onAddTunes?: (count: number) => void;
 }
 
 export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
@@ -56,6 +59,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showQueueDropdown, setShowQueueDropdown] = createSignal(false);
   const [flashcardMode, setFlashcardMode] = createSignal(false);
+  const [showAddTunesDialog, setShowAddTunesDialog] = createSignal(false);
 
   let columnsButtonRef: HTMLButtonElement | undefined;
   let queueButtonRef: HTMLButtonElement | undefined;
@@ -75,8 +79,18 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   };
 
   const handleAddTunes = () => {
-    console.log("Add Tunes to practice queue - Not yet implemented");
-    // TODO: Open dialog to select tunes from repertoire
+    setShowAddTunesDialog(true);
+  };
+
+  const handleAddTunesConfirm = (count: number) => {
+    setShowAddTunesDialog(false);
+    if (props.onAddTunes) {
+      props.onAddTunes(count);
+    }
+  };
+
+  const handleAddTunesCancel = () => {
+    setShowAddTunesDialog(false);
   };
 
   const handleQueueOption = (option: string) => {
@@ -297,6 +311,13 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
           </div>
         </div>
       </div>
+
+      {/* Add Tunes Dialog */}
+      <AddTunesDialog
+        isOpen={showAddTunesDialog()}
+        onConfirm={handleAddTunesConfirm}
+        onClose={handleAddTunesCancel}
+      />
     </div>
   );
 };

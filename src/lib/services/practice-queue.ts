@@ -615,3 +615,163 @@ export async function generateOrGetPracticeQueue(
 
   return persisted;
 }
+
+/**
+ * Add tunes to existing practice queue (refill from backlog)
+ *
+ * Appends additional older/lapsed tunes to the active queue for today.
+ * Only tunes older than the delinquency window (backlog) that aren't
+ * already in the queue are eligible.
+ *
+ * Ported from legacy refill_practice_queue() (lines 1007-1112).
+ *
+ * @param db - SQLite database instance
+ * @param userRef - User ID (from user_profile.id)
+ * @param playlistRef - Playlist ID
+ * @param count - Number of tunes to add (must be >= 1)
+ * @param reviewSitdownDate - Anchor timestamp (defaults to now UTC)
+ * @param localTzOffsetMinutes - Client timezone offset (optional)
+ * @returns Array of newly added queue rows
+ *
+ * @example
+ * ```typescript
+ * const added = await addTunesToQueue(db, 1, 5, 5);
+ * // Adds 5 oldest backlog tunes to today's queue
+ * ```
+ */
+export async function addTunesToQueue(
+  db: SqliteDatabase,
+  userRef: number,
+  playlistRef: number,
+  count: number,
+  reviewSitdownDate: Date = new Date(),
+  localTzOffsetMinutes: number | null = null
+): Promise<DailyPracticeQueueRow[]> {
+  if (count <= 0) {
+    console.warn("[AddTunes] Count must be >= 1, returning empty");
+    return [];
+  }
+
+  // Get preferences
+  const prefs = DEFAULT_PREFS;
+
+  // Compute scheduling windows
+  const windows = computeSchedulingWindows(
+    reviewSitdownDate,
+    prefs.acceptableDelinquencyWindow,
+    localTzOffsetMinutes
+  );
+
+  const windowStartKey = windows.startTs;
+
+  // Get existing active queue for today
+  const existing = await fetchExistingActiveQueue(
+    db,
+    userRef,
+    playlistRef,
+    windowStartKey
+  );
+
+  if (existing.length === 0) {
+    console.warn("[AddTunes] No active queue found for today, returning empty");
+    return [];
+  }
+
+  // Get set of tune IDs already in queue
+  const existingTuneIds = new Set(existing.map((r) => r.tuneRef));
+
+  console.log(
+    `[AddTunes] Existing queue has ${existing.length} tunes, adding ${count} more`
+  );
+
+  // Query backlog tunes (older than delinquency window)
+  // These are tunes scheduled before windowFloorTs that aren't in the queue yet
+  const backlogRows = await db.all<PracticeListStagedRow>(sql`
+    SELECT * 
+    FROM practice_list_staged
+    WHERE user_ref = ${userRef}
+      AND playlist_id = ${playlistRef}
+      AND deleted = 0
+      AND playlist_deleted = 0
+      AND (
+        (scheduled IS NOT NULL AND scheduled < ${windows.windowFloorTs})
+        OR (scheduled IS NULL AND latest_due < ${windows.windowFloorTs})
+      )
+    ORDER BY COALESCE(scheduled, latest_due) DESC
+  `);
+
+  console.log(`[AddTunes] Found ${backlogRows.length} backlog tunes`);
+
+  // Filter out tunes already in queue
+  const newRows: PracticeListStagedRow[] = [];
+  for (const row of backlogRows) {
+    if (!existingTuneIds.has(row.id)) {
+      newRows.push(row);
+      if (newRows.length >= count) {
+        break;
+      }
+    }
+  }
+
+  if (newRows.length === 0) {
+    console.log("[AddTunes] No eligible backlog tunes found");
+    return [];
+  }
+
+  console.log(`[AddTunes] Adding ${newRows.length} new tunes to queue`);
+
+  // Find max order_index from existing queue
+  const maxOrderIndex = Math.max(...existing.map((r) => r.orderIndex), -1);
+
+  // Build queue rows for new tunes
+  const built = buildQueueRows(
+    newRows,
+    windows,
+    prefs,
+    userRef,
+    playlistRef,
+    "per_day",
+    localTzOffsetMinutes
+  );
+
+  // Adjust order indices to append sequentially after existing queue
+  built.forEach((row, index) => {
+    row.orderIndex = maxOrderIndex + 1 + index;
+    row.bucket = 2; // Force bucket 2 (Lapsed) for added tunes
+  });
+
+  // Persist new rows to database
+  const now = new Date().toISOString().replace("T", " ").substring(0, 19);
+  for (const row of built) {
+    await db
+      .insert(dailyPracticeQueue)
+      .values({
+        ...row,
+        lastModifiedAt: now,
+      })
+      .run();
+  }
+
+  // Fetch back the inserted rows
+  const addedTuneIds = built.map((r) => r.tuneRef);
+  const added = await db
+    .select()
+    .from(dailyPracticeQueue)
+    .where(
+      and(
+        eq(dailyPracticeQueue.userRef, userRef),
+        eq(dailyPracticeQueue.playlistRef, playlistRef),
+        eq(dailyPracticeQueue.windowStartUtc, windowStartKey),
+        eq(dailyPracticeQueue.active, 1),
+        sql`${dailyPracticeQueue.tuneRef} IN (${sql.join(
+          addedTuneIds,
+          sql`, `
+        )})`
+      )
+    )
+    .all();
+
+  console.log(`[AddTunes] Successfully added ${added.length} tunes to queue`);
+
+  return added as DailyPracticeQueueRow[];
+}
