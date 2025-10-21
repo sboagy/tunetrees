@@ -22,6 +22,7 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { getUserPlaylists } from "../../lib/db/queries/playlists";
 import type { PlaylistWithSummary } from "../../lib/db/types";
+import { useClickOutside } from "../../lib/hooks/useClickOutside";
 import { log } from "../../lib/logger";
 import {
   getSelectedPlaylistId,
@@ -64,6 +65,17 @@ const PlaylistDropdown: Component = () => {
   const { user, localDb, syncVersion } = useAuth();
   const { currentPlaylistId, setCurrentPlaylistId } = useCurrentPlaylist();
   const [showDropdown, setShowDropdown] = createSignal(false);
+  let dropdownContainerRef: HTMLDivElement | undefined;
+
+  // Close dropdown when clicking outside
+  useClickOutside(
+    () => dropdownContainerRef,
+    () => {
+      if (showDropdown()) {
+        setShowDropdown(false);
+      }
+    }
+  );
 
   // Fetch user playlists
   // Fetch immediately if data exists in SQLite, don't wait for sync
@@ -168,11 +180,14 @@ const PlaylistDropdown: Component = () => {
   });
 
   return (
-    <div class="relative" data-testid="playlist-dropdown">
+    <div
+      class="relative"
+      data-testid="playlist-dropdown"
+      ref={dropdownContainerRef}
+    >
       <button
         type="button"
         onClick={() => setShowDropdown(!showDropdown())}
-        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
         class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
         aria-label="Select playlist"
         aria-expanded={showDropdown()}
@@ -298,6 +313,28 @@ export const TopNav: Component = () => {
   const [pendingCount, setPendingCount] = createSignal(0);
   const [showUserMenu, setShowUserMenu] = createSignal(false);
   const [showDbMenu, setShowDbMenu] = createSignal(false);
+  let userMenuContainerRef: HTMLDivElement | undefined;
+  let dbMenuContainerRef: HTMLDivElement | undefined;
+
+  // Close user menu when clicking outside
+  useClickOutside(
+    () => userMenuContainerRef,
+    () => {
+      if (showUserMenu()) {
+        setShowUserMenu(false);
+      }
+    }
+  );
+
+  // Close database menu when clicking outside
+  useClickOutside(
+    () => dbMenuContainerRef,
+    () => {
+      if (showDbMenu()) {
+        setShowDbMenu(false);
+      }
+    }
+  );
 
   // Monitor online/offline status
   createEffect(() => {
@@ -370,11 +407,14 @@ export const TopNav: Component = () => {
             {/* User Menu Dropdown */}
             <Show when={user()}>
               {(u) => (
-                <div class="relative" data-testid="user-menu-dropdown">
+                <div
+                  class="relative"
+                  data-testid="user-menu-dropdown"
+                  ref={userMenuContainerRef}
+                >
                   <button
                     type="button"
                     onClick={() => setShowUserMenu(!showUserMenu())}
-                    onBlur={() => setTimeout(() => setShowUserMenu(false), 200)}
                     class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                     aria-label="User menu"
                     aria-expanded={showUserMenu()}
@@ -511,11 +551,14 @@ export const TopNav: Component = () => {
             </Show>
 
             {/* Database/Sync Status Dropdown */}
-            <div class="relative" data-testid="database-status-dropdown">
+            <div
+              class="relative"
+              data-testid="database-status-dropdown"
+              ref={dbMenuContainerRef}
+            >
               <button
                 type="button"
                 onClick={() => setShowDbMenu(!showDbMenu())}
-                onBlur={() => setTimeout(() => setShowDbMenu(false), 200)}
                 class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                 aria-label="Database and sync status"
                 aria-expanded={showDbMenu()}
