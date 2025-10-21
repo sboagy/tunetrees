@@ -16,7 +16,7 @@ workflow_runs=$(gh api -X GET /repos/$OWNER/$REPO/actions/runs --paginate -q '.w
 # Delete each workflow run
 count=0
 for run_id in $workflow_runs; do
-  if [ $count -ge 6 ]; then
+  if [ $count -ge 1 ]; then
     gh api -X DELETE /repos/$OWNER/$REPO/actions/runs/$run_id --silent
     echo "Deleted workflow run: $run_id, count: $count"
     # echo "count: $count; gh api -X DELETE /repos/$OWNER/$REPO/actions/runs/$run_id --silent"
