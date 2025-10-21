@@ -17,9 +17,20 @@ const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD;
 
 test.describe("AUTH-001: User Authentication", () => {
   test.beforeEach(async ({ page, context }) => {
-    // Clear all storage to ensure clean state
+    // Clear all storage to ensure clean state (cookies + localStorage + sessionStorage)
     await context.clearCookies();
+
+    // Navigate to the app first
     await page.goto("http://localhost:5173");
+
+    // Clear localStorage and sessionStorage to remove auth tokens
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+
+    // Reload to ensure clean state
+    await page.reload();
   });
 
   test("should redirect to login page when not authenticated", async ({
