@@ -21,7 +21,7 @@ test.describe("AUTH-001: User Authentication", () => {
     await context.clearCookies();
 
     // Navigate to the app first
-    await page.goto("http://localhost:5173");
+    await page.goto("http://localhost:5173", { waitUntil: "networkidle" });
 
     // Clear localStorage and sessionStorage to remove auth tokens
     await page.evaluate(() => {
@@ -29,8 +29,11 @@ test.describe("AUTH-001: User Authentication", () => {
       sessionStorage.clear();
     });
 
-    // Reload to ensure clean state
-    await page.reload();
+    // Reload and wait for navigation to complete
+    await page.reload({ waitUntil: "networkidle" });
+
+    // Give the app time to check auth state and redirect if needed
+    await page.waitForTimeout(1000);
   });
 
   test("should redirect to login page when not authenticated", async ({
@@ -48,8 +51,13 @@ test.describe("AUTH-001: User Authentication", () => {
   test("should sign in successfully with valid credentials", async ({
     page,
   }) => {
-    // Navigate to login
-    await page.goto("http://localhost:5173/login");
+    // Navigate to login and wait for page to be fully loaded
+    await page.goto("http://localhost:5173/login", {
+      waitUntil: "networkidle",
+    });
+
+    // Wait for login form to be visible and interactive
+    await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10000 });
 
     // Fill in Alice's credentials
     await page.getByLabel("Email").fill(ALICE_EMAIL);
