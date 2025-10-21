@@ -85,12 +85,20 @@ function formatTimestamp(date: Date): string {
   return date.toISOString().replace("T", " ").substring(0, 19);
 }
 
-// Helper to create date relative to today
+// Helper to create date relative to today (in UTC to avoid timezone issues)
 function daysFromNow(days: number): Date {
   const d = new Date();
-  d.setDate(d.getDate() + days);
-  d.setHours(12, 0, 0, 0);
-  return d;
+  // Use UTC methods to avoid timezone conversion issues
+  const utcDate = Date.UTC(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate() + days,
+    12, // Noon UTC
+    0,
+    0,
+    0
+  );
+  return new Date(utcDate);
 }
 
 describe("computeSchedulingWindows", () => {
