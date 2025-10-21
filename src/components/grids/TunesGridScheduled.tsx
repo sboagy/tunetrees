@@ -280,10 +280,14 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         : data;
 
     // Map bucket integer to string for display
-    const bucketNames: Record<number, "Due Today" | "Lapsed" | "Backfill"> = {
+    const bucketNames: Record<
+      number,
+      "Due Today" | "Lapsed" | "New" | "Old Lapsed"
+    > = {
       1: "Due Today",
       2: "Lapsed",
-      3: "Backfill",
+      3: "New",
+      4: "Old Lapsed",
     };
 
     return filteredData.map((entry) => {

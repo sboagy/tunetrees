@@ -658,7 +658,7 @@ export function getScheduledColumns(
 
   // Practice-specific columns with Evaluation
   const practiceSpecificColumns: ColumnDef<any>[] = [
-    // Bucket (Due Today, Lapsed, Backfill)
+    // Bucket (Due Today, Lapsed, New, Old Lapsed)
     {
       id: "bucket",
       accessorFn: (row) => row.bucket || "Due Today",
@@ -670,8 +670,9 @@ export function getScheduledColumns(
             "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200",
           Lapsed:
             "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200",
-          Backfill:
-            "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200",
+          New: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200",
+          "Old Lapsed":
+            "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200",
         };
         const colorClass =
           colors[value] ||
