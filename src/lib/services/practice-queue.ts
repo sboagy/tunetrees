@@ -20,9 +20,13 @@
  */
 
 import { and, eq, sql } from "drizzle-orm";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type { PracticeListStagedRow } from "../db/queries/practice";
 import { dailyPracticeQueue } from "../db/schema";
+
+// Type alias to support both sql.js (production) and better-sqlite3 (testing)
+type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 /**
  * Scheduling Options Preferences (stub - hardcoded defaults)
@@ -56,6 +60,10 @@ export interface SchedulingWindows {
   windowFloorTs: string;
   tzOffsetMinutes: number | null;
 }
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000; // $24\times60\times60\times1000$
+const addDays = (d: Date, days: number): Date =>
+  new Date(d.getTime() + days * MS_PER_DAY);
 
 /**
  * Compute scheduling windows from a sit-down instant
@@ -96,29 +104,30 @@ export function computeSchedulingWindows(
     const offsetMs = localTzOffsetMinutes * 60 * 1000;
     const localDt = new Date(sitdownUtc.getTime() + offsetMs);
 
-    // Get midnight in local time
+    // Get midnight in local time (using UTC methods to avoid system timezone)
     const localStart = new Date(
-      localDt.getFullYear(),
-      localDt.getMonth(),
-      localDt.getDate()
+      Date.UTC(
+        localDt.getUTCFullYear(),
+        localDt.getUTCMonth(),
+        localDt.getUTCDate(),
+        0,
+        0,
+        0,
+        0
+      )
     );
 
     // Convert back to UTC
     startOfDayUtc = new Date(localStart.getTime() - offsetMs);
   } else {
-    // Use UTC calendar date
-    startOfDayUtc = new Date(
-      Date.UTC(
-        sitdownUtc.getUTCFullYear(),
-        sitdownUtc.getUTCMonth(),
-        sitdownUtc.getUTCDate()
-      )
-    );
+    startOfDayUtc = new Date(sitdownUtc);
+    startOfDayUtc.setUTCHours(0, 0, 0, 0);
   }
 
-  const endOfDayUtc = new Date(startOfDayUtc.getTime() + 24 * 60 * 60 * 1000);
-  const windowFloorUtc = new Date(
-    startOfDayUtc.getTime() - acceptableDelinquencyWindow * 24 * 60 * 60 * 1000
+  const endOfDayUtc: Date = addDays(startOfDayUtc, 1);
+  const windowFloorUtc: Date = addDays(
+    startOfDayUtc,
+    -acceptableDelinquencyWindow
   );
 
   // Format as YYYY-MM-DD HH:MM:SS (legacy format for lexicographic comparison)
@@ -143,7 +152,8 @@ export function computeSchedulingWindows(
  * Returns bucket classification:
  * - Bucket 1: Due Today (timestamp in [startOfDayUtc, endOfDayUtc))
  * - Bucket 2: Recently Lapsed (timestamp in [windowFloorUtc, startOfDayUtc))
- * - Bucket 3: Backfill (timestamp < windowFloorUtc)
+ * - Bucket 3: New/Unscheduled (never scheduled, no practice history)
+ * - Bucket 4: Old Lapsed (timestamp < windowFloorUtc)
  *
  * Handles various timestamp formats:
  * - ISO 8601 with T separator: "2025-10-16T14:30:00Z"
@@ -156,13 +166,13 @@ export function computeSchedulingWindows(
  *
  * @param coalescedRaw - Timestamp string (scheduled OR latest_due)
  * @param windows - Scheduling windows for comparison
- * @returns Bucket integer (1, 2, or 3)
+ * @returns Bucket integer (1, 2, 3, or 4)
  *
  * @example
  * ```typescript
  * const windows = computeSchedulingWindows(new Date(), 7, null);
  * const bucket = classifyQueueBucket("2025-10-16 10:00:00", windows);
- * // Returns 1 if today, 2 if recent past, 3 if older
+ * // Returns 1 if today, 2 if recent past, 3 if new, 4 if very old
  * ```
  */
 export function classifyQueueBucket(
@@ -179,37 +189,37 @@ export function classifyQueueBucket(
 
   let dt: Date | null = null;
 
-  // Try ISO format first (with timezone)
+  // Parse as YYYY-MM-DD HH:MM:SS (assume UTC) - try this FIRST
   try {
-    dt = new Date(raw.replace("Z", "+00:00"));
-    if (Number.isNaN(dt.getTime())) {
-      dt = null;
+    const match = norm19.match(
+      /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
+    );
+    if (match) {
+      const [, year, month, day, hour, minute, second] = match;
+      dt = new Date(
+        Date.UTC(
+          parseInt(year, 10),
+          parseInt(month, 10) - 1,
+          parseInt(day, 10),
+          parseInt(hour, 10),
+          parseInt(minute, 10),
+          parseInt(second, 10)
+        )
+      );
     }
   } catch {
     dt = null;
   }
 
-  // Fallback: parse as YYYY-MM-DD HH:MM:SS (assume UTC)
+  // Fallback: Try ISO format (with timezone)
   if (!dt) {
     try {
-      const match = norm19.match(
-        /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
-      );
-      if (match) {
-        const [, year, month, day, hour, minute, second] = match;
-        dt = new Date(
-          Date.UTC(
-            parseInt(year),
-            parseInt(month) - 1,
-            parseInt(day),
-            parseInt(hour),
-            parseInt(minute),
-            parseInt(second)
-          )
-        );
+      dt = new Date(raw);
+      if (Number.isNaN(dt.getTime())) {
+        dt = null;
       }
     } catch {
-      return 1; // Parse failure - lenient default
+      dt = null;
     }
   }
 
@@ -229,7 +239,7 @@ export function classifyQueueBucket(
     return 2; // Recently Lapsed
   }
 
-  return 3; // Backfill (older than window floor)
+  return 4; // Old Lapsed (older than window floor)
 }
 
 /**
@@ -276,7 +286,7 @@ export interface DailyPracticeQueueRow {
  * @returns Array of existing active queue rows
  */
 async function fetchExistingActiveQueue(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   userRef: number,
   playlistRef: number,
   windowStartKey: string
@@ -292,6 +302,7 @@ async function fetchExistingActiveQueue(
         eq(dailyPracticeQueue.active, 1)
       )
     )
+    .orderBy(dailyPracticeQueue.orderIndex) // ← ADD THIS
     .all();
 
   return results as DailyPracticeQueueRow[];
@@ -312,6 +323,7 @@ async function fetchExistingActiveQueue(
  * @param playlistRef - Playlist ID
  * @param mode - Queue mode ("per_day" or "rolling")
  * @param localTzOffsetMinutes - Timezone offset
+ * @param forceBucket - Force all rows to specific bucket (optional, for Q3 override)
  * @returns Array of queue row objects ready for insertion
  */
 function buildQueueRows(
@@ -321,7 +333,8 @@ function buildQueueRows(
   userRef: number,
   playlistRef: number,
   mode: string,
-  localTzOffsetMinutes: number | null
+  localTzOffsetMinutes: number | null,
+  forceBucket?: number
 ): Omit<DailyPracticeQueueRow, "id">[] {
   const results: Omit<DailyPracticeQueueRow, "id">[] = [];
   const now = new Date();
@@ -332,7 +345,7 @@ function buildQueueRows(
     const scheduledVal = row.scheduled;
     const latestVal = row.latest_due;
     const coalescedRaw = scheduledVal || latestVal || windows.startTs;
-    const bucket = classifyQueueBucket(coalescedRaw, windows);
+    const bucket = forceBucket ?? classifyQueueBucket(coalescedRaw, windows);
 
     results.push({
       userRef,
@@ -380,7 +393,7 @@ function buildQueueRows(
  * @returns Persisted queue rows (may be existing rows if conflict)
  */
 async function persistQueueRows(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   rows: Omit<DailyPracticeQueueRow, "id">[],
   userRef: number,
   playlistRef: number,
@@ -451,7 +464,7 @@ async function persistQueueRows(
  * ```
  */
 export async function generateOrGetPracticeQueue(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   userRef: number,
   playlistRef: number,
   reviewSitdownDate: Date = new Date(),
@@ -517,9 +530,9 @@ export async function generateOrGetPracticeQueue(
       .run();
   }
 
-  // Query practice_list_staged using three-bucket logic with capacity limits
-  // NOTE: Backfill (Q3) disabled (enable_backfill=false in legacy)
-  // Implements Q1 (due today) + Q2 (recently lapsed) with max_reviews cap
+  // Query practice_list_staged using four-bucket logic with capacity limits
+  // Q1 (Due Today) + Q2 (Recently Lapsed) + Q3 (New/Unscheduled) + Q4 (Old Lapsed)
+  // Implements max_reviews capacity constraint across all buckets
 
   const maxReviews = prefs.maxReviewsPerDay || 0; // 0 = uncapped
   const seenTuneIds = new Set<number>();
@@ -553,10 +566,11 @@ export async function generateOrGetPracticeQueue(
   console.log(`[PracticeQueue] Q1 (due today): ${q1Rows.length} tunes`);
 
   // Q2: Recently Lapsed (if capacity remains)
+  let q2Rows: PracticeListStagedRow[] = [];
   if (maxReviews === 0 || candidateRows.length < maxReviews) {
     const remainingCapacity =
       maxReviews === 0 ? 999999 : maxReviews - candidateRows.length;
-    const q2Rows = await db.all<PracticeListStagedRow>(sql`
+    q2Rows = await db.all<PracticeListStagedRow>(sql`
       SELECT * 
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
@@ -581,24 +595,124 @@ export async function generateOrGetPracticeQueue(
     console.log(`[PracticeQueue] Q2 (recently lapsed): ${q2Rows.length} tunes`);
   }
 
+  // Q3: New/Unscheduled tunes (if capacity still remains)
+  // Never-scheduled tunes (scheduled IS NULL AND latest_due IS NULL)
+  // OR practiced long ago but never scheduled (scheduled IS NULL AND latest_due < windowFloorTs)
+  let q3Rows: PracticeListStagedRow[] = [];
+  if (maxReviews === 0 || candidateRows.length < maxReviews) {
+    const remainingCapacity =
+      maxReviews === 0 ? 999999 : maxReviews - candidateRows.length;
+    q3Rows = await db.all<PracticeListStagedRow>(sql`
+      SELECT * 
+      FROM practice_list_staged
+      WHERE user_ref = ${userRef}
+        AND playlist_id = ${playlistRef}
+        AND deleted = 0
+        AND playlist_deleted = 0
+        AND scheduled IS NULL
+        AND (latest_due IS NULL OR latest_due < ${windows.windowFloorTs})
+      ORDER BY id ASC
+      LIMIT ${remainingCapacity}
+    `);
+
+    for (const row of q3Rows) {
+      if (!seenTuneIds.has(row.id)) {
+        candidateRows.push(row);
+        seenTuneIds.add(row.id);
+      }
+    }
+
+    console.log(`[PracticeQueue] Q3 (new/unscheduled): ${q3Rows.length} tunes`);
+  }
+
+  // Q4: Old Lapsed tunes (if capacity still remains)
+  // Very old scheduled tunes (scheduled before windowFloorTs)
+  let q4Rows: PracticeListStagedRow[] = [];
+  if (maxReviews === 0 || candidateRows.length < maxReviews) {
+    const remainingCapacity =
+      maxReviews === 0 ? 999999 : maxReviews - candidateRows.length;
+    q4Rows = await db.all<PracticeListStagedRow>(sql`
+      SELECT * 
+      FROM practice_list_staged
+      WHERE user_ref = ${userRef}
+        AND playlist_id = ${playlistRef}
+        AND deleted = 0
+        AND playlist_deleted = 0
+        AND scheduled IS NOT NULL
+        AND scheduled < ${windows.windowFloorTs}
+      ORDER BY scheduled ASC
+      LIMIT ${remainingCapacity}
+    `);
+
+    for (const row of q4Rows) {
+      if (!seenTuneIds.has(row.id)) {
+        candidateRows.push(row);
+        seenTuneIds.add(row.id);
+      }
+    }
+
+    console.log(`[PracticeQueue] Q4 (old lapsed): ${q4Rows.length} tunes`);
+  }
+
   console.log(
     `[PracticeQueue] Generating new queue: ${
       candidateRows.length
     } candidate tunes (max: ${maxReviews || "uncapped"})`
   );
 
-  const scheduledRows = candidateRows;
-
-  // Build queue rows with bucket classification
-  const built = buildQueueRows(
-    scheduledRows,
+  // Build queue rows - mark each with its actual bucket
+  // Q1 tunes get bucket 1, Q2 get bucket 2, Q3 get bucket 3, Q4 get bucket 4
+  const q1Built = buildQueueRows(
+    q1Rows,
     windows,
     prefs,
     userRef,
     playlistRef,
     mode,
-    localTzOffsetMinutes
+    localTzOffsetMinutes,
+    1 // Force bucket 1 (Due Today)
   );
+
+  const q2Built = buildQueueRows(
+    q2Rows,
+    windows,
+    prefs,
+    userRef,
+    playlistRef,
+    mode,
+    localTzOffsetMinutes,
+    2 // Force bucket 2 (Recently Lapsed)
+  );
+
+  const q3Built = buildQueueRows(
+    q3Rows,
+    windows,
+    prefs,
+    userRef,
+    playlistRef,
+    mode,
+    localTzOffsetMinutes,
+    3 // Force bucket 3 (New/Unscheduled)
+  );
+
+  const q4Built = buildQueueRows(
+    q4Rows,
+    windows,
+    prefs,
+    userRef,
+    playlistRef,
+    mode,
+    localTzOffsetMinutes,
+    4 // Force bucket 4 (Old Lapsed)
+  );
+
+  // Combine and renumber order indices
+  const built: Omit<DailyPracticeQueueRow, "id">[] = [];
+  let orderIndex = 0;
+
+  for (const row of [...q1Built, ...q2Built, ...q3Built, ...q4Built]) {
+    built.push({ ...row, orderIndex: orderIndex++ });
+  }
 
   // Persist to database
   const persisted = await persistQueueRows(
@@ -640,7 +754,7 @@ export async function generateOrGetPracticeQueue(
  * ```
  */
 export async function addTunesToQueue(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   userRef: number,
   playlistRef: number,
   count: number,

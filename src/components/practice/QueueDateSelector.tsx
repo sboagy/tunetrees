@@ -11,8 +11,8 @@
  * @module components/practice/QueueDateSelector
  */
 
-import { type Component, createSignal, Show } from "solid-js";
 import { X } from "lucide-solid";
+import { type Component, createSignal, Show } from "solid-js";
 
 export interface QueueDateSelectorProps {
   isOpen: boolean;
@@ -22,9 +22,7 @@ export interface QueueDateSelectorProps {
   onClose: () => void;
 }
 
-export const QueueDateSelector: Component<QueueDateSelectorProps> = (
-  props
-) => {
+export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
   const [customDate, setCustomDate] = createSignal("");
 
   const today = new Date();
@@ -108,12 +106,11 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (
 
   return (
     <Show when={props.isOpen}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Escape key handled via onKeyDown */}
       <div
         class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
         onClick={handleBackdropClick}
         onKeyDown={handleKeyDown}
-        role="button"
-        tabIndex={-1}
       >
         <div
           class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4"
@@ -202,11 +199,15 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (
 
             {/* Custom date picker */}
             <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label
+                for="custom-date-input"
+                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
                 Custom Date
               </label>
               <div class="flex gap-2">
                 <input
+                  id="custom-date-input"
                   type="date"
                   value={customDate()}
                   onInput={(e) => setCustomDate(e.currentTarget.value)}
