@@ -16,29 +16,24 @@ const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD;
  */
 
 test.describe("AUTH-001: User Authentication", () => {
-  test.beforeEach(async ({ page, context }) => {
-    // Clear all storage to ensure clean state (cookies + localStorage + sessionStorage)
+  test.beforeEach(async ({ context }) => {
+    // Clear all cookies to ensure completely clean auth state
     await context.clearCookies();
-
-    // Navigate to the app first
-    await page.goto("http://localhost:5173", { waitUntil: "networkidle" });
-
-    // Clear localStorage and sessionStorage to remove auth tokens
-    await page.evaluate(() => {
-      localStorage.clear();
-      sessionStorage.clear();
-    });
-
-    // Reload and wait for navigation to complete
-    await page.reload({ waitUntil: "networkidle" });
-
-    // Give the app time to check auth state and redirect if needed
-    await page.waitForTimeout(1000);
   });
 
   test("should redirect to login page when not authenticated", async ({
     page,
   }) => {
+    // Navigate to root and clear storage
+    await page.goto("http://localhost:5173");
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+
+    // Hard reload to ensure clean state
+    await page.reload({ waitUntil: "networkidle" });
+
     // Verify redirect to login page
     await expect(page).toHaveURL(/.*\/login/, { timeout: 5000 });
 
@@ -51,10 +46,18 @@ test.describe("AUTH-001: User Authentication", () => {
   test("should sign in successfully with valid credentials", async ({
     page,
   }) => {
-    // Navigate to login and wait for page to be fully loaded
-    await page.goto("http://localhost:5173/login", {
-      waitUntil: "networkidle",
+    // Clear storage and navigate directly to login
+    await page.goto("http://localhost:5173/login");
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
     });
+
+    // Hard reload with networkidle to ensure login page is fully loaded
+    await page.reload({ waitUntil: "networkidle" });
+
+    // Wait for URL to be /login
+    await expect(page).toHaveURL(/.*\/login/, { timeout: 5000 });
 
     // Wait for login form to be visible and interactive
     await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10000 });
@@ -93,7 +96,21 @@ test.describe("AUTH-001: User Authentication", () => {
   });
 
   test("should show error with invalid credentials", async ({ page }) => {
+    // Clear storage and navigate directly to login
     await page.goto("http://localhost:5173/login");
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+
+    // Hard reload with networkidle to ensure login page is fully loaded
+    await page.reload({ waitUntil: "networkidle" });
+
+    // Wait for URL to be /login
+    await expect(page).toHaveURL(/.*\/login/, { timeout: 5000 });
+
+    // Wait for login form to be visible
+    await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10000 });
 
     // Try to sign in with wrong password
     await page.getByLabel("Email").fill(ALICE_EMAIL);
