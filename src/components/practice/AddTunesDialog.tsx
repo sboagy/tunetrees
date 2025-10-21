@@ -58,7 +58,7 @@ export const AddTunesDialog: Component<AddTunesDialogProps> = (props) => {
           {/* Header */}
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              Add Tunes
+              Add More Tunes
             </h2>
             <button
               type="button"

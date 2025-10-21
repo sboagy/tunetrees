@@ -21,6 +21,12 @@ import { useNavigate } from "@solidjs/router";
 import type { Component } from "solid-js";
 import { createEffect, createSignal } from "solid-js";
 import type { PlaylistWithSummary } from "../../lib/db/types";
+import {
+  TOOLBAR_BUTTON_BASE,
+  TOOLBAR_BUTTON_DANGER,
+  TOOLBAR_BUTTON_NEUTRAL,
+  TOOLBAR_BUTTON_SUCCESS,
+} from "../grids/shared-toolbar-styles";
 import { CombinedFilterDropdown } from "./CombinedFilterDropdown";
 
 export interface CatalogToolbarProps {
@@ -105,7 +111,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
           type="button"
           onClick={handleAddToRepertoire}
           title="Add selected tunes to repertoire"
-          class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors whitespace-nowrap"
+          class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
         >
           <svg
             class="w-4 h-4"
@@ -173,7 +179,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
           type="button"
           onClick={handleAddTune}
           title="Add a new tune"
-          class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors whitespace-nowrap"
+          class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
         >
           <svg
             class="w-4 h-4"
@@ -199,7 +205,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
           onClick={handleDeleteTunes}
           title="Delete selected tunes"
           disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
-          class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors whitespace-nowrap"
+          class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_DANGER}`}
         >
           <svg
             class="w-4 h-4"
@@ -225,7 +231,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             type="button"
             onClick={handleColumnsToggle}
             title="Show/hide columns"
-            class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors whitespace-nowrap"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
           >
             <svg
               class="w-4 h-4"

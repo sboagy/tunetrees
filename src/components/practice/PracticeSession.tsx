@@ -78,7 +78,12 @@ export const PracticeSession: Component<{
       setLoading(true);
       setError(null);
 
-      const tunes = await getDueTunesLegacy(db, props.playlistId, new Date(), 7);
+      const tunes = await getDueTunesLegacy(
+        db,
+        props.playlistId,
+        new Date(),
+        7
+      );
       setDueTunes(tunes);
     } catch (err) {
       console.error("Error loading due tunes:", err);

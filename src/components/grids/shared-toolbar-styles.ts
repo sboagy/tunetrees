@@ -54,51 +54,58 @@ export const TOOLBAR_BUTTON_BASE =
 /**
  * Primary action button (e.g., Submit, Add To Repertoire)
  * Apply with TOOLBAR_BUTTON_BASE
+ * Ghost/outline style - transparent background with border
  */
 export const TOOLBAR_BUTTON_PRIMARY =
-  "text-blue-600 dark:text-blue-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200/50 dark:border-gray-700/50";
+  "text-gray-700 dark:text-gray-300 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-300 dark:border-gray-600";
 
 /**
  * Success/Add button (e.g., Add Tune)
  * Apply with TOOLBAR_BUTTON_BASE
+ * Ghost/outline style - transparent background with border
  */
 export const TOOLBAR_BUTTON_SUCCESS =
-  "text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200/50 dark:border-gray-700/50";
+  "text-gray-700 dark:text-gray-300 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-300 dark:border-gray-600";
 
 /**
  * Danger/Delete button (e.g., Delete Tunes)
  * Apply with TOOLBAR_BUTTON_BASE
+ * Ghost/outline style - transparent background with border
  */
 export const TOOLBAR_BUTTON_DANGER =
-  "text-red-600 dark:text-red-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed border-gray-200/50 dark:border-gray-700/50";
+  "text-gray-700 dark:text-gray-300 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-300 dark:border-gray-600 disabled:text-gray-400 disabled:border-gray-200 dark:disabled:text-gray-600 dark:disabled:border-gray-700 disabled:cursor-not-allowed";
 
 /**
  * Warning/Remove button (e.g., Remove From Repertoire)
  * Apply with TOOLBAR_BUTTON_BASE
+ * Ghost/outline style - transparent background with border
  */
 export const TOOLBAR_BUTTON_WARNING =
-  "text-orange-600 dark:text-orange-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed border-gray-200/50 dark:border-gray-700/50";
+  "text-gray-700 dark:text-gray-300 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-300 dark:border-gray-600 disabled:text-gray-400 disabled:border-gray-200 dark:disabled:text-gray-600 dark:disabled:border-gray-700 disabled:cursor-not-allowed";
 
 /**
  * Accent button (e.g., Add Tunes to queue - purple)
  * Apply with TOOLBAR_BUTTON_BASE
+ * Ghost/outline style - transparent background with border
  */
 export const TOOLBAR_BUTTON_ACCENT =
-  "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 border-purple-200/50 dark:border-purple-700/50";
+  "text-gray-700 dark:text-gray-300 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-300 dark:border-gray-600";
 
 /**
  * Neutral/Default button (e.g., Columns, Queue)
  * Apply with TOOLBAR_BUTTON_BASE
+ * Ghost/outline style - transparent background with border
  */
 export const TOOLBAR_BUTTON_NEUTRAL =
-  "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200/50 dark:border-gray-700/50";
+  "text-gray-700 dark:text-gray-300 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-300 dark:border-gray-600";
 
 /**
- * Neutral variant 2 (slightly different text color)
+ * Neutral variant 2 (slightly different appearance)
  * Apply with TOOLBAR_BUTTON_BASE
+ * Ghost/outline style - transparent background with border
  */
 export const TOOLBAR_BUTTON_NEUTRAL_ALT =
-  "text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200/50 dark:border-gray-700/50";
+  "text-gray-700 dark:text-gray-300 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50 border-gray-300 dark:border-gray-600";
 
 /**
  * Search input container

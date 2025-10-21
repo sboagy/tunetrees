@@ -23,10 +23,11 @@ import { createSignal, Show } from "solid-js";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import {
   TOOLBAR_BADGE,
-  TOOLBAR_BUTTON_ACCENT,
   TOOLBAR_BUTTON_BASE,
   TOOLBAR_BUTTON_GROUP_CLASSES,
   TOOLBAR_BUTTON_NEUTRAL,
+  TOOLBAR_BUTTON_PRIMARY,
+  TOOLBAR_BUTTON_WARNING,
   TOOLBAR_CONTAINER_CLASSES,
   TOOLBAR_ICON_SIZE,
   TOOLBAR_INNER_CLASSES,
@@ -117,6 +118,39 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
     setShowColumnsDropdown(!showColumnsDropdown());
   };
 
+  const formatQueueDate = (date: Date): string => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const compareDate = new Date(date);
+    compareDate.setHours(12, 0, 0, 0);
+
+    const isSameDay = (d1: Date, d2: Date): boolean => {
+      return (
+        d1.getFullYear() === d2.getFullYear() &&
+        d1.getMonth() === d2.getMonth() &&
+        d1.getDate() === d2.getDate()
+      );
+    };
+
+    if (isSameDay(compareDate, today)) return "Today";
+    if (isSameDay(compareDate, yesterday)) return "Yesterday";
+    if (isSameDay(compareDate, tomorrow)) return "Tomorrow";
+
+    // Format as "Mon, Jan 20" or similar
+    return compareDate.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   return (
     <div class={TOOLBAR_CONTAINER_CLASSES}>
       <div class={TOOLBAR_INNER_CLASSES}>
@@ -130,7 +164,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             title={`Submit ${props.evaluationsCount || 0} practice evaluations`}
             class={`${TOOLBAR_BUTTON_BASE}`}
             classList={{
-              "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 border-blue-200/50 dark:border-blue-700/50":
+              [`${TOOLBAR_BUTTON_PRIMARY}`]:
                 !!props.evaluationsCount && props.evaluationsCount > 0,
               "text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/70 border-gray-300/50 dark:border-gray-600/50 opacity-60 cursor-not-allowed":
                 !props.evaluationsCount || props.evaluationsCount === 0,
@@ -145,7 +179,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
 
           {/* Show Submitted toggle - Switch component */}
           <div
-            class="flex items-center gap-3 px-3 py-1 rounded-md border border-gray-200/50 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL} gap-3 px-3 py-1`}
             title="Show submitted evaluations in the practice grid"
           >
             <Switch
@@ -156,21 +190,21 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               <SwitchControl>
                 <SwitchThumb />
               </SwitchControl>
-              <SwitchLabel class="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none ml-2 hidden sm:inline">
+              <SwitchLabel class="text-xs font-medium cursor-pointer select-none ml-2 hidden sm:inline">
                 Show Submitted
               </SwitchLabel>
             </Switch>
           </div>
 
-          {/* Add Tunes button */}
+          {/* Add More button */}
           <button
             type="button"
             onClick={handleAddTunes}
-            title="Add tunes from repertoire to practice queue"
-            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_ACCENT}`}
+            title="Add more tunes from repertoire to practice queue"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
           >
             <Plus size={14} />
-            <span class="hidden md:inline">Add Tunes</span>
+            <span class="hidden md:inline">Add More</span>
           </button>
 
           {/* Queue control button */}
@@ -194,7 +228,9 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
-            <span class="hidden lg:inline">Queue</span>
+            <span class="hidden lg:inline">
+              {formatQueueDate(props.queueDate || new Date())}
+            </span>
             <svg
               class="w-3 h-3"
               fill="none"
@@ -216,12 +252,10 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             type="button"
             onClick={handleFlashcardToggle}
             title="Toggle flashcard practice mode"
-            class={TOOLBAR_BUTTON_BASE}
+            class={`${TOOLBAR_BUTTON_BASE}`}
             classList={{
-              "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 border-orange-200/50 dark:border-orange-700/50":
-                flashcardMode(),
-              "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200/50 dark:border-gray-700/50":
-                !flashcardMode(),
+              [`${TOOLBAR_BUTTON_WARNING}`]: flashcardMode(),
+              [`${TOOLBAR_BUTTON_NEUTRAL}`]: !flashcardMode(),
             }}
           >
             <svg
