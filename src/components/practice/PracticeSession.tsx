@@ -23,7 +23,7 @@ import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import type { DueTuneEntry } from "../../lib/db/queries/practice";
-import { getDueTunes } from "../../lib/db/queries/practice";
+import { getDueTunesLegacy } from "../../lib/db/queries/practice";
 import { FSRS_QUALITY_MAP } from "../../lib/scheduling/fsrs-service";
 import { recordPracticeRating } from "../../lib/services/practice-recording";
 import { AbcNotation } from "../tunes/AbcNotation";
@@ -78,7 +78,7 @@ export const PracticeSession: Component<{
       setLoading(true);
       setError(null);
 
-      const tunes = await getDueTunes(db, props.playlistId, new Date(), 7);
+      const tunes = await getDueTunesLegacy(db, props.playlistId, new Date(), 7);
       setDueTunes(tunes);
     } catch (err) {
       console.error("Error loading due tunes:", err);

@@ -25,7 +25,7 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import type { SqliteDatabase } from "../db/client-sqlite";
-import { getDueTunes } from "../db/queries/practice";
+import { getDueTunesLegacy } from "../db/queries/practice";
 import { dailyPracticeQueue, playlistTune, userProfile } from "../db/schema";
 import type { DailyPracticeQueue, NewDailyPracticeQueue } from "../db/types";
 import { queueSync } from "../sync/queue";
@@ -279,7 +279,7 @@ export async function generateDailyPracticeQueue(
   }
 
   // Get due tunes
-  const dueTunes = await getDueTunes(
+  const dueTunes = await getDueTunesLegacy(
     db,
     playlistId,
     sitdownDate,
