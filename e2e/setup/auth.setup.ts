@@ -2,6 +2,10 @@ import { exec } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { promisify } from "node:util";
 import { expect, test as setup } from "@playwright/test";
+import { config } from "dotenv";
+
+// Load .env.local for local development (optional, won't fail in CI)
+config({ path: ".env.local" });
 
 const execAsync = promisify(exec);
 
@@ -19,6 +23,9 @@ const AUTH_EXPIRY_MINUTES = 50; // Consider auth stale after 50 minutes (tokens 
  * 4. Saves authentication state for reuse
  */
 setup("authenticate as Alice", async ({ page }) => {
+  // Increase timeout for database reset operations (90 seconds)
+  setup.setTimeout(90000);
+
   // Check if auth file exists and is fresh
   const authExists = existsSync(authFile);
   const shouldReset = process.env.RESET_DB === "true";
@@ -66,18 +73,72 @@ setup("authenticate as Alice", async ({ page }) => {
   // For CI or clean runs: RESET_DB=true npx playwright test
   if (shouldReset) {
     console.log("⏳ Resetting database and loading test data...");
-    console.log(
-      "   Running: supabase db reset && npx tsx scripts/setup-test-environment.ts"
-    );
+    console.log("   Step 1: Running supabase db reset...");
 
     try {
-      const { stdout, stderr } = await execAsync(
-        "cd /Users/sboag/gittt/tunetrees && supabase db reset && npx tsx scripts/setup-test-environment.ts",
-        { timeout: 60000 } // 60 second timeout for database operations
+      // Step 1: Reset the database
+      const { stdout: resetStdout, stderr: resetStderr } = await execAsync(
+        "cd /Users/sboag/gittt/tunetrees && supabase db reset",
+        { timeout: 60000 }
       );
+      if (resetStdout) console.log(resetStdout);
+      if (resetStderr) console.error(resetStderr);
 
-      if (stdout) console.log(stdout);
-      if (stderr) console.error(stderr);
+      // Step 2: Wait for containers to start up
+      console.log("   Step 2: Waiting for Supabase to be ready...");
+      await new Promise((resolve) => setTimeout(resolve, 4000)); // Initial 4s wait
+
+      // Step 3: Poll supabase status until it's ready (max 30 seconds)
+      const maxAttempts = 15; // 15 attempts * 2 seconds = 30 seconds max
+      let attempt = 0;
+      let isReady = false;
+
+      while (attempt < maxAttempts && !isReady) {
+        attempt++;
+        try {
+          const { stdout: statusStdout } = await execAsync(
+            "cd /Users/sboag/gittt/tunetrees && supabase status",
+            { timeout: 5000 }
+          );
+
+          // Check if status output indicates services are running
+          if (statusStdout?.includes("API URL")) {
+            isReady = true;
+            console.log(
+              `   ✅ Supabase ready after ${attempt} attempts (${
+                4 + attempt * 2
+              }s total)`
+            );
+          }
+        } catch {
+          // Status check failed, wait and retry
+          if (attempt < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        }
+      }
+
+      if (!isReady) {
+        throw new Error(
+          "Supabase did not become ready after 30 seconds of polling"
+        );
+      }
+
+      // Step 4: Additional wait for auth service to be fully ready
+      console.log("   Step 3: Waiting for auth service...");
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // Step 5: Run setup script to create test users and data
+      console.log("   Step 4: Running setup-test-environment.ts...");
+      const { stdout: setupStdout, stderr: setupStderr } = await execAsync(
+        "cd /Users/sboag/gittt/tunetrees && npx tsx scripts/setup-test-environment.ts",
+        {
+          timeout: 30000,
+          env: process.env, // Pass through all environment variables (from .env.local or CI)
+        }
+      );
+      if (setupStdout) console.log(setupStdout);
+      if (setupStderr) console.error(setupStderr);
 
       console.log("✅ Database reset complete");
     } catch (error) {

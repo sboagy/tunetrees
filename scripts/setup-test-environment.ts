@@ -3,12 +3,29 @@
  * Runs everything needed for Playwright tests
  */
 
+import { execSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 
+/**
+ * Get the service role key from the running Supabase instance
+ */
+function getSupabaseServiceRoleKey(): string {
+  try {
+    const statusJson = execSync("supabase status --output json", {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const status = JSON.parse(statusJson);
+    return status.SERVICE_ROLE_KEY;
+  } catch {
+    throw new Error(
+      "Failed to get Supabase service role key. Make sure Supabase is running (supabase start)."
+    );
+  }
+}
+
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
-const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+const SUPABASE_SERVICE_ROLE_KEY = getSupabaseServiceRoleKey();
 
 const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || "TestPassword123!";
 
@@ -139,10 +156,13 @@ async function setup() {
       {
         playlist_ref: 9001,
         tune_ref: 9001,
+        // NOTE: scheduled (current) is NULL - tunes not yet added to review
+        // Tests can use setupPracticeScenario() to schedule tunes as needed
       },
       {
         playlist_ref: 9001,
         tune_ref: 9002,
+        // NOTE: scheduled (current) is NULL - tunes not yet added to review
       },
     ]);
 
