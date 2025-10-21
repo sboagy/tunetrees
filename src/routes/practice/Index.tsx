@@ -7,21 +7,22 @@
  * @module routes/practice/Index
  */
 
+import { and, eq, gte, lt, sql } from "drizzle-orm";
+import type { Component } from "solid-js";
 import {
-  type Component,
   createEffect,
+  createResource,
   createSignal,
   onMount,
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
-import { and, eq, gte, lt } from "drizzle-orm";
 import { TunesGridScheduled } from "../../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
 import { PracticeControlBanner } from "../../components/practice";
-import { dailyPracticeQueue } from "../../lib/db/schema";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { dailyPracticeQueue } from "../../lib/db/schema";
 import { addTunesToQueue } from "../../lib/services/practice-queue";
 import { commitStagedEvaluations } from "../../lib/services/practice-recording";
 
@@ -43,8 +44,43 @@ import { commitStagedEvaluations } from "../../lib/services/practice-recording";
  * ```
  */
 const PracticeIndex: Component = () => {
-  const { user, localDb, incrementSyncVersion } = useAuth();
+  const { user, localDb, incrementSyncVersion, syncVersion } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
+
+  // Get current user's local database ID from user_profile
+  const [userId] = createResource(
+    () => {
+      const db = localDb();
+      const currentUser = user();
+      const version = syncVersion(); // Trigger refetch on sync
+      return db && currentUser ? { db, userId: currentUser.id, version } : null;
+    },
+    async (params) => {
+      if (!params) return null;
+      const result = await params.db.all<{ id: number }>(
+        sql`SELECT id FROM user_profile WHERE supabase_user_id = ${params.userId} LIMIT 1`
+      );
+      return result[0]?.id ?? null;
+    }
+  );
+
+  // Helper to get current user ID (for non-reactive contexts)
+  const getUserId = async (): Promise<number | null> => {
+    // If userId resource is already loaded, use it
+    const id = userId();
+    if (id) return id;
+
+    // Otherwise, fetch directly
+    const db = localDb();
+    if (!db || !user()) return null;
+
+    const result = await db.all<{ id: number }>(
+      sql`SELECT id FROM user_profile WHERE supabase_user_id = ${
+        user()!.id
+      } LIMIT 1`
+    );
+    return result[0]?.id ?? null;
+  };
 
   // Track evaluations count and table instance for toolbar
   const [evaluationsCount, setEvaluationsCount] = createSignal(0);
@@ -74,8 +110,9 @@ const PracticeIndex: Component = () => {
   // Load queue date from localStorage on mount
   onMount(() => {
     const storedDate = localStorage.getItem(QUEUE_DATE_STORAGE_KEY);
-    const isManual = localStorage.getItem(QUEUE_DATE_MANUAL_FLAG_KEY) === "true";
-    
+    const isManual =
+      localStorage.getItem(QUEUE_DATE_MANUAL_FLAG_KEY) === "true";
+
     if (storedDate) {
       const parsedDate = new Date(storedDate);
       if (!Number.isNaN(parsedDate.getTime())) {
@@ -83,7 +120,7 @@ const PracticeIndex: Component = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         parsedDate.setHours(0, 0, 0, 0);
-        
+
         if (!isManual && parsedDate < today) {
           // Auto-advance to today (midnight rollover protection)
           const now = new Date();
@@ -125,7 +162,7 @@ const PracticeIndex: Component = () => {
     // TODO: Queue sync to Supabase
   };
 
-  // Handle submit evaluations
+  // Handle submit of staged evaluations
   const handleSubmitEvaluations = async () => {
     const db = localDb();
     const playlistId = currentPlaylistId();
@@ -136,9 +173,12 @@ const PracticeIndex: Component = () => {
       return;
     }
 
-    // TODO: Get actual user ID from user_profile table
-    // For now, using hardcoded user ID 1 (same as grid)
-    const userId = 1;
+    const userId = await getUserId();
+    if (!userId) {
+      console.error("Could not determine user ID");
+      toast.error("Cannot submit: User not found");
+      return;
+    }
 
     const count = evaluationsCount();
     if (count === 0) {
@@ -210,9 +250,12 @@ const PracticeIndex: Component = () => {
       return;
     }
 
-    // TODO: Get actual user ID from user_profile table
-    // For now, using hardcoded user ID 1 (same as grid)
-    const userId = 1;
+    const userId = await getUserId();
+    if (!userId) {
+      console.error("Could not determine user ID");
+      toast.error("Cannot add tunes: User not found");
+      return;
+    }
 
     console.log(
       `Adding ${count} tunes to practice queue for playlist ${playlistId}`
@@ -250,26 +293,31 @@ const PracticeIndex: Component = () => {
 
   // Handle queue date change
   const handleQueueDateChange = (date: Date, isPreview: boolean) => {
-    console.log(`Queue date changed to: ${date.toISOString()}, preview: ${isPreview}`);
-    
+    console.log(
+      `Queue date changed to: ${date.toISOString()}, preview: ${isPreview}`
+    );
+
     // Set to noon to avoid timezone issues
     const dateAtNoon = new Date(date);
     dateAtNoon.setHours(12, 0, 0, 0);
-    
+
     setQueueDate(dateAtNoon);
-    
+
     // Set manual flag if not today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const selectedDay = new Date(dateAtNoon);
     selectedDay.setHours(0, 0, 0, 0);
-    
+
     const isToday = selectedDay.getTime() === today.getTime();
-    localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, isToday ? "false" : "true");
-    
+    localStorage.setItem(
+      QUEUE_DATE_MANUAL_FLAG_KEY,
+      isToday ? "false" : "true"
+    );
+
     // Trigger grid refresh
     incrementSyncVersion();
-    
+
     // Show appropriate message
     const dateStr = dateAtNoon.toLocaleDateString();
     if (isPreview) {
@@ -292,7 +340,12 @@ const PracticeIndex: Component = () => {
       return;
     }
 
-    const userId = 1; // TODO: Get from user_profile
+    const userId = await getUserId();
+    if (!userId) {
+      console.error("Could not determine user ID");
+      toast.error("Cannot reset queue: User not found");
+      return;
+    }
 
     console.log(`Resetting active queue for playlist ${playlistId}`);
 
@@ -360,10 +413,10 @@ const PracticeIndex: Component = () => {
           }
         >
           {/* Use a derivation to get the stable number value */}
-          <Show when={currentPlaylistId()}>
+          <Show when={currentPlaylistId() && userId()}>
             {(playlistId) => (
               <TunesGridScheduled
-                userId={1} // TODO: Get actual user ID from user_profile
+                userId={userId()!}
                 playlistId={playlistId()}
                 tablePurpose="scheduled"
                 onRecallEvalChange={handleRecallEvalChange}
