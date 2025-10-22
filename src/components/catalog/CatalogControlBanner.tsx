@@ -18,21 +18,21 @@
  */
 
 import { useNavigate } from "@solidjs/router";
+import type { Table } from "@tanstack/solid-table";
 import type { Component } from "solid-js";
 import { createEffect, createSignal } from "solid-js";
-import type { Table } from "@tanstack/solid-table";
+import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb } from "../../lib/db/client-sqlite";
 import { addTunesToPlaylist } from "../../lib/db/queries/playlists";
 import type { PlaylistWithSummary } from "../../lib/db/types";
-import { useAuth } from "../../lib/auth/AuthContext";
 import {
   TOOLBAR_BUTTON_BASE,
   TOOLBAR_BUTTON_DANGER,
   TOOLBAR_BUTTON_NEUTRAL,
   TOOLBAR_BUTTON_SUCCESS,
 } from "../grids/shared-toolbar-styles";
-import { CombinedFilterDropdown } from "./CombinedFilterDropdown";
 import type { ITuneOverview } from "../grids/types";
+import { CombinedFilterDropdown } from "./CombinedFilterDropdown";
 
 export interface CatalogToolbarProps {
   /** Search query */
@@ -136,10 +136,14 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
       // Show feedback
       let message = "";
       if (result.added > 0) {
-        message += `Added ${result.added} tune${result.added > 1 ? "s" : ""} to repertoire.`;
+        message += `Added ${result.added} tune${
+          result.added > 1 ? "s" : ""
+        } to repertoire.`;
       }
       if (result.skipped > 0) {
-        message += ` ${result.skipped} tune${result.skipped > 1 ? "s were" : " was"} already in repertoire.`;
+        message += ` ${result.skipped} tune${
+          result.skipped > 1 ? "s were" : " was"
+        } already in repertoire.`;
       }
       alert(message || "No tunes were added.");
 
@@ -150,7 +154,11 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
     } catch (error) {
       console.error("Error adding tunes to repertoire:", error);
       alert(
-        `Error: ${error instanceof Error ? error.message : "Failed to add tunes to repertoire"}`
+        `Error: ${
+          error instanceof Error
+            ? error.message
+            : "Failed to add tunes to repertoire"
+        }`
       );
     }
   };

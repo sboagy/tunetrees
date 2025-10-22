@@ -21,10 +21,10 @@ import { useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, Show } from "solid-js";
+import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb } from "../../lib/db/client-sqlite";
 import { addTunesToPlaylist } from "../../lib/db/queries/playlists";
 import type { PlaylistWithSummary } from "../../lib/db/types";
-import { useAuth } from "../../lib/auth/AuthContext";
 import {
   TOOLBAR_BUTTON_BASE,
   TOOLBAR_BUTTON_DANGER,
@@ -39,9 +39,9 @@ import {
   TOOLBAR_SEARCH_ICON,
   TOOLBAR_SEARCH_INPUT,
 } from "../grids/shared-toolbar-styles";
+import type { ITuneOverview } from "../grids/types";
 import { ColumnVisibilityMenu } from "./ColumnVisibilityMenu";
 import { FilterPanel } from "./FilterPanel";
-import type { ITuneOverview } from "../grids/types";
 
 export interface CatalogToolbarProps {
   /** Search query */
@@ -83,6 +83,7 @@ export interface CatalogToolbarProps {
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const navigate = useNavigate();
   const auth = useAuth();
+  const { incrementSyncVersion } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
@@ -146,21 +147,32 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
       // Show feedback
       let message = "";
       if (result.added > 0) {
-        message += `Added ${result.added} tune${result.added > 1 ? "s" : ""} to repertoire.`;
+        message += `Added ${result.added} tune${
+          result.added > 1 ? "s" : ""
+        } to repertoire.`;
       }
       if (result.skipped > 0) {
-        message += ` ${result.skipped} tune${result.skipped > 1 ? "s were" : " was"} already in repertoire.`;
+        message += ` ${result.skipped} tune${
+          result.skipped > 1 ? "s were" : " was"
+        } already in repertoire.`;
       }
       alert(message || "No tunes were added.");
 
       // Clear selection
       props.table.resetRowSelection();
 
+      // Trigger sync to refresh UI
+      incrementSyncVersion();
+
       console.log("Add to repertoire completed:", result);
     } catch (error) {
       console.error("Error adding tunes to repertoire:", error);
       alert(
-        `Error: ${error instanceof Error ? error.message : "Failed to add tunes to repertoire"}`
+        `Error: ${
+          error instanceof Error
+            ? error.message
+            : "Failed to add tunes to repertoire"
+        }`
       );
     }
   };

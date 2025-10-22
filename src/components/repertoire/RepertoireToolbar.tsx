@@ -24,6 +24,7 @@ import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { getDb } from "../../lib/db/client-sqlite";
 import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
+import { useAuth } from "../../lib/auth/AuthContext";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
 import {
@@ -78,6 +79,7 @@ export interface RepertoireToolbarProps {
 
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   const navigate = useNavigate();
+  const { incrementSyncVersion } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
@@ -118,21 +120,32 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       // Show feedback
       let message = "";
       if (result.added > 0) {
-        message += `Added ${result.added} tune${result.added > 1 ? "s" : ""} to practice queue.`;
+        message += `Added ${result.added} tune${
+          result.added > 1 ? "s" : ""
+        } to practice queue.`;
       }
       if (result.skipped > 0) {
-        message += ` ${result.skipped} tune${result.skipped > 1 ? "s were" : " was"} already scheduled.`;
+        message += ` ${result.skipped} tune${
+          result.skipped > 1 ? "s were" : " was"
+        } already scheduled.`;
       }
       alert(message || "No tunes were added.");
 
       // Clear selection
       props.table.resetRowSelection();
 
+      // Trigger sync to refresh UI
+      incrementSyncVersion();
+
       console.log("Add to review completed:", result);
     } catch (error) {
       console.error("Error adding tunes to practice queue:", error);
       alert(
-        `Error: ${error instanceof Error ? error.message : "Failed to add tunes to practice queue"}`
+        `Error: ${
+          error instanceof Error
+            ? error.message
+            : "Failed to add tunes to practice queue"
+        }`
       );
     }
   };

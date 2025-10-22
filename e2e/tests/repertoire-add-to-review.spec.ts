@@ -20,7 +20,7 @@
  * (scheduled timestamp and practice_record creation) rather than queue display.
  */
 
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Repertoire: Add To Review", () => {
   test.beforeEach(async ({ page }) => {
@@ -154,7 +154,9 @@ test.describe("Repertoire: Add To Review", () => {
     expect(dialogMessage).toMatch(/Added \d+ tunes? to practice queue/);
   });
 
-  test("should verify console logs for database operation", async ({ page }) => {
+  test("should verify console logs for database operation", async ({
+    page,
+  }) => {
     // Set up console message listener
     const consoleLogs: string[] = [];
     page.on("console", (msg) => {

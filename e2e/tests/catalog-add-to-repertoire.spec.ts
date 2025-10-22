@@ -17,7 +17,7 @@
  * - Multiple tunes selected (batch operation)
  */
 
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Catalog: Add To Repertoire", () => {
   test.beforeEach(async ({ page }) => {
@@ -60,7 +60,9 @@ test.describe("Catalog: Add To Repertoire", () => {
 
     // Find tunes NOT already in repertoire by checking a few
     // We'll select "A Fig for a Kiss" (ID 3497) and "Alasdruim's March" (ID 54)
-    const tune1Checkbox = page.getByRole("checkbox", { name: "Select row 3497" });
+    const tune1Checkbox = page.getByRole("checkbox", {
+      name: "Select row 3497",
+    });
     const tune2Checkbox = page.getByRole("checkbox", { name: "Select row 54" });
 
     await tune1Checkbox.check();
@@ -94,13 +96,17 @@ test.describe("Catalog: Add To Repertoire", () => {
     await page.waitForTimeout(1000);
 
     // Verify tunes appear in repertoire grid
-    await expect(page.getByRole("link", { name: "A Fig for a Kiss" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "A Fig for a Kiss" })
+    ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Alasdruim's March (Rolling Wave 2)" })
     ).toBeVisible();
 
     // Verify tune count increased
-    const repertoireCount = await page.getByText(/\d+ tunes in repertoire/).textContent();
+    const repertoireCount = await page
+      .getByText(/\d+ tunes in repertoire/)
+      .textContent();
     expect(repertoireCount).toBeTruthy();
     const count = Number.parseInt(repertoireCount?.match(/\d+/)?.[0] || "0");
     expect(count).toBeGreaterThanOrEqual(2);
@@ -132,13 +138,17 @@ test.describe("Catalog: Add To Repertoire", () => {
     expect(dialogMessage).toMatch(/already in repertoire|No tunes were added/);
   });
 
-  test("should handle batch add with mix of new and existing tunes", async ({ page }) => {
+  test("should handle batch add with mix of new and existing tunes", async ({
+    page,
+  }) => {
     // Navigate to Catalog tab
     await page.getByTestId("tab-catalog").click();
     await page.waitForTimeout(500);
 
     // Select first two tunes using nth() to avoid specific ID lookups
-    const checkboxes = page.locator('input[type="checkbox"][aria-label^="Select row"]');
+    const checkboxes = page.locator(
+      'input[type="checkbox"][aria-label^="Select row"]'
+    );
     await checkboxes.nth(0).check();
     await page.waitForTimeout(300); // Wait for grid to stabilize
     await checkboxes.nth(1).check();
