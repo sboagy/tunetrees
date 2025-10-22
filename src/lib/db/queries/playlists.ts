@@ -635,3 +635,71 @@ export async function getPlaylistTunesStaged(
 
   return result;
 }
+
+/**
+ * Add multiple tunes to playlist
+ *
+ * Batch version of addTuneToPlaylist for adding multiple tunes at once.
+ * Useful for "Add To Repertoire" button on Catalog tab.
+ *
+ * @param db - SQLite database instance
+ * @param playlistId - Playlist ID
+ * @param tuneIds - Array of tune IDs to add
+ * @param userId - User's Supabase UUID (for ownership check)
+ * @returns Object with counts of added and skipped tunes
+ *
+ * @example
+ * ```typescript
+ * const result = await addTunesToPlaylist(db, 1, [123, 456, 789], 'user-uuid');
+ * console.log(`Added ${result.added} tunes, skipped ${result.skipped} (already in playlist)`);
+ * ```
+ */
+export async function addTunesToPlaylist(
+  db: SqliteDatabase,
+  playlistId: number,
+  tuneIds: number[],
+  userId: string
+): Promise<{ added: number; skipped: number; tuneIds: number[] }> {
+  // Verify playlist ownership
+  const playlistRecord = await getPlaylistById(db, playlistId, userId);
+  if (!playlistRecord) {
+    throw new Error("Playlist not found or access denied");
+  }
+
+  let added = 0;
+  let skipped = 0;
+  const addedTuneIds: number[] = [];
+
+  for (const tuneId of tuneIds) {
+    try {
+      // Check if already exists
+      const existing = await db
+        .select()
+        .from(playlistTune)
+        .where(
+          and(
+            eq(playlistTune.playlistRef, playlistId),
+            eq(playlistTune.tuneRef, tuneId)
+          )
+        )
+        .limit(1);
+
+      if (existing && existing.length > 0 && existing[0].deleted === 0) {
+        // Already in playlist and not deleted
+        skipped++;
+        continue;
+      }
+
+      // Add the tune (or undelete if it was deleted)
+      await addTuneToPlaylist(db, playlistId, tuneId, userId);
+      added++;
+      addedTuneIds.push(tuneId);
+    } catch (error) {
+      console.error(`Error adding tune ${tuneId} to playlist:`, error);
+      skipped++;
+    }
+  }
+
+  return { added, skipped, tuneIds: addedTuneIds };
+}
+

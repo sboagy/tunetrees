@@ -21,7 +21,10 @@ import { useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, Show } from "solid-js";
+import { getDb } from "../../lib/db/client-sqlite";
+import { addTunesToPlaylist } from "../../lib/db/queries/playlists";
 import type { PlaylistWithSummary } from "../../lib/db/types";
+import { useAuth } from "../../lib/auth/AuthContext";
 import {
   TOOLBAR_BUTTON_BASE,
   TOOLBAR_BUTTON_DANGER,
@@ -38,6 +41,7 @@ import {
 } from "../grids/shared-toolbar-styles";
 import { ColumnVisibilityMenu } from "./ColumnVisibilityMenu";
 import { FilterPanel } from "./FilterPanel";
+import type { ITuneOverview } from "../grids/types";
 
 export interface CatalogToolbarProps {
   /** Search query */
@@ -70,12 +74,15 @@ export interface CatalogToolbarProps {
   availablePlaylists: PlaylistWithSummary[];
   /** Selected rows count for Delete button state */
   selectedRowsCount?: number;
-  /** Table instance for column visibility control */
-  table?: Table<any>;
+  /** Table instance for column visibility control and row selection */
+  table?: Table<ITuneOverview>;
+  /** Playlist ID for adding tunes to repertoire */
+  playlistId?: number;
 }
 
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
@@ -100,8 +107,62 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
     }
   });
 
-  const handleAddToRepertoire = () => {
-    alert("Add To Repertoire - Not yet implemented");
+  const handleAddToRepertoire = async () => {
+    try {
+      // Validation
+      if (!props.table) {
+        alert("Table not initialized");
+        return;
+      }
+      if (!props.playlistId) {
+        alert("No active playlist selected");
+        return;
+      }
+      if (!auth.user()) {
+        alert("User not authenticated");
+        return;
+      }
+
+      // Get selected rows
+      const selectedRows = props.table.getSelectedRowModel().rows;
+      if (selectedRows.length === 0) {
+        alert("No tunes selected. Please select tunes to add to repertoire.");
+        return;
+      }
+
+      // Extract tune IDs
+      const tuneIds = selectedRows.map((row) => row.original.id);
+      console.log(`Adding ${tuneIds.length} tunes to repertoire:`, tuneIds);
+
+      // Call database function
+      const db = getDb();
+      const result = await addTunesToPlaylist(
+        db,
+        props.playlistId,
+        tuneIds,
+        auth.user()!.id
+      );
+
+      // Show feedback
+      let message = "";
+      if (result.added > 0) {
+        message += `Added ${result.added} tune${result.added > 1 ? "s" : ""} to repertoire.`;
+      }
+      if (result.skipped > 0) {
+        message += ` ${result.skipped} tune${result.skipped > 1 ? "s were" : " was"} already in repertoire.`;
+      }
+      alert(message || "No tunes were added.");
+
+      // Clear selection
+      props.table.resetRowSelection();
+
+      console.log("Add to repertoire completed:", result);
+    } catch (error) {
+      console.error("Error adding tunes to repertoire:", error);
+      alert(
+        `Error: ${error instanceof Error ? error.message : "Failed to add tunes to repertoire"}`
+      );
+    }
   };
 
   const handleAddTune = () => {

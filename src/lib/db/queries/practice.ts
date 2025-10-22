@@ -654,6 +654,109 @@ export async function getPracticeHistory(
 }
 
 /**
+ * Add tunes to practice queue ("Add To Review" from Repertoire)
+ *
+ * For selected repertoire tunes, this function:
+ * 1. Sets the scheduled date to now (makes them immediately available for practice)
+ * 2. Creates initial practice records if they don't exist
+ *
+ * This is the client-side equivalent of the legacy Python function:
+ * `add_tunes_to_practice_queue` in tunetrees/app/queries.py
+ *
+ * @param db - SQLite database instance
+ * @param playlistId - Playlist ID
+ * @param tuneIds - Array of tune IDs to add to practice queue
+ * @returns Object with counts of added and skipped tunes
+ *
+ * @example
+ * ```typescript
+ * const result = await addTunesToPracticeQueue(db, 1, [123, 456]);
+ * console.log(`Added ${result.added} tunes to practice queue`);
+ * ```
+ */
+export async function addTunesToPracticeQueue(
+  db: SqliteDatabase,
+  playlistId: number,
+  tuneIds: number[]
+): Promise<{ added: number; skipped: number; tuneIds: number[] }> {
+  const now = new Date().toISOString();
+  let added = 0;
+  let skipped = 0;
+  const addedTuneIds: number[] = [];
+
+  for (const tuneId of tuneIds) {
+    try {
+      // Update playlist_tune.scheduled to make tune immediately available
+      const result = await db
+        .update(playlistTune)
+        .set({
+          scheduled: now,
+          syncVersion: sql`${playlistTune.syncVersion} + 1`,
+          lastModifiedAt: now,
+        })
+        .where(
+          and(
+            eq(playlistTune.playlistRef, playlistId),
+            eq(playlistTune.tuneRef, tuneId),
+            eq(playlistTune.deleted, 0)
+          )
+        )
+        .returning();
+
+      if (result && result.length > 0) {
+        added++;
+        addedTuneIds.push(tuneId);
+
+        // Check if practice record exists
+        const existing = await db
+          .select()
+          .from(practiceRecord)
+          .where(
+            and(
+              eq(practiceRecord.playlistRef, playlistId),
+              eq(practiceRecord.tuneRef, tuneId)
+            )
+          )
+          .limit(1);
+
+        // If no practice record exists, create an initial one (state=0, New)
+        if (!existing || existing.length === 0) {
+          await db.insert(practiceRecord).values({
+            playlistRef: playlistId,
+            tuneRef: tuneId,
+            practiced: null,
+            quality: null,
+            easiness: null,
+            difficulty: 0,
+            stability: null,
+            interval: null,
+            step: null,
+            repetitions: 0,
+            lapses: 0,
+            elapsedDays: 0,
+            state: 0, // State 0 = New
+            due: null,
+            backupPracticed: null,
+            goal: "recall",
+            technique: null,
+            syncVersion: 1,
+            lastModifiedAt: now,
+            deviceId: "local",
+          });
+        }
+      } else {
+        skipped++;
+      }
+    } catch (error) {
+      console.error(`Error adding tune ${tuneId} to practice queue:`, error);
+      skipped++;
+    }
+  }
+
+  return { added, skipped, tuneIds: addedTuneIds };
+}
+
+/**
  * Get all practice records for a playlist
  *
  * Retrieves practice history for all tunes in a playlist.

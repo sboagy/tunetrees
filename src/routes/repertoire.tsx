@@ -252,6 +252,7 @@ const RepertoirePage: Component = () => {
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
           onRemoveFromRepertoire={handleRemoveFromRepertoire}
+          playlistId={currentPlaylistId() || undefined}
         />
       </Show>
 

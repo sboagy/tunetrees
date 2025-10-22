@@ -273,6 +273,7 @@ const CatalogPage: Component = () => {
           availablePlaylists={userPlaylists() || []}
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
+          playlistId={currentPlaylistId() || undefined}
         />
       </Show>
 

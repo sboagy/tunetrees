@@ -22,6 +22,8 @@ import { useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
+import { getDb } from "../../lib/db/client-sqlite";
+import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
 import {
@@ -39,6 +41,7 @@ import {
   TOOLBAR_SEARCH_ICON,
   TOOLBAR_SEARCH_INPUT,
 } from "../grids/shared-toolbar-styles";
+import type { ITuneOverview } from "../grids/types";
 
 export interface RepertoireToolbarProps {
   /** Search query */
@@ -65,10 +68,12 @@ export interface RepertoireToolbarProps {
   availableGenres: string[];
   /** Selected rows count for Remove/Delete button state */
   selectedRowsCount?: number;
-  /** Table instance for column visibility control */
-  table?: Table<any>;
+  /** Table instance for column visibility control and row selection */
+  table?: Table<ITuneOverview>;
   /** Handler for Remove From Repertoire action */
   onRemoveFromRepertoire?: () => void;
+  /** Playlist ID for adding tunes to practice queue */
+  playlistId?: number;
 }
 
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
@@ -77,8 +82,59 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
 
-  const handleAddToReview = () => {
-    alert("Add To Review - Not yet implemented");
+  const handleAddToReview = async () => {
+    try {
+      // Validation
+      if (!props.table) {
+        alert("Table not initialized");
+        return;
+      }
+      if (!props.playlistId) {
+        alert("No active playlist selected");
+        return;
+      }
+
+      // Get selected rows
+      const selectedRows = props.table.getSelectedRowModel().rows;
+      if (selectedRows.length === 0) {
+        alert(
+          "No tunes selected. Please select tunes to add to practice queue."
+        );
+        return;
+      }
+
+      // Extract tune IDs
+      const tuneIds = selectedRows.map((row) => row.original.id);
+      console.log(`Adding ${tuneIds.length} tunes to practice queue:`, tuneIds);
+
+      // Call database function
+      const db = getDb();
+      const result = await addTunesToPracticeQueue(
+        db,
+        props.playlistId,
+        tuneIds
+      );
+
+      // Show feedback
+      let message = "";
+      if (result.added > 0) {
+        message += `Added ${result.added} tune${result.added > 1 ? "s" : ""} to practice queue.`;
+      }
+      if (result.skipped > 0) {
+        message += ` ${result.skipped} tune${result.skipped > 1 ? "s were" : " was"} already scheduled.`;
+      }
+      alert(message || "No tunes were added.");
+
+      // Clear selection
+      props.table.resetRowSelection();
+
+      console.log("Add to review completed:", result);
+    } catch (error) {
+      console.error("Error adding tunes to practice queue:", error);
+      alert(
+        `Error: ${error instanceof Error ? error.message : "Failed to add tunes to practice queue"}`
+      );
+    }
   };
 
   const handleAddTune = () => {
