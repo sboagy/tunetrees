@@ -84,11 +84,10 @@ test.describe("Repertoire: Add To Review", () => {
     // Verify success message
     expect(dialogMessage).toMatch(/Added \d+ tunes? to practice queue/);
 
-    // Verify selection was cleared
-    const removeButton = page.getByRole("button", {
-      name: /Remove From Repertoire/i,
+    // Verify selection was cleared by checking selection count disappeared
+    await expect(page.getByText(/\d+ tunes? selected/)).not.toBeVisible({
+      timeout: 3000,
     });
-    await expect(removeButton).toBeDisabled();
   });
 
   test("should handle multiple tunes selection", async ({ page }) => {
