@@ -44,7 +44,8 @@ import { commitStagedEvaluations } from "../../lib/services/practice-recording";
  * ```
  */
 const PracticeIndex: Component = () => {
-  const { user, localDb, incrementSyncVersion, syncVersion } = useAuth();
+  const { user, localDb, incrementSyncVersion, forceSyncUp, syncVersion } =
+    useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
 
   // Get current user's local database ID from user_profile
@@ -205,6 +206,10 @@ const PracticeIndex: Component = () => {
           }
         );
 
+        // Force sync up to Supabase BEFORE triggering UI refresh
+        console.log("🔄 [CommitEvaluations] Syncing changes to Supabase...");
+        await forceSyncUp();
+
         // Clear evaluations in grid
         if (clearEvaluationsCallback) {
           clearEvaluationsCallback();
@@ -212,6 +217,9 @@ const PracticeIndex: Component = () => {
 
         // Reset count
         setEvaluationsCount(0);
+
+        // Trigger grid refresh
+        incrementSyncVersion();
 
         console.log(
           `✅ Submit complete: ${result.count} evaluations committed`
@@ -271,6 +279,10 @@ const PracticeIndex: Component = () => {
             duration: 3000,
           }
         );
+
+        // Force sync up to Supabase BEFORE triggering UI refresh
+        console.log("🔄 [AddTunesToQueue] Syncing changes to Supabase...");
+        await forceSyncUp();
 
         // Trigger grid refresh
         incrementSyncVersion();
@@ -371,6 +383,10 @@ const PracticeIndex: Component = () => {
 
       toast.success("Queue reset successfully. It will be regenerated.");
       console.log(`✅ Queue reset complete`);
+
+      // Force sync up to Supabase BEFORE triggering UI refresh
+      console.log("🔄 [QueueReset] Syncing changes to Supabase...");
+      await forceSyncUp();
 
       // Trigger grid refresh to regenerate queue
       incrementSyncVersion();

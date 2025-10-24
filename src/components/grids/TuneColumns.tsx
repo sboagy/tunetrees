@@ -103,7 +103,7 @@ export function getCatalogColumns(
           disabled={!row.getCanSelect()}
           onChange={row.getToggleSelectedHandler()}
           class="w-4 h-4 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={`Select row ${row.id}`}
+          aria-label={`Select row ${row.original?.id ?? row.id}`}
           onClick={(e) => e.stopPropagation()}
         />
       ),

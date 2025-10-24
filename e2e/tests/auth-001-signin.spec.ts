@@ -21,7 +21,7 @@ test.describe("AUTH-001: User Authentication", () => {
     await context.clearCookies();
   });
 
-  test("should redirect to login page when not authenticated", async ({
+  test("should redirect to login page when not authenticated @side-effects", async ({
     page,
   }) => {
     // Navigate to root and clear storage

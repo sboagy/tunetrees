@@ -18,6 +18,7 @@
  */
 
 import { and, eq, sql } from "drizzle-orm";
+import { queueSync } from "../../sync";
 import type { SqliteDatabase } from "../client-sqlite";
 import {
   instrument,
@@ -442,8 +443,14 @@ export async function addTuneToPlaylist(
     throw new Error("Failed to add tune to playlist");
   }
 
-  // Queue for sync
-  // await queueSync(db, 'playlist_tune', `${playlistId}-${tuneId}`, 'insert');
+  // Queue for sync with the full row data
+  await queueSync(
+    db,
+    "playlist_tune",
+    `${playlistId}-${tuneId}`,
+    "insert",
+    result[0]
+  );
 
   return result[0];
 }

@@ -33,6 +33,7 @@ import {
   createResource,
   createSignal,
   For,
+  onCleanup,
   onMount,
   Show,
 } from "solid-js";
@@ -80,7 +81,35 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   const [sorting, setSorting] = createSignal<SortingState>(
     initialState.sorting || []
   );
-  const [rowSelection, setRowSelection] = createSignal<RowSelectionState>({});
+
+  // Load row selection from localStorage on mount
+  const SELECTION_STORAGE_KEY = `TT_CATALOG_SELECTION_${props.userId || 0}`;
+  const loadRowSelection = (): RowSelectionState => {
+    try {
+      const stored = localStorage.getItem(SELECTION_STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored) as RowSelectionState;
+      }
+    } catch (error) {
+      console.warn("Failed to load row selection from localStorage:", error);
+    }
+    return {};
+  };
+
+  const [rowSelection, setRowSelection] = createSignal<RowSelectionState>(
+    loadRowSelection()
+  );
+
+  // Persist row selection to localStorage on change
+  createEffect(() => {
+    const selection = rowSelection();
+    try {
+      localStorage.setItem(SELECTION_STORAGE_KEY, JSON.stringify(selection));
+    } catch (error) {
+      console.warn("Failed to save row selection to localStorage:", error);
+    }
+  });
+
   const [columnSizing, setColumnSizing] = createSignal<ColumnSizingState>(
     initialState.columnSizing || {}
   );
@@ -464,11 +493,81 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     document.removeEventListener("touchend", handleTouchEnd);
   };
 
-  // Restore scroll position
+  // Restore and persist scroll position
+  const SCROLL_STORAGE_KEY = `TT_CATALOG_SCROLL_${props.userId || 0}`;
+
+  // Setup scroll persistence after mount (containerRef is assigned by then)
   onMount(() => {
-    if (containerRef && initialState.scrollTop) {
-      containerRef.scrollTop = initialState.scrollTop;
-    }
+    // Poll for containerRef to be available (ref callback timing varies)
+    const waitForRef = () => {
+      if (!containerRef) {
+        requestAnimationFrame(waitForRef);
+        return;
+      }
+
+      // Wait for grid to be fully rendered before restoring scroll
+      let retryCount = 0;
+      const MAX_RETRIES = 60; // ~1 second at 60fps
+      const restoreScroll = () => {
+        if (!containerRef) {
+          console.warn("[TunesGridCatalog] containerRef lost during restore");
+          return;
+        }
+
+        if (containerRef.scrollHeight <= containerRef.clientHeight) {
+          retryCount++;
+          if (retryCount < MAX_RETRIES) {
+            requestAnimationFrame(restoreScroll);
+          } else {
+            console.warn(
+              "[TunesGridCatalog] Max retries reached, grid still not scrollable"
+            );
+          }
+          return;
+        }
+
+        // Restore scroll position from localStorage (higher priority than initialState)
+        try {
+          const stored = localStorage.getItem(SCROLL_STORAGE_KEY);
+          if (stored && containerRef) {
+            containerRef.scrollTop = Number.parseInt(stored, 10);
+          } else if (initialState.scrollTop && containerRef) {
+            containerRef.scrollTop = initialState.scrollTop;
+          }
+        } catch (error) {
+          console.warn("Failed to restore scroll position:", error);
+        }
+      };
+
+      restoreScroll();
+
+      // Persist scroll position on scroll (debounced)
+      let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+      const handleScroll = () => {
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          if (containerRef) {
+            try {
+              localStorage.setItem(
+                SCROLL_STORAGE_KEY,
+                String(containerRef.scrollTop)
+              );
+            } catch (error) {
+              console.warn("Failed to save scroll position:", error);
+            }
+          }
+        }, 300); // Debounce 300ms
+      };
+
+      containerRef.addEventListener("scroll", handleScroll);
+
+      // Cleanup on unmount
+      onCleanup(() => {
+        containerRef?.removeEventListener("scroll", handleScroll);
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+      });
+    };
+    waitForRef();
   });
 
   // Handle row click
@@ -683,9 +782,8 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
                     <tr
                       class={ROW_CLASSES}
                       classList={{
-                        get ["border-t-2 border-b-2 border-blue-500"]() {
-                          return currentTuneId() === row.original.id;
-                        },
+                        "border-t-2 border-b-2 border-blue-500":
+                          currentTuneId() === row.original.id,
                       }}
                       onClick={() => handleRowClick(row.original)}
                       data-index={virtualRow.index}

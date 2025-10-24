@@ -32,6 +32,8 @@ import {
   createResource,
   createSignal,
   For,
+  onCleanup,
+  onMount,
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
@@ -310,8 +312,14 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     console.log(`Tune ${tuneId} recall eval changed to: ${evaluation}`);
 
     // Update local state to trigger immediate re-render
-    // Store empty string explicitly when "(not set)" is selected
-    setEvaluations((prev) => ({ ...prev, [tuneId]: evaluation }));
+    // Remove key entirely when "(not set)" is selected, otherwise store value
+    setEvaluations((prev) => {
+      if (evaluation === "") {
+        const { [tuneId]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [tuneId]: evaluation };
+    });
 
     // Stage to table_transient_data for FSRS preview, or clear if "(not set)"
     const db = localDb();
@@ -359,6 +367,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
 
   // Notify parent of evaluations count changes
   createEffect(() => {
+    // Count keys in evaluations (empty evaluations are removed from object)
     const count = Object.keys(evaluations()).length;
     if (props.onEvaluationsCountChange) {
       props.onEvaluationsCountChange(count);
@@ -442,6 +451,86 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
       overscan: 10,
     })
   );
+
+  // Restore and persist scroll position
+  const SCROLL_STORAGE_KEY = `TT_PRACTICE_SCROLL_${props.userId || 0}`;
+
+  // Setup scroll persistence after mount (containerRef is assigned by then)
+  onMount(() => {
+    // Poll for containerRef to be available (ref callback timing varies)
+    const waitForRef = () => {
+      if (!containerRef) {
+        requestAnimationFrame(waitForRef);
+        return;
+      }
+
+      // Wait for grid to be fully rendered before restoring scroll
+      let retryCount = 0;
+      const MAX_RETRIES = 60; // ~1 second at 60fps
+      const restoreScroll = () => {
+        if (!containerRef) {
+          console.warn("[TunesGridScheduled] containerRef lost during restore");
+          return;
+        }
+
+        if (containerRef.scrollHeight <= containerRef.clientHeight) {
+          retryCount++;
+          if (retryCount < MAX_RETRIES) {
+            requestAnimationFrame(restoreScroll);
+          } else {
+            console.warn(
+              "[TunesGridScheduled] Max retries reached, grid still not scrollable"
+            );
+          }
+          return;
+        }
+
+        // Restore scroll position from localStorage (higher priority than initialState)
+        try {
+          const stored = localStorage.getItem(SCROLL_STORAGE_KEY);
+          if (stored && containerRef) {
+            containerRef.scrollTop = Number.parseInt(stored, 10);
+          } else if (initialState.scrollTop && containerRef) {
+            containerRef.scrollTop = initialState.scrollTop;
+          }
+        } catch (error) {
+          console.warn("Failed to restore scroll position:", error);
+        }
+      };
+
+      restoreScroll();
+
+      // Persist scroll position on scroll (debounced)
+      let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+      const handleScroll = () => {
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          if (containerRef) {
+            try {
+              localStorage.setItem(
+                SCROLL_STORAGE_KEY,
+                String(containerRef.scrollTop)
+              );
+            } catch (error) {
+              console.warn(
+                "Failed to save scroll position to localStorage:",
+                error
+              );
+            }
+          }
+        }, 300); // Debounce 300ms
+      };
+
+      containerRef.addEventListener("scroll", handleScroll);
+
+      // Cleanup on unmount
+      onCleanup(() => {
+        containerRef?.removeEventListener("scroll", handleScroll);
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+      });
+    };
+    waitForRef();
+  });
 
   // Persist state on changes
   createEffect(() => {
@@ -530,7 +619,9 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
 
       {/* Table Container */}
       <div
-        ref={containerRef}
+        ref={(el) => {
+          containerRef = el;
+        }}
         class={CONTAINER_CLASSES}
         style={{ position: "relative", "touch-action": "pan-x pan-y" }}
       >

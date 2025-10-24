@@ -1,0 +1,213 @@
+/**
+ * Test API (browser-exposed) for fast, deterministic E2E setup
+ *
+ * Provides helpers to seed local SQLite (sql.js) directly during Playwright tests,
+ * bypassing slow remote DB resets. Attached as window.__ttTestApi.
+ */
+
+import { and, desc, eq, sql } from "drizzle-orm";
+import {
+  getDb,
+  initializeDb,
+  type SqliteDatabase,
+} from "@/lib/db/client-sqlite";
+import {
+  dailyPracticeQueue,
+  playlistTune,
+  practiceRecord,
+} from "@/lib/db/schema";
+import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
+import { supabase } from "@/lib/supabase/client";
+
+type SeedAddToReviewInput = {
+  playlistId: number;
+  tuneIds: number[];
+  // Optional explicit user id (user_profile.id). If omitted, we will
+  // resolve from current Supabase session via user_profile lookup.
+  userIdInt?: number;
+};
+
+async function ensureDb(): Promise<SqliteDatabase> {
+  try {
+    return getDb();
+  } catch {
+    return await initializeDb();
+  }
+}
+
+async function resolveUserIdInt(db: SqliteDatabase): Promise<number> {
+  // Try to fetch current auth user from Supabase and map to user_profile.id
+  const { data } = await supabase.auth.getUser();
+  const userId = data.user?.id;
+  if (!userId) throw new Error("No authenticated user in test session");
+
+  const result = await db.all<{ id: number }>(
+    sql`SELECT id FROM user_profile WHERE supabase_user_id = ${userId} LIMIT 1`
+  );
+  const id = result[0]?.id;
+  if (!id) throw new Error("user_profile row not found for current user");
+  return id;
+}
+
+async function seedAddToReview(input: SeedAddToReviewInput) {
+  const db = await ensureDb();
+  const now = new Date().toISOString().replace("T", " ").substring(0, 19);
+
+  const userRef =
+    typeof input.userIdInt === "number"
+      ? input.userIdInt
+      : await resolveUserIdInt(db);
+
+  // 1) Update playlist_tune.scheduled for provided tuneIds
+  let updated = 0;
+  for (const tuneId of input.tuneIds) {
+    const res = await db
+      .update(playlistTune)
+      .set({
+        scheduled: now,
+        syncVersion: sql`${playlistTune.syncVersion} + 1`,
+        lastModifiedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(playlistTune.playlistRef, input.playlistId),
+          eq(playlistTune.tuneRef, tuneId),
+          eq(playlistTune.deleted, 0)
+        )
+      )
+      .returning();
+    if (res && res.length > 0) updated++;
+  }
+
+  // 2) Ensure practice_record exists for each tune
+  for (const tuneId of input.tuneIds) {
+    const existing = await db
+      .select()
+      .from(practiceRecord)
+      .where(
+        and(
+          eq(practiceRecord.playlistRef, input.playlistId),
+          eq(practiceRecord.tuneRef, tuneId)
+        )
+      )
+      .limit(1);
+
+    if (!existing || existing.length === 0) {
+      await db
+        .insert(practiceRecord)
+        .values({
+          playlistRef: input.playlistId,
+          tuneRef: tuneId,
+          practiced: null,
+          quality: null,
+          easiness: null,
+          difficulty: 0,
+          stability: null,
+          interval: null,
+          step: null,
+          repetitions: 0,
+          lapses: 0,
+          elapsedDays: 0,
+          state: 0,
+          due: null,
+          backupPracticed: null,
+          goal: "recall",
+          technique: null,
+          syncVersion: 1,
+          lastModifiedAt: new Date().toISOString(),
+          deviceId: "local",
+        })
+        .run();
+    }
+  }
+
+  // 3) Clear existing queue snapshot for the most recent window (or today)
+  const latestWindow = await db
+    .select({ windowStart: dailyPracticeQueue.windowStartUtc })
+    .from(dailyPracticeQueue)
+    .where(
+      and(
+        eq(dailyPracticeQueue.userRef, userRef),
+        eq(dailyPracticeQueue.playlistRef, input.playlistId),
+        eq(dailyPracticeQueue.active, 1)
+      )
+    )
+    .orderBy(desc(dailyPracticeQueue.windowStartUtc))
+    .limit(1);
+
+  if (latestWindow.length > 0) {
+    await db
+      .delete(dailyPracticeQueue)
+      .where(
+        and(
+          eq(dailyPracticeQueue.userRef, userRef),
+          eq(dailyPracticeQueue.playlistRef, input.playlistId),
+          eq(dailyPracticeQueue.windowStartUtc, latestWindow[0].windowStart)
+        )
+      )
+      .run();
+  }
+
+  // 4) Force-regenerate queue so Practice picks up the latest changes
+  const regenerated = await generateOrGetPracticeQueue(
+    db,
+    userRef,
+    input.playlistId,
+    new Date(),
+    null,
+    "per_day",
+    true
+  );
+
+  // Return a compact summary
+  return {
+    updated,
+    queueCount: regenerated.length,
+    userRef,
+  };
+}
+
+async function getPracticeCount(playlistId: number) {
+  const db = await ensureDb();
+  // Resolve userIdInt
+  const userRef = await resolveUserIdInt(db);
+  const rows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) as count
+    FROM daily_practice_queue dpq
+    WHERE dpq.user_ref = ${userRef}
+      AND dpq.playlist_ref = ${playlistId}
+      AND dpq.active = 1
+      AND dpq.window_start_utc = (
+        SELECT MAX(window_start_utc)
+        FROM daily_practice_queue
+        WHERE user_ref = ${userRef} AND playlist_ref = ${playlistId} AND active = 1
+      )
+  `);
+  return rows[0]?.count ?? 0;
+}
+
+// Attach to window
+declare global {
+  interface Window {
+    __ttTestApi?: {
+      seedAddToReview: (input: SeedAddToReviewInput) => Promise<{
+        updated: number;
+        queueCount: number;
+        userRef: number;
+      }>;
+      getPracticeCount: (playlistId: number) => Promise<number>;
+    };
+  }
+}
+
+if (typeof window !== "undefined") {
+  // Idempotent attach
+  if (!window.__ttTestApi) {
+    window.__ttTestApi = {
+      seedAddToReview,
+      getPracticeCount,
+    };
+    // eslint-disable-next-line no-console
+    console.log("[TestApi] __ttTestApi attached to window");
+  }
+}

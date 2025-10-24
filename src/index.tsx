@@ -3,6 +3,8 @@ import { render } from "solid-js/web";
 import "./App.css";
 import "./index.css";
 import App from "./App.tsx";
+// Attach test API in all environments (safe no-op in production)
+import "./test/test-api";
 
 const root = document.getElementById("root");
 

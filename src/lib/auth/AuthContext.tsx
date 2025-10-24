@@ -34,6 +34,8 @@ import { type SyncService, startSyncWorker } from "../sync";
 interface AuthState {
   /** Current authenticated user (reactive) */
   user: Accessor<User | null>;
+  /** Current authenticated user's integer user_profile.id (reactive) */
+  userIdInt: Accessor<number | null>;
 
   /** Current session (reactive) */
   session: Accessor<Session | null>;
@@ -73,6 +75,9 @@ interface AuthState {
 
   /** Force sync down from Supabase (manual sync) */
   forceSyncDown: () => Promise<void>;
+
+  /** Force sync up to Supabase (push local changes immediately) */
+  forceSyncUp: () => Promise<void>;
 }
 
 /**
@@ -105,6 +110,7 @@ const AuthContext = createContext<AuthState>();
  */
 export const AuthProvider: ParentComponent = (props) => {
   const [user, setUser] = createSignal<User | null>(null);
+  const [userIdInt, setUserIdInt] = createSignal<number | null>(null);
   const [session, setSession] = createSignal<Session | null>(null);
   const [loading, setLoading] = createSignal(true);
   const [localDb, setLocalDb] = createSignal<SqliteDatabase | null>(null);
@@ -153,6 +159,7 @@ export const AuthProvider: ParentComponent = (props) => {
       }
 
       const userIntId = userProfile.id;
+      setUserIdInt(userIntId);
       log.debug("User integer ID:", userIntId, "UUID:", userId);
 
       // Start sync worker (now uses Supabase JS client, browser-compatible)
@@ -345,6 +352,7 @@ export const AuthProvider: ParentComponent = (props) => {
     setLoading(true);
     await supabase.auth.signOut();
     await clearLocalDatabase();
+    setUserIdInt(null);
     setLoading(false);
   };
 
@@ -409,8 +417,55 @@ export const AuthProvider: ParentComponent = (props) => {
     });
   };
 
+  /**
+   * Force sync up to Supabase (push local changes immediately)
+   */
+  const forceSyncUp = async () => {
+    if (!syncServiceInstance) {
+      console.warn("⚠️ [ForceSyncUp] Sync service not available");
+      log.warn("Sync service not available");
+      return;
+    }
+
+    try {
+      console.log("🔄 [ForceSyncUp] Starting sync up to Supabase...");
+      log.info("Forcing sync up to Supabase...");
+
+      const result = await syncServiceInstance.syncUp();
+
+      console.log("✅ [ForceSyncUp] Sync up completed:", {
+        success: result.success,
+        itemsSynced: result.itemsSynced,
+        itemsFailed: result.itemsFailed,
+        conflicts: result.conflicts,
+        errors: result.errors,
+      });
+      log.info("Force sync up completed:", result);
+
+      // Increment sync version to trigger UI updates
+      setSyncVersion((prev) => {
+        const newVersion = prev + 1;
+        console.log(
+          `🔄 [ForceSyncUp] Sync version updated: ${prev} → ${newVersion}`
+        );
+        log.debug(
+          "Sync version changed after force sync:",
+          prev,
+          "->",
+          newVersion
+        );
+        return newVersion;
+      });
+    } catch (error) {
+      console.error("❌ [ForceSyncUp] Sync up failed:", error);
+      log.error("Force sync up failed:", error);
+      throw error;
+    }
+  };
+
   const authState: AuthState = {
     user,
+    userIdInt,
     session,
     loading,
     localDb,
@@ -421,6 +476,7 @@ export const AuthProvider: ParentComponent = (props) => {
     signInWithOAuth,
     signOut,
     forceSyncDown,
+    forceSyncUp,
   };
 
   return (

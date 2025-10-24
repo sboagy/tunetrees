@@ -83,7 +83,7 @@ export interface CatalogToolbarProps {
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const navigate = useNavigate();
   const auth = useAuth();
-  const { incrementSyncVersion } = useAuth();
+  const { incrementSyncVersion, forceSyncUp } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
@@ -160,6 +160,10 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
 
       // Clear selection
       props.table.resetRowSelection();
+
+      // Force sync up to Supabase BEFORE triggering UI refresh
+      console.log("🔄 [AddToRepertoire] Syncing changes to Supabase...");
+      await forceSyncUp();
 
       // Trigger sync to refresh UI
       incrementSyncVersion();

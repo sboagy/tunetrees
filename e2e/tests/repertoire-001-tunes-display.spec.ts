@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { setupForRepertoireTests } from "../helpers/practice-scenarios";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 /**
@@ -11,14 +12,17 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.use({ storageState: "e2e/.auth/alice.json" });
 
-test.describe("REPERTOIRE-001: User's Tunes Display", () => {
+test.describe.serial("REPERTOIRE-001: User's Tunes Display", () => {
   let ttPage: TuneTreesPage;
 
   test.beforeEach(async ({ page }) => {
+    // Fast setup: seed 2 specific tunes in repertoire
+    await setupForRepertoireTests(page, {
+      repertoireTunes: [9001, 9002], // Banish Misfortune, Morrison's Jig
+      scheduleTunes: false,
+    });
+
     ttPage = new TuneTreesPage(page);
-    await ttPage.goto();
-    await ttPage.waitForSync(2000);
-    await ttPage.navigateToTab("repertoire");
   });
 
   test("should display exactly 2 tunes in Repertoire grid", async () => {
@@ -33,6 +37,16 @@ test.describe("REPERTOIRE-001: User's Tunes Display", () => {
   test("should show 'Private' badge on both tunes", async ({ page }) => {
     // Both tunes should have Private badge
     const privateBadges = page.getByText("Private");
+    const start = Date.now();
+    let badgeCount: number = await privateBadges.count();
+    const timeoutMs = 15000;
+    const pollIntervalMs = 250;
+
+    while (badgeCount < 2 && Date.now() - start < timeoutMs) {
+      await page.waitForTimeout(pollIntervalMs);
+      badgeCount = await privateBadges.count();
+    }
+
     await expect(privateBadges).toHaveCount(2, { timeout: 5000 });
   });
 
@@ -44,10 +58,12 @@ test.describe("REPERTOIRE-001: User's Tunes Display", () => {
 
   test("should display tune modes", async ({ page }) => {
     // Look for mode badges
-    await expect(page.getByText(/D Mixolydian/i)).toBeVisible({
+    await expect(page.getByText(/D Mixolydian/i).first()).toBeVisible({
       timeout: 5000,
     });
-    await expect(page.getByText(/E Dorian/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/E Dorian/i).first()).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test("should display tune structure AABBCC", async ({ page }) => {

@@ -367,6 +367,17 @@ export function TunesTable(props: { data: Tune[] }) {
 
 ## Testing Strategy
 
+### Special Considerations
+
+- CoPilot local should NEVER run the dev server. I will do that. If you need the server rebooted, ask. It will always be running on http://localhost:5173/.
+- The "Playwright" and "playwrite-test" server should always be running for testing.
+- Tests must have one input state and one output state. Normally they should not contain conditionals.
+- To reset the local database completely run `npm run db:local:reset`
+
+### Ad hoc Playwright browser testing
+
+- You may start a browser with Playwright MCP, and control the user interface, ad hoc.
+
 ### **Unit Tests**
 
 - **Tool:** Vitest + `@solidjs/testing-library`

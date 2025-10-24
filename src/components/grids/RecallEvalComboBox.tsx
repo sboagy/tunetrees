@@ -113,12 +113,14 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
       <Show when={isOpen()}>
         <div
           ref={dropdownRef}
+          data-testid={`recall-eval-menu-${props.tuneId}`}
           class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg overflow-auto"
           style="left: 32px; max-height: 280px;"
         >
           {options.map((option) => (
             <button
               type="button"
+              data-testid={`recall-eval-option-${option.value || "not-set"}`}
               onClick={(e) => {
                 e.stopPropagation();
                 handleSelect(option.value);

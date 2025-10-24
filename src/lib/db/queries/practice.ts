@@ -17,8 +17,16 @@
  */
 
 import { and, desc, eq, sql } from "drizzle-orm";
+import { computeSchedulingWindows } from "../../services/practice-queue";
+import { queueSync } from "../../sync";
 import type { SqliteDatabase } from "../client-sqlite";
-import { playlist, playlistTune, practiceRecord, tune } from "../schema";
+import {
+  dailyPracticeQueue,
+  playlist,
+  playlistTune,
+  practiceRecord,
+  tune,
+} from "../schema";
 import type {
   DailyPracticeQueue,
   PracticeRecord,
@@ -202,6 +210,8 @@ export async function getPracticeList(
     } rows for user=${userId}, playlist=${playlistId}`
   );
 
+  // Select from the MOST RECENT active queue snapshot rather than relying on DATE('now')
+  // This avoids timezone edge-cases and ensures we always show the latest generated queue
   const rows = await db.all<PracticeListStagedWithQueue>(sql`
     SELECT 
       pls.*,
@@ -214,7 +224,13 @@ export async function getPracticeList(
     WHERE dpq.user_ref = ${userId}
       AND dpq.playlist_ref = ${playlistId}
       AND dpq.active = 1
-      AND DATE(dpq.window_start_utc) = DATE('now')
+      AND dpq.window_start_utc = (
+        SELECT MAX(window_start_utc)
+        FROM daily_practice_queue
+        WHERE user_ref = ${userId}
+          AND playlist_ref = ${playlistId}
+          AND active = 1
+      )
     ORDER BY dpq.bucket ASC, dpq.order_index ASC
   `);
 
@@ -250,7 +266,9 @@ export async function getDueTunesLegacy(
   // Calculate window boundaries
   const windowStart = new Date(sitdownDate);
   windowStart.setDate(windowStart.getDate() - delinquencyWindowDays);
-  const windowEnd = sitdownDate;
+  const windowEnd = new Date(sitdownDate);
+  // Add 1 minute buffer to windowEnd to account for timing issues when tunes are added "now"
+  windowEnd.setMinutes(windowEnd.getMinutes() + 1);
 
   // Query practice_list_joined view or build joined query
   // This gets all tunes in the playlist with their latest practice info
@@ -272,7 +290,7 @@ export async function getDueTunesLegacy(
 
       // Playlist tune info
       playlistRef: playlistTune.playlistRef,
-      scheduled: playlistTune.current, // Next review date (new system)
+      scheduled: playlistTune.scheduled, // Next review date for "Add To Review"
 
       // Latest practice record info (from subquery)
       latest_practiced: sql<string | null>`(
@@ -707,6 +725,15 @@ export async function addTunesToPracticeQueue(
         added++;
         addedTuneIds.push(tuneId);
 
+        // Queue playlist_tune update for sync
+        await queueSync(
+          db,
+          "playlist_tune",
+          `${playlistId}-${tuneId}`,
+          "update",
+          result[0]
+        );
+
         // Check if practice record exists
         const existing = await db
           .select()
@@ -721,28 +748,42 @@ export async function addTunesToPracticeQueue(
 
         // If no practice record exists, create an initial one (state=0, New)
         if (!existing || existing.length === 0) {
-          await db.insert(practiceRecord).values({
-            playlistRef: playlistId,
-            tuneRef: tuneId,
-            practiced: null,
-            quality: null,
-            easiness: null,
-            difficulty: 0,
-            stability: null,
-            interval: null,
-            step: null,
-            repetitions: 0,
-            lapses: 0,
-            elapsedDays: 0,
-            state: 0, // State 0 = New
-            due: null,
-            backupPracticed: null,
-            goal: "recall",
-            technique: null,
-            syncVersion: 1,
-            lastModifiedAt: now,
-            deviceId: "local",
-          });
+          const newRecord = await db
+            .insert(practiceRecord)
+            .values({
+              playlistRef: playlistId,
+              tuneRef: tuneId,
+              practiced: null,
+              quality: null,
+              easiness: null,
+              difficulty: 0,
+              stability: null,
+              interval: null,
+              step: null,
+              repetitions: 0,
+              lapses: 0,
+              elapsedDays: 0,
+              state: 0, // State 0 = New
+              due: null,
+              backupPracticed: null,
+              goal: "recall",
+              technique: null,
+              syncVersion: 1,
+              lastModifiedAt: now,
+              deviceId: "local",
+            })
+            .returning();
+
+          // Queue practice_record insert for sync
+          if (newRecord && newRecord.length > 0) {
+            await queueSync(
+              db,
+              "practice_record",
+              `${playlistId}-${tuneId}`,
+              "insert",
+              newRecord[0]
+            );
+          }
         }
       } else {
         skipped++;
@@ -750,6 +791,44 @@ export async function addTunesToPracticeQueue(
     } catch (error) {
       console.error(`Error adding tune ${tuneId} to practice queue:`, error);
       skipped++;
+    }
+  }
+
+  // Force regenerate the practice queue to pick up newly scheduled tunes
+  // CRITICAL: The practice grid uses forceRegen=false, so we must clear the existing queue
+  // to ensure new tunes appear immediately in the practice tab when incrementSyncVersion() is called
+  if (added > 0) {
+    try {
+      // Get userRef from playlist
+      const playlistData = await db
+        .select({ userRef: playlist.userRef })
+        .from(playlist)
+        .where(eq(playlist.playlistId, playlistId))
+        .limit(1);
+
+      if (playlistData && playlistData.length > 0) {
+        const userRef = playlistData[0].userRef;
+        const windows = computeSchedulingWindows(new Date(), 7, null);
+        const queueDate = windows.startTs.split("T")[0]; // YYYY-MM-DD
+
+        // Delete today's existing queue to force regeneration
+        await db
+          .delete(dailyPracticeQueue)
+          .where(
+            and(
+              eq(dailyPracticeQueue.userRef, userRef),
+              eq(dailyPracticeQueue.playlistRef, playlistId),
+              eq(dailyPracticeQueue.queueDate, queueDate)
+            )
+          );
+
+        console.log(
+          `[addTunesToPracticeQueue] Cleared existing queue for ${queueDate} to force regeneration of ${added} new tunes`
+        );
+      }
+    } catch (error) {
+      console.error("[addTunesToPracticeQueue] Failed to clear queue:", error);
+      // Don't fail the entire operation if queue clearing fails
     }
   }
 

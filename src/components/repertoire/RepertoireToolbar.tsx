@@ -22,9 +22,10 @@ import { useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
+import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb } from "../../lib/db/client-sqlite";
 import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
-import { useAuth } from "../../lib/auth/AuthContext";
+import { generateOrGetPracticeQueue } from "../../lib/services/practice-queue";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
 import {
@@ -79,7 +80,7 @@ export interface RepertoireToolbarProps {
 
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   const navigate = useNavigate();
-  const { incrementSyncVersion } = useAuth();
+  const { incrementSyncVersion, forceSyncUp, userIdInt } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
@@ -133,6 +134,30 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
       // Clear selection
       props.table.resetRowSelection();
+
+      // Regenerate practice queue to include newly added tunes
+      console.log("🔄 [AddToReview] Regenerating practice queue...");
+      const currentUserIdInt = userIdInt();
+      if (currentUserIdInt && props.playlistId) {
+        try {
+          await generateOrGetPracticeQueue(
+            db,
+            currentUserIdInt,
+            props.playlistId,
+            new Date(),
+            null,
+            "per_day",
+            true // force regeneration to pick up newly added tunes
+          );
+          console.log("✅ Practice queue regenerated");
+        } catch (err) {
+          console.error("Error regenerating practice queue:", err);
+        }
+      }
+
+      // Force sync up to Supabase BEFORE triggering UI refresh
+      console.log("🔄 [AddToReview] Syncing changes to Supabase...");
+      await forceSyncUp();
 
       // Trigger sync to refresh UI
       incrementSyncVersion();
