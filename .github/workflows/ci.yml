@@ -110,25 +110,6 @@ jobs:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
-      # 8a. Generate Auth States (requires dev server)
-      - name: Generate Auth States
-        run: |
-          echo "🔐 Starting dev server for auth generation..."
-          npm run dev &
-          DEV_PID=$!
-          sleep 10
-          echo "🔑 Generating auth states for all test users..."
-          npm run db:local:gen-test-auth
-          echo "🛑 Stopping dev server..."
-          kill $DEV_PID || true
-          sleep 2
-          # Ensure all vite processes are killed
-          pkill -f "vite" || true
-          sleep 1
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
-
       # 9. Verify Database Setup (optional debug step)
       - name: Verify Database Setup
         run: |
@@ -155,7 +136,26 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      # 13. Run Playwright Tests (webServer in playwright.config.ts handles dev server)
+      # 13. Generate Auth States (requires dev server + Playwright browsers)
+      - name: Generate Auth States
+        run: |
+          echo "🔐 Starting dev server for auth generation..."
+          npm run dev &
+          DEV_PID=$!
+          sleep 10
+          echo "🔑 Generating auth states for all test users..."
+          npm run db:local:gen-test-auth
+          echo "🛑 Stopping dev server..."
+          kill $DEV_PID || true
+          sleep 2
+          # Ensure all vite processes are killed
+          pkill -f "vite" || true
+          sleep 1
+        env:
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+
+      # 14. Run Playwright Tests (webServer in playwright.config.ts handles dev server)
       - name: Run Playwright Tests
         run: |
           echo "🎭 Starting Playwright tests (dev server will start automatically)..."
