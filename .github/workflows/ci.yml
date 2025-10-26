@@ -22,7 +22,8 @@ jobs:
     timeout-minutes: 30
     environment: vite_pwa_env
     env:
-      TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'TestPassword123!' }}
+      ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD || 'TestPassword123!' }}
+      TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD || 'TestPassword123!' }}
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
     steps:
@@ -139,6 +140,7 @@ jobs:
           echo "📊 Environment check:"
           echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
           echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:0:20}..."
+          echo "ALICE_TEST_PASSWORD is set: $([[ -n "$ALICE_TEST_PASSWORD" ]] && echo 'yes' || echo 'no')"
           echo "TEST_USER_PASSWORD is set: $([[ -n "$TEST_USER_PASSWORD" ]] && echo 'yes' || echo 'no')"
           echo "🎬 Running full test suite (setup + chromium-auth + chromium + Mobile Chrome)"
           npx playwright test --project=setup --project=chromium-auth --project=chromium --project="Mobile Chrome" --reporter=list,html
