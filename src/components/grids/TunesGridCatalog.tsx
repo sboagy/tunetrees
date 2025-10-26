@@ -494,7 +494,19 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   };
 
   // Restore and persist scroll position
-  const SCROLL_STORAGE_KEY = `TT_CATALOG_SCROLL_${props.userId || 0}`;
+  // Compute scroll storage key reactively once userId is available
+  const scrollKey = createMemo<string | null>(() => {
+    const uid = props.userId;
+    if (!uid || uid === 0) return null;
+    return `TT_CATALOG_SCROLL_${uid}`;
+  });
+
+  // Scroll restore hardening: track initial restore and one re-apply window
+  const [didInitialRestore, setDidInitialRestore] = createSignal(false);
+  const [didSecondApply, setDidSecondApply] = createSignal(false);
+  const [restoreAt, setRestoreAt] = createSignal<number>(0);
+  const [initialRowsCount, setInitialRowsCount] = createSignal<number>(0);
+  const [initialTotalSize, setInitialTotalSize] = createSignal<number>(0);
 
   // Setup scroll persistence after mount (containerRef is assigned by then)
   onMount(() => {
@@ -534,22 +546,80 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
 
         // Restore scroll position from localStorage (higher priority than initialState)
         try {
-          const stored = localStorage.getItem(SCROLL_STORAGE_KEY);
+          const key = scrollKey();
+          if (!key) {
+            requestAnimationFrame(restoreScroll);
+            return;
+          }
+          const stored = localStorage.getItem(key);
           console.log("[TunesGridCatalog] Restoring scroll:", {
-            key: SCROLL_STORAGE_KEY,
+            key,
             stored,
             hasContainer: !!containerRef,
           });
+          let applied = 0;
           if (stored && containerRef) {
-            containerRef.scrollTop = Number.parseInt(stored, 10);
+            applied = Number.parseInt(stored, 10);
+            containerRef.scrollTop = applied;
             console.log("[TunesGridCatalog] Set scrollTop to:", stored);
           } else if (initialState.scrollTop && containerRef) {
-            containerRef.scrollTop = initialState.scrollTop;
+            applied = initialState.scrollTop;
+            containerRef.scrollTop = applied;
             console.log(
               "[TunesGridCatalog] Set scrollTop from initialState:",
               initialState.scrollTop
             );
           }
+
+          // Track and log actual application timing/details
+          setInitialRowsCount(table.getRowModel().rows.length);
+          setInitialTotalSize(rowVirtualizer().getTotalSize());
+          setDidInitialRestore(true);
+          setDidSecondApply(false);
+          setRestoreAt(Date.now());
+          console.log(
+            `CATALOG_SCROLL: applied scrollTop=${applied} phase=initial rows=${
+              table.getRowModel().rows.length
+            } totalSize=${rowVirtualizer().getTotalSize()} key=${key} time=${performance
+              .now()
+              .toFixed(1)}ms`
+          );
+
+          // Safety re-apply after a short delay if something reset scrollTop
+          const safetyTimer: ReturnType<typeof setTimeout> | null = setTimeout(
+            () => {
+              if (didSecondApply()) return;
+              // Recompute target from storage/initial state
+              let target = 0;
+              try {
+                const k = scrollKey();
+                const stored2 = k ? localStorage.getItem(k) : null;
+                if (stored2) target = Number.parseInt(stored2, 10);
+                if (!stored2 && initialState.scrollTop)
+                  target = initialState.scrollTop;
+              } catch {
+                // ignore
+              }
+              if (
+                containerRef &&
+                target > 0 &&
+                containerRef.scrollTop < target - 1
+              ) {
+                containerRef.scrollTop = target;
+                setDidSecondApply(true);
+                console.log(
+                  `CATALOG_SCROLL: re-applied scrollTop=${target} phase=safety-delay age=${
+                    Date.now() - restoreAt()
+                  }ms`
+                );
+              }
+            },
+            350
+          );
+
+          onCleanup(() => {
+            if (safetyTimer) clearTimeout(safetyTimer);
+          });
         } catch (error) {
           console.warn("Failed to restore scroll position:", error);
         }
@@ -565,10 +635,9 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           if (containerRef && containerRef.scrollTop > 0) {
             // Only save non-zero scroll positions to avoid overwriting on mount
             try {
-              localStorage.setItem(
-                SCROLL_STORAGE_KEY,
-                String(containerRef.scrollTop)
-              );
+              const key = scrollKey();
+              if (!key) return;
+              localStorage.setItem(key, String(containerRef.scrollTop));
             } catch (error) {
               console.warn("Failed to save scroll position:", error);
             }
@@ -585,6 +654,47 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
       });
     };
     waitForRef();
+  });
+
+  // Post-stabilization: if the grid's row count or virtualizer total size changes shortly
+  // after the initial restore, re-apply the stored scrollTop once to counter late reflows.
+  createEffect(() => {
+    if (!didInitialRestore() || didSecondApply()) return;
+    const age = Date.now() - restoreAt();
+    if (age > 800) return; // only within ~0.8s window
+
+    const currentRows = table.getRowModel().rows.length;
+    const currentTotal = rowVirtualizer().getTotalSize();
+    const rowsChanged = currentRows !== initialRowsCount();
+    const sizeChanged = currentTotal !== initialTotalSize();
+    const canScroll =
+      !!containerRef && containerRef.scrollHeight > containerRef.clientHeight;
+
+    if ((rowsChanged || sizeChanged) && canScroll) {
+      let target = 0;
+      try {
+        const key = scrollKey();
+        const stored = key ? localStorage.getItem(key) : null;
+        if (stored) target = Number.parseInt(stored, 10);
+        if (!stored && initialState.scrollTop) target = initialState.scrollTop;
+      } catch {
+        // noop
+      }
+
+      if (containerRef) {
+        containerRef.scrollTop = target;
+        setDidSecondApply(true);
+        console.log(
+          `CATALOG_SCROLL: re-applied scrollTop=${target} phase=reapply cause=${
+            rowsChanged
+              ? "rowsChanged"
+              : sizeChanged
+              ? "sizeChanged"
+              : "unknown"
+          } rows=${currentRows} totalSize=${currentTotal} age=${age}ms`
+        );
+      }
+    }
   });
 
   // Handle row click

@@ -461,11 +461,31 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   };
 
   // Restore and persist scroll position
-  const SCROLL_STORAGE_KEY = `TT_REPERTOIRE_SCROLL_${props.userId || 0}`;
+  // Compute scroll storage key reactively once userId and (for repertoire) playlistId are available
+  const scrollKey = createMemo<string | null>(() => {
+    const uid = props.userId;
+    const pid = currentPlaylistId();
+    if (!uid || uid === 0) return null;
+    return pid
+      ? `TT_REPERTOIRE_SCROLL_${uid}_${pid}`
+      : `TT_REPERTOIRE_SCROLL_${uid}`;
+  });
+  // Back-compat: legacy key without playlist scoping
+  const legacyScrollKey = createMemo<string | null>(() => {
+    const uid = props.userId;
+    if (!uid || uid === 0) return null;
+    return `TT_REPERTOIRE_SCROLL_${uid}`;
+  });
+
+  // Scroll restore hardening: track initial restore and one re-apply window
+  const [didInitialRestore, setDidInitialRestore] = createSignal(false);
+  const [didSecondApply, setDidSecondApply] = createSignal(false);
+  const [restoreAt, setRestoreAt] = createSignal<number>(0);
+  const [initialRowsCount, setInitialRowsCount] = createSignal<number>(0);
+  const [initialTotalSize, setInitialTotalSize] = createSignal<number>(0);
 
   // Setup scroll persistence after mount (containerRef is assigned by then)
   onMount(() => {
-    // Poll for containerRef to be available (ref callback timing varies)
     const waitForRef = () => {
       if (!containerRef) {
         requestAnimationFrame(waitForRef);
@@ -497,12 +517,86 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
 
         // Restore scroll position from localStorage (higher priority than initialState)
         try {
-          const stored = localStorage.getItem(SCROLL_STORAGE_KEY);
-          if (stored && containerRef) {
-            containerRef.scrollTop = Number.parseInt(stored, 10);
-          } else if (initialState.scrollTop && containerRef) {
-            containerRef.scrollTop = initialState.scrollTop;
+          const key = scrollKey();
+          if (!key) {
+            // Wait until we have a valid key (user/playlist known)
+            requestAnimationFrame(restoreScroll);
+            return;
           }
+          let stored = localStorage.getItem(key);
+          // Fallback to legacy key if no value under playlist-scoped key
+          if (!stored) {
+            const legacy = legacyScrollKey();
+            if (legacy) stored = localStorage.getItem(legacy);
+          }
+          console.log(`SCROLL_STORAGE_KEY: ${stored}`);
+          let applied = 0;
+          if (stored && containerRef) {
+            applied = Number.parseInt(stored, 10);
+            containerRef.scrollTop = applied;
+          } else if (initialState.scrollTop && containerRef) {
+            applied = initialState.scrollTop;
+            containerRef.scrollTop = applied;
+          }
+          // Track and log actual application timing/details
+          setInitialRowsCount(table.getRowModel().rows.length);
+          setInitialTotalSize(rowVirtualizer().getTotalSize());
+          setDidInitialRestore(true);
+          setDidSecondApply(false);
+          setRestoreAt(Date.now());
+          console.log(
+            `REPERTOIRE_SCROLL: applied scrollTop=${applied} phase=initial rows=${
+              table.getRowModel().rows.length
+            } totalSize=${rowVirtualizer().getTotalSize()} key=${key} time=${performance
+              .now()
+              .toFixed(1)}ms`
+          );
+
+          // Safety re-apply after a short delay if something reset scrollTop
+          const safetyTimer: ReturnType<typeof setTimeout> | null = setTimeout(
+            () => {
+              if (didSecondApply()) return;
+              // Recompute target from storage/initial state
+              let target = 0;
+              let usedKey: string | null = null;
+              try {
+                const k = scrollKey();
+                let stored2 = k ? localStorage.getItem(k) : null;
+                if (stored2) {
+                  usedKey = k;
+                } else {
+                  const legacy2 = legacyScrollKey();
+                  if (legacy2) {
+                    stored2 = localStorage.getItem(legacy2);
+                    if (stored2) usedKey = legacy2;
+                  }
+                }
+                if (stored2) target = Number.parseInt(stored2, 10);
+                if (!stored2 && initialState.scrollTop)
+                  target = initialState.scrollTop;
+              } catch {
+                // ignore
+              }
+              if (
+                containerRef &&
+                target > 0 &&
+                containerRef.scrollTop < target - 1
+              ) {
+                containerRef.scrollTop = target;
+                setDidSecondApply(true);
+                console.log(
+                  `REPERTOIRE_SCROLL: re-applied scrollTop=${target} phase=safety-delay age=${
+                    Date.now() - restoreAt()
+                  }ms key=${usedKey ?? key ?? "none"}`
+                );
+              }
+            },
+            350
+          );
+
+          onCleanup(() => {
+            if (safetyTimer) clearTimeout(safetyTimer);
+          });
         } catch (error) {
           console.warn("Failed to restore scroll position:", error);
         }
@@ -518,10 +612,13 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
           if (containerRef && containerRef.scrollTop > 0) {
             // Only save non-zero scroll positions to avoid overwriting on mount
             try {
-              localStorage.setItem(
-                SCROLL_STORAGE_KEY,
-                String(containerRef.scrollTop)
-              );
+              const key = scrollKey();
+              const legacy = legacyScrollKey();
+              if (!key && !legacy) return; // No key yet
+              if (key)
+                localStorage.setItem(key, String(containerRef.scrollTop));
+              if (legacy)
+                localStorage.setItem(legacy, String(containerRef.scrollTop));
             } catch (error) {
               console.warn(
                 "Failed to save scroll position to localStorage:",
@@ -541,6 +638,59 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       });
     };
     waitForRef();
+  });
+
+  // Post-stabilization: if the grid's row count or virtualizer total size changes shortly
+  // after the initial restore, re-apply the stored scrollTop once to counter late reflows.
+  createEffect(() => {
+    if (!didInitialRestore() || didSecondApply()) return;
+    const age = Date.now() - restoreAt();
+    if (age > 800) return; // only within ~0.8s window
+
+    const currentRows = table.getRowModel().rows.length;
+    const currentTotal = rowVirtualizer().getTotalSize();
+    const rowsChanged = currentRows !== initialRowsCount();
+    const sizeChanged = currentTotal !== initialTotalSize();
+    const canScroll =
+      !!containerRef && containerRef.scrollHeight > containerRef.clientHeight;
+
+    if ((rowsChanged || sizeChanged) && canScroll) {
+      let target = 0;
+      let usedKey: string | null = null;
+      try {
+        const key = scrollKey();
+        let stored = key ? localStorage.getItem(key) : null;
+        if (stored) {
+          usedKey = key;
+        } else {
+          const legacy = legacyScrollKey();
+          if (legacy) {
+            stored = localStorage.getItem(legacy);
+            if (stored) usedKey = legacy;
+          }
+        }
+        if (stored) target = Number.parseInt(stored, 10);
+        if (!stored && initialState.scrollTop) target = initialState.scrollTop;
+      } catch {
+        // noop - fall back to target=0
+      }
+
+      if (containerRef) {
+        containerRef.scrollTop = target;
+        setDidSecondApply(true);
+        console.log(
+          `REPERTOIRE_SCROLL: re-applied scrollTop=${target} phase=reapply cause=${
+            rowsChanged
+              ? "rowsChanged"
+              : sizeChanged
+              ? "sizeChanged"
+              : "unknown"
+          } rows=${currentRows} totalSize=${currentTotal} age=${age}ms key=${
+            usedKey ?? scrollKey() ?? "none"
+          }`
+        );
+      }
+    }
   });
 
   // Handle row click
