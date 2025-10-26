@@ -106,6 +106,23 @@ jobs:
       # 8. Reset and Seed Database
       - name: Reset and Seed Database
         run: npm run db:ci:reset
+        env:
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+
+      # 8a. Generate Auth States (requires dev server)
+      - name: Generate Auth States
+        run: |
+          echo "🔐 Starting dev server for auth generation..."
+          npm run dev &
+          DEV_PID=$!
+          sleep 10
+          echo "🔑 Generating auth states for all test users..."
+          npm run db:local:gen-test-auth
+          kill $DEV_PID || true
+        env:
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
       # 9. Verify Database Setup (optional debug step)
       - name: Verify Database Setup
@@ -142,8 +159,8 @@ jobs:
           echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:0:20}..."
           echo "ALICE_TEST_PASSWORD is set: $([[ -n "$ALICE_TEST_PASSWORD" ]] && echo 'yes' || echo 'no')"
           echo "TEST_USER_PASSWORD is set: $([[ -n "$TEST_USER_PASSWORD" ]] && echo 'yes' || echo 'no')"
-          echo "🎬 Running full test suite (setup + chromium-auth + chromium + Mobile Chrome)"
-          npx playwright test --project=setup --project=chromium-auth --project=chromium --project="Mobile Chrome" --reporter=list,html
+          echo "🎬 Running full test suite (chromium-auth + chromium + Mobile Chrome)"
+          npx playwright test --project=chromium-auth --project=chromium --project="Mobile Chrome" --reporter=list,html
 
       # 14. Upload Test Results
       - name: Upload Playwright Report
