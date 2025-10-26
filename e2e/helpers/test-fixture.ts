@@ -19,7 +19,7 @@ export interface TestUserFixture {
 const AUTH_EXPIRY_MINUTES = 10080; // 7 days in minutes (matches jwt_expiry = 604800 seconds)
 
 /**
- * Check if auth file exists and is fresh (< 50 minutes old)
+ * Check if auth file exists and is fresh (< AUTH_EXPIRY_MINUTES old)
  */
 function isAuthFresh(authFile: string, userEmail: string): boolean {
   if (!existsSync(authFile)) {
@@ -29,9 +29,7 @@ function isAuthFresh(authFile: string, userEmail: string): boolean {
 
   try {
     const authData = JSON.parse(readFileSync(authFile, "utf-8"));
-    const fileStats = statSync(authFile);
-    const fileAgeMinutes = (Date.now() - fileStats.mtimeMs) / 1000 / 60;
-
+    
     // Check if this auth file is for the correct user
     const origins = authData.origins || [];
     const hasUserData = origins.some((origin: any) => {
@@ -43,6 +41,14 @@ function isAuthFresh(authFile: string, userEmail: string): boolean {
       console.log(`⚠️  Auth file is not for ${userEmail}: ${authFile}`);
       return false;
     }
+
+    // Skip age check in CI - files are freshly generated
+    if (process.env.CI) {
+      return true;
+    }
+
+    const fileStats = statSync(authFile);
+    const fileAgeMinutes = (Date.now() - fileStats.mtimeMs) / 1000 / 60;
 
     if (fileAgeMinutes >= AUTH_EXPIRY_MINUTES) {
       console.log(
