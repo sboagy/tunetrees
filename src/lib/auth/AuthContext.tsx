@@ -481,7 +481,13 @@ export const AuthProvider: ParentComponent = (props) => {
 
   return (
     <AuthContext.Provider value={authState}>
-      {props.children}
+      <div
+        data-auth-initialized={!loading()}
+        data-sync-version={syncVersion()}
+        style={{ display: "contents" }}
+      >
+        {props.children}
+      </div>
     </AuthContext.Provider>
   );
 };

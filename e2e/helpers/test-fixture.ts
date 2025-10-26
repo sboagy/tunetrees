@@ -29,7 +29,7 @@ function isAuthFresh(authFile: string, userEmail: string): boolean {
 
   try {
     const authData = JSON.parse(readFileSync(authFile, "utf-8"));
-    
+
     // Check if this auth file is for the correct user
     const origins = authData.origins || [];
     const hasUserData = origins.some((origin: any) => {

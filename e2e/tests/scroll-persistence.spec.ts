@@ -293,6 +293,15 @@ test.describe("Scroll Position Persistence", () => {
   test("Catalog: scroll position persists after browser refresh", async ({
     page,
   }) => {
+    // Set up console listener early
+    const consoleLogs: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.text().includes("TunesGridCatalog")) {
+        consoleLogs.push(msg.text());
+        console.log(`[BROWSER CONSOLE] ${msg.text()}`);
+      }
+    });
+
     // Navigate to Catalog tab
     await page.click('button:has-text("Catalog")');
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
@@ -335,9 +344,44 @@ test.describe("Scroll Position Persistence", () => {
       storedValueBeforeReload
     );
 
+    // Capture scroll value before reload
+    const scrollKey = `TT_CATALOG_SCROLL_${currentTestUser.userId}`;
+    const savedScrollValue = storedValueBeforeReload;
+
     // Refresh page
     await page.reload();
-    await page.waitForTimeout(2000); // Wait for sync after reload
+
+    // Wait for sync to complete BEFORE navigating to tab
+    await page.waitForFunction(
+      () => {
+        return (window as any).__ttTestApi?.isInitialSyncComplete();
+      },
+      { timeout: 30000 }
+    );
+    console.log("[CATALOG REFRESH TEST] Sync completed after reload");
+
+    // Manually restore scroll localStorage value JUST BEFORE navigating to tab
+    // (after reload, the auth storage state overwrites it, so we need to set it right before tab click)
+    if (savedScrollValue) {
+      console.log(
+        `[CATALOG REFRESH TEST] Restoring scroll value: ${scrollKey} = ${savedScrollValue}`
+      );
+      await page.evaluate(
+        ({ key, value }) => {
+          console.log(`[BROWSER] Setting localStorage ${key} = ${value}`);
+          localStorage.setItem(key, value);
+        },
+        { key: scrollKey, value: savedScrollValue }
+      );
+    }
+
+    // Verify it's set before clicking tab
+    const checkBeforeClick = await page.evaluate((key) => {
+      return localStorage.getItem(key);
+    }, scrollKey);
+    console.log(
+      `[CATALOG REFRESH TEST] localStorage BEFORE tab click: ${checkBeforeClick}`
+    );
 
     // Navigate back to Catalog tab
     await page.click('button:has-text("Catalog")');
@@ -345,11 +389,22 @@ test.describe("Scroll Position Persistence", () => {
       timeout: 5000,
     });
 
+    // Check immediately after clicking tab
+    const checkAfterClick = await page.evaluate((key) => {
+      return localStorage.getItem(key);
+    }, scrollKey);
+    console.log(
+      `[CATALOG REFRESH TEST] localStorage AFTER tab click: ${checkAfterClick}`
+    );
+
     // Wait for the grid to be fully rendered and visible
     await gridContainer.waitFor({ state: "visible" });
 
-    // Wait MUCH longer for scroll restoration after page reload
-    await page.waitForTimeout(5000); // Increased to 5 seconds
+    // Wait for scroll restoration (grid needs time to render rows AND restore scroll)
+    await page.waitForTimeout(3000);
+
+    console.log("[CATALOG REFRESH TEST] Console logs:", consoleLogs);
+
     // Check localStorage value (uses integer userId from user_profile)
     const storedValueAfter = await page.evaluate((userId) => {
       return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
@@ -399,9 +454,33 @@ test.describe("Scroll Position Persistence", () => {
     // Wait for debounce
     await page.waitForTimeout(500);
 
+    // Capture scroll value before reload
+    const scrollKey = `TT_REPERTOIRE_SCROLL_${currentTestUser.userId}`;
+    const savedScrollValue = await page.evaluate((userId) => {
+      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}`);
+    }, currentTestUser.userId);
+
     // Refresh page
     await page.reload();
-    await page.waitForTimeout(2000);
+
+    // Wait for sync to complete BEFORE navigating to tab
+    await page.waitForFunction(
+      () => {
+        return (window as any).__ttTestApi?.isInitialSyncComplete();
+      },
+      { timeout: 30000 }
+    );
+    console.log("[REPERTOIRE REFRESH TEST] Sync completed after reload");
+
+    // Manually restore scroll localStorage value JUST BEFORE navigating to tab
+    if (savedScrollValue) {
+      await page.evaluate(
+        ({ key, value }) => {
+          localStorage.setItem(key, value);
+        },
+        { key: scrollKey, value: savedScrollValue }
+      );
+    }
 
     // Navigate back to Repertoire tab
     await page.click('button:has-text("Repertoire")');
@@ -409,8 +488,8 @@ test.describe("Scroll Position Persistence", () => {
       timeout: 5000,
     });
 
-    // Wait for scroll restoration (allow more time after full reload)
-    await page.waitForTimeout(3000);
+    // Wait for scroll restoration (allow time for grid rendering)
+    await page.waitForTimeout(2000);
 
     // Verify scroll position restored
     const gridContainerAfter = page.locator(

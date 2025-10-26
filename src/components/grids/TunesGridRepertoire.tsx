@@ -515,7 +515,8 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       const handleScroll = () => {
         if (scrollTimeout) clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => {
-          if (containerRef) {
+          if (containerRef && containerRef.scrollTop > 0) {
+            // Only save non-zero scroll positions to avoid overwriting on mount
             try {
               localStorage.setItem(
                 SCROLL_STORAGE_KEY,

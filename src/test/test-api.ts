@@ -196,6 +196,8 @@ declare global {
         userRef: number;
       }>;
       getPracticeCount: (playlistId: number) => Promise<number>;
+      getSyncVersion: () => number;
+      isInitialSyncComplete: () => boolean;
     };
   }
 }
@@ -206,6 +208,19 @@ if (typeof window !== "undefined") {
     window.__ttTestApi = {
       seedAddToReview,
       getPracticeCount,
+      getSyncVersion: () => {
+        // Access the sync version from AuthContext
+        // The version starts at 0 and increments to 1 after initial sync
+        const el = document.querySelector("[data-auth-initialized]");
+        const version = el?.getAttribute("data-sync-version");
+        return version ? Number.parseInt(version, 10) : 0;
+      },
+      isInitialSyncComplete: () => {
+        // Initial sync is complete when syncVersion >= 1
+        const el = document.querySelector("[data-auth-initialized]");
+        const version = el?.getAttribute("data-sync-version");
+        return version ? Number.parseInt(version, 10) >= 1 : false;
+      },
     };
     // eslint-disable-next-line no-console
     console.log("[TestApi] __ttTestApi attached to window");

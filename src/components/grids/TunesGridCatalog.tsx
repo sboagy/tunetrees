@@ -520,19 +520,35 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
             requestAnimationFrame(restoreScroll);
           } else {
             console.warn(
-              "[TunesGridCatalog] Max retries reached, grid still not scrollable"
+              "[TunesGridCatalog] Max retries reached, grid still not scrollable",
+              {
+                scrollHeight: containerRef.scrollHeight,
+                clientHeight: containerRef.clientHeight,
+              }
             );
           }
           return;
         }
 
+        console.log("[TunesGridCatalog] Grid is scrollable, restoring scroll");
+
         // Restore scroll position from localStorage (higher priority than initialState)
         try {
           const stored = localStorage.getItem(SCROLL_STORAGE_KEY);
+          console.log("[TunesGridCatalog] Restoring scroll:", {
+            key: SCROLL_STORAGE_KEY,
+            stored,
+            hasContainer: !!containerRef,
+          });
           if (stored && containerRef) {
             containerRef.scrollTop = Number.parseInt(stored, 10);
+            console.log("[TunesGridCatalog] Set scrollTop to:", stored);
           } else if (initialState.scrollTop && containerRef) {
             containerRef.scrollTop = initialState.scrollTop;
+            console.log(
+              "[TunesGridCatalog] Set scrollTop from initialState:",
+              initialState.scrollTop
+            );
           }
         } catch (error) {
           console.warn("Failed to restore scroll position:", error);
@@ -546,7 +562,8 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
       const handleScroll = () => {
         if (scrollTimeout) clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => {
-          if (containerRef) {
+          if (containerRef && containerRef.scrollTop > 0) {
+            // Only save non-zero scroll positions to avoid overwriting on mount
             try {
               localStorage.setItem(
                 SCROLL_STORAGE_KEY,

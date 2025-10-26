@@ -5,7 +5,7 @@
  * Uses direct Supabase calls to manipulate database state before tests run.
  */
 
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 // ============================================================================
 // LEGACY ALICE-SPECIFIC FUNCTIONS (DEPRECATED)
@@ -153,34 +153,34 @@ export async function clearTunetreesStorageDB(page: Page) {
  */
 async function waitForSyncComplete(
   page: Page,
-  timeoutMs = 15000
+  timeoutMs = 30000
 ): Promise<void> {
   const startTime = Date.now();
 
-  // Poll for sync completion by checking console messages
+  console.log("⏳ Waiting for initial sync to complete...");
+
+  // Poll for sync completion by checking if initial syncDown has finished
   while (Date.now() - startTime < timeoutMs) {
-    // Check if sync has completed by looking at browser state
+    // Check if initial sync is complete via test API
     const syncComplete = await page.evaluate(() => {
-      // Check if window has our test API and sync is done
-      if ((window as any).__ttTestApi) {
-        return true; // If test API is attached, basic init is done
+      // Check if test API indicates sync is complete
+      if ((window as any).__ttTestApi?.isInitialSyncComplete()) {
+        return true;
       }
       return false;
     });
 
     if (syncComplete) {
-      console.log("✅ Sync complete detected (test API ready)");
-      // Give it a tiny bit more time to ensure data is in IndexedDB
-      await page.waitForTimeout(500);
+      console.log("✅ Initial sync complete detected");
       return;
     }
 
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(200);
   }
 
-  // Timeout - but don't fail, just warn
-  console.warn(
-    `⚠️  Sync detection timeout (${timeoutMs}ms) - continuing anyway`
+  // Timeout - throw error since sync is critical
+  throw new Error(
+    `⚠️ Initial sync did not complete within ${timeoutMs}ms - tests may fail`
   );
 }
 
@@ -767,42 +767,16 @@ export async function setupForCatalogTestsParallel(
   await page.reload({ waitUntil: "domcontentloaded" });
   await waitForSyncComplete(page);
 
+  // 6. Wait for playlist dropdown to show correct data
   const playlistLocator = page.getByTestId("playlist-dropdown-button");
-
-  // wait for the playlist dropdown to be visible
   await playlistLocator.waitFor({ state: "visible", timeout: 10000 });
-  const playlistDropdownButton = page.getByTestId("playlist-dropdown-button");
-  // Playlist name is computed as "Irish Flute (playlistId)" when name column is NULL
+
   const expectedTitle = `Irish Flute (${user.playlistId})`;
-  const timeoutMs = 20000;
-  const start = Date.now();
-  let innerText = "";
+  await expect(playlistLocator).toContainText(expectedTitle, {
+    timeout: 10000,
+  });
 
-  // Poll until the playlist dropdown title matches expectedTitle or timeout
-  while (Date.now() - start < timeoutMs) {
-    try {
-      innerText = await playlistDropdownButton.innerText({ timeout: 1000 });
-    } catch {
-      innerText = "";
-    }
-
-    innerText = innerText.trim();
-    if (innerText === expectedTitle) {
-      console.log(`✅ [${user.name}] Playlist title matched: ${innerText}`);
-      break;
-    }
-
-    await page.waitForTimeout(200);
-  }
-
-  if (innerText !== expectedTitle) {
-    console.error(
-      `⚠️ [${user.name}] playlist menu title did not match within ${timeoutMs}ms, last value: ${innerText}`
-    );
-    throw new Error(
-      `Playlist dropdown title did not match expected value within ${timeoutMs}ms. Expected "${expectedTitle}", last value: "${innerText}"`
-    );
-  }
+  console.log(`✅ [${user.name}] Playlist title matched: ${expectedTitle}`);
 
   // 6. Navigate to starting tab
   await page.waitForSelector(`[data-testid="tab-${startTab}"]`, {

@@ -23,6 +23,7 @@
     "test:unit": "vitest run tests/",
     "test:e2e": "playwright test  --reporter=list",
     "test:e2e:chromium": "playwright test --project=chromium --reporter=list",
+    "test:e2e:chromium:mobile": "playwright test --project='Mobile Chrome' --reporter=list",
     "test:e2e:chromium:headed": "playwright test --project=chromium --reporter=list --headed",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",

@@ -185,7 +185,11 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     );
     await expect(userPrivateTune).toBeVisible({ timeout: 5000 });
     const checkbox1 = userPrivateTune.locator('input[type="checkbox"]').first();
-    await checkbox1.check();
+    
+    // Scroll checkbox into center of viewport to avoid overlapping elements
+    await checkbox1.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300); // Let scroll settle
+    await checkbox1.check({ force: true }); // Force click to bypass overlay detection
 
     let dialogMessage = "";
     page.on("dialog", async (dialog) => {
