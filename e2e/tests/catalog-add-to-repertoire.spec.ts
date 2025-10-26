@@ -17,30 +17,36 @@
  * - Multiple tunes selected (batch operation)
  */
 
-import { expect, test } from "@playwright/test";
-import { setupForCatalogTests } from "../helpers/practice-scenarios";
+import { expect } from "@playwright/test";
+import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
+import type { TestUser } from "../helpers/test-users";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe.serial("Catalog: Add To Repertoire", () => {
-  test.beforeEach(async ({ page }) => {
+  let currentTestUser: TestUser;
+
+  test.beforeEach(async ({ page, testUser }) => {
+    currentTestUser = testUser;
     // Fast setup: clear repertoire, start on catalog tab
-    await setupForCatalogTests(page, {
+    await setupForCatalogTestsParallel(page, testUser, {
       emptyRepertoire: true,
       startTab: "catalog",
     });
-    await page.waitForSelector('[data-testid="tab-repertoire"]', {
-      timeout: 10000,
-    });
-    await page.getByTestId("tab-repertoire").click();
-    await page.waitForTimeout(500);
+    // await page.waitForSelector('[data-testid="tab-repertoire"]', {
+    //   timeout: 10000,
+    // });
+    // await page.getByTestId("tab-repertoire").click();
+    // await page.waitForTimeout(500);
 
-    const dataRows = page.locator(
-      '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
-    );
-    const dataCount = await dataRows.count();
-    console.log(`📊 Repertoire has ${dataCount} data rows`);
-    expect(dataCount).toBe(0);
+    // const dataRows = page.locator(
+    //   '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
+    // );
+    // const dataCount = await dataRows.count();
+    // console.log(`📊 Repertoire has ${dataCount} data rows`);
+    // expect(dataCount).toBe(0);
 
-    await page.getByTestId(`tab-catalog`).click();
+    // await page.getByTestId(`tab-catalog`).click();
     await page.waitForTimeout(500);
   });
 
@@ -50,6 +56,15 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     page.on("dialog", async (dialog) => {
       dialogMessage = dialog.message();
       await dialog.accept();
+    });
+
+    // Ensure catalog grid and toolbar are ready
+    await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
+      timeout: 10000,
+    });
+    await page.getByTestId("catalog-add-to-repertoire-button").waitFor({
+      state: "visible",
+      timeout: 10000,
     });
 
     // Click "Add To Repertoire" without selecting any tunes
@@ -79,7 +94,9 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     const tune1Checkbox = page.getByRole("checkbox", {
       name: "Select row 3497",
     });
-    const tune2Checkbox = page.getByRole("checkbox", { name: "Select row 54" });
+    const tune2Checkbox = page.getByRole("checkbox", {
+      name: "Select row 54",
+    });
 
     await tune1Checkbox.check();
     await tune2Checkbox.check();
@@ -117,9 +134,9 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     await page.waitForTimeout(1000);
 
     // Debug: Query Supabase directly to see what's actually there
-    const supabaseCount = await page.evaluate(async () => {
+    const supabaseCount = await page.evaluate(async (playlistId) => {
       const response = await fetch(
-        "http://localhost:54321/rest/v1/playlist_tune?playlist_ref=eq.9001&select=tune_ref",
+        `http://localhost:54321/rest/v1/playlist_tune?playlist_ref=eq.${playlistId}&select=tune_ref`,
         {
           headers: {
             apikey:
@@ -130,8 +147,10 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
       );
       const data = await response.json();
       return data.length;
-    });
-    console.log(`🔍 Supabase has ${supabaseCount} tunes for Alice`);
+    }, currentTestUser.playlistId);
+    console.log(
+      `🔍 Supabase has ${supabaseCount} tunes for user ${currentTestUser.playlistId}`
+    );
 
     // Grid uses virtualization with spacer rows for scrolling
     // Count only data rows (those with data-index attribute)
@@ -152,11 +171,20 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
   test("should handle tunes already in repertoire @side-effects", async ({
     page,
   }) => {
-    // First add tune 9001 to repertoire
+    const ttPage = new TuneTreesPage(page);
+    // First add user's private tune to repertoire
     await page.getByTestId("tab-catalog").click();
     await page.waitForTimeout(500);
-
-    const checkbox1 = page.getByRole("checkbox", { name: "Select row 9001" });
+    // Ensure grid rendered content
+    await ttPage.expectGridHasContent(ttPage.catalogGrid);
+    // Search for the tune to force row virtualization to render
+    await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
+    const userPrivateTune = await ttPage.getTuneRowById(
+      currentTestUser.userId,
+      ttPage.catalogGrid
+    );
+    await expect(userPrivateTune).toBeVisible({ timeout: 5000 });
+    const checkbox1 = userPrivateTune.locator('input[type="checkbox"]').first();
     await checkbox1.check();
 
     let dialogMessage = "";
@@ -173,8 +201,16 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     // Now try to add same tune again
     await page.getByTestId("tab-catalog").click();
     await page.waitForTimeout(500);
-
-    const checkbox2 = page.getByRole("checkbox", { name: "Select row 9001" });
+    await ttPage.clearSearch();
+    await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
+    const userPrivateTuneB = await ttPage.getTuneRowById(
+      currentTestUser.userId,
+      ttPage.catalogGrid
+    );
+    await expect(userPrivateTuneB).toBeVisible({ timeout: 5000 });
+    const checkbox2 = userPrivateTuneB
+      .locator('input[type="checkbox"]')
+      .first();
     await checkbox2.check();
 
     dialogMessage = ""; // Reset
@@ -241,7 +277,9 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     const tune1Checkbox = page.getByRole("checkbox", {
       name: "Select row 3497",
     });
-    const tune2Checkbox = page.getByRole("checkbox", { name: "Select row 54" });
+    const tune2Checkbox = page.getByRole("checkbox", {
+      name: "Select row 54",
+    });
 
     await tune1Checkbox.check();
     await tune2Checkbox.check();

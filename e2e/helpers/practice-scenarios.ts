@@ -6,177 +6,11 @@
  */
 
 import type { Page } from "@playwright/test";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "http://127.0.0.1:54321";
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
-
-/**
- * Practice scenario configurations
- */
-export interface PracticeScenario {
-  name: string;
-  description: string;
-  setup: () => Promise<void>;
-}
-
-/**
- * Get authenticated Supabase client for Alice
- * Uses Alice's test credentials from environment
- */
-let cachedAliceClient: { supabase: SupabaseClient; userId: string } | null =
-  null;
-
-/**
- * Force a fresh Supabase client (clears cache)
- * Call this at the start of each setup function to ensure clean state
- */
-export function resetAliceClient() {
-  cachedAliceClient = null;
-}
-
-async function getAliceClient() {
-  if (cachedAliceClient) {
-    return cachedAliceClient;
-  }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: "alice.test@tunetrees.test",
-    password: process.env.ALICE_TEST_PASSWORD || "TestPassword123!",
-  });
-
-  if (error) {
-    throw new Error(`Failed to authenticate Alice: ${error.message}`);
-  }
-
-  cachedAliceClient = { supabase, userId: data.user.id };
-  return cachedAliceClient;
-}
-
-/**
- * Reset Alice's playlist_tune scheduled dates to NULL (unscheduled state)
- */
-export async function resetScheduledDates() {
-  const { supabase } = await getAliceClient();
-
-  const { error } = await supabase
-    .from("playlist_tune")
-    .update({ scheduled: null })
-    .eq("playlist_ref", 9001);
-
-  if (error) {
-    throw new Error(`Failed to reset scheduled dates: ${error.message}`);
-  }
-
-  console.log("✅ Reset scheduled dates to NULL");
-}
-
-/**
- * Delete Alice's active practice queue
- */
-export async function deleteActivePracticeQueue() {
-  const { supabase } = await getAliceClient();
-
-  const { error } = await supabase
-    .from("daily_practice_queue")
-    .delete()
-    .eq("user_ref", 9001)
-    .eq("playlist_ref", 9001);
-
-  if (error) {
-    throw new Error(`Failed to delete practice queue: ${error.message}`);
-  }
-
-  console.log("✅ Deleted active practice queue");
-}
-
-/**
- * Schedule Alice's tunes for practice (sets playlist_tune.current)
- *
- * @param daysAgo - How many days in the past to schedule (0 = today)
- * @param tuneRefs - Specific tune IDs to schedule (defaults to all Alice's tunes)
- */
-export async function scheduleTunesForPractice(
-  daysAgo: number = 0,
-  tuneRefs: number[] = [9001, 9002]
-) {
-  const { supabase } = await getAliceClient();
-
-  const scheduledDate = new Date();
-  scheduledDate.setDate(scheduledDate.getDate() - daysAgo);
-  const scheduledStr = scheduledDate.toISOString();
-
-  for (const tuneRef of tuneRefs) {
-    const { error } = await supabase
-      .from("playlist_tune")
-      .update({ scheduled: scheduledStr })
-      .eq("playlist_ref", 9001)
-      .eq("tune_ref", tuneRef);
-
-    if (error) {
-      throw new Error(`Failed to schedule tune ${tuneRef}: ${error.message}`);
-    }
-  }
-
-  console.log(`✅ Scheduled ${tuneRefs.length} tunes (${daysAgo} days ago)`);
-}
-
-/**
- * SCENARIO: Fresh account with unscheduled tunes
- * - Tunes exist in repertoire but not scheduled for practice
- * - Practice queue should be empty
- */
-export async function setupFreshAccountScenario() {
-  await resetScheduledDates();
-  await deleteActivePracticeQueue();
-  console.log("📋 Scenario: Fresh Account (unscheduled tunes)");
-}
-
-/**
- * SCENARIO: Account with lapsed tunes (overdue for practice)
- * - Tunes scheduled 7 days ago (beyond today but within delinquency window)
- * - Should appear in Q2 (recently lapsed) bucket
- */
-export async function setupLapsedTunesScenario() {
-  await resetScheduledDates();
-  await deleteActivePracticeQueue();
-  await scheduleTunesForPractice(7); // 7 days ago
-  console.log("📋 Scenario: Lapsed Tunes (7 days overdue)");
-}
-
-/**
- * SCENARIO: Account with tunes due today
- * - Tunes scheduled for today
- * - Should appear in Q1 (due today) bucket
- */
-export async function setupDueTodayScenario() {
-  await resetScheduledDates();
-  await deleteActivePracticeQueue();
-  await scheduleTunesForPractice(0); // Today
-  console.log("📋 Scenario: Tunes Due Today");
-}
-
-/**
- * SCENARIO: Mixed - one tune due today, one lapsed
- */
-export async function setupMixedScenario() {
-  await resetScheduledDates();
-  await deleteActivePracticeQueue();
-  await scheduleTunesForPractice(0, [9001]); // Tune 9001 due today
-  await scheduleTunesForPractice(7, [9002]); // Tune 9002 lapsed 7 days ago
-  console.log("📋 Scenario: Mixed (1 due today, 1 lapsed)");
-}
-
-/**
- * Available test scenarios
- */
-export const PRACTICE_SCENARIOS = {
-  freshAccount: setupFreshAccountScenario,
-  lapsedTunes: setupLapsedTunesScenario,
-  dueToday: setupDueTodayScenario,
-  mixed: setupMixedScenario,
-} as const;
+// ============================================================================
+// LEGACY ALICE-SPECIFIC FUNCTIONS (DEPRECATED)
+// All new tests should use the parallel-safe functions below
+// ============================================================================
 
 /**
  * Fast local seeding via browser Test API (preferred for E2E)
@@ -258,56 +92,18 @@ export async function clearTunetreesStorageDB(page: Page) {
       tryDelete();
     });
     console.log("✅ Cleared local IndexedDB cache");
-    // Also clear other client-side caches so tests start truly fresh
 
-    // 1) Clear localStorage & sessionStorage (non-HttpOnly)
+    // Clear app caches (but preserve auth state for parallel workers)
+
+    // 1) Clear sessionStorage only (non-persistent storage)
     try {
-      // Optionally clear localStorage if you want to remove client-side auth/state.
-      // Be careful: some flows expect auth to remain in localStorage, so keep commented when needed.
-      // localStorage.clear();
-
       sessionStorage.clear();
-
-      // Clear service-worker related CacheStorage entries by common patterns
-      if (typeof caches !== "undefined") {
-        const pattern =
-          /workbox|precache|runtime|vite-pwa|workbox-precache|workbox-runtime/i;
-        const cacheNames = await caches.keys();
-        const swCaches = cacheNames.filter((n) => pattern.test(n));
-        await Promise.all(swCaches.map((n) => caches.delete(n)));
-        if (swCaches.length) {
-          console.log("✅ Cleared SW CacheStorage caches:", swCaches);
-        } else {
-          console.log("ℹ️ No SW-specific CacheStorage caches found");
-        }
-      }
-
-      console.log("✅ Cleared sessionStorage (and selected SW caches)");
+      console.log("✅ Cleared sessionStorage");
     } catch (err) {
-      console.warn("Failed to clear local/session storage or SW caches:", err);
+      console.warn("Failed to clear sessionStorage:", err);
     }
 
-    // 2) Clear document cookies (note: HttpOnly cookies cannot be removed from JS)
-    try {
-      document.cookie
-        .split(";")
-        .map((c) => c.trim())
-        .filter(Boolean)
-        .forEach((cookie) => {
-          const eq = cookie.indexOf("=");
-          const name = eq > -1 ? cookie.slice(0, eq) : cookie;
-          // attempt removal for common scopes
-          // biome-ignore lint/suspicious/noDocumentCookie: this is just test code, so it's ok
-          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-          // biome-ignore lint/suspicious/noDocumentCookie: this is just test code, so it's ok
-          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${location.hostname}`;
-        });
-      console.log("✅ Cleared document cookies (non-HttpOnly)");
-    } catch (err) {
-      console.warn("Failed to clear document cookies:", err);
-    }
-
-    // 3) Clear CacheStorage (service-worker / workbox caches)
+    // 2) Clear CacheStorage (service-worker / workbox caches for app code)
     if (typeof caches !== "undefined") {
       try {
         const cacheNames = await caches.keys();
@@ -318,26 +114,7 @@ export async function clearTunetreesStorageDB(page: Page) {
       }
     }
 
-    // 4) Unregister service workers so SW-controlled caches/clients are removed
-    if (navigator?.serviceWorker) {
-      try {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(
-          regs.map(async (reg) => {
-            try {
-              await reg.unregister();
-            } catch (e) {
-              console.warn("Failed to unregister service worker:", e);
-            }
-          })
-        );
-        console.log("✅ Unregistered service workers");
-      } catch (err) {
-        console.warn("Failed to get/unregister service workers:", err);
-      }
-    }
-
-    // 5) Clear any in-memory test hooks the app may have exposed
+    // 3) Clear any in-memory test hooks the app may have exposed
     try {
       if ((window as any).__ttTestApi) {
         if (typeof (window as any).__ttTestApi.dispose === "function") {
@@ -407,265 +184,27 @@ async function waitForSyncComplete(
   );
 }
 
-/**
- * Remove all tunes from Alice's repertoire (playlist_tune table)
- */
-export async function clearAliceRepertoire() {
-  const { supabase } = await getAliceClient();
+// ============================================================================
+// PARALLEL-SAFE SETUP FUNCTIONS (support multiple test users)
+// ============================================================================
 
-  // First, check what's there
-  const { data: before, error: readError } = await supabase
-    .from("playlist_tune")
-    .select("tune_ref")
-    .eq("playlist_ref", 9001);
-
-  if (readError) {
-    throw new Error(`Failed to read repertoire: ${readError.message}`);
-  }
-  console.log(`🗑️  Deleting ${before?.length || 0} tunes from repertoire`);
-
-  const { error } = await supabase
-    .from("playlist_tune")
-    .delete()
-    .eq("playlist_ref", 9001);
-
-  if (error) {
-    throw new Error(`Failed to clear repertoire: ${error.message}`);
-  }
-
-  // Verify it's actually cleared
-  // Wait up to 15s for playlist_tune rows to be gone, polling every 500ms
-  const timeoutMs = 15000;
-  const retryDelayMs = 500;
-  const start = Date.now();
-  let finalCount: number | null = null;
-
-  while (Date.now() - start < timeoutMs) {
-    const { count, error: countError } = await supabase
-      .from("playlist_tune")
-      .select("tune_ref", { count: "exact", head: true })
-      .eq("playlist_ref", 9001);
-
-    if (countError) {
-      // transient read error - warn and retry
-      // eslint-disable-next-line no-console
-      console.warn(
-        "Transient error reading playlist_tune count, retrying:",
-        countError.message
-      );
-    } else {
-      // Preserve null to detect unexpected null responses from Supabase
-      finalCount = count ?? null;
-      // If API returned null, fail immediately per test expectation
-      if (finalCount === null) {
-        throw new Error(
-          "Failed to verify deletion: Supabase returned null count for playlist_tune"
-        );
-      }
-      if (finalCount === 0) break;
-      // Otherwise finalCount > 0 -> keep retrying until timeout then surface error below
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-  }
-
-  // After retries, if count is still null or greater than zero, raise an error
-  if (finalCount === null || finalCount > 0) {
-    throw new Error(
-      `Failed to clear playlist_tune: expected 0 rows, last known count: ${finalCount}`
-    );
-  }
-
-  // Fetch remaining rows (if any) for accurate logging
-  const { data: after, error: afterError } = await supabase
-    .from("playlist_tune")
-    .select("tune_ref")
-    .eq("playlist_ref", 9001);
-
-  if (afterError) {
-    throw new Error(
-      `Failed to read repertoire after delete: ${afterError.message}`
-    );
-  }
-
-  console.log(
-    `✅ Cleared Alice's repertoire (${after?.length || 0} remaining)`
-  );
-}
+import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
+import { getTestUserClient, type TestUser } from "./test-users";
 
 /**
- * Seed Alice's repertoire with specific tunes
+ * Parallel-safe version of setupDeterministicTest
+ * Sets up a deterministic test state for a specific user
  */
-export async function seedAliceRepertoire(tuneIds: number[]) {
-  const { supabase } = await getAliceClient();
-
-  // Verify playlist_tune is empty for Alice's playlist before seeding
-  {
-    const timeoutMs = 16000;
-    const retryDelayMs = 1000;
-    const start = Date.now();
-    let finalCount: number | null = null;
-
-    while (Date.now() - start < timeoutMs) {
-      const { count, error } = await supabase
-        .from("playlist_tune")
-        .select("tune_ref", { count: "exact", head: true })
-        .eq("playlist_ref", 9001);
-
-      if (error) {
-        // Transient read error - warn and retry
-        // eslint-disable-next-line no-console
-        console.warn(
-          "Transient error querying playlist_tune, retrying:",
-          error.message
-        );
-      } else {
-        finalCount = count ?? 0;
-        if (finalCount === 0) break;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-    }
-
-    // If we never got a successful read, try one final time and fail on error
-    if (finalCount === null) {
-      const { count, error } = await supabase
-        .from("playlist_tune")
-        .select("tune_ref", { count: "exact", head: true })
-        .eq("playlist_ref", 9001);
-
-      if (error) {
-        throw new Error(
-          `Failed to query playlist_tune after retries: ${error.message}`
-        );
-      }
-      finalCount = count ?? 0;
-    }
-
-    if (finalCount > 0) {
-      // Log actual rows for debugging
-      const { data: debugRows } = await supabase
-        .from("playlist_tune")
-        .select("*")
-        .eq("playlist_ref", 9001);
-      console.error(
-        `❌ SEED PRE-CHECK FAILED: Found ${finalCount} rows:`,
-        JSON.stringify(debugRows, null, 2)
-      );
-
-      throw new Error(
-        `Refusing to seed repertoire: playlist_tune contains ${finalCount} row(s). Clear repertoire before seeding.`
-      );
-    }
-  }
-
-  for (const tuneId of tuneIds) {
-    const { error } = await supabase
-      .from("playlist_tune")
-      .upsert({
-        playlist_ref: 9001,
-        tune_ref: tuneId,
-        current: null, // Not currently practicing
-        learned: null, // Not yet learned
-        scheduled: null, // Not scheduled for practice
-        goal: "recall",
-        deleted: false,
-        sync_version: 1,
-        last_modified_at: new Date().toISOString(),
-        device_id: "test-seed",
-      })
-      .eq("playlist_ref", 9001)
-      .eq("tune_ref", tuneId);
-
-    if (error) {
-      throw new Error(`Failed to seed tune ${tuneId}: ${error.message}`);
-    }
-  }
-
-  // Verify rows reached expected count in Supabase (retry loop)
-  {
-    const timeoutMs: number = 8000;
-    const retryDelayMs: number = 500;
-    const start = Date.now();
-    let matched = false;
-
-    while (Date.now() - start < timeoutMs) {
-      const { count, error } = await supabase
-        .from("playlist_tune")
-        .select("*", { count: "exact", head: true })
-        .eq("playlist_ref", 9001)
-        .in("tune_ref", tuneIds);
-
-      if (error) {
-        // Transient read error - warn and retry
-        // eslint-disable-next-line no-console
-        console.warn(
-          "Transient error reading playlist_tune count, retrying:",
-          error.message
-        );
-      } else {
-        const currentCount = count ?? 0;
-        if (currentCount === tuneIds.length) {
-          matched = true;
-          break;
-        }
-        // eslint-disable-next-line no-console
-        console.log(
-          `Waiting for seeded tunes to appear: ${currentCount}/${tuneIds.length}`
-        );
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-    }
-
-    if (!matched) {
-      console.warn(
-        `⚠️ Timed out waiting for playlist_tune to contain ${tuneIds.length} rows`
-      );
-    }
-
-    // Fetch final rows for accurate logging
-    const { data: finalRows, error: finalError } = await supabase
-      .from("playlist_tune")
-      .select("tune_ref")
-      .eq("playlist_ref", 9001)
-      .in("tune_ref", tuneIds);
-
-    if (finalError) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "Failed to read back seeded playlist_tune rows:",
-        finalError
-      );
-    } else {
-      // eslint-disable-next-line no-console
-      console.log(
-        `✅ Verified seeded tunes present: ${finalRows?.length ?? 0}/${
-          tuneIds.length
-        }`
-      );
-    }
-  }
-
-  console.log(`✅ Seeded ${tuneIds.length} tunes in repertoire`);
-}
-
-/**
- * MASTER SETUP: Deterministic test state
- * 1. Navigate to page (if not already)
- * 2. Setup Supabase state
- * 3. Clear local cache
- * 4. Reload page to trigger fresh sync
- */
-export async function setupDeterministicTest(
+export async function setupDeterministicTestParallel(
   page: Page,
+  user: TestUser,
   opts: {
     clearRepertoire?: boolean;
     seedRepertoire?: number[];
     scheduleTunes?: { tuneIds: number[]; daysAgo: number };
   } = {}
 ) {
-  console.log("🔧 Setting up deterministic test state...");
+  console.log(`🔧 [${user.name}] Setting up deterministic test state...`);
 
   // Step 0: Navigate to page if not already (needed for IndexedDB access)
   const currentUrl = page.url();
@@ -678,154 +217,395 @@ export async function setupDeterministicTest(
     await page.waitForTimeout(1000);
   }
 
-  // Step 1: Clear Supabase state
+  // Step 1: Clear user's state
   if (opts.clearRepertoire) {
-    await clearAliceRepertoire();
+    await clearUserRepertoire(user);
   }
-  await deleteActivePracticeQueue();
-  await resetScheduledDates();
+  await clearUserTable(user, "daily_practice_queue");
+  await clearUserTable(user, "practice_record");
 
-  // Step 2: Seed Supabase state
+  // Step 2: Seed user's repertoire if specified
   if (opts.seedRepertoire && opts.seedRepertoire.length > 0) {
-    await clearAliceRepertoire();
-    await seedAliceRepertoire(opts.seedRepertoire);
-  }
-  if (opts.scheduleTunes) {
-    await scheduleTunesForPractice(
-      opts.scheduleTunes.daysAgo,
-      opts.scheduleTunes.tuneIds
-    );
+    await seedUserRepertoire(user, opts.seedRepertoire);
   }
 
-  // Step 3: Clear local cache
+  // Step 3: Schedule tunes if specified
+  if (opts.scheduleTunes) {
+    const userKey = user.email.split(".")[0]; // alice.test@... → alice
+    const { supabase } = await getTestUserClient(userKey);
+
+    const daysAgo = opts.scheduleTunes.daysAgo;
+    const pastDate = new Date();
+    pastDate.setDate(pastDate.getDate() - daysAgo);
+    const scheduledDateStr = pastDate.toISOString();
+
+    for (const tuneId of opts.scheduleTunes.tuneIds) {
+      const { error } = await supabase
+        .from("playlist_tune")
+        .update({ scheduled: scheduledDateStr })
+        .eq("playlist_ref", user.playlistId)
+        .eq("tune_ref", tuneId);
+
+      if (error) {
+        throw new Error(`Failed to schedule tune ${tuneId}: ${error.message}`);
+      }
+    }
+  }
+
+  // Step 4: Clear local cache
   await clearTunetreesStorageDB(page);
 
-  // Step 4: Reload page to trigger fresh sync
+  // Step 5: Reload page to trigger fresh sync
   await page.reload();
   await page.waitForTimeout(3000); // Wait for sync to complete
 
-  console.log("✅ Deterministic test state ready");
+  console.log(`✅ [${user.name}] Deterministic test state ready`);
 }
 
 /**
- * Helper: Clear a specific Supabase table
+ * Clear repertoire for a specific test user (parallel-safe)
  */
-async function clearSupabaseTable(tableName: string) {
-  const { supabase } = await getAliceClient();
+export async function clearUserRepertoire(user: TestUser) {
+  const userKey = user.email.split(".")[0]; // alice.test@... → alice
+  const { supabase } = await getTestUserClient(userKey);
 
-  // Different tables use different column names for user identification
-  let query = supabase.from(tableName).delete();
+  const { data: before, error: readError } = await supabase
+    .from("playlist_tune")
+    .select("tune_ref")
+    .eq("playlist_ref", user.playlistId);
 
-  if (tableName === "practice_record" || tableName === "daily_practice_queue") {
-    // These tables use playlist_ref to identify user's data
-    query = query.eq("playlist_ref", 9001);
-  } else if (tableName === "table_transient_data") {
-    // This table uses user_id
-    query = query.eq("user_id", 9001);
-  } else {
-    // Default: assume user_ref
-    query = query.eq("user_ref", 9001);
+  if (readError) {
+    throw new Error(`Failed to read repertoire: ${readError.message}`);
+  }
+  console.log(
+    `🗑️  [${user.name}] Deleting ${before?.length || 0} tunes from repertoire`
+  );
+
+  const { error } = await supabase
+    .from("playlist_tune")
+    .delete()
+    .eq("playlist_ref", user.playlistId);
+
+  if (error) {
+    throw new Error(`Failed to clear repertoire: ${error.message}`);
   }
 
-  const { error } = await query;
+  // Verify it's actually cleared
+  const timeoutMs = 15000;
+  const retryDelayMs = 500;
+  const start = Date.now();
+  let finalCount: number | null = null;
 
-  if (!error) {
-    // Verify deletion count (head:true returns count)
-    const timeoutMs = 8000;
-    const retryDelayMs = 500;
+  while (Date.now() - start < timeoutMs) {
+    const { count, error: countError } = await supabase
+      .from("playlist_tune")
+      .select("tune_ref", { count: "exact", head: true })
+      .eq("playlist_ref", user.playlistId);
+
+    if (countError) {
+      console.warn(
+        `[${user.name}] Transient error reading playlist_tune count, retrying:`,
+        countError.message
+      );
+    } else {
+      finalCount = count ?? null;
+      if (finalCount === null) {
+        throw new Error(
+          `Failed to verify deletion: Supabase returned null count for playlist_tune`
+        );
+      }
+      if (finalCount === 0) break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+  }
+
+  if (finalCount === null || finalCount > 0) {
+    throw new Error(
+      `Failed to clear playlist_tune: expected 0 rows, last known count: ${finalCount}`
+    );
+  }
+
+  console.log(`✅ [${user.name}] Cleared repertoire (0 remaining)`);
+}
+
+/**
+ * Seed repertoire for a specific test user (parallel-safe)
+ */
+export async function seedUserRepertoire(user: TestUser, tuneIds: number[]) {
+  const userKey = user.email.split(".")[0]; // alice.test@... → alice
+  const { supabase } = await getTestUserClient(userKey);
+
+  // Verify playlist_tune is empty before seeding
+  {
+    const timeoutMs = 16000;
+    const retryDelayMs = 1000;
     const start = Date.now();
     let finalCount: number | null = null;
 
     while (Date.now() - start < timeoutMs) {
-      const { count, error: countError } = await supabase
-        .from(tableName)
-        .select("*", { count: "exact", head: true });
+      const { count, error } = await supabase
+        .from("playlist_tune")
+        .select("tune_ref", { count: "exact", head: true })
+        .eq("playlist_ref", user.playlistId);
 
-      if (countError) {
-        // Treat "no rows" style errors as empty
-        if (countError.message?.includes("no rows")) {
-          finalCount = 0;
-          break;
-        }
-        // Transient read error - warn and retry
-        // eslint-disable-next-line no-console
+      if (error) {
         console.warn(
-          `Transient error reading count for ${tableName}, retrying:`,
-          countError.message
+          `[${user.name}] Transient error querying playlist_tune, retrying:`,
+          error.message
         );
       } else {
         finalCount = count ?? 0;
         if (finalCount === 0) break;
       }
 
-      await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     }
 
-    if (finalCount === 0) {
-      console.log(`✅ Cleared ${tableName} (remaining rows: 0)`);
-    } else {
+    if (finalCount === null) {
+      const { count, error } = await supabase
+        .from("playlist_tune")
+        .select("tune_ref", { count: "exact", head: true })
+        .eq("playlist_ref", user.playlistId);
+
+      if (error) {
+        throw new Error(
+          `Failed to query playlist_tune after retries: ${error.message}`
+        );
+      }
+      finalCount = count ?? 0;
+    }
+
+    if (finalCount > 0) {
+      const { data: debugRows } = await supabase
+        .from("playlist_tune")
+        .select("*")
+        .eq("playlist_ref", user.playlistId);
       console.error(
-        `❌ Timed out waiting for ${tableName} to be empty. Last known count: ${finalCount}`
+        `❌ [${user.name}] SEED PRE-CHECK FAILED: Found ${finalCount} rows:`,
+        JSON.stringify(debugRows, null, 2)
+      );
+
+      throw new Error(
+        `Refusing to seed repertoire: playlist_tune contains ${finalCount} row(s). Clear repertoire before seeding.`
       );
     }
   }
 
-  if (error && !error.message.includes("no rows")) {
-    console.error(`Failed to clear ${tableName}:`, error);
+  const maxAttempts = 5;
+  for (const tuneId of tuneIds) {
+    let attempt = 0;
+    while (true) {
+      attempt++;
+      const { error } = await supabase
+        .from("playlist_tune")
+        .upsert({
+          playlist_ref: user.playlistId,
+          tune_ref: tuneId,
+          current: null,
+          learned: null,
+          scheduled: null,
+          goal: "recall",
+          deleted: false,
+          sync_version: 1,
+          last_modified_at: new Date().toISOString(),
+          device_id: "test-seed",
+        })
+        .eq("playlist_ref", user.playlistId)
+        .eq("tune_ref", tuneId);
+
+      if (!error) break;
+
+      if (attempt >= maxAttempts) {
+        throw new Error(
+          `Failed to seed tune ${tuneId} after ${attempt} attempts: ${error.message}`
+        );
+      }
+
+      const backoffMs = Math.min(1000 * 2 ** (attempt - 1), 5000);
+      const jitter = Math.floor(Math.random() * 200);
+      const delay = backoffMs + jitter;
+
+      console.warn(
+        `[${user.name}] Transient error seeding tune ${tuneId} (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${delay}ms`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
   }
+
+  // Verify rows reached expected count
+  {
+    const timeoutMs: number = 8000;
+    const retryDelayMs: number = 500;
+    const start = Date.now();
+    let matched = false;
+
+    while (Date.now() - start < timeoutMs) {
+      const { count, error } = await supabase
+        .from("playlist_tune")
+        .select("*", { count: "exact", head: true })
+        .eq("playlist_ref", user.playlistId)
+        .in("tune_ref", tuneIds);
+
+      if (error) {
+        console.warn(
+          `[${user.name}] Transient error reading playlist_tune count, retrying:`,
+          error.message
+        );
+      } else {
+        const currentCount = count ?? 0;
+        if (currentCount === tuneIds.length) {
+          matched = true;
+          break;
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    }
+
+    if (!matched) {
+      console.warn(
+        `⚠️ [${user.name}] Timed out waiting for playlist_tune to contain ${tuneIds.length} rows`
+      );
+    }
+  }
+
+  console.log(`✅ [${user.name}] Seeded ${tuneIds.length} tunes in repertoire`);
 }
 
-/**
- * Helper: Update tune's scheduled date
- */
-async function updateTuneScheduled(
-  tuneId: number,
-  scheduledDate: string | null
+function applyTableQueryFilters(
+  tableName: string,
+  query: PostgrestFilterBuilder<any, any, any, null, string, unknown, "DELETE">,
+  user: TestUser
 ) {
-  const { supabase } = await getAliceClient();
+  if (tableName === "daily_practice_queue") {
+    // Belt-and-suspenders: filter by both playlist and user for safety
+    query = query
+      .eq("playlist_ref", user.playlistId)
+      .eq("user_ref", user.userId);
+  } else if (tableName === "practice_record") {
+    // practice_record is keyed by playlist_ref
+    query = query.eq("playlist_ref", user.playlistId);
+  } else if (tableName === "table_transient_data") {
+    query = query.eq("user_id", user.userId);
+  } else {
+    query = query.eq("user_ref", user.userId);
+  }
+  return query;
+}
 
-  const { error } = await supabase
-    .from("playlist_tune")
-    .update({ scheduled: scheduledDate })
-    .eq("tune_ref", tuneId)
-    .eq("user_ref", 9001)
-    .eq("playlist_ref", 9001);
+/**
+ * Clear a Supabase table for a specific user (parallel-safe)
+ */
+async function clearUserTable(user: TestUser, tableName: string) {
+  const userKey = user.email.split(".")[0]; // alice.test@... → alice
+  const { supabase } = await getTestUserClient(userKey);
 
-  if (error) {
-    console.error(`Failed to update scheduled date for tune ${tuneId}:`, error);
+  let query = supabase.from(tableName).delete();
+
+  query = applyTableQueryFilters(tableName, query, user);
+
+  const { error } = await query;
+
+  if (error && !error.message.includes("no rows")) {
+    console.error(`[${user.name}] Failed to clear ${tableName}:`, error);
+  } else {
+    console.log(`✅ [${user.name}] Cleared ${tableName}`);
+  }
+  // Verify table is empty (polling)
+  {
+    const timeoutMs = 8000;
+    const retryDelayMs = 500;
+    const start = Date.now();
+    let finalCount: number | null = null;
+
+    while (Date.now() - start < timeoutMs) {
+      // Build count query with same safety filters as the delete above
+      let countQuery = supabase.from(tableName).select("*", {
+        count: "exact",
+        head: true,
+      }) as any;
+
+      countQuery = applyTableQueryFilters(tableName, countQuery, user);
+
+      const { count, error: countError } = await countQuery;
+
+      if (countError) {
+        console.warn(
+          `[${user.name}] Transient error reading ${tableName} count, retrying:`,
+          countError.message
+        );
+      } else {
+        finalCount = count ?? 0;
+        if (finalCount === 0) {
+          break;
+        }
+        console.log(
+          `[${user.name}] Waiting for ${tableName} to drain: ${finalCount} remaining`
+        );
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    }
+
+    // Final verification
+    if (finalCount === null) {
+      // Try one final time to get an authoritative count
+      let finalQuery = supabase.from(tableName).select("*", {
+        count: "exact",
+        head: true,
+      }) as any;
+
+      finalQuery = applyTableQueryFilters(tableName, finalQuery, user);
+
+      const { count: finalCountRead, error: finalReadError } = await finalQuery;
+      if (finalReadError) {
+        throw new Error(
+          `[${user.name}] Failed to verify ${tableName} deletion after retries: ${finalReadError.message}`
+        );
+      }
+      finalCount = finalCountRead ?? 0;
+    }
+
+    if (finalCount == null || finalCount > 0) {
+      throw new Error(
+        `[${user.name}] Failed to clear ${tableName}: expected 0 rows, last known count: ${finalCount}`
+      );
+    }
+
+    console.log(`✅ [${user.name}] Verified ${tableName} is empty`);
   }
 }
 
 /**
- * PRACTICE TEST SETUP
- * Fast, deterministic setup for practice-related tests.
- * Clears practice state but keeps catalog intact.
+ * PARALLEL-SAFE PRACTICE SETUP
+ * Works with any test user - safe for parallel execution
  */
-export async function setupForPracticeTests(
+export async function setupForPracticeTestsParallel(
   page: Page,
+  user: TestUser,
   opts?: {
-    /** Tune IDs to have in Alice's repertoire (default: [9001, 3497]) */
     repertoireTunes?: number[];
-    /** Which tab to navigate to (default: 'practice') */
     startTab?: "practice" | "repertoire" | "catalog";
   }
 ) {
   const { repertoireTunes = [9001, 3497], startTab = "practice" } = opts ?? {};
 
-  console.log("🔧 [setupForPracticeTests] Starting...");
+  console.log(`🔧 [${user.name}] setupForPracticeTests Starting...`);
 
-  // 1. Clear practice-specific tables only (fast - don't touch catalog!)
-  await clearSupabaseTable("practice_record");
-  await clearSupabaseTable("daily_practice_queue");
-  await clearSupabaseTable("table_transient_data");
+  // 1. Clear practice-specific tables
+  await clearUserTable(user, "practice_record");
+  await clearUserTable(user, "daily_practice_queue");
+  await clearUserTable(user, "table_transient_data");
+  await clearUserTable(user, "tune_override");
 
-  // 2. Reset Alice's repertoire to known state
-  await clearAliceRepertoire();
+  // 2. Reset repertoire
+  await clearUserRepertoire(user);
   if (repertoireTunes.length > 0) {
-    await seedAliceRepertoire(repertoireTunes);
+    await seedUserRepertoire(user, repertoireTunes);
   }
 
-  // 3. Navigate to ensure we're on a valid origin
+  // 3. Navigate if needed
   const currentUrl = page.url();
   if (
     !currentUrl ||
@@ -836,12 +616,11 @@ export async function setupForPracticeTests(
     await page.waitForTimeout(1000);
   }
 
-  // 4. Clear ONLY IndexedDB cache (keep auth in localStorage!)
+  // 4. Clear IndexedDB cache
   await clearTunetreesStorageDB(page);
 
-  // 5. Reload to trigger fresh sync from Supabase
+  // 5. Reload to trigger fresh sync
   await page.reload();
-  // Wait longer for sync to complete (complex sync can take time)
   await page.waitForTimeout(5000);
 
   // 6. Navigate to starting tab
@@ -852,37 +631,119 @@ export async function setupForPracticeTests(
   await page.waitForTimeout(500);
 
   console.log(
-    `✅ [setupForPracticeTests] Ready with ${repertoireTunes.length} tunes in repertoire`
+    `✅ [${user.name}] setupForPracticeTests Ready with ${repertoireTunes.length} tunes`
   );
 }
 
 /**
- * CATALOG TEST SETUP
- * Fast setup for catalog/import tests.
- * Keeps catalog intact, clears user's repertoire.
+ * PARALLEL-SAFE REPERTOIRE SETUP
+ * Works with any test user - safe for parallel execution
  */
-export async function setupForCatalogTests(
+export async function setupForRepertoireTestsParallel(
   page: Page,
+  user: TestUser,
+  opts: {
+    repertoireTunes: number[];
+    scheduleTunes?: boolean;
+    scheduleDaysAgo?: number;
+  }
+) {
+  const { repertoireTunes, scheduleTunes = false, scheduleDaysAgo = 0 } = opts;
+
+  console.log(`🔧 [${user.name}] setupForRepertoireTests Starting...`);
+
+  // 1. Clear practice state
+  await clearUserTable(user, "practice_record");
+  await clearUserTable(user, "daily_practice_queue");
+  await clearUserTable(user, "table_transient_data");
+  await clearUserTable(user, "tune_override");
+
+  // 2. Reset repertoire
+  await clearUserRepertoire(user);
+  await seedUserRepertoire(user, repertoireTunes);
+
+  // 3. Optionally schedule tunes
+  if (scheduleTunes) {
+    const userKey = user.email.split(".")[0]; // alice.test@... → alice
+    const { supabase } = await getTestUserClient(userKey);
+    const scheduleDate = new Date();
+    scheduleDate.setDate(scheduleDate.getDate() - scheduleDaysAgo);
+    const scheduleDateStr = scheduleDate.toISOString();
+
+    for (const tuneId of repertoireTunes) {
+      const { error } = await supabase
+        .from("playlist_tune")
+        .update({ scheduled: scheduleDateStr })
+        .eq("tune_ref", tuneId)
+        .eq("playlist_ref", user.playlistId);
+
+      if (error) {
+        console.error(
+          `[${user.name}] Failed to update scheduled date for tune ${tuneId}:`,
+          error
+        );
+      }
+    }
+  }
+
+  // 4. Navigate if needed
+  const currentUrl = page.url();
+  if (
+    !currentUrl ||
+    currentUrl === "about:blank" ||
+    currentUrl.startsWith("data:")
+  ) {
+    await page.goto("http://localhost:5173/");
+    await page.waitForTimeout(1000);
+  }
+
+  // 5. Clear IndexedDB cache
+  await clearTunetreesStorageDB(page);
+
+  // 6. Reload to trigger fresh sync
+  await page.reload();
+  await page.waitForTimeout(5000);
+
+  // 7. Navigate to repertoire tab
+  await page.waitForSelector('[data-testid="tab-repertoire"]', {
+    timeout: 20000,
+  });
+  await page.getByTestId("tab-repertoire").click();
+  await page.waitForTimeout(1000);
+
+  console.log(
+    `✅ [${user.name}] setupForRepertoireTests Ready with ${
+      repertoireTunes.length
+    } tunes ${scheduleTunes ? "(scheduled)" : "(unscheduled)"}`
+  );
+}
+
+/**
+ * PARALLEL-SAFE CATALOG SETUP
+ * Works with any test user - safe for parallel execution
+ */
+export async function setupForCatalogTestsParallel(
+  page: Page,
+  user: TestUser,
   opts?: {
-    /** Whether to start with empty repertoire (default: true) */
     emptyRepertoire?: boolean;
-    /** Which tab to navigate to (default: 'catalog') */
     startTab?: "practice" | "repertoire" | "catalog";
   }
 ) {
   const { emptyRepertoire = true, startTab = "catalog" } = opts ?? {};
 
-  console.log("🔧 [setupForCatalogTests] Starting...");
+  console.log(`🔧 [${user.name}] setupForCatalogTests Starting...`);
 
   // 1. Clear only user's repertoire (keep catalog!)
   if (emptyRepertoire) {
-    await clearAliceRepertoire();
+    await clearUserRepertoire(user);
   }
 
   // 2. Clear practice state
-  await clearSupabaseTable("practice_record");
-  await clearSupabaseTable("daily_practice_queue");
-  await clearSupabaseTable("table_transient_data");
+  await clearUserTable(user, "practice_record");
+  await clearUserTable(user, "daily_practice_queue");
+  await clearUserTable(user, "table_transient_data");
+  await clearUserTable(user, "tune_override");
 
   // 3. Navigate to ensure valid origin
   const currentUrl = page.url();
@@ -908,10 +769,11 @@ export async function setupForCatalogTests(
 
   const playlistLocator = page.getByTestId("playlist-dropdown-button");
 
-  // wait for the playlist dropdown to be visible and its title to contain "Irish Flute"
+  // wait for the playlist dropdown to be visible
   await playlistLocator.waitFor({ state: "visible", timeout: 10000 });
   const playlistDropdownButton = page.getByTestId("playlist-dropdown-button");
-  const expectedTitle = "Irish Flute (9001)";
+  // Playlist name is computed as "Irish Flute (playlistId)" when name column is NULL
+  const expectedTitle = `Irish Flute (${user.playlistId})`;
   const timeoutMs = 20000;
   const start = Date.now();
   let innerText = "";
@@ -926,7 +788,7 @@ export async function setupForCatalogTests(
 
     innerText = innerText.trim();
     if (innerText === expectedTitle) {
-      console.log(`✅ Playlist title matched: ${innerText}`);
+      console.log(`✅ [${user.name}] Playlist title matched: ${innerText}`);
       break;
     }
 
@@ -935,24 +797,19 @@ export async function setupForCatalogTests(
 
   if (innerText !== expectedTitle) {
     console.error(
-      `⚠️ playlist menu title did not match within ${timeoutMs}ms, last value: ${innerText}`
+      `⚠️ [${user.name}] playlist menu title did not match within ${timeoutMs}ms, last value: ${innerText}`
     );
     throw new Error(
       `Playlist dropdown title did not match expected value within ${timeoutMs}ms. Expected "${expectedTitle}", last value: "${innerText}"`
     );
   }
-  // const innerText = await playlistDropdownButton.innerText({ timeout: 10000 });
-  // console.log(`playlist menu title after reload: ${innerText}`);
-  // // expect(innerText).toBe("Irish Flute (9001)");
-
-  // Wait longer for sync to complete
-  // await page.waitForTimeout(5000);
 
   // 6. Navigate to starting tab
   await page.waitForSelector(`[data-testid="tab-${startTab}"]`, {
     timeout: 10000,
   });
   await page.getByTestId(`tab-${startTab}`).click();
+  await page.waitForTimeout(500);
 
   const catalogAddToRepertoireButton = page.getByTestId(
     "catalog-add-to-repertoire-button"
@@ -961,93 +818,39 @@ export async function setupForCatalogTests(
     state: "visible",
     timeout: 10000,
   });
+
+  // Wait for tune count to be visible (any number of tunes)
   const tuneCountComponent = page
     .locator("div")
-    .filter({ hasText: /^492 tunes$/ })
+    .filter({ hasText: /^\d+ tunes?$/ })
     .first();
 
-  await tuneCountComponent.waitFor({
-    state: "visible",
-    timeout: 10000,
-  });
+  await page.waitForTimeout(2000);
+
+  const isVisible = await tuneCountComponent.isVisible();
+  if (!isVisible) {
+    const snapshotName = `e2e/tests/artifacts/catalog-missing-${
+      user.email.split(".")[0]
+    }-${Date.now()}.png`;
+    try {
+      await page.screenshot({ path: snapshotName, fullPage: true });
+      console.error(`📸 Snapshot saved: ${snapshotName}`);
+    } catch (err) {
+      console.warn("⚠️ Failed to save snapshot:", String(err));
+    }
+    throw new Error(
+      `Tune count component not visible; snapshot saved as ${snapshotName}`
+    );
+  }
+
+  // await tuneCountComponent.waitFor({
+  //   state: "visible",
+  //   timeout: 10000,
+  // });
 
   await page.waitForTimeout(500);
 
-  console.log(`✅ [setupForCatalogTests] Ready on ${startTab} tab`);
-}
-
-/**
- * REPERTOIRE TEST SETUP
- * Fast setup for repertoire tests.
- * Seeds specific tunes in repertoire.
- */
-export async function setupForRepertoireTests(
-  page: Page,
-  opts: {
-    /** Tune IDs to seed in repertoire */
-    repertoireTunes: number[];
-    /** Whether to schedule them for practice (default: false) */
-    scheduleTunes?: boolean;
-    /** Days ago to schedule (default: 0 = today) */
-    scheduleDaysAgo?: number;
-  }
-) {
-  const { repertoireTunes, scheduleTunes = false, scheduleDaysAgo = 0 } = opts;
-
-  console.log("🔧 [setupForRepertoireTests] Starting...");
-
-  // RESET CLIENT CACHE to ensure fresh session
-  resetAliceClient();
-
-  // 1. Clear practice state
-  await clearAliceRepertoire();
-  await clearSupabaseTable("practice_record");
-  await clearSupabaseTable("daily_practice_queue");
-  await clearSupabaseTable("table_transient_data");
-
-  // 2. Reset repertoire
-  await seedAliceRepertoire(repertoireTunes);
-
-  // 3. Optionally schedule tunes
-  if (scheduleTunes) {
-    const scheduleDate = new Date();
-    scheduleDate.setDate(scheduleDate.getDate() - scheduleDaysAgo);
-    const scheduleDateStr = scheduleDate.toISOString();
-
-    for (const tuneId of repertoireTunes) {
-      await updateTuneScheduled(tuneId, scheduleDateStr);
-    }
-  }
-
-  // 4. Navigate to ensure valid origin
-  const currentUrl = page.url();
-  if (
-    !currentUrl ||
-    currentUrl === "about:blank" ||
-    currentUrl.startsWith("data:")
-  ) {
-    await page.goto("http://localhost:5173/");
-    await page.waitForTimeout(1000);
-  }
-
-  // 5. Clear ONLY IndexedDB cache (keep auth in localStorage!)
-  await clearTunetreesStorageDB(page);
-
-  // 6. Reload to trigger fresh sync from Supabase
-  await page.reload();
-  // Wait longer for sync to complete
-  await page.waitForTimeout(5000);
-
-  // 7. Navigate to repertoire tab
-  await page.waitForSelector('[data-testid="tab-repertoire"]', {
-    timeout: 10000,
-  });
-  await page.getByTestId("tab-repertoire").click();
-  await page.waitForTimeout(1000);
-
   console.log(
-    `✅ [setupForRepertoireTests] Ready with ${repertoireTunes.length} tunes ${
-      scheduleTunes ? "(scheduled)" : "(unscheduled)"
-    }`
+    `✅ [${user.name}] setupForCatalogTests Ready on ${startTab} tab`
   );
 }

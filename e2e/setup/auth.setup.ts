@@ -12,7 +12,7 @@ const execAsync = promisify(exec);
 const authFile = "e2e/.auth/alice.json";
 const ALICE_EMAIL = "alice.test@tunetrees.test";
 const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD; // Default to null, i.e. its an error if not specified
-const AUTH_EXPIRY_MINUTES = 50; // Consider auth stale after 50 minutes (tokens typically expire at 60 min)
+const AUTH_EXPIRY_MINUTES = 10080; // 7 days in minutes (matches jwt_expiry = 604800 seconds in supabase/config.toml)
 
 /**
  * Authentication setup for Alice test user

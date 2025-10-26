@@ -11,24 +11,30 @@
  * 4. Select tunes, refresh browser → verify selections persist
  */
 
-import { expect, test } from "@playwright/test";
-import { setupForRepertoireTests } from "../helpers/practice-scenarios";
+import { expect } from "@playwright/test";
+import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
-test.use({ storageState: "e2e/.auth/alice.json" });
+test.describe.serial("Row Selection Persistence", () => {
+  let ttPage: TuneTreesPage;
 
-test.describe("Row Selection Persistence", () => {
-  test.beforeEach(async ({ page }) => {
+  test.slow();
+
+  test.beforeEach(async ({ page, testUser }) => {
     // Setup: Seed several tunes in repertoire for selection testing
     // Using known valid tune IDs: 9001 (Banish Misfortune), 3497 (Morrison's Jig)
     // Start on catalog tab since most tests begin there
-    await setupForRepertoireTests(page, {
-      repertoireTunes: [9001, 3497], // Only 2 tunes that we know exist
+    await setupForRepertoireTestsParallel(page, testUser, {
+      repertoireTunes: [testUser.userId, 3497], // Only 2 tunes that we know exist
       scheduleTunes: false,
     });
 
-    // Navigate to catalog tab for tests that start there
-    await page.click('button:has-text("Catalog")');
-    await page.waitForTimeout(500);
+    ttPage = new TuneTreesPage(page);
+
+    ttPage.navigateToTab("catalog");
+
+    console.debug("Row Selection Persistence: setup complete");
   });
 
   test("Catalog: selections persist across tab switches", async ({ page }) => {
@@ -70,17 +76,28 @@ test.describe("Row Selection Persistence", () => {
     page,
   }) => {
     // Navigate to Repertoire tab
-    const repertoireTabSelector = page.getByTestId("tab-repertoire");
-    await repertoireTabSelector.isVisible();
-    repertoireTabSelector.click();
+    ttPage.navigateToTab("repertoire");
+
+    // Ensure grid is hydrated and checkboxes are rendered: header + 2 rows (>= 3 checkboxes)
+    await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
+      timeout: 10000,
+    });
+    await page.waitForFunction(
+      (sel) => document.querySelectorAll(sel).length >= 3,
+      '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
+    );
 
     // Select first 2 tunes using checkboxes
     const checkboxes = page.locator(
       '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
     );
-    await checkboxes.nth(1).isVisible();
     await checkboxes.nth(1).check(); // Skip header checkbox, select row 1
-    await checkboxes.nth(2).isVisible();
+    // Take a visual snapshot for debugging / CI artifacts
+    await page.screenshot({
+      path: `e2e/artifacts/repertoire-selection-mid-${Date.now()}.png`,
+      fullPage: false,
+    });
+    await page.waitForTimeout(250);
     await checkboxes.nth(2).check();
 
     // Verify selection summary shows "2 tunes selected"
@@ -95,6 +112,12 @@ test.describe("Row Selection Persistence", () => {
     await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
       timeout: 5000,
     });
+
+    // Ensure checkboxes are still present
+    await page.waitForFunction(
+      (sel) => document.querySelectorAll(sel).length >= 2,
+      '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
+    );
 
     // Verify selections are still intact
     await expect(page.locator("text=2 tunes selected")).toBeVisible();
@@ -179,10 +202,13 @@ test.describe("Row Selection Persistence", () => {
     page,
   }) => {
     // Navigate to Repertoire tab
-    await page.click('button:has-text("Repertoire")');
-    await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
-      timeout: 5000,
-    });
+    ttPage.navigateToTab("repertoire");
+
+    // Ensure checkboxes are rendered: header + 2 rows (>= 3 checkboxes)
+    await page.waitForFunction(
+      (sel) => document.querySelectorAll(sel).length >= 3,
+      '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
+    );
 
     // Select 2 tunes
     const checkboxes = page.locator(
@@ -192,6 +218,11 @@ test.describe("Row Selection Persistence", () => {
     await page.waitForTimeout(250);
     await expect(checkboxes.nth(1)).toBeChecked();
 
+    // Take a visual snapshot for debugging / CI artifacts
+    await page.screenshot({
+      path: `e2e/artifacts/repertoire-selection-before-second-${Date.now()}.png`,
+      fullPage: false,
+    });
     await checkboxes.nth(2).check();
     await page.waitForTimeout(250);
     await expect(checkboxes.nth(2)).toBeChecked();

@@ -1,24 +1,24 @@
-import { expect, test } from "@playwright/test";
-import { setupForRepertoireTests } from "../helpers/practice-scenarios";
+import { expect } from "@playwright/test";
+import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 /**
- * REPERTOIRE-001: Repertoire tab shows Alice's 2 private tunes
+ * REPERTOIRE-001: Repertoire tab shows user's 2 private tunes
  * Priority: Critical
  *
- * Tests that the Repertoire tab correctly displays Alice's private tunes
+ * Tests that the Repertoire tab correctly displays user's private tunes
  * after login and sync completion.
+ * Uses auto-assigned test user for parallel execution.
  */
-
-test.use({ storageState: "e2e/.auth/alice.json" });
 
 test.describe.serial("REPERTOIRE-001: User's Tunes Display", () => {
   let ttPage: TuneTreesPage;
 
-  test.beforeEach(async ({ page }) => {
-    // Fast setup: seed 2 specific tunes in repertoire
-    await setupForRepertoireTests(page, {
-      repertoireTunes: [9001, 9002], // Banish Misfortune, Morrison's Jig
+  test.beforeEach(async ({ page, testUser }) => {
+    // Fast setup: seed 2 private tunes in repertoire for assigned user
+    await setupForRepertoireTestsParallel(page, testUser, {
+      repertoireTunes: [testUser.userId, testUser.userId + 10000], // User's 2 private tunes
       scheduleTunes: false,
     });
 

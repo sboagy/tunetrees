@@ -1,4 +1,4 @@
-import { dirname, resolve } from "node:path";
+import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 /**
@@ -19,14 +19,16 @@ export default defineConfig({
   testDir: "./e2e/tests", // More specific path
   testMatch: /.*\.spec\.ts/,
 
+  outputDir: path.resolve(__dirname, "test-results"), // Example: './test-results-ci'
+
   /* Run tests in files in parallel */
   fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Force serial execution - all tests share same Supabase database */
-  workers: 1,
+  /* Enable parallel workers - each worker gets dedicated test user to avoid conflicts */
+  workers: process.env.CI ? 2 : 8,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: "list",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -42,7 +44,14 @@ export default defineConfig({
 
     /* Take screenshots only on failure */
     screenshot: "only-on-failure",
+
+    // headless: true,
   },
+
+  // Global timeout for each test (in milliseconds)
+  // timeout: 120 * 1000,
+
+  globalTimeout: process.env.CI ? 60 * 60 * 1000 : undefined,
 
   /* Configure projects for major browsers */
   projects: [
@@ -64,14 +73,16 @@ export default defineConfig({
       },
     },
 
-    // Authenticated tests use saved state
+    // Authenticated tests use saved state (per-worker via fixture)
     {
       name: "chromium",
       testDir: "./e2e/tests",
       testIgnore: /auth-.*\.spec\.ts/, // Exclude auth tests
       use: {
         ...devices["Desktop Chrome"],
-        storageState: "e2e/.auth/alice.json",
+        // headless: true,
+        // channel: "chromium",
+        // storageState is set per-worker by test-fixture.ts
       },
       dependencies: ["setup"],
     },
@@ -80,7 +91,7 @@ export default defineConfig({
       name: "firefox",
       use: {
         ...devices["Desktop Firefox"],
-        storageState: "e2e/.auth/alice.json",
+        // storageState: "e2e/.auth/alice.json",
       },
       dependencies: ["setup"],
     },
@@ -89,7 +100,7 @@ export default defineConfig({
       name: "webkit",
       use: {
         ...devices["Desktop Safari"],
-        storageState: "e2e/.auth/alice.json",
+        // storageState: "e2e/.auth/alice.json",
       },
       dependencies: ["setup"],
     },
@@ -101,7 +112,7 @@ export default defineConfig({
       testIgnore: /auth-.*\.spec\.ts/, // Exclude auth tests
       use: {
         ...devices["Pixel 5"],
-        storageState: "e2e/.auth/alice.json",
+        // storageState: "e2e/.auth/alice.json",
       },
       dependencies: ["setup"],
     },

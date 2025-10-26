@@ -20,18 +20,21 @@
  * (scheduled timestamp and practice_record creation) rather than queue display.
  */
 
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+// import { TuneTreesPage } from "../helpers/page-objects";
+import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
 
 test.describe("Repertoire: Add To Review", () => {
-  test.beforeEach(async ({ page }) => {
-    // Navigate to app and wait for sync (user is already authenticated)
-    await page.goto("http://localhost:5173/");
-    await page.waitForSelector('[data-testid="tab-repertoire"]', {
-      state: "visible",
-      timeout: 15000,
+  // let ttPage: TuneTreesPage;
+
+  test.beforeEach(async ({ page, testUser }) => {
+    await setupForRepertoireTestsParallel(page, testUser, {
+      repertoireTunes: [testUser.userId, testUser.userId + 10000], // User's 2 private tunes
+      scheduleTunes: false,
     });
-    // Wait for sync to complete
-    await page.waitForTimeout(2000);
+
+    // ttPage = new TuneTreesPage(page);
   });
 
   test("should show alert when no tunes selected", async ({ page }) => {

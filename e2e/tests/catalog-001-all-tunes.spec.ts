@@ -1,8 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
+import type { TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 /**
- * CATALOG-001: Catalog tab shows all public tunes + Alice's private tunes
+ * CATALOG-001: Catalog tab shows all public tunes + User's private tunes
  * Priority: High
  *
  * Tests that the Catalog tab displays approximately 494 tunes
@@ -11,17 +14,25 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe("CATALOG-001: Public + Private Tunes Display", () => {
   let ttPage: TuneTreesPage;
+  let currentTestUser: TestUser;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
+    currentTestUser = testUser;
 
-    // Navigate to app and wait for sync
-    await ttPage.goto();
-    await ttPage.waitForSync(2000);
+    // Fast setup: clear repertoire, start on catalog tab
 
-    // Navigate to Catalog tab
-    await ttPage.navigateToTab("catalog");
+    try {
+      await setupForCatalogTestsParallel(page, testUser, {
+        emptyRepertoire: true,
+        startTab: "catalog",
+      });
+    } catch (err: unknown) {
+      console.error("setupForCatalogTestsParallel failed:", err);
+      throw err;
+    }
   });
+
   test("should display Catalog grid with many tunes", async () => {
     // Use Page Object to verify grid is visible and has content
     await ttPage.expectGridHasContent(ttPage.catalogGrid);
@@ -31,16 +42,19 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     await ttPage.expectTuneVisible("Abbey Reel", ttPage.catalogGrid);
   });
 
-  test("should include Alice's private tunes in catalog", async () => {
-    // Search for Alice's private tune using Page Object
+  test("should include Users's private tunes in catalog", async () => {
+    // Search for User's private tune using Page Object
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
 
     // Verify the tune is visible
     await ttPage.expectTuneVisible("Banish Misfortune", ttPage.catalogGrid);
 
-    // Verify ID 9001 row exists (Alice's private tune)
-    const row9001 = await ttPage.getTuneRowById(9001, ttPage.catalogGrid);
-    await expect(row9001).toBeVisible({ timeout: 3000 });
+    // Verify user's private tune row exists
+    const userPrivateTune = await ttPage.getTuneRowById(
+      currentTestUser.userId,
+      ttPage.catalogGrid
+    );
+    await expect(userPrivateTune).toBeVisible({ timeout: 3000 });
 
     // Also search for Morrison's Jig
     await ttPage.clearSearch();
@@ -48,22 +62,25 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     await ttPage.expectTuneVisible("Morrison's Jig", ttPage.catalogGrid);
   });
 
-  test("should show Private badge on Alice's private tunes only", async () => {
-    // Search for Alice's private tune
+  test("should show Private badge on User's private tunes only", async () => {
+    // Search for User's private tune
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
 
-    // Check if row 9001 exists (Alice's private tune)
-    const row9001 = await ttPage.getTuneRowById(9001, ttPage.catalogGrid);
+    // Check if user's private tune row exists
+    const userPrivateTune = await ttPage.getTuneRowById(
+      currentTestUser.userId,
+      ttPage.catalogGrid
+    );
 
     // Verify the row exists
-    if (await row9001.isVisible({ timeout: 2000 })) {
+    if (await userPrivateTune.isVisible({ timeout: 2000 })) {
       // Check status column (6th column, index 5)
-      const statusCell = row9001.locator("td").nth(5);
+      const statusCell = userPrivateTune.locator("td").nth(5);
       const statusText = await statusCell.textContent();
-      console.log(`Tune 9001 status: ${statusText}`);
+      console.log(`Tune ${currentTestUser.userId} status: ${statusText}`);
 
       // For now, just verify the row exists - status badge display is separate issue
-      await expect(row9001).toBeVisible();
+      await expect(userPrivateTune).toBeVisible();
     }
   });
 
@@ -93,7 +110,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     // Use Page Object to filter by Jig type
     await ttPage.filterByType("JigD");
 
-    // Verify filtered results show Jigs (Alice's tunes are JigD)
+    // Verify filtered results show Jigs (User's tunes are JigD)
     await ttPage.expectTuneVisible("Banish Misfortune", ttPage.catalogGrid);
   });
 

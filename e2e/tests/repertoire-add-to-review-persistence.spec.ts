@@ -9,17 +9,16 @@
  * 5. Verifies they persist after reload
  */
 
-import { expect, test } from "@playwright/test";
-import { setupDeterministicTest } from "../helpers/practice-scenarios";
-
-test.use({ storageState: "e2e/.auth/alice.json" });
+import { expect } from "@playwright/test";
+import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
 
 test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, testUser }) => {
     // Setup with 3 known tunes in repertoire
-    await setupDeterministicTest(page, {
+    await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
-      seedRepertoire: [9001, 3497, 54], // Banish Misfortune, A Fig for a Kiss, Alasdruim's March
+      seedRepertoire: [testUser.userId, 3497, 54], // User's private tune, A Fig for a Kiss, Alasdruim's March
     });
   });
 

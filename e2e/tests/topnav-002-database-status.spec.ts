@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 /**
@@ -14,11 +16,13 @@ test.use({ storageState: "e2e/.auth/alice.json" });
 let ttPage: TuneTreesPage;
 
 test.describe("TOPNAV-002: Database Status Dropdown", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
 
-    await page.goto("http://localhost:5173");
-    await page.waitForTimeout(5000); // Wait for sync to complete
+    await setupDeterministicTestParallel(page, testUser, {
+      clearRepertoire: true,
+      seedRepertoire: [],
+    });
   });
 
   test("should show database status icon in TopNav", async ({ page }) => {

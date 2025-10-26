@@ -1,4 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
+import type { TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 /**
@@ -6,21 +9,21 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * Priority: Critical
  *
  * Tests that the playlist dropdown in TopNav correctly displays
- * Alice's playlist with proper details after login.
+ * user's playlist with proper details after login.
  */
 
-// Use authenticated state
-test.use({ storageState: "e2e/.auth/alice.json" });
-
 let ttPage: TuneTreesPage;
+let currentTestUser: TestUser;
 
 test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
+    currentTestUser = testUser;
 
-    await page.goto("http://localhost:5173");
-    // Wait for page to load and sync to complete
-    await page.waitForTimeout(3000);
+    await setupDeterministicTestParallel(page, testUser, {
+      clearRepertoire: true,
+      seedRepertoire: [],
+    });
   });
 
   test("should display default selected playlist in TopNav", async ({
@@ -30,19 +33,25 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     // Adjust selector based on your actual implementation
     const playlistButton = page
       .locator("button")
-      .filter({ hasText: /Irish Flute|9001/i });
+      .filter({
+        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+      });
 
     await expect(playlistButton).toBeVisible({ timeout: 10000 });
 
     // Should show playlist name or instrument name
-    await expect(playlistButton).toContainText(/Irish Flute|9001/i);
+    await expect(playlistButton).toContainText(
+      new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i")
+    );
   });
 
   test("should open dropdown menu when clicked", async ({ page }) => {
     // Click the playlist dropdown button
     const playlistButton = page
       .locator("button")
-      .filter({ hasText: /Irish Flute|9001/i })
+      .filter({
+        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+      })
       .first();
     await playlistButton.click();
 
@@ -56,7 +65,9 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
   test("should show playlist details in dropdown", async ({ page }) => {
     const playlistButton = page
       .locator("button")
-      .filter({ hasText: /Irish Flute|9001/i })
+      .filter({
+        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+      })
       .first();
     await playlistButton.click();
 
@@ -79,7 +90,9 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
   }) => {
     const playlistButton = page
       .locator("button")
-      .filter({ hasText: /Irish Flute|9001/i })
+      .filter({
+        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+      })
       .first();
     await playlistButton.click();
 
@@ -92,7 +105,9 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
   test("should close dropdown when clicking outside", async ({ page }) => {
     const playlistButton = page
       .locator("button")
-      .filter({ hasText: /Irish Flute|9001/i })
+      .filter({
+        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+      })
       .first();
     await playlistButton.click();
 
@@ -118,7 +133,9 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     // Playlist button should be enabled and show content
     const playlistButton = page
       .locator("button")
-      .filter({ hasText: /Irish Flute|9001/i })
+      .filter({
+        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+      })
       .first();
     await expect(playlistButton).toBeEnabled();
   });

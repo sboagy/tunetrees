@@ -111,3 +111,5 @@ lighthouse_localhost_4173-20251007T123110.json
 /playwright/.auth/
 /e2e/.auth/
 test-output.txt
+e2e/artifacts/**/*
+test-output-e2e.txt

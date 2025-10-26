@@ -1,3 +1,7 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+# Environment secrets (vite_pwa_env): ALICE_TEST_PASSWORD, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+# yamllint disable rule:line-length
+
 name: CI - Tests
 
 on:
@@ -20,6 +24,7 @@ jobs:
     env:
       SUPABASE_URL: ""
       SUPABASE_ANON_KEY: ""
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
     steps:
       # 1. Checkout code
@@ -98,24 +103,13 @@ jobs:
 
       # 8. Reset and Seed Database
       - name: Reset and Seed Database
+        run: npm run db:ci:reset
+
+      # 9. Verify Database Setup (optional debug step)
+      - name: Verify Database Setup
         run: |
-          echo "📊 Checking migrations..."
-          pwd
-          ls -la supabase/ || echo "No supabase dir"
-          ls -la supabase/migrations/ || echo "No migrations dir"
-          find . -name "*.sql" -type f | head -20
-          echo "🔄 Running db reset..."
-          supabase db reset --debug
           echo "✅ Verifying tables exist..."
           echo "\dt public.*" | supabase db psql || echo "⚠️  No tables found!"
-
-      # 9. Create Test Users
-      - name: Create Test Users
-        run: npx tsx scripts/setup-test-environment.ts
-        env:
-          ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
       # 10. Cache Playwright Browsers
       - name: Cache Playwright Browsers
@@ -146,11 +140,6 @@ jobs:
           echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:0:20}..."
           echo "� Running full test suite (setup + chromium-auth + chromium + Mobile Chrome)"
           npx playwright test --project=setup --project=chromium-auth --project=chromium --project="Mobile Chrome" --reporter=list,html
-        env:
-          ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
-          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
       # 14. Upload Test Results
       - name: Upload Playwright Report
@@ -202,9 +191,6 @@ jobs:
       # 4. Build for production
       - name: Build Application
         run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       # 5. Deploy to Cloudflare Pages
       - name: Deploy to Cloudflare Pages

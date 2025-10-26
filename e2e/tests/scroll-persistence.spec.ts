@@ -1,11 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { setupForPracticeTests } from "../helpers/practice-scenarios";
+import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
+import type { TestUser } from "../helpers/test-users";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
-
-test.use({ storageState: "e2e/.auth/alice.json" });
 
 /**
  * E2E Test: Scroll Position Persistence
@@ -22,13 +22,15 @@ test.use({ storageState: "e2e/.auth/alice.json" });
 
 test.describe("Scroll Position Persistence", () => {
   let addedTuneIds: number[] = [];
+  let currentTestUser: TestUser;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, testUser }) => {
+    currentTestUser = testUser;
     // Add 30 tunes to playlist for scrollable content
-    addedTuneIds = await addScrollTestTunes();
+    addedTuneIds = await addScrollTestTunes(testUser);
 
     // Setup with many tunes in repertoire
-    await setupForPracticeTests(page, {
+    await setupForPracticeTestsParallel(page, testUser, {
       repertoireTunes: addedTuneIds,
       startTab: "practice",
     });
@@ -37,12 +39,12 @@ test.describe("Scroll Position Persistence", () => {
   /**
    * Add tunes to playlist temporarily for scroll testing
    */
-  async function addScrollTestTunes() {
+  async function addScrollTestTunes(user: TestUser) {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const { error: authError } = await supabase.auth.signInWithPassword({
-      email: "alice.test@tunetrees.test",
-      password: process.env.ALICE_TEST_PASSWORD || "TestPassword123!",
+      email: user.email,
+      password: process.env.TEST_USER_PASSWORD || "TestPassword123!",
     });
 
     if (authError) throw new Error(`Auth failed: ${authError.message}`);
@@ -58,7 +60,7 @@ test.describe("Scroll Position Persistence", () => {
 
     // Add to playlist
     const playlistTuneInserts = tunes.map((tune) => ({
-      playlist_ref: 9001,
+      playlist_ref: user.playlistId,
       tune_ref: tune.id,
       current: null,
     }));
@@ -77,24 +79,24 @@ test.describe("Scroll Position Persistence", () => {
   /**
    * Remove scroll test tunes from playlist
    */
-  async function removeScrollTestTunes(tuneIds: number[]) {
+  async function removeScrollTestTunes(tuneIds: number[], user: TestUser) {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const { error: authError } = await supabase.auth.signInWithPassword({
-      email: "alice.test@tunetrees.test",
-      password: process.env.ALICE_TEST_PASSWORD || "TestPassword123!",
+      email: user.email,
+      password: process.env.TEST_USER_PASSWORD || "TestPassword123!",
     });
 
     if (authError) throw new Error(`Auth failed: ${authError.message}`);
 
-    // Only delete the tunes we added (beyond the original 2)
-    const tunesToRemove = tuneIds.slice(2); // Keep 9001 and 9002
+    // Only delete the tunes we added (beyond the original 2 private tunes)
+    const tunesToRemove = tuneIds.slice(2); // Keep user's 2 private tunes
 
     if (tunesToRemove.length > 0) {
       const { error } = await supabase
         .from("playlist_tune")
         .delete()
-        .eq("playlist_ref", 9001)
+        .eq("playlist_ref", user.playlistId)
         .in("tune_ref", tunesToRemove);
 
       if (error)
@@ -104,7 +106,7 @@ test.describe("Scroll Position Persistence", () => {
 
   test.afterEach(async () => {
     // Clean up: remove test tunes
-    await removeScrollTestTunes(addedTuneIds);
+    await removeScrollTestTunes(addedTuneIds, currentTestUser);
   });
 
   test("Catalog: scroll position persists across tab switches", async ({
@@ -138,11 +140,9 @@ test.describe("Scroll Position Persistence", () => {
     await page.waitForTimeout(500);
 
     // Check localStorage - all grids now use integer userId from user_profile table
-    // Alice's integer userId is 9001
-    const storedValue = await page.evaluate(() => {
-      const ALICE_USER_ID = 9001; // Integer ID from user_profile table
-      return localStorage.getItem(`TT_CATALOG_SCROLL_${ALICE_USER_ID}`);
-    });
+    const storedValue = await page.evaluate((userId) => {
+      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
+    }, currentTestUser.userId);
     console.log("[CATALOG TEST] localStorage value:", storedValue);
 
     // Verify we scrolled (check scrollTop is approximately 1000)
@@ -262,12 +262,10 @@ test.describe("Scroll Position Persistence", () => {
     console.log("[PRACTICE TAB SWITCH TEST] scrollTopBefore:", scrollTopBefore);
 
     // Check localStorage
-    // Practice grid uses integer userId from user_profile table, not parsed UUID
-    // Alice's integer userId is 9001
-    const storedValue = await page.evaluate(() => {
-      const PRACTICE_USER_ID = 9001; // Alice's integer ID from user_profile
-      return localStorage.getItem(`TT_PRACTICE_SCROLL_${PRACTICE_USER_ID}`);
-    });
+    // Practice grid uses integer userId from user_profile table
+    const storedValue = await page.evaluate((userId) => {
+      return localStorage.getItem(`TT_PRACTICE_SCROLL_${userId}`);
+    }, currentTestUser.userId);
     console.log("[PRACTICE TAB SWITCH TEST] localStorage value:", storedValue);
 
     expect(scrollTopBefore).toBeGreaterThan(20);
@@ -329,10 +327,9 @@ test.describe("Scroll Position Persistence", () => {
     expect(scrollTopBefore).toBeGreaterThan(900);
 
     // Check localStorage BEFORE reload (uses integer userId from user_profile)
-    const storedValueBeforeReload = await page.evaluate(() => {
-      const ALICE_USER_ID = 9001; // Integer ID from user_profile table
-      return localStorage.getItem(`TT_CATALOG_SCROLL_${ALICE_USER_ID}`);
-    });
+    const storedValueBeforeReload = await page.evaluate((userId) => {
+      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
+    }, currentTestUser.userId);
     console.log(
       "[CATALOG REFRESH TEST] localStorage BEFORE reload:",
       storedValueBeforeReload
@@ -354,10 +351,9 @@ test.describe("Scroll Position Persistence", () => {
     // Wait MUCH longer for scroll restoration after page reload
     await page.waitForTimeout(5000); // Increased to 5 seconds
     // Check localStorage value (uses integer userId from user_profile)
-    const storedValueAfter = await page.evaluate(() => {
-      const ALICE_USER_ID = 9001; // Integer ID from user_profile table
-      return localStorage.getItem(`TT_CATALOG_SCROLL_${ALICE_USER_ID}`);
-    });
+    const storedValueAfter = await page.evaluate((userId) => {
+      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
+    }, currentTestUser.userId);
     console.log(
       "[CATALOG REFRESH TEST] localStorage after reload:",
       storedValueAfter
@@ -424,10 +420,9 @@ test.describe("Scroll Position Persistence", () => {
       (el) => el.scrollTop
     );
     // Use stored value if present; otherwise relax assertion
-    const storedRep = await page.evaluate(() => {
-      const ALICE_USER_ID = 9001;
-      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${ALICE_USER_ID}`);
-    });
+    const storedRep = await page.evaluate((userId) => {
+      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}`);
+    }, currentTestUser.userId);
     const repVal = Number(storedRep || "0");
     if (repVal > 0) {
       expect(scrollTopAfter).toBeGreaterThan(repVal - 100);
@@ -480,10 +475,9 @@ test.describe("Scroll Position Persistence", () => {
     const scrollTopAfter = await gridContainerAfter.evaluate(
       (el) => el.scrollTop
     );
-    const storedPractice = await page.evaluate(() => {
-      const PRACTICE_USER_ID = 9001;
-      return localStorage.getItem(`TT_PRACTICE_SCROLL_${PRACTICE_USER_ID}`);
-    });
+    const storedPractice = await page.evaluate((userId) => {
+      return localStorage.getItem(`TT_PRACTICE_SCROLL_${userId}`);
+    }, currentTestUser.userId);
     const practiceVal = Number(storedPractice || "0");
     if (practiceVal > 0) {
       expect(scrollTopAfter).toBeGreaterThan(practiceVal - 20);

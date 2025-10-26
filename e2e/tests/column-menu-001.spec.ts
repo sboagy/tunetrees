@@ -1,14 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe("Column Visibility Menu", () => {
   let ttPage: TuneTreesPage;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
-    await ttPage.goto();
-    await ttPage.waitForSync(2000);
-    await page.waitForLoadState("networkidle");
+
+    await setupForRepertoireTestsParallel(page, testUser, {
+      repertoireTunes: [testUser.userId, testUser.userId + 10000], // User's 2 private tunes
+      scheduleTunes: false,
+    });
   });
 
   test("should keep menu open when clicking checkbox", async ({ page }) => {

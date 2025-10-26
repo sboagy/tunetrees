@@ -1,29 +1,34 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
+import type { TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 /**
- * TOPNAV-003: User menu shows Alice's information
+ * TOPNAV-003: User menu shows user's information
  * Priority: Low
  *
  * Tests that the user menu dropdown displays correct user information
  * and allows sign out.
  */
 
-test.use({ storageState: "e2e/.auth/alice.json" });
-
 let ttPage: TuneTreesPage;
+let currentTestUser: TestUser;
 
 test.describe("TOPNAV-003: User Menu Dropdown", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
+    currentTestUser = testUser;
 
-    await ttPage.goto();
-    await page.waitForTimeout(3000); // Wait for page load
+    await setupDeterministicTestParallel(page, testUser, {
+      clearRepertoire: true,
+      seedRepertoire: [],
+    });
   });
 
   test("should show user email in TopNav", async () => {
     // User menu button should be visible (email text on desktop, icon on mobile)
-    await ttPage.expectUserMenuVisible("alice.test@tunetrees.test");
+    await ttPage.expectUserMenuVisible(currentTestUser.email);
   });
 
   test("should open user menu when email clicked", async () => {
@@ -37,8 +42,8 @@ test.describe("TOPNAV-003: User Menu Dropdown", () => {
   test("should display user name in dropdown", async ({ page }) => {
     await ttPage.openUserMenu();
 
-    // Should show Alice's full name
-    await expect(page.getByText("Alice Test User")).toBeVisible({
+    // Should show user's full name
+    await expect(page.getByText(currentTestUser.name)).toBeVisible({
       timeout: 2000,
     });
   });
@@ -46,9 +51,11 @@ test.describe("TOPNAV-003: User Menu Dropdown", () => {
   test("should display user UUID in dropdown", async ({ page }) => {
     await ttPage.openUserMenu();
 
-    // Should show user ID (UUID format)
+    // Should show user ID (UUID format) - just check for UUID pattern
     await expect(
-      page.getByText(/11111111-1111-1111-1111-111111111111/i)
+      page.getByText(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+      )
     ).toBeVisible({ timeout: 2000 });
   });
 
@@ -57,7 +64,7 @@ test.describe("TOPNAV-003: User Menu Dropdown", () => {
 
     // Email should be visible within the dropdown content
     const emailInDropdown = ttPage.userMenuPanel.getByText(
-      "alice.test@tunetrees.test"
+      currentTestUser.email
     );
     await expect(emailInDropdown).toBeVisible({ timeout: 2000 });
   });

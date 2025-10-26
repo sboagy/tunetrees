@@ -1,5 +1,8 @@
-import { expect, test } from "@playwright/test";
-import { setupForPracticeTests } from "../helpers/practice-scenarios";
+import { expect } from "@playwright/test";
+import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
+
+// import type { TestUser } from "../helpers/test-users";
 
 /**
  * PRACTICE-001: Practice tab with unscheduled tunes (Q3 New bucket)
@@ -9,7 +12,7 @@ import { setupForPracticeTests } from "../helpers/practice-scenarios";
  * have never been scheduled (fresh account with unscheduled tunes).
  *
  * Test Scenario:
- * - Alice has 2 specific tunes in her repertoire (IDs 9001, 3497)
+ * - User has 2 specific tunes in their repertoire (user's private tune + one public tune)
  * - Neither tune is scheduled for practice (playlist_tune.scheduled = NULL)
  * - Practice queue should show exactly 2 tunes in Q3 (New) bucket
  * - UI should display grid with bucket labels showing "New"
@@ -18,13 +21,14 @@ import { setupForPracticeTests } from "../helpers/practice-scenarios";
  * not in an empty state. This prioritizes new tunes for practice.
  */
 
-test.use({ storageState: "e2e/.auth/alice.json" });
-
 test.describe.serial("PRACTICE-001: Unscheduled Tunes (Q3 New Bucket)", () => {
-  test.beforeEach(async ({ page }) => {
+  // let currentTestUser: TestUser;
+
+  test.beforeEach(async ({ page, testUser }) => {
+    // currentTestUser = testUser;
     // Fast setup: clear practice state, seed 2 unscheduled tunes
-    await setupForPracticeTests(page, {
-      repertoireTunes: [9001, 3497], // Banish Misfortune, A Fig for a Kiss
+    await setupForPracticeTestsParallel(page, testUser, {
+      repertoireTunes: [testUser.userId, 3497], // User's private tune, A Fig for a Kiss
       startTab: "practice",
     });
   });

@@ -82,7 +82,7 @@ export class TuneTreesPage {
 
   async takeDebugScreenshot(name: string) {
     await this.page.screenshot({
-      path: `test-results/debug-${name}.png`,
+      path: `e2e/tests/artifacts/debug-${name}.png`,
       fullPage: true,
     });
   }

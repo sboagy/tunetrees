@@ -11,16 +11,15 @@
  * 4. Clear some evaluations → verify count decrements correctly
  */
 
-import { expect, test } from "@playwright/test";
-import { setupForPracticeTests } from "../helpers/practice-scenarios";
-
-test.use({ storageState: "e2e/.auth/alice.json" });
+import { expect } from "@playwright/test";
+import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
 
 test.describe.serial("Practice Evaluation Reset Behavior", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, testUser }) => {
     // Fast setup: seed 2 tunes, start on practice tab
-    await setupForPracticeTests(page, {
-      repertoireTunes: [9001, 3497],
+    await setupForPracticeTestsParallel(page, testUser, {
+      repertoireTunes: [testUser.userId, 3497],
       startTab: "practice",
     });
   });

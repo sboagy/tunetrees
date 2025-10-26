@@ -34,16 +34,64 @@ const TEST_USERS = [
     id: "11111111-1111-1111-1111-111111111111",
     email: "alice.test@tunetrees.test",
     name: "Alice Test User",
+    userId: 9001,
+    playlistId: 9001,
   },
   {
     id: "22222222-2222-2222-2222-222222222222",
     email: "bob.test@tunetrees.test",
     name: "Bob Test User",
+    userId: 9002,
+    playlistId: 9002,
   },
   {
     id: "33333333-3333-3333-3333-333333333333",
-    email: "charlie.test@tunetrees.test",
-    name: "Charlie Test User",
+    email: "carol.test@tunetrees.test",
+    name: "Carol Test User",
+    userId: 9003,
+    playlistId: 9003,
+  },
+  {
+    id: "44444444-4444-4444-4444-444444444444",
+    email: "dave.test@tunetrees.test",
+    name: "Dave Test User",
+    userId: 9004,
+    playlistId: 9004,
+  },
+  {
+    id: "55555555-5555-5555-5555-555555555555",
+    email: "eve.test@tunetrees.test",
+    name: "Eve Test User",
+    userId: 9005,
+    playlistId: 9005,
+  },
+  {
+    id: "66666666-6666-6666-6666-666666666666",
+    email: "frank.test@tunetrees.test",
+    name: "Frank Test User",
+    userId: 9006,
+    playlistId: 9006,
+  },
+  {
+    id: "77777777-7777-7777-7777-777777777777",
+    email: "grace.test@tunetrees.test",
+    name: "Grace Test User",
+    userId: 9007,
+    playlistId: 9007,
+  },
+  {
+    id: "88888888-8888-8888-8888-888888888888",
+    email: "henry.test@tunetrees.test",
+    name: "Henry Test User",
+    userId: 9008,
+    playlistId: 9008,
+  },
+  {
+    id: "99999999-9999-9999-9999-999999999999",
+    email: "iris.test@tunetrees.test",
+    name: "Iris Test User",
+    userId: 9009,
+    playlistId: 9009,
   },
 ];
 
@@ -75,122 +123,117 @@ async function setup() {
   // Step 2: Create user_profile records
   console.log("\n2️⃣  Creating user profiles...");
 
-  const { error: profileError } = await supabase.from("user_profile").upsert([
-    {
-      id: 9001,
-      supabase_user_id: "11111111-1111-1111-1111-111111111111",
-      name: "Alice Test User",
-      email: "alice.test@tunetrees.test",
-    },
-    {
-      id: 9002,
-      supabase_user_id: "22222222-2222-2222-2222-222222222222",
-      name: "Bob Test User",
-      email: "bob.test@tunetrees.test",
-    },
-    {
-      id: 9003,
-      supabase_user_id: "33333333-3333-3333-3333-333333333333",
-      name: "Charlie Test User",
-      email: "charlie.test@tunetrees.test",
-    },
-  ]);
+  const userProfiles = TEST_USERS.map((user) => ({
+    id: user.userId,
+    supabase_user_id: user.id,
+    name: user.name,
+    email: user.email,
+  }));
+
+  const { error: profileError } = await supabase
+    .from("user_profile")
+    .upsert(userProfiles);
 
   if (profileError) {
     console.error("   ❌ User profiles failed:", profileError);
   } else {
-    console.log("   ✅ User profiles created");
+    console.log(`   ✅ ${userProfiles.length} user profiles created`);
   }
 
-  // Step 3: Alice's playlist
-  console.log("\n3️⃣  Creating Alice's playlist...");
-  const { error: alicePlaylistError } = await supabase.from("playlist").upsert({
-    playlist_id: 9001,
-    user_ref: 9001,
-    instrument_ref: 1, // flute
+  // Step 3: Create playlists for all users
+  console.log("\n3️⃣  Creating playlists...");
+
+  const playlists = TEST_USERS.map((user) => ({
+    playlist_id: user.playlistId,
+    user_ref: user.userId,
+    instrument_ref: 1, // All use flute for consistency
     genre_default: "Irish Traditional",
-  });
+  }));
 
-  if (alicePlaylistError) {
-    console.error("   ❌ Alice's playlist failed:", alicePlaylistError);
+  const { error: playlistError } = await supabase
+    .from("playlist")
+    .upsert(playlists);
+
+  if (playlistError) {
+    console.error("   ❌ Playlists failed:", playlistError);
   } else {
-    console.log("   ✅ Alice's playlist created (ID: 9001)");
+    console.log(`   ✅ ${playlists.length} playlists created`);
   }
 
-  // Step 4: Alice's tunes
-  console.log("\n4️⃣  Creating Alice's tunes...");
-  const { error: aliceTunesError } = await supabase.from("tune").upsert([
+  // Step 4: Create private tunes for all users
+  console.log("\n4️⃣  Creating private tunes for all users...");
+
+  const privateTunes = TEST_USERS.flatMap((user) => [
     {
-      id: 9001,
+      id: user.userId, // Use userId as base for first tune (9001, 9002, 9004, etc.)
       title: "Banish Misfortune",
       type: "JigD",
       structure: "AABBCC",
       mode: "D Mixolydian",
       incipit: "|fed cAG|",
       genre: "ITRAD",
-      private_for: 9001,
+      private_for: user.userId,
     },
     {
-      id: 9002,
+      id: user.userId + 10000, // Offset for second tune (19001, 19002, 19004, etc.)
       title: "Morrison's Jig",
       type: "JigD",
       structure: "AABBCC",
       mode: "E Dorian",
       incipit: "|EDB cAF|",
       genre: "ITRAD",
-      private_for: 9001,
+      private_for: user.userId,
     },
   ]);
 
-  if (aliceTunesError) {
-    console.error("   ❌ Alice's tunes failed:", aliceTunesError);
+  const { error: privateTunesError } = await supabase
+    .from("tune")
+    .upsert(privateTunes);
+
+  if (privateTunesError) {
+    console.error("   ❌ Private tunes failed:", privateTunesError);
   } else {
-    console.log("   ✅ Alice's tunes created (IDs: 9001, 9002)");
-  }
-
-  // Step 5: Link Alice's tunes to her playlist
-  console.log("\n5️⃣  Linking Alice's tunes to playlist...");
-  const { error: alicePlaylistTuneError } = await supabase
-    .from("playlist_tune")
-    .upsert([
-      {
-        playlist_ref: 9001,
-        tune_ref: 9001,
-        // NOTE: scheduled (current) is NULL - tunes not yet added to review
-        // Tests can use setupPracticeScenario() to schedule tunes as needed
-      },
-      {
-        playlist_ref: 9001,
-        tune_ref: 9002,
-        // NOTE: scheduled (current) is NULL - tunes not yet added to review
-      },
-    ]);
-
-  if (alicePlaylistTuneError) {
-    console.error(
-      "   ❌ Alice's playlist_tune links failed:",
-      alicePlaylistTuneError
+    console.log(
+      `   ✅ ${privateTunes.length} private tunes created (2 per user)`
     );
-  } else {
-    console.log("   ✅ Alice's tunes linked to playlist (2 links)");
   }
 
-  // Step 6: Bob's playlist
-  console.log("\n6️⃣  Creating Bob's playlist...");
-  const { error: bobPlaylistError } = await supabase.from("playlist").upsert({
-    playlist_id: 9002,
-    user_ref: 9002,
-    instrument_ref: 2, // fiddle
-    genre_default: "Irish Traditional",
-  });
+  // Step 5: Link each user's private tunes to their playlist
+  console.log("\n5️⃣  Linking private tunes to playlists...");
 
-  if (bobPlaylistError) {
-    console.error("   ❌ Bob's playlist failed:", bobPlaylistError);
+  const playlistTuneLinks = TEST_USERS.flatMap((user) => [
+    {
+      playlist_ref: user.playlistId,
+      tune_ref: user.userId, // First private tune
+      // NOTE: scheduled (current) is NULL - tunes not yet added to review
+      // Tests can use setupPracticeScenario() to schedule tunes as needed
+    },
+    {
+      playlist_ref: user.playlistId,
+      tune_ref: user.userId + 10000, // Second private tune
+      // NOTE: scheduled (current) is NULL - tunes not yet added to review
+    },
+  ]);
+
+  const { error: playlistTuneError } = await supabase
+    .from("playlist_tune")
+    .upsert(playlistTuneLinks);
+
+  if (playlistTuneError) {
+    console.error("   ❌ Playlist_tune links failed:", playlistTuneError);
   } else {
-    console.log("   ✅ Bob's playlist created (ID: 9002)");
+    console.log(
+      `   ✅ ${playlistTuneLinks.length} playlist_tune links created`
+    );
   }
 
   console.log("\n✨ Test environment ready!");
+  console.log("\n📋 Test users created:");
+  TEST_USERS.forEach((user) => {
+    console.log(
+      `   - ${user.email} (user_id: ${user.userId}, playlist_id: ${user.playlistId})`
+    );
+  });
 }
 
 setup().catch(console.error);

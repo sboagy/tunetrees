@@ -8,20 +8,17 @@
  * 4. Verify they persist after reload
  */
 
-import { expect, test } from "@playwright/test";
-import { setupDeterministicTest } from "../helpers/practice-scenarios";
-
-test.use({ storageState: "e2e/.auth/alice.json" });
+import { expect } from "@playwright/test";
+import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
 
 test.describe("Catalog: Add To Repertoire - Fresh Database", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, testUser }) => {
     // Start with empty repertoire
-    await setupDeterministicTest(page, {
+    await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
       seedRepertoire: [],
     });
-    // Extra wait for sync to complete fully - IndexedDB clear + reload takes time
-    await page.waitForTimeout(3000);
   });
 
   // SKIP: Infrastructure issue - IndexedDB cache not clearing properly

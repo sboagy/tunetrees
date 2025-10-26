@@ -140,8 +140,15 @@ export class TuneTreesPage {
     tabId: "practice" | "repertoire" | "catalog" | "analysis"
   ) {
     const tab = this.page.getByTestId(`tab-${tabId}`);
+
+    await tab.isVisible();
     await tab.click();
-    await this.page.waitForTimeout(1000); // Wait for tab content to load
+    try {
+      await this.page.waitForTimeout(1000); // Wait for tab content to load
+    } catch (e) {
+      console.error(e);
+      // throw e;
+    }
   }
 
   /**

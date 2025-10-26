@@ -1,18 +1,18 @@
-import { expect, test } from "@playwright/test";
-import { setupDeterministicTest } from "../helpers/practice-scenarios";
+import { expect } from "@playwright/test";
+import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
 
 test.describe("Add To Review - Complete Workflow", () => {
-  test.use({ storageState: "e2e/.auth/alice.json" });
-
   // SKIP: UI BUG - Add To Review adds ALL tunes instead of just selected ones
   // Dialog says "Added 3 tunes" but practice queue shows 6 (all repertoire tunes)
   test.skip("CRITICAL: Add tunes to repertoire, then add 3 to review, verify in practice queue", async ({
     page,
+    testUser,
   }) => {
     await page.goto("http://localhost:5173/");
 
     // Setup deterministic state: seed 6 specific tunes in repertoire, unscheduled
-    await setupDeterministicTest(page, {
+    await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
       seedRepertoire: [66, 70, 72, 3497, 54, 55], // Valid tune IDs
     });
