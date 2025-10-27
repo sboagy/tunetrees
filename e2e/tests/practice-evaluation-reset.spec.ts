@@ -36,16 +36,26 @@ test.describe.serial("Practice Evaluation Reset Behavior", () => {
       try {
         await trigger.scrollIntoViewIfNeeded();
       } catch {}
-      await trigger.click({ force: true });
-      await page.waitForTimeout(50);
+
+      await trigger.click({ delay: 50 });
+
+      await menu.waitFor({ state: "visible" });
       await expect(menu).toBeVisible();
       const option = menu.getByTestId(`recall-eval-option-${optionKey}`);
       await expect(option).toBeVisible();
       try {
         await option.click();
+        // Give things a tiny chance to calm down a bit before proceeding
+        await page.waitForTimeout(250);
         return;
       } catch {
         // menu may have detached due to re-render; retry once
+        // Check if page is still alive before waiting
+        if (page.isClosed()) {
+          throw new Error(
+            `Page closed during eval selection for tune ${tuneId}`
+          );
+        }
         await page.waitForTimeout(150);
       }
     }
