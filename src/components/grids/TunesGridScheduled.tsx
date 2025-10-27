@@ -228,28 +228,26 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     }
   );
 
-  // Use external evaluations if provided, otherwise manage locally
-  const [internalEvaluations, setInternalEvaluations] = createSignal<
-    Record<number, string>
-  >({});
-
-  // Use external or internal evaluations
-  const evaluations = () => props.evaluations ?? internalEvaluations();
+  // Use shared evaluations from parent - NO local state!
+  const evaluations = () => props.evaluations ?? {};
   const setEvaluations = (
     evalsOrUpdater:
       | Record<number, string>
       | ((prev: Record<number, string>) => Record<number, string>)
   ) => {
+    if (!props.onEvaluationsChange) {
+      console.error(
+        "[TunesGridScheduled] No onEvaluationsChange callback provided!"
+      );
+      return;
+    }
+
     const newEvals =
       typeof evalsOrUpdater === "function"
         ? evalsOrUpdater(evaluations())
         : evalsOrUpdater;
 
-    if (props.onEvaluationsChange) {
-      props.onEvaluationsChange(newEvals);
-    } else {
-      setInternalEvaluations(newEvals);
-    }
+    props.onEvaluationsChange(newEvals);
   };
 
   // Initialize evaluations from existing staged data in database

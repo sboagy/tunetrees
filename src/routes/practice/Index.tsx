@@ -220,16 +220,37 @@ const PracticeIndex: Component = () => {
 
   const [tableInstance, setTableInstance] = createSignal<any>(null);
 
-  // Store tunes for flashcard view
-  const [tunesForFlashcard, setTunesForFlashcard] = createSignal<any[]>([]);
+  // Store tunes for flashcard view - directly reactive to syncVersion
+  const [tunesForFlashcard] = createResource(
+    () => {
+      const db = localDb();
+      const playlistId = currentPlaylistId();
+      const version = syncVersion(); // Reactive to sync changes
+      return db && userId() && playlistId
+        ? { db, userId: userId()!, playlistId, version }
+        : null;
+    },
+    async (params) => {
+      if (!params) return [];
+      const { getPracticeList } = await import("../../lib/db/queries/practice");
+      const delinquencyWindowDays = 7;
+      // Returns PracticeListStagedWithQueue[] which is compatible with ITuneOverview
+      return await getPracticeList(
+        params.db,
+        params.userId,
+        params.playlistId,
+        delinquencyWindowDays
+      );
+    }
+  );
 
   // Filtered tunes for flashcard - applies showSubmitted filter
   const filteredTunesForFlashcard = createMemo(() => {
-    const tunes = tunesForFlashcard();
+    const tunes = tunesForFlashcard() || [];
     if (showSubmitted()) {
       return tunes; // Show all tunes including submitted
     }
-    return tunes.filter((tune) => !tune.completed_at); // Filter out submitted tunes
+    return tunes.filter((tune: any) => !tune.completed_at); // Filter out submitted tunes
   });
 
   // Callback from grid to clear evaluations after submit
@@ -307,7 +328,10 @@ const PracticeIndex: Component = () => {
         console.log("🔄 [CommitEvaluations] Syncing changes to Supabase...");
         await forceSyncUp();
 
-        // Clear evaluations in grid
+        // Clear shared evaluations state (used by both grid and flashcard)
+        setEvaluations({});
+
+        // Clear evaluations in grid (if callback exists)
         if (clearEvaluationsCallback) {
           clearEvaluationsCallback();
         }
@@ -536,10 +560,16 @@ const PracticeIndex: Component = () => {
                 when={!flashcardMode()}
                 fallback={
                   <FlashcardView
-                    tunes={filteredTunesForFlashcard()}
+                    tunes={filteredTunesForFlashcard() as any}
                     fieldVisibility={flashcardFieldVisibility()}
+                    evaluations={evaluations()}
+                    onEvaluationsChange={setEvaluations}
                     onEvaluationChange={handleRecallEvalChange}
                     onExitFlashcardMode={() => setFlashcardMode(false)}
+                    localDb={localDb}
+                    userId={userId() || undefined}
+                    playlistId={playlistId()}
+                    incrementSyncVersion={incrementSyncVersion}
                   />
                 }
               >
@@ -554,7 +584,6 @@ const PracticeIndex: Component = () => {
                   onTableInstanceChange={setTableInstance}
                   onClearEvaluationsReady={setClearEvaluationsCallback}
                   showSubmitted={showSubmitted()}
-                  onTunesChange={setTunesForFlashcard}
                 />
               </Show>
             )}
