@@ -557,7 +557,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
                 );
               }
             },
-            350
+            800
           );
 
           onCleanup(() => {
@@ -607,7 +607,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   createEffect(() => {
     if (!didInitialRestore() || didSecondApply()) return;
     const age = Date.now() - restoreAt();
-    if (age > 800) return; // only within ~0.8s window
+    if (age > 1500) return; // only within ~1.5s window
 
     const currentRows = table.getRowModel().rows.length;
     const currentTotal = rowVirtualizer().getTotalSize();
