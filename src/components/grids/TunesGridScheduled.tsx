@@ -57,7 +57,7 @@ import {
   mergeWithDefaults,
   saveTableState,
 } from "./table-state-persistence";
-import type { IGridBaseProps } from "./types";
+import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   const { localDb, syncVersion, incrementSyncVersion } = useAuth();
@@ -228,10 +228,29 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     }
   );
 
-  // Track evaluation changes locally for UI updates
-  const [evaluations, setEvaluations] = createSignal<Record<number, string>>(
-    {}
-  );
+  // Use external evaluations if provided, otherwise manage locally
+  const [internalEvaluations, setInternalEvaluations] = createSignal<
+    Record<number, string>
+  >({});
+
+  // Use external or internal evaluations
+  const evaluations = () => props.evaluations ?? internalEvaluations();
+  const setEvaluations = (
+    evalsOrUpdater:
+      | Record<number, string>
+      | ((prev: Record<number, string>) => Record<number, string>)
+  ) => {
+    const newEvals =
+      typeof evalsOrUpdater === "function"
+        ? evalsOrUpdater(evaluations())
+        : evalsOrUpdater;
+
+    if (props.onEvaluationsChange) {
+      props.onEvaluationsChange(newEvals);
+    } else {
+      setInternalEvaluations(newEvals);
+    }
+  };
 
   // Initialize evaluations from existing staged data in database
   createEffect(() => {
@@ -275,11 +294,13 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     const data = dueTunesData() || [];
     const evals = evaluations();
 
-    // Filter by completed_at if showSubmitted is false
+    // Filter by completed_at if showSubmitted is false or undefined
+    // When showSubmitted is true, show all tunes including submitted ones
+    // When showSubmitted is false or undefined, hide submitted tunes
     const filteredData =
-      props.showSubmitted === false
-        ? data.filter((entry) => !entry.completed_at)
-        : data;
+      props.showSubmitted === true
+        ? data
+        : data.filter((entry) => !entry.completed_at);
 
     // Map bucket integer to string for display
     const bucketNames: Record<
@@ -305,6 +326,14 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         // All latest_* fields already provided by VIEW via COALESCE
       };
     });
+  });
+
+  // Notify parent when tunes change (for flashcard view)
+  createEffect(() => {
+    if (props.onTunesChange) {
+      // Cast to ITuneOverview[] since the shape matches
+      props.onTunesChange(tunes() as unknown as ITuneOverview[]);
+    }
   });
 
   // Callback for recall evaluation changes

@@ -56,6 +56,11 @@ export interface ITuneOverview {
   note_public: string | null;
   recall_eval: string | null;
 
+  // Queue data (from daily_practice_queue)
+  bucket?: number | null; // Queue bucket (1=Due Today, 2=Lapsed, 3=New, 4=Old Lapsed)
+  order_index?: number | null; // Position in queue
+  completed_at?: string | null; // Timestamp when evaluation was submitted
+
   // Metadata
   tags: string | null;
   notes: string | null;
@@ -119,6 +124,8 @@ export interface IGridBaseProps {
   onEvaluationsCountChange?: (count: number) => void;
   onTableInstanceChange?: (table: any) => void;
   onClearEvaluationsReady?: (callback: () => void) => void;
+  // Flashcard mode callback
+  onTunesChange?: (tunes: ITuneOverview[]) => void;
   // Table instance callback
   onTableReady?: (table: any) => void;
   // Column visibility
@@ -139,6 +146,9 @@ export interface IGridBaseProps {
   selectedPlaylistIds?: number[];
   // Practice-specific props
   showSubmitted?: boolean; // Display already-submitted tunes in practice queue
+  // Evaluation state management (for flashcard/grid coordination)
+  evaluations?: Record<number, string>; // External evaluation state
+  onEvaluationsChange?: (evals: Record<number, string>) => void; // Callback when evaluations change
 }
 
 /**

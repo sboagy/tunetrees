@@ -11,6 +11,7 @@ import { and, eq, gte, lt, sql } from "drizzle-orm";
 import type { Component } from "solid-js";
 import {
   createEffect,
+  createMemo,
   createResource,
   createSignal,
   onMount,
@@ -19,7 +20,12 @@ import {
 import { toast } from "solid-sonner";
 import { TunesGridScheduled } from "../../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
-import { PracticeControlBanner } from "../../components/practice";
+import {
+  type FlashcardFieldVisibilityByFace,
+  FlashcardView,
+  getDefaultFieldVisibility,
+  PracticeControlBanner,
+} from "../../components/practice";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { dailyPracticeQueue } from "../../lib/db/schema";
@@ -86,6 +92,17 @@ const PracticeIndex: Component = () => {
   // Track evaluations count and table instance for toolbar
   const [evaluationsCount, setEvaluationsCount] = createSignal(0);
 
+  // Shared evaluation state between grid and flashcard views
+  const [evaluations, setEvaluations] = createSignal<Record<number, string>>(
+    {}
+  );
+
+  // Update count when evaluations change
+  createEffect(() => {
+    const count = Object.keys(evaluations()).length;
+    setEvaluationsCount(count);
+  });
+
   // Display Submitted state - persisted to localStorage
   const STORAGE_KEY = "TT_PRACTICE_SHOW_SUBMITTED";
   const [showSubmitted, setShowSubmitted] = createSignal(false);
@@ -141,7 +158,79 @@ const PracticeIndex: Component = () => {
     localStorage.setItem(QUEUE_DATE_STORAGE_KEY, queueDate().toISOString());
   });
 
+  // Flashcard Mode state - persisted to localStorage
+  const FLASHCARD_MODE_STORAGE_KEY = "TT_PRACTICE_FLASHCARD_MODE";
+  const [flashcardMode, setFlashcardMode] = createSignal(false);
+
+  // Flashcard Field Visibility - persisted to localStorage
+  const FLASHCARD_FIELDS_STORAGE_KEY = "TT_FLASHCARD_FIELD_VISIBILITY";
+  const [flashcardFieldVisibility, setFlashcardFieldVisibility] =
+    createSignal<FlashcardFieldVisibilityByFace>(getDefaultFieldVisibility());
+
+  // Load flashcard mode from localStorage on mount
+  onMount(() => {
+    const stored = localStorage.getItem(FLASHCARD_MODE_STORAGE_KEY);
+    if (stored !== null) {
+      setFlashcardMode(stored === "true");
+    }
+
+    // Load flashcard field visibility from localStorage
+    const storedFields = localStorage.getItem(FLASHCARD_FIELDS_STORAGE_KEY);
+    if (storedFields) {
+      try {
+        const parsed = JSON.parse(storedFields);
+
+        // Check if old format (flat object with 'type' directly) or new format (has 'front'/'back')
+        if (parsed.type !== undefined && !parsed.front) {
+          // Old format - migrate to new per-face structure
+          console.info(
+            "Migrating old flashcard field visibility format to new front/back structure"
+          );
+          setFlashcardFieldVisibility({
+            front: { ...parsed },
+            back: { ...parsed },
+          });
+        } else if (parsed.front && parsed.back) {
+          // New format - use as is
+          setFlashcardFieldVisibility(parsed);
+        } else {
+          // Unrecognized format - use defaults
+          console.warn(
+            "Unrecognized flashcard field visibility format, using defaults"
+          );
+        }
+      } catch (e) {
+        console.error("Failed to parse flashcard field visibility:", e);
+      }
+    }
+  });
+
+  // Persist flashcard mode to localStorage on change
+  createEffect(() => {
+    localStorage.setItem(FLASHCARD_MODE_STORAGE_KEY, String(flashcardMode()));
+  });
+
+  // Persist flashcard field visibility to localStorage on change
+  createEffect(() => {
+    localStorage.setItem(
+      FLASHCARD_FIELDS_STORAGE_KEY,
+      JSON.stringify(flashcardFieldVisibility())
+    );
+  });
+
   const [tableInstance, setTableInstance] = createSignal<any>(null);
+
+  // Store tunes for flashcard view
+  const [tunesForFlashcard, setTunesForFlashcard] = createSignal<any[]>([]);
+
+  // Filtered tunes for flashcard - applies showSubmitted filter
+  const filteredTunesForFlashcard = createMemo(() => {
+    const tunes = tunesForFlashcard();
+    if (showSubmitted()) {
+      return tunes; // Show all tunes including submitted
+    }
+    return tunes.filter((tune) => !tune.completed_at); // Filter out submitted tunes
+  });
 
   // Callback from grid to clear evaluations after submit
   let clearEvaluationsCallback: (() => void) | undefined;
@@ -152,8 +241,16 @@ const PracticeIndex: Component = () => {
   // Handle recall evaluation changes
   const handleRecallEvalChange = (tuneId: number, evaluation: string) => {
     console.log(`Recall evaluation for tune ${tuneId}: ${evaluation}`);
-    // Evaluation is staged locally in grid component state
-    // Will be submitted in batch by handleSubmitEvaluations()
+
+    // Update shared evaluation state
+    setEvaluations((prev) => {
+      if (evaluation === "") {
+        // Remove evaluation if empty
+        const { [tuneId]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [tuneId]: evaluation };
+    });
   };
 
   // Handle goal changes
@@ -413,10 +510,14 @@ const PracticeIndex: Component = () => {
         onQueueReset={handleQueueReset}
         showSubmitted={showSubmitted()}
         onShowSubmittedChange={setShowSubmitted}
+        flashcardMode={flashcardMode()}
+        onFlashcardModeChange={setFlashcardMode}
         table={tableInstance()}
+        flashcardFieldVisibility={flashcardFieldVisibility()}
+        onFlashcardFieldVisibilityChange={setFlashcardFieldVisibility}
       />
 
-      {/* Main Content Area - Grid fills remaining space */}
+      {/* Main Content Area - Grid or Flashcard fills remaining space */}
       <div class={GRID_CONTENT_CONTAINER}>
         <Show
           when={user() && localDb() && currentPlaylistId()}
@@ -431,17 +532,31 @@ const PracticeIndex: Component = () => {
           {/* Use a derivation to get the stable number value */}
           <Show when={currentPlaylistId() && userId()}>
             {(playlistId) => (
-              <TunesGridScheduled
-                userId={userId()!}
-                playlistId={playlistId()}
-                tablePurpose="scheduled"
-                onRecallEvalChange={handleRecallEvalChange}
-                onGoalChange={handleGoalChange}
-                onEvaluationsCountChange={setEvaluationsCount}
-                onTableInstanceChange={setTableInstance}
-                onClearEvaluationsReady={setClearEvaluationsCallback}
-                showSubmitted={showSubmitted()}
-              />
+              <Show
+                when={!flashcardMode()}
+                fallback={
+                  <FlashcardView
+                    tunes={filteredTunesForFlashcard()}
+                    fieldVisibility={flashcardFieldVisibility()}
+                    onEvaluationChange={handleRecallEvalChange}
+                    onExitFlashcardMode={() => setFlashcardMode(false)}
+                  />
+                }
+              >
+                <TunesGridScheduled
+                  userId={userId()!}
+                  playlistId={playlistId()}
+                  tablePurpose="scheduled"
+                  onRecallEvalChange={handleRecallEvalChange}
+                  onGoalChange={handleGoalChange}
+                  evaluations={evaluations()}
+                  onEvaluationsChange={setEvaluations}
+                  onTableInstanceChange={setTableInstance}
+                  onClearEvaluationsReady={setClearEvaluationsCallback}
+                  showSubmitted={showSubmitted()}
+                  onTunesChange={setTunesForFlashcard}
+                />
+              </Show>
             )}
           </Show>
         </Show>

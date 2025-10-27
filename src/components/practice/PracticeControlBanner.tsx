@@ -27,13 +27,14 @@ import {
   TOOLBAR_BUTTON_GROUP_CLASSES,
   TOOLBAR_BUTTON_NEUTRAL,
   TOOLBAR_BUTTON_PRIMARY,
-  TOOLBAR_BUTTON_WARNING,
   TOOLBAR_CONTAINER_CLASSES,
   TOOLBAR_ICON_SIZE,
   TOOLBAR_INNER_CLASSES,
 } from "../grids/shared-toolbar-styles";
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 import { AddTunesDialog } from "./AddTunesDialog";
+import { FlashcardFieldVisibilityMenu } from "./FlashcardFieldVisibilityMenu";
+import type { FlashcardFieldVisibilityByFace } from "./flashcard-fields";
 import { QueueDateSelector } from "./QueueDateSelector";
 
 export interface PracticeControlBannerProps {
@@ -45,8 +46,18 @@ export interface PracticeControlBannerProps {
   showSubmitted?: boolean;
   /** Handler for display submitted toggle */
   onShowSubmittedChange?: (show: boolean) => void;
-  /** Table instance for column visibility control */
+  /** Flashcard mode flag */
+  flashcardMode?: boolean;
+  /** Handler for flashcard mode toggle */
+  onFlashcardModeChange?: (enabled: boolean) => void;
+  /** Table instance for column visibility control (grid mode) */
   table?: Table<any>;
+  /** Flashcard field visibility (flashcard mode) */
+  flashcardFieldVisibility?: FlashcardFieldVisibilityByFace;
+  /** Handler for flashcard field visibility change */
+  onFlashcardFieldVisibilityChange?: (
+    visibility: FlashcardFieldVisibilityByFace
+  ) => void;
   /** Handler for add tunes action */
   onAddTunes?: (count: number) => void;
   /** Current queue date */
@@ -62,7 +73,6 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
 ) => {
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showQueueSelector, setShowQueueSelector] = createSignal(false);
-  const [flashcardMode, setFlashcardMode] = createSignal(false);
   const [showAddTunesDialog, setShowAddTunesDialog] = createSignal(false);
 
   let columnsButtonRef: HTMLButtonElement | undefined;
@@ -109,9 +119,9 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   };
 
   const handleFlashcardToggle = () => {
-    setFlashcardMode(!flashcardMode());
-    console.log(`Flashcard mode: ${!flashcardMode()}`);
-    // TODO: Switch between table and flashcard view
+    if (props.onFlashcardModeChange) {
+      props.onFlashcardModeChange(!(props.flashcardMode ?? false));
+    }
   };
 
   const handleColumnsToggle = () => {
@@ -247,53 +257,73 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             </svg>
           </button>
 
-          {/* Flashcard Mode toggle */}
-          <button
-            type="button"
-            onClick={handleFlashcardToggle}
+          {/* Flashcard Mode toggle - Switch component */}
+          <div
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL} gap-3 px-3 py-1`}
             title="Toggle flashcard practice mode"
-            class={`${TOOLBAR_BUTTON_BASE}`}
-            classList={{
-              [`${TOOLBAR_BUTTON_WARNING}`]: flashcardMode(),
-              [`${TOOLBAR_BUTTON_NEUTRAL}`]: !flashcardMode(),
-            }}
           >
-            <svg
-              class={TOOLBAR_ICON_SIZE}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
+            <Switch
+              checked={props.flashcardMode ?? false}
+              onChange={handleFlashcardToggle}
+              data-testid="flashcard-mode-switch"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
-              />
-            </svg>
-            <span class="hidden lg:inline">Flashcard</span>
-          </button>
+              <SwitchControl>
+                <SwitchThumb />
+              </SwitchControl>
+              <SwitchLabel class="text-xs font-medium cursor-pointer select-none ml-2 hidden sm:inline">
+                Flashcard Mode
+              </SwitchLabel>
+            </Switch>
+          </div>
 
-          {/* Columns dropdown */}
+          {/* Columns/Fields dropdown */}
           <div class="relative">
             <button
               ref={columnsButtonRef}
               type="button"
               onClick={handleColumnsToggle}
-              title="Show/hide columns"
+              title={
+                props.flashcardMode ? "Show/hide fields" : "Show/hide columns"
+              }
               data-testid="practice-columns-button"
               class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
             >
               <Columns size={14} />
-              <span class="hidden sm:inline">Columns</span>
+              <span class="hidden sm:inline">
+                {props.flashcardMode ? "Fields" : "Columns"}
+              </span>
             </button>
 
-            {/* Columns menu */}
-            <Show when={showColumnsDropdown() && props.table}>
+            {/* Grid Columns menu */}
+            <Show
+              when={
+                showColumnsDropdown() && !props.flashcardMode && props.table
+              }
+            >
               <ColumnVisibilityMenu
                 isOpen={showColumnsDropdown()}
                 table={props.table!}
+                onClose={() => setShowColumnsDropdown(false)}
+                triggerRef={columnsButtonRef}
+              />
+            </Show>
+
+            {/* Flashcard Fields menu */}
+            <Show
+              when={
+                showColumnsDropdown() &&
+                props.flashcardMode &&
+                props.flashcardFieldVisibility
+              }
+            >
+              <FlashcardFieldVisibilityMenu
+                isOpen={showColumnsDropdown()}
+                fieldVisibility={props.flashcardFieldVisibility!}
+                onFieldVisibilityChange={(visibility) => {
+                  if (props.onFlashcardFieldVisibilityChange) {
+                    props.onFlashcardFieldVisibilityChange(visibility);
+                  }
+                }}
                 onClose={() => setShowColumnsDropdown(false)}
                 triggerRef={columnsButtonRef}
               />
