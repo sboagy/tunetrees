@@ -22,8 +22,10 @@ jobs:
     timeout-minutes: 30
     environment: vite_pwa_env
     env:
-      ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD || 'TestPassword123!' }}
-      TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD || 'TestPassword123!' }}
+      ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+      TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
     steps:
@@ -107,8 +109,8 @@ jobs:
       - name: Reset and Seed Database
         run: npm run db:ci:reset
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
       # 9. Verify Database Setup (optional debug step)
       - name: Verify Database Setup
@@ -152,8 +154,8 @@ jobs:
           pkill -f "vite" || true
           sleep 1
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
       # 14. Run Playwright Tests (webServer in playwright.config.ts handles dev server)
       - name: Run Playwright Tests
@@ -217,6 +219,9 @@ jobs:
       # 4. Build for production
       - name: Build Application
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       # 5. Deploy to Cloudflare Pages
       - name: Deploy to Cloudflare Pages
