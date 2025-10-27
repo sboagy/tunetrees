@@ -107,8 +107,8 @@ jobs:
       - name: Reset and Seed Database
         run: npm run db:ci:reset
         env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       # 9. Verify Database Setup (optional debug step)
       - name: Verify Database Setup
@@ -152,8 +152,8 @@ jobs:
           pkill -f "vite" || true
           sleep 1
         env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       # 14. Run Playwright Tests (webServer in playwright.config.ts handles dev server)
       - name: Run Playwright Tests
