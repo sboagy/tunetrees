@@ -140,6 +140,25 @@ test.describe("Scroll Position Persistence", () => {
       el.scrollTop = 1000; // Scroll down 1000px
     });
 
+    // Wait for scroll to settle (especially important in Firefox)
+    await page.waitForTimeout(200);
+
+    // Verify scroll actually worked before proceeding
+    const actualScroll = await gridContainer.evaluate((el) => el.scrollTop);
+    console.log("[CATALOG TEST] Actual scroll after setting:", actualScroll);
+
+    // If scroll didn't reach target, grid might not be fully rendered
+    if (actualScroll < 900) {
+      console.log(
+        "[CATALOG TEST] Scroll insufficient, waiting for render and retrying"
+      );
+      await page.waitForTimeout(500);
+      await gridContainer.evaluate((el) => {
+        el.scrollTop = 1000;
+      });
+      await page.waitForTimeout(200);
+    }
+
     // Wait for debounce to persist scroll position (300ms + buffer)
     await page.waitForTimeout(500);
 
@@ -299,6 +318,7 @@ test.describe("Scroll Position Persistence", () => {
 
   test("Catalog: scroll position persists after browser refresh", async ({
     page,
+    browserName,
   }) => {
     // Set up console listener early
     const consoleLogs: string[] = [];
@@ -324,8 +344,17 @@ test.describe("Scroll Position Persistence", () => {
     const box = await gridContainer.boundingBox();
     if (box) {
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      // Scroll down with mouse wheel (negative deltaY scrolls down)
-      await page.mouse.wheel(0, 1000);
+
+      // Firefox uses DOM_DELTA_LINE mode (~3 lines per unit), Chromium uses DOM_DELTA_PIXEL
+      // But also, Firefox only seems to let you scroll with the wheel so much.
+      // I know we can just programmatically set the scroll value, but it's nice to
+      // have this wheel-based test.
+      const wheelDelta = 1000;
+      await page.mouse.wheel(0, wheelDelta);
+      if (browserName === "firefox") {
+        await page.mouse.wheel(0, wheelDelta);
+        await page.mouse.wheel(0, 50);
+      }
     }
 
     // Wait for debounce
