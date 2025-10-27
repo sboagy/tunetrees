@@ -65,7 +65,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       .update(playlistTune)
       .set({
         scheduled: now,
-        syncVersion: sql`${playlistTune.syncVersion} + 1`,
+        syncVersion: sql.raw(`${playlistTune.syncVersion} + 1`),
         lastModifiedAt: new Date().toISOString(),
       })
       .where(
