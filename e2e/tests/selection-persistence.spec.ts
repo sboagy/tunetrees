@@ -22,11 +22,12 @@ test.describe.serial("Row Selection Persistence", () => {
   test.slow();
 
   test.beforeEach(async ({ page, testUser }) => {
+    const testUserPrivateTune1 = testUser.userId;
     // Setup: Seed several tunes in repertoire for selection testing
-    // Using known valid tune IDs: 9001 (Banish Misfortune), 3497 (Morrison's Jig)
+    // Using known valid tune IDs: testUserPrivateTune1 (Banish Misfortune), 3497 (Morrison's Jig)
     // Start on catalog tab since most tests begin there
     await setupForRepertoireTestsParallel(page, testUser, {
-      repertoireTunes: [testUser.userId, 3497], // Only 2 tunes that we know exist
+      repertoireTunes: [testUserPrivateTune1, 3497], // Only 2 tunes that we know exist
       scheduleTunes: false,
     });
 

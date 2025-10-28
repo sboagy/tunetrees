@@ -565,7 +565,6 @@ const PracticeIndex: Component = () => {
                     evaluations={evaluations()}
                     onEvaluationsChange={setEvaluations}
                     onEvaluationChange={handleRecallEvalChange}
-                    onExitFlashcardMode={() => setFlashcardMode(false)}
                     localDb={localDb}
                     userId={userId() || undefined}
                     playlistId={playlistId()}

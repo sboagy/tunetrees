@@ -5,6 +5,7 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { test as base } from "@playwright/test";
+import log from "loglevel";
 import {
   getTestUserByWorkerIndex,
   TEST_USERS,
@@ -113,7 +114,7 @@ export const test = base.extend<TestUserFixture>({
       );
     }
 
-    console.log(`🔐 Worker auth: ${authFile} (fresh)`);
+    log.debug(`🔐 Worker auth: ${authFile} (fresh)`);
     await use(authFile);
   },
 });

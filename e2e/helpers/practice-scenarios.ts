@@ -6,6 +6,9 @@
  */
 
 import { expect, type Page } from "@playwright/test";
+import log from "loglevel";
+
+log.setLevel("info");
 
 // ============================================================================
 // LEGACY ALICE-SPECIFIC FUNCTIONS (DEPRECATED)
@@ -91,14 +94,14 @@ export async function clearTunetreesStorageDB(page: Page) {
 
       tryDelete();
     });
-    console.log("✅ Cleared local IndexedDB cache");
+    log.debug("✅ Cleared local IndexedDB cache");
 
     // Clear app caches (but preserve auth state for parallel workers)
 
     // 1) Clear sessionStorage only (non-persistent storage)
     try {
       sessionStorage.clear();
-      console.log("✅ Cleared sessionStorage");
+      log.debug("✅ Cleared sessionStorage");
     } catch (err) {
       console.warn("Failed to clear sessionStorage:", err);
     }
@@ -108,7 +111,7 @@ export async function clearTunetreesStorageDB(page: Page) {
       try {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map((n) => caches.delete(n)));
-        console.log("✅ Cleared CacheStorage caches:", cacheNames);
+        log.debug("✅ Cleared CacheStorage caches:", cacheNames);
       } catch (err) {
         console.warn("Failed to clear CacheStorage:", err);
       }
@@ -137,7 +140,7 @@ export async function clearTunetreesStorageDB(page: Page) {
         }
       }
 
-      console.log("✅ Cleared in-memory globals/test hooks");
+      log.debug("✅ Cleared in-memory globals/test hooks");
     } catch (err) {
       console.warn("Failed to clear in-memory globals:", err);
     }
@@ -157,7 +160,7 @@ async function waitForSyncComplete(
 ): Promise<void> {
   const startTime = Date.now();
 
-  console.log("⏳ Waiting for initial sync to complete...");
+  log.debug("⏳ Waiting for initial sync to complete...");
 
   // Poll for sync completion by checking if initial syncDown has finished
   while (Date.now() - startTime < timeoutMs) {
@@ -171,7 +174,7 @@ async function waitForSyncComplete(
     });
 
     if (syncComplete) {
-      console.log("✅ Initial sync complete detected");
+      log.debug("✅ Initial sync complete detected");
       return;
     }
 
@@ -204,7 +207,7 @@ export async function setupDeterministicTestParallel(
     scheduleTunes?: { tuneIds: number[]; daysAgo: number };
   } = {}
 ) {
-  console.log(`🔧 [${user.name}] Setting up deterministic test state...`);
+  log.debug(`🔧 [${user.name}] Setting up deterministic test state...`);
 
   // Step 0: Navigate to page if not already (needed for IndexedDB access)
   const currentUrl = page.url();
@@ -214,15 +217,21 @@ export async function setupDeterministicTestParallel(
     currentUrl.startsWith("data:")
   ) {
     await page.goto("http://localhost:5173/");
-    await page.waitForTimeout(1000);
+    await waitForSyncComplete(page);
   }
+
+  let whichTables = ["daily_practice_queue", "practice_record"];
 
   // Step 1: Clear user's state
   if (opts.clearRepertoire) {
-    await clearUserRepertoire(user);
+    // Clear user's repertoire via generic table helper and verify
+    await clearUserTable(user, "playlist_tune");
+    whichTables = [...whichTables, "playlist_tune"];
   }
   await clearUserTable(user, "daily_practice_queue");
   await clearUserTable(user, "practice_record");
+
+  await verifyTablesEmpty(user, whichTables);
 
   // Step 2: Seed user's repertoire if specified
   if (opts.seedRepertoire && opts.seedRepertoire.length > 0) {
@@ -257,139 +266,27 @@ export async function setupDeterministicTestParallel(
 
   // Step 5: Reload page to trigger fresh sync
   await page.reload();
-  await page.waitForTimeout(3000); // Wait for sync to complete
+  await waitForSyncComplete(page);
 
-  console.log(`✅ [${user.name}] Deterministic test state ready`);
+  log.debug(`✅ [${user.name}] Deterministic test state ready`);
 }
 
-/**
- * Clear repertoire for a specific test user (parallel-safe)
- */
-export async function clearUserRepertoire(user: TestUser) {
-  const userKey = user.email.split(".")[0]; // alice.test@... → alice
-  const { supabase } = await getTestUserClient(userKey);
-
-  const { data: before, error: readError } = await supabase
-    .from("playlist_tune")
-    .select("tune_ref")
-    .eq("playlist_ref", user.playlistId);
-
-  if (readError) {
-    throw new Error(`Failed to read repertoire: ${readError.message}`);
-  }
-  console.log(
-    `🗑️  [${user.name}] Deleting ${before?.length || 0} tunes from repertoire`
-  );
-
-  const { error } = await supabase
-    .from("playlist_tune")
-    .delete()
-    .eq("playlist_ref", user.playlistId);
-
-  if (error) {
-    throw new Error(`Failed to clear repertoire: ${error.message}`);
-  }
-
-  // Verify it's actually cleared
-  const timeoutMs = 15000;
-  const retryDelayMs = 500;
-  const start = Date.now();
-  let finalCount: number | null = null;
-
-  while (Date.now() - start < timeoutMs) {
-    const { count, error: countError } = await supabase
-      .from("playlist_tune")
-      .select("tune_ref", { count: "exact", head: true })
-      .eq("playlist_ref", user.playlistId);
-
-    if (countError) {
-      console.warn(
-        `[${user.name}] Transient error reading playlist_tune count, retrying:`,
-        countError.message
-      );
-    } else {
-      finalCount = count ?? null;
-      if (finalCount === null) {
-        throw new Error(
-          `Failed to verify deletion: Supabase returned null count for playlist_tune`
-        );
-      }
-      if (finalCount === 0) break;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-  }
-
-  if (finalCount === null || finalCount > 0) {
-    throw new Error(
-      `Failed to clear playlist_tune: expected 0 rows, last known count: ${finalCount}`
-    );
-  }
-
-  console.log(`✅ [${user.name}] Cleared repertoire (0 remaining)`);
-}
+// clearUserRepertoire removed; use clearUserTable(user, "playlist_tune") + verifyTablesEmpty
 
 /**
  * Seed repertoire for a specific test user (parallel-safe)
  */
-export async function seedUserRepertoire(user: TestUser, tuneIds: number[]) {
+export async function seedUserRepertoire(
+  user: TestUser,
+  tuneIds: number[],
+  preCheck: boolean = false
+) {
   const userKey = user.email.split(".")[0]; // alice.test@... → alice
   const { supabase } = await getTestUserClient(userKey);
 
-  // Verify playlist_tune is empty before seeding
-  {
-    const timeoutMs = 16000;
-    const retryDelayMs = 1000;
-    const start = Date.now();
-    let finalCount: number | null = null;
-
-    while (Date.now() - start < timeoutMs) {
-      const { count, error } = await supabase
-        .from("playlist_tune")
-        .select("tune_ref", { count: "exact", head: true })
-        .eq("playlist_ref", user.playlistId);
-
-      if (error) {
-        console.warn(
-          `[${user.name}] Transient error querying playlist_tune, retrying:`,
-          error.message
-        );
-      } else {
-        finalCount = count ?? 0;
-        if (finalCount === 0) break;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-    }
-
-    if (finalCount === null) {
-      const { count, error } = await supabase
-        .from("playlist_tune")
-        .select("tune_ref", { count: "exact", head: true })
-        .eq("playlist_ref", user.playlistId);
-
-      if (error) {
-        throw new Error(
-          `Failed to query playlist_tune after retries: ${error.message}`
-        );
-      }
-      finalCount = count ?? 0;
-    }
-
-    if (finalCount > 0) {
-      const { data: debugRows } = await supabase
-        .from("playlist_tune")
-        .select("*")
-        .eq("playlist_ref", user.playlistId);
-      console.error(
-        `❌ [${user.name}] SEED PRE-CHECK FAILED: Found ${finalCount} rows:`,
-        JSON.stringify(debugRows, null, 2)
-      );
-
-      throw new Error(
-        `Refusing to seed repertoire: playlist_tune contains ${finalCount} row(s). Clear repertoire before seeding.`
-      );
-    }
+  // Verify playlist_tune is empty before seeding (consistent helper)
+  if (preCheck) {
+    await verifyTablesEmpty(user, ["playlist_tune"], supabase);
   }
 
   const maxAttempts = 5;
@@ -470,7 +367,7 @@ export async function seedUserRepertoire(user: TestUser, tuneIds: number[]) {
     }
   }
 
-  console.log(`✅ [${user.name}] Seeded ${tuneIds.length} tunes in repertoire`);
+  log.debug(`✅ [${user.name}] Seeded ${tuneIds.length} tunes in repertoire`);
 }
 
 function applyTableQueryFilters(
@@ -486,6 +383,9 @@ function applyTableQueryFilters(
   } else if (tableName === "practice_record") {
     // practice_record is keyed by playlist_ref
     query = query.eq("playlist_ref", user.playlistId);
+  } else if (tableName === "playlist_tune") {
+    // playlist_tune rows are keyed by playlist_ref; no user_ref column
+    query = query.eq("playlist_ref", user.playlistId);
   } else if (tableName === "table_transient_data") {
     query = query.eq("user_id", user.userId);
   } else {
@@ -495,32 +395,106 @@ function applyTableQueryFilters(
 }
 
 /**
- * Clear a Supabase table for a specific user (parallel-safe)
+ * Verify that a table for a specific user is empty (with polling and retries)
  */
-async function clearUserTable(user: TestUser, tableName: string) {
-  const userKey = user.email.split(".")[0]; // alice.test@... → alice
-  const { supabase } = await getTestUserClient(userKey);
-
-  let query = supabase.from(tableName).delete();
-
-  query = applyTableQueryFilters(tableName, query, user);
-
-  const { error } = await query;
-
-  if (error && !error.message.includes("no rows")) {
-    console.error(`[${user.name}] Failed to clear ${tableName}:`, error);
-  } else {
-    console.log(`✅ [${user.name}] Cleared ${tableName}`);
+async function verifyTableEmpty(
+  user: TestUser,
+  tableName: string,
+  supabase?: any
+) {
+  const userKey = user.email.split(".")[0];
+  if (!supabase) {
+    const client = await getTestUserClient(userKey);
+    supabase = client.supabase;
   }
-  // Verify table is empty (polling)
-  {
-    const timeoutMs = 8000;
-    const retryDelayMs = 500;
-    const start = Date.now();
-    let finalCount: number | null = null;
 
-    while (Date.now() - start < timeoutMs) {
-      // Build count query with same safety filters as the delete above
+  const timeoutMs = 16000;
+  const retryDelayMs = 500;
+  const start = Date.now();
+  let finalCount: number | null = null;
+
+  while (Date.now() - start < timeoutMs) {
+    // Build count query with same safety filters
+    let countQuery = supabase.from(tableName).select("*", {
+      count: "exact",
+      head: true,
+    }) as any;
+
+    countQuery = applyTableQueryFilters(tableName, countQuery, user);
+
+    const { count, error: countError } = await countQuery;
+
+    if (countError) {
+      console.warn(
+        `[${user.name}] Transient error reading ${tableName} count, retrying:`,
+        countError.message
+      );
+    } else {
+      finalCount = count ?? 0;
+      if (finalCount === 0) {
+        break;
+      }
+      log.debug(
+        `[${user.name}] Waiting for ${tableName} to drain: ${finalCount} remaining`
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+  }
+
+  // Final verification
+  if (finalCount === null) {
+    // Try one final time to get an authoritative count
+    let finalQuery = supabase.from(tableName).select("*", {
+      count: "exact",
+      head: true,
+    }) as any;
+
+    finalQuery = applyTableQueryFilters(tableName, finalQuery, user);
+
+    const { count: finalCountRead, error: finalReadError } = await finalQuery;
+    if (finalReadError) {
+      throw new Error(
+        `[${user.name}] Failed to verify ${tableName} deletion after retries: ${finalReadError.message}`
+      );
+    }
+    finalCount = finalCountRead ?? 0;
+  }
+
+  if (finalCount == null || finalCount > 0) {
+    throw new Error(
+      `[${user.name}] Failed to clear ${tableName}: expected 0 rows, last known count: ${finalCount}`
+    );
+  }
+
+  log.debug(`✅ [${user.name}] Verified ${tableName} is empty`);
+}
+
+/**
+ * Verify that multiple tables for a specific user are empty (parallel queries for efficiency)
+ */
+async function verifyTablesEmpty(
+  user: TestUser,
+  tableNames: string[],
+  supabase?: any
+) {
+  const userKey = user.email.split(".")[0];
+  if (!supabase) {
+    const client = await getTestUserClient(userKey);
+    supabase = client.supabase;
+  }
+
+  const timeoutMs = 16000;
+  const retryDelayMs = 500;
+  const start = Date.now();
+  const tableCounts = new Map<string, number | null>(
+    tableNames.map((t) => [t, null])
+  );
+
+  // Polling loop with parallel queries for all tables
+  while (Date.now() - start < timeoutMs) {
+    // Query all tables in parallel
+    const queryPromises = tableNames.map(async (tableName) => {
       let countQuery = supabase.from(tableName).select("*", {
         count: "exact",
         head: true,
@@ -535,22 +509,38 @@ async function clearUserTable(user: TestUser, tableName: string) {
           `[${user.name}] Transient error reading ${tableName} count, retrying:`,
           countError.message
         );
-      } else {
-        finalCount = count ?? 0;
-        if (finalCount === 0) {
-          break;
-        }
-        console.log(
-          `[${user.name}] Waiting for ${tableName} to drain: ${finalCount} remaining`
-        );
+        return { tableName, count: null, error: countError };
       }
 
-      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      return { tableName, count: count ?? 0, error: null };
+    });
+
+    const results = await Promise.all(queryPromises);
+
+    // Update counts
+    let allEmpty = true;
+    for (const { tableName, count, error } of results) {
+      if (!error) {
+        tableCounts.set(tableName, count);
+        if (count > 0) {
+          allEmpty = false;
+          log.debug(
+            `[${user.name}] Waiting for ${tableName} to drain: ${count} remaining`
+          );
+        }
+      }
     }
 
-    // Final verification
-    if (finalCount === null) {
-      // Try one final time to get an authoritative count
+    if (allEmpty && results.every((r) => !r.error)) {
+      break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+  }
+
+  // Final verification - query any tables that haven't been confirmed as empty
+  for (const tableName of tableNames) {
+    if (tableCounts.get(tableName) === null) {
       let finalQuery = supabase.from(tableName).select("*", {
         count: "exact",
         head: true,
@@ -564,16 +554,59 @@ async function clearUserTable(user: TestUser, tableName: string) {
           `[${user.name}] Failed to verify ${tableName} deletion after retries: ${finalReadError.message}`
         );
       }
-      finalCount = finalCountRead ?? 0;
+      tableCounts.set(tableName, finalCountRead ?? 0);
     }
+  }
 
-    if (finalCount == null || finalCount > 0) {
-      throw new Error(
-        `[${user.name}] Failed to clear ${tableName}: expected 0 rows, last known count: ${finalCount}`
-      );
+  // Check all tables are actually empty
+  const failedTables: Array<[string, number]> = [];
+  for (const [tableName, count] of tableCounts.entries()) {
+    if (count == null || count > 0) {
+      failedTables.push([tableName, count ?? 0]);
     }
+  }
 
-    console.log(`✅ [${user.name}] Verified ${tableName} is empty`);
+  if (failedTables.length > 0) {
+    const details = failedTables
+      .map(([name, count]) => `${name} (${count} rows)`)
+      .join(", ");
+    throw new Error(`[${user.name}] Failed to clear tables: ${details}`);
+  }
+
+  log.debug(
+    `✅ [${user.name}] Verified ${
+      tableNames.length
+    } tables are empty: ${tableNames.join(", ")}`
+  );
+}
+
+/**
+ * Clear a Supabase table for a specific user (parallel-safe)
+ * @param check - if true, verifies the table is empty after deletion
+ */
+async function clearUserTable(
+  user: TestUser,
+  tableName: string,
+  check: boolean = false
+) {
+  const userKey = user.email.split(".")[0]; // alice.test@... → alice
+  const { supabase } = await getTestUserClient(userKey);
+
+  let query = supabase.from(tableName).delete();
+
+  query = applyTableQueryFilters(tableName, query, user);
+
+  const { error } = await query;
+
+  if (error && !error.message.includes("no rows")) {
+    console.error(`[${user.name}] Failed to clear ${tableName}:`, error);
+  } else {
+    log.debug(`✅ [${user.name}] Cleared ${tableName}`);
+  }
+
+  // Verify table is empty if requested
+  if (check) {
+    await verifyTableEmpty(user, tableName, supabase);
   }
 }
 
@@ -587,11 +620,20 @@ export async function setupForPracticeTestsParallel(
   opts?: {
     repertoireTunes?: number[];
     startTab?: "practice" | "repertoire" | "catalog";
+    /**
+     * If provided, marks all repertoireTunes as scheduled this many days ago.
+     * Ensures they appear in today's practice queue so flashcards have items.
+     */
+    scheduleDaysAgo?: number;
   }
 ) {
-  const { repertoireTunes = [9001, 3497], startTab = "practice" } = opts ?? {};
+  const {
+    repertoireTunes = [9001, 3497],
+    startTab = "practice",
+    scheduleDaysAgo,
+  } = opts ?? {};
 
-  console.log(`🔧 [${user.name}] setupForPracticeTests Starting...`);
+  log.debug(`🔧 [${user.name}] setupForPracticeTests Starting...`);
 
   // 1. Clear practice-specific tables
   await clearUserTable(user, "practice_record");
@@ -600,9 +642,41 @@ export async function setupForPracticeTestsParallel(
   await clearUserTable(user, "tune_override");
 
   // 2. Reset repertoire
-  await clearUserRepertoire(user);
+  await clearUserTable(user, "playlist_tune");
+
+  await verifyTablesEmpty(user, [
+    "practice_record",
+    "daily_practice_queue",
+    "table_transient_data",
+    "tune_override",
+    "playlist_tune",
+  ]);
+
   if (repertoireTunes.length > 0) {
-    await seedUserRepertoire(user, repertoireTunes);
+    await seedUserRepertoire(user, repertoireTunes, true);
+  }
+
+  // 2b. Optionally schedule tunes so they're due today
+  if (scheduleDaysAgo !== undefined) {
+    const userKey = user.email.split(".")[0];
+    const { supabase } = await getTestUserClient(userKey);
+    const date = new Date();
+    date.setDate(date.getDate() - scheduleDaysAgo);
+    const scheduleDateStr = date.toISOString();
+
+    for (const tuneId of repertoireTunes) {
+      const { error } = await supabase
+        .from("playlist_tune")
+        .update({ scheduled: scheduleDateStr })
+        .eq("playlist_ref", user.playlistId)
+        .eq("tune_ref", tuneId);
+
+      if (error) {
+        console.warn(
+          `[${user.name}] Failed to schedule tune ${tuneId}: ${error.message}`
+        );
+      }
+    }
   }
 
   // 3. Navigate if needed
@@ -613,7 +687,7 @@ export async function setupForPracticeTestsParallel(
     currentUrl.startsWith("data:")
   ) {
     await page.goto("http://localhost:5173/");
-    await page.waitForTimeout(1000);
+    await waitForSyncComplete(page);
   }
 
   // 4. Clear IndexedDB cache
@@ -621,16 +695,25 @@ export async function setupForPracticeTestsParallel(
 
   // 5. Reload to trigger fresh sync
   await page.reload();
-  await page.waitForTimeout(5000);
+  await waitForSyncComplete(page);
 
-  // 6. Navigate to starting tab
-  await page.waitForSelector(`[data-testid="tab-${startTab}"]`, {
-    timeout: 10000,
-  });
-  await page.getByTestId(`tab-${startTab}`).click();
-  await page.waitForTimeout(500);
+  // 6. Navigate to starting tab (skip if already active)
+  const tabSelector = `[data-testid="tab-${startTab}"]`;
+  const tabLocator = page.getByTestId(`tab-${startTab}`);
 
-  console.log(
+  const isActive = await tabLocator.evaluate(
+    (el) =>
+      el.getAttribute("aria-selected") === "true" ||
+      el.classList.contains("active")
+  );
+
+  if (!isActive) {
+    await page.waitForSelector(tabSelector, { timeout: 10000 });
+    await tabLocator.click();
+    await page.waitForTimeout(500);
+  }
+
+  log.debug(
     `✅ [${user.name}] setupForPracticeTests Ready with ${repertoireTunes.length} tunes`
   );
 }
@@ -650,7 +733,7 @@ export async function setupForRepertoireTestsParallel(
 ) {
   const { repertoireTunes, scheduleTunes = false, scheduleDaysAgo = 0 } = opts;
 
-  console.log(`🔧 [${user.name}] setupForRepertoireTests Starting...`);
+  log.debug(`🔧 [${user.name}] setupForRepertoireTests Starting...`);
 
   // 1. Clear practice state
   await clearUserTable(user, "practice_record");
@@ -659,7 +742,16 @@ export async function setupForRepertoireTestsParallel(
   await clearUserTable(user, "tune_override");
 
   // 2. Reset repertoire
-  await clearUserRepertoire(user);
+  await clearUserTable(user, "playlist_tune");
+
+  await verifyTablesEmpty(user, [
+    "practice_record",
+    "daily_practice_queue",
+    "table_transient_data",
+    "tune_override",
+    "playlist_tune",
+  ]);
+
   await seedUserRepertoire(user, repertoireTunes);
 
   // 3. Optionally schedule tunes
@@ -694,7 +786,7 @@ export async function setupForRepertoireTestsParallel(
     currentUrl.startsWith("data:")
   ) {
     await page.goto("http://localhost:5173/");
-    await page.waitForTimeout(1000);
+    await waitForSyncComplete(page);
   }
 
   // 5. Clear IndexedDB cache
@@ -702,7 +794,7 @@ export async function setupForRepertoireTestsParallel(
 
   // 6. Reload to trigger fresh sync
   await page.reload();
-  await page.waitForTimeout(5000);
+  await waitForSyncComplete(page);
 
   // 7. Navigate to repertoire tab
   await page.waitForSelector('[data-testid="tab-repertoire"]', {
@@ -711,7 +803,7 @@ export async function setupForRepertoireTestsParallel(
   await page.getByTestId("tab-repertoire").click();
   await page.waitForTimeout(1000);
 
-  console.log(
+  log.debug(
     `✅ [${user.name}] setupForRepertoireTests Ready with ${
       repertoireTunes.length
     } tunes ${scheduleTunes ? "(scheduled)" : "(unscheduled)"}`
@@ -732,11 +824,20 @@ export async function setupForCatalogTestsParallel(
 ) {
   const { emptyRepertoire = true, startTab = "catalog" } = opts ?? {};
 
-  console.log(`🔧 [${user.name}] setupForCatalogTests Starting...`);
+  log.debug(`🔧 [${user.name}] setupForCatalogTests Starting...`);
+
+  let whichTables = [
+    "practice_record",
+    "daily_practice_queue",
+    "table_transient_data",
+    "tune_override",
+    "playlist_tune",
+  ];
 
   // 1. Clear only user's repertoire (keep catalog!)
   if (emptyRepertoire) {
-    await clearUserRepertoire(user);
+    await clearUserTable(user, "playlist_tune");
+    whichTables = [...whichTables, "playlist_tune"];
   }
 
   // 2. Clear practice state
@@ -744,6 +845,8 @@ export async function setupForCatalogTestsParallel(
   await clearUserTable(user, "daily_practice_queue");
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "tune_override");
+
+  await verifyTablesEmpty(user, whichTables);
 
   // 3. Navigate to ensure valid origin
   const currentUrl = page.url();
@@ -776,7 +879,7 @@ export async function setupForCatalogTestsParallel(
     timeout: 10000,
   });
 
-  console.log(`✅ [${user.name}] Playlist title matched: ${expectedTitle}`);
+  log.debug(`✅ [${user.name}] Playlist title matched: ${expectedTitle}`);
 
   // 6. Navigate to starting tab
   await page.waitForSelector(`[data-testid="tab-${startTab}"]`, {
@@ -824,7 +927,5 @@ export async function setupForCatalogTestsParallel(
 
   await page.waitForTimeout(500);
 
-  console.log(
-    `✅ [${user.name}] setupForCatalogTests Ready on ${startTab} tab`
-  );
+  log.debug(`✅ [${user.name}] setupForCatalogTests Ready on ${startTab} tab`);
 }

@@ -158,13 +158,19 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
   };
 
   return (
-    <div class="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+    <div
+      class="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700"
+      data-testid="flashcard-card"
+    >
       {/* Front Side - Always Visible */}
       <div class="flex-1 flex flex-col p-8">
         {/* Tune Name */}
         <div class="text-center mb-6">
           <div class="flex items-center justify-center mb-2">
-            <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <h2
+              class="text-3xl font-bold text-gray-900 dark:text-gray-100"
+              data-testid="flashcard-tune-title"
+            >
               {props.tune.title || "Untitled"}
             </h2>
           </div>
@@ -187,18 +193,25 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
               class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
               title={props.isRevealed ? "Show front" : "Show back"}
               aria-label={props.isRevealed ? "Show front" : "Show back"}
+              data-testid="flashcard-reveal-toggle"
             >
               <FlipVertical2 class="w-4 h-4" />
             </button>
           </div>
           <div class="flex items-center justify-center gap-4 text-lg text-gray-600 dark:text-gray-400">
             <Show when={props.tune.type && isFieldVisible()("type")}>
-              <span class="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+              <span
+                class="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full"
+                data-testid="flashcard-field-type"
+              >
                 {props.tune.type}
               </span>
             </Show>
             <Show when={props.tune.mode && isFieldVisible()("mode")}>
-              <span class="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full">
+              <span
+                class="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full"
+                data-testid="flashcard-field-mode"
+              >
                 {formatMode(props.tune.mode)}
               </span>
             </Show>
@@ -206,13 +219,15 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
         </div>
 
         {/* Evaluation Control */}
-        <div class="mb-6">{renderEvaluation()}</div>
+        <div class="mb-6" data-testid="flashcard-evaluation">
+          {renderEvaluation()}
+        </div>
 
         {/* Detail Fields - Shown based on current face and field visibility settings */}
         <div class="flex-1 overflow-y-auto space-y-6">
           {/* Structure */}
           <Show when={isFieldVisible()("structure")}>
-            <div>
+            <div data-testid="flashcard-field-structure">
               <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Structure
               </h3>
@@ -224,7 +239,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
 
           {/* Incipit (ABC Notation preview) */}
           <Show when={isFieldVisible()("incipit")}>
-            <div>
+            <div data-testid="flashcard-field-incipit">
               <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Incipit
               </h3>
@@ -236,7 +251,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
 
           {/* Public Notes */}
           <Show when={isFieldVisible()("note_public")}>
-            <div>
+            <div data-testid="flashcard-field-note_public">
               <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Notes
               </h3>
@@ -250,7 +265,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
 
           {/* Private Notes */}
           <Show when={isFieldVisible()("note_private")}>
-            <div>
+            <div data-testid="flashcard-field-note_private">
               <h3 class="text-sm font-semibold text-yellow-700 dark:text-yellow-300 mb-2">
                 Private Notes
               </h3>
@@ -264,7 +279,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
 
           {/* Favorite URL */}
           <Show when={isFieldVisible()("favorite_url")}>
-            <div>
+            <div data-testid="flashcard-field-favorite_url">
               <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Reference
               </h3>
@@ -286,7 +301,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
 
           {/* Goal */}
           <Show when={isFieldVisible()("goal")}>
-            <div>
+            <div data-testid="flashcard-field-goal">
               <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Goal
               </h3>
@@ -298,7 +313,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
 
           {/* Technique */}
           <Show when={isFieldVisible()("technique")}>
-            <div>
+            <div data-testid="flashcard-field-technique">
               <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Technique
               </h3>
@@ -310,7 +325,10 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
 
           {/* Scheduling Info */}
           <Show when={isFieldVisible()("practice_history")}>
-            <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div
+              class="pt-4 border-t border-gray-200 dark:border-gray-700"
+              data-testid="flashcard-field-practice_history"
+            >
               <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Practice History
               </h3>

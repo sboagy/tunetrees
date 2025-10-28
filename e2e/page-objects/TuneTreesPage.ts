@@ -54,6 +54,21 @@ export class TuneTreesPage {
   readonly repertoireDeleteButton: Locator;
 
   readonly practiceColumnsButton: Locator;
+  // Practice-specific controls
+  readonly submitEvaluationsButton: Locator;
+  readonly displaySubmittedSwitch: Locator;
+  readonly flashcardModeSwitch: Locator;
+
+  // Flashcard view locators
+  readonly flashcardView: Locator;
+  readonly flashcardHeaderCounter: Locator;
+  readonly flashcardPrevButton: Locator;
+  readonly flashcardNextButton: Locator;
+  readonly flashcardCard: Locator;
+  readonly flashcardTitle: Locator;
+  readonly flashcardRevealToggle: Locator;
+  readonly flashcardRevealButtonMobile: Locator;
+  readonly flashcardFieldsMenu: Locator;
 
   readonly topNavManagePlaylistsPanel: Locator;
 
@@ -118,6 +133,24 @@ export class TuneTreesPage {
 
     // Tab-specific Toolbar Buttons - Practice
     this.practiceColumnsButton = page.getByTestId("practice-columns-button");
+    this.submitEvaluationsButton = page.getByTestId(
+      "submit-evaluations-button"
+    );
+    this.displaySubmittedSwitch = page.getByTestId("display-submitted-switch");
+    this.flashcardModeSwitch = page.getByTestId("flashcard-mode-switch");
+
+    // Flashcard view
+    this.flashcardView = page.getByTestId("flashcard-view");
+    this.flashcardHeaderCounter = page.getByTestId("flashcard-counter");
+    this.flashcardPrevButton = page.getByTestId("flashcard-prev-button");
+    this.flashcardNextButton = page.getByTestId("flashcard-next-button");
+    this.flashcardCard = page.getByTestId("flashcard-card");
+    this.flashcardTitle = page.getByTestId("flashcard-tune-title");
+    this.flashcardRevealToggle = page.getByTestId("flashcard-reveal-toggle");
+    this.flashcardRevealButtonMobile = page.getByTestId(
+      "flashcard-reveal-button"
+    );
+    this.flashcardFieldsMenu = page.getByTestId("flashcard-fields-menu");
 
     this.topNavManagePlaylistsPanel = page.getByTestId(
       "top-nav-manage-playlists-panel"
@@ -456,5 +489,186 @@ export class TuneTreesPage {
       }
       // On mobile, email text is hidden but button is still there
     }
+  }
+
+  // ===== Flashcard helpers =====
+
+  async enableFlashcardMode() {
+    await this.flashcardModeSwitch.click();
+    await expect(this.flashcardView).toBeVisible({ timeout: 5000 });
+  }
+
+  async disableFlashcardMode() {
+    await this.flashcardModeSwitch.click();
+    await expect(this.flashcardView).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async waitForNextCardButtonToBeEnabled(
+    maxRetries: number = 100,
+    retryDelayMs: number = 200
+  ): Promise<number> {
+    for (let i = 0; i < maxRetries; i++) {
+      const isEnabled = await this.flashcardNextButton
+        .isEnabled({ timeout: 500 })
+        .catch(() => false);
+      if (isEnabled) return i;
+      await this.page.waitForTimeout(retryDelayMs);
+    }
+    await this.page.screenshot({
+      path: `test-results/flashcard-wait-for-next-card_button-timeout-${Date.now()}.png`,
+    });
+    throw new Error("Next button did not become enabled within timeout");
+  }
+
+  async waitForPrevCardButtonToBeEnabled(
+    maxRetries: number = 100,
+    retryDelayMs: number = 200
+  ): Promise<number> {
+    for (let i = 0; i < maxRetries; i++) {
+      const isEnabled = await this.flashcardPrevButton
+        .isEnabled({ timeout: 500 })
+        .catch(() => false);
+      if (isEnabled) return i;
+      await this.page.waitForTimeout(retryDelayMs);
+    }
+    await this.page.screenshot({
+      path: `test-results/flashcard-wait-for-previous-card_button-timeout-${Date.now()}.png`,
+    });
+    throw new Error("Previous button did not become enabled within timeout");
+  }
+
+  async goNextCard() {
+    await this.waitForNextCardButtonToBeEnabled();
+    await this.flashcardNextButton.click();
+  }
+
+  async goPrevCard() {
+    await this.waitForPrevCardButtonToBeEnabled();
+    await this.flashcardPrevButton.click();
+  }
+
+  async revealCard() {
+    // Prefer desktop toggle; fall back to mobile button
+    const desktopVisible = await this.flashcardRevealToggle
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (desktopVisible) {
+      await this.flashcardRevealToggle.click();
+      return;
+    }
+    const mobileVisible = await this.flashcardRevealButtonMobile
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (mobileVisible) {
+      await this.flashcardRevealButtonMobile.click();
+    }
+  }
+
+  /**
+   * Ensure a specific reveal state without toggling blindly.
+   * desired = true -> ensure Back is shown; desired = false -> ensure Front is shown.
+   * Uses aria-label on the reveal toggle which reflects the action ("Show back" when on front, "Show front" when on back).
+   */
+  async ensureReveal(desiredBack: boolean) {
+    // Try desktop toggle first
+    const desktopVisible = await this.flashcardRevealToggle
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (desktopVisible) {
+      for (let i = 0; i < 2; i++) {
+        const label =
+          (await this.flashcardRevealToggle.getAttribute("aria-label")) || "";
+        const currentlyBack = /Show front/i.test(label); // if button says "Show front", we are on Back
+        if (currentlyBack === desiredBack) return;
+        await this.flashcardRevealToggle.click();
+      }
+      return;
+    }
+    // Fallback to mobile button: we can only toggle; assume initial is front
+    const mobileVisible = await this.flashcardRevealButtonMobile
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (mobileVisible) {
+      if (desiredBack) {
+        await this.flashcardRevealButtonMobile.click();
+      }
+    }
+  }
+
+  async selectFlashcardEvaluation(
+    value: "again" | "hard" | "good" | "easy" | "not-set" = "good"
+  ) {
+    // Open the first (and only) evaluation combobox in the card
+    const evalButton = this.page.getByTestId(/^recall-eval-\d+$/).first();
+    // If not immediately clickable, ensure the back of the card is revealed
+    const clickable = await evalButton
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (!clickable) {
+      await this.ensureReveal(true);
+    }
+    await evalButton.click();
+    const optionTestId = `recall-eval-option-${value}`;
+    await this.page.getByTestId(optionTestId).click();
+  }
+
+  async openFlashcardFieldsMenu() {
+    await this.practiceColumnsButton.click();
+    await expect(this.flashcardFieldsMenu).toBeVisible({ timeout: 2000 });
+  }
+
+  async toggleFlashcardField(
+    face: "front" | "back",
+    fieldId: string,
+    desired?: boolean
+  ) {
+    await this.openFlashcardFieldsMenu();
+    const checkbox = this.page.getByTestId(`ffv-${face}-${fieldId}`);
+    if (desired === undefined) {
+      await checkbox.click();
+    } else {
+      const isChecked = await checkbox.isChecked().catch(() => false);
+      if (isChecked !== desired) {
+        await checkbox.click();
+      }
+    }
+    // Click outside to close menu (click Columns/Fields button again)
+    await this.practiceColumnsButton.click();
+  }
+
+  async getFlashcardCounterText(): Promise<string> {
+    return (await this.flashcardHeaderCounter.textContent())?.trim() || "";
+  }
+
+  async getFlashcardTitle(): Promise<string> {
+    return (await this.flashcardTitle.textContent())?.trim() || "";
+  }
+
+  /**
+   * Wait for flashcard counter to stabilize and return the total count value.
+   * Polls the counter text and extracts the "of X" value, retrying until a valid count is found.
+   * @param maxRetries - max number of polling attempts (default: 100)
+   * @param retryDelayMs - delay between retries in ms (default: 200)
+   * @returns total count from counter (e.g., "5 of 10" returns 10)
+   */
+  async waitForCounterValue(
+    maxRetries: number = 100,
+    retryDelayMs: number = 200
+  ): Promise<number> {
+    let total = 0;
+    for (let i = 0; i < maxRetries; i++) {
+      const counterText = await this.flashcardHeaderCounter.textContent();
+      total = parseInt(counterText?.split(" of ")[1] || "0", 10);
+      if (total >= 1) {
+        return total;
+      }
+      await this.page.waitForTimeout(retryDelayMs);
+    }
+    await this.page.screenshot({
+      path: `test-results/flashcard-counter-timeout-${Date.now()}.png`,
+    });
+    throw new Error(
+      `Counter value did not stabilize within ${maxRetries * retryDelayMs}ms`
+    );
   }
 }

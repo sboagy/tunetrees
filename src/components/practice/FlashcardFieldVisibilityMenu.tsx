@@ -104,7 +104,10 @@ export const FlashcardFieldVisibilityMenu: Component<
           {/* Field rows */}
           <For each={FLASHCARD_FIELDS}>
             {(field) => (
-              <div class="grid grid-cols-[1fr_auto_auto] gap-2 items-center px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <div
+                class="grid grid-cols-[1fr_auto_auto] gap-2 items-center px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                data-testid={`ffv-row-${field.id}`}
+              >
                 <span class="text-sm text-gray-700 dark:text-gray-300">
                   {field.label}
                 </span>
@@ -115,6 +118,8 @@ export const FlashcardFieldVisibilityMenu: Component<
                     onChange={() => handleToggleFront(field.id)}
                     class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
                     title={`Show ${field.label} on front`}
+                    aria-label={`Show ${field.label} on front`}
+                    data-testid={`ffv-front-${field.id}`}
                   />
                 </div>
                 <div class="w-16 flex justify-center">
@@ -124,6 +129,8 @@ export const FlashcardFieldVisibilityMenu: Component<
                     onChange={() => handleToggleBack(field.id)}
                     class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
                     title={`Show ${field.label} on back`}
+                    aria-label={`Show ${field.label} on back`}
+                    data-testid={`ffv-back-${field.id}`}
                   />
                 </div>
               </div>

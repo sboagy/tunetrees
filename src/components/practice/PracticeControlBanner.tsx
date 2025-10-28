@@ -74,14 +74,24 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showQueueSelector, setShowQueueSelector] = createSignal(false);
   const [showAddTunesDialog, setShowAddTunesDialog] = createSignal(false);
+  const [isSubmitting, setIsSubmitting] = createSignal(false);
 
   let columnsButtonRef: HTMLButtonElement | undefined;
 
-  const handleSubmit = () => {
-    if (props.onSubmitEvaluations) {
-      props.onSubmitEvaluations();
-    } else {
-      console.log("Submit practice evaluations");
+  const handleSubmit = async () => {
+    // Protect against rapid clicks by disabling immediately
+    if (isSubmitting()) return;
+    setIsSubmitting(true);
+
+    try {
+      if (props.onSubmitEvaluations) {
+        await props.onSubmitEvaluations();
+      } else {
+        console.log("Submit practice evaluations");
+      }
+    } finally {
+      // Re-enable after handler completes (or after a short delay if sync)
+      setTimeout(() => setIsSubmitting(false), 100);
     }
   };
 
@@ -170,14 +180,22 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             type="button"
             data-testid="submit-evaluations-button"
             onClick={handleSubmit}
-            disabled={!props.evaluationsCount || props.evaluationsCount === 0}
+            disabled={
+              !props.evaluationsCount ||
+              props.evaluationsCount === 0 ||
+              isSubmitting()
+            }
             title={`Submit ${props.evaluationsCount || 0} practice evaluations`}
             class={`${TOOLBAR_BUTTON_BASE}`}
             classList={{
               [`${TOOLBAR_BUTTON_PRIMARY}`]:
-                !!props.evaluationsCount && props.evaluationsCount > 0,
+                !!props.evaluationsCount &&
+                props.evaluationsCount > 0 &&
+                !isSubmitting(),
               "text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/70 border-gray-300/50 dark:border-gray-600/50 opacity-60 cursor-not-allowed":
-                !props.evaluationsCount || props.evaluationsCount === 0,
+                !props.evaluationsCount ||
+                props.evaluationsCount === 0 ||
+                isSubmitting(),
             }}
           >
             <Send size={14} />

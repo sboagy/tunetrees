@@ -27,7 +27,6 @@ import type { FlashcardFieldVisibilityByFace } from "./flashcard-fields";
 export interface FlashcardViewProps {
   tunes: ITuneOverview[];
   onEvaluationChange?: (tuneId: number, value: string) => void;
-  onExitFlashcardMode?: () => void;
   fieldVisibility?: FlashcardFieldVisibilityByFace;
   // Shared evaluation state (same as TunesGridScheduled)
   evaluations?: Record<number, string>;
@@ -41,9 +40,10 @@ export interface FlashcardViewProps {
 }
 
 export const FlashcardView: Component<FlashcardViewProps> = (props) => {
-  const { setCurrentTuneId } = useCurrentTune();
+  const { currentTuneId, setCurrentTuneId } = useCurrentTune();
   const [currentIndex, setCurrentIndex] = createSignal(0);
   const [isRevealed, setIsRevealed] = createSignal(false);
+  const [didInitFromSelection, setDidInitFromSelection] = createSignal(false);
 
   // Use shared evaluations from parent, or fall back to empty object
   const evaluations = () => props.evaluations || {};
@@ -76,6 +76,23 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
       console.log("[FlashcardView] No tunes left, resetting index to 0");
       setCurrentIndex(0);
     }
+  });
+
+  // On initial mount: if a current tune is selected in the grid, start on that tune's index
+  // Runs once when tunes are available and a selection exists
+  createEffect(() => {
+    if (didInitFromSelection()) return;
+    const selectedId = currentTuneId?.() ?? null;
+    const tunes = props.tunes;
+    if (!tunes || tunes.length === 0) return; // wait until tunes are ready
+
+    if (selectedId !== null) {
+      const idx = tunes.findIndex((t) => t.id === selectedId);
+      if (idx >= 0) {
+        setCurrentIndex(idx);
+      }
+    }
+    setDidInitFromSelection(true);
   });
 
   // Set current tune in context whenever flashcard changes
@@ -257,11 +274,18 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
       class="h-full flex flex-col bg-gray-50 dark:bg-gray-900"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
+      data-testid="flashcard-view"
     >
       {/* Progress Indicator */}
-      <div class="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3">
+      <div
+        class="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3"
+        data-testid="flashcard-header"
+      >
         <div class="flex items-center justify-between">
-          <div class="text-sm text-gray-600 dark:text-gray-400">
+          <div
+            class="text-sm text-gray-600 dark:text-gray-400"
+            data-testid="flashcard-counter"
+          >
             <span class="font-semibold text-gray-900 dark:text-gray-100">
               {currentIndex() + 1}
             </span>{" "}
@@ -300,7 +324,10 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
         <Show
           when={currentTune()}
           fallback={
-            <div class="text-center text-gray-500 dark:text-gray-400">
+            <div
+              class="text-center text-gray-500 dark:text-gray-400"
+              data-testid="flashcard-empty-state"
+            >
               <p class="text-xl mb-2">No tunes available</p>
               <p class="text-sm">
                 Add tunes to your practice queue to get started.
@@ -309,7 +336,10 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
           }
         >
           {(tune) => (
-            <div class="w-full max-w-4xl h-full max-h-[calc(100vh-12rem)] relative">
+            <div
+              class="w-full max-w-4xl h-full max-h-[calc(100vh-12rem)] relative"
+              data-testid="flashcard-card-container"
+            >
               {/* Navigation Buttons - Aligned with Front/Back label */}
               <button
                 type="button"
@@ -317,6 +347,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
                 disabled={currentIndex() === 0}
                 class="absolute left-2 top-20 p-3 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all z-10"
                 aria-label="Previous tune"
+                data-testid="flashcard-prev-button"
               >
                 <ChevronLeft size={24} />
               </button>
@@ -327,6 +358,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
                 disabled={currentIndex() === props.tunes.length - 1}
                 class="absolute right-2 top-20 p-3 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all z-10"
                 aria-label="Next tune"
+                data-testid="flashcard-next-button"
               >
                 <ChevronRight size={24} />
               </button>
@@ -363,6 +395,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
             type="button"
             onClick={toggleReveal}
             class="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg font-medium"
+            data-testid="flashcard-reveal-button"
           >
             {isRevealed() ? "Hide" : "Reveal"}
           </button>
