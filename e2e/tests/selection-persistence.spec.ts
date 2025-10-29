@@ -33,14 +33,12 @@ test.describe.serial("Row Selection Persistence", () => {
 
     ttPage = new TuneTreesPage(page);
 
-    ttPage.navigateToTab("catalog");
-
     console.debug("Row Selection Persistence: setup complete");
   });
 
   test("Catalog: selections persist across tab switches", async ({ page }) => {
     // Navigate to Catalog tab
-    await page.click('button:has-text("Catalog")');
+    ttPage.navigateToTab("catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -130,7 +128,7 @@ test.describe.serial("Row Selection Persistence", () => {
     page,
   }) => {
     // Navigate to Catalog tab
-    await page.click('button:has-text("Catalog")');
+    ttPage.navigateToTab("catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -165,7 +163,7 @@ test.describe.serial("Row Selection Persistence", () => {
     page,
   }) => {
     // Navigate to Catalog tab
-    await page.click('button:has-text("Catalog")');
+    ttPage.navigateToTab("catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -215,6 +213,7 @@ test.describe.serial("Row Selection Persistence", () => {
     const checkboxes = page.locator(
       '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
     );
+    await expect(checkboxes.nth(1)).toBeEnabled({ timeout: 10000 });
     await checkboxes.nth(1).check();
     await page.waitForTimeout(250);
     await expect(checkboxes.nth(1)).toBeChecked();
@@ -224,6 +223,7 @@ test.describe.serial("Row Selection Persistence", () => {
       path: `e2e/artifacts/repertoire-selection-before-second-${Date.now()}.png`,
       fullPage: false,
     });
+    await expect(checkboxes.nth(2)).toBeEnabled({ timeout: 10000 });
     await checkboxes.nth(2).check();
     await page.waitForTimeout(250);
     await expect(checkboxes.nth(2)).toBeChecked();
