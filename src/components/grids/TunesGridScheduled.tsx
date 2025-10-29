@@ -476,6 +476,20 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
       getScrollElement: () => containerRef || null,
       estimateSize: () => 48, // Row height
       overscan: 10,
+      // Stabilize item identity across re-sorts/filters to reduce scroll jumps
+      getItemKey: (index) => {
+        const row = table.getRowModel().rows[index];
+        return row ? row.id : index;
+      },
+      // Smooth out resize observer measurements to reduce jitter
+      useAnimationFrameWithResizeObserver: true,
+      // Give a bit more time before clearing the scrolling state
+      isScrollingResetDelay: 200,
+      // Use direct scrollTop assignment to avoid native element.scrollTo side-effects
+      scrollToFn: (offset, _opts, instance) => {
+        const el = instance.scrollElement as unknown as HTMLElement | null;
+        if (el) el.scrollTop = offset;
+      },
     })
   );
 
@@ -609,6 +623,41 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
             containerRef.addEventListener("scroll", debugScrollListener, {
               passive: true,
             });
+
+            // Observe DOM mutations to detect container replacement/removal
+            try {
+              const parent = containerRef.parentElement;
+              if (parent) {
+                const mo = new MutationObserver((mutations) => {
+                  for (const m of mutations) {
+                    if (m.type === "childList") {
+                      const removed = Array.from(m.removedNodes).includes(
+                        containerRef as unknown as Node
+                      );
+                      const added = Array.from(m.addedNodes).some(
+                        (n) =>
+                          (n as Element)?.getAttribute?.("data-testid") ===
+                          "tunes-grid-practice"
+                      );
+                      if (removed || added) {
+                        console.warn(
+                          "[PRACTICE_SCROLL][DEBUG] container mutated",
+                          {
+                            removed,
+                            added,
+                            stack: new Error("mutation trace").stack,
+                          }
+                        );
+                      }
+                    }
+                  }
+                });
+                mo.observe(parent, { childList: true });
+                onCleanup(() => mo.disconnect());
+              }
+            } catch {
+              // ignore MutationObserver failures
+            }
           }
 
           let guardTimer: ReturnType<typeof setTimeout> | null = null;

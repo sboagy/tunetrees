@@ -29,7 +29,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
     // Verify on card 1
     const counter = app.flashcardHeaderCounter;
     const initial = await counter.textContent();
-  const total = parseInt(initial?.split(" of ")[1] || "0", 10);
+    const total = parseInt(initial?.split(" of ")[1] || "0", 10);
     if (total < 2) {
       test.fixme(
         true,
@@ -57,7 +57,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
 
     const counter = app.flashcardHeaderCounter;
     const initial = await counter.textContent();
-  const total = parseInt(initial?.split(" of ")[1] || "0", 10);
+    const total = parseInt(initial?.split(" of ")[1] || "0", 10);
     if (total < 2) {
       test.fixme(
         true,
@@ -150,7 +150,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
     // Ensure multi-card scenario
     const counter = app.flashcardHeaderCounter;
     const initial = await counter.textContent();
-  const total = parseInt(initial?.split(" of ")[1] || "0", 10);
+    const total = parseInt(initial?.split(" of ")[1] || "0", 10);
     if (total < 2) {
       test.fixme(
         true,
@@ -213,7 +213,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
 
     const counter = app.flashcardHeaderCounter;
     const initialText = await counter.textContent();
-  const total = parseInt(initialText?.split(" of ")[1] || "0", 10);
+    const total = parseInt(initialText?.split(" of ")[1] || "0", 10);
     if (total < 2) {
       test.fixme(
         true,

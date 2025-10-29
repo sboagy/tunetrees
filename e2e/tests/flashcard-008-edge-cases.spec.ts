@@ -195,7 +195,7 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
 
     const counter = app.flashcardHeaderCounter;
     const initialText = await counter.textContent();
-  const total = parseInt(initialText?.split(" of ")[1] || "0", 10);
+    const total = parseInt(initialText?.split(" of ")[1] || "0", 10);
     // On first card, Prev should be disabled and counter stays on 1
     await expect(counter).toHaveText(new RegExp(`^1 of ${total}$`));
     await expect(app.flashcardPrevButton).toBeDisabled();
