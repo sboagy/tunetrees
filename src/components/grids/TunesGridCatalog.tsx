@@ -585,40 +585,114 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
               .toFixed(1)}ms`
           );
 
-          // Safety re-apply after a short delay if something reset scrollTop
-          const safetyTimer: ReturnType<typeof setTimeout> | null = setTimeout(
-            () => {
-              if (didSecondApply()) return;
-              // Recompute target from storage/initial state
-              let target = 0;
-              try {
-                const k = scrollKey();
-                const stored2 = k ? localStorage.getItem(k) : null;
-                if (stored2) target = Number.parseInt(stored2, 10);
-                if (!stored2 && initialState.scrollTop)
-                  target = initialState.scrollTop;
-              } catch {
-                // ignore
+          // Guarded re-apply window: poll for up to 2s and re-apply if something resets scrollTop
+          const GUARD_WINDOW_MS = 2000;
+          const POLL_INTERVAL_MS = 100;
+          const guardEndTime = Date.now() + GUARD_WINDOW_MS;
+
+          // Optional diagnostics (enable with localStorage key: TT_DEBUG_CATALOG_SCROLL = "true")
+          const debugScroll = (() => {
+            try {
+              return localStorage.getItem("TT_DEBUG_CATALOG_SCROLL") === "true";
+            } catch {
+              return false;
+            }
+          })();
+
+          let originalScrollTo: ((...args: any[]) => any) | null = null;
+          const debugScrollListener = () => {
+            if (!containerRef) return;
+            const top = containerRef.scrollTop;
+            if (top <= 2) {
+              const err = new Error("Scroll reset detected (<=2)");
+              console.warn(
+                "[CATALOG_SCROLL][DEBUG] scroll event: scrollTop<=2",
+                {
+                  top,
+                  totalSize: rowVirtualizer().getTotalSize(),
+                  rows: table.getRowModel().rows.length,
+                }
+              );
+              if (err.stack) console.warn(err.stack);
+            }
+          };
+
+          if (debugScroll && containerRef) {
+            try {
+              if (typeof containerRef.scrollTo === "function") {
+                originalScrollTo = containerRef.scrollTo.bind(
+                  containerRef
+                ) as any;
+                (containerRef as any).scrollTo = (...args: any[]) => {
+                  console.warn("[CATALOG_SCROLL][DEBUG] scrollTo invoked", {
+                    args,
+                    stack: new Error("scrollTo trace").stack,
+                  });
+                  return originalScrollTo!(...args);
+                };
               }
-              if (
-                containerRef &&
-                target > 0 &&
-                containerRef.scrollTop < target - 1
-              ) {
-                containerRef.scrollTop = target;
-                setDidSecondApply(true);
-                console.log(
-                  `CATALOG_SCROLL: re-applied scrollTop=${target} phase=safety-delay age=${
-                    Date.now() - restoreAt()
-                  }ms`
+            } catch {
+              // ignore monkey patch failures
+            }
+            containerRef.addEventListener("scroll", debugScrollListener, {
+              passive: true,
+            });
+          }
+
+          let guardTimer: ReturnType<typeof setTimeout> | null = null;
+          let reapplyCount = 0;
+          const pollReapply = () => {
+            if (!containerRef) return;
+            if (didSecondApply()) return;
+
+            // Recompute target from storage/initial state on each tick
+            let target = 0;
+            try {
+              const k = scrollKey();
+              const stored2 = k ? localStorage.getItem(k) : null;
+              if (stored2) target = Number.parseInt(stored2, 10);
+              if (!stored2 && initialState.scrollTop)
+                target = initialState.scrollTop;
+            } catch {
+              // ignore
+            }
+
+            if (target > 0 && containerRef.scrollTop < target - 1) {
+              containerRef.scrollTop = target;
+              reapplyCount++;
+              console.log(
+                `CATALOG_SCROLL: re-applied scrollTop=${target} phase=guard-poll count=${reapplyCount} age=${
+                  Date.now() - restoreAt()
+                }ms`
+              );
+            }
+
+            if (Date.now() < guardEndTime) {
+              guardTimer = setTimeout(pollReapply, POLL_INTERVAL_MS);
+            } else {
+              setDidSecondApply(true);
+              if (debugScroll) {
+                console.warn(
+                  `[CATALOG_SCROLL][DEBUG] guard window ended. reapplyCount=${reapplyCount}`
                 );
               }
-            },
-            800
-          );
+            }
+          };
+
+          guardTimer = setTimeout(pollReapply, POLL_INTERVAL_MS);
 
           onCleanup(() => {
-            if (safetyTimer) clearTimeout(safetyTimer);
+            if (guardTimer) clearTimeout(guardTimer);
+            if (debugScroll && containerRef) {
+              containerRef.removeEventListener("scroll", debugScrollListener);
+              if (originalScrollTo) {
+                try {
+                  (containerRef as any).scrollTo = originalScrollTo;
+                } catch {
+                  // noop
+                }
+              }
+            }
           });
         } catch (error) {
           console.warn("Failed to restore scroll position:", error);

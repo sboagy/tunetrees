@@ -174,13 +174,33 @@ export class TuneTreesPage {
   ) {
     const tab = this.page.getByTestId(`tab-${tabId}`);
 
-    await tab.isVisible();
+    await expect(tab).toBeVisible({ timeout: 5000 });
     await tab.click();
-    try {
-      await this.page.waitForTimeout(1000); // Wait for tab content to load
-    } catch (e) {
-      console.error(e);
-      // throw e;
+
+    // Wait for the tab to become selected via ARIA
+    // Some tabs use aria-selected, others use aria-current="page".
+    const hasAriaSelected = (await tab.getAttribute("aria-selected")) !== null;
+    if (hasAriaSelected) {
+      await expect(tab).toHaveAttribute("aria-selected", "true", {
+        timeout: 5000,
+      });
+    } else {
+      await expect(tab).toHaveAttribute("aria-current", "page", {
+        timeout: 5000,
+      });
+    }
+
+    // Then wait for the corresponding grid/content to be visible
+    const grid =
+      tabId === "practice"
+        ? this.practiceGrid
+        : tabId === "repertoire"
+        ? this.repertoireGrid
+        : tabId === "catalog"
+        ? this.catalogGrid
+        : undefined;
+    if (grid) {
+      await expect(grid).toBeVisible({ timeout: 10000 });
     }
   }
 
