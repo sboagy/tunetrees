@@ -326,6 +326,12 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     });
   });
 
+  // Track open state for RecallEvalComboBox per tune to preserve dropdowns across refreshes
+  const [openMenus, setOpenMenus] = createSignal<Record<number, boolean>>({});
+  const getRecallEvalOpen = (tuneId: number) => !!openMenus()[tuneId];
+  const setRecallEvalOpen = (tuneId: number, isOpen: boolean) =>
+    setOpenMenus((prev) => ({ ...prev, [tuneId]: isOpen }));
+
   // Notify parent when tunes change (for flashcard view)
   createEffect(() => {
     if (props.onTunesChange) {
@@ -339,12 +345,10 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     console.log(`Tune ${tuneId} recall eval changed to: ${evaluation}`);
 
     // Update local state to trigger immediate re-render
-    // Remove key entirely when "(not set)" is selected, otherwise store value
+    // Optimistic update: store value for immediate UI feedback.
+    // For "(Not Set)" we now store an explicit empty string instead of deleting the key,
+    // so the label updates right away even before the DB/view refresh completes.
     setEvaluations((prev) => {
-      if (evaluation === "") {
-        const { [tuneId]: _, ...rest } = prev;
-        return rest;
-      }
       return { ...prev, [tuneId]: evaluation };
     });
 
@@ -394,8 +398,8 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
 
   // Notify parent of evaluations count changes
   createEffect(() => {
-    // Count keys in evaluations (empty evaluations are removed from object)
-    const count = Object.keys(evaluations()).length;
+    // Count only non-empty evaluations (ignore "(Not Set)" which is stored as "")
+    const count = Object.values(evaluations()).filter((v) => v !== "").length;
     if (props.onEvaluationsCountChange) {
       props.onEvaluationsCountChange(count);
     }
@@ -406,6 +410,8 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     getColumns("scheduled", {
       onRecallEvalChange: handleRecallEvalChange,
       onGoalChange: props.onGoalChange,
+      getRecallEvalOpen,
+      setRecallEvalOpen,
     })
   );
 
@@ -888,243 +894,238 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         class={CONTAINER_CLASSES}
         style={{ position: "relative", "touch-action": "pan-x pan-y" }}
       >
+        {/* Keep table mounted during refresh to avoid closing open dropdowns */}
+        <Show when={dueTunesData.loading}>
+          <div class="absolute top-2 right-3 z-10 text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+            Refreshing…
+          </div>
+        </Show>
         <Show
-          when={!dueTunesData.loading}
+          when={tunes().length > 0}
           fallback={
             <div class="flex items-center justify-center h-full">
-              <p class="text-gray-500 dark:text-gray-400">
-                Loading practice queue...
-              </p>
+              <div class="text-center py-12">
+                <div class="text-6xl mb-4">🎉</div>
+                <h3 class="text-xl font-semibold text-green-900 dark:text-green-300 mb-2">
+                  All Caught Up!
+                </h3>
+                <p class="text-green-700 dark:text-green-400">
+                  No tunes are due for practice right now.
+                </p>
+              </div>
             </div>
           }
         >
-          <Show
-            when={tunes().length > 0}
-            fallback={
-              <div class="flex items-center justify-center h-full">
-                <div class="text-center py-12">
-                  <div class="text-6xl mb-4">🎉</div>
-                  <h3 class="text-xl font-semibold text-green-900 dark:text-green-300 mb-2">
-                    All Caught Up!
-                  </h3>
-                  <p class="text-green-700 dark:text-green-400">
-                    No tunes are due for practice right now.
-                  </p>
-                </div>
-              </div>
-            }
+          {/* Virtual scrolling table */}
+          <table
+            data-testid="tunes-grid-practice"
+            class={TABLE_CLASSES}
+            style={{
+              width: `${table.getTotalSize()}px`,
+            }}
           >
-            {/* Virtual scrolling table */}
-            <table
-              data-testid="tunes-grid-practice"
-              class={TABLE_CLASSES}
-              style={{
-                width: `${table.getTotalSize()}px`,
-              }}
-            >
-              {/* Sticky Header */}
-              <thead class={HEADER_CLASSES}>
-                <For each={table.getHeaderGroups()}>
-                  {(headerGroup) => (
-                    <tr>
-                      <For each={headerGroup.headers}>
-                        {(header) => {
-                          const canResize = header.column.getCanResize();
-                          const canSort = header.column.getCanSort();
+            {/* Sticky Header */}
+            <thead class={HEADER_CLASSES}>
+              <For each={table.getHeaderGroups()}>
+                {(headerGroup) => (
+                  <tr>
+                    <For each={headerGroup.headers}>
+                      {(header) => {
+                        const canResize = header.column.getCanResize();
+                        const canSort = header.column.getCanSort();
 
-                          return (
-                            <th
-                              data-testid={`ch-${header.column.id}`}
-                              colSpan={header.colSpan}
-                              class={getHeaderCellClasses(
-                                `${
-                                  draggedColumn() === header.column.id
-                                    ? "opacity-50"
-                                    : ""
-                                } ${
-                                  isDragging() &&
-                                  draggedColumn() !== header.column.id
-                                    ? "bg-blue-50 dark:bg-blue-900/20"
-                                    : ""
-                                }`
-                              )}
-                              style={{
-                                width: `${header.getSize()}px`,
-                              }}
-                              onDragOver={handleDragOver}
-                              onDrop={(e) => handleDrop(e, header.column.id)}
-                            >
-                              {/* Column content with drag handle */}
-                              <div class="flex items-center gap-0 justify-between">
-                                {/* Main content area */}
+                        return (
+                          <th
+                            data-testid={`ch-${header.column.id}`}
+                            colSpan={header.colSpan}
+                            class={getHeaderCellClasses(
+                              `${
+                                draggedColumn() === header.column.id
+                                  ? "opacity-50"
+                                  : ""
+                              } ${
+                                isDragging() &&
+                                draggedColumn() !== header.column.id
+                                  ? "bg-blue-50 dark:bg-blue-900/20"
+                                  : ""
+                              }`
+                            )}
+                            style={{
+                              width: `${header.getSize()}px`,
+                            }}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, header.column.id)}
+                          >
+                            {/* Column content with drag handle */}
+                            <div class="flex items-center gap-0 justify-between">
+                              {/* Main content area */}
+                              <button
+                                type="button"
+                                class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-0 p-0 text-left"
+                                onClick={
+                                  canSort
+                                    ? header.column.getToggleSortingHandler()
+                                    : undefined
+                                }
+                                style={{
+                                  cursor: canSort ? "pointer" : "default",
+                                }}
+                                disabled={!canSort}
+                              >
+                                {flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext()
+                                )}
+                              </button>
+
+                              {/* Drag handle - available on all columns except select/actions */}
+                              <Show
+                                when={
+                                  header.column.id !== "select" &&
+                                  header.column.id !== "actions"
+                                }
+                              >
                                 <button
                                   type="button"
-                                  class="flex items-center gap-1 flex-1 min-w-0 bg-transparent border-0 p-0 text-left"
-                                  onClick={
-                                    canSort
-                                      ? header.column.getToggleSortingHandler()
-                                      : undefined
+                                  draggable={true}
+                                  onDragStart={(e) =>
+                                    handleDragStart(e, header.column.id)
                                   }
-                                  style={{
-                                    cursor: canSort ? "pointer" : "default",
-                                  }}
-                                  disabled={!canSort}
+                                  onDragEnd={handleDragEnd}
+                                  class="cursor-grab active:cursor-grabbing flex-shrink-0 p-0.5 border-0 bg-transparent"
+                                  aria-label={`Drag to reorder ${
+                                    header.column.columnDef.header as string
+                                  } column`}
                                 >
-                                  {flexRender(
-                                    header.column.columnDef.header,
-                                    header.getContext()
-                                  )}
-                                </button>
-
-                                {/* Drag handle - available on all columns except select/actions */}
-                                <Show
-                                  when={
-                                    header.column.id !== "select" &&
-                                    header.column.id !== "actions"
-                                  }
-                                >
-                                  <button
-                                    type="button"
-                                    draggable={true}
-                                    onDragStart={(e) =>
-                                      handleDragStart(e, header.column.id)
-                                    }
-                                    onDragEnd={handleDragEnd}
-                                    class="cursor-grab active:cursor-grabbing flex-shrink-0 p-0.5 border-0 bg-transparent"
-                                    aria-label={`Drag to reorder ${
-                                      header.column.columnDef.header as string
-                                    } column`}
-                                  >
-                                    <GripVertical
-                                      size={14}
-                                      class="text-gray-400 dark:text-gray-500 opacity-50 md:opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                                    />
-                                  </button>
-                                </Show>
-                              </div>
-
-                              {/* Resize handle - improved visibility */}
-                              <Show when={canResize}>
-                                <button
-                                  type="button"
-                                  onMouseDown={(e) => {
-                                    e.stopPropagation();
-                                    header.getResizeHandler()(e);
-                                  }}
-                                  onTouchStart={(e) => {
-                                    e.stopPropagation();
-                                    header.getResizeHandler()(e);
-                                  }}
-                                  class="resize-handle absolute top-0 right-0 w-4 h-full cursor-col-resize select-none touch-none group/resize bg-transparent border-0 p-0 z-10"
-                                  aria-label={`Resize ${header.id} column`}
-                                >
-                                  {/* Visual indicator - more prominent */}
-                                  <div class="absolute top-0 right-0 w-1 h-full bg-gray-300 dark:bg-gray-600 group-hover/resize:bg-blue-500 dark:group-hover/resize:bg-blue-400 group-hover/resize:w-1.5 transition-all pointer-events-none" />
+                                  <GripVertical
+                                    size={14}
+                                    class="text-gray-400 dark:text-gray-500 opacity-50 md:opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                  />
                                 </button>
                               </Show>
-                            </th>
+                            </div>
+
+                            {/* Resize handle - improved visibility */}
+                            <Show when={canResize}>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  header.getResizeHandler()(e);
+                                }}
+                                onTouchStart={(e) => {
+                                  e.stopPropagation();
+                                  header.getResizeHandler()(e);
+                                }}
+                                class="resize-handle absolute top-0 right-0 w-4 h-full cursor-col-resize select-none touch-none group/resize bg-transparent border-0 p-0 z-10"
+                                aria-label={`Resize ${header.id} column`}
+                              >
+                                {/* Visual indicator - more prominent */}
+                                <div class="absolute top-0 right-0 w-1 h-full bg-gray-300 dark:bg-gray-600 group-hover/resize:bg-blue-500 dark:group-hover/resize:bg-blue-400 group-hover/resize:w-1.5 transition-all pointer-events-none" />
+                              </button>
+                            </Show>
+                          </th>
+                        );
+                      }}
+                    </For>
+                  </tr>
+                )}
+              </For>
+            </thead>
+
+            {/* Virtual scrolling body */}
+            <tbody class={TBODY_CLASSES}>
+              {/* Top spacer */}
+              <Show
+                when={
+                  rowVirtualizer().getVirtualItems().length > 0 &&
+                  rowVirtualizer().getVirtualItems()[0].start > 0
+                }
+              >
+                <tr>
+                  <td
+                    style={{
+                      height: `${
+                        rowVirtualizer().getVirtualItems()[0].start
+                      }px`,
+                    }}
+                  />
+                </tr>
+              </Show>
+
+              {/* Virtual rows */}
+              <For each={rowVirtualizer().getVirtualItems()}>
+                {(virtualRow) => {
+                  const row = table.getRowModel().rows[virtualRow.index];
+                  if (!row) return null;
+
+                  const tune = row.original;
+                  const isSelected = row.getIsSelected();
+                  const isCurrent = tune.tune_id === currentTuneId();
+
+                  return (
+                    <tr
+                      data-index={virtualRow.index}
+                      ref={(el) => {
+                        if (el) {
+                          queueMicrotask(() =>
+                            rowVirtualizer().measureElement(el)
                           );
-                        }}
+                        }
+                      }}
+                      class={ROW_CLASSES}
+                      classList={{
+                        "bg-blue-50 dark:bg-blue-900/20": isSelected,
+                        "ring-2 ring-inset ring-blue-500 dark:ring-blue-400":
+                          isCurrent,
+                      }}
+                      onClick={() => handleRowClick(tune)}
+                    >
+                      <For each={row.getVisibleCells()}>
+                        {(cell) => (
+                          <td
+                            class={CELL_CLASSES}
+                            style={{
+                              width: `${cell.column.getSize()}px`,
+                            }}
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )}
+                          </td>
+                        )}
                       </For>
                     </tr>
-                  )}
-                </For>
-              </thead>
+                  );
+                }}
+              </For>
 
-              {/* Virtual scrolling body */}
-              <tbody class={TBODY_CLASSES}>
-                {/* Top spacer */}
-                <Show
-                  when={
-                    rowVirtualizer().getVirtualItems().length > 0 &&
-                    rowVirtualizer().getVirtualItems()[0].start > 0
-                  }
-                >
-                  <tr>
-                    <td
-                      style={{
-                        height: `${
-                          rowVirtualizer().getVirtualItems()[0].start
-                        }px`,
-                      }}
-                    />
-                  </tr>
-                </Show>
-
-                {/* Virtual rows */}
-                <For each={rowVirtualizer().getVirtualItems()}>
-                  {(virtualRow) => {
-                    const row = table.getRowModel().rows[virtualRow.index];
-                    if (!row) return null;
-
-                    const tune = row.original;
-                    const isSelected = row.getIsSelected();
-                    const isCurrent = tune.tune_id === currentTuneId();
-
-                    return (
-                      <tr
-                        data-index={virtualRow.index}
-                        ref={(el) => {
-                          if (el) {
-                            queueMicrotask(() =>
-                              rowVirtualizer().measureElement(el)
-                            );
-                          }
-                        }}
-                        class={ROW_CLASSES}
-                        classList={{
-                          "bg-blue-50 dark:bg-blue-900/20": isSelected,
-                          "ring-2 ring-inset ring-blue-500 dark:ring-blue-400":
-                            isCurrent,
-                        }}
-                        onClick={() => handleRowClick(tune)}
-                      >
-                        <For each={row.getVisibleCells()}>
-                          {(cell) => (
-                            <td
-                              class={CELL_CLASSES}
-                              style={{
-                                width: `${cell.column.getSize()}px`,
-                              }}
-                            >
-                              {flexRender(
-                                cell.column.columnDef.cell,
-                                cell.getContext()
-                              )}
-                            </td>
-                          )}
-                        </For>
-                      </tr>
-                    );
-                  }}
-                </For>
-
-                {/* Bottom spacer */}
-                <Show
-                  when={
-                    rowVirtualizer().getVirtualItems().length > 0 &&
-                    rowVirtualizer().getTotalSize() >
-                      rowVirtualizer().getVirtualItems()[
-                        rowVirtualizer().getVirtualItems().length - 1
-                      ].end
-                  }
-                >
-                  <tr>
-                    <td
-                      style={{
-                        height: `${
-                          rowVirtualizer().getTotalSize() -
-                          rowVirtualizer().getVirtualItems()[
-                            rowVirtualizer().getVirtualItems().length - 1
-                          ].end
-                        }px`,
-                      }}
-                    />
-                  </tr>
-                </Show>
-              </tbody>
-            </table>
-          </Show>
+              {/* Bottom spacer */}
+              <Show
+                when={
+                  rowVirtualizer().getVirtualItems().length > 0 &&
+                  rowVirtualizer().getTotalSize() >
+                    rowVirtualizer().getVirtualItems()[
+                      rowVirtualizer().getVirtualItems().length - 1
+                    ].end
+                }
+              >
+                <tr>
+                  <td
+                    style={{
+                      height: `${
+                        rowVirtualizer().getTotalSize() -
+                        rowVirtualizer().getVirtualItems()[
+                          rowVirtualizer().getVirtualItems().length - 1
+                        ].end
+                      }px`,
+                    }}
+                  />
+                </tr>
+              </Show>
+            </tbody>
+          </table>
         </Show>
       </div>
 

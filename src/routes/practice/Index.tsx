@@ -99,7 +99,8 @@ const PracticeIndex: Component = () => {
 
   // Update count when evaluations change
   createEffect(() => {
-    const count = Object.keys(evaluations()).length;
+    // Count only non-empty evaluations; empty string represents "(Not Set)"
+    const count = Object.values(evaluations()).filter((v) => v !== "").length;
     setEvaluationsCount(count);
   });
 
@@ -265,11 +266,8 @@ const PracticeIndex: Component = () => {
 
     // Update shared evaluation state
     setEvaluations((prev) => {
-      if (evaluation === "") {
-        // Remove evaluation if empty
-        const { [tuneId]: _, ...rest } = prev;
-        return rest;
-      }
+      // Store explicit empty string for "(Not Set)" to avoid truthy fallbacks
+      // and ensure immediate UI update without DB re-seeding overriding it.
       return { ...prev, [tuneId]: evaluation };
     });
   };

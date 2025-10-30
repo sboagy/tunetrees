@@ -14,28 +14,24 @@
  * @module components/grids/RecallEvalComboBox
  */
 
+import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { ChevronDown } from "lucide-solid";
-import {
-  type Component,
-  createSignal,
-  onCleanup,
-  onMount,
-  Show,
-} from "solid-js";
+import type { Component } from "solid-js";
+import { For } from "solid-js";
 
 interface RecallEvalComboBoxProps {
   tuneId: number;
   value: string;
   onChange: (value: string) => void;
+  // Controlled open state (optional). When provided, the dropdown will keep
+  // its open/close state across parent re-renders (e.g., grid refresh).
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
   props
 ) => {
-  const [isOpen, setIsOpen] = createSignal(false);
-  let dropdownRef: HTMLDivElement | undefined;
-  let buttonRef: HTMLButtonElement | undefined;
-
   const options = [
     {
       value: "",
@@ -67,74 +63,46 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
   const selectedOption = () =>
     options.find((opt) => opt.value === props.value) || options[0];
 
-  const handleSelect = (value: string) => {
-    props.onChange(value);
-    setIsOpen(false);
-  };
-
-  // Close dropdown when clicking outside
-  const handleClickOutside = (e: MouseEvent) => {
-    if (
-      dropdownRef &&
-      buttonRef &&
-      !dropdownRef.contains(e.target as Node) &&
-      !buttonRef.contains(e.target as Node)
-    ) {
-      setIsOpen(false);
-    }
-  };
-
-  onMount(() => {
-    document.addEventListener("mousedown", handleClickOutside);
-  });
-
-  onCleanup(() => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  });
-
   return (
     <div class="relative inline-block w-full">
-      {/* Trigger Button */}
-      <button
-        ref={buttonRef}
-        type="button"
-        data-testid={`recall-eval-${props.tuneId}`}
-        onClick={(e) => {
-          e.stopPropagation(); // Prevent row click
-          setIsOpen(!isOpen());
-        }}
-        class="w-full flex items-center justify-between px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+      <DropdownMenu
+        // Control open state if provided to avoid unexpected closes on grid refresh
+        open={props.open}
+        onOpenChange={props.onOpenChange}
+        // Non-modal prevents aggressive focus stealing which can contribute to closes
+        modal={false}
       >
-        <span class={selectedOption().color}>{selectedOption().label}</span>
-        <ChevronDown class="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
-      </button>
-
-      {/* Dropdown Menu */}
-      <Show when={isOpen()}>
-        <div
-          ref={dropdownRef}
-          data-testid={`recall-eval-menu-${props.tuneId}`}
-          class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg overflow-auto"
-          style="left: 32px; max-height: 280px;"
+        <DropdownMenu.Trigger
+          data-testid={`recall-eval-${props.tuneId}`}
+          class="w-full flex items-center justify-between px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          onPointerDown={(e) => e.stopPropagation()}
         >
-          {options.map((option) => (
-            <button
-              type="button"
-              data-testid={`recall-eval-option-${option.value || "not-set"}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSelect(option.value);
-              }}
-              class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              classList={{
-                "bg-blue-50 dark:bg-blue-900/20": option.value === props.value,
-              }}
-            >
-              <span class={option.color}>{option.label}</span>
-            </button>
-          ))}
-        </div>
-      </Show>
+          <span class={selectedOption().color}>{selectedOption().label}</span>
+          <ChevronDown class="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
+        </DropdownMenu.Trigger>
+
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            data-testid={`recall-eval-menu-${props.tuneId}`}
+            class="z-50 mt-1 w-[var(--kb-dropdown-menu-trigger-width, var(--tt-ev-width, 100%))] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-72 overflow-auto"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <For each={options}>
+              {(option) => (
+                <DropdownMenu.Item
+                  data-testid={`recall-eval-option-${
+                    option.value || "not-set"
+                  }`}
+                  class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                  onSelect={() => props.onChange(option.value)}
+                >
+                  <span class={option.color}>{option.label}</span>
+                </DropdownMenu.Item>
+              )}
+            </For>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu>
     </div>
   );
 };

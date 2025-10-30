@@ -182,4 +182,7 @@ export interface ICellEditorCallbacks {
   onGoalChange?: (tuneId: number, newValue: string | null) => void;
   onNotePrivateChange?: (tuneId: number, newValue: string) => void;
   onNotePublicChange?: (tuneId: number, newValue: string) => void;
+  // Optional control for keeping dropdowns open across refreshes
+  getRecallEvalOpen?: (tuneId: number) => boolean;
+  setRecallEvalOpen?: (tuneId: number, isOpen: boolean) => void;
 }

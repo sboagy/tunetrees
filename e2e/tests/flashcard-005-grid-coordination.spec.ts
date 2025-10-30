@@ -260,24 +260,26 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     await expect(gridEvalTrigger).toBeVisible({ timeout: 10000 });
     await gridEvalTrigger.click();
     await page.getByTestId("recall-eval-option-easy").click();
+    // ...note this will change the "current" row, so the row we just set will be what comes
+    // in flashcards, per current spec behavior. (I'm not certain I love this behavior yet.  -sb)
     await page.waitForTimeout(300);
 
     // Open flashcard mode
     await app.enableFlashcardMode();
 
-    // Verify first flashcard shows "Good"
+    // Verify "current" flashcard shows "Easy"
     let evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
-    await expect(evalButton).toContainText(/Good/i);
-
-    // Navigate to second flashcard
-    await app.goNextCard();
-    await page.waitForTimeout(300);
-
-    // Verify second flashcard shows "Easy"
-    evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
     await expect(evalButton).toContainText(/Easy/i);
 
-    // Change second evaluation to "Hard" in flashcard
+    // Navigate backwards to first flashcard
+    await app.goPrevCard();
+    await page.waitForTimeout(300);
+
+    // Verify first flashcard shows "Good"
+    evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    await expect(evalButton).toContainText(/Good/i);
+
+    // Change first evaluation to "Hard" in flashcards
     await app.selectFlashcardEvaluation("hard");
     await page.waitForTimeout(300);
 
@@ -286,7 +288,7 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     await page.waitForTimeout(300);
 
     // Verify grid updated to "Hard"
-    const secondGridEval = grid.getByTestId(/^recall-eval-\d+$/).nth(1);
+    const secondGridEval = grid.getByTestId(/^recall-eval-\d+$/).first();
     await expect(secondGridEval).toContainText(/Hard/i);
   });
 });

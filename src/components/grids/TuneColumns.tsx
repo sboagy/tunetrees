@@ -781,6 +781,11 @@ export function getScheduledColumns(
           <RecallEvalComboBox
             tuneId={tuneId}
             value={currentEval}
+            // Persist open state across grid refreshes if callbacks provided
+            open={callbacks?.getRecallEvalOpen?.(tuneId)}
+            onOpenChange={(isOpen) =>
+              callbacks?.setRecallEvalOpen?.(tuneId, isOpen)
+            }
             onChange={(value) => {
               if (callbacks?.onRecallEvalChange) {
                 callbacks.onRecallEvalChange(tuneId, value);
