@@ -25,6 +25,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
   const [results, setResults] = createSignal<QueryResult | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [executionTime, setExecutionTime] = createSignal<number>(0);
+  const [tipsOpen, setTipsOpen] = createSignal(true);
 
   // Get table list for quick access
   const [tables] = createResource(localDb, async (db) => {
@@ -107,31 +108,37 @@ export default function DatabaseBrowser(): ReturnType<Component> {
   };
 
   return (
-    <div class="container mx-auto p-6 max-w-7xl">
-      <h1 class="text-3xl font-bold mb-6">SQLite WASM Database Browser</h1>
+    <div class="fixed inset-0 flex flex-col bg-white dark:bg-gray-950">
+      {/* Header */}
+      <div class="p-6 flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
+        <h1 class="text-3xl font-bold">SQLite WASM Database Browser</h1>
+      </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Main Content - Flex to fill remaining space */}
+      <div class="flex-1 flex overflow-hidden">
         {/* Sidebar - Tables & Presets */}
-        <div class="lg:col-span-1 space-y-4">
+        <div class="w-80 p-6 space-y-4 overflow-y-auto border-r border-gray-200 dark:border-gray-700">
           {/* Tables List */}
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex flex-col h-96">
             <h2 class="text-lg font-semibold mb-3">Tables</h2>
             <Show
               when={!tables.loading}
               fallback={<p class="text-sm text-gray-500">Loading...</p>}
             >
-              <div class="space-y-1">
-                <For each={tables()}>
-                  {(table) => (
-                    <button
-                      type="button"
-                      onClick={() => browseTable(table)}
-                      class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      📋 {table}
-                    </button>
-                  )}
-                </For>
+              <div class="overflow-y-auto flex-1">
+                <div class="space-y-1">
+                  <For each={tables()}>
+                    {(table) => (
+                      <button
+                        type="button"
+                        onClick={() => browseTable(table)}
+                        class="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        📋 {table}
+                      </button>
+                    )}
+                  </For>
+                </div>
               </div>
             </Show>
           </div>
@@ -155,10 +162,10 @@ export default function DatabaseBrowser(): ReturnType<Component> {
           </div>
         </div>
 
-        {/* Main Query Panel */}
-        <div class="lg:col-span-3 space-y-4">
+        {/* Main Query Panel - Fill remaining space */}
+        <div class="flex-1 p-6 flex flex-col space-y-4 overflow-hidden">
           {/* Query Editor */}
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex-shrink-0">
             <h2 class="text-lg font-semibold mb-3">SQL Query</h2>
             <textarea
               value={query()}
@@ -185,7 +192,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
 
           {/* Error Display */}
           <Show when={error()}>
-            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex-shrink-0">
               <h3 class="text-red-800 dark:text-red-400 font-semibold mb-1">
                 Error
               </h3>
@@ -195,15 +202,15 @@ export default function DatabaseBrowser(): ReturnType<Component> {
             </div>
           </Show>
 
-          {/* Results Display */}
+          {/* Results Display - Grows to fill remaining space */}
           <Show when={results()}>
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-              <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0">
+              <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                 <h2 class="text-lg font-semibold">
                   Results ({results()?.values.length || 0} rows)
                 </h2>
               </div>
-              <div class="overflow-x-auto">
+              <div class="overflow-auto flex-1">
                 <Show
                   when={(results()?.values.length ?? 0) > 0}
                   fallback={
@@ -213,7 +220,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
                   }
                 >
                   <table class="w-full text-sm">
-                    <thead class="bg-gray-50 dark:bg-gray-900">
+                    <thead class="bg-gray-50 dark:bg-gray-900 sticky top-0">
                       <tr>
                         <For each={results()?.columns}>
                           {(column) => (
@@ -255,30 +262,44 @@ export default function DatabaseBrowser(): ReturnType<Component> {
         </div>
       </div>
 
-      {/* Help Section */}
-      <div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <h3 class="text-blue-800 dark:text-blue-400 font-semibold mb-2">
-          💡 Tips
-        </h3>
-        <ul class="text-blue-700 dark:text-blue-300 text-sm space-y-1">
-          <li>• Click a table name to browse its contents</li>
-          <li>• Use preset queries for common inspections</li>
-          <li>
-            • Run any valid SQLite SQL (SELECT, INSERT, UPDATE, DELETE, etc.)
-          </li>
-          <li>
-            • Check PRAGMA commands:{" "}
-            <code class="px-1 py-0.5 bg-blue-100 dark:bg-blue-900 rounded">
-              PRAGMA table_info(table_name)
-            </code>
-          </li>
-          <li>
-            • View schema:{" "}
-            <code class="px-1 py-0.5 bg-blue-100 dark:bg-blue-900 rounded">
-              SELECT sql FROM sqlite_master WHERE name='table_name'
-            </code>
-          </li>
-        </ul>
+      {/* Collapsible Tips Section - Fixed at bottom */}
+      <div class="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+        <button
+          type="button"
+          onClick={() => setTipsOpen(!tipsOpen())}
+          class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          <h3 class="text-blue-800 dark:text-blue-400 font-semibold flex items-center gap-2">
+            💡 Tips
+            <span class="text-xs text-blue-600 dark:text-blue-300">
+              {tipsOpen() ? "▼" : "▶"}
+            </span>
+          </h3>
+        </button>
+        <Show when={tipsOpen()}>
+          <div class="px-6 pb-4 max-h-48 overflow-y-auto bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-800">
+            <ul class="text-blue-700 dark:text-blue-300 text-sm space-y-1">
+              <li>• Click a table name to browse its contents</li>
+              <li>• Use preset queries for common inspections</li>
+              <li>
+                • Run any valid SQLite SQL (SELECT, INSERT, UPDATE, DELETE,
+                etc.)
+              </li>
+              <li>
+                • Check PRAGMA commands:{" "}
+                <code class="px-1 py-0.5 bg-blue-100 dark:bg-blue-900 rounded">
+                  PRAGMA table_info(table_name)
+                </code>
+              </li>
+              <li>
+                • View schema:{" "}
+                <code class="px-1 py-0.5 bg-blue-100 dark:bg-blue-900 rounded">
+                  SELECT sql FROM sqlite_master WHERE name='table_name'
+                </code>
+              </li>
+            </ul>
+          </div>
+        </Show>
       </div>
     </div>
   );

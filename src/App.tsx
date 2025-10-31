@@ -104,9 +104,7 @@ function App() {
                 path="/debug/db"
                 component={() => (
                   <ProtectedRoute>
-                    <MainLayout>
-                      <DatabaseBrowser />
-                    </MainLayout>
+                    <DatabaseBrowser />
                   </ProtectedRoute>
                 )}
               />
