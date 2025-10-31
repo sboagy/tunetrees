@@ -514,6 +514,7 @@ export const tabGroupMainState = pgTable(
     tabSpec: text("tab_spec"),
     practiceShowSubmitted: integer("practice_show_submitted").default(0),
     practiceModeFlashcard: integer("practice_mode_flashcard").default(0),
+    sidebarDockPosition: text("sidebar_dock_position").default("left"),
 
     // Sync columns
     ...pgSyncColumns,

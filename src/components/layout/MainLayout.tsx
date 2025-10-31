@@ -14,7 +14,9 @@
 
 import type { ParentComponent } from "solid-js";
 import { createSignal, onMount } from "solid-js";
+import { DropZoneOverlays } from "./DropZoneOverlays";
 import { Sidebar } from "./Sidebar";
+import { useSidebarDock } from "./SidebarDockContext";
 import { TabBar, type TabId } from "./TabBar";
 import { TopNav } from "./TopNav";
 
@@ -36,8 +38,20 @@ interface MainLayoutProps {
  * ```
  */
 export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
+  const { position: dockPosition } = useSidebarDock();
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false);
   const [sidebarWidth, setSidebarWidth] = createSignal(320); // Default 320px
+  const [isDragging, setIsDragging] = createSignal(false);
+
+  // Track drag state globally for drop zone visibility
+  const handleDragStart = () => {
+    console.log("🚀 MainLayout: Drag started, showing drop zones");
+    setIsDragging(true);
+  };
+  const handleDragEnd = () => {
+    console.log("🛑 MainLayout: Drag ended, hiding drop zones");
+    setIsDragging(false);
+  };
 
   // Load sidebar state from localStorage on mount
   onMount(() => {
@@ -90,8 +104,19 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
       {/* Top Navigation Bar */}
       <TopNav />
 
-      <div class="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
+      <div
+        class={`flex flex-1 overflow-hidden relative ${
+          dockPosition() === "bottom"
+            ? "flex-col-reverse"
+            : dockPosition() === "right"
+            ? "flex-row-reverse"
+            : "flex-row"
+        }`}
+      >
+        {/* Drop Zone Overlays (shown during drag) */}
+        <DropZoneOverlays isDragging={isDragging()} />
+
+        {/* Sidebar */}
         <Sidebar
           collapsed={sidebarCollapsed()}
           onToggle={handleSidebarToggle}
@@ -100,6 +125,9 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
           onWidthChangeEnd={handleSidebarWidthChangeEnd}
           minWidth={240}
           maxWidth={600}
+          dockPosition={dockPosition()}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
         />
 
         {/* Main Content Area */}

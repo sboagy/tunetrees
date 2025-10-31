@@ -332,6 +332,7 @@ export const tabGroupMainState = sqliteTable("tab_group_main_state", {
   tabSpec: text("tab_spec"),
   practiceShowSubmitted: integer("practice_show_submitted").default(0),
   practiceModeFlashcard: integer("practice_mode_flashcard").default(0),
+  sidebarDockPosition: text("sidebar_dock_position").default("left"),
   syncVersion: integer("sync_version").default(1).notNull(),
   lastModifiedAt: text("last_modified_at").notNull(),
   deviceId: text("device_id"),

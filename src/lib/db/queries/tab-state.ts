@@ -6,6 +6,7 @@
  */
 
 import { eq } from "drizzle-orm";
+import type { DockPosition } from "@/components/layout/SidebarDockContext";
 import type { SqliteDatabase } from "../client-sqlite";
 import { tabGroupMainState } from "../schema";
 
@@ -14,6 +15,7 @@ export type TabId = "practice" | "repertoire" | "catalog" | "analysis";
 export interface TabState {
   whichTab: TabId;
   sidebarCollapsed?: boolean;
+  sidebarDockPosition?: DockPosition;
   playlistId?: number;
 }
 
@@ -25,6 +27,7 @@ export async function getTabState(
     .select({
       whichTab: tabGroupMainState.whichTab,
       playlistId: tabGroupMainState.playlistId,
+      sidebarDockPosition: tabGroupMainState.sidebarDockPosition,
     })
     .from(tabGroupMainState)
     .where(eq(tabGroupMainState.userId, userId))
@@ -35,6 +38,7 @@ export async function getTabState(
     return {
       whichTab: "practice",
       sidebarCollapsed: false,
+      sidebarDockPosition: "left",
     };
   }
 
@@ -42,6 +46,8 @@ export async function getTabState(
     whichTab: (result[0].whichTab as TabId) || "practice",
     playlistId: result[0].playlistId || undefined,
     sidebarCollapsed: false,
+    sidebarDockPosition:
+      (result[0].sidebarDockPosition as DockPosition) || "left",
   };
 }
 

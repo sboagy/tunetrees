@@ -10,6 +10,7 @@ import { Route, Router, useNavigate } from "@solidjs/router";
 import { Toaster } from "solid-sonner";
 import { ProtectedRoute } from "./components/auth";
 import { MainLayout } from "./components/layout";
+import { SidebarDockProvider } from "./components/layout/SidebarDockContext";
 import { AuthProvider } from "./lib/auth/AuthContext";
 import { CurrentPlaylistProvider } from "./lib/context/CurrentPlaylistContext";
 import { CurrentTuneProvider } from "./lib/context/CurrentTuneContext";
@@ -53,134 +54,136 @@ function App() {
     <AuthProvider>
       <CurrentPlaylistProvider>
         <CurrentTuneProvider>
-          {/* Toast notification provider */}
-          <Toaster position="top-right" richColors closeButton />
-          {/* <ThemeDebugger /> */}
-          <Router>
-            {/* Public Routes */}
-            <Route path="/login" component={Login} />
+          <SidebarDockProvider>
+            {/* Toast notification provider */}
+            <Toaster position="top-right" richColors closeButton />
+            {/* <ThemeDebugger /> */}
+            <Router>
+              {/* Public Routes */}
+              <Route path="/login" component={Login} />
 
-            {/* Main App - Home with MainLayout + tabs */}
-            <Route path="/" component={Home} />
+              {/* Main App - Home with MainLayout + tabs */}
+              <Route path="/" component={Home} />
 
-            {/* Tab Route Redirects - Redirect to home with tab parameter */}
-            <Route
-              path="/practice"
-              component={() => {
-                const navigate = useNavigate();
-                navigate("/?tab=practice", { replace: true });
-                return null;
-              }}
-            />
-            <Route
-              path="/repertoire"
-              component={() => {
-                const navigate = useNavigate();
-                navigate("/?tab=repertoire", { replace: true });
-                return null;
-              }}
-            />
-            <Route
-              path="/catalog"
-              component={() => {
-                const navigate = useNavigate();
-                navigate("/?tab=catalog", { replace: true });
-                return null;
-              }}
-            />
-            <Route
-              path="/analysis"
-              component={() => {
-                const navigate = useNavigate();
-                navigate("/?tab=analysis", { replace: true });
-                return null;
-              }}
-            />
+              {/* Tab Route Redirects - Redirect to home with tab parameter */}
+              <Route
+                path="/practice"
+                component={() => {
+                  const navigate = useNavigate();
+                  navigate("/?tab=practice", { replace: true });
+                  return null;
+                }}
+              />
+              <Route
+                path="/repertoire"
+                component={() => {
+                  const navigate = useNavigate();
+                  navigate("/?tab=repertoire", { replace: true });
+                  return null;
+                }}
+              />
+              <Route
+                path="/catalog"
+                component={() => {
+                  const navigate = useNavigate();
+                  navigate("/?tab=catalog", { replace: true });
+                  return null;
+                }}
+              />
+              <Route
+                path="/analysis"
+                component={() => {
+                  const navigate = useNavigate();
+                  navigate("/?tab=analysis", { replace: true });
+                  return null;
+                }}
+              />
 
-            {/* Debug/Admin Routes */}
-            <Route
-              path="/debug/db"
-              component={() => (
-                <ProtectedRoute>
-                  <MainLayout>
-                    <DatabaseBrowser />
-                  </MainLayout>
-                </ProtectedRoute>
-              )}
-            />
+              {/* Debug/Admin Routes */}
+              <Route
+                path="/debug/db"
+                component={() => (
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <DatabaseBrowser />
+                    </MainLayout>
+                  </ProtectedRoute>
+                )}
+              />
 
-            {/* Protected Sub-routes - Wrapped in MainLayout */}
-            <Route
-              path="/practice/history"
-              component={() => (
-                <ProtectedRoute>
-                  <MainLayout>
-                    <PracticeHistory />
-                  </MainLayout>
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/playlists"
-              component={() => (
-                <ProtectedRoute>
-                  <MainLayout>
-                    <PlaylistsPage />
-                  </MainLayout>
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/playlists/new"
-              component={() => (
-                <ProtectedRoute>
-                  <MainLayout>
-                    <NewPlaylistPage />
-                  </MainLayout>
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/playlists/:id/edit"
-              component={() => (
-                <ProtectedRoute>
-                  <MainLayout>
-                    <EditPlaylistPage />
-                  </MainLayout>
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/tunes/new"
-              component={() => (
-                <ProtectedRoute>
-                  <MainLayout>
-                    <NewTunePage />
-                  </MainLayout>
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/tunes/:id/edit"
-              component={() => (
-                <ProtectedRoute>
-                  <MainLayout>
-                    <EditTunePage />
-                  </MainLayout>
-                </ProtectedRoute>
-              )}
-            />
-            <Route
-              path="/tunes/:id"
-              component={() => (
-                <ProtectedRoute>
-                  <MainLayout>
-                    <TuneDetailsPage />
-                  </MainLayout>
-                </ProtectedRoute>
-              )}
-            />
-          </Router>
+              {/* Protected Sub-routes - Wrapped in MainLayout */}
+              <Route
+                path="/practice/history"
+                component={() => (
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <PracticeHistory />
+                    </MainLayout>
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/playlists"
+                component={() => (
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <PlaylistsPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/playlists/new"
+                component={() => (
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <NewPlaylistPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/playlists/:id/edit"
+                component={() => (
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <EditPlaylistPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/tunes/new"
+                component={() => (
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <NewTunePage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/tunes/:id/edit"
+                component={() => (
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <EditTunePage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/tunes/:id"
+                component={() => (
+                  <ProtectedRoute>
+                    <MainLayout>
+                      <TuneDetailsPage />
+                    </MainLayout>
+                  </ProtectedRoute>
+                )}
+              />
+            </Router>
+          </SidebarDockProvider>
         </CurrentTuneProvider>
       </CurrentPlaylistProvider>
     </AuthProvider>

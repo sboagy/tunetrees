@@ -24,11 +24,12 @@ import {
   createEffect,
   createSignal,
   onCleanup,
-  Show,
 } from "solid-js";
 import { NotesPanel } from "@/components/notes/NotesPanel";
 import { ReferencesPanel } from "@/components/references/ReferencesPanel";
 import { TuneInfoHeader } from "@/components/sidebar";
+import type { DockPosition } from "./SidebarDockContext";
+import { SidebarDragHandle } from "./SidebarDragHandle";
 
 /**
  * Sidebar Component Props
@@ -41,6 +42,9 @@ interface SidebarProps {
   onWidthChangeEnd?: (width: number) => void; // Called when drag ends (for localStorage save)
   minWidth?: number;
   maxWidth?: number;
+  dockPosition: DockPosition;
+  onDragStart?: () => void; // Called when drag handle starts dragging
+  onDragEnd?: () => void; // Called when drag handle ends dragging
 }
 
 /**
@@ -96,8 +100,9 @@ export const Sidebar: Component<SidebarProps> = (props) => {
     e.preventDefault();
     setIsResizing(true);
 
-    const startX = e.clientX;
-    const startWidth = localWidth();
+    const horizontal = isHorizontal();
+    const startPos = horizontal ? e.clientY : e.clientX;
+    const startSize = localWidth();
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       // Cancel any pending RAF
@@ -107,13 +112,24 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
       // Throttle updates using requestAnimationFrame
       rafId = requestAnimationFrame(() => {
-        const delta = moveEvent.clientX - startX;
-        const newWidth = Math.max(
+        const currentPos = horizontal ? moveEvent.clientY : moveEvent.clientX;
+        let delta = currentPos - startPos;
+
+        // For bottom position, we need to invert delta (dragging down = smaller)
+        if (horizontal) {
+          delta = -delta;
+        }
+        // For right position, we need to invert delta (dragging left = bigger)
+        if (props.dockPosition === "right") {
+          delta = -delta;
+        }
+
+        const newSize = Math.max(
           minWidth(),
-          Math.min(maxWidth(), startWidth + delta)
+          Math.min(maxWidth(), startSize + delta)
         );
         // Update local state only - fast and doesn't trigger parent re-render
-        setLocalWidth(newWidth);
+        setLocalWidth(newSize);
         rafId = null;
       });
     };
@@ -139,7 +155,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
-    document.body.style.cursor = "col-resize";
+    document.body.style.cursor = horizontal ? "row-resize" : "col-resize";
     document.body.style.userSelect = "none";
   };
 
@@ -148,9 +164,10 @@ export const Sidebar: Component<SidebarProps> = (props) => {
     e.preventDefault();
     setIsResizing(true);
 
+    const horizontal = isHorizontal();
     const touch = e.touches[0];
-    const startX = touch.clientX;
-    const startWidth = localWidth();
+    const startPos = horizontal ? touch.clientY : touch.clientX;
+    const startSize = localWidth();
 
     const handleTouchMove = (moveEvent: TouchEvent) => {
       // Cancel any pending RAF
@@ -161,13 +178,24 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       // Throttle updates using requestAnimationFrame
       rafId = requestAnimationFrame(() => {
         const touch = moveEvent.touches[0];
-        const delta = touch.clientX - startX;
-        const newWidth = Math.max(
+        const currentPos = horizontal ? touch.clientY : touch.clientX;
+        let delta = currentPos - startPos;
+
+        // For bottom position, we need to invert delta (dragging down = smaller)
+        if (horizontal) {
+          delta = -delta;
+        }
+        // For right position, we need to invert delta (dragging left = bigger)
+        if (props.dockPosition === "right") {
+          delta = -delta;
+        }
+
+        const newSize = Math.max(
           minWidth(),
-          Math.min(maxWidth(), startWidth + delta)
+          Math.min(maxWidth(), startSize + delta)
         );
         // Update local state only - fast and doesn't trigger parent re-render
-        setLocalWidth(newWidth);
+        setLocalWidth(newSize);
         rafId = null;
       });
     };
@@ -204,72 +232,137 @@ export const Sidebar: Component<SidebarProps> = (props) => {
     document.body.style.userSelect = "";
   });
 
+  const isHorizontal = () => props.dockPosition === "bottom";
+
   return (
     <aside
-      class={`relative bg-gray-50/30 dark:bg-gray-800/30 border-r border-gray-200/20 dark:border-gray-700/20 flex-shrink-0 flex flex-col select-none ${
-        isResizing() ? "" : "transition-all duration-300"
-      }`}
+      class={`relative bg-gray-50/30 dark:bg-gray-800/30 flex-shrink-0 flex select-none ${
+        isHorizontal()
+          ? "flex-row border-t border-gray-200/20 dark:border-gray-700/20"
+          : "flex-col border-r border-gray-200/20 dark:border-gray-700/20"
+      } ${isResizing() ? "" : "transition-all duration-300"} z-10`}
       style={{
-        width: props.collapsed ? "20px" : `${localWidth()}px`,
-        "will-change": isResizing() ? "width" : "auto",
+        [isHorizontal() ? "height" : "width"]: props.collapsed
+          ? "40px"
+          : `${localWidth()}px`,
+        "will-change": isResizing()
+          ? isHorizontal()
+            ? "height"
+            : "width"
+          : "auto",
       }}
     >
-      {/* Sidebar Content (only show when expanded) */}
-      <Show when={!props.collapsed}>
-        <div class="flex-1 overflow-y-auto p-2 space-y-2">
-          {/* Current Tune Info Header */}
-          <TuneInfoHeader />
+      {/* Drag Handle Header - Always visible */}
+      <header
+        class={`flex items-center justify-center p-1 border-b border-gray-200/20 dark:border-gray-700/20 ${
+          isHorizontal() ? "border-r border-b-0" : ""
+        } flex-shrink-0 relative z-20`}
+      >
+        {/* The drag handle has been moved next to the collapse button */}
+      </header>
 
-          {/* References Section */}
-          <section
-            class="bg-white/50 dark:bg-gray-900/50 rounded p-2 border border-gray-200/30 dark:border-gray-700/30"
-            aria-labelledby="references-heading"
-          >
-            <ReferencesPanel />
-          </section>
+      {/* Sidebar Content (conditionally rendered) */}
+      <div
+        class={`flex-1 overflow-auto p-2 ${
+          isHorizontal() ? "flex flex-row space-x-2" : "space-y-2"
+        } ${props.collapsed ? "hidden" : ""}`}
+      >
+        {/* Current Tune Info Header */}
+        <TuneInfoHeader />
 
-          {/* Notes Section */}
-          <section
-            class="bg-white/50 dark:bg-gray-900/50 rounded p-2 border border-gray-200/30 dark:border-gray-700/30"
-            aria-labelledby="notes-heading"
-          >
-            <NotesPanel />
-          </section>
-        </div>
-      </Show>
+        {/* References Section */}
+        <section
+          class="bg-white/50 dark:bg-gray-900/50 rounded p-2 border border-gray-200/30 dark:border-gray-700/30"
+          aria-labelledby="references-heading"
+        >
+          <ReferencesPanel />
+        </section>
+
+        {/* Notes Section */}
+        <section
+          class="bg-white/50 dark:bg-gray-900/50 rounded p-2 border border-gray-200/30 dark:border-gray-700/30"
+          aria-labelledby="notes-heading"
+        >
+          <NotesPanel />
+        </section>
+      </div>
 
       {/* Resize Handle with GripVertical indicator (only when expanded) */}
-      <Show when={!props.collapsed}>
+      <div class={`${props.collapsed ? "hidden" : ""}`}>
         <button
           type="button"
-          class="absolute top-0 right-0 w-4 md:w-1 h-full cursor-col-resize hover:bg-blue-500 md:hover:w-1.5 transition-all group border-0 bg-transparent p-0 touch-none"
+          class={`absolute z-20 ${
+            isHorizontal()
+              ? "top-0 left-12 right-0 h-4 md:h-1 cursor-row-resize hover:bg-blue-500 md:hover:h-1.5"
+              : props.dockPosition === "right"
+              ? "top-0 left-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
+              : "top-0 right-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
+          } transition-all group border-0 bg-transparent p-0 touch-none`}
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
           title="Drag to resize sidebar"
           aria-label="Resize sidebar"
         >
-          {/* GripVertical icon - centered vertically, always slightly visible on mobile, hover on desktop */}
-          <div class="absolute top-1/2 -translate-y-1/2 -right-2 opacity-60 md:opacity-30 group-hover:opacity-100 transition-opacity pointer-events-none">
-            <GripVertical class="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+          {/* GripVertical icon - centered, always slightly visible on mobile, hover on desktop */}
+          <div
+            class={`absolute opacity-60 md:opacity-30 group-hover:opacity-100 transition-opacity pointer-events-none ${
+              isHorizontal()
+                ? "left-1/2 -translate-x-1/2 -top-2"
+                : props.dockPosition === "right"
+                ? "top-1/2 -translate-y-1/2 -left-2"
+                : "top-1/2 -translate-y-1/2 -right-2"
+            }`}
+          >
+            <GripVertical
+              class={`w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ${
+                isHorizontal() ? "rotate-90" : ""
+              }`}
+            />
           </div>
         </button>
-      </Show>
+      </div>
 
-      {/* Collapse Toggle Button - centered vertically */}
-      <button
-        type="button"
-        onClick={props.onToggle}
-        class="absolute top-1/2 -translate-y-1/2 right-0.5 p-0.5 text-gray-600 dark:text-gray-400 hover:bg-gray-200/30 dark:hover:bg-gray-700/30 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500 flex items-center justify-center z-10"
-        title={props.collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        aria-label={props.collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        aria-expanded={!props.collapsed}
+      {/* Collapse Toggle Button and Drag Handle - positioned based on dock position */}
+      <div
+        class={`absolute flex items-center justify-center z-30 ${
+          isHorizontal()
+            ? "top-0.5 left-1/2 -translate-x-1/2 space-x-2"
+            : props.dockPosition === "right"
+            ? "top-1/2 -translate-y-1/2 left-0.5 flex-col space-y-2"
+            : "top-1/2 -translate-y-1/2 right-0.5 flex-col space-y-2"
+        }`}
       >
-        {props.collapsed ? (
-          <ChevronRight class="w-3.5 h-3.5" />
-        ) : (
-          <ChevronLeft class="w-3.5 h-3.5" />
-        )}
-      </button>
+        <button
+          type="button"
+          onClick={props.onToggle}
+          class="p-0.5 text-gray-600 dark:text-gray-400 hover:bg-gray-200/30 dark:hover:bg-gray-700/30 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500"
+          title={props.collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={props.collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!props.collapsed}
+        >
+          {props.collapsed ? (
+            isHorizontal() ? (
+              <ChevronLeft class="w-3.5 h-3.5 rotate-90" />
+            ) : props.dockPosition === "right" ? (
+              <ChevronLeft class="w-3.5 h-3.5" />
+            ) : (
+              <ChevronRight class="w-3.5 h-3.5" />
+            )
+          ) : isHorizontal() ? (
+            <ChevronRight class="w-3.5 h-3.5 rotate-90" />
+          ) : props.dockPosition === "right" ? (
+            <ChevronRight class="w-3.5 h-3.5" />
+          ) : (
+            <ChevronLeft class="w-3.5 h-3.5" />
+          )}
+        </button>
+        <div class="p-0.5">
+          <SidebarDragHandle
+            onDragStart={props.onDragStart}
+            onDragEnd={props.onDragEnd}
+          />
+        </div>
+      </div>
     </aside>
   );
 };
