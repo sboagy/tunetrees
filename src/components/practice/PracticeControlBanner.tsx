@@ -30,6 +30,7 @@ import {
   TOOLBAR_CONTAINER_CLASSES,
   TOOLBAR_ICON_SIZE,
   TOOLBAR_INNER_CLASSES,
+  TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 import { AddTunesDialog } from "./AddTunesDialog";
@@ -293,60 +294,61 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               </SwitchLabel>
             </Switch>
           </div>
+        </div>
 
-          {/* Columns/Fields dropdown */}
-          <div class="relative">
-            <button
-              ref={columnsButtonRef}
-              type="button"
-              onClick={handleColumnsToggle}
-              title={
-                props.flashcardMode ? "Show/hide fields" : "Show/hide columns"
-              }
-              data-testid="practice-columns-button"
-              class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
-            >
-              <Columns size={14} />
-              <span class="hidden sm:inline">
-                {props.flashcardMode ? "Fields" : "Columns"}
-              </span>
-            </button>
+        {/* Spacer to push Columns/Fields to the right */}
+        <div class={TOOLBAR_SPACER} />
 
-            {/* Grid Columns menu */}
-            <Show
-              when={
-                showColumnsDropdown() && !props.flashcardMode && props.table
-              }
-            >
-              <ColumnVisibilityMenu
-                isOpen={showColumnsDropdown()}
-                table={props.table!}
-                onClose={() => setShowColumnsDropdown(false)}
-                triggerRef={columnsButtonRef}
-              />
-            </Show>
+        {/* Columns/Fields dropdown */}
+        <div class="relative">
+          <button
+            ref={columnsButtonRef}
+            type="button"
+            onClick={handleColumnsToggle}
+            title={
+              props.flashcardMode ? "Show/hide fields" : "Show/hide columns"
+            }
+            data-testid="practice-columns-button"
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
+          >
+            <Columns size={14} />
+            <span class="hidden sm:inline">
+              {props.flashcardMode ? "Fields" : "Columns"}
+            </span>
+          </button>
 
-            {/* Flashcard Fields menu */}
-            <Show
-              when={
-                showColumnsDropdown() &&
-                props.flashcardMode &&
-                props.flashcardFieldVisibility
-              }
-            >
-              <FlashcardFieldVisibilityMenu
-                isOpen={showColumnsDropdown()}
-                fieldVisibility={props.flashcardFieldVisibility!}
-                onFieldVisibilityChange={(visibility) => {
-                  if (props.onFlashcardFieldVisibilityChange) {
-                    props.onFlashcardFieldVisibilityChange(visibility);
-                  }
-                }}
-                onClose={() => setShowColumnsDropdown(false)}
-                triggerRef={columnsButtonRef}
-              />
-            </Show>
-          </div>
+          {/* Grid Columns menu */}
+          <Show
+            when={showColumnsDropdown() && !props.flashcardMode && props.table}
+          >
+            <ColumnVisibilityMenu
+              isOpen={showColumnsDropdown()}
+              table={props.table!}
+              onClose={() => setShowColumnsDropdown(false)}
+              triggerRef={columnsButtonRef}
+            />
+          </Show>
+
+          {/* Flashcard Fields menu */}
+          <Show
+            when={
+              showColumnsDropdown() &&
+              props.flashcardMode &&
+              props.flashcardFieldVisibility
+            }
+          >
+            <FlashcardFieldVisibilityMenu
+              isOpen={showColumnsDropdown()}
+              fieldVisibility={props.flashcardFieldVisibility!}
+              onFieldVisibilityChange={(visibility) => {
+                if (props.onFlashcardFieldVisibilityChange) {
+                  props.onFlashcardFieldVisibilityChange(visibility);
+                }
+              }}
+              onClose={() => setShowColumnsDropdown(false)}
+              triggerRef={columnsButtonRef}
+            />
+          </Show>
         </div>
       </div>
 

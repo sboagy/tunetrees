@@ -629,6 +629,15 @@ export class SyncEngine {
             // Composite key: playlistRef + tuneRef
             conflictTarget = [localTable.playlistRef, localTable.tuneRef];
             break;
+          case "daily_practice_queue":
+            // Composite key: userRef + playlistRef + windowStartUtc + tuneRef
+            conflictTarget = [
+              localTable.userRef,
+              localTable.playlistRef,
+              localTable.windowStartUtc,
+              localTable.tuneRef,
+            ];
+            break;
           default:
             // Most tables use 'id' as primary key
             conflictTarget = [localTable.id];

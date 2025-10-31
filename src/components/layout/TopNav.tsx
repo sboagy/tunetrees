@@ -696,11 +696,13 @@ export const TopNav: Component = () => {
                             console.log(
                               "✅ [Force Sync Down] Sync completed successfully"
                             );
+                            setShowDbMenu(false); // Close menu after successful sync
                           } catch (error) {
                             console.error(
                               "❌ [Force Sync Down] Sync failed:",
                               error
                             );
+                            setShowDbMenu(false); // Close menu even on error
                           }
                         }}
                         class="w-full px-4 py-2 text-left text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-2 rounded-md font-medium"
@@ -733,8 +735,9 @@ export const TopNav: Component = () => {
                       </button>
                     </div>
 
-                    {/* Database Browser (Dev Mode Only) */}
-                    <Show when={import.meta.env.DEV}>
+                    {/* Database Browser (Temporarily enabled for production) */}
+                    {/* TODO: Restore dev-only condition: <Show when={import.meta.env.DEV}> */}
+                    <Show when={true}>
                       <a
                         href="/debug/db"
                         target="_blank"

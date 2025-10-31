@@ -20,6 +20,7 @@
 
 import { useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
+import { Columns } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
@@ -42,6 +43,7 @@ import {
   TOOLBAR_SEARCH_CONTAINER,
   TOOLBAR_SEARCH_ICON,
   TOOLBAR_SEARCH_INPUT,
+  TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../grids/types";
 
@@ -346,59 +348,49 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             </svg>
             <span class="hidden sm:inline">Delete</span>
           </button>
+        </div>
 
-          {/* Columns dropdown */}
-          <div class="relative" ref={columnsDropdownRef!}>
-            <button
-              ref={columnsButtonRef!}
-              type="button"
-              onClick={handleColumnsToggle}
-              title="Show/hide columns"
-              data-testid="repertoire-columns-button"
-              aria-expanded={showColumnsDropdown()}
-              class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
+        {/* Spacer to push Columns to the right */}
+        <div class={TOOLBAR_SPACER} />
+
+        {/* Columns dropdown */}
+        <div class="relative" ref={columnsDropdownRef!}>
+          <button
+            ref={columnsButtonRef!}
+            type="button"
+            onClick={handleColumnsToggle}
+            title="Show/hide columns"
+            data-testid="repertoire-columns-button"
+            aria-expanded={showColumnsDropdown()}
+            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
+          >
+            <Columns size={14} />
+            <span class="hidden lg:inline">Columns</span>
+            <svg
+              class="w-3.5 h-3.5 hidden lg:inline"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
             >
-              <svg
-                class={TOOLBAR_ICON_SIZE}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
-                />
-              </svg>
-              <span class="hidden lg:inline">Columns</span>
-              <svg
-                class="w-3.5 h-3.5 hidden lg:inline"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-
-            {/* Column visibility menu */}
-            <Show when={props.table}>
-              <ColumnVisibilityMenu
-                table={props.table!}
-                isOpen={showColumnsDropdown()}
-                onClose={() => setShowColumnsDropdown(false)}
-                triggerRef={columnsButtonRef}
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
               />
-            </Show>
-          </div>
+            </svg>
+          </button>
+
+          {/* Column visibility menu */}
+          <Show when={props.table}>
+            <ColumnVisibilityMenu
+              table={props.table!}
+              isOpen={showColumnsDropdown()}
+              onClose={() => setShowColumnsDropdown(false)}
+              triggerRef={columnsButtonRef}
+            />
+          </Show>
         </div>
       </div>
     </div>

@@ -379,37 +379,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
         </Show>
       </div>
 
-      {/* Mobile Navigation Buttons */}
-      <div class="flex-shrink-0 md:hidden bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
-        <div class="flex items-center justify-between gap-4">
-          <button
-            type="button"
-            onClick={goToPrevious}
-            disabled={currentIndex() === 0}
-            class="flex-1 py-2 px-4 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed font-medium"
-          >
-            ← Previous
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleReveal}
-            class="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg font-medium"
-            data-testid="flashcard-reveal-button"
-          >
-            {isRevealed() ? "Hide" : "Reveal"}
-          </button>
-
-          <button
-            type="button"
-            onClick={goToNext}
-            disabled={currentIndex() === props.tunes.length - 1}
-            class="flex-1 py-2 px-4 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed font-medium"
-          >
-            Next →
-          </button>
-        </div>
-      </div>
+      {/* Mobile bottom nav removed: swipe + floating arrows are sufficient */}
     </div>
   );
 };
