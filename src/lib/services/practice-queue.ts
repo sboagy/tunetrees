@@ -19,11 +19,12 @@
  * @module lib/services/practice-queue
  */
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type { PracticeListStagedRow } from "../db/queries/practice";
 import { dailyPracticeQueue } from "../db/schema";
+import { generateId } from "../utils/uuid";
 
 // Type alias to support both sql.js (production) and better-sqlite3 (testing)
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
@@ -248,12 +249,12 @@ export function classifyQueueBucket(
  * Represents a queue entry as stored in daily_practice_queue table.
  */
 export interface DailyPracticeQueueRow {
-  id?: number;
-  userRef: number;
-  playlistRef: number;
+  id?: string;
+  userRef: string;
+  playlistRef: string;
   windowStartUtc: string;
   windowEndUtc: string;
-  tuneRef: number;
+  tuneRef: string;
   bucket: number;
   orderIndex: number;
   snapshotCoalescedTs: string;
@@ -287,8 +288,8 @@ export interface DailyPracticeQueueRow {
  */
 async function fetchExistingActiveQueue(
   db: AnyDatabase,
-  userRef: number,
-  playlistRef: number,
+  userRef: string,
+  playlistRef: string,
   windowStartKey: string
 ): Promise<DailyPracticeQueueRow[]> {
   const results = await db
@@ -330,8 +331,8 @@ function buildQueueRows(
   rows: PracticeListStagedRow[],
   windows: SchedulingWindows,
   prefs: PrefsSchedulingOptions,
-  userRef: number,
-  playlistRef: number,
+  userRef: string,
+  playlistRef: string,
   mode: string,
   localTzOffsetMinutes: number | null,
   forceBucket?: number
@@ -395,14 +396,17 @@ function buildQueueRows(
 async function persistQueueRows(
   db: AnyDatabase,
   rows: Omit<DailyPracticeQueueRow, "id">[],
-  userRef: number,
-  playlistRef: number,
+  userRef: string,
+  playlistRef: string,
   windows: SchedulingWindows
 ): Promise<DailyPracticeQueueRow[]> {
   try {
     // Insert all rows
     for (const row of rows) {
-      await db.insert(dailyPracticeQueue).values(row).run();
+      await db
+        .insert(dailyPracticeQueue)
+        .values({ id: generateId(), ...row })
+        .run();
     }
 
     // Fetch back the inserted rows
@@ -465,8 +469,8 @@ async function persistQueueRows(
  */
 export async function generateOrGetPracticeQueue(
   db: AnyDatabase,
-  userRef: number,
-  playlistRef: number,
+  userRef: string,
+  playlistRef: string,
   reviewSitdownDate: Date = new Date(),
   localTzOffsetMinutes: number | null = null,
   mode: string = "per_day",
@@ -535,28 +539,41 @@ export async function generateOrGetPracticeQueue(
   // Implements max_reviews capacity constraint across all buckets
 
   const maxReviews = prefs.maxReviewsPerDay || 0; // 0 = uncapped
-  const seenTuneIds = new Set<number>();
+  const seenTuneIds = new Set<string>();
   const candidateRows: PracticeListStagedRow[] = [];
 
   // Q1: Due Today (scheduled or latest_due within [startTs, endTs))
-  const q1Rows = await db.all<PracticeListStagedRow>(sql`
-    SELECT * 
-    FROM practice_list_staged
-    WHERE user_ref = ${userRef}
-      AND playlist_id = ${playlistRef}
-      AND deleted = 0
-      AND playlist_deleted = 0
-      AND (
-        (scheduled IS NOT NULL AND scheduled >= ${
-          windows.startTs
-        } AND scheduled < ${windows.endTs})
-        OR (scheduled IS NULL AND latest_due >= ${
-          windows.startTs
-        } AND latest_due < ${windows.endTs})
-      )
-    ORDER BY COALESCE(scheduled, latest_due) ASC
-    ${maxReviews > 0 ? sql`LIMIT ${maxReviews}` : sql``}
-  `);
+  let q1Rows: PracticeListStagedRow[];
+  if (maxReviews > 0) {
+    q1Rows = await db.all<PracticeListStagedRow>(sql`
+      SELECT * 
+      FROM practice_list_staged
+      WHERE user_ref = ${userRef}
+        AND playlist_id = ${playlistRef}
+        AND deleted = 0
+        AND playlist_deleted = 0
+        AND (
+          (scheduled IS NOT NULL AND scheduled >= ${windows.startTs} AND scheduled < ${windows.endTs})
+          OR (scheduled IS NULL AND latest_due >= ${windows.startTs} AND latest_due < ${windows.endTs})
+        )
+      ORDER BY COALESCE(scheduled, latest_due) ASC
+      LIMIT ${maxReviews}
+    `);
+  } else {
+    q1Rows = await db.all<PracticeListStagedRow>(sql`
+      SELECT * 
+      FROM practice_list_staged
+      WHERE user_ref = ${userRef}
+        AND playlist_id = ${playlistRef}
+        AND deleted = 0
+        AND playlist_deleted = 0
+        AND (
+          (scheduled IS NOT NULL AND scheduled >= ${windows.startTs} AND scheduled < ${windows.endTs})
+          OR (scheduled IS NULL AND latest_due >= ${windows.startTs} AND latest_due < ${windows.endTs})
+        )
+      ORDER BY COALESCE(scheduled, latest_due) ASC
+    `);
+  }
 
   for (const row of q1Rows) {
     candidateRows.push(row);
@@ -755,8 +772,8 @@ export async function generateOrGetPracticeQueue(
  */
 export async function addTunesToQueue(
   db: AnyDatabase,
-  userRef: number,
-  playlistRef: number,
+  userRef: string,
+  playlistRef: string,
   count: number,
   reviewSitdownDate: Date = new Date(),
   localTzOffsetMinutes: number | null = null
@@ -860,6 +877,7 @@ export async function addTunesToQueue(
     await db
       .insert(dailyPracticeQueue)
       .values({
+        id: generateId(),
         ...row,
         lastModifiedAt: now,
       })
@@ -877,10 +895,7 @@ export async function addTunesToQueue(
         eq(dailyPracticeQueue.playlistRef, playlistRef),
         eq(dailyPracticeQueue.windowStartUtc, windowStartKey),
         eq(dailyPracticeQueue.active, 1),
-        sql`${dailyPracticeQueue.tuneRef} IN (${sql.join(
-          addedTuneIds,
-          sql`, `
-        )})`
+        inArray(dailyPracticeQueue.tuneRef, addedTuneIds)
       )
     )
     .all();

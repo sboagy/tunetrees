@@ -1,4 +1,9 @@
 import { expect } from "@playwright/test";
+import {
+  TEST_TUNE_BANISH_ID,
+  TEST_TUNE_MASONS_ID,
+  TEST_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -14,9 +19,8 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe.serial("Flashcard Feature: Edge Cases", () => {
   test("01. Single tune in flashcard list", async ({ page, testUser }) => {
-    const testUserPrivateTune1 = testUser.userId;
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1], // Only 1 tune
+      repertoireTunes: [TEST_TUNE_BANISH_ID], // Only 1 tune
       scheduleDaysAgo: 1, // Ensure it's due and appears in flashcards
       startTab: "practice",
     });
@@ -51,10 +55,9 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     // FIXME: This scenario remains flaky due to background sync/virtualized grid timing.
     // Occasionally the evaluation menu or grid count does not update within the timeout window.
     // Marking as fixme until the underlying UI synchronization is stabilized.
-    const testUserPrivateTune1 = testUser.userId;
 
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, 3497], // 2 tunes
+      repertoireTunes: [TEST_TUNE_BANISH_ID, TEST_TUNE_MASONS_ID], // 2 tunes
       scheduleDaysAgo: 1,
       startTab: "practice",
     });
@@ -126,11 +129,12 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     page,
     testUser,
   }) => {
-    const testUserPrivateTune1 = testUser.userId;
-    const testUserPrivateTune2 = testUser.userId + 10000;
-
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, testUserPrivateTune2, 3497], // 3 tunes that exist in seed data
+      repertoireTunes: [
+        TEST_TUNE_BANISH_ID,
+        TEST_TUNE_MORRISON_ID,
+        TEST_TUNE_MASONS_ID,
+      ], // 3 tunes that exist in seed data
       scheduleDaysAgo: 1,
       startTab: "practice",
     });
@@ -182,10 +186,12 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     page,
     testUser,
   }) => {
-    const testUserPrivateTune1 = testUser.userId;
-    const testUserPrivateTune2 = testUser.userId + 10000;
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, testUserPrivateTune2, 3497], // 3 tunes that exist in seed data
+      repertoireTunes: [
+        TEST_TUNE_BANISH_ID,
+        TEST_TUNE_MORRISON_ID,
+        TEST_TUNE_MASONS_ID,
+      ], // 3 tunes that exist in seed data
       scheduleDaysAgo: 1,
       startTab: "practice",
     });
@@ -205,9 +211,8 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     page,
     testUser,
   }) => {
-    const testUserPrivateTune1 = testUser.userId;
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, 3497], // 2 tunes
+      repertoireTunes: [TEST_TUNE_BANISH_ID, TEST_TUNE_MASONS_ID], // 2 tunes
       scheduleDaysAgo: 1,
       startTab: "practice",
     });
@@ -323,10 +328,12 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     page,
     testUser,
   }) => {
-    const testUserPrivateTune1 = testUser.userId;
-    const testUserPrivateTune2 = testUser.userId + 10000;
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, testUserPrivateTune2, 3497], // 3 tunes that exist in seed data
+      repertoireTunes: [
+        TEST_TUNE_BANISH_ID,
+        TEST_TUNE_MORRISON_ID,
+        TEST_TUNE_MASONS_ID,
+      ], // 3 tunes that exist in seed data
       scheduleDaysAgo: 1,
       startTab: "practice",
     });
@@ -364,9 +371,8 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     page,
     testUser,
   }) => {
-    const testUserPrivateTune1 = testUser.userId;
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, 3497], // 2 tunes
+      repertoireTunes: [TEST_TUNE_BANISH_ID, TEST_TUNE_MASONS_ID], // 2 tunes
       scheduleDaysAgo: 1,
       startTab: "practice",
     });

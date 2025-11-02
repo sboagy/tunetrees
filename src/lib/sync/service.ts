@@ -34,7 +34,8 @@ export interface SyncResult {
  */
 export interface SyncServiceConfig {
   supabase: SupabaseClient;
-  userId: number | null;
+  // Supabase Auth user id (UUID string)
+  userId: string | null;
   realtimeEnabled?: boolean;
   syncIntervalMs?: number;
   onSyncComplete?: (result: SyncResult) => void;
@@ -66,7 +67,7 @@ export class SyncService {
     this.syncEngine = new SyncEngine(
       this.db,
       config.supabase,
-      config.userId ?? 0,
+      config.userId ?? "",
       {
         batchSize: 100,
         maxRetries: 3,

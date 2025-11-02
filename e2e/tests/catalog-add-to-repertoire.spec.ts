@@ -18,6 +18,10 @@
  */
 
 import { expect } from "@playwright/test";
+import {
+  CATALOG_TUNE_54_ID,
+  CATALOG_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
@@ -90,12 +94,12 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     await page.getByTestId("tab-catalog").click();
     await page.waitForTimeout(500);
 
-    // Select specific tunes that we know exist (IDs 3497, 54)
+    // Select specific tunes that we know exist
     const tune1Checkbox = page.getByRole("checkbox", {
-      name: "Select row 3497",
+      name: `Select row ${CATALOG_TUNE_MORRISON_ID}`,
     });
     const tune2Checkbox = page.getByRole("checkbox", {
-      name: "Select row 54",
+      name: `Select row ${CATALOG_TUNE_54_ID}`,
     });
 
     await tune1Checkbox.check();
@@ -289,10 +293,10 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
 
     // Select 2 specific tunes
     const tune1Checkbox = page.getByRole("checkbox", {
-      name: "Select row 3497",
+      name: `Select row ${CATALOG_TUNE_MORRISON_ID}`,
     });
     const tune2Checkbox = page.getByRole("checkbox", {
-      name: "Select row 54",
+      name: `Select row ${CATALOG_TUNE_54_ID}`,
     });
 
     await tune1Checkbox.check();

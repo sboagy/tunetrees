@@ -12,6 +12,7 @@
  */
 
 import { expect } from "@playwright/test";
+import { TEST_TUNE_MORRISON_ID } from "../../tests/fixtures/test-data";
 import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -24,10 +25,10 @@ test.describe.serial("Row Selection Persistence", () => {
   test.beforeEach(async ({ page, testUser }) => {
     const testUserPrivateTune1 = testUser.userId;
     // Setup: Seed several tunes in repertoire for selection testing
-    // Using known valid tune IDs: testUserPrivateTune1 (Banish Misfortune), 3497 (Morrison's Jig)
+    // Using known valid tune IDs: testUserPrivateTune1 (Banish Misfortune), TEST_TUNE_MORRISON_ID (Morrison's Jig)
     // Start on catalog tab since most tests begin there
     await setupForRepertoireTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, 3497], // Only 2 tunes that we know exist
+      repertoireTunes: [testUserPrivateTune1, TEST_TUNE_MORRISON_ID], // Only 2 tunes that we know exist
       scheduleTunes: false,
     });
 

@@ -19,6 +19,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { computeSchedulingWindows } from "../../services/practice-queue";
 import { queueSync } from "../../sync";
+import { generateId } from "../../utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import {
   dailyPracticeQueue,
@@ -46,22 +47,22 @@ import type {
  */
 export interface PracticeListStagedRow {
   // Core tune info
-  id: number;
+  id: string;
   title: string;
   type: string;
   mode: string;
   structure: string | null;
   incipit: string | null;
   genre: string | null;
-  private_for: number | null;
+  private_for: string | null;
   deleted: number;
 
   // Playlist info
   learned: number | null;
   goal: string;
   scheduled: string | null;
-  user_ref: number;
-  playlist_id: number;
+  user_ref: string;
+  playlist_id: string;
   instrument: string | null;
   playlist_deleted: number;
 
@@ -114,8 +115,8 @@ export interface PracticeListStagedWithQueue extends PracticeListStagedRow {
  * @deprecated Use PracticeListStagedWithQueue instead
  */
 export interface DueTuneEntry {
-  tuneRef: number;
-  playlistRef: number;
+  tuneRef: string;
+  playlistRef: string;
   title: string | null;
   type: string | null;
   mode: string | null;
@@ -176,8 +177,8 @@ export interface DueTuneEntry {
  */
 export async function getPracticeList(
   db: SqliteDatabase,
-  userId: number,
-  playlistId: number,
+  userId: string,
+  playlistId: string,
   _delinquencyWindowDays: number = 7 // Kept for API compatibility
 ): Promise<PracticeListStagedWithQueue[]> {
   // Query practice_list_staged INNER JOIN daily_practice_queue
@@ -245,8 +246,8 @@ export async function getPracticeList(
  */
 export async function getDueTunes(
   db: SqliteDatabase,
-  userId: number,
-  playlistId: number,
+  userId: string,
+  playlistId: string,
   delinquencyWindowDays: number = 7
 ): Promise<PracticeListStagedWithQueue[]> {
   return getPracticeList(db, userId, playlistId, delinquencyWindowDays);
@@ -259,7 +260,7 @@ export async function getDueTunes(
  */
 export async function getDueTunesLegacy(
   db: SqliteDatabase,
-  playlistId: number,
+  playlistId: string,
   sitdownDate: Date,
   delinquencyWindowDays = 7
 ): Promise<DueTuneEntry[]> {
@@ -295,41 +296,41 @@ export async function getDueTunesLegacy(
       // Latest practice record info (from subquery)
       latest_practiced: sql<string | null>`(
         SELECT practiced 
-        FROM ${practiceRecord} 
-        WHERE ${practiceRecord.tuneRef} = ${tune.id} 
-          AND ${practiceRecord.playlistRef} = ${playlistId}
+        FROM practice_record
+        WHERE tune_ref = ${tune.id} 
+          AND playlist_ref = ${playlistId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
       latest_due: sql<string | null>`(
         SELECT due 
-        FROM ${practiceRecord} 
-        WHERE ${practiceRecord.tuneRef} = ${tune.id} 
-          AND ${practiceRecord.playlistRef} = ${playlistId}
+        FROM practice_record
+        WHERE tune_ref = ${tune.id} 
+          AND playlist_ref = ${playlistId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
       latest_stability: sql<number | null>`(
         SELECT stability 
-        FROM ${practiceRecord} 
-        WHERE ${practiceRecord.tuneRef} = ${tune.id} 
-          AND ${practiceRecord.playlistRef} = ${playlistId}
+        FROM practice_record
+        WHERE tune_ref = ${tune.id} 
+          AND playlist_ref = ${playlistId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
       latest_difficulty: sql<number | null>`(
         SELECT difficulty 
-        FROM ${practiceRecord} 
-        WHERE ${practiceRecord.tuneRef} = ${tune.id} 
-          AND ${practiceRecord.playlistRef} = ${playlistId}
+        FROM practice_record
+        WHERE tune_ref = ${tune.id} 
+          AND playlist_ref = ${playlistId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
       latest_state: sql<number | null>`(
         SELECT state 
-        FROM ${practiceRecord} 
-        WHERE ${practiceRecord.tuneRef} = ${tune.id} 
-          AND ${practiceRecord.playlistRef} = ${playlistId}
+        FROM practice_record
+        WHERE tune_ref = ${tune.id} 
+          AND playlist_ref = ${playlistId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -364,6 +365,8 @@ export async function getDueTunesLegacy(
         latest_practiced: row.latest_practiced,
         tune: {
           id: row.tuneRef,
+          idForeign: null, // Not available in practice_list_staged view
+          primaryOrigin: null, // Not available in practice_list_staged view
           title: row.title,
           type: row.type,
           mode: row.mode,
@@ -403,6 +406,8 @@ export async function getDueTunesLegacy(
         latest_practiced: row.latest_practiced,
         tune: {
           id: row.tuneRef,
+          idForeign: null, // Not available in practice_list_staged view
+          primaryOrigin: null, // Not available in practice_list_staged view
           title: row.title,
           type: row.type,
           mode: row.mode,
@@ -461,7 +466,7 @@ export async function getDueTunesLegacy(
 export async function getDailyPracticeQueue(
   _db: SqliteDatabase,
   _userId: string,
-  _playlistId: number,
+  _playlistId: string,
   _queueDate: Date = new Date()
 ): Promise<DailyPracticeQueue[]> {
   // TODO: Get user_profile.id from Supabase UUID
@@ -516,8 +521,8 @@ export async function getDailyPracticeQueue(
  */
 export async function getLatestPracticeRecord(
   db: SqliteDatabase,
-  tuneId: number,
-  playlistId: number
+  tuneId: string,
+  playlistId: string
 ): Promise<PracticeRecord | null> {
   const results = await db
     .select()
@@ -553,7 +558,7 @@ export async function getUserPreferences(
   // TODO: Get user_profile.id from Supabase UUID
   // For now, return default FSRS preferences
   return {
-    userId: 1, // Placeholder
+    userId: _userId, // Use the UUID directly
     algType: "FSRS",
     fsrsWeights: null,
     requestRetention: 0.9,
@@ -597,8 +602,8 @@ export async function getUserPreferences(
  */
 export async function getPracticeHistory(
   db: SqliteDatabase,
-  tuneId: number,
-  playlistId: number,
+  tuneId: string,
+  playlistId: string,
   limit?: number
 ): Promise<PracticeRecordWithTune[]> {
   let query = db
@@ -629,6 +634,8 @@ export async function getPracticeHistory(
       // Tune fields
       tune: {
         id: tune.id,
+        idForeign: tune.idForeign,
+        primaryOrigin: tune.primaryOrigin,
         title: tune.title,
         type: tune.type,
         mode: tune.mode,
@@ -694,13 +701,13 @@ export async function getPracticeHistory(
  */
 export async function addTunesToPracticeQueue(
   db: SqliteDatabase,
-  playlistId: number,
-  tuneIds: number[]
-): Promise<{ added: number; skipped: number; tuneIds: number[] }> {
+  playlistId: string,
+  tuneIds: string[]
+): Promise<{ added: number; skipped: number; tuneIds: string[] }> {
   const now = new Date().toISOString();
   let added = 0;
   let skipped = 0;
-  const addedTuneIds: number[] = [];
+  const addedTuneIds: string[] = [];
 
   for (const tuneId of tuneIds) {
     try {
@@ -709,7 +716,7 @@ export async function addTunesToPracticeQueue(
         .update(playlistTune)
         .set({
           scheduled: now,
-          syncVersion: sql`${playlistTune.syncVersion} + 1`,
+          syncVersion: sql.raw(`sync_version + 1`),
           lastModifiedAt: now,
         })
         .where(
@@ -751,6 +758,7 @@ export async function addTunesToPracticeQueue(
           const newRecord = await db
             .insert(practiceRecord)
             .values({
+              id: generateId(),
               playlistRef: playlistId,
               tuneRef: tuneId,
               practiced: null,
@@ -854,7 +862,7 @@ export async function addTunesToPracticeQueue(
  */
 export async function getPracticeRecords(
   db: SqliteDatabase,
-  playlistId: number,
+  playlistId: string,
   limit = 100
 ): Promise<PracticeRecordWithTune[]> {
   const results = await db
@@ -885,6 +893,8 @@ export async function getPracticeRecords(
       // Tune fields
       tune: {
         id: tune.id,
+        idForeign: tune.idForeign,
+        primaryOrigin: tune.primaryOrigin,
         title: tune.title,
         type: tune.type,
         mode: tune.mode,

@@ -7,6 +7,7 @@
 
 import { eq } from "drizzle-orm";
 import type { DockPosition } from "@/components/layout/SidebarDockContext";
+import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { tabGroupMainState } from "../schema";
 
@@ -16,12 +17,12 @@ export interface TabState {
   whichTab: TabId;
   sidebarCollapsed?: boolean;
   sidebarDockPosition?: DockPosition;
-  playlistId?: number;
+  playlistId?: string;
 }
 
 export async function getTabState(
   db: SqliteDatabase,
-  userId: number
+  userId: string
 ): Promise<TabState> {
   const result = await db
     .select({
@@ -53,7 +54,7 @@ export async function getTabState(
 
 export async function saveActiveTab(
   db: SqliteDatabase,
-  userId: number,
+  userId: string,
   tabId: TabId
 ): Promise<void> {
   const existing = await db
@@ -76,6 +77,7 @@ export async function saveActiveTab(
     await db
       .insert(tabGroupMainState)
       .values({
+        id: generateId(),
         userId,
         whichTab: tabId,
         lastModifiedAt: new Date().toISOString(),

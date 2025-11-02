@@ -100,8 +100,8 @@ export interface PlaylistWithSummary extends Playlist {
  */
 export interface PlaylistTuneWithDetails {
   // PlaylistTune fields
-  playlist_ref: number;
-  tune_ref: number;
+  playlist_ref: string; // UUID
+  tune_ref: string; // UUID
   deleted: boolean | null;
   current: string | null;
 
@@ -141,15 +141,15 @@ export interface CreateTuneInput {
   mode?: string;
   structure?: string;
   incipit?: string;
-  genre?: string;
-  privateFor?: number; // User ID reference (integer in SQLite)
+  genre?: string; // UUID
+  privateFor?: string; // User UUID (was integer)
 }
 
 /**
  * Input for updating an existing tune
  */
 export interface UpdateTuneInput extends Partial<CreateTuneInput> {
-  id: number;
+  id: string; // UUID (was integer)
 }
 
 /**
@@ -157,24 +157,24 @@ export interface UpdateTuneInput extends Partial<CreateTuneInput> {
  */
 export interface CreatePlaylistInput {
   user_ref: string; // User UUID
-  instrument?: string;
-  genre?: string;
-  annotation_set_ref?: number;
+  instrument?: string; // UUID
+  genre?: string; // UUID
+  annotation_set_ref?: string; // UUID (was integer)
 }
 
 /**
  * Input for updating a playlist
  */
 export interface UpdatePlaylistInput extends Partial<CreatePlaylistInput> {
-  playlist_id: number;
+  id: string; // UUID (renamed from playlist_id)
 }
 
 /**
  * Input for adding a tune to a playlist
  */
 export interface AddTuneToPlaylistInput {
-  playlist_ref: number;
-  tune_ref: number;
+  playlist_ref: string; // UUID (was integer)
+  tune_ref: string; // UUID (was integer)
 }
 
 // ============================================================================
@@ -293,8 +293,8 @@ export interface PracticeRecordWithTune extends PracticeRecord {
  * Input for recording a practice session
  */
 export interface RecordPracticeInput {
-  playlistRef: number;
-  tuneRef: number;
+  playlistRef: string; // UUID (was integer)
+  tuneRef: string; // UUID (was integer)
   quality: number; // Rating quality (1-4 for FSRS: Again, Hard, Good, Easy)
   practiced: Date; // Practice session date/time
   goal?: string; // Practice goal (recall, initial_learn, fluency, etc.)
@@ -371,5 +371,5 @@ export type WithoutDeleted<T> = Omit<T, "deleted">;
 /**
  * Make all fields optional except ID
  */
-export type PartialExceptId<T extends { id: number }> = Partial<T> &
+export type PartialExceptId<T extends { id: string }> = Partial<T> &
   Pick<T, "id">;

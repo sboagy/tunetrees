@@ -249,9 +249,9 @@ export class TuneTreesPage {
 
   /**
    * Find a tune row by ID in a specific grid
-   * Useful for checking private tunes (ID 9001, 9002, etc.)
+   * Useful for checking private tunes (UUIDs)
    */
-  async getTuneRowById(tuneId: number, grid: Locator): Promise<Locator> {
+  async getTuneRowById(tuneId: string, grid: Locator): Promise<Locator> {
     return grid.locator(`tr:has-text("${tuneId}")`);
   }
 

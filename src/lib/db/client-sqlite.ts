@@ -13,6 +13,15 @@ import initSqlJs from "sql.js";
 import * as relations from "../../../drizzle/relations";
 import * as schema from "../../../drizzle/schema-sqlite";
 import { initializeViews, recreateViews } from "./init-views";
+import {
+  clearLocalDatabaseForMigration,
+  clearMigrationParams,
+  getCurrentSchemaVersion,
+  getLocalSchemaVersion,
+  isForcedReset,
+  needsMigration,
+  setLocalSchemaVersion,
+} from "./migration-version";
 
 /**
  * SQLite WASM instance
@@ -62,6 +71,32 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
 
   console.log("🔧 Initializing SQLite WASM database...");
 
+  // Check if schema migration is needed (e.g., integer IDs → UUIDs)
+  const migrationNeeded = needsMigration();
+  const forcedReset = isForcedReset();
+
+  if (migrationNeeded) {
+    const localVersion = getLocalSchemaVersion();
+    const currentVersion = getCurrentSchemaVersion();
+
+    if (forcedReset) {
+      console.warn(
+        "🔄 FORCED RESET via URL parameter - clearing all local data"
+      );
+    } else {
+      console.warn(
+        `⚠️ Schema migration detected: ${
+          localVersion || "none"
+        } → ${currentVersion}`
+      );
+      console.warn("🔄 Clearing local database for migration...");
+    }
+
+    // Clear local data so new schema can be populated from Supabase
+    // Note: This happens before creating the drizzle instance
+    // Actual table clearing will happen after DB is initialized
+  }
+
   // Load sql.js WASM module
   const SQL = await initSqlJs({
     locateFile: (file: string) => `/sql-wasm/${file}`,
@@ -105,6 +140,8 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
     const migrations = [
       "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
       "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
+      "/drizzle/migrations/sqlite/0002_nappy_roland_deschain.sql",
+      "/drizzle/migrations/sqlite/0003_friendly_cerebro.sql",
     ];
 
     try {
@@ -160,7 +197,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
   try {
     sqliteDb.run(`
       CREATE TABLE IF NOT EXISTS sync_queue (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY NOT NULL,
         table_name TEXT NOT NULL,
         record_id TEXT NOT NULL,
         operation TEXT NOT NULL,
@@ -182,6 +219,33 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
 
   // Database is ready - sync will handle populating with real data from Supabase
   console.log("✅ SQLite WASM database ready");
+
+  // Handle schema migration if needed
+  if (migrationNeeded) {
+    console.log("🔄 Executing schema migration...");
+    try {
+      await clearLocalDatabaseForMigration(drizzleDb);
+      setLocalSchemaVersion(getCurrentSchemaVersion());
+      clearMigrationParams(); // Remove URL params like ?reset=true
+
+      if (forcedReset) {
+        console.log("✅ Forced reset complete. Local database cleared.");
+      } else {
+        console.log(
+          "✅ Schema migration complete. Ready for re-sync from Supabase."
+        );
+      }
+    } catch (error) {
+      console.error("❌ Migration failed:", error);
+      // Continue anyway - sync will handle populating data
+    }
+  } else {
+    // Ensure version is set even if no migration needed
+    const currentLocal = getLocalSchemaVersion();
+    if (!currentLocal) {
+      setLocalSchemaVersion(getCurrentSchemaVersion());
+    }
+  }
 
   // DEBUG: Check what data exists in tune table
   const tuneCount = sqliteDb.exec("SELECT COUNT(*) as count FROM tune");

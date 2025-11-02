@@ -16,7 +16,7 @@ export type TablePurpose = "scheduled" | "repertoire" | "catalog";
  */
 export interface ITuneOverview {
   // Tune basic info
-  id: number;
+  id: string;
   title: string | null;
   type: string | null;
   structure: string | null;
@@ -27,8 +27,8 @@ export interface ITuneOverview {
   deleted: number;
 
   // Playlist info
-  user_ref: number;
-  playlist_id: number;
+  user_ref: string;
+  playlist_id: string;
   instrument: string | null;
   learned: number | null;
   scheduled: number | null;

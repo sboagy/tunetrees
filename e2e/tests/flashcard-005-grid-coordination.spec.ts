@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { TEST_TUNE_MORRISON_ID } from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -15,7 +16,7 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
   test.beforeEach(async ({ page, testUser }) => {
     const testUserPrivateTune1 = testUser.userId;
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, 3497], // 2 tunes
+      repertoireTunes: [testUserPrivateTune1, TEST_TUNE_MORRISON_ID], // 2 tunes
       scheduleDaysAgo: 1, // Ensure both are due today
       startTab: "practice",
     });

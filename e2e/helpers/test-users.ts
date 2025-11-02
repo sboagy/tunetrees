@@ -9,61 +9,88 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "http://127.0.0.1:54321";
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
 const TEST_PASSWORD = "TestPassword123!";
 
-export interface TestUser {
+import {
+  TEST_PLAYLIST_ALICE_ID,
+  TEST_PLAYLIST_BOB_ID,
+  TEST_PLAYLIST_DAVE_ID,
+  TEST_PLAYLIST_EVE_ID,
+  TEST_PLAYLIST_FRANK_ID,
+  TEST_PLAYLIST_GRACE_ID,
+  TEST_PLAYLIST_HENRY_ID,
+  TEST_PLAYLIST_IRIS_ID,
+  TEST_USER_ALICE_EMAIL,
+  TEST_USER_ALICE_ID,
+  TEST_USER_BOB_EMAIL,
+  TEST_USER_BOB_ID,
+  TEST_USER_DAVE_EMAIL,
+  TEST_USER_DAVE_ID,
+  TEST_USER_EVE_EMAIL,
+  TEST_USER_EVE_ID,
+  TEST_USER_FRANK_EMAIL,
+  TEST_USER_FRANK_ID,
+  TEST_USER_GRACE_EMAIL,
+  TEST_USER_GRACE_ID,
+  TEST_USER_HENRY_EMAIL,
+  TEST_USER_HENRY_ID,
+  TEST_USER_IRIS_EMAIL,
+  TEST_USER_IRIS_ID,
+} from "../../tests/fixtures/test-data";
+
+export type TestUser = {
   email: string;
   name: string;
-  userId: number;
-  playlistId: number;
-}
+  userId: string;
+  playlistId: string;
+};
 
 export const TEST_USERS: Record<string, TestUser> = {
   bob: {
-    email: "bob.test@tunetrees.test",
-    name: "Bob Test",
-    userId: 9002,
-    playlistId: 9002,
+    email: TEST_USER_BOB_EMAIL,
+    name: "Bob",
+    userId: TEST_USER_BOB_ID,
+    playlistId: TEST_PLAYLIST_BOB_ID,
   },
   alice: {
-    email: "alice.test@tunetrees.test",
-    name: "Alice Test",
-    userId: 9001,
-    playlistId: 9001,
+    email: TEST_USER_ALICE_EMAIL,
+    name: "Alice",
+    userId: TEST_USER_ALICE_ID,
+    playlistId: TEST_PLAYLIST_ALICE_ID,
   },
   dave: {
-    email: "dave.test@tunetrees.test",
-    name: "Dave Test",
-    userId: 9004,
-    playlistId: 9004,
+    email: TEST_USER_DAVE_EMAIL,
+    name: "Dave",
+    userId: TEST_USER_DAVE_ID,
+    playlistId: TEST_PLAYLIST_DAVE_ID,
   },
   eve: {
-    email: "eve.test@tunetrees.test",
-    name: "Eve Test",
-    userId: 9005,
-    playlistId: 9005,
+    email: TEST_USER_EVE_EMAIL,
+    name: "Eve",
+    userId: TEST_USER_EVE_ID,
+    playlistId: TEST_PLAYLIST_EVE_ID,
   },
   frank: {
-    email: "frank.test@tunetrees.test",
-    name: "Frank Test",
-    userId: 9006,
-    playlistId: 9006,
+    email: TEST_USER_FRANK_EMAIL,
+    name: "Frank",
+    userId: TEST_USER_FRANK_ID,
+    playlistId: TEST_PLAYLIST_FRANK_ID,
   },
   grace: {
-    email: "grace.test@tunetrees.test",
-    name: "Grace Test",
-    userId: 9007,
-    playlistId: 9007,
+    email: TEST_USER_GRACE_EMAIL,
+    name: "Grace",
+    userId: TEST_USER_GRACE_ID,
+    playlistId: TEST_PLAYLIST_GRACE_ID,
   },
   henry: {
-    email: "henry.test@tunetrees.test",
-    name: "Henry Test",
-    userId: 9008,
-    playlistId: 9008,
+    email: TEST_USER_HENRY_EMAIL,
+    name: "Henry",
+    userId: TEST_USER_HENRY_ID,
+    playlistId: TEST_PLAYLIST_HENRY_ID,
   },
   iris: {
-    email: "iris.test@tunetrees.test",
-    name: "Iris Test",
-    userId: 9009,
-    playlistId: 9009,
+    email: TEST_USER_IRIS_EMAIL,
+    name: "Iris",
+    userId: TEST_USER_IRIS_ID,
+    playlistId: TEST_PLAYLIST_IRIS_ID,
   },
 };
 

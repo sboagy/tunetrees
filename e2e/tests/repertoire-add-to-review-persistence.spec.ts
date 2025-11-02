@@ -10,6 +10,10 @@
  */
 
 import { expect } from "@playwright/test";
+import {
+  CATALOG_TUNE_54_ID,
+  CATALOG_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 
@@ -18,7 +22,11 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     // Setup with 3 known tunes in repertoire
     await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
-      seedRepertoire: [testUser.userId, 3497, 54], // User's private tune, A Fig for a Kiss, Alasdruim's March
+      seedRepertoire: [
+        testUser.userId,
+        CATALOG_TUNE_MORRISON_ID,
+        CATALOG_TUNE_54_ID,
+      ], // User's private tune, Morrison's Jig, tune 54
     });
   });
 

@@ -15,8 +15,8 @@ import {
 } from "solid-js";
 
 interface CurrentPlaylistContextValue {
-  currentPlaylistId: () => number | null;
-  setCurrentPlaylistId: (id: number | null) => void;
+  currentPlaylistId: () => string | null;
+  setCurrentPlaylistId: (id: string | null) => void;
 }
 
 const CurrentPlaylistContext = createContext<CurrentPlaylistContextValue>();
@@ -39,7 +39,7 @@ const CurrentPlaylistContext = createContext<CurrentPlaylistContextValue>();
  * ```
  */
 export const CurrentPlaylistProvider: ParentComponent = (props) => {
-  const [currentPlaylistId, setCurrentPlaylistId] = createSignal<number | null>(
+  const [currentPlaylistId, setCurrentPlaylistId] = createSignal<string | null>(
     null
   );
 

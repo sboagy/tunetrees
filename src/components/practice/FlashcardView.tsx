@@ -26,15 +26,15 @@ import type { FlashcardFieldVisibilityByFace } from "./flashcard-fields";
 
 export interface FlashcardViewProps {
   tunes: ITuneOverview[];
-  onEvaluationChange?: (tuneId: number, value: string) => void;
+  onEvaluationChange?: (tuneId: string, value: string) => void;
   fieldVisibility?: FlashcardFieldVisibilityByFace;
   // Shared evaluation state (same as TunesGridScheduled)
-  evaluations?: Record<number, string>;
-  onEvaluationsChange?: (evals: Record<number, string>) => void;
+  evaluations?: Record<string, string>;
+  onEvaluationsChange?: (evals: Record<string, string>) => void;
   // For staging to table_transient_data
   localDb?: () => SqliteDatabase | null;
-  userId?: number;
-  playlistId?: number;
+  userId?: string;
+  playlistId?: string;
   // For incrementing sync version after staging
   incrementSyncVersion?: () => void;
 }

@@ -9,6 +9,12 @@
  */
 
 import { expect } from "@playwright/test";
+import {
+  CATALOG_TUNE_43_ID,
+  CATALOG_TUNE_54_ID,
+  CATALOG_TUNE_55_ID,
+  CATALOG_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 
@@ -55,12 +61,22 @@ test.describe("Catalog: Add To Repertoire - Fresh Database", () => {
     await page.getByTestId("tab-catalog").click();
 
     // Select tunes by ID (using IDs that exist in first page of catalog)
-    console.log("🎯 Selecting tunes with IDs: 3497, 43, 54, 55");
+    console.log(
+      `🎯 Selecting tunes with IDs: ${CATALOG_TUNE_MORRISON_ID}, ${CATALOG_TUNE_43_ID}, ${CATALOG_TUNE_54_ID}, ${CATALOG_TUNE_55_ID}`
+    );
 
-    const tune1 = page.getByRole("checkbox", { name: "Select row 3497" });
-    const tune2 = page.getByRole("checkbox", { name: "Select row 43" });
-    const tune3 = page.getByRole("checkbox", { name: "Select row 54" });
-    const tune4 = page.getByRole("checkbox", { name: "Select row 55" });
+    const tune1 = page.getByRole("checkbox", {
+      name: `Select row ${CATALOG_TUNE_MORRISON_ID}`,
+    });
+    const tune2 = page.getByRole("checkbox", {
+      name: `Select row ${CATALOG_TUNE_43_ID}`,
+    });
+    const tune3 = page.getByRole("checkbox", {
+      name: `Select row ${CATALOG_TUNE_54_ID}`,
+    });
+    const tune4 = page.getByRole("checkbox", {
+      name: `Select row ${CATALOG_TUNE_55_ID}`,
+    });
 
     await tune1.check();
     await page.waitForTimeout(300);

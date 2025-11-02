@@ -1,4 +1,9 @@
 import { expect } from "@playwright/test";
+import {
+  TEST_TUNE_BANISH_ID,
+  TEST_TUNE_MASONS_ID,
+  TEST_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -11,10 +16,13 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe.serial("Flashcard Feature: Evaluations", () => {
   test.beforeEach(async ({ page, testUser }) => {
-    const testUserPrivateTune1 = testUser.userId;
-    const testUserPrivateTune2 = testUser.userId + 10000;
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, testUserPrivateTune2, 3497], // 3 tunes that exist in seed data
+      repertoireTunes: [
+        TEST_TUNE_BANISH_ID,
+        TEST_TUNE_MORRISON_ID,
+        TEST_TUNE_MASONS_ID,
+      ], // 3 tunes that exist in seed data
+      scheduleDaysAgo: 1,
       startTab: "practice",
     });
   });

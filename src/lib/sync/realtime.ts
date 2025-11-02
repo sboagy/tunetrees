@@ -20,13 +20,14 @@ import type { SyncEngine } from "./engine";
 import type { SyncableTable } from "./queue";
 
 // Debug flag for realtime logging
-const REALTIME_DEBUG = import.meta.env.VITE_SYNC_DEBUG === 'true';
+const REALTIME_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
 const realtimeLog = (...args: any[]) => REALTIME_DEBUG && console.log(...args);
 
 export interface RealtimeConfig {
   enabled: boolean;
   tables: SyncableTable[];
-  userId: number | null;
+  // Supabase Auth user id (UUID string)
+  userId: string | null;
   onConnected?: () => void;
   onDisconnected?: () => void;
   onError?: (error: Error) => void;

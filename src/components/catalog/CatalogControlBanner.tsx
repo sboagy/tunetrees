@@ -72,7 +72,7 @@ export interface CatalogToolbarProps {
   /** Table instance for accessing selected rows */
   table?: Table<ITuneOverview>;
   /** Playlist ID for adding tunes to repertoire */
-  playlistId?: number;
+  playlistId?: string;
 }
 
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {

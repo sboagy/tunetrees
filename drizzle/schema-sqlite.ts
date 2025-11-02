@@ -11,14 +11,14 @@ import {
 export const dailyPracticeQueue = sqliteTable(
   "daily_practice_queue",
   {
-    id: integer().primaryKey({ autoIncrement: true }).notNull(),
-    userRef: integer("user_ref").notNull(),
-    playlistRef: integer("playlist_ref").notNull(),
+    id: text().primaryKey().notNull(), // UUID
+    userRef: text("user_ref").notNull(), // UUID FK
+    playlistRef: text("playlist_ref").notNull(), // UUID FK
     mode: text(),
     queueDate: text("queue_date"),
     windowStartUtc: text("window_start_utc").notNull(),
     windowEndUtc: text("window_end_utc").notNull(),
-    tuneRef: integer("tune_ref").notNull(),
+    tuneRef: text("tune_ref").notNull(), // UUID FK
     bucket: integer().notNull(),
     orderIndex: integer("order_index").notNull(),
     snapshotCoalescedTs: text("snapshot_coalesced_ts").notNull(),
@@ -62,7 +62,7 @@ export const dailyPracticeQueue = sqliteTable(
 );
 
 export const genre = sqliteTable("genre", {
-  id: text().primaryKey().notNull(),
+  id: text().primaryKey().notNull(), // UUID (was TEXT semantic ID)
   name: text(),
   region: text(),
   description: text(),
@@ -73,10 +73,10 @@ export const genreTuneType = sqliteTable(
   {
     genreId: text("genre_id")
       .notNull()
-      .references(() => genre.id),
+      .references(() => genre.id), // UUID FK
     tuneTypeId: text("tune_type_id")
       .notNull()
-      .references(() => tuneType.id),
+      .references(() => tuneType.id), // UUID FK
   },
   (table) => [
     primaryKey({
@@ -89,11 +89,13 @@ export const genreTuneType = sqliteTable(
 export const instrument = sqliteTable(
   "instrument",
   {
-    id: integer().primaryKey({ autoIncrement: true }).notNull(),
-    privateToUser: integer("private_to_user").references(() => userProfile.id),
+    id: text().primaryKey().notNull(), // UUID
+    privateToUser: text("private_to_user").references(
+      () => userProfile.supabaseUserId
+    ), // UUID FK
     instrument: text(),
     description: text(),
-    genreDefault: text("genre_default"),
+    genreDefault: text("genre_default"), // UUID FK to genre
     deleted: integer().default(0).notNull(),
     syncVersion: integer("sync_version").default(1).notNull(),
     lastModifiedAt: text("last_modified_at").notNull(),
@@ -112,12 +114,12 @@ export const instrument = sqliteTable(
 export const note = sqliteTable(
   "note",
   {
-    id: integer().primaryKey({ autoIncrement: true }).notNull(),
-    userRef: integer("user_ref").references(() => userProfile.id),
-    tuneRef: integer("tune_ref")
+    id: text().primaryKey().notNull(), // UUID
+    userRef: text("user_ref").references(() => userProfile.supabaseUserId), // UUID FK
+    tuneRef: text("tune_ref")
       .notNull()
-      .references(() => tune.id),
-    playlistRef: integer("playlist_ref").references(() => playlist.playlistId),
+      .references(() => tune.id), // UUID FK
+    playlistRef: text("playlist_ref").references(() => playlist.playlistId), // UUID FK
     createdDate: text("created_date"),
     noteText: text("note_text"),
     public: integer().default(0).notNull(),
@@ -142,15 +144,13 @@ export const note = sqliteTable(
 export const playlist = sqliteTable(
   "playlist",
   {
-    playlistId: integer("playlist_id")
-      .primaryKey({ autoIncrement: true })
-      .notNull(),
-    userRef: integer("user_ref")
+    playlistId: text("playlist_id").primaryKey().notNull(), // UUID
+    userRef: text("user_ref")
       .notNull()
-      .references(() => userProfile.id),
+      .references(() => userProfile.supabaseUserId), // UUID FK
     name: text(),
-    instrumentRef: integer("instrument_ref"),
-    genreDefault: text("genre_default").references(() => genre.id),
+    instrumentRef: text("instrument_ref"), // UUID FK
+    genreDefault: text("genre_default").references(() => genre.id), // UUID FK
     srAlgType: text("sr_alg_type"),
     deleted: integer().default(0).notNull(),
     syncVersion: integer("sync_version").default(1).notNull(),
@@ -168,12 +168,12 @@ export const playlist = sqliteTable(
 export const playlistTune = sqliteTable(
   "playlist_tune",
   {
-    playlistRef: integer("playlist_ref")
+    playlistRef: text("playlist_ref")
       .notNull()
-      .references(() => playlist.playlistId),
-    tuneRef: integer("tune_ref")
+      .references(() => playlist.playlistId), // UUID FK
+    tuneRef: text("tune_ref")
       .notNull()
-      .references(() => tune.id),
+      .references(() => tune.id), // UUID FK
     current: text(),
     learned: text(),
     scheduled: text(),
@@ -194,13 +194,13 @@ export const playlistTune = sqliteTable(
 export const practiceRecord = sqliteTable(
   "practice_record",
   {
-    id: integer().primaryKey({ autoIncrement: true }).notNull(),
-    playlistRef: integer("playlist_ref")
+    id: text().primaryKey().notNull(), // UUID
+    playlistRef: text("playlist_ref")
       .notNull()
-      .references(() => playlist.playlistId),
-    tuneRef: integer("tune_ref")
+      .references(() => playlist.playlistId), // UUID FK
+    tuneRef: text("tune_ref")
       .notNull()
-      .references(() => tune.id),
+      .references(() => tune.id), // UUID FK
     practiced: text(),
     quality: integer(),
     easiness: real(),
@@ -237,10 +237,10 @@ export const practiceRecord = sqliteTable(
 );
 
 export const prefsSchedulingOptions = sqliteTable("prefs_scheduling_options", {
-  userId: integer("user_id")
+  userId: text("user_id")
     .primaryKey()
     .notNull()
-    .references(() => userProfile.id),
+    .references(() => userProfile.supabaseUserId), // UUID FK
   acceptableDelinquencyWindow: integer("acceptable_delinquency_window")
     .default(21)
     .notNull(),
@@ -257,9 +257,9 @@ export const prefsSchedulingOptions = sqliteTable("prefs_scheduling_options", {
 export const prefsSpacedRepetition = sqliteTable(
   "prefs_spaced_repetition",
   {
-    userId: integer("user_id")
+    userId: text("user_id")
       .notNull()
-      .references(() => userProfile.id),
+      .references(() => userProfile.supabaseUserId), // UUID FK
     algType: text("alg_type").notNull(),
     fsrsWeights: text("fsrs_weights"),
     requestRetention: real("request_retention"),
@@ -282,13 +282,13 @@ export const prefsSpacedRepetition = sqliteTable(
 export const reference = sqliteTable(
   "reference",
   {
-    id: integer().primaryKey({ autoIncrement: true }).notNull(),
+    id: text().primaryKey().notNull(), // UUID
     url: text().notNull(),
     refType: text("ref_type"),
-    tuneRef: integer("tune_ref")
+    tuneRef: text("tune_ref")
       .notNull()
-      .references(() => tune.id),
-    userRef: integer("user_ref").references(() => userProfile.id),
+      .references(() => tune.id), // UUID FK
+    userRef: text("user_ref").references(() => userProfile.supabaseUserId), // UUID FK
     comment: text(),
     title: text(),
     public: integer(),
@@ -310,9 +310,9 @@ export const reference = sqliteTable(
 );
 
 export const syncQueue = sqliteTable("sync_queue", {
-  id: integer().primaryKey({ autoIncrement: true }).notNull(),
+  id: text().primaryKey().notNull(), // UUID
   tableName: text("table_name").notNull(),
-  recordId: text("record_id").notNull(),
+  recordId: text("record_id").notNull(), // UUID of the record being synced
   operation: text().notNull(),
   data: text(),
   status: text().default("pending").notNull(),
@@ -323,12 +323,12 @@ export const syncQueue = sqliteTable("sync_queue", {
 });
 
 export const tabGroupMainState = sqliteTable("tab_group_main_state", {
-  id: integer().primaryKey({ autoIncrement: true }).notNull(),
-  userId: integer("user_id")
+  id: text().primaryKey().notNull(), // UUID
+  userId: text("user_id")
     .notNull()
-    .references(() => userProfile.id),
+    .references(() => userProfile.supabaseUserId), // UUID FK
   whichTab: text("which_tab").default("practice"),
-  playlistId: integer("playlist_id"),
+  playlistId: text("playlist_id"), // UUID FK
   tabSpec: text("tab_spec"),
   practiceShowSubmitted: integer("practice_show_submitted").default(0),
   practiceModeFlashcard: integer("practice_mode_flashcard").default(0),
@@ -341,16 +341,16 @@ export const tabGroupMainState = sqliteTable("tab_group_main_state", {
 export const tableState = sqliteTable(
   "table_state",
   {
-    userId: integer("user_id")
+    userId: text("user_id")
       .notNull()
-      .references(() => userProfile.id),
+      .references(() => userProfile.supabaseUserId), // UUID FK
     screenSize: text("screen_size").notNull(),
     purpose: text().notNull(),
-    playlistId: integer("playlist_id")
+    playlistId: text("playlist_id")
       .notNull()
-      .references(() => playlist.playlistId),
+      .references(() => playlist.playlistId), // UUID FK
     settings: text(),
-    currentTune: integer("current_tune"),
+    currentTune: text("current_tune"), // UUID
     syncVersion: integer("sync_version").default(1).notNull(),
     lastModifiedAt: text("last_modified_at").notNull(),
     deviceId: text("device_id"),
@@ -371,15 +371,15 @@ export const tableState = sqliteTable(
 export const tableTransientData = sqliteTable(
   "table_transient_data",
   {
-    userId: integer("user_id")
+    userId: text("user_id")
       .notNull()
-      .references(() => userProfile.id),
-    tuneId: integer("tune_id")
+      .references(() => userProfile.supabaseUserId), // UUID FK
+    tuneId: text("tune_id")
       .notNull()
-      .references(() => tune.id),
-    playlistId: integer("playlist_id")
+      .references(() => tune.id), // UUID FK
+    playlistId: text("playlist_id")
       .notNull()
-      .references(() => playlist.playlistId),
+      .references(() => playlist.playlistId), // UUID FK
     purpose: text(),
     notePrivate: text("note_private"),
     notePublic: text("note_public"),
@@ -412,13 +412,13 @@ export const tableTransientData = sqliteTable(
 export const tag = sqliteTable(
   "tag",
   {
-    tagId: integer("tag_id").primaryKey({ autoIncrement: true }).notNull(),
-    userRef: integer("user_ref")
+    id: text().primaryKey().notNull(), // UUID (renamed from tagId)
+    userRef: text("user_ref")
       .notNull()
-      .references(() => userProfile.id),
-    tuneRef: integer("tune_ref")
+      .references(() => userProfile.supabaseUserId), // UUID FK
+    tuneRef: text("tune_ref")
       .notNull()
-      .references(() => tune.id),
+      .references(() => tune.id), // UUID FK
     tagText: text("tag_text").notNull(),
     syncVersion: integer("sync_version").default(1).notNull(),
     lastModifiedAt: text("last_modified_at").notNull(),
@@ -436,14 +436,16 @@ export const tag = sqliteTable(
 );
 
 export const tune = sqliteTable("tune", {
-  id: integer().primaryKey({ autoIncrement: true }).notNull(),
+  id: text().primaryKey().notNull(), // UUID
+  idForeign: integer("id_foreign"), // Legacy integer ID for provenance tracking (nullable, non-unique)
+  primaryOrigin: text("primary_origin").default("irishtune.info"), // Source: 'irishtune.info', 'user_created', etc.
   title: text(),
   type: text(),
   structure: text(),
   mode: text(),
   incipit: text(),
-  genre: text().references(() => genre.id),
-  privateFor: integer("private_for").references(() => userProfile.id),
+  genre: text().references(() => genre.id), // UUID FK
+  privateFor: text("private_for").references(() => userProfile.supabaseUserId), // UUID FK
   deleted: integer().default(0).notNull(),
   syncVersion: integer("sync_version").default(1).notNull(),
   lastModifiedAt: text("last_modified_at").notNull(),
@@ -451,17 +453,17 @@ export const tune = sqliteTable("tune", {
 });
 
 export const tuneOverride = sqliteTable("tune_override", {
-  id: integer().primaryKey({ autoIncrement: true }).notNull(),
-  tuneRef: integer("tune_ref")
+  id: text().primaryKey().notNull(), // UUID
+  tuneRef: text("tune_ref")
     .notNull()
-    .references(() => tune.id),
-  userRef: integer("user_ref")
+    .references(() => tune.id), // UUID FK
+  userRef: text("user_ref")
     .notNull()
-    .references(() => userProfile.id),
+    .references(() => userProfile.supabaseUserId), // UUID FK
   title: text(),
   type: text(),
   structure: text(),
-  genre: text().references(() => genre.id),
+  genre: text().references(() => genre.id), // UUID FK
   mode: text(),
   incipit: text(),
   deleted: integer().default(0).notNull(),
@@ -471,7 +473,7 @@ export const tuneOverride = sqliteTable("tune_override", {
 });
 
 export const tuneType = sqliteTable("tune_type", {
-  id: text().primaryKey().notNull(),
+  id: text().primaryKey().notNull(), // UUID (was TEXT semantic ID)
   name: text(),
   rhythm: text(),
   description: text(),
@@ -480,8 +482,8 @@ export const tuneType = sqliteTable("tune_type", {
 export const userProfile = sqliteTable(
   "user_profile",
   {
-    id: integer().primaryKey({ autoIncrement: true }).notNull(),
-    supabaseUserId: text("supabase_user_id").notNull(),
+    id: text().notNull(), // UUID (matches PostgreSQL, but not used as PK in SQLite)
+    supabaseUserId: text("supabase_user_id").primaryKey().notNull(), // UUID PK
     name: text(),
     email: text(),
     srAlgType: text("sr_alg_type"),

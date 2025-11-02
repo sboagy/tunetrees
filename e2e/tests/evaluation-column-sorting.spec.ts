@@ -9,6 +9,7 @@
  */
 
 import { expect } from "@playwright/test";
+import { TEST_TUNE_MORRISON_ID } from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 
@@ -16,7 +17,7 @@ test.describe("Evaluation Column Sorting Disabled", () => {
   test.beforeEach(async ({ page, testUser }) => {
     // Fast setup: seed 2 tunes, start on practice tab
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUser.userId, 3497],
+      repertoireTunes: [testUser.userId, TEST_TUNE_MORRISON_ID],
       startTab: "practice",
     });
   });

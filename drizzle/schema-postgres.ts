@@ -20,12 +20,12 @@ import {
   pgTable,
   primaryKey,
   real,
-  serial,
   text,
   timestamp,
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { generateId } from "../src/lib/utils/uuid";
 import { pgSyncColumns } from "./sync-columns";
 
 // ============================================================================
@@ -37,10 +37,11 @@ import { pgSyncColumns } from "./sync-columns";
  *
  * Extends Supabase auth.users with app-specific fields.
  * The supabase_user_id is the source of truth (FK to auth.users).
- * The id field is kept for backward compatibility with existing foreign keys.
  */
 export const userProfile = pgTable("user_profile", {
-  id: serial("id").primaryKey(),
+  id: uuid("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
   supabaseUserId: uuid("supabase_user_id").notNull().unique(),
   name: text("name"),
   email: text("email"), // Denormalized from auth.users for queries
@@ -111,14 +112,18 @@ export const genreTuneType = pgTable(
  * Private tunes need sync columns for multi-device support.
  */
 export const tune = pgTable("tune", {
-  id: serial("id").primaryKey(),
+  id: uuid("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  idForeign: integer("id_foreign"), // Legacy integer ID for provenance tracking (nullable, non-unique)
+  primaryOrigin: text("primary_origin").default("irishtune.info"), // Source: 'irishtune.info', 'user_created', etc.
   title: text("title"),
   type: text("type"),
   structure: text("structure"),
   mode: text("mode"),
   incipit: text("incipit"), // ABC notation snippet
   genre: text("genre").references(() => genre.id),
-  privateFor: integer("private_for").references(() => userProfile.id),
+  privateFor: uuid("private_for").references(() => userProfile.id),
   deleted: boolean("deleted").default(false).notNull(),
 
   // Sync columns (needed for private tunes)
@@ -132,11 +137,13 @@ export const tune = pgTable("tune", {
  * User-specific overrides need sync columns.
  */
 export const tuneOverride = pgTable("tune_override", {
-  id: serial("id").primaryKey(),
-  tuneRef: integer("tune_ref")
+  id: uuid("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  tuneRef: uuid("tune_ref")
     .notNull()
     .references(() => tune.id),
-  userRef: integer("user_ref")
+  userRef: uuid("user_ref")
     .notNull()
     .references(() => userProfile.id),
   title: text("title"),
@@ -160,8 +167,10 @@ export const tuneOverride = pgTable("tune_override", {
 export const instrument = pgTable(
   "instrument",
   {
-    id: serial("id").primaryKey(),
-    privateToUser: integer("private_to_user").references(() => userProfile.id),
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    privateToUser: uuid("private_to_user").references(() => userProfile.id),
     instrument: text("instrument"),
     description: text("description"),
     genreDefault: text("genre_default"),
@@ -190,12 +199,14 @@ export const instrument = pgTable(
 export const playlist = pgTable(
   "playlist",
   {
-    playlistId: serial("playlist_id").primaryKey(),
-    userRef: integer("user_ref")
+    playlistId: uuid("playlist_id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    userRef: uuid("user_ref")
       .notNull()
       .references(() => userProfile.id),
     name: text("name"), // Playlist name (e.g., "My Irish Tunes")
-    instrumentRef: integer("instrument_ref"),
+    instrumentRef: uuid("instrument_ref"),
     genreDefault: text("genre_default").references(() => genre.id), // Default genre for this playlist
     srAlgType: text("sr_alg_type"), // 'SM2' | 'FSRS'
     deleted: boolean("deleted").default(false).notNull(),
@@ -215,10 +226,10 @@ export const playlist = pgTable(
 export const playlistTune = pgTable(
   "playlist_tune",
   {
-    playlistRef: integer("playlist_ref")
+    playlistRef: uuid("playlist_ref")
       .notNull()
       .references(() => playlist.playlistId),
-    tuneRef: integer("tune_ref")
+    tuneRef: uuid("tune_ref")
       .notNull()
       .references(() => tune.id),
     current: timestamp("current"),
@@ -242,11 +253,13 @@ export const playlistTune = pgTable(
 export const practiceRecord = pgTable(
   "practice_record",
   {
-    id: serial("id").primaryKey(),
-    playlistRef: integer("playlist_ref")
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    playlistRef: uuid("playlist_ref")
       .notNull()
       .references(() => playlist.playlistId),
-    tuneRef: integer("tune_ref")
+    tuneRef: uuid("tune_ref")
       .notNull()
       .references(() => tune.id),
     practiced: timestamp("practiced"),
@@ -289,14 +302,16 @@ export const practiceRecord = pgTable(
 export const dailyPracticeQueue = pgTable(
   "daily_practice_queue",
   {
-    id: serial("id").primaryKey(),
-    userRef: integer("user_ref").notNull(),
-    playlistRef: integer("playlist_ref").notNull(),
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    userRef: uuid("user_ref").notNull(),
+    playlistRef: uuid("playlist_ref").notNull(),
     mode: text("mode"),
     queueDate: timestamp("queue_date"),
     windowStartUtc: timestamp("window_start_utc").notNull(),
     windowEndUtc: timestamp("window_end_utc").notNull(),
-    tuneRef: integer("tune_ref").notNull(),
+    tuneRef: uuid("tune_ref").notNull(),
     bucket: integer("bucket").notNull(), // 0=new, 1=learning, 2=review
     orderIndex: integer("order_index").notNull(),
     snapshotCoalescedTs: timestamp("snapshot_coalesced_ts").notNull(),
@@ -349,12 +364,14 @@ export const dailyPracticeQueue = pgTable(
 export const note = pgTable(
   "note",
   {
-    id: serial("id").primaryKey(),
-    userRef: integer("user_ref").references(() => userProfile.id),
-    tuneRef: integer("tune_ref")
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    userRef: uuid("user_ref").references(() => userProfile.id),
+    tuneRef: uuid("tune_ref")
       .notNull()
       .references(() => tune.id),
-    playlistRef: integer("playlist_ref").references(() => playlist.playlistId),
+    playlistRef: uuid("playlist_ref").references(() => playlist.playlistId),
     createdDate: timestamp("created_date"),
     noteText: text("note_text"),
     public: boolean("public").default(false).notNull(),
@@ -373,8 +390,8 @@ export const note = pgTable(
       t.public
     ),
     index("idx_note_tune_user").on(t.tuneRef, t.userRef),
-    check("chk_public_bool", sql`public IN (true, false)`),
-    check("chk_favorite_bool", sql`favorite IN (true, false)`),
+    check("chk_public_bool", sql.raw(`"public" IN (true, false)`)),
+    check("chk_favorite_bool", sql.raw(`"favorite" IN (true, false)`)),
   ]
 );
 
@@ -386,13 +403,15 @@ export const note = pgTable(
 export const reference = pgTable(
   "reference",
   {
-    id: serial("id").primaryKey(),
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
     url: text("url").notNull(),
     refType: text("ref_type"), // 'website' | 'audio' | 'video'
-    tuneRef: integer("tune_ref")
+    tuneRef: uuid("tune_ref")
       .notNull()
       .references(() => tune.id),
-    userRef: integer("user_ref").references(() => userProfile.id),
+    userRef: uuid("user_ref").references(() => userProfile.id),
     comment: text("comment"),
     title: text("title"),
     public: boolean("public"),
@@ -406,9 +425,12 @@ export const reference = pgTable(
     index("idx_reference_tune_public").on(t.tuneRef, t.public),
     index("idx_reference_tune_user_ref").on(t.tuneRef, t.userRef),
     index("idx_reference_user_tune_public").on(t.userRef, t.tuneRef, t.public),
-    check("check_ref_type", sql`ref_type IN ('website', 'audio', 'video')`),
-    check("check_public", sql`public IN (true, false)`),
-    check("check_favorite", sql`favorite IN (true, false)`),
+    check(
+      "check_ref_type",
+      sql.raw(`ref_type IN ('website', 'audio', 'video')`)
+    ),
+    check("check_public", sql.raw(`"public" IN (true, false)`)),
+    check("check_favorite", sql.raw(`"favorite" IN (true, false)`)),
   ]
 );
 
@@ -420,11 +442,13 @@ export const reference = pgTable(
 export const tag = pgTable(
   "tag",
   {
-    tagId: serial("tag_id").primaryKey(),
-    userRef: integer("user_ref")
+    tagId: uuid("tag_id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    userRef: uuid("user_ref")
       .notNull()
       .references(() => userProfile.id),
-    tuneRef: integer("tune_ref")
+    tuneRef: uuid("tune_ref")
       .notNull()
       .references(() => tune.id),
     tagText: text("tag_text").notNull(),
@@ -451,7 +475,7 @@ export const tag = pgTable(
 export const prefsSpacedRepetition = pgTable(
   "prefs_spaced_repetition",
   {
-    userId: integer("user_id")
+    userId: uuid("user_id")
       .notNull()
       .references(() => userProfile.id),
     algType: text("alg_type").notNull(), // 'SM2' | 'FSRS'
@@ -467,7 +491,7 @@ export const prefsSpacedRepetition = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.userId, t.algType] }),
-    check("check_name", sql`alg_type IN ('SM2', 'FSRS')`),
+    check("check_name", sql.raw(`alg_type IN ('SM2', 'FSRS')`)),
   ]
 );
 
@@ -477,7 +501,7 @@ export const prefsSpacedRepetition = pgTable(
  * Per-user scheduling preferences (acceptable delinquency, min/max reviews, etc.).
  */
 export const prefsSchedulingOptions = pgTable("prefs_scheduling_options", {
-  userId: integer("user_id")
+  userId: uuid("user_id")
     .primaryKey()
     .references(() => userProfile.id),
   acceptableDelinquencyWindow: integer("acceptable_delinquency_window")
@@ -505,12 +529,14 @@ export const prefsSchedulingOptions = pgTable("prefs_scheduling_options", {
 export const tabGroupMainState = pgTable(
   "tab_group_main_state",
   {
-    id: serial("id").primaryKey(),
-    userId: integer("user_id")
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    userId: uuid("user_id")
       .notNull()
       .references(() => userProfile.id),
     whichTab: text("which_tab").default("practice"),
-    playlistId: integer("playlist_id"),
+    playlistId: uuid("playlist_id"),
     tabSpec: text("tab_spec"),
     practiceShowSubmitted: integer("practice_show_submitted").default(0),
     practiceModeFlashcard: integer("practice_mode_flashcard").default(0),
@@ -522,7 +548,7 @@ export const tabGroupMainState = pgTable(
   () => [
     check(
       "check_name",
-      sql`which_tab IN ('scheduled', 'repertoire', 'catalog', 'analysis')`
+      sql.raw(`which_tab IN ('scheduled', 'repertoire', 'catalog', 'analysis')`)
     ),
   ]
 );
@@ -535,16 +561,16 @@ export const tabGroupMainState = pgTable(
 export const tableState = pgTable(
   "table_state",
   {
-    userId: integer("user_id")
+    userId: uuid("user_id")
       .notNull()
       .references(() => userProfile.id),
     screenSize: text("screen_size").notNull(),
     purpose: text("purpose").notNull(),
-    playlistId: integer("playlist_id")
+    playlistId: uuid("playlist_id")
       .notNull()
       .references(() => playlist.playlistId),
     settings: text("settings"),
-    currentTune: integer("current_tune"),
+    currentTune: uuid("current_tune"),
 
     // Sync columns
     ...pgSyncColumns,
@@ -555,9 +581,9 @@ export const tableState = pgTable(
     }),
     check(
       "purpose_check",
-      sql`purpose IN ('practice', 'repertoire', 'catalog', 'analysis')`
+      sql.raw(`purpose IN ('practice', 'repertoire', 'catalog', 'analysis')`)
     ),
-    check("screen_size_check", sql`screen_size IN ('small', 'full')`),
+    check("screen_size_check", sql.raw(`screen_size IN ('small', 'full')`)),
   ]
 );
 
@@ -569,13 +595,13 @@ export const tableState = pgTable(
 export const tableTransientData = pgTable(
   "table_transient_data",
   {
-    userId: integer("user_id")
+    userId: uuid("user_id")
       .notNull()
       .references(() => userProfile.id),
-    tuneId: integer("tune_id")
+    tuneId: uuid("tune_id")
       .notNull()
       .references(() => tune.id),
-    playlistId: integer("playlist_id")
+    playlistId: uuid("playlist_id")
       .notNull()
       .references(() => playlist.playlistId),
     purpose: text("purpose"),

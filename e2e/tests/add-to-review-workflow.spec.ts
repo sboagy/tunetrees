@@ -1,4 +1,12 @@
 import { expect } from "@playwright/test";
+import {
+  CATALOG_TUNE_54_ID,
+  CATALOG_TUNE_55_ID,
+  CATALOG_TUNE_66_ID,
+  CATALOG_TUNE_70_ID,
+  CATALOG_TUNE_72_ID,
+  CATALOG_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 
@@ -14,7 +22,14 @@ test.describe("Add To Review - Complete Workflow", () => {
     // Setup deterministic state: seed 6 specific tunes in repertoire, unscheduled
     await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
-      seedRepertoire: [66, 70, 72, 3497, 54, 55], // Valid tune IDs
+      seedRepertoire: [
+        CATALOG_TUNE_66_ID,
+        CATALOG_TUNE_70_ID,
+        CATALOG_TUNE_72_ID,
+        CATALOG_TUNE_MORRISON_ID,
+        CATALOG_TUNE_54_ID,
+        CATALOG_TUNE_55_ID,
+      ], // Valid tune IDs
     });
 
     // STEP 1: Skip catalog, go directly to Repertoire (we seeded it)

@@ -55,8 +55,8 @@ function mapEvaluationToRating(evaluation: string): Rating {
  */
 async function getLatestPracticeRecord(
   db: SqliteDatabase,
-  tuneId: number,
-  playlistId: number
+  tuneId: string,
+  playlistId: string
 ): Promise<Card | null> {
   const result = await db.all<{
     stability: number | null;
@@ -131,9 +131,9 @@ async function getLatestPracticeRecord(
  */
 export async function stagePracticeEvaluation(
   db: SqliteDatabase,
-  userId: number,
-  playlistId: number,
-  tuneId: number,
+  userId: string,
+  playlistId: string,
+  tuneId: string,
   evaluation: string,
   goal: string = "recall",
   technique: string = ""
@@ -275,9 +275,9 @@ export async function stagePracticeEvaluation(
  */
 export async function clearStagedEvaluation(
   db: SqliteDatabase,
-  userId: number,
-  tuneId: number,
-  playlistId: number
+  userId: string,
+  tuneId: string,
+  playlistId: string
 ): Promise<void> {
   await db.run(sql`
     DELETE FROM table_transient_data
@@ -310,7 +310,7 @@ export async function clearStagedEvaluation(
  */
 export async function clearAllStagedForPlaylist(
   db: SqliteDatabase,
-  playlistId: number
+  playlistId: string
 ): Promise<void> {
   await db.run(sql`
     DELETE FROM table_transient_data

@@ -77,7 +77,7 @@ export interface RepertoireToolbarProps {
   /** Handler for Remove From Repertoire action */
   onRemoveFromRepertoire?: () => void;
   /** Playlist ID for adding tunes to practice queue */
-  playlistId?: number;
+  playlistId?: string;
 }
 
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {

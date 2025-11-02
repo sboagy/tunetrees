@@ -15,6 +15,20 @@
       "when": 1759798797266,
       "tag": "0001_thin_chronomancer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1762040440415,
+      "tag": "0002_nappy_roland_deschain",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1762044041103,
+      "tag": "0003_friendly_cerebro",
+      "breakpoints": true
     }
   ]
 }

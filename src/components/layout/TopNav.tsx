@@ -38,9 +38,9 @@ const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
     return playlist.name.trim();
   }
 
-  // Otherwise use instrument + id format
-  const instrument = playlist.instrumentName || "Unknown";
-  return `${instrument} (${playlist.playlistId})`;
+  // Otherwise just use instrument name
+  const instrument = playlist.instrumentName || "Unknown Instrument";
+  return instrument;
 };
 
 /**
@@ -158,7 +158,7 @@ const PlaylistDropdown: Component = () => {
     }
   });
 
-  const handlePlaylistSelect = (playlistId: number) => {
+  const handlePlaylistSelect = (playlistId: string) => {
     const userId = user()?.id;
     if (!userId) return;
 

@@ -4,11 +4,12 @@
  * This script migrates ALL data from tunetrees_production_manual.sqlite3 to Supabase.
  * It handles schema differences, creates Supabase Auth users, and preserves relationships.
  *
- * ARCHITECTURE:
- * - user.id (SQLite) → user_profile.id (PostgreSQL) - INTEGER preserved for FK compatibility
- * - Creates Supabase auth.users entry with UUID
- * - user_profile.supabase_user_id links to auth.users(id)
- * - All foreign keys use INTEGER IDs, not UUIDs
+ * ARCHITECTURE (UUID Migration):
+ * - ALL entity IDs are UUIDs (text type) in PostgreSQL
+ * - SQLite integer IDs are mapped to newly generated UUIDv7 values
+ * - UUIDv7 provides time-ordering while maintaining uniqueness
+ * - All foreign keys reference UUID strings, not integers
+ * - user.id (SQLite) → generated UUID → auth.users(id) and user_profile.id
  *
  * MIGRATION STRATEGY:
  * Phase 0: CLEANUP - Deletes all existing data in Supabase (clean slate)
@@ -37,13 +38,63 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
+import { execSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 import BetterSqlite3 from "better-sqlite3";
 import * as dotenv from "dotenv";
 import postgres from "postgres";
+import { getCatalogTuneUuid } from "../src/lib/db/catalog-tune-ids.js";
+import { generateId } from "../src/lib/utils/uuid.js";
 
-// Load environment variables
-dotenv.config({ path: ".env.production" });
+// ============================================================================
+// Helper: Get Service Role Key from Supabase
+// ============================================================================
+
+/**
+ * Get the service role key from the running Supabase instance
+ * This only works for local development (supabase start must be running)
+ */
+function getSupabaseServiceRoleKey(): string {
+  try {
+    const statusJson = execSync("supabase status --output json", {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const status = JSON.parse(statusJson);
+    return status.SERVICE_ROLE_KEY;
+  } catch {
+    throw new Error(
+      "Failed to get Supabase service role key. Make sure Supabase is running (supabase start)."
+    );
+  }
+}
+
+// ============================================================================
+// Parse Command Line Arguments
+// ============================================================================
+
+const args = process.argv.slice(2);
+const isRemote = args.includes("--remote");
+
+// Load environment variables based on target
+const envFile = isRemote ? ".env.production" : ".env.local";
+dotenv.config({ path: envFile });
+
+console.log(
+  `🎯 Target: ${isRemote ? "REMOTE (Production)" : "LOCAL (Development)"}`
+);
+console.log(`📄 Environment file: ${envFile}\n`);
+
+if (isRemote) {
+  console.log(
+    "⚠️  WARNING: You are about to migrate to the REMOTE production database!"
+  );
+  console.log(
+    "⚠️  This will DELETE all existing data in the remote Supabase instance!"
+  );
+  console.log("⚠️  Press Ctrl+C within 5 seconds to cancel...\n");
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+}
 
 // ============================================================================
 // Configuration
@@ -54,35 +105,60 @@ const BATCH_SIZE = 100; // For batch inserts
 const MIGRATION_DEVICE_ID = "data-migration-2025-10-05";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DATABASE_URL = process.env.DATABASE_URL; // Direct Postgres connection string
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error("❌ Missing Supabase credentials!");
-  console.error(
-    "Set VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.production"
-  );
+// Get service role key:
+// - For REMOTE: require it in .env.production (for safety)
+// - For LOCAL: dynamically fetch from running Supabase instance
+let SUPABASE_SERVICE_KEY: string;
+if (isRemote) {
+  // Remote: require explicit service role key in environment file
+  SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!SUPABASE_SERVICE_KEY) {
+    console.error("❌ Missing Supabase service role key!");
+    console.error(
+      `Set SUPABASE_SERVICE_ROLE_KEY in ${envFile} for remote migration`
+    );
+    process.exit(1);
+  }
+} else {
+  // Local: dynamically get from running Supabase instance
+  try {
+    SUPABASE_SERVICE_KEY = getSupabaseServiceRoleKey();
+    console.log("✓ Retrieved service role key from running Supabase instance");
+  } catch (error: any) {
+    console.error("❌ Failed to get service role key:", error.message);
+    console.error(
+      "Make sure Supabase is running locally with 'supabase start'"
+    );
+    process.exit(1);
+  }
+}
+
+if (!SUPABASE_URL) {
+  console.error("❌ Missing Supabase URL!");
+  console.error(`Set VITE_SUPABASE_URL in ${envFile}`);
   process.exit(1);
 }
 
 if (!DATABASE_URL) {
   console.error("❌ Missing DATABASE_URL!");
-  console.error(
-    "Set DATABASE_URL in .env.production for direct Postgres access"
-  );
+  console.error(`Set DATABASE_URL in ${envFile} for direct Postgres access`);
   process.exit(1);
 }
 
 // Get target user UUID from command line or use default
-const args = process.argv.slice(2);
 const userUuidArg = args.find((arg) => arg.startsWith("--user-uuid="));
 const DEFAULT_USER_UUID = "b2b64a0a-18d4-4d00-aecb-27f676defe31"; // Default to main user
 const TARGET_USER_UUID = userUuidArg?.split("=")[1] || DEFAULT_USER_UUID;
 
 if (!TARGET_USER_UUID) {
   console.error("❌ Missing target user UUID!");
-  console.error("Usage: npm run migrate:production -- --user-uuid=<your-uuid>");
+  console.error(
+    "Usage: npm run migrate:production -- --user-uuid=<your-uuid> [--remote]"
+  );
   console.error("\nGet your UUID from the home page after logging in.");
+  console.error("Add --remote flag to migrate to production instead of local.");
   process.exit(1);
 }
 
@@ -95,6 +171,9 @@ if (!UUID_REGEX.test(TARGET_USER_UUID)) {
 }
 
 console.log("🔧 Migration Configuration:");
+console.log(
+  `   Target: ${isRemote ? "REMOTE (Production)" : "LOCAL (Development)"}`
+);
 console.log(`   Source: ${SQLITE_DB_PATH}`);
 console.log(`   Target: Supabase PostgreSQL`);
 console.log(`   Your UUID: ${TARGET_USER_UUID}`);
@@ -115,11 +194,25 @@ const sql = postgres(DATABASE_URL, {
   onnotice: () => {}, // Suppress CASCADE notices
 });
 
-// User ID mapping: SQLite integer ID → { intId: preserved integer, uuid: Supabase auth UUID }
-const userIdMapping = new Map<number, { intId: number; uuid: string }>();
+// UUID Mapping: SQLite integer ID → Generated UUIDv7
+// These maps allow us to preserve foreign key relationships while migrating to UUIDs
+const userIdMapping = new Map<number, string>();
+const playlistIdMapping = new Map<number, string>();
+const tuneIdMapping = new Map<number, string>();
+const practiceRecordIdMapping = new Map<number, string>();
+const dailyPracticeQueueIdMapping = new Map<number, string>();
+const noteIdMapping = new Map<number, string>();
+const referenceIdMapping = new Map<string, string>(); // Key is URL (PK)
+const tagIdMapping = new Map<string, string>(); // Composite key: "user_ref:tune_ref:tag_text"
+// Note: tune_override uses (tune_ref, user_ref) as composite PK - no separate UUID
+const tableTransientDataIdMapping = new Map<number, string>();
+const tableStateIdMapping = new Map<number, string>();
+const tabGroupMainStateIdMapping = new Map<number, string>();
 
-// Instrument mapping: SQLite text → PostgreSQL integer ID
-const instrumentMapping = new Map<string, number>();
+// Instrument mapping: SQLite integer ID → Generated UUID
+const instrumentIdMapping = new Map<number, string>();
+// Also map instrument name → UUID for lookups
+const instrumentNameMapping = new Map<string, string>();
 
 // ============================================================================
 // Helper Functions
@@ -163,8 +256,11 @@ async function cleanupSupabaseTables() {
   console.log("Deleting in dependency order (children first)...\n");
 
   try {
-    // Use a single literal TRUNCATE with explicit identifiers to retain syntax checks
-    // and avoid identifier interpolation edge-cases.
+    // First, delete auth.users (this will cascade to user_profile due to FK)
+    await sql`DELETE FROM auth.users`;
+    console.log("✓ Deleted all auth.users records");
+
+    // Then truncate all public schema tables
     await sql`
       TRUNCATE TABLE
         "practice_record",
@@ -216,39 +312,28 @@ async function migrateUsers() {
   for (const user of users) {
     try {
       let supabaseAuthUserId: string;
+      let userProfileId: string;
 
-      if (user.id === 1) {
-        // User ID 1 maps to your existing Supabase auth user
-        supabaseAuthUserId = TARGET_USER_UUID!;
+      // Check if auth user already exists by email
+      const existingAuthUser = await sql<{ id: string }[]>`
+        SELECT id FROM auth.users WHERE email = ${user.email}
+      `;
+
+      if (existingAuthUser.length > 0) {
+        // User already exists - use their UUID
+        supabaseAuthUserId = existingAuthUser[0].id;
+        userProfileId = existingAuthUser[0].id;
         console.log(
-          `✓ User ${user.id} (${
-            user.email
-          }) → Using existing UUID ${TARGET_USER_UUID!}`
+          `✓ User ${user.id} (${user.email}) → Using existing auth user UUID ${supabaseAuthUserId}`
         );
       } else {
-        // Check if auth user already exists by email
-        const { data: existingUsers } = await supabase.auth.admin.listUsers();
-        const existingUser = existingUsers?.users.find(
-          (u: any) => u.email === user.email
-        );
-
-        if (existingUser) {
-          // User already exists from previous migration run
-          supabaseAuthUserId = existingUser.id;
-          console.log(
-            `✓ User ${user.id} (${user.email}) → Using existing UUID ${supabaseAuthUserId} (already exists)`
-          );
-        } else {
-          // Create new Supabase auth user
-          const tempPassword = `temp-${Math.random()
-            .toString(36)
-            .slice(2)}-${Date.now()}`;
-
-          const { data: authUser, error: authError } =
+        // Create auth user using Supabase Admin API (works with proper JWT service role key)
+        try {
+          const { data: authData, error: authError } =
             await supabase.auth.admin.createUser({
               email: user.email,
-              password: tempPassword,
-              email_confirm: true, // Skip email confirmation
+              password: "MigratedUser123!",
+              email_confirm: true,
               user_metadata: {
                 name: user.name,
                 migrated_from_sqlite: true,
@@ -259,56 +344,72 @@ async function migrateUsers() {
 
           if (authError) {
             console.error(
-              `✗ Failed to create auth user for ${user.email}:`,
-              authError
+              `✗ Failed to create auth user via Admin API for ${user.email}:`,
+              authError.message
             );
             continue;
           }
 
-          supabaseAuthUserId = authUser.user!.id;
+          if (!authData.user) {
+            console.error(
+              `✗ No user returned from Admin API for ${user.email}`
+            );
+            continue;
+          }
+
+          supabaseAuthUserId = authData.user.id;
+          userProfileId = authData.user.id;
+
           console.log(
-            `✓ User ${user.id} (${user.email}) → Created new UUID ${supabaseAuthUserId}`
+            `✓ User ${user.id} (${user.email}) → Created auth user UUID ${supabaseAuthUserId}`
           );
+        } catch (authApiError: any) {
+          console.error(
+            `✗ Failed to create auth user for ${user.email}:`,
+            authApiError.message
+          );
+          continue;
         }
       }
 
-      // Insert into user_profile with BOTH integer ID (preserved) and UUID
-      const { error: profileError } = await supabase
-        .from("user_profile")
-        .upsert(
-          {
-            id: user.id, // Preserve original integer ID for FK compatibility
-            supabase_user_id: supabaseAuthUserId,
-            name: user.name,
-            email: user.email,
-            sr_alg_type: user.sr_alg_type || null,
-            phone: user.phone || null,
-            phone_verified: sqliteTimestampToPostgres(user.phone_verified),
-            acceptable_delinquency_window:
-              user.acceptable_delinquency_window || 21,
-            deleted: false,
-            sync_version: 1,
-            last_modified_at: now(),
-            device_id: MIGRATION_DEVICE_ID,
-          },
-          {
-            onConflict: "supabase_user_id", // Prevent duplicates
-          }
+      // Insert into user_profile using direct SQL (bypasses PostgREST cache issue)
+      try {
+        console.log(
+          `Trying to insert into user_profile ${user.email} as ${userProfileId}`
         );
-
-      if (profileError) {
+        await sql`
+          INSERT INTO user_profile (
+            id, supabase_user_id, name, email, sr_alg_type, phone, phone_verified,
+            acceptable_delinquency_window, deleted, sync_version, last_modified_at, device_id
+          ) VALUES (
+            ${userProfileId}, ${supabaseAuthUserId}, ${user.name}, ${
+          user.email
+        },
+            ${user.sr_alg_type || null}, ${user.phone || null},
+            ${sqliteTimestampToPostgres(user.phone_verified)},
+            ${
+              user.acceptable_delinquency_window || 21
+            }, false, 1, ${now()}, ${MIGRATION_DEVICE_ID}
+          )
+          ON CONFLICT (supabase_user_id) DO UPDATE SET
+            name = EXCLUDED.name,
+            email = EXCLUDED.email,
+            sr_alg_type = EXCLUDED.sr_alg_type,
+            phone = EXCLUDED.phone,
+            phone_verified = EXCLUDED.phone_verified,
+            acceptable_delinquency_window = EXCLUDED.acceptable_delinquency_window,
+            last_modified_at = EXCLUDED.last_modified_at
+        `;
+      } catch (profileError: any) {
         console.error(
           `✗ Failed to insert user_profile for ${user.email}:`,
-          profileError
+          profileError.message
         );
         continue;
       }
 
-      // Store mapping
-      userIdMapping.set(user.id, {
-        intId: user.id, // Integer ID preserved
-        uuid: supabaseAuthUserId,
-      });
+      // Store mapping: SQLite integer ID → Generated UUID
+      userIdMapping.set(user.id, userProfileId);
     } catch (error) {
       console.error(`✗ Error migrating user ${user.id}:`, error);
     }
@@ -316,8 +417,9 @@ async function migrateUsers() {
 
   console.log(`\n✅ Migrated ${userIdMapping.size} users`);
   console.log(
-    `   User ID mapping: ${Array.from(userIdMapping.entries())
-      .map(([k, v]) => `${k}→${v.intId}`)
+    `   User ID mapping (first 5): ${Array.from(userIdMapping.entries())
+      .slice(0, 5)
+      .map(([k, v]) => `${k}→${v.substring(0, 8)}...`)
       .join(", ")}`
   );
 }
@@ -411,63 +513,53 @@ async function migrateReferenceData() {
     }
   }
 
-  // Instruments (TEXT in SQLite → need to migrate to INTEGER ID in PostgreSQL)
+  // Instruments (INTEGER in SQLite → UUID in PostgreSQL)
   console.log("\nMigrating instruments...");
   const instruments = sqlite
     .prepare("SELECT * FROM instrument WHERE deleted = 0")
     .all() as any[];
 
   if (instruments.length > 0) {
-    // First, get existing instruments from PostgreSQL to build mapping
-    const { data: existingInstruments } = await supabase
-      .from("instrument")
-      .select("id, instrument");
-
-    const existingMap = new Map<string, number>();
-    if (existingInstruments) {
-      existingInstruments.forEach((inst: any) => {
-        if (inst.instrument) {
-          existingMap.set(inst.instrument, inst.id);
-        }
-      });
-    }
-
     // Migrate each instrument
     for (const inst of instruments) {
       const instrumentName = inst.instrument;
 
-      // Check if it already exists
-      if (existingMap.has(instrumentName)) {
-        instrumentMapping.set(instrumentName, existingMap.get(instrumentName)!);
-        continue;
-      }
+      // Generate UUID for this instrument
+      const instrumentUuid = generateId();
+      instrumentIdMapping.set(inst.id, instrumentUuid);
+      instrumentNameMapping.set(instrumentName, instrumentUuid);
+
+      // Map private_to_user from integer ID to UUID
+      const privateToUserUuid = inst.private_to_user
+        ? userIdMapping.get(inst.private_to_user)
+        : null;
 
       // Insert new instrument
-      const { data, error } = await supabase
-        .from("instrument")
-        .insert({
-          id: inst.id,
-          private_to_user: inst.private_to_user || null,
-          instrument: instrumentName,
-          description: inst.description || null,
-          genre_default: inst.genre_default || null,
-          deleted: false,
-          sync_version: 1,
-          last_modified_at: now(),
-          device_id: MIGRATION_DEVICE_ID,
-        })
-        .select("id")
-        .single();
+      const { error } = await supabase.from("instrument").insert({
+        id: instrumentUuid, // UUID instead of integer
+        private_to_user: privateToUserUuid || null, // UUID reference
+        instrument: instrumentName,
+        description: inst.description || null,
+        genre_default: inst.genre_default || null,
+        deleted: false,
+        sync_version: 1,
+        last_modified_at: now(),
+        device_id: MIGRATION_DEVICE_ID,
+      });
 
       if (error) {
         console.error(`Error inserting instrument ${instrumentName}:`, error);
-      } else if (data) {
-        instrumentMapping.set(instrumentName, data.id);
-        console.log(`✓ Migrated instrument: ${instrumentName} → ID ${data.id}`);
+      } else {
+        console.log(
+          `✓ Migrated instrument: ${instrumentName} → UUID ${instrumentUuid.substring(
+            0,
+            8
+          )}...`
+        );
       }
     }
 
-    console.log(`✓ Total instruments: ${instrumentMapping.size}`);
+    console.log(`✓ Total instruments: ${instrumentIdMapping.size}`);
   }
 
   console.log("\n✅ Reference data migration complete");
@@ -502,6 +594,19 @@ async function migrateTunes() {
   console.log(`Found ${tunes.length} tunes\n`);
 
   const supabaseTunes = tunes.map((tune) => {
+    // Generate UUID for this tune
+    // Try catalog mapping first (for stable UUIDs across migrations)
+    // Otherwise generate new UUIDv7 for user-private tunes or unmapped tunes
+    let tuneUuid = getCatalogTuneUuid(tune.id);
+    if (!tuneUuid) {
+      tuneUuid = generateId(); // New UUIDv7 for unmapped tunes
+    }
+    tuneIdMapping.set(tune.id, tuneUuid);
+
+    // Set id_foreign and primary_origin for provenance tracking
+    const id_foreign = tune.private_for ? null : tune.id; // Preserve catalog IDs
+    const primary_origin = tune.private_for ? "user_created" : "irishtune.info";
+
     // Use the genre value directly from SQLite, defaulting to ITRAD if null
     let genreValue = tune.genre || "ITRAD";
 
@@ -514,16 +619,22 @@ async function migrateTunes() {
       genreValue = "BGRA";
     }
 
+    // Map private_for from integer ID to UUID
+    const privateForUuid = tune.private_for
+      ? userIdMapping.get(tune.private_for)
+      : null;
+
     return {
-      id: tune.id,
+      id: tuneUuid, // UUID instead of integer
+      id_foreign, // Legacy integer ID for provenance tracking
+      primary_origin, // Source: 'irishtune.info' or 'user_created'
       title: tune.title || null,
       type: tune.type || null,
       structure: tune.structure || null,
       mode: tune.mode || null,
       incipit: tune.incipit || null,
-      // SQLite genre (TEXT) maps directly to PostgreSQL genre (TEXT)
       genre: genreValue,
-      private_for: tune.private_for || null,
+      private_for: privateForUuid || null,
       deleted: false,
       sync_version: 1,
       last_modified_at: now(),
@@ -550,6 +661,7 @@ async function migrateTunes() {
   }
 
   console.log("\n✅ Tunes migration complete");
+  console.log(`   Generated ${tuneIdMapping.size} tune UUIDs`);
 }
 
 // ============================================================================
@@ -566,20 +678,45 @@ async function migrateTuneOverrides() {
 
   console.log(`Found ${tuneOverrides.length} tune overrides\n`);
 
-  const supabaseTuneOverrides = tuneOverrides.map((to) => ({
-    tune_ref: to.tune_ref,
-    user_ref: to.user_ref,
-    title: to.title || null,
-    type: to.type || null,
-    structure: to.structure || null,
-    genre: to.genre || null,
-    mode: to.mode || null,
-    incipit: to.incipit || null,
-    deleted: false,
-    sync_version: 1,
-    last_modified_at: now(),
-    device_id: MIGRATION_DEVICE_ID,
-  }));
+  const supabaseTuneOverrides = tuneOverrides
+    .map((to: any) => {
+      // Map foreign keys from integer IDs to UUIDs
+      const tuneUuid = tuneIdMapping.get(to.tune_ref);
+      const userUuid = userIdMapping.get(to.user_ref);
+
+      if (!tuneUuid) {
+        console.warn(
+          `⚠️  Skipping tune_override: tune_ref ${to.tune_ref} not found`
+        );
+        return null;
+      }
+      if (!userUuid) {
+        console.warn(
+          `⚠️  Skipping tune_override: user_ref ${to.user_ref} not found`
+        );
+        return null;
+      }
+
+      // Generate UUID for tune_override
+      const tuneOverrideUuid = generateId();
+
+      return {
+        id: tuneOverrideUuid, // UUID primary key
+        tune_ref: tuneUuid, // UUID
+        user_ref: userUuid, // UUID
+        title: to.title || null,
+        type: to.type || null,
+        structure: to.structure || null,
+        genre: to.genre || null,
+        mode: to.mode || null,
+        incipit: to.incipit || null,
+        deleted: false,
+        sync_version: 1,
+        last_modified_at: now(),
+        device_id: MIGRATION_DEVICE_ID,
+      };
+    })
+    .filter((to: any) => to !== null); // Remove nulls from failed mappings
 
   if (supabaseTuneOverrides.length > 0) {
     const { error } = await supabase
@@ -610,32 +747,43 @@ async function migratePlaylists() {
 
   console.log(`Found ${playlists.length} playlists\n`);
 
-  const supabasePlaylists = playlists.map((p) => {
-    // Validate instrument_ref - must exist in instrument table
-    let instrumentRef = p.instrument_ref || null;
-    if (instrumentRef !== null) {
-      const instrumentExists = sqlite
-        .prepare("SELECT id FROM instrument WHERE id = ? AND deleted = 0")
-        .get(instrumentRef);
-      if (!instrumentExists) {
-        console.log(
-          `⚠️  Playlist ${p.playlist_id} references invalid instrument ${instrumentRef}, setting to null`
-        );
-        instrumentRef = null;
-      }
-    }
+  const supabasePlaylists = playlists
+    .map((p: any) => {
+      // Generate UUID for this playlist
+      const playlistUuid = generateId();
+      playlistIdMapping.set(p.playlist_id, playlistUuid);
 
-    return {
-      playlist_id: p.playlist_id,
-      user_ref: p.user_ref, // Integer ID preserved
-      instrument_ref: instrumentRef,
-      sr_alg_type: p.sr_alg_type || null,
-      deleted: false,
-      sync_version: 1,
-      last_modified_at: now(),
-      device_id: MIGRATION_DEVICE_ID,
-    };
-  });
+      // Map user_ref from integer to UUID
+      const userUuid = userIdMapping.get(p.user_ref);
+      if (!userUuid) {
+        console.warn(
+          `⚠️  Playlist ${p.playlist_id} references unknown user ${p.user_ref}`
+        );
+      }
+
+      // Map instrument_ref from integer ID to UUID
+      let instrumentUuid: string | null = null;
+      if (p.instrument_ref !== null) {
+        instrumentUuid = instrumentIdMapping.get(p.instrument_ref) || null;
+        if (!instrumentUuid) {
+          console.log(
+            `⚠️  Playlist ${p.playlist_id} references unknown instrument ${p.instrument_ref}, setting to null`
+          );
+        }
+      }
+
+      return {
+        playlist_id: playlistUuid, // UUID
+        user_ref: userUuid, // UUID (mapped from integer)
+        instrument_ref: instrumentUuid, // UUID (mapped from integer)
+        sr_alg_type: p.sr_alg_type || null,
+        deleted: false,
+        sync_version: 1,
+        last_modified_at: now(),
+        device_id: MIGRATION_DEVICE_ID,
+      };
+    })
+    .filter((p: any) => p.user_ref !== undefined); // Skip playlists with invalid user refs
 
   const { error } = await supabase
     .from("playlist")
@@ -648,6 +796,7 @@ async function migratePlaylists() {
   }
 
   console.log("\n✅ Playlists migration complete");
+  console.log(`   Generated ${playlistIdMapping.size} playlist UUIDs`);
 }
 
 // ============================================================================
@@ -662,38 +811,48 @@ async function migratePlaylistTunes() {
     .prepare("SELECT * FROM playlist_tune WHERE deleted = 0")
     .all() as any[];
 
-  // Filter out references to deleted tunes (tunes that don't exist)
-  const validPlaylistTunes = playlistTunes.filter((pt: any) => {
-    const tuneExists = sqlite
-      .prepare("SELECT id FROM tune WHERE id = ? AND deleted = 0")
-      .get(pt.tune_ref);
-    return tuneExists !== undefined;
-  });
-
-  if (validPlaylistTunes.length < playlistTunes.length) {
-    console.log(
-      `⚠️  Skipped ${
-        playlistTunes.length - validPlaylistTunes.length
-      } playlist-tune relationships referencing deleted tunes`
-    );
-  }
-
   console.log(
-    `Found ${validPlaylistTunes.length} playlist-tune relationships\n`
+    `Found ${playlistTunes.length} playlist-tune relationships (before filtering)\n`
   );
 
-  const supabasePlaylistTunes = validPlaylistTunes.map((pt: any) => ({
-    playlist_ref: pt.playlist_ref,
-    tune_ref: pt.tune_ref,
-    current: sqliteTimestampToPostgres(pt.current),
-    learned: sqliteTimestampToPostgres(pt.learned),
-    scheduled: sqliteTimestampToPostgres(pt.scheduled),
-    goal: pt.goal || "recall",
-    deleted: false,
-    sync_version: 1,
-    last_modified_at: now(),
-    device_id: MIGRATION_DEVICE_ID,
-  }));
+  // Map and filter playlist-tune relationships
+  const supabasePlaylistTunes = playlistTunes
+    .map((pt: any) => {
+      // Map foreign keys from integers to UUIDs
+      const playlistUuid = playlistIdMapping.get(pt.playlist_ref);
+      const tuneUuid = tuneIdMapping.get(pt.tune_ref);
+
+      if (!playlistUuid) {
+        console.warn(
+          `⚠️  Skipping playlist_tune: playlist_ref ${pt.playlist_ref} not found`
+        );
+        return null;
+      }
+      if (!tuneUuid) {
+        console.warn(
+          `⚠️  Skipping playlist_tune: tune_ref ${pt.tune_ref} not found`
+        );
+        return null;
+      }
+
+      return {
+        playlist_ref: playlistUuid, // UUID
+        tune_ref: tuneUuid, // UUID
+        current: sqliteTimestampToPostgres(pt.current),
+        learned: sqliteTimestampToPostgres(pt.learned),
+        scheduled: sqliteTimestampToPostgres(pt.scheduled),
+        goal: pt.goal || "recall",
+        deleted: false,
+        sync_version: 1,
+        last_modified_at: now(),
+        device_id: MIGRATION_DEVICE_ID,
+      };
+    })
+    .filter((pt: any) => pt !== null); // Remove failed mappings
+
+  console.log(
+    `Migrating ${supabasePlaylistTunes.length} valid relationships\n`
+  );
 
   // Batch insert
   for (let i = 0; i < supabasePlaylistTunes.length; i += BATCH_SIZE) {
@@ -730,29 +889,54 @@ async function migratePracticeRecords() {
 
   console.log(`Found ${practiceRecords.length} practice records\n`);
 
-  const supabasePracticeRecords = practiceRecords.map((pr) => ({
-    id: pr.id,
-    playlist_ref: pr.playlist_ref,
-    tune_ref: pr.tune_ref,
-    practiced: sqliteTimestampToPostgres(pr.practiced_at || pr.practiced), // Column name changed
-    quality: pr.quality || null,
-    easiness: pr.easiness || null,
-    difficulty: pr.difficulty || null,
-    stability: pr.stability || null,
-    interval: pr.interval || null,
-    step: pr.step || null,
-    repetitions: pr.reps || pr.repetitions || null, // Column name changed: reps → repetitions
-    lapses: pr.lapses || null,
-    elapsed_days: pr.elapsed_days || null,
-    state: pr.state || null,
-    due: sqliteTimestampToPostgres(pr.due),
-    backup_practiced: sqliteTimestampToPostgres(pr.backup_practiced),
-    goal: pr.goal || "recall",
-    technique: pr.technique || null,
-    sync_version: 1,
-    last_modified_at: now(),
-    device_id: MIGRATION_DEVICE_ID,
-  }));
+  const supabasePracticeRecords = practiceRecords
+    .map((pr: any) => {
+      // Generate UUID for practice record
+      const practiceRecordUuid = generateId();
+      practiceRecordIdMapping.set(pr.id, practiceRecordUuid);
+
+      // Map foreign keys from integers to UUIDs
+      const playlistUuid = playlistIdMapping.get(pr.playlist_ref);
+      const tuneUuid = tuneIdMapping.get(pr.tune_ref);
+
+      if (!playlistUuid) {
+        console.warn(
+          `⚠️  Skipping practice_record ${pr.id}: playlist_ref ${pr.playlist_ref} not found`
+        );
+        return null;
+      }
+      if (!tuneUuid) {
+        console.warn(
+          `⚠️  Skipping practice_record ${pr.id}: tune_ref ${pr.tune_ref} not found`
+        );
+        return null;
+      }
+
+      return {
+        id: practiceRecordUuid, // UUID
+        playlist_ref: playlistUuid, // UUID
+        tune_ref: tuneUuid, // UUID
+        practiced: sqliteTimestampToPostgres(pr.practiced_at || pr.practiced),
+        quality: pr.quality || null,
+        easiness: pr.easiness || null,
+        difficulty: pr.difficulty || null,
+        stability: pr.stability || null,
+        interval: pr.interval || null,
+        step: pr.step || null,
+        repetitions: pr.reps || pr.repetitions || null,
+        lapses: pr.lapses || null,
+        elapsed_days: pr.elapsed_days || null,
+        state: pr.state || null,
+        due: sqliteTimestampToPostgres(pr.due),
+        backup_practiced: sqliteTimestampToPostgres(pr.backup_practiced),
+        goal: pr.goal || "recall",
+        technique: pr.technique || null,
+        sync_version: 1,
+        last_modified_at: now(),
+        device_id: MIGRATION_DEVICE_ID,
+      };
+    })
+    .filter((pr: any) => pr !== null); // Remove failed mappings
 
   // Batch insert
   for (let i = 0; i < supabasePracticeRecords.length; i += BATCH_SIZE) {
@@ -774,6 +958,9 @@ async function migratePracticeRecords() {
   }
 
   console.log("\n✅ Practice records migration complete");
+  console.log(
+    `   Generated ${practiceRecordIdMapping.size} practice record UUIDs`
+  );
 }
 
 // ============================================================================
@@ -790,20 +977,42 @@ async function migrateNotes() {
 
   console.log(`Found ${notes.length} notes\n`);
 
-  const supabaseNotes = notes.map((note) => ({
-    id: note.id,
-    user_ref: note.user_ref || null,
-    tune_ref: note.tune_ref,
-    playlist_ref: note.playlist_ref || null,
-    created_date: sqliteTimestampToPostgres(note.created_date),
-    note_text: note.note_text || null,
-    public: Boolean(note.public),
-    favorite: Boolean(note.favorite),
-    deleted: false,
-    sync_version: 1,
-    last_modified_at: now(),
-    device_id: MIGRATION_DEVICE_ID,
-  }));
+  const supabaseNotes = notes
+    .map((note: any) => {
+      // Generate UUID for note
+      const noteUuid = generateId();
+      noteIdMapping.set(note.id, noteUuid);
+
+      // Map foreign keys from integers to UUIDs
+      const userUuid = note.user_ref ? userIdMapping.get(note.user_ref) : null;
+      const tuneUuid = tuneIdMapping.get(note.tune_ref);
+      const playlistUuid = note.playlist_ref
+        ? playlistIdMapping.get(note.playlist_ref)
+        : null;
+
+      if (!tuneUuid) {
+        console.warn(
+          `⚠️  Skipping note ${note.id}: tune_ref ${note.tune_ref} not found`
+        );
+        return null;
+      }
+
+      return {
+        id: noteUuid, // UUID
+        user_ref: userUuid || null, // UUID
+        tune_ref: tuneUuid, // UUID
+        playlist_ref: playlistUuid || null, // UUID
+        created_date: sqliteTimestampToPostgres(note.created_date),
+        note_text: note.note_text || null,
+        public: Boolean(note.public),
+        favorite: Boolean(note.favorite),
+        deleted: false,
+        sync_version: 1,
+        last_modified_at: now(),
+        device_id: MIGRATION_DEVICE_ID,
+      };
+    })
+    .filter((note: any) => note !== null); // Remove failed mappings
 
   const { error } = await supabase
     .from("note")
@@ -816,6 +1025,7 @@ async function migrateNotes() {
   }
 
   console.log("\n✅ Notes migration complete");
+  console.log(`   Generated ${noteIdMapping.size} note UUIDs`);
 }
 
 async function migrateReferences() {
@@ -828,23 +1038,42 @@ async function migrateReferences() {
 
   console.log(`Found ${references.length} references\n`);
 
-  const supabaseReferences = references.map((ref) => ({
-    url: ref.url,
-    ref_type: ref.ref_type || null,
-    tune_ref: ref.tune_ref,
-    user_ref: ref.user_ref || null,
-    comment: ref.reference_text || ref.comment || null, // Column name changed: reference_text → comment
-    title: ref.title || null,
-    public: Boolean(ref.public),
-    favorite: Boolean(ref.favorite),
-    deleted: false,
-    sync_version: 1,
-    last_modified_at: now(),
-    device_id: MIGRATION_DEVICE_ID,
-  }));
+  const supabaseReferences = references
+    .map((ref: any) => {
+      // Generate UUID for reference (note: url is the primary key, but we generate UUID for consistency)
+      const refUuid = generateId();
+      referenceIdMapping.set(ref.url, refUuid); // Use URL as key since that's the PK
+
+      // Map foreign keys from integers to UUIDs
+      const tuneUuid = tuneIdMapping.get(ref.tune_ref);
+      const userUuid = ref.user_ref ? userIdMapping.get(ref.user_ref) : null;
+
+      if (!tuneUuid) {
+        console.warn(
+          `⚠️  Skipping reference ${ref.url}: tune_ref ${ref.tune_ref} not found`
+        );
+        return null;
+      }
+
+      return {
+        id: refUuid, // UUID primary key
+        url: ref.url,
+        ref_type: ref.ref_type || null,
+        tune_ref: tuneUuid, // UUID
+        user_ref: userUuid || null, // UUID
+        comment: ref.reference_text || ref.comment || null,
+        title: ref.title || null,
+        public: Boolean(ref.public),
+        favorite: Boolean(ref.favorite),
+        deleted: false,
+        sync_version: 1,
+        last_modified_at: now(),
+        device_id: MIGRATION_DEVICE_ID,
+      };
+    })
+    .filter((ref: any) => ref !== null); // Remove failed mappings
 
   // Batch insert references
-  const BATCH_SIZE = 100;
   for (let i = 0; i < supabaseReferences.length; i += BATCH_SIZE) {
     const batch = supabaseReferences.slice(i, i + BATCH_SIZE);
     const { error } = await supabase.from("reference").insert(batch);
@@ -871,14 +1100,38 @@ async function migrateTags() {
 
   console.log(`Found ${tags.length} tags\n`);
 
-  const supabaseTags = tags.map((tag) => ({
-    user_ref: tag.user_ref,
-    tune_ref: tag.tune_ref,
-    tag_text: tag.tag || tag.tag_text, // Column name changed: tag → tag_text
-    sync_version: 1,
-    last_modified_at: now(),
-    device_id: MIGRATION_DEVICE_ID,
-  }));
+  const supabaseTags = tags
+    .map((tag: any) => {
+      // Generate UUID for tag
+      const tagUuid = generateId();
+      tagIdMapping.set(
+        `${tag.user_ref}:${tag.tune_ref}:${tag.tag || tag.tag_text}`,
+        tagUuid
+      );
+
+      // Map foreign keys from integers to UUIDs
+      const userUuid = userIdMapping.get(tag.user_ref);
+      const tuneUuid = tuneIdMapping.get(tag.tune_ref);
+
+      if (!userUuid) {
+        console.warn(`⚠️  Skipping tag: user_ref ${tag.user_ref} not found`);
+        return null;
+      }
+      if (!tuneUuid) {
+        console.warn(`⚠️  Skipping tag: tune_ref ${tag.tune_ref} not found`);
+        return null;
+      }
+
+      return {
+        user_ref: userUuid, // UUID
+        tune_ref: tuneUuid, // UUID
+        tag_text: tag.tag || tag.tag_text,
+        sync_version: 1,
+        last_modified_at: now(),
+        device_id: MIGRATION_DEVICE_ID,
+      };
+    })
+    .filter((tag: any) => tag !== null); // Remove failed mappings
 
   const { error } = await supabase
     .from("tag")
@@ -891,6 +1144,7 @@ async function migrateTags() {
   }
 
   console.log("\n✅ Tags migration complete");
+  console.log(`   Generated ${tagIdMapping.size} tag UUIDs`);
 }
 
 // ============================================================================
@@ -907,19 +1161,33 @@ async function migratePreferences() {
     .all() as any[];
 
   if (srPrefs.length > 0) {
-    const supabaseSRPrefs = srPrefs.map((pref) => ({
-      user_id: pref.user_id,
-      alg_type: pref.alg_type,
-      fsrs_weights: pref.fsrs_weights || null,
-      request_retention: pref.request_retention || null,
-      maximum_interval: pref.maximum_interval || null,
-      learning_steps: pref.learning_steps || null,
-      relearning_steps: pref.relearning_steps || null,
-      enable_fuzzing: Boolean(pref.enable_fuzzing),
-      sync_version: 1,
-      last_modified_at: now(),
-      device_id: MIGRATION_DEVICE_ID,
-    }));
+    const supabaseSRPrefs = srPrefs
+      .map((pref: any) => {
+        // Map user_id from integer to UUID
+        const userUuid = userIdMapping.get(pref.user_id);
+
+        if (!userUuid) {
+          console.warn(
+            `⚠️  Skipping SR pref: user_id ${pref.user_id} not found`
+          );
+          return null;
+        }
+
+        return {
+          user_id: userUuid, // UUID
+          alg_type: pref.alg_type,
+          fsrs_weights: pref.fsrs_weights || null,
+          request_retention: pref.request_retention || null,
+          maximum_interval: pref.maximum_interval || null,
+          learning_steps: pref.learning_steps || null,
+          relearning_steps: pref.relearning_steps || null,
+          enable_fuzzing: Boolean(pref.enable_fuzzing),
+          sync_version: 1,
+          last_modified_at: now(),
+          device_id: MIGRATION_DEVICE_ID,
+        };
+      })
+      .filter((pref: any) => pref !== null);
 
     const { error } = await supabase
       .from("prefs_spaced_repetition")
@@ -940,18 +1208,33 @@ async function migratePreferences() {
     .all() as any[];
 
   if (schedPrefs.length > 0) {
-    const supabaseSchedPrefs = schedPrefs.map((pref) => ({
-      user_id: pref.user_id,
-      acceptable_delinquency_window: pref.acceptable_delinquency_window || 21,
-      min_reviews_per_day: pref.min_reviews_per_day || null,
-      max_reviews_per_day: pref.max_reviews_per_day || null,
-      days_per_week: pref.days_per_week || null,
-      weekly_rules: pref.weekly_rules || null,
-      exceptions: pref.exceptions || null,
-      sync_version: 1,
-      last_modified_at: now(),
-      device_id: MIGRATION_DEVICE_ID,
-    }));
+    const supabaseSchedPrefs = schedPrefs
+      .map((pref: any) => {
+        // Map user_id from integer to UUID
+        const userUuid = userIdMapping.get(pref.user_id);
+
+        if (!userUuid) {
+          console.warn(
+            `⚠️  Skipping sched pref: user_id ${pref.user_id} not found`
+          );
+          return null;
+        }
+
+        return {
+          user_id: userUuid, // UUID
+          acceptable_delinquency_window:
+            pref.acceptable_delinquency_window || 21,
+          min_reviews_per_day: pref.min_reviews_per_day || null,
+          max_reviews_per_day: pref.max_reviews_per_day || null,
+          days_per_week: pref.days_per_week || null,
+          weekly_rules: pref.weekly_rules || null,
+          exceptions: pref.exceptions || null,
+          sync_version: 1,
+          last_modified_at: now(),
+          device_id: MIGRATION_DEVICE_ID,
+        };
+      })
+      .filter((pref: any) => pref !== null);
 
     const { error } = await supabase
       .from("prefs_scheduling_options")
@@ -992,37 +1275,59 @@ async function migrateDailyPracticeQueue() {
   const batchSize = 100;
   let migrated = 0;
   let errors = 0;
+  let skipped = 0;
 
   for (let i = 0; i < queueRecords.length; i += batchSize) {
     const batch = queueRecords.slice(i, i + batchSize);
 
-    const supabaseQueueRecords = batch.map((record) => ({
-      id: record.id,
-      user_ref: record.user_ref,
-      playlist_ref: record.playlist_ref,
-      mode: record.mode || null,
-      queue_date: record.queue_date || null,
-      window_start_utc: record.window_start_utc,
-      window_end_utc: record.window_end_utc,
-      tune_ref: record.tune_ref,
-      bucket: record.bucket,
-      order_index: record.order_index,
-      snapshot_coalesced_ts: record.snapshot_coalesced_ts,
-      scheduled_snapshot: record.scheduled_snapshot || null,
-      latest_due_snapshot: record.latest_due_snapshot || null,
-      acceptable_delinquency_window_snapshot:
-        record.acceptable_delinquency_window_snapshot || null,
-      tz_offset_minutes_snapshot: record.tz_offset_minutes_snapshot || null,
-      generated_at: record.generated_at,
-      completed_at: record.completed_at || null,
-      exposures_required: record.exposures_required || null,
-      exposures_completed: record.exposures_completed || 0,
-      outcome: record.outcome || null,
-      active: Boolean(record.active ?? true),
-      sync_version: 1,
-      last_modified_at: now(),
-      device_id: MIGRATION_DEVICE_ID,
-    }));
+    const supabaseQueueRecords = batch
+      .map((record: any) => {
+        // Generate UUID for this queue record
+        const queueUuid = generateId();
+        dailyPracticeQueueIdMapping.set(record.id, queueUuid);
+
+        // Map foreign keys from integers to UUIDs
+        const userUuid = userIdMapping.get(record.user_ref);
+        const playlistUuid = playlistIdMapping.get(record.playlist_ref);
+        const tuneUuid = tuneIdMapping.get(record.tune_ref);
+
+        if (!userUuid || !playlistUuid || !tuneUuid) {
+          console.warn(
+            `⚠️  Skipping queue record ${record.id}: missing FK mapping`
+          );
+          skipped++;
+          return null;
+        }
+
+        return {
+          id: queueUuid, // UUID
+          user_ref: userUuid, // UUID
+          playlist_ref: playlistUuid, // UUID
+          mode: record.mode || null,
+          queue_date: record.queue_date || null,
+          window_start_utc: record.window_start_utc,
+          window_end_utc: record.window_end_utc,
+          tune_ref: tuneUuid, // UUID
+          bucket: record.bucket,
+          order_index: record.order_index,
+          snapshot_coalesced_ts: record.snapshot_coalesced_ts,
+          scheduled_snapshot: record.scheduled_snapshot || null,
+          latest_due_snapshot: record.latest_due_snapshot || null,
+          acceptable_delinquency_window_snapshot:
+            record.acceptable_delinquency_window_snapshot || null,
+          tz_offset_minutes_snapshot: record.tz_offset_minutes_snapshot || null,
+          generated_at: record.generated_at,
+          completed_at: record.completed_at || null,
+          exposures_required: record.exposures_required || null,
+          exposures_completed: record.exposures_completed || 0,
+          outcome: record.outcome || null,
+          active: Boolean(record.active ?? true),
+          sync_version: 1,
+          last_modified_at: now(),
+          device_id: MIGRATION_DEVICE_ID,
+        };
+      })
+      .filter((record: any) => record !== null);
 
     const { error } = await supabase
       .from("daily_practice_queue")
@@ -1034,18 +1339,19 @@ async function migrateDailyPracticeQueue() {
       console.error(`✗ Error migrating batch ${i / batchSize + 1}:`, error);
       errors += batch.length;
     } else {
-      migrated += batch.length;
+      migrated += supabaseQueueRecords.length;
       console.log(
         `✓ Batch ${i / batchSize + 1}/${Math.ceil(
           queueRecords.length / batchSize
-        )}: Migrated ${batch.length} queue records`
+        )}: Migrated ${supabaseQueueRecords.length} queue records`
       );
     }
   }
 
   console.log(
-    `\n✅ Daily practice queue migration complete: ${migrated} migrated, ${errors} errors`
+    `\n✅ Daily practice queue migration complete: ${migrated} migrated, ${skipped} skipped, ${errors} errors`
   );
+  console.log(`   Generated ${dailyPracticeQueueIdMapping.size} queue UUIDs`);
 }
 
 // ============================================================================
@@ -1062,43 +1368,49 @@ async function migrateUIStateTables() {
     .prepare("SELECT * FROM tab_group_main_state WHERE user_id != -1")
     .all() as any[];
   if (tabGroupStates.length > 0) {
-    // Filter out invalid user references (user_id=-1 or users that don't exist)
-    const validTabGroupStates = tabGroupStates.filter((state: any) => {
-      if (state.user_id <= 0) return false; // Skip user_id <= 0
-      const userExists = sqlite
-        .prepare("SELECT id FROM user WHERE id = ? AND deleted = 0")
-        .get(state.user_id);
-      return userExists !== undefined;
-    });
+    const supabaseTabGroupStates = tabGroupStates
+      .map((state: any) => {
+        if (state.user_id <= 0) return null; // Skip invalid user IDs
 
-    if (validTabGroupStates.length < tabGroupStates.length) {
-      console.log(
-        `⚠️  Skipped ${
-          tabGroupStates.length - validTabGroupStates.length
-        } tab group states with invalid user references`
-      );
-    }
+        // Generate UUID for this tab group state
+        const tabGroupUuid = generateId();
+        tabGroupMainStateIdMapping.set(state.id, tabGroupUuid);
 
-    const supabaseTabGroupStates = validTabGroupStates.map((state: any) => ({
-      id: state.id,
-      user_id: state.user_id,
-      which_tab: state.which_tab || "practice",
-      playlist_id: state.playlist_id || null,
-      tab_spec: state.tab_spec || null,
-      practice_show_submitted:
-        state.practice_show_submitted === 1 ||
-        state.practice_show_submitted === true
-          ? 1
-          : 0,
-      practice_mode_flashcard:
-        state.practice_mode_flashcard === 1 ||
-        state.practice_mode_flashcard === true
-          ? 1
-          : 0,
-      sync_version: 1,
-      last_modified_at: now(),
-      device_id: MIGRATION_DEVICE_ID,
-    }));
+        // Map foreign keys from integers to UUIDs
+        const userUuid = userIdMapping.get(state.user_id);
+        const playlistUuid = state.playlist_id
+          ? playlistIdMapping.get(state.playlist_id)
+          : null;
+
+        if (!userUuid) {
+          console.warn(
+            `⚠️  Skipping tab_group_main_state ${state.id}: user_id ${state.user_id} not found`
+          );
+          return null;
+        }
+
+        return {
+          id: tabGroupUuid, // UUID
+          user_id: userUuid, // UUID
+          which_tab: state.which_tab || "practice",
+          playlist_id: playlistUuid || null, // UUID
+          tab_spec: state.tab_spec || null,
+          practice_show_submitted:
+            state.practice_show_submitted === 1 ||
+            state.practice_show_submitted === true
+              ? 1
+              : 0,
+          practice_mode_flashcard:
+            state.practice_mode_flashcard === 1 ||
+            state.practice_mode_flashcard === true
+              ? 1
+              : 0,
+          sync_version: 1,
+          last_modified_at: now(),
+          device_id: MIGRATION_DEVICE_ID,
+        };
+      })
+      .filter((state: any) => state !== null);
 
     const { error } = await supabase
       .from("tab_group_main_state")
@@ -1108,7 +1420,7 @@ async function migrateUIStateTables() {
       console.error("Error migrating tab_group_main_state:", error);
     } else {
       console.log(
-        `✓ Migrated ${supabaseTabGroupStates.length} tab group states (${validTabGroupStates.length} valid of ${tabGroupStates.length} total)`
+        `✓ Migrated ${supabaseTabGroupStates.length} tab group states (${tabGroupMainStateIdMapping.size} UUIDs generated)`
       );
     }
   } else {
@@ -1122,42 +1434,39 @@ async function migrateUIStateTables() {
     .all() as any[];
 
   if (tableStates.length > 0) {
-    // Filter out table_state records that reference deleted playlists or users
-    const validTableStates = tableStates.filter((state: any) => {
-      // Check if playlist exists and is not deleted
-      const playlistExists = sqlite
-        .prepare(
-          "SELECT playlist_id FROM playlist WHERE playlist_id = ? AND deleted = 0"
-        )
-        .get(state.playlist_id);
+    const supabaseTableStates = tableStates
+      .map((state: any) => {
+        // Generate UUID for this table state
+        const tableStateUuid = generateId();
+        tableStateIdMapping.set(state.id || tableStateUuid, tableStateUuid);
 
-      // Check if user exists and is not deleted
-      const userExists = sqlite
-        .prepare("SELECT id FROM user WHERE id = ? AND deleted = 0")
-        .get(state.user_id);
+        // Map foreign keys from integers to UUIDs
+        const userUuid = userIdMapping.get(state.user_id);
+        const playlistUuid = playlistIdMapping.get(state.playlist_id);
+        const currentTuneUuid = state.current_tune
+          ? tuneIdMapping.get(state.current_tune)
+          : null;
 
-      return playlistExists !== undefined && userExists !== undefined;
-    });
+        if (!userUuid || !playlistUuid) {
+          console.warn(
+            `⚠️  Skipping table_state: missing user or playlist mapping`
+          );
+          return null;
+        }
 
-    if (validTableStates.length < tableStates.length) {
-      console.log(
-        `⚠️  Skipped ${
-          tableStates.length - validTableStates.length
-        } table states with invalid playlist/user references`
-      );
-    }
-
-    const supabaseTableStates = validTableStates.map((state) => ({
-      user_id: state.user_id,
-      screen_size: state.screen_size,
-      purpose: state.purpose,
-      playlist_id: state.playlist_id,
-      settings: state.settings || null,
-      current_tune: state.current_tune || null,
-      sync_version: 1,
-      last_modified_at: now(),
-      device_id: MIGRATION_DEVICE_ID,
-    }));
+        return {
+          user_id: userUuid, // UUID
+          screen_size: state.screen_size,
+          purpose: state.purpose,
+          playlist_id: playlistUuid, // UUID
+          settings: state.settings || null,
+          current_tune: currentTuneUuid || null, // UUID
+          sync_version: 1,
+          last_modified_at: now(),
+          device_id: MIGRATION_DEVICE_ID,
+        };
+      })
+      .filter((state: any) => state !== null);
 
     const { error } = await supabase
       .from("table_state")
@@ -1181,31 +1490,52 @@ async function migrateUIStateTables() {
     .all() as any[];
 
   if (tableTransientData.length > 0) {
-    const supabaseTableTransientData = tableTransientData.map((data) => ({
-      user_id: data.user_id,
-      tune_id: data.tune_id,
-      playlist_id: data.playlist_id,
-      purpose: data.purpose || null,
-      note_private: data.note_private || null,
-      note_public: data.note_public || null,
-      recall_eval: data.recall_eval || null,
-      practiced: sqliteTimestampToPostgres(data.practiced),
-      quality: data.quality || null,
-      easiness: data.easiness || null,
-      difficulty: data.difficulty || null,
-      interval: data.interval || null,
-      step: data.step || null,
-      repetitions: data.repetitions || null,
-      due: sqliteTimestampToPostgres(data.due),
-      backup_practiced: sqliteTimestampToPostgres(data.backup_practiced),
-      goal: data.goal || null,
-      technique: data.technique || null,
-      stability: data.stability || null,
-      state: data.state || null,
-      sync_version: 1,
-      last_modified_at: now(),
-      device_id: MIGRATION_DEVICE_ID,
-    }));
+    const supabaseTableTransientData = tableTransientData
+      .map((data: any) => {
+        // Generate UUID for this transient data record
+        const transientDataUuid = generateId();
+        tableTransientDataIdMapping.set(
+          data.id || transientDataUuid,
+          transientDataUuid
+        );
+
+        // Map foreign keys from integers to UUIDs
+        const userUuid = userIdMapping.get(data.user_id);
+        const tuneUuid = tuneIdMapping.get(data.tune_id);
+        const playlistUuid = playlistIdMapping.get(data.playlist_id);
+
+        if (!userUuid || !tuneUuid || !playlistUuid) {
+          console.warn(`⚠️  Skipping table_transient_data: missing FK mapping`);
+          return null;
+        }
+
+        return {
+          user_id: userUuid, // UUID
+          tune_id: tuneUuid, // UUID
+          playlist_id: playlistUuid, // UUID
+          purpose: data.purpose || null,
+          note_private: data.note_private || null,
+          note_public: data.note_public || null,
+          recall_eval: data.recall_eval || null,
+          practiced: sqliteTimestampToPostgres(data.practiced),
+          quality: data.quality || null,
+          easiness: data.easiness || null,
+          difficulty: data.difficulty || null,
+          interval: data.interval || null,
+          step: data.step || null,
+          repetitions: data.repetitions || null,
+          due: sqliteTimestampToPostgres(data.due),
+          backup_practiced: sqliteTimestampToPostgres(data.backup_practiced),
+          goal: data.goal || null,
+          technique: data.technique || null,
+          stability: data.stability || null,
+          state: data.state || null,
+          sync_version: 1,
+          last_modified_at: now(),
+          device_id: MIGRATION_DEVICE_ID,
+        };
+      })
+      .filter((data: any) => data !== null);
 
     const { error } = await supabase
       .from("table_transient_data")
@@ -1225,6 +1555,9 @@ async function migrateUIStateTables() {
   }
 
   console.log("\n✅ UI state tables migration complete");
+  console.log(
+    `   Generated ${tableTransientDataIdMapping.size} transient data UUIDs`
+  );
 }
 
 // ============================================================================

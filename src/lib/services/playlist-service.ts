@@ -83,38 +83,31 @@ export async function getOrCreateDefaultPlaylist(
  * Falls back to default playlist if no selection stored.
  *
  * @param userId - User's Supabase UUID
- * @returns Playlist ID or null
+ * @returns Playlist ID (UUID string) or null
  */
-export function getSelectedPlaylistId(userId: string): number | null {
+export function getSelectedPlaylistId(userId: string): string | null {
   if (typeof window === "undefined") return null;
 
   const key = `tunetrees:selectedPlaylist:${userId}`;
   const stored = localStorage.getItem(key);
 
-  if (stored) {
-    const parsed = parseInt(stored, 10);
-    if (!Number.isNaN(parsed)) {
-      return parsed;
-    }
-  }
-
-  return null;
+  return stored || null;
 }
 
 /**
  * Set user's currently selected playlist ID in localStorage
  *
  * @param userId - User's Supabase UUID
- * @param playlistId - Playlist ID to select
+ * @param playlistId - Playlist ID (UUID string) to select
  */
 export function setSelectedPlaylistId(
   userId: string,
-  playlistId: number
+  playlistId: string
 ): void {
   if (typeof window === "undefined") return;
 
   const key = `tunetrees:selectedPlaylist:${userId}`;
-  localStorage.setItem(key, playlistId.toString());
+  localStorage.setItem(key, playlistId);
 
   console.log(`✅ Selected playlist ${playlistId} for user ${userId}`);
 }

@@ -126,7 +126,7 @@ export function getCatalogColumns(
       sortingFn: numericSortingFn,
       size: 80,
       minSize: 60,
-      maxSize: 120,
+      maxSize: 36 * 10,
     },
 
     // Title (with link)

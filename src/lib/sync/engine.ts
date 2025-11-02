@@ -76,14 +76,15 @@ const DEFAULT_CONFIG: SyncConfig = {
 export class SyncEngine {
   private localDb: SqliteDatabase;
   private supabase: SupabaseClient;
-  private userId: number;
+  // Supabase Auth user id (UUID string)
+  private userId: string;
   private config: SyncConfig;
   private lastSyncTimestamp: string | null = null;
 
   constructor(
     localDb: SqliteDatabase,
     supabase: SupabaseClient,
-    userId: number,
+    userId: string,
     config: Partial<SyncConfig> = {}
   ) {
     this.localDb = localDb;
@@ -255,19 +256,25 @@ export class SyncEngine {
         "genre",
         "tune_type",
         "genre_tune_type",
-        "instrument",
 
         // User profiles (critical for FK relationships)
         "user_profile",
 
+        // Instrument (depends on user_profile for privateToUser FK)
+        "instrument",
+
         // User preferences
         "prefs_scheduling_options",
         "prefs_spaced_repetition",
-        "table_state",
-        "tab_group_main_state",
 
         // User data (with dependencies)
         "playlist",
+
+        // Table state (depends on playlist FK)
+        "table_state",
+        "tab_group_main_state",
+
+        // Tune and related data
         "tune",
         "playlist_tune",
         "practice_record",
@@ -374,7 +381,7 @@ export class SyncEngine {
         if (tableName === "table_transient_data") {
           // Composite key: userId + tuneId + playlistId (format: "1-1815-1")
           // Use UPSERT for transient data - insert if not exists, update if exists
-          const [userId, tuneId, playlistId] = recordId.split("-").map(Number);
+          const [userId, tuneId, playlistId] = recordId.split("-");
 
           // Ensure composite key columns are in the data
           remoteData.user_id = userId;
@@ -392,7 +399,7 @@ export class SyncEngine {
           const { error } = await this.supabase
             .from(tableName)
             .update(remoteData)
-            .eq("id", Number(recordId));
+            .eq("id", String(recordId));
           if (error) throw error;
         }
         break;
@@ -402,7 +409,7 @@ export class SyncEngine {
         // Handle composite keys
         if (tableName === "table_transient_data") {
           // Composite key: userId + tuneId + playlistId (format: "1-1815-1")
-          const [userId, tuneId, playlistId] = recordId.split("-").map(Number);
+          const [userId, tuneId, playlistId] = recordId.split("-");
           const { error } = await this.supabase
             .from(tableName)
             .delete()
@@ -415,7 +422,7 @@ export class SyncEngine {
           const { error } = await this.supabase
             .from(tableName)
             .update({ deleted: true })
-            .eq("id", Number(recordId));
+            .eq("id", String(recordId));
           if (error) throw error;
         }
         break;
@@ -566,6 +573,15 @@ export class SyncEngine {
       try {
         const transformed = this.transformRemoteToLocal(record);
 
+        // Debug: Log first record of each table to verify transformation
+        if (filteredRecords.indexOf(record) === 0) {
+          console.log(
+            `🔍 [SyncEngine] First ${tableName} record from Supabase:`,
+            record
+          );
+          console.log(`🔍 [SyncEngine] Transformed to SQLite:`, transformed);
+        }
+
         // Determine conflict target based on table structure
         let conflictTarget: any[];
 
@@ -581,14 +597,14 @@ export class SyncEngine {
             conflictTarget = [localTable.genreId, localTable.tuneTypeId];
             break;
           case "instrument":
-            // Use 'id' (integer primary key)
+            // Use 'id' (text UUID primary key)
             conflictTarget = [localTable.id];
             break;
 
           // User profiles
           case "user_profile":
-            // Use 'id' (integer primary key)
-            conflictTarget = [localTable.id];
+            // Use supabaseUserId (text UUID primary key)
+            conflictTarget = [localTable.supabaseUserId];
             break;
 
           // User preferences (use userId as primary key)
@@ -609,7 +625,7 @@ export class SyncEngine {
             ];
             break;
           case "tab_group_main_state":
-            // Uses auto-increment id as PK (not composite)
+            // Uses id as PK (text UUID)
             conflictTarget = [localTable.id];
             break;
           case "table_transient_data":
@@ -623,6 +639,7 @@ export class SyncEngine {
 
           // User data tables
           case "playlist":
+            // Playlist PK is playlistId (text UUID)
             conflictTarget = [localTable.playlistId];
             break;
           case "playlist_tune":
@@ -631,11 +648,21 @@ export class SyncEngine {
             break;
           case "daily_practice_queue":
             // Composite key: userRef + playlistRef + windowStartUtc + tuneRef
+            // Use INSERT OR REPLACE to handle ID conflicts from stale local data
             conflictTarget = [
               localTable.userRef,
               localTable.playlistRef,
               localTable.windowStartUtc,
               localTable.tuneRef,
+            ];
+            break;
+          case "practice_record":
+            // Composite key: tuneRef + playlistRef + practiced
+            // Use INSERT OR REPLACE to handle ID conflicts
+            conflictTarget = [
+              localTable.tuneRef,
+              localTable.playlistRef,
+              localTable.practiced,
             ];
             break;
           default:
@@ -818,7 +845,7 @@ export class SyncEngine {
 export function createSyncEngine(
   localDb: SqliteDatabase,
   supabase: SupabaseClient,
-  userId: number,
+  userId: string,
   config?: Partial<SyncConfig>
 ): SyncEngine {
   return new SyncEngine(localDb, supabase, userId, config);

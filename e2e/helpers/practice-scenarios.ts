@@ -23,7 +23,7 @@ log.setLevel("info");
  */
 export async function seedAddToReviewLocally(
   page: Page,
-  opts: { playlistId: number; tuneIds: number[]; userIdInt?: number }
+  opts: { playlistId: string; tuneIds: string[]; userIdInt?: string }
 ) {
   return await page.evaluate(async (input) => {
     if (!(window as any).__ttTestApi) {
@@ -36,7 +36,7 @@ export async function seedAddToReviewLocally(
 /**
  * Read the current practice queue size (latest snapshot) from inside the app.
  */
-export async function getPracticeCountLocally(page: Page, playlistId: number) {
+export async function getPracticeCountLocally(page: Page, playlistId: string) {
   return await page.evaluate(async (pid) => {
     if (!(window as any).__ttTestApi) {
       throw new Error("__ttTestApi not attached on window");
@@ -203,8 +203,8 @@ export async function setupDeterministicTestParallel(
   user: TestUser,
   opts: {
     clearRepertoire?: boolean;
-    seedRepertoire?: number[];
-    scheduleTunes?: { tuneIds: number[]; daysAgo: number };
+    seedRepertoire?: string[];
+    scheduleTunes?: { tuneIds: string[]; daysAgo: number };
   } = {}
 ) {
   log.debug(`🔧 [${user.name}] Setting up deterministic test state...`);
@@ -278,7 +278,7 @@ export async function setupDeterministicTestParallel(
  */
 export async function seedUserRepertoire(
   user: TestUser,
-  tuneIds: number[],
+  tuneIds: string[],
   preCheck: boolean = false
 ) {
   const userKey = user.email.split(".")[0]; // alice.test@... → alice
@@ -618,7 +618,7 @@ export async function setupForPracticeTestsParallel(
   page: Page,
   user: TestUser,
   opts?: {
-    repertoireTunes?: number[];
+    repertoireTunes?: string[];
     startTab?: "practice" | "repertoire" | "catalog";
     /**
      * If provided, marks all repertoireTunes as scheduled this many days ago.
@@ -628,7 +628,7 @@ export async function setupForPracticeTestsParallel(
   }
 ) {
   const {
-    repertoireTunes = [9001, 3497],
+    repertoireTunes = [],
     startTab = "practice",
     scheduleDaysAgo,
   } = opts ?? {};
@@ -726,7 +726,7 @@ export async function setupForRepertoireTestsParallel(
   page: Page,
   user: TestUser,
   opts: {
-    repertoireTunes: number[];
+    repertoireTunes: string[];
     scheduleTunes?: boolean;
     scheduleDaysAgo?: number;
   }

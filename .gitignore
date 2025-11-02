@@ -119,3 +119,13 @@ test-retest-output.txt
 test-chromium-both-output.txt
 failures.list
 test-output.txt
+
+scripts/debug/
+sql_scripts/debug/
+supabase/migrations.backup/
+*.disabled
+# _notes/*.md
+scripts/test-login.ts
+supabase/query_duplicates.ts
+_notes/phase-4-3-playwright-update-plan.md
+_notes/phase-5-migration-script-complete.md

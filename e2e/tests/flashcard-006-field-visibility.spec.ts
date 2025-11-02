@@ -1,4 +1,9 @@
 import { expect } from "@playwright/test";
+import {
+  TEST_TUNE_BANISH_ID,
+  TEST_TUNE_MASONS_ID,
+  TEST_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -11,10 +16,12 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe.serial("Flashcard Feature: Field Visibility", () => {
   test.beforeEach(async ({ page, testUser }) => {
-    const testUserPrivateTune1 = testUser.userId;
-    const testUserPrivateTune2 = testUser.userId + 10000;
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, 3497, testUserPrivateTune2], // ensure >= 2 cards available
+      repertoireTunes: [
+        TEST_TUNE_BANISH_ID,
+        TEST_TUNE_MASONS_ID,
+        TEST_TUNE_MORRISON_ID,
+      ], // ensure >= 2 cards available
       scheduleDaysAgo: 1, // Ensure multiple cards are available
       startTab: "practice",
     });

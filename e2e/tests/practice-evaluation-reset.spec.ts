@@ -12,14 +12,18 @@
  */
 
 import { expect } from "@playwright/test";
+import {
+  CATALOG_TUNE_54_ID,
+  TEST_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 
-test.describe.serial("Practice Evaluation Reset Behavior", () => {
+test.describe("Practice Evaluation Interaction", () => {
   test.beforeEach(async ({ page, testUser }) => {
     // Fast setup: seed 2 tunes, start on practice tab
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUser.userId, 3497],
+      repertoireTunes: [testUser.userId, TEST_TUNE_MORRISON_ID],
       startTab: "practice",
     });
   });
@@ -131,7 +135,7 @@ test.describe.serial("Practice Evaluation Reset Behavior", () => {
 
     // Select "Good" on a row that is currently (Not Set)
     const ids = await getNotSetIds(page, 1);
-    const targetId = ids[0] ?? 54;
+    const targetId = ids[0] ?? CATALOG_TUNE_54_ID; // Fallback to catalog tune 54
     const trigger = page.getByTestId(`recall-eval-${targetId}`);
     await trigger.scrollIntoViewIfNeeded();
     await selectEvalFor(page, targetId, "good");
@@ -162,7 +166,7 @@ test.describe.serial("Practice Evaluation Reset Behavior", () => {
   test("should correctly track count with multiple evaluations", async ({
     page,
   }) => {
-    // Using explicit row targets below for stability (IDs 54, 55)
+    // Using explicit row targets below for stability
     const submitButton = page.locator('button:has-text("Submit")');
     const baselineText = await submitButton.textContent();
     const baselineMatch = baselineText?.match(/Submit(\d+)/);

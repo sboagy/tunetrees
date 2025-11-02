@@ -36,35 +36,106 @@ const SUPABASE_SERVICE_ROLE_KEY =
 const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || "TestPassword123!";
 
 // Test users configuration
+// These match the UUIDs in tests/fixtures/test-data.ts
 const TEST_USERS = [
   {
-    id: "11111111-1111-1111-1111-111111111111",
+    id: "00000000-0000-4000-8000-000000000001",
+    email: "test@example.com",
+    password: TEST_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      name: "Test User",
+      role: "basic_test_user",
+    },
+  },
+  {
+    id: "00000000-0000-4000-8000-000000000002",
+    email: "test2@example.com",
+    password: TEST_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      name: "Test User 2",
+      role: "basic_test_user",
+    },
+  },
+  {
+    id: "00000000-0000-4000-8000-000000009001",
     email: "alice.test@tunetrees.test",
     password: TEST_PASSWORD,
     email_confirm: true,
     user_metadata: {
-      name: "Alice Test User",
-      role: "primary_test_user",
+      name: "Alice Test",
+      role: "playwright_test_user",
     },
   },
   {
-    id: "22222222-2222-2222-2222-222222222222",
+    id: "00000000-0000-4000-8000-000000009002",
     email: "bob.test@tunetrees.test",
     password: TEST_PASSWORD,
     email_confirm: true,
     user_metadata: {
-      name: "Bob Test User",
-      role: "secondary_test_user",
+      name: "Bob Test",
+      role: "playwright_test_user",
     },
   },
   {
-    id: "33333333-3333-3333-3333-333333333333",
-    email: "charlie.test@tunetrees.test",
+    id: "00000000-0000-4000-8000-000000009004",
+    email: "dave.test@tunetrees.test",
     password: TEST_PASSWORD,
     email_confirm: true,
     user_metadata: {
-      name: "Charlie Test User",
-      role: "edge_case_test_user",
+      name: "Dave Test",
+      role: "playwright_test_user",
+    },
+  },
+  {
+    id: "00000000-0000-4000-8000-000000009005",
+    email: "eve.test@tunetrees.test",
+    password: TEST_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      name: "Eve Test",
+      role: "playwright_test_user",
+    },
+  },
+  {
+    id: "00000000-0000-4000-8000-000000009006",
+    email: "frank.test@tunetrees.test",
+    password: TEST_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      name: "Frank Test",
+      role: "playwright_test_user",
+    },
+  },
+  {
+    id: "00000000-0000-4000-8000-000000009007",
+    email: "grace.test@tunetrees.test",
+    password: TEST_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      name: "Grace Test",
+      role: "playwright_test_user",
+    },
+  },
+  {
+    id: "00000000-0000-4000-8000-000000009008",
+    email: "henry.test@tunetrees.test",
+    password: TEST_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      name: "Henry Test",
+      role: "playwright_test_user",
+    },
+  },
+  {
+    id: "00000000-0000-4000-8000-000000009009",
+    email: "iris.test@tunetrees.test",
+    password: TEST_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      name: "Iris Test",
+      role: "playwright_test_user",
     },
   },
 ];

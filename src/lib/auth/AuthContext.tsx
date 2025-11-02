@@ -34,8 +34,8 @@ import { type SyncService, startSyncWorker } from "../sync";
 interface AuthState {
   /** Current authenticated user (reactive) */
   user: Accessor<User | null>;
-  /** Current authenticated user's integer user_profile.id (reactive) */
-  userIdInt: Accessor<number | null>;
+  /** Current authenticated user's UUID from user_profile.supabase_user_id (reactive) */
+  userIdInt: Accessor<string | null>;
 
   /** Current session (reactive) */
   session: Accessor<Session | null>;
@@ -110,7 +110,7 @@ const AuthContext = createContext<AuthState>();
  */
 export const AuthProvider: ParentComponent = (props) => {
   const [user, setUser] = createSignal<User | null>(null);
-  const [userIdInt, setUserIdInt] = createSignal<number | null>(null);
+  const [userIdInt, setUserIdInt] = createSignal<string | null>(null);
   const [session, setSession] = createSignal<Session | null>(null);
   const [loading, setLoading] = createSignal(true);
   const [localDb, setLocalDb] = createSignal<SqliteDatabase | null>(null);
@@ -146,10 +146,10 @@ export const AuthProvider: ParentComponent = (props) => {
       // Set up auto-persistence (store cleanup for later)
       autoPersistCleanup = setupAutoPersist();
 
-      // Get user's integer ID from user_profile table (user_ref columns use integer IDs)
+      // Get user's UUID from user_profile table (user_ref columns now use UUID)
       const { data: userProfile, error } = await supabase
         .from("user_profile")
-        .select("id")
+        .select("supabase_user_id")
         .eq("supabase_user_id", userId)
         .single();
 
@@ -158,9 +158,9 @@ export const AuthProvider: ParentComponent = (props) => {
         throw new Error("User profile not found in database");
       }
 
-      const userIntId = userProfile.id;
-      setUserIdInt(userIntId);
-      log.debug("User integer ID:", userIntId, "UUID:", userId);
+      const userUuid = userProfile.supabase_user_id;
+      setUserIdInt(userUuid);
+      log.debug("User UUID:", userUuid);
 
       // Start sync worker (now uses Supabase JS client, browser-compatible)
       // Realtime is disabled by default to reduce console noise during development
@@ -169,7 +169,7 @@ export const AuthProvider: ParentComponent = (props) => {
       if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
         const syncWorker = startSyncWorker(db, {
           supabase,
-          userId: userIntId,
+          userId: userUuid,
           realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
           syncIntervalMs: 5000, // Sync every 5 seconds (fast upload of local changes)
           onSyncComplete: () => {
@@ -304,12 +304,22 @@ export const AuthProvider: ParentComponent = (props) => {
    */
   const signIn = async (email: string, password: string) => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    console.log("🔐 SignIn attempt:", {
+      email,
+      passwordLength: password.length,
+    });
+    console.log("🔐 Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
+    const result = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+    console.log("🔐 SignIn result:", {
+      success: !result.error,
+      error: result.error,
+      user: result.data?.user?.email,
+    });
     setLoading(false);
-    return { error };
+    return { error: result.error };
   };
 
   /**

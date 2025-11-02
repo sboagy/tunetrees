@@ -18,6 +18,7 @@
  */
 
 import { and, eq, sql } from "drizzle-orm";
+import { generateId } from "@/lib/utils/uuid";
 import { queueSync } from "../../sync";
 import type { SqliteDatabase } from "../client-sqlite";
 import {
@@ -59,7 +60,7 @@ export async function getUserPlaylists(
 ): Promise<PlaylistWithSummary[]> {
   // First, get the user_profile id from supabase_user_id
   const userRecord = await db
-    .select({ id: userProfile.id })
+    .select({ id: userProfile.supabaseUserId })
     .from(userProfile)
     .where(eq(userProfile.supabaseUserId, userId))
     .limit(1);
@@ -97,9 +98,9 @@ export async function getUserPlaylists(
       deviceId: playlist.deviceId,
       tuneCount: sql<number>`(
         SELECT COUNT(*)
-        FROM ${playlistTune}
-        WHERE ${playlistTune.playlistRef} = ${playlist.playlistId}
-          AND ${playlistTune.deleted} = 0
+        FROM playlist_tune
+        WHERE playlist_ref = ${playlist.playlistId}
+          AND deleted = 0
       )`,
     })
     .from(playlist)
@@ -126,7 +127,7 @@ export async function getUserPlaylists(
  *
  * @example
  * ```typescript
- * const playlist = await getPlaylistById(db, 1, 'user-uuid');
+ * const playlist = await getPlaylistById(db, 'playlist-uuid', 'user-uuid');
  * if (!playlist) {
  *   console.log('Playlist not found or access denied');
  * }
@@ -134,12 +135,12 @@ export async function getUserPlaylists(
  */
 export async function getPlaylistById(
   db: SqliteDatabase,
-  playlistId: number,
+  playlistId: string,
   userId: string
 ): Promise<Playlist | null> {
   // Get user_ref from supabase_user_id
   const userRecord = await db
-    .select({ id: userProfile.id })
+    .select({ id: userProfile.supabaseUserId })
     .from(userProfile)
     .where(eq(userProfile.supabaseUserId, userId))
     .limit(1);
@@ -190,12 +191,12 @@ export async function createPlaylist(
   userId: string,
   data: Omit<
     NewPlaylist,
-    "userRef" | "syncVersion" | "lastModifiedAt" | "deviceId"
+    "playlistId" | "userRef" | "syncVersion" | "lastModifiedAt" | "deviceId"
   >
 ): Promise<Playlist> {
   // Get user_ref from supabase_user_id
   const userRecord = await db
-    .select({ id: userProfile.id })
+    .select({ id: userProfile.supabaseUserId })
     .from(userProfile)
     .where(eq(userProfile.supabaseUserId, userId))
     .limit(1);
@@ -208,6 +209,7 @@ export async function createPlaylist(
   const now = new Date().toISOString();
 
   const newPlaylist: NewPlaylist = {
+    playlistId: generateId(),
     userRef,
     name: data.name ?? null,
     genreDefault: data.genreDefault ?? null,
@@ -251,16 +253,16 @@ export async function createPlaylist(
  *
  * @example
  * ```typescript
- * const updated = await updatePlaylist(db, 1, 'user-uuid', {
+ * const updated = await updatePlaylist(db, 'playlist-uuid', 'user-uuid', {
  *   srAlgType: 'sm2',
  * });
  * ```
  */
 export async function updatePlaylist(
   db: SqliteDatabase,
-  playlistId: number,
+  playlistId: string,
   userId: string,
-  data: Partial<Omit<NewPlaylist, "userRef" | "playlistId">>
+  data: Partial<Omit<NewPlaylist, "userRef" | "id">>
 ): Promise<Playlist | null> {
   // Verify ownership
   const existing = await getPlaylistById(db, playlistId, userId);
@@ -306,7 +308,7 @@ export async function updatePlaylist(
  *
  * @example
  * ```typescript
- * const deleted = await deletePlaylist(db, 1, 'user-uuid');
+ * const deleted = await deletePlaylist(db, 'playlist-uuid', 'user-uuid');
  * if (deleted) {
  *   console.log('Playlist deleted');
  * }
@@ -314,7 +316,7 @@ export async function updatePlaylist(
  */
 export async function deletePlaylist(
   db: SqliteDatabase,
-  playlistId: number,
+  playlistId: string,
   userId: string
 ): Promise<boolean> {
   // Verify ownership
@@ -340,7 +342,7 @@ export async function deletePlaylist(
     .update(playlistTune)
     .set({
       deleted: 1,
-      syncVersion: sql`${playlistTune.syncVersion} + 1`,
+      syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
       lastModifiedAt: now,
     })
     .where(eq(playlistTune.playlistRef, playlistId));
@@ -365,14 +367,14 @@ export async function deletePlaylist(
  *
  * @example
  * ```typescript
- * const association = await addTuneToPlaylist(db, 1, 123, 'user-uuid');
+ * const association = await addTuneToPlaylist(db, 'playlist-uuid', 'tune-uuid', 'user-uuid');
  * console.log(`Added tune ${tuneId} to playlist ${playlistId}`);
  * ```
  */
 export async function addTuneToPlaylist(
   db: SqliteDatabase,
-  playlistId: number,
-  tuneId: number,
+  playlistId: string,
+  tuneId: string,
   userId: string
 ): Promise<PlaylistTune> {
   // Verify playlist ownership
@@ -468,7 +470,7 @@ export async function addTuneToPlaylist(
  *
  * @example
  * ```typescript
- * const removed = await removeTuneFromPlaylist(db, 1, 123, 'user-uuid');
+ * const removed = await removeTuneFromPlaylist(db, 'playlist-uuid', 'tune-uuid', 'user-uuid');
  * if (removed) {
  *   console.log('Tune removed from playlist');
  * }
@@ -476,8 +478,8 @@ export async function addTuneToPlaylist(
  */
 export async function removeTuneFromPlaylist(
   db: SqliteDatabase,
-  playlistId: number,
-  tuneId: number,
+  playlistId: string,
+  tuneId: string,
   userId: string
 ): Promise<boolean> {
   // Verify playlist ownership
@@ -492,7 +494,7 @@ export async function removeTuneFromPlaylist(
     .update(playlistTune)
     .set({
       deleted: 1,
-      syncVersion: sql`${playlistTune.syncVersion} + 1`,
+      syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
       lastModifiedAt: now,
     })
     .where(
@@ -525,13 +527,13 @@ export async function removeTuneFromPlaylist(
  *
  * @example
  * ```typescript
- * const tunes = await getPlaylistTunes(db, 1, 'user-uuid');
+ * const tunes = await getPlaylistTunes(db, 'playlist-uuid', 'user-uuid');
  * console.log(`Playlist has ${tunes.length} tunes`);
  * ```
  */
 export async function getPlaylistTunes(
   db: SqliteDatabase,
-  playlistId: number,
+  playlistId: string,
   userId: string
 ) {
   // Verify playlist ownership
@@ -602,13 +604,13 @@ export async function getPlaylistTunes(
  *
  * @example
  * ```typescript
- * const tunes = await getPlaylistTunesStaged(db, 1, 'user-uuid');
+ * const tunes = await getPlaylistTunesStaged(db, 'playlist-uuid', 'user-uuid');
  * console.log(`Repertoire has ${tunes.length} tunes`);
  * ```
  */
 export async function getPlaylistTunesStaged(
   db: SqliteDatabase,
-  playlistId: number,
+  playlistId: string,
   userId: string
 ) {
   // Verify playlist ownership
@@ -619,7 +621,7 @@ export async function getPlaylistTunesStaged(
 
   // Get user_ref from supabase_user_id
   const userRecord = await db
-    .select({ id: userProfile.id })
+    .select({ id: userProfile.supabaseUserId })
     .from(userProfile)
     .where(eq(userProfile.supabaseUserId, userId))
     .limit(1);
@@ -657,16 +659,16 @@ export async function getPlaylistTunesStaged(
  *
  * @example
  * ```typescript
- * const result = await addTunesToPlaylist(db, 1, [123, 456, 789], 'user-uuid');
+ * const result = await addTunesToPlaylist(db, 'playlist-uuid', ['tune1', 'tune2', 'tune3'], 'user-uuid');
  * console.log(`Added ${result.added} tunes, skipped ${result.skipped} (already in playlist)`);
  * ```
  */
 export async function addTunesToPlaylist(
   db: SqliteDatabase,
-  playlistId: number,
-  tuneIds: number[],
+  playlistId: string,
+  tuneIds: string[],
   userId: string
-): Promise<{ added: number; skipped: number; tuneIds: number[] }> {
+): Promise<{ added: number; skipped: number; tuneIds: string[] }> {
   // Verify playlist ownership
   const playlistRecord = await getPlaylistById(db, playlistId, userId);
   if (!playlistRecord) {
@@ -675,7 +677,7 @@ export async function addTunesToPlaylist(
 
   let added = 0;
   let skipped = 0;
-  const addedTuneIds: number[] = [];
+  const addedTuneIds: string[] = [];
 
   for (const tuneId of tuneIds) {
     try {

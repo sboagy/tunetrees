@@ -9,6 +9,7 @@
  */
 
 import { desc, eq, sql } from "drizzle-orm";
+import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { syncQueue } from "../db/schema";
 import type { SyncQueueItem } from "../db/types";
@@ -81,6 +82,7 @@ export async function queueSync(
   const [queueItem] = await db
     .insert(syncQueue)
     .values({
+      id: generateId(),
       tableName: tableName,
       recordId: String(recordId),
       operation,
@@ -142,7 +144,7 @@ export async function getFailedSyncItems(
  */
 export async function updateSyncStatus(
   db: SqliteDatabase,
-  itemId: number,
+  itemId: string,
   status: SyncStatus,
   error?: string
 ): Promise<void> {
@@ -150,7 +152,7 @@ export async function updateSyncStatus(
     .update(syncQueue)
     .set({
       status,
-      attempts: sql`${syncQueue.attempts} + 1`,
+      attempts: sql.raw(`${syncQueue.attempts.name} + 1`),
       lastError: error || null,
     })
     .where(eq(syncQueue.id, itemId));
@@ -164,7 +166,7 @@ export async function updateSyncStatus(
  */
 export async function markSynced(
   db: SqliteDatabase,
-  itemId: number
+  itemId: string
 ): Promise<void> {
   await db.delete(syncQueue).where(eq(syncQueue.id, itemId));
 }
@@ -177,7 +179,7 @@ export async function markSynced(
  */
 export async function retrySyncItem(
   db: SqliteDatabase,
-  itemId: number
+  itemId: string
 ): Promise<void> {
   await db
     .update(syncQueue)

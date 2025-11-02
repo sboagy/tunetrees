@@ -21,6 +21,10 @@
  */
 
 import { expect } from "@playwright/test";
+import {
+  TEST_TUNE_BANISH_ID,
+  TEST_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 // import { TuneTreesPage } from "../helpers/page-objects";
 import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
@@ -30,7 +34,7 @@ test.describe("Repertoire: Add To Review", () => {
 
   test.beforeEach(async ({ page, testUser }) => {
     await setupForRepertoireTestsParallel(page, testUser, {
-      repertoireTunes: [testUser.userId, testUser.userId + 10000], // User's 2 private tunes
+      repertoireTunes: [TEST_TUNE_BANISH_ID, TEST_TUNE_MORRISON_ID], // User's 2 private tunes
       scheduleTunes: false,
     });
 

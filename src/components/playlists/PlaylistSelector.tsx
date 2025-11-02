@@ -33,7 +33,7 @@ interface PlaylistSelectorProps {
   /**
    * Callback when playlist selection changes
    */
-  onPlaylistChange?: (playlistId: number) => void;
+  onPlaylistChange?: (playlistId: string) => void;
 
   /**
    * CSS class for styling
@@ -56,7 +56,7 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
   const { user, localDb } = useAuth();
   const [playlists, setPlaylists] = createSignal<PlaylistWithSummary[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistIdSignal] = createSignal<
-    number | null
+    string | null
   >(null);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
@@ -109,7 +109,7 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
     }
   }
 
-  function handlePlaylistSelect(playlistId: number) {
+  function handlePlaylistSelect(playlistId: string) {
     const currentUser = user();
     if (!currentUser) return;
 
@@ -148,7 +148,9 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
         >
           <div class="flex-1">
             <div class="font-medium text-gray-900 dark:text-white">
-              Playlist {selectedPlaylist()?.playlistId}
+              {selectedPlaylist()?.name ||
+                selectedPlaylist()?.instrumentName ||
+                "Unnamed Playlist"}
             </div>
             <div class="text-xs text-gray-500 dark:text-gray-400">
               {selectedPlaylist()?.tuneCount || 0} tune
@@ -198,7 +200,9 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
                 <div class="flex justify-between items-start">
                   <div class="flex-1">
                     <div class="font-medium text-gray-900 dark:text-white">
-                      {playlist.name || `Playlist ${playlist.playlistId}`}
+                      {playlist.name ||
+                        playlist.instrumentName ||
+                        "Unnamed Playlist"}
                     </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {playlist.tuneCount}{" "}
