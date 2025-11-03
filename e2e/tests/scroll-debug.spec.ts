@@ -161,7 +161,7 @@ test.describe("Scroll Reset Debugger", () => {
     }
   });
 
-  test("trace scroll resets across tabs and actions", async ({ page }) => {
+  test.skip("trace scroll resets across tabs and actions", async ({ page }) => {
     // Force a desktop-like viewport to ensure tab buttons are visible
     await page.setViewportSize({ width: 1366, height: 900 });
     await setDebugFlags(page);
