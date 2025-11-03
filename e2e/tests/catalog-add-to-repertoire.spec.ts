@@ -23,10 +23,8 @@ import {
   CATALOG_TUNE_ALASDRUIMS_MARCH,
 } from "../../src/lib/db/catalog-tune-ids";
 import {
-  CATALOG_TUNE_54_ID,
   CATALOG_TUNE_66_ID,
   CATALOG_TUNE_70_ID,
-  CATALOG_TUNE_MORRISON_ID,
   getPrivateTuneIds,
 } from "../../tests/fixtures/test-data";
 import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";

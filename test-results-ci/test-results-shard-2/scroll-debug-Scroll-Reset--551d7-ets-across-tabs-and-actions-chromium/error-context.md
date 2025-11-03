@@ -1,0 +1,587 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - link "TuneTrees Logo TuneTrees" [ref=e9] [cursor=pointer]:
+          - /url: /
+          - img "TuneTrees Logo" [ref=e10]
+          - generic [ref=e11]: TuneTrees
+        - button "Select playlist" [ref=e13]:
+          - generic [ref=e14]: Irish Flute
+          - img [ref=e15]
+      - generic [ref=e17]:
+        - button "User menu" [ref=e19]:
+          - generic [ref=e20]: alice.test@tunetrees.test
+          - img [ref=e21]
+        - button "Database and sync status" [ref=e24]:
+          - img [ref=e25]
+          - generic "Synced" [ref=e29]: ✓
+  - generic [ref=e30]:
+    - complementary [ref=e31]:
+      - generic [ref=e33]:
+        - generic [ref=e35]:
+          - img [ref=e36]
+          - paragraph [ref=e40]: No tune selected
+          - paragraph [ref=e41]: Click a tune to view details
+        - region [ref=e42]:
+          - generic [ref=e43]:
+            - generic [ref=e45]:
+              - img [ref=e46]
+              - heading "0 references" [level=4] [ref=e49]
+            - paragraph [ref=e50]: Select a tune to view references
+            - generic [ref=e52]:
+              - paragraph [ref=e53]: No references yet
+              - paragraph [ref=e54]: Add links to videos, sheet music, or articles
+        - region [ref=e55]:
+          - generic [ref=e56]:
+            - generic [ref=e58]:
+              - img [ref=e59]
+              - heading "0 notes" [level=4] [ref=e62]
+            - paragraph [ref=e63]: Select a tune to view notes
+      - button "Resize sidebar" [ref=e64]:
+        - generic:
+          - img
+      - generic [ref=e65]:
+        - button "Collapse sidebar" [expanded] [ref=e66]:
+          - img [ref=e67]
+        - button "Drag to reposition sidebar" [ref=e71]:
+          - img
+    - generic [ref=e72]:
+      - navigation "Tabs" [ref=e74]:
+        - button "🎯Practice" [ref=e75]
+        - button "📚Repertoire" [ref=e76]
+        - button "📖Catalog" [active] [ref=e77]
+        - button "📊Analysis" [ref=e78]
+      - generic [ref=e80]:
+        - generic [ref=e82]:
+          - generic [ref=e83]:
+            - button "Add To Repertoire" [ref=e84]:
+              - img [ref=e85]
+              - generic [ref=e87]: Add To Repertoire
+            - generic [ref=e88]:
+              - img
+              - textbox "Search tunes..." [ref=e89]
+            - button "Filter options" [ref=e91]:
+              - img [ref=e92]
+              - generic [ref=e94]: Filters
+              - img "Toggle filters" [ref=e95]
+            - button "Add Tune" [ref=e97]:
+              - img [ref=e98]
+              - generic [ref=e100]: Add Tune
+            - button "Delete" [disabled] [ref=e101]:
+              - img [ref=e102]
+              - generic [ref=e104]: Delete
+          - button "Columns" [ref=e107]:
+            - img [ref=e108]
+            - generic [ref=e110]: Columns
+            - img [ref=e111]
+        - generic [ref=e114]:
+          - table [ref=e116]:
+            - rowgroup [ref=e117]:
+              - 'row "Select all rows ID ↕ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"ID\" }) column Resize id column Title ↑ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Title\" }) column Resize title column Type ↕ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Type\" }) column Resize type column Mode ↕ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Mode\" }) column Resize mode column Structure ↕ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Structure\" }) column Resize structure column Status ↕ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Status\" }) column Resize private_for column" [ref=e118]':
+                - cell "Select all rows" [ref=e119]:
+                  - checkbox "Select all rows" [ref=e122] [cursor=pointer]
+                - 'cell "ID ↕ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"ID\" }) column Resize id column" [ref=e123]':
+                  - generic [ref=e124]:
+                    - button "ID ↕" [ref=e126]:
+                      - generic [ref=e127]: ID
+                      - generic [ref=e128]: ↕
+                    - 'button "Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"ID\" }) column" [ref=e129]':
+                      - img
+                  - button "Resize id column" [ref=e130]
+                - 'cell "Title ↑ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Title\" }) column Resize title column" [ref=e131]':
+                  - generic [ref=e132]:
+                    - button "Title ↑" [ref=e134]:
+                      - generic [ref=e135]: Title
+                      - generic [ref=e136]: ↑
+                    - 'button "Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Title\" }) column" [ref=e137]':
+                      - img
+                  - button "Resize title column" [ref=e138]
+                - 'cell "Type ↕ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Type\" }) column Resize type column" [ref=e139]':
+                  - generic [ref=e140]:
+                    - button "Type ↕" [ref=e142]:
+                      - generic [ref=e143]: Type
+                      - generic [ref=e144]: ↕
+                    - 'button "Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Type\" }) column" [ref=e145]':
+                      - img
+                  - button "Resize type column" [ref=e146]
+                - 'cell "Mode ↕ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Mode\" }) column Resize mode column" [ref=e147]':
+                  - generic [ref=e148]:
+                    - button "Mode ↕" [ref=e150]:
+                      - generic [ref=e151]: Mode
+                      - generic [ref=e152]: ↕
+                    - 'button "Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Mode\" }) column" [ref=e153]':
+                      - img
+                  - button "Resize mode column" [ref=e154]
+                - 'cell "Structure ↕ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Structure\" }) column Resize structure column" [ref=e155]':
+                  - generic [ref=e156]:
+                    - button "Structure ↕" [ref=e158]:
+                      - generic [ref=e159]: Structure
+                      - generic [ref=e160]: ↕
+                    - 'button "Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Structure\" }) column" [ref=e161]':
+                      - img
+                  - button "Resize structure column" [ref=e162]
+                - 'cell "Status ↕ Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Status\" }) column Resize private_for column" [ref=e163]':
+                  - generic [ref=e164]:
+                    - button "Status ↕" [ref=e166]:
+                      - generic [ref=e167]: Status
+                      - generic [ref=e168]: ↕
+                    - 'button "Drag to reorder ({ column }) => _$createComponent(SortableHeader, { column, title: \"Status\" }) column" [ref=e169]':
+                      - img
+                  - button "Resize private_for column" [ref=e170]
+            - rowgroup [ref=e171]:
+              - row
+              - row "Select row 019a3f77-efdc-70ab-a1eb-aac1b42a7b53 019a3f77-efdc-70ab-a1eb-aac1b42a7b53 A Fig for a Kiss JigSl E Dorian AB Public" [ref=e172] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdc-70ab-a1eb-aac1b42a7b53" [ref=e173]:
+                  - checkbox "Select row 019a3f77-efdc-70ab-a1eb-aac1b42a7b53" [ref=e174]
+                - cell "019a3f77-efdc-70ab-a1eb-aac1b42a7b53" [ref=e175]
+                - cell "A Fig for a Kiss" [ref=e176]:
+                  - link "A Fig for a Kiss" [ref=e177]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdc-70ab-a1eb-aac1b42a7b53/
+                - cell "JigSl" [ref=e178]:
+                  - generic [ref=e179]: JigSl
+                - cell "E Dorian" [ref=e180]:
+                  - generic [ref=e181]: E Dorian
+                - cell "AB" [ref=e182]
+                - cell "Public" [ref=e183]:
+                  - generic [ref=e184]: Public
+              - row "Select row 019a3f77-efdb-7079-bc17-f665e277d646 019a3f77-efdb-7079-bc17-f665e277d646 Abbey Reel Reel A Dorian AB Public" [ref=e185] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-7079-bc17-f665e277d646" [ref=e186]:
+                  - checkbox "Select row 019a3f77-efdb-7079-bc17-f665e277d646" [ref=e187]
+                - cell "019a3f77-efdb-7079-bc17-f665e277d646" [ref=e188]
+                - cell "Abbey Reel" [ref=e189]:
+                  - link "Abbey Reel" [ref=e190]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-7079-bc17-f665e277d646/
+                - cell "Reel" [ref=e191]:
+                  - generic [ref=e192]: Reel
+                - cell "A Dorian" [ref=e193]:
+                  - generic [ref=e194]: A Dorian
+                - cell "AB" [ref=e195]
+                - cell "Public" [ref=e196]:
+                  - generic [ref=e197]: Public
+              - row "Select row 019a3f77-efdb-7042-b723-c310e6040c3f 019a3f77-efdb-7042-b723-c310e6040c3f Alasdruim's March (Rolling Wave 2) JigD G Major AABB Public" [ref=e198] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-7042-b723-c310e6040c3f" [ref=e199]:
+                  - checkbox "Select row 019a3f77-efdb-7042-b723-c310e6040c3f" [ref=e200]
+                - cell "019a3f77-efdb-7042-b723-c310e6040c3f" [ref=e201]
+                - cell "Alasdruim's March (Rolling Wave 2)" [ref=e202]:
+                  - link "Alasdruim's March (Rolling Wave 2)" [ref=e203]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-7042-b723-c310e6040c3f/
+                - cell "JigD" [ref=e204]:
+                  - generic [ref=e205]: JigD
+                - cell "G Major" [ref=e206]:
+                  - generic [ref=e207]: G Major
+                - cell "AABB" [ref=e208]
+                - cell "Public" [ref=e209]:
+                  - generic [ref=e210]: Public
+              - row "Select row 019a3f77-efdb-70c0-9ec2-8061bb07a94a 019a3f77-efdb-70c0-9ec2-8061bb07a94a Alexander's Hpipe D Major AABB Public" [ref=e211] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-70c0-9ec2-8061bb07a94a" [ref=e212]:
+                  - checkbox "Select row 019a3f77-efdb-70c0-9ec2-8061bb07a94a" [ref=e213]
+                - cell "019a3f77-efdb-70c0-9ec2-8061bb07a94a" [ref=e214]
+                - cell "Alexander's" [ref=e215]:
+                  - link "Alexander's" [ref=e216]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-70c0-9ec2-8061bb07a94a/
+                - cell "Hpipe" [ref=e217]:
+                  - generic [ref=e218]: Hpipe
+                - cell "D Major" [ref=e219]:
+                  - generic [ref=e220]: D Major
+                - cell "AABB" [ref=e221]
+                - cell "Public" [ref=e222]:
+                  - generic [ref=e223]: Public
+              - row "Select row 019a3f77-efdb-7044-aff0-8d363601dd9c 019a3f77-efdb-7044-aff0-8d363601dd9c An Chóisir Slide B Minor AABB Public" [ref=e224] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-7044-aff0-8d363601dd9c" [ref=e225]:
+                  - checkbox "Select row 019a3f77-efdb-7044-aff0-8d363601dd9c" [ref=e226]
+                - cell "019a3f77-efdb-7044-aff0-8d363601dd9c" [ref=e227]
+                - cell "An Chóisir" [ref=e228]:
+                  - link "An Chóisir" [ref=e229]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-7044-aff0-8d363601dd9c/
+                - cell "Slide" [ref=e230]:
+                  - generic [ref=e231]: Slide
+                - cell "B Minor" [ref=e232]:
+                  - generic [ref=e233]: B Minor
+                - cell "AABB" [ref=e234]
+                - cell "Public" [ref=e235]:
+                  - generic [ref=e236]: Public
+              - row "Select row 019a3f77-efdb-70bc-b1f9-8a474e665927 019a3f77-efdb-70bc-b1f9-8a474e665927 An Sean Duine JigD D Major AABB Public" [ref=e237] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-70bc-b1f9-8a474e665927" [ref=e238]:
+                  - checkbox "Select row 019a3f77-efdb-70bc-b1f9-8a474e665927" [ref=e239]
+                - cell "019a3f77-efdb-70bc-b1f9-8a474e665927" [ref=e240]
+                - cell "An Sean Duine" [ref=e241]:
+                  - link "An Sean Duine" [ref=e242]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-70bc-b1f9-8a474e665927/
+                - cell "JigD" [ref=e243]:
+                  - generic [ref=e244]: JigD
+                - cell "D Major" [ref=e245]:
+                  - generic [ref=e246]: D Major
+                - cell "AABB" [ref=e247]
+                - cell "Public" [ref=e248]:
+                  - generic [ref=e249]: Public
+              - row "Select row 019a3f77-efdb-7061-ae8d-16cb01f600ab 019a3f77-efdb-7061-ae8d-16cb01f600ab Anderson's Reel Reel D Major AB Public" [ref=e250] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-7061-ae8d-16cb01f600ab" [ref=e251]:
+                  - checkbox "Select row 019a3f77-efdb-7061-ae8d-16cb01f600ab" [ref=e252]
+                - cell "019a3f77-efdb-7061-ae8d-16cb01f600ab" [ref=e253]
+                - cell "Anderson's Reel" [ref=e254]:
+                  - link "Anderson's Reel" [ref=e255]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-7061-ae8d-16cb01f600ab/
+                - cell "Reel" [ref=e256]:
+                  - generic [ref=e257]: Reel
+                - cell "D Major" [ref=e258]:
+                  - generic [ref=e259]: D Major
+                - cell "AB" [ref=e260]
+                - cell "Public" [ref=e261]:
+                  - generic [ref=e262]: Public
+              - row "Select row 019a3f77-efdc-703b-b868-d1ecd0f5f74d 019a3f77-efdc-703b-b868-d1ecd0f5f74d Anthony Frawley's JigD G Major AABB Public" [ref=e263] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdc-703b-b868-d1ecd0f5f74d" [ref=e264]:
+                  - checkbox "Select row 019a3f77-efdc-703b-b868-d1ecd0f5f74d" [ref=e265]
+                - cell "019a3f77-efdc-703b-b868-d1ecd0f5f74d" [ref=e266]
+                - cell "Anthony Frawley's" [ref=e267]:
+                  - link "Anthony Frawley's" [ref=e268]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdc-703b-b868-d1ecd0f5f74d/
+                - cell "JigD" [ref=e269]:
+                  - generic [ref=e270]: JigD
+                - cell "G Major" [ref=e271]:
+                  - generic [ref=e272]: G Major
+                - cell "AABB" [ref=e273]
+                - cell "Public" [ref=e274]:
+                  - generic [ref=e275]: Public
+              - row "Select row 019a3f77-efdb-707f-b6cc-71e5b62e7334 019a3f77-efdb-707f-b6cc-71e5b62e7334 Apples in Winter JigD E Dorian AABB Public" [ref=e276] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-707f-b6cc-71e5b62e7334" [ref=e277]:
+                  - checkbox "Select row 019a3f77-efdb-707f-b6cc-71e5b62e7334" [ref=e278]
+                - cell "019a3f77-efdb-707f-b6cc-71e5b62e7334" [ref=e279]
+                - cell "Apples in Winter" [ref=e280]:
+                  - link "Apples in Winter" [ref=e281]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-707f-b6cc-71e5b62e7334/
+                - cell "JigD" [ref=e282]:
+                  - generic [ref=e283]: JigD
+                - cell "E Dorian" [ref=e284]:
+                  - generic [ref=e285]: E Dorian
+                - cell "AABB" [ref=e286]
+                - cell "Public" [ref=e287]:
+                  - generic [ref=e288]: Public
+              - row "Select row 019a3f77-efdb-7068-8367-a5410d4c2991 019a3f77-efdb-7068-8367-a5410d4c2991 Ash Plant Reel E Dorian AABB Public" [ref=e289] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-7068-8367-a5410d4c2991" [ref=e290]:
+                  - checkbox "Select row 019a3f77-efdb-7068-8367-a5410d4c2991" [ref=e291]
+                - cell "019a3f77-efdb-7068-8367-a5410d4c2991" [ref=e292]
+                - cell "Ash Plant" [ref=e293]:
+                  - link "Ash Plant" [ref=e294]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-7068-8367-a5410d4c2991/
+                - cell "Reel" [ref=e295]:
+                  - generic [ref=e296]: Reel
+                - cell "E Dorian" [ref=e297]:
+                  - generic [ref=e298]: E Dorian
+                - cell "AABB" [ref=e299]
+                - cell "Public" [ref=e300]:
+                  - generic [ref=e301]: Public
+              - row "Select row 019a3f77-efdc-707d-b436-0c1ecb165739 019a3f77-efdc-707d-b436-0c1ecb165739 Back of the Haggard Hpipe D Major AABB Public" [ref=e302] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdc-707d-b436-0c1ecb165739" [ref=e303]:
+                  - checkbox "Select row 019a3f77-efdc-707d-b436-0c1ecb165739" [ref=e304]
+                - cell "019a3f77-efdc-707d-b436-0c1ecb165739" [ref=e305]
+                - cell "Back of the Haggard" [ref=e306]:
+                  - link "Back of the Haggard" [ref=e307]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdc-707d-b436-0c1ecb165739/
+                - cell "Hpipe" [ref=e308]:
+                  - generic [ref=e309]: Hpipe
+                - cell "D Major" [ref=e310]:
+                  - generic [ref=e311]: D Major
+                - cell "AABB" [ref=e312]
+                - cell "Public" [ref=e313]:
+                  - generic [ref=e314]: Public
+              - row "Select row 019a3f77-efdb-7018-9fc3-3db01574841b 019a3f77-efdb-7018-9fc3-3db01574841b Ballydesmond Polka Polka D Mixolydian AABB Public" [ref=e315] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-7018-9fc3-3db01574841b" [ref=e316]:
+                  - checkbox "Select row 019a3f77-efdb-7018-9fc3-3db01574841b" [ref=e317]
+                - cell "019a3f77-efdb-7018-9fc3-3db01574841b" [ref=e318]
+                - cell "Ballydesmond Polka" [ref=e319]:
+                  - link "Ballydesmond Polka" [ref=e320]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-7018-9fc3-3db01574841b/
+                - cell "Polka" [ref=e321]:
+                  - generic [ref=e322]: Polka
+                - cell "D Mixolydian" [ref=e323]:
+                  - generic [ref=e324]: D Mixolydian
+                - cell "AABB" [ref=e325]
+                - cell "Public" [ref=e326]:
+                  - generic [ref=e327]: Public
+              - row "Select row 019a3f77-efdb-70e0-971e-201bfff0ca44 019a3f77-efdb-70e0-971e-201bfff0ca44 Ballydesmond Polka Polka A Dorian AABB Public" [ref=e328] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-70e0-971e-201bfff0ca44" [ref=e329]:
+                  - checkbox "Select row 019a3f77-efdb-70e0-971e-201bfff0ca44" [ref=e330]
+                - cell "019a3f77-efdb-70e0-971e-201bfff0ca44" [ref=e331]
+                - cell "Ballydesmond Polka" [ref=e332]:
+                  - link "Ballydesmond Polka" [ref=e333]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-70e0-971e-201bfff0ca44/
+                - cell "Polka" [ref=e334]:
+                  - generic [ref=e335]: Polka
+                - cell "A Dorian" [ref=e336]:
+                  - generic [ref=e337]: A Dorian
+                - cell "AABB" [ref=e338]
+                - cell "Public" [ref=e339]:
+                  - generic [ref=e340]: Public
+              - 'row "Select row 019a3f77-efdb-70d6-92f3-1c5cf1295033 019a3f77-efdb-70d6-92f3-1c5cf1295033 Ballydesmond Polka #2 Polka A Dorian AABB Public" [ref=e341] [cursor=pointer]':
+                - cell "Select row 019a3f77-efdb-70d6-92f3-1c5cf1295033" [ref=e342]:
+                  - checkbox "Select row 019a3f77-efdb-70d6-92f3-1c5cf1295033" [ref=e343]
+                - cell "019a3f77-efdb-70d6-92f3-1c5cf1295033" [ref=e344]
+                - 'cell "Ballydesmond Polka #2" [ref=e345]':
+                  - 'link "Ballydesmond Polka #2" [ref=e346]':
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-70d6-92f3-1c5cf1295033/
+                - cell "Polka" [ref=e347]:
+                  - generic [ref=e348]: Polka
+                - cell "A Dorian" [ref=e349]:
+                  - generic [ref=e350]: A Dorian
+                - cell "AABB" [ref=e351]
+                - cell "Public" [ref=e352]:
+                  - generic [ref=e353]: Public
+              - row "Select row 019a3f77-efdc-7064-b9f6-12d0e7629275 019a3f77-efdc-7064-b9f6-12d0e7629275 Ballygow Polka Polka D Major AABB Public" [ref=e354] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdc-7064-b9f6-12d0e7629275" [ref=e355]:
+                  - checkbox "Select row 019a3f77-efdc-7064-b9f6-12d0e7629275" [ref=e356]
+                - cell "019a3f77-efdc-7064-b9f6-12d0e7629275" [ref=e357]
+                - cell "Ballygow Polka" [ref=e358]:
+                  - link "Ballygow Polka" [ref=e359]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdc-7064-b9f6-12d0e7629275/
+                - cell "Polka" [ref=e360]:
+                  - generic [ref=e361]: Polka
+                - cell "D Major" [ref=e362]:
+                  - generic [ref=e363]: D Major
+                - cell "AABB" [ref=e364]
+                - cell "Public" [ref=e365]:
+                  - generic [ref=e366]: Public
+              - row "Select row 019a3f77-efdc-7083-a7a0-4b47f54b4db6 019a3f77-efdc-7083-a7a0-4b47f54b4db6 Baltimore Salute Reel G Major AABB Public" [ref=e367] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdc-7083-a7a0-4b47f54b4db6" [ref=e368]:
+                  - checkbox "Select row 019a3f77-efdc-7083-a7a0-4b47f54b4db6" [ref=e369]
+                - cell "019a3f77-efdc-7083-a7a0-4b47f54b4db6" [ref=e370]
+                - cell "Baltimore Salute" [ref=e371]:
+                  - link "Baltimore Salute" [ref=e372]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdc-7083-a7a0-4b47f54b4db6/
+                - cell "Reel" [ref=e373]:
+                  - generic [ref=e374]: Reel
+                - cell "G Major" [ref=e375]:
+                  - generic [ref=e376]: G Major
+                - cell "AABB" [ref=e377]
+                - cell "Public" [ref=e378]:
+                  - generic [ref=e379]: Public
+              - row "Select row 019a3f77-efdb-70c3-8e73-c3c2233e7685 019a3f77-efdb-70c3-8e73-c3c2233e7685 Banish Misfortune JigD D Mixolydian AABBCC Public" [ref=e380] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-70c3-8e73-c3c2233e7685" [ref=e381]:
+                  - checkbox "Select row 019a3f77-efdb-70c3-8e73-c3c2233e7685" [ref=e382]
+                - cell "019a3f77-efdb-70c3-8e73-c3c2233e7685" [ref=e383]
+                - cell "Banish Misfortune" [ref=e384]:
+                  - link "Banish Misfortune" [ref=e385]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-70c3-8e73-c3c2233e7685/
+                - cell "JigD" [ref=e386]:
+                  - generic [ref=e387]: JigD
+                - cell "D Mixolydian" [ref=e388]:
+                  - generic [ref=e389]: D Mixolydian
+                - cell "AABBCC" [ref=e390]
+                - cell "Public" [ref=e391]:
+                  - generic [ref=e392]: Public
+              - row "Select row 00000000-0000-4000-8000-000000029001 00000000-0000-4000-8000-000000029001 Banish Misfortune JigD D Mixolydian AABBCC Public" [ref=e393] [cursor=pointer]:
+                - cell "Select row 00000000-0000-4000-8000-000000029001" [ref=e394]:
+                  - checkbox "Select row 00000000-0000-4000-8000-000000029001" [ref=e395]
+                - cell "00000000-0000-4000-8000-000000029001" [ref=e396]
+                - cell "Banish Misfortune" [ref=e397]:
+                  - link "Banish Misfortune" [ref=e398]:
+                    - /url: https://www.irishtune.info/tune/00000000-0000-4000-8000-000000029001/
+                - cell "JigD" [ref=e399]:
+                  - generic [ref=e400]: JigD
+                - cell "D Mixolydian" [ref=e401]:
+                  - generic [ref=e402]: D Mixolydian
+                - cell "AABBCC" [ref=e403]
+                - cell "Public" [ref=e404]:
+                  - generic [ref=e405]: Public
+              - row "Select row 019a3f77-efdb-703b-8785-7c7f9e2cca70 019a3f77-efdb-703b-8785-7c7f9e2cca70 Bank of Ireland Reel D Mixolydian AABB Public" [ref=e406] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-703b-8785-7c7f9e2cca70" [ref=e407]:
+                  - checkbox "Select row 019a3f77-efdb-703b-8785-7c7f9e2cca70" [ref=e408]
+                - cell "019a3f77-efdb-703b-8785-7c7f9e2cca70" [ref=e409]
+                - cell "Bank of Ireland" [ref=e410]:
+                  - link "Bank of Ireland" [ref=e411]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-703b-8785-7c7f9e2cca70/
+                - cell "Reel" [ref=e412]:
+                  - generic [ref=e413]: Reel
+                - cell "D Mixolydian" [ref=e414]:
+                  - generic [ref=e415]: D Mixolydian
+                - cell "AABB" [ref=e416]
+                - cell "Public" [ref=e417]:
+                  - generic [ref=e418]: Public
+              - row "Select row 019a3f77-efdb-7017-89ec-b8a87b75ae72 019a3f77-efdb-7017-89ec-b8a87b75ae72 Bank of Turf JigD D Major AABB Public" [ref=e419] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-7017-89ec-b8a87b75ae72" [ref=e420]:
+                  - checkbox "Select row 019a3f77-efdb-7017-89ec-b8a87b75ae72" [ref=e421]
+                - cell "019a3f77-efdb-7017-89ec-b8a87b75ae72" [ref=e422]
+                - cell "Bank of Turf" [ref=e423]:
+                  - link "Bank of Turf" [ref=e424]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-7017-89ec-b8a87b75ae72/
+                - cell "JigD" [ref=e425]:
+                  - generic [ref=e426]: JigD
+                - cell "D Major" [ref=e427]:
+                  - generic [ref=e428]: D Major
+                - cell "AABB" [ref=e429]
+                - cell "Public" [ref=e430]:
+                  - generic [ref=e431]: Public
+              - row "Select row 019a3f77-efdb-70b7-97d1-47c67da4ce5e 019a3f77-efdb-70b7-97d1-47c67da4ce5e Banshee Reel G Major AABB Public" [ref=e432] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-70b7-97d1-47c67da4ce5e" [ref=e433]:
+                  - checkbox "Select row 019a3f77-efdb-70b7-97d1-47c67da4ce5e" [ref=e434]
+                - cell "019a3f77-efdb-70b7-97d1-47c67da4ce5e" [ref=e435]
+                - cell "Banshee" [ref=e436]:
+                  - link "Banshee" [ref=e437]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-70b7-97d1-47c67da4ce5e/
+                - cell "Reel" [ref=e438]:
+                  - generic [ref=e439]: Reel
+                - cell "G Major" [ref=e440]:
+                  - generic [ref=e441]: G Major
+                - cell "AABB" [ref=e442]
+                - cell "Public" [ref=e443]:
+                  - generic [ref=e444]: Public
+              - row "Select row 019a3f77-efdc-7063-991e-9d7e40cacb0c 019a3f77-efdc-7063-991e-9d7e40cacb0c Bantry Bay Hpipe G Major AABB Public" [ref=e445] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdc-7063-991e-9d7e40cacb0c" [ref=e446]:
+                  - checkbox "Select row 019a3f77-efdc-7063-991e-9d7e40cacb0c" [ref=e447]
+                - cell "019a3f77-efdc-7063-991e-9d7e40cacb0c" [ref=e448]
+                - cell "Bantry Bay" [ref=e449]:
+                  - link "Bantry Bay" [ref=e450]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdc-7063-991e-9d7e40cacb0c/
+                - cell "Hpipe" [ref=e451]:
+                  - generic [ref=e452]: Hpipe
+                - cell "G Major" [ref=e453]:
+                  - generic [ref=e454]: G Major
+                - cell "AABB" [ref=e455]
+                - cell "Public" [ref=e456]:
+                  - generic [ref=e457]: Public
+              - row "Select row 019a3f77-efdc-709a-a9d3-001e1c65aab1 019a3f77-efdc-709a-a9d3-001e1c65aab1 Bantry Lasses Reel G Major AABB Public" [ref=e458] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdc-709a-a9d3-001e1c65aab1" [ref=e459]:
+                  - checkbox "Select row 019a3f77-efdc-709a-a9d3-001e1c65aab1" [ref=e460]
+                - cell "019a3f77-efdc-709a-a9d3-001e1c65aab1" [ref=e461]
+                - cell "Bantry Lasses" [ref=e462]:
+                  - link "Bantry Lasses" [ref=e463]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdc-709a-a9d3-001e1c65aab1/
+                - cell "Reel" [ref=e464]:
+                  - generic [ref=e465]: Reel
+                - cell "G Major" [ref=e466]:
+                  - generic [ref=e467]: G Major
+                - cell "AABB" [ref=e468]
+                - cell "Public" [ref=e469]:
+                  - generic [ref=e470]: Public
+              - row "Select row 019a3f77-efdb-705e-8205-0cef4d0031bf 019a3f77-efdb-705e-8205-0cef4d0031bf Battering Ram JigD G Major AABBCC Public" [ref=e471] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-705e-8205-0cef4d0031bf" [ref=e472]:
+                  - checkbox "Select row 019a3f77-efdb-705e-8205-0cef4d0031bf" [ref=e473]
+                - cell "019a3f77-efdb-705e-8205-0cef4d0031bf" [ref=e474]
+                - cell "Battering Ram" [ref=e475]:
+                  - link "Battering Ram" [ref=e476]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-705e-8205-0cef4d0031bf/
+                - cell "JigD" [ref=e477]:
+                  - generic [ref=e478]: JigD
+                - cell "G Major" [ref=e479]:
+                  - generic [ref=e480]: G Major
+                - cell "AABBCC" [ref=e481]
+                - cell "Public" [ref=e482]:
+                  - generic [ref=e483]: Public
+              - row "Select row 019a3f77-efdc-7093-b2b0-3625daa6ecfc 019a3f77-efdc-7093-b2b0-3625daa6ecfc Beautiful Goldfinch Waltz Eb Major AABB Public" [ref=e484] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdc-7093-b2b0-3625daa6ecfc" [ref=e485]:
+                  - checkbox "Select row 019a3f77-efdc-7093-b2b0-3625daa6ecfc" [ref=e486]
+                - cell "019a3f77-efdc-7093-b2b0-3625daa6ecfc" [ref=e487]
+                - cell "Beautiful Goldfinch" [ref=e488]:
+                  - link "Beautiful Goldfinch" [ref=e489]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdc-7093-b2b0-3625daa6ecfc/
+                - cell "Waltz" [ref=e490]:
+                  - generic [ref=e491]: Waltz
+                - cell "Eb Major" [ref=e492]:
+                  - generic [ref=e493]: Eb Major
+                - cell "AABB" [ref=e494]
+                - cell "Public" [ref=e495]:
+                  - generic [ref=e496]: Public
+              - row "Select row 019a3f77-efdb-7074-aeaa-d86954ac7895 019a3f77-efdb-7074-aeaa-d86954ac7895 Behind the Haystack JigD D Major AABBCC Public" [ref=e497] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-7074-aeaa-d86954ac7895" [ref=e498]:
+                  - checkbox "Select row 019a3f77-efdb-7074-aeaa-d86954ac7895" [ref=e499]
+                - cell "019a3f77-efdb-7074-aeaa-d86954ac7895" [ref=e500]
+                - cell "Behind the Haystack" [ref=e501]:
+                  - link "Behind the Haystack" [ref=e502]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-7074-aeaa-d86954ac7895/
+                - cell "JigD" [ref=e503]:
+                  - generic [ref=e504]: JigD
+                - cell "D Major" [ref=e505]:
+                  - generic [ref=e506]: D Major
+                - cell "AABBCC" [ref=e507]
+                - cell "Public" [ref=e508]:
+                  - generic [ref=e509]: Public
+              - row "Select row 019a3f77-efdc-707a-b00f-740a65aa18b5 019a3f77-efdc-707a-b00f-740a65aa18b5 Bells of Tipperary Reel D Major AABB Public" [ref=e510] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdc-707a-b00f-740a65aa18b5" [ref=e511]:
+                  - checkbox "Select row 019a3f77-efdc-707a-b00f-740a65aa18b5" [ref=e512]
+                - cell "019a3f77-efdc-707a-b00f-740a65aa18b5" [ref=e513]
+                - cell "Bells of Tipperary" [ref=e514]:
+                  - link "Bells of Tipperary" [ref=e515]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdc-707a-b00f-740a65aa18b5/
+                - cell "Reel" [ref=e516]:
+                  - generic [ref=e517]: Reel
+                - cell "D Major" [ref=e518]:
+                  - generic [ref=e519]: D Major
+                - cell "AABB" [ref=e520]
+                - cell "Public" [ref=e521]:
+                  - generic [ref=e522]: Public
+              - row "Select row 019a3f77-efdb-70bb-8df4-db998b90b5ae 019a3f77-efdb-70bb-8df4-db998b90b5ae Belltable Waltz D Major AABB Public" [ref=e523] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-70bb-8df4-db998b90b5ae" [ref=e524]:
+                  - checkbox "Select row 019a3f77-efdb-70bb-8df4-db998b90b5ae" [ref=e525]
+                - cell "019a3f77-efdb-70bb-8df4-db998b90b5ae" [ref=e526]
+                - cell "Belltable" [ref=e527]:
+                  - link "Belltable" [ref=e528]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-70bb-8df4-db998b90b5ae/
+                - cell "Waltz" [ref=e529]:
+                  - generic [ref=e530]: Waltz
+                - cell "D Major" [ref=e531]:
+                  - generic [ref=e532]: D Major
+                - cell "AABB" [ref=e533]
+                - cell "Public" [ref=e534]:
+                  - generic [ref=e535]: Public
+              - row "Select row 019a3f77-efdc-7038-ab38-321513f42628 019a3f77-efdc-7038-ab38-321513f42628 Ben Hill Reel Reel G Major AABB Public" [ref=e536] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdc-7038-ab38-321513f42628" [ref=e537]:
+                  - checkbox "Select row 019a3f77-efdc-7038-ab38-321513f42628" [ref=e538]
+                - cell "019a3f77-efdc-7038-ab38-321513f42628" [ref=e539]
+                - cell "Ben Hill Reel" [ref=e540]:
+                  - link "Ben Hill Reel" [ref=e541]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdc-7038-ab38-321513f42628/
+                - cell "Reel" [ref=e542]:
+                  - generic [ref=e543]: Reel
+                - cell "G Major" [ref=e544]:
+                  - generic [ref=e545]: G Major
+                - cell "AABB" [ref=e546]
+                - cell "Public" [ref=e547]:
+                  - generic [ref=e548]: Public
+              - row "Select row 019a3f77-efdb-70a4-a238-216e8f279934 019a3f77-efdb-70a4-a238-216e8f279934 Billy Brocker's Reel D Major AB Public" [ref=e549] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-70a4-a238-216e8f279934" [ref=e550]:
+                  - checkbox "Select row 019a3f77-efdb-70a4-a238-216e8f279934" [ref=e551]
+                - cell "019a3f77-efdb-70a4-a238-216e8f279934" [ref=e552]
+                - cell "Billy Brocker's" [ref=e553]:
+                  - link "Billy Brocker's" [ref=e554]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-70a4-a238-216e8f279934/
+                - cell "Reel" [ref=e555]:
+                  - generic [ref=e556]: Reel
+                - cell "D Major" [ref=e557]:
+                  - generic [ref=e558]: D Major
+                - cell "AB" [ref=e559]
+                - cell "Public" [ref=e560]:
+                  - generic [ref=e561]: Public
+              - row "Select row 019a3f77-efdb-7017-96a5-4d5b726793df 019a3f77-efdb-7017-96a5-4d5b726793df Bird in the Bush Reel G Major AABB Public" [ref=e562] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-7017-96a5-4d5b726793df" [ref=e563]:
+                  - checkbox "Select row 019a3f77-efdb-7017-96a5-4d5b726793df" [ref=e564]
+                - cell "019a3f77-efdb-7017-96a5-4d5b726793df" [ref=e565]
+                - cell "Bird in the Bush" [ref=e566]:
+                  - link "Bird in the Bush" [ref=e567]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-7017-96a5-4d5b726793df/
+                - cell "Reel" [ref=e568]:
+                  - generic [ref=e569]: Reel
+                - cell "G Major" [ref=e570]:
+                  - generic [ref=e571]: G Major
+                - cell "AABB" [ref=e572]
+                - cell "Public" [ref=e573]:
+                  - generic [ref=e574]: Public
+              - row "Select row 019a3f77-efdb-7062-bc21-4da0f4cd703f 019a3f77-efdb-7062-bc21-4da0f4cd703f Black Rogue JigD D Major AABB Public" [ref=e575] [cursor=pointer]:
+                - cell "Select row 019a3f77-efdb-7062-bc21-4da0f4cd703f" [ref=e576]:
+                  - checkbox "Select row 019a3f77-efdb-7062-bc21-4da0f4cd703f" [ref=e577]
+                - cell "019a3f77-efdb-7062-bc21-4da0f4cd703f" [ref=e578]
+                - cell "Black Rogue" [ref=e579]:
+                  - link "Black Rogue" [ref=e580]:
+                    - /url: https://www.irishtune.info/tune/019a3f77-efdb-7062-bc21-4da0f4cd703f/
+                - cell "JigD" [ref=e581]:
+                  - generic [ref=e582]: JigD
+                - cell "D Major" [ref=e583]:
+                  - generic [ref=e584]: D Major
+                - cell "AABB" [ref=e585]
+                - cell "Public" [ref=e586]:
+                  - generic [ref=e587]: Public
+              - row [ref=e588]
+          - generic [ref=e591]: 492 tunes
+```

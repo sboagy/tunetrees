@@ -1,0 +1,52 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - link "TuneTrees Logo TuneTrees" [ref=e9] [cursor=pointer]:
+          - /url: /
+          - img "TuneTrees Logo" [ref=e10]
+          - generic [ref=e11]: TuneTrees
+        - button "Select playlist" [ref=e13]:
+          - generic [ref=e14]: 📋
+          - img [ref=e15]
+      - generic [ref=e17]:
+        - button "User menu" [ref=e19]:
+          - img [ref=e20]
+        - button "Database and sync status" [ref=e23]:
+          - img [ref=e24]
+          - generic "Synced" [ref=e28]: ✓
+  - generic [ref=e29]:
+    - complementary [ref=e30]:
+      - generic [ref=e32]:
+        - button "Expand sidebar" [ref=e33]:
+          - img [ref=e34]
+        - button "Drag to reposition sidebar" [ref=e38]:
+          - img
+    - generic [ref=e39]:
+      - navigation "Tabs" [ref=e41]:
+        - button "🎯" [ref=e42]
+        - button "📚" [active] [ref=e43]
+        - button "📖" [ref=e44]
+        - button "📊" [ref=e45]
+      - generic [ref=e47]:
+        - generic [ref=e49]:
+          - generic [ref=e50]:
+            - button "Add selected tunes to practice review queue" [ref=e51]:
+              - img [ref=e52]
+            - button "Filter options" [ref=e55]:
+              - img [ref=e56]
+            - button "Add a new tune" [ref=e58]:
+              - img [ref=e59]
+            - button "Remove selected tunes from repertoire" [disabled] [ref=e61]:
+              - img [ref=e62]
+            - button "Delete selected tunes" [disabled] [ref=e64]:
+              - img [ref=e65]
+          - button "Show/hide columns" [ref=e68]:
+            - img [ref=e69]
+        - generic [ref=e74]:
+          - paragraph [ref=e75]: No tunes in repertoire
+          - paragraph [ref=e76]: Add tunes to your repertoire from the Catalog tab
+```

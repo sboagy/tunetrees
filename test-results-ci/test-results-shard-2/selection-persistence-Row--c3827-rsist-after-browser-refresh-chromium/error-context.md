@@ -1,0 +1,87 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - link "TuneTrees Logo TuneTrees" [ref=e9] [cursor=pointer]:
+          - /url: /
+          - img "TuneTrees Logo" [ref=e10]
+          - generic [ref=e11]: TuneTrees
+        - button "Select playlist" [ref=e13]:
+          - generic [ref=e14]: Irish Flute
+          - img [ref=e15]
+      - generic [ref=e17]:
+        - button "User menu" [ref=e19]:
+          - generic [ref=e20]: alice.test@tunetrees.test
+          - img [ref=e21]
+        - button "Database and sync status" [ref=e24]:
+          - img [ref=e25]
+          - generic "Synced" [ref=e29]: ✓
+  - generic [ref=e30]:
+    - complementary [ref=e31]:
+      - generic [ref=e33]:
+        - generic [ref=e35]:
+          - img [ref=e36]
+          - paragraph [ref=e40]: No tune selected
+          - paragraph [ref=e41]: Click a tune to view details
+        - region [ref=e42]:
+          - generic [ref=e43]:
+            - generic [ref=e45]:
+              - img [ref=e46]
+              - heading "0 references" [level=4] [ref=e49]
+            - paragraph [ref=e50]: Select a tune to view references
+            - generic [ref=e52]:
+              - paragraph [ref=e53]: No references yet
+              - paragraph [ref=e54]: Add links to videos, sheet music, or articles
+        - region [ref=e55]:
+          - generic [ref=e56]:
+            - generic [ref=e58]:
+              - img [ref=e59]
+              - heading "0 notes" [level=4] [ref=e62]
+            - paragraph [ref=e63]: Select a tune to view notes
+      - button "Resize sidebar" [ref=e64]:
+        - generic:
+          - img
+      - generic [ref=e65]:
+        - button "Collapse sidebar" [expanded] [ref=e66]:
+          - img [ref=e67]
+        - button "Drag to reposition sidebar" [ref=e71]:
+          - img
+    - generic [ref=e72]:
+      - navigation "Tabs" [ref=e74]:
+        - button "🎯Practice" [ref=e75]
+        - button "📚Repertoire" [active] [ref=e76]
+        - button "📖Catalog" [ref=e77]
+        - button "📊Analysis" [ref=e78]
+      - generic [ref=e80]:
+        - generic [ref=e82]:
+          - generic [ref=e83]:
+            - button "Add To Review" [ref=e84]:
+              - img [ref=e85]
+              - generic [ref=e87]: Add To Review
+            - generic [ref=e88]:
+              - img
+              - textbox "Search tunes..." [ref=e89]
+            - button "Filter options" [ref=e91]:
+              - img [ref=e92]
+              - generic [ref=e94]: Filters
+              - img "Toggle filters" [ref=e95]
+            - button "Add Tune" [ref=e97]:
+              - img [ref=e98]
+              - generic [ref=e100]: Add Tune
+            - button "Remove From Repertoire" [disabled] [ref=e101]:
+              - img [ref=e102]
+              - generic [ref=e104]: Remove From Repertoire
+            - button "Delete" [disabled] [ref=e105]:
+              - img [ref=e106]
+              - generic [ref=e108]: Delete
+          - button "Columns" [ref=e110]:
+            - img [ref=e111]
+            - generic [ref=e113]: Columns
+            - img [ref=e114]
+        - generic [ref=e119]:
+          - paragraph [ref=e120]: No tunes in repertoire
+          - paragraph [ref=e121]: Add tunes to your repertoire from the Catalog tab
+```

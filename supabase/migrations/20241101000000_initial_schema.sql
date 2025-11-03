@@ -10,7 +10,6 @@ SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
-SET row_security = off;
 
 
 CREATE SCHEMA IF NOT EXISTS "public";
@@ -1072,9 +1071,458 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
 
 
+--
+-- ROW LEVEL SECURITY POLICIES
+--
+-- These policies ensure users can only access their own data.
+-- auth.uid() returns the authenticated user's UUID from Supabase Auth.
+--
 
+-- Enable RLS on all user-scoped tables
+ALTER TABLE "public"."user_profile" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."playlist" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."playlist_tune" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."tune" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."tune_override" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."practice_record" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."daily_practice_queue" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."note" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."reference" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."tag" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."prefs_spaced_repetition" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."prefs_scheduling_options" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."tab_group_main_state" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."table_state" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."table_transient_data" ENABLE ROW LEVEL SECURITY;
 
+-- Reference tables (public read, no writes needed from client)
+ALTER TABLE "public"."genre" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."tune_type" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."genre_tune_type" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."instrument" ENABLE ROW LEVEL SECURITY;
 
+-- user_profile: Users can view and update their own profile
+CREATE POLICY "Users can view own profile"
+  ON "public"."user_profile" FOR SELECT
+  USING ("supabase_user_id" = "auth"."uid"());
+
+CREATE POLICY "Users can update own profile"
+  ON "public"."user_profile" FOR UPDATE
+  USING ("supabase_user_id" = "auth"."uid"());
+
+CREATE POLICY "Users can insert own profile"
+  ON "public"."user_profile" FOR INSERT
+  WITH CHECK ("supabase_user_id" = "auth"."uid"());
+
+-- playlist: Users can manage their own playlists
+CREATE POLICY "Users can view own playlists"
+  ON "public"."playlist" FOR SELECT
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own playlists"
+  ON "public"."playlist" FOR INSERT
+  WITH CHECK ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own playlists"
+  ON "public"."playlist" FOR UPDATE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own playlists"
+  ON "public"."playlist" FOR DELETE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- playlist_tune: Users can manage tunes in their playlists
+CREATE POLICY "Users can view playlist_tune in own playlists"
+  ON "public"."playlist_tune" FOR SELECT
+  USING ("playlist_ref" IN (
+    SELECT "playlist_id" FROM "public"."playlist" WHERE "user_ref" IN (
+      SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+    )
+  ));
+
+CREATE POLICY "Users can insert playlist_tune in own playlists"
+  ON "public"."playlist_tune" FOR INSERT
+  WITH CHECK ("playlist_ref" IN (
+    SELECT "playlist_id" FROM "public"."playlist" WHERE "user_ref" IN (
+      SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+    )
+  ));
+
+CREATE POLICY "Users can update playlist_tune in own playlists"
+  ON "public"."playlist_tune" FOR UPDATE
+  USING ("playlist_ref" IN (
+    SELECT "playlist_id" FROM "public"."playlist" WHERE "user_ref" IN (
+      SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+    )
+  ));
+
+CREATE POLICY "Users can delete playlist_tune in own playlists"
+  ON "public"."playlist_tune" FOR DELETE
+  USING ("playlist_ref" IN (
+    SELECT "playlist_id" FROM "public"."playlist" WHERE "user_ref" IN (
+      SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+    )
+  ));
+
+-- tune: Users can view all catalog tunes + their private tunes
+CREATE POLICY "Users can view catalog tunes and own private tunes"
+  ON "public"."tune" FOR SELECT
+  USING (
+    "private_for" IS NULL  -- Catalog tunes (public)
+    OR "private_for" IN (
+      SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+    )
+  );
+
+CREATE POLICY "Users can insert own private tunes"
+  ON "public"."tune" FOR INSERT
+  WITH CHECK ("private_for" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own private tunes"
+  ON "public"."tune" FOR UPDATE
+  USING ("private_for" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own private tunes"
+  ON "public"."tune" FOR DELETE
+  USING ("private_for" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- tune_override: Users can manage their own tune overrides
+CREATE POLICY "Users can view own tune overrides"
+  ON "public"."tune_override" FOR SELECT
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own tune overrides"
+  ON "public"."tune_override" FOR INSERT
+  WITH CHECK ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own tune overrides"
+  ON "public"."tune_override" FOR UPDATE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own tune overrides"
+  ON "public"."tune_override" FOR DELETE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- practice_record: Users can manage practice records in their playlists
+CREATE POLICY "Users can view practice_record in own playlists"
+  ON "public"."practice_record" FOR SELECT
+  USING ("playlist_ref" IN (
+    SELECT "playlist_id" FROM "public"."playlist" WHERE "user_ref" IN (
+      SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+    )
+  ));
+
+CREATE POLICY "Users can insert practice_record in own playlists"
+  ON "public"."practice_record" FOR INSERT
+  WITH CHECK ("playlist_ref" IN (
+    SELECT "playlist_id" FROM "public"."playlist" WHERE "user_ref" IN (
+      SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+    )
+  ));
+
+CREATE POLICY "Users can update practice_record in own playlists"
+  ON "public"."practice_record" FOR UPDATE
+  USING ("playlist_ref" IN (
+    SELECT "playlist_id" FROM "public"."playlist" WHERE "user_ref" IN (
+      SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+    )
+  ));
+
+CREATE POLICY "Users can delete practice_record in own playlists"
+  ON "public"."practice_record" FOR DELETE
+  USING ("playlist_ref" IN (
+    SELECT "playlist_id" FROM "public"."playlist" WHERE "user_ref" IN (
+      SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+    )
+  ));
+
+-- daily_practice_queue: Users can manage their own practice queue
+CREATE POLICY "Users can view own daily_practice_queue"
+  ON "public"."daily_practice_queue" FOR SELECT
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own daily_practice_queue"
+  ON "public"."daily_practice_queue" FOR INSERT
+  WITH CHECK ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own daily_practice_queue"
+  ON "public"."daily_practice_queue" FOR UPDATE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own daily_practice_queue"
+  ON "public"."daily_practice_queue" FOR DELETE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- note: Users can manage their own notes
+CREATE POLICY "Users can view own notes"
+  ON "public"."note" FOR SELECT
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own notes"
+  ON "public"."note" FOR INSERT
+  WITH CHECK ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own notes"
+  ON "public"."note" FOR UPDATE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own notes"
+  ON "public"."note" FOR DELETE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- reference: Users can manage their own references
+CREATE POLICY "Users can view own references"
+  ON "public"."reference" FOR SELECT
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own references"
+  ON "public"."reference" FOR INSERT
+  WITH CHECK ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own references"
+  ON "public"."reference" FOR UPDATE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own references"
+  ON "public"."reference" FOR DELETE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- tag: Users can manage their own tags
+CREATE POLICY "Users can view own tags"
+  ON "public"."tag" FOR SELECT
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own tags"
+  ON "public"."tag" FOR INSERT
+  WITH CHECK ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own tags"
+  ON "public"."tag" FOR UPDATE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own tags"
+  ON "public"."tag" FOR DELETE
+  USING ("user_ref" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- prefs_spaced_repetition: Users can manage their own preferences
+CREATE POLICY "Users can view own spaced_repetition prefs"
+  ON "public"."prefs_spaced_repetition" FOR SELECT
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own spaced_repetition prefs"
+  ON "public"."prefs_spaced_repetition" FOR INSERT
+  WITH CHECK ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own spaced_repetition prefs"
+  ON "public"."prefs_spaced_repetition" FOR UPDATE
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own spaced_repetition prefs"
+  ON "public"."prefs_spaced_repetition" FOR DELETE
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- prefs_scheduling_options: Users can manage their own preferences
+CREATE POLICY "Users can view own scheduling_options prefs"
+  ON "public"."prefs_scheduling_options" FOR SELECT
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own scheduling_options prefs"
+  ON "public"."prefs_scheduling_options" FOR INSERT
+  WITH CHECK ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own scheduling_options prefs"
+  ON "public"."prefs_scheduling_options" FOR UPDATE
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own scheduling_options prefs"
+  ON "public"."prefs_scheduling_options" FOR DELETE
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- tab_group_main_state: Users can manage their own UI state
+CREATE POLICY "Users can view own tab_group_main_state"
+  ON "public"."tab_group_main_state" FOR SELECT
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own tab_group_main_state"
+  ON "public"."tab_group_main_state" FOR INSERT
+  WITH CHECK ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own tab_group_main_state"
+  ON "public"."tab_group_main_state" FOR UPDATE
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own tab_group_main_state"
+  ON "public"."tab_group_main_state" FOR DELETE
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- table_state: Users can manage their own table state
+CREATE POLICY "Users can view own table_state"
+  ON "public"."table_state" FOR SELECT
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own table_state"
+  ON "public"."table_state" FOR INSERT
+  WITH CHECK ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own table_state"
+  ON "public"."table_state" FOR UPDATE
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own table_state"
+  ON "public"."table_state" FOR DELETE
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- table_transient_data: Users can manage their own transient data
+CREATE POLICY "Users can view own table_transient_data"
+  ON "public"."table_transient_data" FOR SELECT
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can insert own table_transient_data"
+  ON "public"."table_transient_data" FOR INSERT
+  WITH CHECK ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own table_transient_data"
+  ON "public"."table_transient_data" FOR UPDATE
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own table_transient_data"
+  ON "public"."table_transient_data" FOR DELETE
+  USING ("user_id" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+-- Reference tables: Everyone can read, no one can write from client
+CREATE POLICY "Anyone can view genres"
+  ON "public"."genre" FOR SELECT
+  USING (true);
+
+CREATE POLICY "Anyone can view tune_types"
+  ON "public"."tune_type" FOR SELECT
+  USING (true);
+
+CREATE POLICY "Anyone can view genre_tune_type"
+  ON "public"."genre_tune_type" FOR SELECT
+  USING (true);
+
+-- instrument: View catalog instruments + own private instruments
+CREATE POLICY "Users can view catalog and own instruments"
+  ON "public"."instrument" FOR SELECT
+  USING (
+    "private_to_user" IS NULL  -- Catalog instruments
+    OR "private_to_user" IN (
+      SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+    )
+  );
+
+CREATE POLICY "Users can insert own private instruments"
+  ON "public"."instrument" FOR INSERT
+  WITH CHECK ("private_to_user" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can update own private instruments"
+  ON "public"."instrument" FOR UPDATE
+  USING ("private_to_user" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
+
+CREATE POLICY "Users can delete own private instruments"
+  ON "public"."instrument" FOR DELETE
+  USING ("private_to_user" IN (
+    SELECT "id" FROM "public"."user_profile" WHERE "supabase_user_id" = "auth"."uid"()
+  ));
 
 
 RESET ALL;
