@@ -173,7 +173,7 @@ jobs:
           echo "ALICE_TEST_PASSWORD is set: $([[ -n "$ALICE_TEST_PASSWORD" ]] && echo 'yes' || echo 'no')"
           echo "TEST_USER_PASSWORD is set: $([[ -n "$TEST_USER_PASSWORD" ]] && echo 'yes' || echo 'no')"
           echo "🎬 Running full test suite (chromium-auth + chromium + Mobile Chrome)"
-          npx playwright test --shard=${{ matrix.shard }}/4 --project=chromium-auth --project=chromium --project="Mobile Chrome" --reporter=list,html
+          npx playwright test --shard=${{ matrix.shard }}/4 --project=chromium-auth --project=chromium --project="Mobile Chrome"
 
       # 15. Upload Playwright blob report for merging
       - name: Upload blob report to GitHub Actions Artifacts
