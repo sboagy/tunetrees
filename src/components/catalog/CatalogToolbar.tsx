@@ -21,7 +21,7 @@ import { useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import { Columns } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createEffect, createSignal, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb } from "../../lib/db/client-sqlite";
 import { addTunesToPlaylist } from "../../lib/db/queries/playlists";
@@ -87,28 +87,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const auth = useAuth();
   const { incrementSyncVersion, forceSyncUp } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
-  let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
-
-  // Handle click outside to close columns dropdown
-  const handleClickOutside = (event: MouseEvent) => {
-    if (
-      columnsDropdownRef &&
-      !columnsDropdownRef.contains(event.target as Node)
-    ) {
-      setShowColumnsDropdown(false);
-    }
-  };
-
-  // Setup click outside listener
-  createEffect(() => {
-    if (showColumnsDropdown()) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }
-  });
 
   const handleAddToRepertoire = async () => {
     try {
@@ -326,7 +305,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
 
         {/* Right-aligned group: Columns dropdown */}
         <div class={TOOLBAR_BUTTON_GROUP_CLASSES}>
-          <div class="relative" ref={columnsDropdownRef!}>
+          <div class="relative">
             <button
               ref={columnsButtonRef!}
               type="button"

@@ -152,13 +152,15 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
         }
       };
 
-      // Use setTimeout to avoid closing immediately when opening
-      setTimeout(() => {
-        document.addEventListener("click", handleClickOutside, false); // Use bubble phase instead
-      }, 100);
+      // Use requestAnimationFrame to wait until next frame
+      // This prevents the opening click from immediately closing the menu
+      const frameId = requestAnimationFrame(() => {
+        document.addEventListener("click", handleClickOutside, true);
+      });
 
       onCleanup(() => {
-        document.removeEventListener("click", handleClickOutside, false);
+        cancelAnimationFrame(frameId);
+        document.removeEventListener("click", handleClickOutside, true);
       });
     }
   });
@@ -286,10 +288,9 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
                 <button
                   type="button"
                   class="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded transition-colors w-full text-left"
-                  onClick={(e) => {
-                    // Stop event completely before it reaches click-outside handler
+                  on:click={(e) => {
+                    // Use native event binding (on:click) to bypass SolidJS delegation
                     e.stopPropagation();
-                    e.stopImmediatePropagation();
                     e.preventDefault();
 
                     // Toggle column visibility
