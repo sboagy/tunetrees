@@ -121,8 +121,8 @@ jobs:
       # 9. Verify Database Setup (optional debug step)
       - name: Verify Database Setup
         run: |
-          echo "✅ Verifying tables exist..."
-          echo "\dt public.*" | supabase db psql || echo "⚠️  No tables found!"
+          echo "✅ Verifying database was seeded..."
+          docker exec supabase_db_tunetrees psql -U postgres -d postgres -c "SELECT COUNT(*) as table_count FROM information_schema.tables WHERE table_schema = 'public';" || echo "⚠️  Could not verify tables"
 
       # 10. Cache Playwright Browsers
       - name: Cache Playwright Browsers
