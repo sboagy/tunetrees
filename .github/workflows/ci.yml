@@ -175,23 +175,16 @@ jobs:
           echo "🎬 Running full test suite (chromium-auth + chromium + Mobile Chrome)"
           npx playwright test --shard=${{ matrix.shard }}/4 --project=chromium-auth --project=chromium --project="Mobile Chrome" --reporter=list,html
 
-      # 14. Upload Test Results
-      - name: Upload Playwright Report
+      # 14. Upload Test Results (HTML reports + screenshots/videos)
+      - name: Upload Playwright Report and Test Artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report-shard-${{ matrix.shard }}
-          path: playwright-report/
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 30
-
-      # 16. Upload Test Screenshots/Videos
-      - name: Upload Test Artifacts
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: test-results-shard-${{ matrix.shard }}
-          path: test-results/
-          retention-days: 7
 
       # 17. Stop Supabase (cleanup)
       - name: Stop Supabase
