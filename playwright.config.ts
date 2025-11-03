@@ -30,7 +30,7 @@ export default defineConfig({
   /* Enable parallel workers - each worker gets dedicated test user to avoid conflicts */
   workers: process.env.CI ? 2 : 8,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: "list",
+  reporter: process.env.CI ? [["blob"], ["list"]] : [["html"], ["list"]],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
