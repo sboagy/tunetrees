@@ -27,11 +27,12 @@ import { useAuth } from "../lib/auth/AuthContext";
  */
 const Login: Component = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
-  // Redirect to practice if already logged in
-  if (user()) {
+  // Redirect to practice if already logged in (only after auth is loaded)
+  if (!loading() && user()) {
     navigate("/", { replace: true });
+    return null;
   }
 
   const handleSuccess = () => {
@@ -61,7 +62,10 @@ const Login: Component = () => {
         </div>
 
         {/* Login Form */}
-        <Show when={!user()}>
+        <Show
+          when={!loading()}
+          fallback={<div class="text-center text-gray-400">Loading...</div>}
+        >
           <LoginForm onSuccess={handleSuccess} />
         </Show>
       </div>
