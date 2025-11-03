@@ -49,6 +49,9 @@ interface AuthState {
   /** Sync version - increments when sync completes (triggers UI updates) */
   syncVersion: Accessor<number>;
 
+  /** Initial sync completed (true after first successful sync down) */
+  initialSyncComplete: Accessor<boolean>;
+
   /** Increment sync version to trigger UI refresh */
   incrementSyncVersion: () => void;
 
@@ -115,6 +118,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const [loading, setLoading] = createSignal(true);
   const [localDb, setLocalDb] = createSignal<SqliteDatabase | null>(null);
   const [syncVersion, setSyncVersion] = createSignal(0);
+  const [initialSyncComplete, setInitialSyncComplete] = createSignal(false);
 
   // Sync worker cleanup function and service instance
   let stopSyncWorker: (() => void) | null = null;
@@ -179,33 +183,26 @@ export const AuthProvider: ParentComponent = (props) => {
               log.debug("Sync version changed:", prev, "->", newVersion);
               return newVersion;
             });
+            // Mark initial sync as complete on first sync
+            if (!initialSyncComplete()) {
+              setInitialSyncComplete(true);
+              console.log(
+                "✅ [AuthContext] Initial sync complete, UI can now load data"
+              );
+            }
           },
         });
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
         log.info("Sync worker started");
 
-        // Perform initial sync down to populate local database with user's data
-        log.info("Performing initial syncDown on login...");
-        try {
-          const result = await syncWorker.service.syncDown();
-          log.info("Initial syncDown completed:", result);
-          // Increment sync version to trigger UI updates
-          setSyncVersion((prev) => {
-            const newVersion = prev + 1;
-            log.debug(
-              "Sync version changed after initial sync:",
-              prev,
-              "->",
-              newVersion
-            );
-            return newVersion;
-          });
-        } catch (error) {
-          log.error("Initial syncDown failed:", error);
-        }
+        // Note: syncWorker automatically runs initial syncDown on startup
+        // We rely on onSyncComplete callback above to mark sync as complete
+        console.log("⏳ [AuthContext] Waiting for initial sync to complete...");
       } else {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
+        // When sync is disabled, mark as complete immediately
+        setInitialSyncComplete(true);
       }
 
       log.info("Local database ready");
@@ -363,6 +360,7 @@ export const AuthProvider: ParentComponent = (props) => {
     await supabase.auth.signOut();
     await clearLocalDatabase();
     setUserIdInt(null);
+    setInitialSyncComplete(false); // Reset sync status on logout
     setLoading(false);
   };
 
@@ -480,6 +478,7 @@ export const AuthProvider: ParentComponent = (props) => {
     loading,
     localDb,
     syncVersion,
+    initialSyncComplete,
     incrementSyncVersion,
     signIn,
     signUp,

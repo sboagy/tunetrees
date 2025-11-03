@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { getPrivateTuneIds } from "../../tests/fixtures/test-data";
 import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
@@ -49,9 +50,12 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     // Verify the tune is visible
     await ttPage.expectTuneVisible("Banish Misfortune", ttPage.catalogGrid);
 
+    // Get user's private tune IDs
+    const { privateTune1Id } = getPrivateTuneIds(currentTestUser.userId);
+
     // Verify user's private tune row exists
     const userPrivateTune = await ttPage.getTuneRowById(
-      currentTestUser.userId,
+      privateTune1Id,
       ttPage.catalogGrid
     );
     await expect(userPrivateTune).toBeVisible({ timeout: 3000 });
@@ -66,9 +70,12 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     // Search for User's private tune
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
 
+    // Get user's private tune IDs
+    const { privateTune1Id } = getPrivateTuneIds(currentTestUser.userId);
+
     // Check if user's private tune row exists
     const userPrivateTune = await ttPage.getTuneRowById(
-      currentTestUser.userId,
+      privateTune1Id,
       ttPage.catalogGrid
     );
 

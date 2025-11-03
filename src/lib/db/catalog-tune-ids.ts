@@ -527,11 +527,17 @@ export function getCatalogTuneUuid(intId: number): string | undefined {
  */
 export const CATALOG_TUNE_43_ID = CATALOG_TUNE_ID_MAP[43]!; // Abbey Reel
 export const CATALOG_TUNE_54_ID = CATALOG_TUNE_ID_MAP[54]!; // Alasdruim's March (Rolling Wave 2)
+export const CATALOG_TUNE_ALASDRUIMS_MARCH = CATALOG_TUNE_ID_MAP[54]!; // Alasdruim's March (Rolling Wave 2)
 export const CATALOG_TUNE_55_ID = CATALOG_TUNE_ID_MAP[55]!; // Alexander's
 export const CATALOG_TUNE_66_ID = CATALOG_TUNE_ID_MAP[66]!; // An Chóisir
 export const CATALOG_TUNE_70_ID = CATALOG_TUNE_ID_MAP[70]!; // An Sean Duine
 export const CATALOG_TUNE_72_ID = CATALOG_TUNE_ID_MAP[72]!; // Anderson's Reel
-export const CATALOG_TUNE_MORRISON_ID = CATALOG_TUNE_ID_MAP[3497]!; // Morrison's Jig
+export const CATALOG_TUNE_MORRISON_ID = CATALOG_TUNE_ID_MAP[1343]!; // Morrison's Jig
+export const CATALOG_TUNE_BANISH_MISFORTUNE = CATALOG_TUNE_ID_MAP[113]!; // Banish Misfortune
+export const CATALOG_TUNE_113_ID = CATALOG_TUNE_ID_MAP[113]!; // Banish Misfortune
+
+export const CATALOG_TUNE_A_FIG_FOR_A_KISS = CATALOG_TUNE_ID_MAP[3497]!; // Banish Misfortune
+// 3497
 
 /**
  * Type-safe lookup for catalog tune UUIDs

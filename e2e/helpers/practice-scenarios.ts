@@ -874,7 +874,7 @@ export async function setupForCatalogTestsParallel(
   const playlistLocator = page.getByTestId("playlist-dropdown-button");
   await playlistLocator.waitFor({ state: "visible", timeout: 10000 });
 
-  const expectedTitle = `Irish Flute (${user.playlistId})`;
+  const expectedTitle = `Irish Flute`;
   await expect(playlistLocator).toContainText(expectedTitle, {
     timeout: 10000,
   });

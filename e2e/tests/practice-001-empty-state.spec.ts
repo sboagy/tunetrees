@@ -1,5 +1,8 @@
 import { expect } from "@playwright/test";
-import { TEST_TUNE_MORRISON_ID } from "../../tests/fixtures/test-data";
+import {
+  getPrivateTuneIds,
+  TEST_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 
@@ -28,8 +31,9 @@ test.describe.serial("PRACTICE-001: Unscheduled Tunes (Q3 New Bucket)", () => {
   test.beforeEach(async ({ page, testUser }) => {
     // currentTestUser = testUser;
     // Fast setup: clear practice state, seed 2 unscheduled tunes
+    const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUser.userId, TEST_TUNE_MORRISON_ID], // User's private tune, Morrison's Jig
+      repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID], // User's private tune, Morrison's Jig
       startTab: "practice",
     });
   });

@@ -539,8 +539,9 @@ npm run test:unit
 // Before
 import { test } from "../helpers/test-fixture";
 test.beforeEach(async ({ page, testUser }) => {
+  const { privateTune1Id, privateTune2Id } = getPrivateTuneIds(testUser.userId);
   await setupForPracticeTestsParallel(page, testUser, {
-    repertoireTunes: [testUser.userId, testUser.userId + 10000, 3497],
+    repertoireTunes: [privateTune1Id, privateTune2Id, 3497],
   });
 });
 

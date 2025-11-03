@@ -64,15 +64,15 @@ const PracticeIndex: Component = () => {
     },
     async (params) => {
       if (!params) return null;
-      const result = await params.db.all<{ id: number }>(
-        sql`SELECT id FROM user_profile WHERE supabase_user_id = ${params.userId} LIMIT 1`
+      const result = await params.db.all<{ supabase_user_id: string }>(
+        sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${params.userId} LIMIT 1`
       );
-      return result[0]?.id ?? null;
+      return result[0]?.supabase_user_id ?? null;
     }
   );
 
   // Helper to get current user ID (for non-reactive contexts)
-  const getUserId = async (): Promise<number | null> => {
+  const getUserId = async (): Promise<string | null> => {
     // If userId resource is already loaded, use it
     const id = userId();
     if (id) return id;
@@ -81,12 +81,12 @@ const PracticeIndex: Component = () => {
     const db = localDb();
     if (!db || !user()) return null;
 
-    const result = await db.all<{ id: number }>(
-      sql`SELECT id FROM user_profile WHERE supabase_user_id = ${
+    const result = await db.all<{ supabase_user_id: string }>(
+      sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${
         user()!.id
       } LIMIT 1`
     );
-    return result[0]?.id ?? null;
+    return result[0]?.supabase_user_id ?? null;
   };
 
   // Track evaluations count and table instance for toolbar
@@ -261,7 +261,7 @@ const PracticeIndex: Component = () => {
   };
 
   // Handle recall evaluation changes
-  const handleRecallEvalChange = (tuneId: number, evaluation: string) => {
+  const handleRecallEvalChange = (tuneId: string, evaluation: string) => {
     console.log(`Recall evaluation for tune ${tuneId}: ${evaluation}`);
 
     // Update shared evaluation state
@@ -273,7 +273,7 @@ const PracticeIndex: Component = () => {
   };
 
   // Handle goal changes
-  const handleGoalChange = (tuneId: number, goal: string | null) => {
+  const handleGoalChange = (tuneId: string, goal: string | null) => {
     console.log(`Goal for tune ${tuneId}: ${goal}`);
     // TODO: Update goal in local DB immediately
     // TODO: Queue sync to Supabase
@@ -553,37 +553,35 @@ const PracticeIndex: Component = () => {
         >
           {/* Use a derivation to get the stable number value */}
           <Show when={currentPlaylistId() && userId()}>
-            {(playlistId) => (
-              <Show
-                when={!flashcardMode()}
-                fallback={
-                  <FlashcardView
-                    tunes={filteredTunesForFlashcard() as any}
-                    fieldVisibility={flashcardFieldVisibility()}
-                    evaluations={evaluations()}
-                    onEvaluationsChange={setEvaluations}
-                    onEvaluationChange={handleRecallEvalChange}
-                    localDb={localDb}
-                    userId={userId() || undefined}
-                    playlistId={playlistId()}
-                    incrementSyncVersion={incrementSyncVersion}
-                  />
-                }
-              >
-                <TunesGridScheduled
-                  userId={userId()!}
-                  playlistId={playlistId()}
-                  tablePurpose="scheduled"
-                  onRecallEvalChange={handleRecallEvalChange}
-                  onGoalChange={handleGoalChange}
+            <Show
+              when={!flashcardMode()}
+              fallback={
+                <FlashcardView
+                  tunes={filteredTunesForFlashcard() as any}
+                  fieldVisibility={flashcardFieldVisibility()}
                   evaluations={evaluations()}
                   onEvaluationsChange={setEvaluations}
-                  onTableInstanceChange={setTableInstance}
-                  onClearEvaluationsReady={setClearEvaluationsCallback}
-                  showSubmitted={showSubmitted()}
+                  onEvaluationChange={handleRecallEvalChange}
+                  localDb={localDb}
+                  userId={userId() || undefined}
+                  playlistId={currentPlaylistId() || undefined}
+                  incrementSyncVersion={incrementSyncVersion}
                 />
-              </Show>
-            )}
+              }
+            >
+              <TunesGridScheduled
+                userId={userId()!}
+                playlistId={currentPlaylistId()!}
+                tablePurpose="scheduled"
+                onRecallEvalChange={handleRecallEvalChange}
+                onGoalChange={handleGoalChange}
+                evaluations={evaluations()}
+                onEvaluationsChange={setEvaluations}
+                onTableInstanceChange={setTableInstance}
+                onClearEvaluationsReady={setClearEvaluationsCallback}
+                showSubmitted={showSubmitted()}
+              />
+            </Show>
           </Show>
         </Show>
       </div>

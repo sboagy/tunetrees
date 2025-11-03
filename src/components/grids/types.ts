@@ -104,21 +104,21 @@ export interface ITableStateExtended {
  * Table state persistence key
  */
 export interface ITableStateKey {
-  userId: number;
+  userId: string;
   tablePurpose: TablePurpose;
-  playlistId: number;
+  playlistId: string;
 }
 
 /**
  * Props for grid components
  */
 export interface IGridBaseProps {
-  userId: number;
-  playlistId: number;
+  userId: string;
+  playlistId: string;
   tablePurpose: TablePurpose;
   onTuneSelect?: (tune: ITuneOverview) => void;
-  onRecallEvalChange?: (tuneId: number, newValue: string) => void;
-  onGoalChange?: (tuneId: number, newValue: string | null) => void;
+  onRecallEvalChange?: (tuneId: string, newValue: string) => void;
+  onGoalChange?: (tuneId: string, newValue: string | null) => void;
   onSelectionChange?: (selectedCount: number) => void;
   // Practice toolbar callbacks
   onEvaluationsCountChange?: (count: number) => void;
@@ -143,12 +143,12 @@ export interface IGridBaseProps {
     region: string | null;
     description: string | null;
   }>;
-  selectedPlaylistIds?: number[];
+  selectedPlaylistIds?: string[];
   // Practice-specific props
   showSubmitted?: boolean; // Display already-submitted tunes in practice queue
   // Evaluation state management (for flashcard/grid coordination)
-  evaluations?: Record<number, string>; // External evaluation state
-  onEvaluationsChange?: (evals: Record<number, string>) => void; // Callback when evaluations change
+  evaluations?: Record<string, string>; // External evaluation state (keyed by tune ID string)
+  onEvaluationsChange?: (evals: Record<string, string>) => void; // Callback when evaluations change
 }
 
 /**
@@ -178,11 +178,11 @@ export type SchedulingState =
  * Cell editor callback signatures
  */
 export interface ICellEditorCallbacks {
-  onRecallEvalChange?: (tuneId: number, newValue: string) => void;
-  onGoalChange?: (tuneId: number, newValue: string | null) => void;
-  onNotePrivateChange?: (tuneId: number, newValue: string) => void;
-  onNotePublicChange?: (tuneId: number, newValue: string) => void;
+  onRecallEvalChange?: (tuneId: string, newValue: string) => void;
+  onGoalChange?: (tuneId: string, newValue: string | null) => void;
+  onNotePrivateChange?: (tuneId: string, newValue: string) => void;
+  onNotePublicChange?: (tuneId: string, newValue: string) => void;
   // Optional control for keeping dropdowns open across refreshes
-  getRecallEvalOpen?: (tuneId: number) => boolean;
-  setRecallEvalOpen?: (tuneId: number, isOpen: boolean) => void;
+  getRecallEvalOpen?: (tuneId: string) => boolean;
+  setRecallEvalOpen?: (tuneId: string, isOpen: boolean) => void;
 }

@@ -129,6 +129,8 @@ test.describe.serial("Flashcard Feature: Show Submitted Filter", () => {
       await page.waitForTimeout(500);
     }
 
+    await page.getByRole("cell", { name: "Lapsed" }).first().click();
+
     // Open flashcard (will show first tune, which may be submitted)
     await app.enableFlashcardMode();
 
@@ -169,8 +171,8 @@ test.describe.serial("Flashcard Feature: Show Submitted Filter", () => {
     await page.waitForTimeout(1500);
 
     // Verify count decreased (only unsubmitted visible)
-    total = await app.waitForCounterValue();
-    expect(total).toBeGreaterThanOrEqual(0);
+    total = await app.waitForCounterValue(100, 200, 1, true);
+    expect(total).toBeGreaterThanOrEqual(1);
 
     // Toggle Show Submitted ON
     await app.displaySubmittedSwitch.click();
@@ -178,7 +180,7 @@ test.describe.serial("Flashcard Feature: Show Submitted Filter", () => {
 
     // Verify count is now >= previous off count
     total = await app.waitForCounterValue();
-    expect(total).toBeGreaterThanOrEqual(1);
+    expect(total).toBeGreaterThanOrEqual(3);
   });
 
   test("06. Filter state persists across flashcard open/close", async ({
@@ -223,6 +225,6 @@ test.describe.serial("Flashcard Feature: Show Submitted Filter", () => {
 
     // Verify ON state persisted (includes submitted)
     total = await app.waitForCounterValue();
-    expect(total).toBeGreaterThanOrEqual(1);
+    expect(total).toBeGreaterThanOrEqual(3);
   });
 });

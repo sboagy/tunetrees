@@ -19,8 +19,15 @@
 
 import { expect } from "@playwright/test";
 import {
+  CATALOG_TUNE_A_FIG_FOR_A_KISS,
+  CATALOG_TUNE_ALASDRUIMS_MARCH,
+} from "../../src/lib/db/catalog-tune-ids";
+import {
   CATALOG_TUNE_54_ID,
+  CATALOG_TUNE_66_ID,
+  CATALOG_TUNE_70_ID,
   CATALOG_TUNE_MORRISON_ID,
+  getPrivateTuneIds,
 } from "../../tests/fixtures/test-data";
 import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
@@ -96,10 +103,10 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
 
     // Select specific tunes that we know exist
     const tune1Checkbox = page.getByRole("checkbox", {
-      name: `Select row ${CATALOG_TUNE_MORRISON_ID}`,
+      name: `Select row ${CATALOG_TUNE_A_FIG_FOR_A_KISS}`,
     });
     const tune2Checkbox = page.getByRole("checkbox", {
-      name: `Select row ${CATALOG_TUNE_54_ID}`,
+      name: `Select row ${CATALOG_TUNE_ALASDRUIMS_MARCH}`,
     });
 
     await tune1Checkbox.check();
@@ -183,8 +190,10 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     await ttPage.expectGridHasContent(ttPage.catalogGrid);
     // Search for the tune to force row virtualization to render
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
+
+    const { privateTune1Id } = getPrivateTuneIds(currentTestUser.userId);
     const userPrivateTune = await ttPage.getTuneRowById(
-      currentTestUser.userId,
+      privateTune1Id,
       ttPage.catalogGrid
     );
     await expect(userPrivateTune).toBeVisible({ timeout: 5000 });
@@ -217,8 +226,9 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     await page.waitForTimeout(500);
     await ttPage.clearSearch();
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
+
     const userPrivateTuneB = await ttPage.getTuneRowById(
-      currentTestUser.userId,
+      privateTune1Id,
       ttPage.catalogGrid
     );
     await expect(userPrivateTuneB).toBeVisible({ timeout: 5000 });
@@ -247,7 +257,9 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     await page.getByTestId("tab-catalog").click();
     await page.waitForTimeout(500);
 
-    const checkbox = page.getByRole("checkbox", { name: "Select row 66" });
+    const checkbox = page.getByRole("checkbox", {
+      name: `Select row ${CATALOG_TUNE_66_ID}`,
+    });
     await checkbox.check();
 
     let dialogMessage = "";
@@ -263,8 +275,12 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
     await page.getByTestId("tab-catalog").click();
     await page.waitForTimeout(500);
 
-    await page.getByRole("checkbox", { name: "Select row 66" }).check();
-    await page.getByRole("checkbox", { name: "Select row 70" }).check();
+    await page
+      .getByRole("checkbox", { name: `Select row ${CATALOG_TUNE_66_ID}` })
+      .check();
+    await page
+      .getByRole("checkbox", { name: `Select row ${CATALOG_TUNE_70_ID}` })
+      .check();
 
     dialogMessage = ""; // Reset
     await page.getByTestId("catalog-add-to-repertoire-button").click();
@@ -293,10 +309,10 @@ test.describe.serial("Catalog: Add To Repertoire", () => {
 
     // Select 2 specific tunes
     const tune1Checkbox = page.getByRole("checkbox", {
-      name: `Select row ${CATALOG_TUNE_MORRISON_ID}`,
+      name: `Select row ${CATALOG_TUNE_A_FIG_FOR_A_KISS}`,
     });
     const tune2Checkbox = page.getByRole("checkbox", {
-      name: `Select row ${CATALOG_TUNE_54_ID}`,
+      name: `Select row ${CATALOG_TUNE_ALASDRUIMS_MARCH}`,
     });
 
     await tune1Checkbox.check();

@@ -39,26 +39,6 @@ const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || "TestPassword123!";
 // These match the UUIDs in tests/fixtures/test-data.ts
 const TEST_USERS = [
   {
-    id: "00000000-0000-4000-8000-000000000001",
-    email: "test@example.com",
-    password: TEST_PASSWORD,
-    email_confirm: true,
-    user_metadata: {
-      name: "Test User",
-      role: "basic_test_user",
-    },
-  },
-  {
-    id: "00000000-0000-4000-8000-000000000002",
-    email: "test2@example.com",
-    password: TEST_PASSWORD,
-    email_confirm: true,
-    user_metadata: {
-      name: "Test User 2",
-      role: "basic_test_user",
-    },
-  },
-  {
     id: "00000000-0000-4000-8000-000000009001",
     email: "alice.test@tunetrees.test",
     password: TEST_PASSWORD,
@@ -75,6 +55,16 @@ const TEST_USERS = [
     email_confirm: true,
     user_metadata: {
       name: "Bob Test",
+      role: "playwright_test_user",
+    },
+  },
+  {
+    id: "00000000-0000-4000-8000-000000009003",
+    email: "carol.test@tunetrees.test",
+    password: TEST_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      name: "Carol Test",
       role: "playwright_test_user",
     },
   },

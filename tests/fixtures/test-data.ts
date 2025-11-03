@@ -24,6 +24,7 @@ import {
   CATALOG_TUNE_66_ID,
   CATALOG_TUNE_70_ID,
   CATALOG_TUNE_72_ID,
+  CATALOG_TUNE_113_ID,
   CATALOG_TUNE_ID_MAP,
   CATALOG_TUNE_MORRISON_ID,
   type CatalogTuneId,
@@ -51,14 +52,6 @@ export const TEST_TUNE_MORRISON_ID = CATALOG_TUNE_MORRISON_ID;
 // USERS
 // ============================================================
 
-export const TEST_USER_ID = "00000000-0000-4000-8000-000000000001";
-export const TEST_USER_EMAIL = "test@example.com";
-export const TEST_USER_NAME = "Test User";
-
-export const TEST_USER_2_ID = "00000000-0000-4000-8000-000000000002";
-export const TEST_USER_2_EMAIL = "test2@example.com";
-export const TEST_USER_2_NAME = "Test User 2";
-
 // Playwright E2E Test Users (matching e2e/helpers/test-users.ts)
 export const TEST_USER_ALICE_ID = "00000000-0000-4000-8000-000000009001";
 export const TEST_USER_ALICE_EMAIL = "alice.test@tunetrees.test";
@@ -67,6 +60,10 @@ export const TEST_USER_ALICE_NAME = "Alice Test";
 export const TEST_USER_BOB_ID = "00000000-0000-4000-8000-000000009002";
 export const TEST_USER_BOB_EMAIL = "bob.test@tunetrees.test";
 export const TEST_USER_BOB_NAME = "Bob Test";
+
+export const TEST_USER_CAROL_ID = "00000000-0000-4000-8000-000000009003";
+export const TEST_USER_CAROL_EMAIL = "carol.test@tunetrees.test";
+export const TEST_USER_CAROL_NAME = "Carol Test";
 
 export const TEST_USER_DAVE_ID = "00000000-0000-4000-8000-000000009004";
 export const TEST_USER_DAVE_EMAIL = "dave.test@tunetrees.test";
@@ -91,6 +88,64 @@ export const TEST_USER_HENRY_NAME = "Henry Test";
 export const TEST_USER_IRIS_ID = "00000000-0000-4000-8000-000000009009";
 export const TEST_USER_IRIS_EMAIL = "iris.test@tunetrees.test";
 export const TEST_USER_IRIS_NAME = "Iris Test";
+
+// ============================================================
+// PRIVATE TUNES (Per-User)
+// ============================================================
+
+// Alice's Private Tunes
+export const TEST_USER_ALICE_PRIVATE_TUNE_1_ID =
+  "00000000-0000-4000-8000-000000029001";
+export const TEST_USER_ALICE_PRIVATE_TUNE_2_ID =
+  "00000000-0000-4000-8000-000000039001";
+
+// Bob's Private Tunes
+export const TEST_USER_BOB_PRIVATE_TUNE_1_ID =
+  "00000000-0000-4000-8000-000000029002";
+export const TEST_USER_BOB_PRIVATE_TUNE_2_ID =
+  "00000000-0000-4000-8000-000000039002";
+
+// Carol's Private Tunes
+export const TEST_USER_CAROL_PRIVATE_TUNE_1_ID =
+  "00000000-0000-4000-8000-000000029003";
+export const TEST_USER_CAROL_PRIVATE_TUNE_2_ID =
+  "00000000-0000-4000-8000-000000039003";
+
+// Dave's Private Tunes
+export const TEST_USER_DAVE_PRIVATE_TUNE_1_ID =
+  "00000000-0000-4000-8000-000000029004";
+export const TEST_USER_DAVE_PRIVATE_TUNE_2_ID =
+  "00000000-0000-4000-8000-000000039004";
+
+// Eve's Private Tunes
+export const TEST_USER_EVE_PRIVATE_TUNE_1_ID =
+  "00000000-0000-4000-8000-000000029005";
+export const TEST_USER_EVE_PRIVATE_TUNE_2_ID =
+  "00000000-0000-4000-8000-000000039005";
+
+// Frank's Private Tunes
+export const TEST_USER_FRANK_PRIVATE_TUNE_1_ID =
+  "00000000-0000-4000-8000-000000029006";
+export const TEST_USER_FRANK_PRIVATE_TUNE_2_ID =
+  "00000000-0000-4000-8000-000000039006";
+
+// Grace's Private Tunes
+export const TEST_USER_GRACE_PRIVATE_TUNE_1_ID =
+  "00000000-0000-4000-8000-000000029007";
+export const TEST_USER_GRACE_PRIVATE_TUNE_2_ID =
+  "00000000-0000-4000-8000-000000039007";
+
+// Henry's Private Tunes
+export const TEST_USER_HENRY_PRIVATE_TUNE_1_ID =
+  "00000000-0000-4000-8000-000000029008";
+export const TEST_USER_HENRY_PRIVATE_TUNE_2_ID =
+  "00000000-0000-4000-8000-000000039008";
+
+// Iris's Private Tunes
+export const TEST_USER_IRIS_PRIVATE_TUNE_1_ID =
+  "00000000-0000-4000-8000-000000029009";
+export const TEST_USER_IRIS_PRIVATE_TUNE_2_ID =
+  "00000000-0000-4000-8000-000000039009";
 
 // ============================================================
 // REFERENCE DATA (Genres, Instruments, Tune Types)
@@ -165,35 +220,37 @@ export const TEST_PLAYLIST_IRIS_ID = "00000000-0000-4000-8000-000000019009";
 // TUNES
 // ============================================================
 
-// Irish Reels
-export const TEST_TUNE_KESH_ID = "00000000-0000-4000-8000-000000000100";
-export const TEST_TUNE_KESH_TITLE = "The Kesh";
-export const TEST_TUNE_KESH_TYPE = TEST_TUNE_TYPE_REEL_ID;
-export const TEST_TUNE_KESH_MODE = "D Major";
-
-export const TEST_TUNE_BANISH_ID = "00000000-0000-4000-8000-000000000101";
+// DEPRECATED: Use private tune IDs or catalog tune IDs instead
+// These aliases point to Alice's private tunes for backwards compatibility
+export const TEST_TUNE_BANISH_ID = CATALOG_TUNE_113_ID; // "Banish Misfortune"
 export const TEST_TUNE_BANISH_TITLE = "Banish Misfortune";
-export const TEST_TUNE_BANISH_TYPE = TEST_TUNE_TYPE_REEL_ID;
+export const TEST_TUNE_BANISH_TYPE = "JigD";
 export const TEST_TUNE_BANISH_MODE = "D Mixolydian";
 
-export const TEST_TUNE_MASONS_ID = "00000000-0000-4000-8000-000000000102";
+// For tests that need different tunes, use catalog tunes
+export const TEST_TUNE_KESH_ID = CATALOG_TUNE_43_ID; // "The Kesh" from catalog
+export const TEST_TUNE_KESH_TITLE = "The Kesh";
+export const TEST_TUNE_KESH_TYPE = "ReelD";
+export const TEST_TUNE_KESH_MODE = "D Major";
+
+export const TEST_TUNE_MASONS_ID = CATALOG_TUNE_54_ID; // "The Mason's Apron" from catalog
 export const TEST_TUNE_MASONS_TITLE = "The Mason's Apron";
-export const TEST_TUNE_MASONS_TYPE = TEST_TUNE_TYPE_REEL_ID;
+export const TEST_TUNE_MASONS_TYPE = "ReelA";
 export const TEST_TUNE_MASONS_MODE = "A Major";
 
 // Jigs
-export const TEST_TUNE_SWALLOWTAIL_ID = "00000000-0000-4000-8000-000000000110";
+export const TEST_TUNE_SWALLOWTAIL_ID = CATALOG_TUNE_55_ID; // "Swallowtail Jig" from catalog
 export const TEST_TUNE_SWALLOWTAIL_TITLE = "Swallowtail Jig";
-export const TEST_TUNE_SWALLOWTAIL_TYPE = TEST_TUNE_TYPE_JIG_ID;
+export const TEST_TUNE_SWALLOWTAIL_TYPE = "JigE";
 export const TEST_TUNE_SWALLOWTAIL_MODE = "E Minor";
 
 // Morrison's Jig uses catalog tune ID (re-exported above as TEST_TUNE_MORRISON_ID)
 export const TEST_TUNE_MORRISON_TITLE = "Morrison's Jig";
-export const TEST_TUNE_MORRISON_TYPE = TEST_TUNE_TYPE_JIG_ID;
+export const TEST_TUNE_MORRISON_TYPE = "JigE";
 export const TEST_TUNE_MORRISON_MODE = "E Dorian";
 
 // Hornpipes
-export const TEST_TUNE_HARVEST_HOME_ID = "00000000-0000-4000-8000-000000000120";
+export const TEST_TUNE_HARVEST_HOME_ID = CATALOG_TUNE_66_ID; // "Harvest Home" from catalog
 export const TEST_TUNE_HARVEST_HOME_TITLE = "Harvest Home";
 export const TEST_TUNE_HARVEST_HOME_TYPE = TEST_TUNE_TYPE_HORNPIPE_ID;
 export const TEST_TUNE_HARVEST_HOME_MODE = "D Major";
@@ -277,21 +334,67 @@ export function isTestUUID(uuid: string): boolean {
   return uuid.startsWith("00000000-0000-4000-8000-");
 }
 
+/**
+ * Get private tune IDs for a specific test user
+ * @param userId - Test user UUID
+ * @returns Object with privateTune1Id and privateTune2Id
+ */
+export function getPrivateTuneIds(userId: string): {
+  privateTune1Id: string;
+  privateTune2Id: string;
+} {
+  const tuneMap: Record<
+    string,
+    { privateTune1Id: string; privateTune2Id: string }
+  > = {
+    [TEST_USER_ALICE_ID]: {
+      privateTune1Id: TEST_USER_ALICE_PRIVATE_TUNE_1_ID,
+      privateTune2Id: TEST_USER_ALICE_PRIVATE_TUNE_2_ID,
+    },
+    [TEST_USER_BOB_ID]: {
+      privateTune1Id: TEST_USER_BOB_PRIVATE_TUNE_1_ID,
+      privateTune2Id: TEST_USER_BOB_PRIVATE_TUNE_2_ID,
+    },
+    [TEST_USER_CAROL_ID]: {
+      privateTune1Id: TEST_USER_CAROL_PRIVATE_TUNE_1_ID,
+      privateTune2Id: TEST_USER_CAROL_PRIVATE_TUNE_2_ID,
+    },
+    [TEST_USER_DAVE_ID]: {
+      privateTune1Id: TEST_USER_DAVE_PRIVATE_TUNE_1_ID,
+      privateTune2Id: TEST_USER_DAVE_PRIVATE_TUNE_2_ID,
+    },
+    [TEST_USER_EVE_ID]: {
+      privateTune1Id: TEST_USER_EVE_PRIVATE_TUNE_1_ID,
+      privateTune2Id: TEST_USER_EVE_PRIVATE_TUNE_2_ID,
+    },
+    [TEST_USER_FRANK_ID]: {
+      privateTune1Id: TEST_USER_FRANK_PRIVATE_TUNE_1_ID,
+      privateTune2Id: TEST_USER_FRANK_PRIVATE_TUNE_2_ID,
+    },
+    [TEST_USER_GRACE_ID]: {
+      privateTune1Id: TEST_USER_GRACE_PRIVATE_TUNE_1_ID,
+      privateTune2Id: TEST_USER_GRACE_PRIVATE_TUNE_2_ID,
+    },
+    [TEST_USER_HENRY_ID]: {
+      privateTune1Id: TEST_USER_HENRY_PRIVATE_TUNE_1_ID,
+      privateTune2Id: TEST_USER_HENRY_PRIVATE_TUNE_2_ID,
+    },
+    [TEST_USER_IRIS_ID]: {
+      privateTune1Id: TEST_USER_IRIS_PRIVATE_TUNE_1_ID,
+      privateTune2Id: TEST_USER_IRIS_PRIVATE_TUNE_2_ID,
+    },
+  };
+
+  const tunes = tuneMap[userId];
+  if (!tunes) {
+    throw new Error(`No private tunes found for user ID: ${userId}`);
+  }
+  return tunes;
+}
+
 // ============================================================
 // TEST DATA OBJECTS
 // ============================================================
-
-export const TEST_USER = {
-  supabaseUserId: TEST_USER_ID,
-  email: TEST_USER_EMAIL,
-  name: TEST_USER_NAME,
-};
-
-export const TEST_USER_2 = {
-  supabaseUserId: TEST_USER_2_ID,
-  email: TEST_USER_2_EMAIL,
-  name: TEST_USER_2_NAME,
-};
 
 export const TEST_GENRE_IRISH = {
   id: TEST_GENRE_IRISH_ID,
@@ -329,7 +432,7 @@ export const TEST_TUNE_KESH = {
   type: TEST_TUNE_KESH_TYPE,
   mode: TEST_TUNE_KESH_MODE,
   structure: "AABB",
-  userRef: TEST_USER_ID,
+  userRef: TEST_USER_ALICE_ID,
   currentKey: "D",
   defaultKey: "D",
   privateFor: null as string | null,
@@ -341,7 +444,7 @@ export const TEST_TUNE_BANISH = {
   type: TEST_TUNE_BANISH_TYPE,
   mode: TEST_TUNE_BANISH_MODE,
   structure: "AABB",
-  userRef: TEST_USER_ID,
+  userRef: TEST_USER_ALICE_ID,
   currentKey: "D",
   defaultKey: "D",
   privateFor: null as string | null,
@@ -350,7 +453,7 @@ export const TEST_TUNE_BANISH = {
 export const TEST_PLAYLIST_IRISH_FIDDLE = {
   id: TEST_PLAYLIST_IRISH_FIDDLE_ID,
   name: TEST_PLAYLIST_IRISH_FIDDLE_NAME,
-  userRef: TEST_USER_ID,
+  userRef: TEST_USER_ALICE_ID,
   instrument: TEST_INSTRUMENT_FIDDLE_ID,
   genre: TEST_GENRE_IRISH_ID,
   description: "Irish tunes for fiddle practice",
@@ -390,7 +493,7 @@ export const ALL_TEST_TUNES = [
     type: TEST_TUNE_MASONS_TYPE,
     mode: TEST_TUNE_MASONS_MODE,
     structure: "AABB",
-    userRef: TEST_USER_ID,
+    userRef: TEST_USER_ALICE_ID,
     currentKey: "A",
     defaultKey: "A",
     privateFor: null as string | null,
@@ -401,7 +504,7 @@ export const ALL_TEST_TUNES = [
     type: TEST_TUNE_SWALLOWTAIL_TYPE,
     mode: TEST_TUNE_SWALLOWTAIL_MODE,
     structure: "AABB",
-    userRef: TEST_USER_ID,
+    userRef: TEST_USER_ALICE_ID,
     currentKey: "E",
     defaultKey: "E",
     privateFor: null as string | null,
@@ -412,7 +515,7 @@ export const ALL_TEST_TUNES = [
     type: TEST_TUNE_MORRISON_TYPE,
     mode: TEST_TUNE_MORRISON_MODE,
     structure: "AABB",
-    userRef: TEST_USER_ID,
+    userRef: TEST_USER_ALICE_ID,
     currentKey: "E",
     defaultKey: "E",
     privateFor: null as string | null,
@@ -423,7 +526,7 @@ export const ALL_TEST_TUNES = [
     type: TEST_TUNE_HARVEST_HOME_TYPE,
     mode: TEST_TUNE_HARVEST_HOME_MODE,
     structure: "AABB",
-    userRef: TEST_USER_ID,
+    userRef: TEST_USER_ALICE_ID,
     currentKey: "D",
     defaultKey: "D",
     privateFor: null as string | null,

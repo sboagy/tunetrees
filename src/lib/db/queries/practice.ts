@@ -222,6 +222,8 @@ export async function getPracticeList(
     FROM practice_list_staged pls
     INNER JOIN daily_practice_queue dpq 
       ON dpq.tune_ref = pls.id
+      AND dpq.user_ref = pls.user_ref
+      AND dpq.playlist_ref = pls.playlist_id
     WHERE dpq.user_ref = ${userId}
       AND dpq.playlist_ref = ${playlistId}
       AND dpq.active = 1

@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import {
+  getPrivateTuneIds,
   TEST_TUNE_BANISH_ID,
   TEST_TUNE_MASONS_ID,
   TEST_TUNE_MORRISON_ID,
@@ -77,13 +78,19 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     const grid = app.practiceGrid;
     // Ensure grid has content
     await app.expectGridHasContent(grid);
-    let triggerCount = await grid.getByTestId(/^recall-eval-\d+$/).count();
+    let triggerCount = await grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .count();
 
     // Submit up to two items explicitly to avoid long loops
     for (let i = 0; i < 2 && triggerCount > 0; i++) {
-      const preCount = await grid.getByTestId(/^recall-eval-\d+$/).count();
+      const preCount = await grid
+        .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+        .count();
       if (preCount === 0) break;
-      const gridEvalTrigger = grid.getByTestId(/^recall-eval-\d+$/).first();
+      const gridEvalTrigger = grid
+        .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+        .first();
       await expect(gridEvalTrigger).toBeVisible({ timeout: 5000 });
       await gridEvalTrigger.click();
       const option = page.getByTestId("recall-eval-option-good");
@@ -92,11 +99,13 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
       await page.waitForTimeout(300);
       await app.submitEvaluationsButton.click();
       // Wait for grid to reflect one fewer trigger
-      await expect(grid.getByTestId(/^recall-eval-\d+$/)).toHaveCount(
+      await expect(grid.getByTestId(/^recall-eval-[0-9a-f-]+$/i)).toHaveCount(
         preCount - 1,
         { timeout: 7000 }
       );
-      triggerCount = await grid.getByTestId(/^recall-eval-\d+$/).count();
+      triggerCount = await grid
+        .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+        .count();
     }
 
     // Verify no triggers left in grid
@@ -273,9 +282,9 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
   });
 
   test("06. Rapid Submit clicks are debounced", async ({ page, testUser }) => {
-    const testUserPrivateTune1 = testUser.userId;
+    const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1], // 1 tune
+      repertoireTunes: [privateTune1Id], // 1 tune
       scheduleDaysAgo: 1,
       startTab: "practice",
     });
@@ -363,7 +372,7 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     await expect(counter).toHaveText(new RegExp(`^1 of ${total}$`));
 
     // Evaluation should still be selected
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Good/i);
   });
 
@@ -380,7 +389,7 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     const app = new TuneTreesPage(page);
     // Submit one tune first
     const gridEvalTrigger = app.practiceGrid
-      .getByTestId(/^recall-eval-\d+$/)
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
       .first();
     await expect(gridEvalTrigger).toBeVisible({ timeout: 10000 });
     await gridEvalTrigger.click();
@@ -407,7 +416,7 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     expect(counterText).toMatch(/\d+ of \d+/);
 
     // Verify the current card has been submitted (no live evaluation input)
-    const liveEvalInput = page.getByTestId(/^recall-eval-\d+$/).first();
+    const liveEvalInput = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(liveEvalInput).not.toBeVisible();
 
     // go back to unsubmitted card
@@ -417,7 +426,7 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     // Verify can still select evaluation, IF we're showing an unsubmitted card
     await app.selectFlashcardEvaluation("good");
     await page.waitForTimeout(300);
-    const evalButton2 = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton2 = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton2).toContainText(/Good/i);
   });
 
@@ -448,9 +457,9 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     page,
     testUser,
   }) => {
-    const testUserPrivateTune1 = testUser.userId;
+    const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1], // Assuming this tune might have missing fields
+      repertoireTunes: [privateTune1Id], // Assuming this tune might have missing fields
       scheduleDaysAgo: 1,
       startTab: "practice",
     });
@@ -464,7 +473,7 @@ test.describe.serial("Flashcard Feature: Edge Cases", () => {
     // Verify can still select evaluation even if some fields missing
     await app.selectFlashcardEvaluation("good");
     await page.waitForTimeout(300);
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Good/i);
 
     // Verify Submit still works

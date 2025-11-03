@@ -62,7 +62,7 @@ import {
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
-  const { localDb, syncVersion } = useAuth();
+  const { localDb, syncVersion, initialSyncComplete } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -70,7 +70,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   const stateKey = createMemo(() => ({
     userId: props.userId,
     tablePurpose: props.tablePurpose,
-    playlistId: currentPlaylistId() || 0,
+    playlistId: currentPlaylistId() || "0",
   }));
 
   // Load persisted state
@@ -83,7 +83,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   );
 
   // Load row selection from localStorage on mount
-  const SELECTION_STORAGE_KEY = `TT_CATALOG_SELECTION_${props.userId || 0}`;
+  const SELECTION_STORAGE_KEY = `TT_CATALOG_SELECTION_${props.userId || "0"}`;
   const loadRowSelection = (): RowSelectionState => {
     try {
       const stored = localStorage.getItem(SELECTION_STORAGE_KEY);
@@ -137,6 +137,15 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
       const db = localDb();
       const userId = useAuth().user()?.id;
       const version = syncVersion(); // Triggers refetch when sync completes
+      const syncComplete = initialSyncComplete(); // Wait for initial sync
+
+      if (!syncComplete) {
+        console.log(
+          "[TunesGridCatalog] Waiting for initial sync to complete..."
+        );
+        return null;
+      }
+
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
@@ -511,7 +520,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   // Compute scroll storage key reactively once userId is available
   const scrollKey = createMemo<string | null>(() => {
     const uid = props.userId;
-    if (!uid || uid === 0) return null;
+    if (!uid) return null;
     return `TT_CATALOG_SCROLL_${uid}`;
   });
 

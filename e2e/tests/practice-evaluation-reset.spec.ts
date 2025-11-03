@@ -14,6 +14,7 @@
 import { expect } from "@playwright/test";
 import {
   CATALOG_TUNE_54_ID,
+  getPrivateTuneIds,
   TEST_TUNE_MORRISON_ID,
 } from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
@@ -22,15 +23,16 @@ import { test } from "../helpers/test-fixture";
 test.describe("Practice Evaluation Interaction", () => {
   test.beforeEach(async ({ page, testUser }) => {
     // Fast setup: seed 2 tunes, start on practice tab
+    const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUser.userId, TEST_TUNE_MORRISON_ID],
+      repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID],
       startTab: "practice",
     });
   });
 
   async function selectEvalFor(
     page: import("@playwright/test").Page,
-    tuneId: number,
+    tuneId: string,
     optionKey: "not-set" | "again" | "hard" | "good" | "easy"
   ) {
     const trigger = page.getByTestId(`recall-eval-${tuneId}`);
@@ -71,19 +73,26 @@ test.describe("Practice Evaluation Interaction", () => {
   async function getNotSetIds(
     page: import("@playwright/test").Page,
     needed: number
-  ): Promise<number[]> {
+  ): Promise<string[]> {
     const loc = page.locator('[data-testid^="recall-eval-"]', {
       hasText: "(Not Set)",
     });
     const found = Math.min(await loc.count(), needed);
-    const ids: number[] = [];
+    const ids: string[] = [];
     for (let i = 0; i < found; i++) {
       const el = loc.nth(i);
       const testid = await el.getAttribute("data-testid");
       if (testid) {
+        // Format: recall-eval-{uuid}
         const parts = testid.split("-");
-        const id = Number.parseInt(parts[2] ?? "", 10);
-        if (!Number.isNaN(id)) ids.push(id);
+        // UUIDs have format: 8-4-4-4-12 hex digits with hyphens
+        // After split on "-": ["recall", "eval", ...uuid parts...]
+        // Rejoin from index 2 onwards to reconstruct the UUID
+        const id = parts.slice(2).join("-");
+        // Validate it looks like a UUID (36 chars with hyphens at positions 8,13,18,23)
+        if (id.length === 36 && id[8] === "-" && id[13] === "-") {
+          ids.push(id);
+        }
       }
     }
     // Fallback: if none marked "(Not Set)", pick from any visible triggers
@@ -94,8 +103,10 @@ test.describe("Practice Evaluation Interaction", () => {
         const testid = await anyTriggers.nth(i).getAttribute("data-testid");
         if (testid) {
           const parts = testid.split("-");
-          const id = Number.parseInt(parts[2] ?? "", 10);
-          if (!Number.isNaN(id)) ids.push(id);
+          const id = parts.slice(2).join("-");
+          if (id.length === 36 && id[8] === "-" && id[13] === "-") {
+            ids.push(id);
+          }
         }
       }
     }

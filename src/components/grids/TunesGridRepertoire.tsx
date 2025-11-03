@@ -61,7 +61,7 @@ import {
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
-  const { localDb, syncVersion, user } = useAuth();
+  const { localDb, syncVersion, initialSyncComplete, user } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -69,7 +69,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   const stateKey = createMemo(() => ({
     userId: props.userId,
     tablePurpose: props.tablePurpose,
-    playlistId: currentPlaylistId() || 0,
+    playlistId: currentPlaylistId() || "0",
   }));
 
   // Load persisted state
@@ -137,6 +137,15 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       const userId = user()?.id;
       const playlistId = currentPlaylistId();
       const version = syncVersion(); // Triggers refetch when sync completes
+      const syncComplete = initialSyncComplete(); // Wait for initial sync
+
+      if (!syncComplete) {
+        console.log(
+          "[TunesGridRepertoire] Waiting for initial sync to complete..."
+        );
+        return null;
+      }
+
       return db && userId && playlistId
         ? { db, userId, playlistId, version }
         : null;
@@ -479,7 +488,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   const scrollKey = createMemo<string | null>(() => {
     const uid = props.userId;
     const pid = currentPlaylistId();
-    if (!uid || uid === 0) return null;
+    if (!uid) return null;
     return pid
       ? `TT_REPERTOIRE_SCROLL_${uid}_${pid}`
       : `TT_REPERTOIRE_SCROLL_${uid}`;
@@ -487,7 +496,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   // Back-compat: legacy key without playlist scoping
   const legacyScrollKey = createMemo<string | null>(() => {
     const uid = props.userId;
-    if (!uid || uid === 0) return null;
+    if (!uid) return null;
     return `TT_REPERTOIRE_SCROLL_${uid}`;
   });
 

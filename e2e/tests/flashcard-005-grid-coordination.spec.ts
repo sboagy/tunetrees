@@ -1,5 +1,8 @@
 import { expect } from "@playwright/test";
-import { TEST_TUNE_MORRISON_ID } from "../../tests/fixtures/test-data";
+import {
+  getPrivateTuneIds,
+  TEST_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -14,9 +17,9 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe.serial("Flashcard Feature: Grid Coordination", () => {
   test.beforeEach(async ({ page, testUser }) => {
-    const testUserPrivateTune1 = testUser.userId;
+    const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, TEST_TUNE_MORRISON_ID], // 2 tunes
+      repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID], // 2 tunes
       scheduleDaysAgo: 1, // Ensure both are due today
       startTab: "practice",
     });
@@ -30,7 +33,9 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     const grid = app.practiceGrid;
     await app.expectGridHasContent(grid);
     // Ensure there are at least two rows to test synchronization
-    const triggerCount = await grid.getByTestId(/^recall-eval-\d+$/).count();
+    const triggerCount = await grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .count();
     if (triggerCount < 2) {
       test.fixme(
         true,
@@ -38,7 +43,9 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
       );
       return;
     }
-    const gridEvalTrigger = grid.getByTestId(/^recall-eval-\d+$/).first();
+    const gridEvalTrigger = grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .first();
     await expect(gridEvalTrigger).toBeVisible({ timeout: 10000 });
     await gridEvalTrigger.click();
     await page.getByTestId("recall-eval-option-good").click();
@@ -48,7 +55,7 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     await app.enableFlashcardMode();
 
     // Verify flashcard shows same evaluation in combobox
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Good/i);
   });
 
@@ -72,7 +79,7 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
 
     // Verify grid shows same evaluation
     const gridEvalTrigger = app.practiceGrid
-      .getByTestId(/^recall-eval-\d+$/)
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
       .first();
     await expect(gridEvalTrigger).toContainText(/Easy/i);
   });
@@ -91,7 +98,9 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     // Select and submit in grid
     const grid = app.practiceGrid;
     await app.expectGridHasContent(grid);
-    const gridEvalTrigger = grid.getByTestId(/^recall-eval-\d+$/).first();
+    const gridEvalTrigger = grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .first();
     await expect(gridEvalTrigger).toBeVisible({ timeout: 10000 });
     await gridEvalTrigger.click();
     await page.getByTestId("recall-eval-option-good").click();
@@ -123,7 +132,9 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
 
     // Count initial grid rows
     const grid = app.practiceGrid;
-    const initialGridRows = await grid.getByTestId(/^recall-eval-\d+$/).count();
+    const initialGridRows = await grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .count();
 
     // Open flashcard and submit
     await app.enableFlashcardMode();
@@ -148,7 +159,9 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     }
 
     // Otherwise verify grid row count decreased
-    const updatedGridRows = await grid.getByTestId(/^recall-eval-\d+$/).count();
+    const updatedGridRows = await grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .count();
     expect(updatedGridRows).toBe(initialGridRows - 1);
   });
 
@@ -157,7 +170,9 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     const app = new TuneTreesPage(page);
     const grid = app.practiceGrid;
     await app.expectGridHasContent(grid);
-    const gridEvalTrigger = grid.getByTestId(/^recall-eval-\d+$/).first();
+    const gridEvalTrigger = grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .first();
     await expect(gridEvalTrigger).toBeVisible({ timeout: 10000 });
     await gridEvalTrigger.click();
     await page.getByTestId("recall-eval-option-good").click();
@@ -204,7 +219,9 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     await grid
       .locator("tbody")
       .evaluate((el: HTMLElement) => el.scrollTo(0, el.scrollHeight));
-    const secondRowTrigger = grid.getByTestId(/^recall-eval-\d+$/).last();
+    const secondRowTrigger = grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .last();
     await expect(secondRowTrigger).toBeVisible({ timeout: 10000 });
     const row = secondRowTrigger.locator("xpath=ancestor::tr");
     const firstCell = row.locator("td").first(); // Click neutral cell
@@ -239,14 +256,16 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     // Evaluate first tune in grid
     const app = new TuneTreesPage(page);
     const grid = app.practiceGrid;
-    let gridEvalTrigger = grid.getByTestId(/^recall-eval-\d+$/).first();
+    let gridEvalTrigger = grid.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await gridEvalTrigger.click();
     await page.getByTestId("recall-eval-option-good").click();
     await page.waitForTimeout(300);
 
     // Evaluate second tune in grid
     // Ensure second row is rendered in virtualized grid
-    const triggerCount = await grid.getByTestId(/^recall-eval-\d+$/).count();
+    const triggerCount = await grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .count();
     if (triggerCount < 2) {
       test.fixme(
         true,
@@ -257,7 +276,7 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     await grid
       .locator("tbody")
       .evaluate((el: HTMLElement) => el.scrollTo(0, el.scrollHeight));
-    gridEvalTrigger = grid.getByTestId(/^recall-eval-\d+$/).last();
+    gridEvalTrigger = grid.getByTestId(/^recall-eval-[0-9a-f-]+$/i).last();
     await expect(gridEvalTrigger).toBeVisible({ timeout: 10000 });
     await gridEvalTrigger.click();
     await page.getByTestId("recall-eval-option-easy").click();
@@ -269,7 +288,7 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     await app.enableFlashcardMode();
 
     // Verify "current" flashcard shows "Easy"
-    let evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    let evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Easy/i);
 
     // Navigate backwards to first flashcard
@@ -277,7 +296,7 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     await page.waitForTimeout(300);
 
     // Verify first flashcard shows "Good"
-    evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Good/i);
 
     // Change first evaluation to "Hard" in flashcards
@@ -289,7 +308,9 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     await page.waitForTimeout(300);
 
     // Verify grid updated to "Hard"
-    const secondGridEval = grid.getByTestId(/^recall-eval-\d+$/).first();
+    const secondGridEval = grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .first();
     await expect(secondGridEval).toContainText(/Hard/i);
   });
 });

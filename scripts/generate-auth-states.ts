@@ -19,7 +19,7 @@ const TEST_USERS = [
   { email: "iris.test@tunetrees.test", name: "iris" },
 ];
 
-const PASSWORD = "TestPassword123!";
+const PASSWORD = process.env.TEST_USER_PASSWORD || "TestPassword123!";
 const AUTH_DIR = resolve(process.cwd(), "e2e/.auth");
 
 async function generateAuthStates() {

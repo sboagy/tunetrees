@@ -136,7 +136,9 @@ test.describe.serial("Flashcard Feature: Submit", () => {
 
     // Count initial grid rows (evaluation triggers as proxy)
     const grid = app.practiceGrid;
-    const initialRows = await grid.getByTestId(/^recall-eval-\d+$/).count();
+    const initialRows = await grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .count();
 
     await app.enableFlashcardMode();
 
@@ -164,7 +166,9 @@ test.describe.serial("Flashcard Feature: Submit", () => {
     // Verify grid updated (row count should decrease)
     // Allow some settling time then assert decrease
     await page.waitForTimeout(200);
-    const updatedRows = await grid.getByTestId(/^recall-eval-\d+$/).count();
+    const updatedRows = await grid
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .count();
     expect(updatedRows).toBeLessThan(initialRows);
   });
 

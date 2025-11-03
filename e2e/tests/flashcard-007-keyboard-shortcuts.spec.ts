@@ -91,7 +91,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
     await page.waitForTimeout(300);
 
     // Verify "Again" selected
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Again/i);
   });
 
@@ -104,7 +104,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
     await page.waitForTimeout(300);
 
     // Verify "Hard" selected
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Hard/i);
   });
 
@@ -117,7 +117,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
     await page.waitForTimeout(300);
 
     // Verify "Good" selected
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Good/i);
   });
 
@@ -130,7 +130,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
     await page.waitForTimeout(300);
 
     // Verify "Easy" selected
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Easy/i);
   });
 
@@ -190,7 +190,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
     await page.waitForTimeout(300);
 
     // Verify first evaluation persisted
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Good/i);
   });
 
@@ -202,7 +202,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
     await page.keyboard.press("3");
     await page.waitForTimeout(300);
 
-    const evalButton1 = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton1 = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton1).toContainText(/Good/i);
 
     // Change to Easy
@@ -210,7 +210,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
     await page.waitForTimeout(300);
 
     // Verify Easy selected now
-    const evalButton2 = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton2 = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton2).toContainText(/Easy/i);
   });
 
@@ -282,7 +282,7 @@ test.describe.serial("Flashcard Feature: Keyboard Shortcuts", () => {
     await page.waitForTimeout(300);
 
     // Verify evaluation selected
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Good/i);
   });
 });

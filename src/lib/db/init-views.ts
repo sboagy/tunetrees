@@ -234,6 +234,7 @@ FROM
     AND pr.playlist_ref = playlist_tune.playlist_ref
   LEFT JOIN table_transient_data td ON td.tune_id = tune.id
     AND td.playlist_id = playlist_tune.playlist_ref
+WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref
 `;
 
 /**

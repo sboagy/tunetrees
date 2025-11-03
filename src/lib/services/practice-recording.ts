@@ -32,6 +32,7 @@ import type {
 } from "../db/types";
 import { FSRS_QUALITY_MAP, FSRSService } from "../scheduling/fsrs-service";
 import { queueSync } from "../sync/queue";
+import { generateId } from "../utils/uuid";
 
 /**
  * Result of recording a practice rating
@@ -113,6 +114,7 @@ export async function recordPracticeRating(
     const dueStr = schedule.nextDue.toISOString();
 
     const newRecord: NewPracticeRecord = {
+      id: generateId(),
       lastModifiedAt: new Date().toISOString(),
       playlistRef: input.playlistRef,
       tuneRef: input.tuneRef,
@@ -251,8 +253,8 @@ export async function batchRecordPracticeRatings(
  */
 export async function getPracticeStatistics(
   db: SqliteDatabase,
-  tuneId: number,
-  playlistId: number
+  tuneId: string,
+  playlistId: string
 ): Promise<{
   totalCount: number;
   successRate: number;
@@ -346,14 +348,40 @@ export async function getPracticeStatistics(
  */
 export async function commitStagedEvaluations(
   db: SqliteDatabase,
-  userId: number,
-  playlistId: number
+  userId: string,
+  playlistId: string
 ): Promise<{ success: boolean; count: number; error?: string }> {
   try {
+    console.log("=== commitStagedEvaluations START ===");
+    console.log("Parameters:", {
+      userId,
+      playlistId,
+      userIdType: typeof userId,
+      playlistIdType: typeof playlistId,
+    });
+
     const { sql } = await import("drizzle-orm");
     const { persistDb } = await import("../db/client-sqlite");
 
+    // DEBUG: Check what's actually in table_transient_data
+    const allTransientData = await db.all(sql`
+      SELECT user_id, tune_id, playlist_id, practiced, recall_eval
+      FROM table_transient_data
+    `);
+    console.log("ALL table_transient_data rows:", allTransientData);
+
+    // DEBUG: Try the exact query we're about to run
+    const debugQuery = await db.all(sql`
+      SELECT user_id, tune_id, playlist_id, practiced
+      FROM table_transient_data
+      WHERE user_id = ${userId}
+        AND playlist_id = ${playlistId}
+        AND practiced IS NOT NULL
+    `);
+    console.log("DEBUG query result (should match main query):", debugQuery);
+
     // 1. Fetch all staged evaluations from table_transient_data for this playlist
+    console.log("Querying table_transient_data...");
     const stagedEvaluations = await db.all<{
       tune_id: number;
       quality: number;
@@ -391,11 +419,18 @@ export async function commitStagedEvaluations(
         AND practiced IS NOT NULL
     `);
 
+    console.log("Staged evaluations found:", stagedEvaluations.length);
+    if (stagedEvaluations.length > 0) {
+      console.log("First staged evaluation:", stagedEvaluations[0]);
+    }
+
     if (stagedEvaluations.length === 0) {
+      console.log("No staged evaluations, returning early");
       return { success: true, count: 0 };
     }
 
     // 2. Get tune_ids that are in the current practice queue (filter to current session only)
+    console.log("Querying daily_practice_queue...");
     const queueTuneIds = await db.all<{ tune_ref: number }>(sql`
       SELECT DISTINCT tune_ref
       FROM daily_practice_queue
@@ -404,6 +439,11 @@ export async function commitStagedEvaluations(
         AND DATE(window_start_utc) = DATE('now')
     `);
 
+    console.log("Queue tune IDs found:", queueTuneIds.length);
+    if (queueTuneIds.length > 0) {
+      console.log("First queue tune:", queueTuneIds[0]);
+    }
+
     const queueTuneIdSet = new Set(queueTuneIds.map((row) => row.tune_ref));
 
     // 3. Filter staged evaluations to only include tunes in current queue
@@ -411,7 +451,13 @@ export async function commitStagedEvaluations(
       queueTuneIdSet.has(eval_.tune_id)
     );
 
+    console.log(
+      "Evaluations to commit (after filtering):",
+      evaluationsToCommit.length
+    );
+
     if (evaluationsToCommit.length === 0) {
+      console.log("No evaluations to commit after filtering, returning");
       return { success: true, count: 0 };
     }
 
@@ -419,7 +465,10 @@ export async function commitStagedEvaluations(
     const committedTuneIds: number[] = [];
     const now = new Date().toISOString();
 
+    console.log("Starting to commit evaluations...");
     for (const staged of evaluationsToCommit) {
+      console.log(`Processing tune ${staged.tune_id}...`);
+
       // Ensure unique practiced timestamp (check if already exists)
       let practicedTimestamp = staged.practiced;
       let attempts = 0;
@@ -452,8 +501,10 @@ export async function commitStagedEvaluations(
       }
 
       // Insert practice_record
+      const recordId = generateId();
       await db.run(sql`
         INSERT INTO practice_record (
+          id,
           playlist_ref,
           tune_ref,
           practiced,
@@ -473,6 +524,7 @@ export async function commitStagedEvaluations(
           technique,
           last_modified_at
         ) VALUES (
+          ${recordId},
           ${playlistId},
           ${staged.tune_id},
           ${practicedTimestamp},
@@ -494,20 +546,8 @@ export async function commitStagedEvaluations(
         )
       `);
 
-      // Get the inserted record ID for sync queue
-      const insertedRecord = await db.all<{ id: number }>(sql`
-        SELECT id FROM practice_record
-        WHERE tune_ref = ${staged.tune_id}
-          AND playlist_ref = ${playlistId}
-          AND practiced = ${practicedTimestamp}
-        ORDER BY id DESC
-        LIMIT 1
-      `);
-
-      const recordId = insertedRecord[0]?.id;
-      if (recordId) {
-        await queueSync(db, "practice_record", recordId, "insert");
-      }
+      // Queue sync for the newly inserted record
+      await queueSync(db, "practice_record", recordId, "insert");
 
       // Update playlist_tune.current (next review date)
       await db.run(sql`
@@ -526,6 +566,7 @@ export async function commitStagedEvaluations(
       );
 
       // Delete from table_transient_data
+      console.log(`Deleting staged evaluation for tune ${staged.tune_id}...`);
       await db.run(sql`
         DELETE FROM table_transient_data
         WHERE user_id = ${userId}
@@ -541,6 +582,9 @@ export async function commitStagedEvaluations(
       );
 
       // Mark queue item as completed
+      console.log(
+        `Marking queue item as completed for tune ${staged.tune_id}...`
+      );
       await db.run(sql`
         UPDATE daily_practice_queue
         SET completed_at = ${now}
@@ -558,21 +602,24 @@ export async function commitStagedEvaluations(
       );
 
       committedTuneIds.push(staged.tune_id);
+      console.log(`✓ Completed processing tune ${staged.tune_id}`);
     }
 
     // 5. Persist database to IndexedDB
+    console.log("Persisting database...");
     await persistDb();
 
     console.log(
       `✅ Committed ${committedTuneIds.length} staged evaluations for playlist ${playlistId}`
     );
+    console.log("=== commitStagedEvaluations END ===");
 
     return {
       success: true,
       count: committedTuneIds.length,
     };
   } catch (error) {
-    console.error("Error committing staged evaluations:", error);
+    console.error("=== commitStagedEvaluations ERROR ===", error);
     return {
       success: false,
       count: 0,
@@ -602,8 +649,8 @@ export async function commitStagedEvaluations(
  */
 export async function undoLastPracticeRating(
   db: SqliteDatabase,
-  tuneId: number,
-  playlistId: number
+  tuneId: string,
+  playlistId: string
 ): Promise<boolean> {
   try {
     // Get the last two practice records

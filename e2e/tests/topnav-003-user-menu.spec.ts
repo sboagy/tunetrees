@@ -43,7 +43,7 @@ test.describe("TOPNAV-003: User Menu Dropdown", () => {
     await ttPage.openUserMenu();
 
     // Should show user's full name
-    await expect(page.getByText(currentTestUser.name)).toBeVisible({
+    await expect(page.getByText(currentTestUser.userId).first()).toBeVisible({
       timeout: 2000,
     });
   });

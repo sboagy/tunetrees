@@ -81,7 +81,7 @@ function captureConsole(page: import("@playwright/test").Page) {
 // Seeds data and logs in via the shared Playwright fixture so grids mount and are scrollable
 
 test.describe("Scroll Reset Debugger", () => {
-  let addedTuneIds: number[] = [];
+  let addedTuneIds: string[] = [];
   let currentTestUser: TestUser;
   let ttPage: TuneTreesPage;
 
@@ -101,7 +101,7 @@ test.describe("Scroll Reset Debugger", () => {
   });
 
   // Add tunes to playlist temporarily for scroll testing
-  async function addScrollTestTunes(user: TestUser) {
+  async function addScrollTestTunes(user: TestUser): Promise<string[]> {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const { error: authError } = await supabase.auth.signInWithPassword({
@@ -110,7 +110,7 @@ test.describe("Scroll Reset Debugger", () => {
     });
     if (authError) throw new Error(`Auth failed: ${authError.message}`);
 
-    // Pull a batch of tunes from catalog
+    // Pull a batch of tunes from catalog (UUIDs)
     const { data: tunes, error: tunesError } = await supabase
       .from("tune")
       .select("id")
@@ -118,10 +118,10 @@ test.describe("Scroll Reset Debugger", () => {
     if (tunesError || !tunes)
       throw new Error(`Failed to fetch tunes: ${tunesError?.message}`);
 
-    // Upsert them into the user's playlist
+    // Upsert them into the user's playlist (using UUID strings)
     const playlistTuneInserts = tunes.map((tune) => ({
-      playlist_ref: user.playlistId,
-      tune_ref: tune.id,
+      playlist_ref: user.playlistId, // UUID string
+      tune_ref: tune.id, // UUID string
       current: null,
     }));
     const { error } = await supabase
@@ -129,11 +129,11 @@ test.describe("Scroll Reset Debugger", () => {
       .upsert(playlistTuneInserts, { onConflict: "playlist_ref,tune_ref" });
     if (error) throw new Error(`Failed to add tunes: ${error.message}`);
 
-    return tunes.map((t) => t.id);
+    return tunes.map((t) => t.id); // Return UUID strings
   }
 
   // Remove test tunes so we don't pollute subsequent runs
-  async function removeScrollTestTunes(tuneIds: number[], user: TestUser) {
+  async function removeScrollTestTunes(tuneIds: string[], user: TestUser) {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { error: authError } = await supabase.auth.signInWithPassword({
       email: user.email,
@@ -141,14 +141,13 @@ test.describe("Scroll Reset Debugger", () => {
     });
     if (authError) throw new Error(`Auth failed: ${authError.message}`);
 
-    // Only remove the tunes we added beyond the user's two private tunes
-    const tunesToRemove = tuneIds.slice(2);
-    if (tunesToRemove.length > 0) {
+    // Remove all the added test tunes (UUID strings)
+    if (tuneIds.length > 0) {
       const { error } = await supabase
         .from("playlist_tune")
         .delete()
         .eq("playlist_ref", user.playlistId)
-        .in("tune_ref", tunesToRemove);
+        .in("tune_ref", tuneIds);
       if (error)
         throw new Error(`Failed to remove test tunes: ${error.message}`);
     }

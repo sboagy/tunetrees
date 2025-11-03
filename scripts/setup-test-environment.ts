@@ -5,6 +5,7 @@
 
 import { execSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
+import { CATALOG_INSTRUMENT_IRISH_FLUTE_ID } from "../src/lib/db/catalog-instrument-ids.js";
 
 /**
  * Get the service role key from the running Supabase instance
@@ -29,69 +30,79 @@ const SUPABASE_SERVICE_ROLE_KEY = getSupabaseServiceRoleKey();
 
 const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || "TestPassword123!";
 
+// Test users with UUIDs matching tests/fixtures/test-data.ts
 const TEST_USERS = [
   {
-    id: "11111111-1111-1111-1111-111111111111",
+    id: "00000000-0000-4000-8000-000000009001", // auth.users.id
     email: "alice.test@tunetrees.test",
-    name: "Alice Test User",
-    userId: 9001,
-    playlistId: 9001,
+    name: "Alice Test",
+    playlistId: "00000000-0000-4000-8000-000000019001",
+    privateTune1Id: "00000000-0000-4000-8000-000000029001", // Private tune 1
+    privateTune2Id: "00000000-0000-4000-8000-000000039001", // Private tune 2
   },
   {
-    id: "22222222-2222-2222-2222-222222222222",
+    id: "00000000-0000-4000-8000-000000009002",
     email: "bob.test@tunetrees.test",
-    name: "Bob Test User",
-    userId: 9002,
-    playlistId: 9002,
+    name: "Bob Test",
+    playlistId: "00000000-0000-4000-8000-000000019002",
+    privateTune1Id: "00000000-0000-4000-8000-000000029002",
+    privateTune2Id: "00000000-0000-4000-8000-000000039002",
   },
   {
-    id: "33333333-3333-3333-3333-333333333333",
+    id: "00000000-0000-4000-8000-000000009003",
     email: "carol.test@tunetrees.test",
-    name: "Carol Test User",
-    userId: 9003,
-    playlistId: 9003,
+    name: "Carol Test",
+    playlistId: "00000000-0000-4000-8000-000000019003",
+    privateTune1Id: "00000000-0000-4000-8000-000000029003",
+    privateTune2Id: "00000000-0000-4000-8000-000000039003",
   },
   {
-    id: "44444444-4444-4444-4444-444444444444",
+    id: "00000000-0000-4000-8000-000000009004",
     email: "dave.test@tunetrees.test",
-    name: "Dave Test User",
-    userId: 9004,
-    playlistId: 9004,
+    name: "Dave Test",
+    playlistId: "00000000-0000-4000-8000-000000019004",
+    privateTune1Id: "00000000-0000-4000-8000-000000029004",
+    privateTune2Id: "00000000-0000-4000-8000-000000039004",
   },
   {
-    id: "55555555-5555-5555-5555-555555555555",
+    id: "00000000-0000-4000-8000-000000009005",
     email: "eve.test@tunetrees.test",
-    name: "Eve Test User",
-    userId: 9005,
-    playlistId: 9005,
+    name: "Eve Test",
+    playlistId: "00000000-0000-4000-8000-000000019005",
+    privateTune1Id: "00000000-0000-4000-8000-000000029005",
+    privateTune2Id: "00000000-0000-4000-8000-000000039005",
   },
   {
-    id: "66666666-6666-6666-6666-666666666666",
+    id: "00000000-0000-4000-8000-000000009006",
     email: "frank.test@tunetrees.test",
-    name: "Frank Test User",
-    userId: 9006,
-    playlistId: 9006,
+    name: "Frank Test",
+    playlistId: "00000000-0000-4000-8000-000000019006",
+    privateTune1Id: "00000000-0000-4000-8000-000000029006",
+    privateTune2Id: "00000000-0000-4000-8000-000000039006",
   },
   {
-    id: "77777777-7777-7777-7777-777777777777",
+    id: "00000000-0000-4000-8000-000000009007",
     email: "grace.test@tunetrees.test",
-    name: "Grace Test User",
-    userId: 9007,
-    playlistId: 9007,
+    name: "Grace Test",
+    playlistId: "00000000-0000-4000-8000-000000019007",
+    privateTune1Id: "00000000-0000-4000-8000-000000029007",
+    privateTune2Id: "00000000-0000-4000-8000-000000039007",
   },
   {
-    id: "88888888-8888-8888-8888-888888888888",
+    id: "00000000-0000-4000-8000-000000009008",
     email: "henry.test@tunetrees.test",
-    name: "Henry Test User",
-    userId: 9008,
-    playlistId: 9008,
+    name: "Henry Test",
+    playlistId: "00000000-0000-4000-8000-000000019008",
+    privateTune1Id: "00000000-0000-4000-8000-000000029008",
+    privateTune2Id: "00000000-0000-4000-8000-000000039008",
   },
   {
-    id: "99999999-9999-9999-9999-999999999999",
+    id: "00000000-0000-4000-8000-000000009009",
     email: "iris.test@tunetrees.test",
-    name: "Iris Test User",
-    userId: 9009,
-    playlistId: 9009,
+    name: "Iris Test",
+    playlistId: "00000000-0000-4000-8000-000000019009",
+    privateTune1Id: "00000000-0000-4000-8000-000000029009",
+    privateTune2Id: "00000000-0000-4000-8000-000000039009",
   },
 ];
 
@@ -124,10 +135,10 @@ async function setup() {
   console.log("\n2️⃣  Creating user profiles...");
 
   const userProfiles = TEST_USERS.map((user) => ({
-    id: user.userId,
-    supabase_user_id: user.id,
-    name: user.name,
+    id: user.id, // user_profile.id (auto-gen UUID, but we set it explicitly to match auth.users.id)
+    supabase_user_id: user.id, // References auth.users.id
     email: user.email,
+    name: user.name,
   }));
 
   const { error: profileError } = await supabase
@@ -144,10 +155,10 @@ async function setup() {
   console.log("\n3️⃣  Creating playlists...");
 
   const playlists = TEST_USERS.map((user) => ({
-    playlist_id: user.playlistId,
-    user_ref: user.userId,
-    instrument_ref: 1, // All use flute for consistency
-    genre_default: "Irish Traditional",
+    playlist_id: user.playlistId, // UUID schema uses playlist_id, not id
+    user_ref: user.id, // References user_profile.supabase_user_id
+    instrument_ref: CATALOG_INSTRUMENT_IRISH_FLUTE_ID, // Can be set per-user if needed
+    genre_default: "ITRAD", // Genre code, not full name
   }));
 
   const { error: playlistError } = await supabase
@@ -165,24 +176,24 @@ async function setup() {
 
   const privateTunes = TEST_USERS.flatMap((user) => [
     {
-      id: user.userId, // Use userId as base for first tune (9001, 9002, 9004, etc.)
+      id: user.privateTune1Id,
       title: "Banish Misfortune",
       type: "JigD",
       structure: "AABBCC",
       mode: "D Mixolydian",
       incipit: "|fed cAG|",
       genre: "ITRAD",
-      private_for: user.userId,
+      private_for: user.id,
     },
     {
-      id: user.userId + 10000, // Offset for second tune (19001, 19002, 19004, etc.)
+      id: user.privateTune2Id,
       title: "Morrison's Jig",
       type: "JigD",
       structure: "AABBCC",
       mode: "E Dorian",
       incipit: "|EDB cAF|",
       genre: "ITRAD",
-      private_for: user.userId,
+      private_for: user.id,
     },
   ]);
 
@@ -204,13 +215,13 @@ async function setup() {
   const playlistTuneLinks = TEST_USERS.flatMap((user) => [
     {
       playlist_ref: user.playlistId,
-      tune_ref: user.userId, // First private tune
+      tune_ref: user.privateTune1Id,
       // NOTE: scheduled (current) is NULL - tunes not yet added to review
       // Tests can use setupPracticeScenario() to schedule tunes as needed
     },
     {
       playlist_ref: user.playlistId,
-      tune_ref: user.userId + 10000, // Second private tune
+      tune_ref: user.privateTune2Id,
       // NOTE: scheduled (current) is NULL - tunes not yet added to review
     },
   ]);
@@ -231,7 +242,7 @@ async function setup() {
   console.log("\n📋 Test users created:");
   TEST_USERS.forEach((user) => {
     console.log(
-      `   - ${user.email} (user_id: ${user.userId}, playlist_id: ${user.playlistId})`
+      `   - ${user.email} (id: ${user.id}, playlist: ${user.playlistId})`
     );
   });
 }

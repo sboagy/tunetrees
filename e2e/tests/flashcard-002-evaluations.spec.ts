@@ -35,7 +35,8 @@ test.describe.serial("Flashcard Feature: Evaluations", () => {
     await app.selectFlashcardEvaluation("good");
 
     // Verify the combobox now shows "Good"
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    // page.getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Good/i);
   });
 
@@ -65,7 +66,7 @@ test.describe.serial("Flashcard Feature: Evaluations", () => {
     await app.goPrevCard();
 
     // Verify combobox still shows "Good"
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Good/i);
   });
 
@@ -84,7 +85,7 @@ test.describe.serial("Flashcard Feature: Evaluations", () => {
     await page.waitForTimeout(300);
 
     // Verify no evaluation selected on second card
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Not set|Select/i);
   });
 
@@ -103,7 +104,7 @@ test.describe.serial("Flashcard Feature: Evaluations", () => {
     await page.waitForTimeout(300);
 
     // Verify only "Easy" is shown
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Easy/i);
   });
 
@@ -150,7 +151,7 @@ test.describe.serial("Flashcard Feature: Evaluations", () => {
     await page.waitForTimeout(300);
 
     // Verify deselected (combobox shows Not set)
-    const evalButton = page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
     await expect(evalButton).toContainText(/Not set|Select/i);
 
     // Verify Submit button count back to 0

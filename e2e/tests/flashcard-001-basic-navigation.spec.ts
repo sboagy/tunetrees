@@ -1,5 +1,8 @@
 import { expect } from "@playwright/test";
-import { TEST_TUNE_MORRISON_ID } from "../../tests/fixtures/test-data";
+import {
+  getPrivateTuneIds,
+  TEST_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -12,9 +15,9 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe.serial("Flashcard Feature: Basic Navigation", () => {
   test.beforeEach(async ({ page, testUser }) => {
-    const testUserPrivateTune1 = testUser.userId;
+    const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [testUserPrivateTune1, TEST_TUNE_MORRISON_ID], // 2 tunes for navigation testing
+      repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID], // 2 tunes for navigation testing
       startTab: "practice",
     });
   });
@@ -35,7 +38,10 @@ test.describe.serial("Flashcard Feature: Basic Navigation", () => {
     await expect(app.flashcardHeaderCounter).toBeVisible();
 
     // Verify evaluation control is present (combobox in card)
-    await expect(page.getByTestId(/^recall-eval-\d+$/).first()).toBeVisible();
+    // UUID format: recall-eval-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    await expect(
+      page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first()
+    ).toBeVisible();
   });
 
   test("03. Navigate between flashcards", async ({ page }) => {

@@ -43,6 +43,7 @@ import { createClient } from "@supabase/supabase-js";
 import BetterSqlite3 from "better-sqlite3";
 import * as dotenv from "dotenv";
 import postgres from "postgres";
+import { getCatalogInstrumentUuid } from "../src/lib/db/catalog-instrument-ids.js";
 import { getCatalogTuneUuid } from "../src/lib/db/catalog-tune-ids.js";
 import { generateId } from "../src/lib/utils/uuid.js";
 
@@ -241,6 +242,64 @@ async function countSupabase(tableName: string): Promise<number> {
     return 0;
   }
   return count || 0;
+}
+
+// ============================================================================
+// Schema Check: Install schema if database is empty
+// ============================================================================
+
+async function checkAndInstallSchema() {
+  console.log("\n🔍 Checking database schema...");
+
+  try {
+    // Check if user_profile table exists
+    const tableCheck = await sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'user_profile'
+      ) as table_exists
+    `;
+
+    if (!tableCheck[0]?.table_exists) {
+      console.log(
+        "⚠️  Schema not found. Installing schema from sql_scripts/create-uuid-schema.sql...\n"
+      );
+
+      try {
+        // Read and execute the schema file
+        const fs = await import("node:fs/promises");
+        const path = await import("node:path");
+        const { fileURLToPath } = await import("node:url");
+
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+        const schemaPath = path.join(
+          __dirname,
+          "..",
+          "sql_scripts",
+          "create-uuid-schema.sql"
+        );
+
+        const schemaSQL = await fs.readFile(schemaPath, "utf-8");
+
+        // Execute the schema SQL
+        await sql.unsafe(schemaSQL);
+
+        console.log("✅ Schema installed successfully\n");
+      } catch (error: any) {
+        console.error("❌ Failed to install schema:", error.message);
+        console.error("\nPlease run manually:");
+        console.error("  npm run db:install-schema");
+        process.exit(1);
+      }
+    } else {
+      console.log("✓ Schema already exists\n");
+    }
+  } catch (error: any) {
+    console.error("❌ Failed to check schema:", error.message);
+    throw error;
+  }
 }
 
 // ============================================================================
@@ -524,8 +583,12 @@ async function migrateReferenceData() {
     for (const inst of instruments) {
       const instrumentName = inst.instrument;
 
-      // Generate UUID for this instrument
-      const instrumentUuid = generateId();
+      // Use catalog instrument UUID if this is a catalog instrument (legacy IDs 1-8)
+      // Otherwise generate a new UUID for private instruments
+      const instrumentUuid =
+        inst.id >= 1 && inst.id <= 8
+          ? getCatalogInstrumentUuid(inst.id)
+          : generateId();
       instrumentIdMapping.set(inst.id, instrumentUuid);
       instrumentNameMapping.set(instrumentName, instrumentUuid);
 
@@ -1768,6 +1831,7 @@ async function main() {
   const startTime = Date.now();
 
   try {
+    await checkAndInstallSchema(); // Check schema exists, install if needed
     await cleanupSupabaseTables(); // Phase 0: Clear all tables for clean migration
     await migrateUsers(); // Phase 1: Create auth users + user_profile
     await migrateReferenceData(); // Phase 2: Genres, tune types, instruments

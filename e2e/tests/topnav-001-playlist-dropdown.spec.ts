@@ -31,11 +31,9 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
   }) => {
     // Look for playlist button/dropdown in TopNav
     // Adjust selector based on your actual implementation
-    const playlistButton = page
-      .locator("button")
-      .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
-      });
+    const playlistButton = page.locator("button").filter({
+      hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+    });
 
     await expect(playlistButton).toBeVisible({ timeout: 10000 });
 
@@ -66,7 +64,7 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     const playlistButton = page
       .locator("button")
       .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+        hasText: "Irish Flute",
       })
       .first();
     await playlistButton.click();
@@ -77,7 +75,7 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
       ttPage.topNavManagePlaylistsPanel.getByText(/tunes/i, { exact: false })
     ).toBeVisible({ timeout: 2000 });
     await expect(
-      ttPage.topNavManagePlaylistsPanel.getByText(/Irish Traditional/i, {
+      ttPage.topNavManagePlaylistsPanel.getByText(/ITRAD/i, {
         exact: false,
       })
     ).toBeVisible({

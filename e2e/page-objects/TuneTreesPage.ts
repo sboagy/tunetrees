@@ -619,7 +619,9 @@ export class TuneTreesPage {
     value: "again" | "hard" | "good" | "easy" | "not-set" = "good"
   ) {
     // Open the first (and only) evaluation combobox in the card
-    const evalButton = this.page.getByTestId(/^recall-eval-\d+$/).first();
+    const evalButton = this.page
+      .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+      .first();
     // If not immediately clickable, ensure the back of the card is revealed
     const clickable = await evalButton
       .isVisible({ timeout: 500 })
@@ -673,13 +675,17 @@ export class TuneTreesPage {
    */
   async waitForCounterValue(
     maxRetries: number = 100,
-    retryDelayMs: number = 200
+    retryDelayMs: number = 200,
+    countToWaitUpTo = 1,
+    waitGTE = true
   ): Promise<number> {
     let total = 0;
     for (let i = 0; i < maxRetries; i++) {
       const counterText = await this.flashcardHeaderCounter.textContent();
       total = parseInt(counterText?.split(" of ")[1] || "0", 10);
-      if (total >= 1) {
+      if (waitGTE && total >= countToWaitUpTo) {
+        return total;
+      } else if (!waitGTE && total <= countToWaitUpTo) {
         return total;
       }
       await this.page.waitForTimeout(retryDelayMs);

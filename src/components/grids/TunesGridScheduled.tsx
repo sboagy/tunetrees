@@ -60,7 +60,8 @@ import {
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
-  const { localDb, syncVersion, incrementSyncVersion } = useAuth();
+  const { localDb, syncVersion, initialSyncComplete, incrementSyncVersion } =
+    useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -68,7 +69,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   const stateKey = createMemo(() => ({
     userId: props.userId,
     tablePurpose: props.tablePurpose,
-    playlistId: currentPlaylistId() || 0,
+    playlistId: currentPlaylistId() || "0",
   }));
 
   // Load persisted state
@@ -145,13 +146,30 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
 
   // Generate/fetch daily practice queue (frozen snapshot)
   // This must run BEFORE getPracticeList since the query JOINs with the queue
+  // CRITICAL: Must wait for initialSyncComplete to ensure data exists in SQLite
   const [queueInitialized] = createResource(
     () => {
       const db = localDb();
       const playlistId = currentPlaylistId();
       const version = syncVersion(); // Triggers refetch when sync completes
+      const syncComplete = initialSyncComplete(); // Wait for initial sync to finish
+
+      console.log(
+        `[TunesGridScheduled] queueInitialized deps: db=${!!db}, userId=${
+          props.userId
+        }, playlist=${playlistId}, version=${version}, syncComplete=${syncComplete}`
+      );
+
+      // Don't attempt to run until initial sync completes
+      if (!syncComplete) {
+        console.log(
+          "[TunesGridScheduled] Waiting for initial sync to complete..."
+        );
+        return null;
+      }
+
       return db && props.userId && playlistId
-        ? { db, userId: props.userId, playlistId, version }
+        ? { db, userId: props.userId, playlistId, version, syncComplete }
         : null;
     },
     async (params) => {
@@ -232,8 +250,8 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   const evaluations = () => props.evaluations ?? {};
   const setEvaluations = (
     evalsOrUpdater:
-      | Record<number, string>
-      | ((prev: Record<number, string>) => Record<number, string>)
+      | Record<string, string>
+      | ((prev: Record<string, string>) => Record<string, string>)
   ) => {
     if (!props.onEvaluationsChange) {
       console.error(
@@ -254,7 +272,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   createEffect(() => {
     const data = dueTunesData();
     if (data && data.length > 0) {
-      const initialEvals: Record<number, string> = {};
+      const initialEvals: Record<string, string> = {};
       for (const entry of data) {
         // Only include entries that have a staged recall_eval from database
         if (entry.recall_eval && entry.recall_eval !== "") {
@@ -327,9 +345,9 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   });
 
   // Track open state for RecallEvalComboBox per tune to preserve dropdowns across refreshes
-  const [openMenus, setOpenMenus] = createSignal<Record<number, boolean>>({});
-  const getRecallEvalOpen = (tuneId: number) => !!openMenus()[tuneId];
-  const setRecallEvalOpen = (tuneId: number, isOpen: boolean) =>
+  const [openMenus, setOpenMenus] = createSignal<Record<string, boolean>>({});
+  const getRecallEvalOpen = (tuneId: string) => !!openMenus()[tuneId];
+  const setRecallEvalOpen = (tuneId: string, isOpen: boolean) =>
     setOpenMenus((prev) => ({ ...prev, [tuneId]: isOpen }));
 
   // Notify parent when tunes change (for flashcard view)
@@ -341,7 +359,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   });
 
   // Callback for recall evaluation changes
-  const handleRecallEvalChange = async (tuneId: number, evaluation: string) => {
+  const handleRecallEvalChange = async (tuneId: string, evaluation: string) => {
     console.log(`Tune ${tuneId} recall eval changed to: ${evaluation}`);
 
     // Update local state to trigger immediate re-render
@@ -503,7 +521,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   // Compute scroll storage key reactively once userId is available
   const scrollKey = createMemo<string | null>(() => {
     const uid = props.userId;
-    if (!uid || uid === 0) return null;
+    if (!uid) return null;
     return `TT_PRACTICE_SCROLL_${uid}`;
   });
 
@@ -904,15 +922,36 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           when={tunes().length > 0}
           fallback={
             <div class="flex items-center justify-center h-full">
-              <div class="text-center py-12">
-                <div class="text-6xl mb-4">🎉</div>
-                <h3 class="text-xl font-semibold text-green-900 dark:text-green-300 mb-2">
-                  All Caught Up!
-                </h3>
-                <p class="text-green-700 dark:text-green-400">
-                  No tunes are due for practice right now.
-                </p>
-              </div>
+              <Show
+                when={
+                  initialSyncComplete() &&
+                  !queueInitialized.loading &&
+                  !dueTunesData.loading &&
+                  queueInitialized() !== undefined &&
+                  dueTunesData() !== undefined
+                }
+                fallback={
+                  <div class="text-center py-12">
+                    <div class="text-6xl mb-4">⏳</div>
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-300 mb-2">
+                      Loading Practice Queue...
+                    </h3>
+                    <p class="text-gray-700 dark:text-gray-400">
+                      Syncing your data from the cloud...
+                    </p>
+                  </div>
+                }
+              >
+                <div class="text-center py-12">
+                  <div class="text-6xl mb-4">🎉</div>
+                  <h3 class="text-xl font-semibold text-green-900 dark:text-green-300 mb-2">
+                    All Caught Up!
+                  </h3>
+                  <p class="text-green-700 dark:text-green-400">
+                    No tunes are due for practice right now.
+                  </p>
+                </div>
+              </Show>
             </div>
           }
         >

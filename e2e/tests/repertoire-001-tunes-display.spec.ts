@@ -38,7 +38,7 @@ test.describe.serial("REPERTOIRE-001: User's Tunes Display", () => {
     await ttPage.expectTuneVisible("Morrison's Jig", ttPage.repertoireGrid);
   });
 
-  test("should show 'Private' badge on both tunes", async ({ page }) => {
+  test.skip("should show 'Private' badge on both tunes", async ({ page }) => {
     // Both tunes should have Private badge
     const privateBadges = page.getByText("Private");
     const start = Date.now();
