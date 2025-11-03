@@ -13,7 +13,7 @@ import type { Reference } from "@/lib/db/queries/references";
 interface ReferenceListProps {
   references: Reference[];
   onEdit?: (reference: Reference) => void;
-  onDelete?: (referenceId: number) => void;
+  onDelete?: (referenceId: string) => void;
   showActions?: boolean;
   groupByType?: boolean;
 }

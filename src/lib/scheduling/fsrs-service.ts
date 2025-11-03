@@ -30,6 +30,7 @@ import type {
   PrefsSpacedRepetition,
   RecordPracticeInput,
 } from "../db/types";
+import { generateId } from "../utils/uuid";
 
 /**
  * FSRS quality ratings mapped to ts-fsrs Grade enum
@@ -248,9 +249,10 @@ export class FSRSService {
   createPracticeRecord(
     input: RecordPracticeInput,
     schedule: NextReviewSchedule,
-    playlistRef: number
+    playlistRef: string
   ): NewPracticeRecord {
     return {
+      id: generateId(),
       lastModifiedAt: new Date().toISOString(),
       tuneRef: input.tuneRef,
       playlistRef: playlistRef,

@@ -5,48 +5,15 @@
  * Tags are stored in a join table (tag) with userRef, tuneRef, and tagText.
  */
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Get user_profile.id from supabase_user_id (UUID)
- * Returns null if user not found
- */
-async function getUserProfileId(
-  db: SqliteDatabase,
-  supabaseUserId: string
-): Promise<number | null> {
-  const result = await db
-    .select({ id: schema.userProfile.id })
-    .from(schema.userProfile)
-    .where(eq(schema.userProfile.supabaseUserId, supabaseUserId))
-    .limit(1);
-
-  if (!result || result.length === 0) {
-    return null;
-  }
-
-  return result[0].id;
-}
+import type { Tag } from "../types";
 
 // ============================================================================
 // Types
 // ============================================================================
-
-export interface Tag {
-  tagId: number;
-  userRef: number;
-  tuneRef: number;
-  tagText: string;
-  syncVersion: number;
-  lastModifiedAt: string;
-  deviceId: string | null;
-}
 
 export interface TagWithUsageCount {
   tagText: string;
@@ -54,7 +21,7 @@ export interface TagWithUsageCount {
 }
 
 export interface TuneTag {
-  tagId: number;
+  tagId: string; // UUID
   tagText: string;
 }
 
@@ -71,18 +38,13 @@ export async function getUserTags(
   db: SqliteDatabase,
   supabaseUserId: string
 ): Promise<TagWithUsageCount[]> {
-  const userRef = await getUserProfileId(db, supabaseUserId);
-  if (!userRef) {
-    return [];
-  }
-
   const results = await db
     .select({
       tagText: schema.tag.tagText,
-      usageCount: sql<number>`COUNT(DISTINCT ${schema.tag.tuneRef})`,
+      usageCount: count(schema.tag.tuneRef),
     })
     .from(schema.tag)
-    .where(eq(schema.tag.userRef, userRef))
+    .where(eq(schema.tag.userRef, supabaseUserId))
     .groupBy(schema.tag.tagText)
     .orderBy(schema.tag.tagText)
     .all();
@@ -98,21 +60,21 @@ export async function getUserTags(
  */
 export async function getTuneTags(
   db: SqliteDatabase,
-  tuneId: number,
+  tuneId: string,
   supabaseUserId: string
 ): Promise<TuneTag[]> {
-  const userRef = await getUserProfileId(db, supabaseUserId);
-  if (!userRef) {
-    return [];
-  }
-
   const results = await db
     .select({
-      tagId: schema.tag.tagId,
+      tagId: schema.tag.id,
       tagText: schema.tag.tagText,
     })
     .from(schema.tag)
-    .where(and(eq(schema.tag.tuneRef, tuneId), eq(schema.tag.userRef, userRef)))
+    .where(
+      and(
+        eq(schema.tag.tuneRef, tuneId),
+        eq(schema.tag.userRef, supabaseUserId)
+      )
+    )
     .orderBy(schema.tag.tagText)
     .all();
 
@@ -130,25 +92,20 @@ export async function getTuneTags(
  */
 export async function addTagToTune(
   db: SqliteDatabase,
-  tuneId: number,
+  tuneId: string,
   supabaseUserId: string,
   tagText: string,
   deviceId?: string
 ): Promise<Tag | null> {
-  const userRef = await getUserProfileId(db, supabaseUserId);
-  if (!userRef) {
-    console.error("User profile not found for", supabaseUserId);
-    return null;
-  }
-
   const now = new Date().toISOString();
 
   try {
     const result = await db
       .insert(schema.tag)
       .values({
+        id: generateId(),
         tuneRef: tuneId,
-        userRef: userRef,
+        userRef: supabaseUserId,
         tagText: tagText.trim().toLowerCase(), // Normalize tag text
         syncVersion: 1,
         lastModifiedAt: now,
@@ -180,21 +137,16 @@ export async function addTagToTune(
  */
 export async function removeTagFromTune(
   db: SqliteDatabase,
-  tuneId: number,
+  tuneId: string,
   supabaseUserId: string,
   tagText: string
 ): Promise<boolean> {
-  const userRef = await getUserProfileId(db, supabaseUserId);
-  if (!userRef) {
-    return false;
-  }
-
   const result = await db
     .delete(schema.tag)
     .where(
       and(
         eq(schema.tag.tuneRef, tuneId),
-        eq(schema.tag.userRef, userRef),
+        eq(schema.tag.userRef, supabaseUserId),
         eq(schema.tag.tagText, tagText.trim().toLowerCase())
       )
     )
@@ -209,11 +161,11 @@ export async function removeTagFromTune(
  */
 export async function removeTagById(
   db: SqliteDatabase,
-  tagId: number
+  tagId: string
 ): Promise<boolean> {
   const result = await db
     .delete(schema.tag)
-    .where(eq(schema.tag.tagId, tagId))
+    .where(eq(schema.tag.id, tagId))
     .returning()
     .all();
 
@@ -231,18 +183,16 @@ export async function getTagUsageCount(
   supabaseUserId: string,
   tagText: string
 ): Promise<number> {
-  const userRef = await getUserProfileId(db, supabaseUserId);
-  if (!userRef) {
-    return 0;
-  }
-
   const result = await db
     .select({
-      count: sql<number>`COUNT(DISTINCT ${schema.tag.tuneRef})`,
+      count: count(schema.tag.tuneRef),
     })
     .from(schema.tag)
     .where(
-      and(eq(schema.tag.userRef, userRef), eq(schema.tag.tagText, tagText))
+      and(
+        eq(schema.tag.userRef, supabaseUserId),
+        eq(schema.tag.tagText, tagText)
+      )
     )
     .get();
 
@@ -261,15 +211,13 @@ export async function deleteTagForUser(
   supabaseUserId: string,
   tagText: string
 ): Promise<number> {
-  const userRef = await getUserProfileId(db, supabaseUserId);
-  if (!userRef) {
-    return 0;
-  }
-
   const result = await db
     .delete(schema.tag)
     .where(
-      and(eq(schema.tag.userRef, userRef), eq(schema.tag.tagText, tagText))
+      and(
+        eq(schema.tag.userRef, supabaseUserId),
+        eq(schema.tag.tagText, tagText)
+      )
     )
     .returning()
     .all();
@@ -293,23 +241,21 @@ export async function renameTagForUser(
   newTagText: string,
   deviceId?: string
 ): Promise<number> {
-  const userRef = await getUserProfileId(db, supabaseUserId);
-  if (!userRef) {
-    return 0;
-  }
-
   const now = new Date().toISOString();
 
   const result = await db
     .update(schema.tag)
     .set({
       tagText: newTagText.trim().toLowerCase(),
-      syncVersion: sql`${schema.tag.syncVersion} + 1`,
+      syncVersion: sql.raw(`${schema.tag.syncVersion.name} + 1`),
       lastModifiedAt: now,
       deviceId: deviceId ?? null,
     })
     .where(
-      and(eq(schema.tag.userRef, userRef), eq(schema.tag.tagText, oldTagText))
+      and(
+        eq(schema.tag.userRef, supabaseUserId),
+        eq(schema.tag.tagText, oldTagText)
+      )
     )
     .returning()
     .all();
@@ -327,13 +273,8 @@ export async function getTuneIdsByTags(
   db: SqliteDatabase,
   supabaseUserId: string,
   tagTexts: string[]
-): Promise<number[]> {
+): Promise<string[]> {
   if (tagTexts.length === 0) {
-    return [];
-  }
-
-  const userRef = await getUserProfileId(db, supabaseUserId);
-  if (!userRef) {
     return [];
   }
 
@@ -346,7 +287,7 @@ export async function getTuneIdsByTags(
     .from(schema.tag)
     .where(
       and(
-        eq(schema.tag.userRef, userRef),
+        eq(schema.tag.userRef, supabaseUserId),
         inArray(schema.tag.tagText, normalizedTags)
       )
     )

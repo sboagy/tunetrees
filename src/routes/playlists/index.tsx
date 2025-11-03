@@ -22,7 +22,7 @@ const PlaylistsPage: Component = () => {
     navigate(`/playlists/${playlist.playlistId}/edit`);
   };
 
-  const handlePlaylistDeleted = (playlistId: number) => {
+  const handlePlaylistDeleted = (playlistId: string) => {
     console.log("Playlist deleted:", playlistId);
     // PlaylistList will automatically refetch, no action needed
   };

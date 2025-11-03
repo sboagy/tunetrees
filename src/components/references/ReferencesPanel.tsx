@@ -100,7 +100,7 @@ export const ReferencesPanel: Component = () => {
   };
 
   // Handle deleting a reference
-  const handleDeleteReference = async (referenceId: number) => {
+  const handleDeleteReference = async (referenceId: string) => {
     if (!confirm("Delete this reference?")) return;
 
     try {

@@ -22,7 +22,7 @@ const NewTunePage: Component = () => {
 
   const handleSave = async (
     tuneData: Partial<TuneEditorData>
-  ): Promise<number> => {
+  ): Promise<string> => {
     const db = localDb();
     if (!db) {
       console.error("Database not initialized");

@@ -18,13 +18,14 @@ import {
 } from "@/lib/db/schema";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
+import { generateId } from "@/lib/utils/uuid";
 
 type SeedAddToReviewInput = {
-  playlistId: number;
-  tuneIds: number[];
-  // Optional explicit user id (user_profile.id). If omitted, we will
+  playlistId: string; // UUID
+  tuneIds: string[]; // UUIDs
+  // Optional explicit user id (user_profile.id UUID). If omitted, we will
   // resolve from current Supabase session via user_profile lookup.
-  userIdInt?: number;
+  userId?: string;
 };
 
 async function ensureDb(): Promise<SqliteDatabase> {
@@ -35,13 +36,13 @@ async function ensureDb(): Promise<SqliteDatabase> {
   }
 }
 
-async function resolveUserIdInt(db: SqliteDatabase): Promise<number> {
+async function resolveUserId(db: SqliteDatabase): Promise<string> {
   // Try to fetch current auth user from Supabase and map to user_profile.id
   const { data } = await supabase.auth.getUser();
   const userId = data.user?.id;
   if (!userId) throw new Error("No authenticated user in test session");
 
-  const result = await db.all<{ id: number }>(
+  const result = await db.all<{ id: string }>(
     sql`SELECT id FROM user_profile WHERE supabase_user_id = ${userId} LIMIT 1`
   );
   const id = result[0]?.id;
@@ -53,10 +54,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
   const db = await ensureDb();
   const now = new Date().toISOString().replace("T", " ").substring(0, 19);
 
-  const userRef =
-    typeof input.userIdInt === "number"
-      ? input.userIdInt
-      : await resolveUserIdInt(db);
+  const userRef = input.userId ?? (await resolveUserId(db));
 
   // 1) Update playlist_tune.scheduled for provided tuneIds
   let updated = 0;
@@ -96,6 +94,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       await db
         .insert(practiceRecord)
         .values({
+          id: generateId(),
           playlistRef: input.playlistId,
           tuneRef: tuneId,
           practiced: null,
@@ -167,10 +166,10 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
   };
 }
 
-async function getPracticeCount(playlistId: number) {
+async function getPracticeCount(playlistId: string) {
   const db = await ensureDb();
-  // Resolve userIdInt
-  const userRef = await resolveUserIdInt(db);
+  // Resolve userId
+  const userRef = await resolveUserId(db);
   const rows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
     FROM daily_practice_queue dpq
@@ -193,9 +192,9 @@ declare global {
       seedAddToReview: (input: SeedAddToReviewInput) => Promise<{
         updated: number;
         queueCount: number;
-        userRef: number;
+        userRef: string; // UUID
       }>;
-      getPracticeCount: (playlistId: number) => Promise<number>;
+      getPracticeCount: (playlistId: string) => Promise<number>; // UUID
       getSyncVersion: () => number;
       isInitialSyncComplete: () => boolean;
     };

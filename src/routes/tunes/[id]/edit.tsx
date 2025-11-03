@@ -26,8 +26,8 @@ const EditTunePage: Component = () => {
   const [tune] = createResource(
     () => {
       const db = localDb();
-      const tuneId = parseInt(params.id, 10);
-      return db && !Number.isNaN(tuneId) ? { db, tuneId } : null;
+      const tuneId = params.id;
+      return db && tuneId ? { db, tuneId } : null;
     },
     async (params) => {
       if (!params) return null;
@@ -37,15 +37,15 @@ const EditTunePage: Component = () => {
 
   const handleSave = async (
     tuneData: Partial<TuneEditorData>
-  ): Promise<number | undefined> => {
+  ): Promise<string | undefined> => {
     const db = localDb();
     if (!db) {
       console.error("Database not initialized");
       throw new Error("Database not available");
     }
 
-    const tuneId = parseInt(params.id, 10);
-    if (Number.isNaN(tuneId)) {
+    const tuneId = params.id;
+    if (!tuneId) {
       console.error("Invalid tune ID");
       throw new Error("Invalid tune ID");
     }

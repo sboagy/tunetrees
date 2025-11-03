@@ -36,7 +36,7 @@ import type { PlaylistWithSummary } from "@/lib/db/types";
 interface PlaylistSelectorModalProps {
   isOpen: boolean;
   tuneCount: number;
-  onSelect: (playlistId: number) => void;
+  onSelect: (playlistId: string) => void;
   onCancel: () => void;
 }
 
@@ -45,7 +45,7 @@ export const PlaylistSelectorModal: Component<PlaylistSelectorModalProps> = (
 ) => {
   const { localDb, user } = useAuth();
   const [selectedPlaylistId, setSelectedPlaylistId] = createSignal<
-    number | null
+    string | null
   >(null);
 
   // Fetch user playlists

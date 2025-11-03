@@ -55,7 +55,7 @@ interface TuneEditorProps {
   /** Callback when save is requested (should return tune ID for new tunes) */
   onSave?: (
     tuneData: Partial<TuneEditorData>
-  ) => Promise<number | undefined> | undefined;
+  ) => Promise<string | undefined> | undefined;
   /** Callback when cancel is requested */
   onCancel?: () => void;
   /** Show all FSRS/SM2 fields (collapsed by default) */

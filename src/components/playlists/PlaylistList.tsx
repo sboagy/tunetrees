@@ -39,7 +39,7 @@ interface PlaylistListProps {
   /** Callback when a playlist is selected for editing */
   onPlaylistSelect?: (playlist: PlaylistWithSummary) => void;
   /** Callback when a playlist is deleted */
-  onPlaylistDeleted?: (playlistId: number) => void;
+  onPlaylistDeleted?: (playlistId: string) => void;
   /** Include soft-deleted playlists */
   includeDeleted?: boolean;
 }
@@ -56,7 +56,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
   const { user, localDb } = useAuth();
   const [searchQuery, setSearchQuery] = createSignal("");
   const [sorting, setSorting] = createSignal<SortingState>([]);
-  const [deletingId, setDeletingId] = createSignal<number | null>(null);
+  const [deletingId, setDeletingId] = createSignal<string | null>(null);
 
   // Fetch playlists from local database
   const [playlists, { refetch }] = createResource(
@@ -97,7 +97,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
   });
 
   // Handle delete action
-  const handleDelete = async (playlistId: number) => {
+  const handleDelete = async (playlistId: string) => {
     const userId = user()?.id;
     const db = localDb();
     if (!userId || !db) {

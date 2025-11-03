@@ -9,6 +9,7 @@
 
 import { and, asc, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { queueSync } from "../../sync";
+import { generateId } from "../../utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
 import type { CreateTuneInput, Tune } from "../types";
@@ -26,7 +27,7 @@ export interface SearchTunesOptions {
   /** Filter by genres (multi-select) */
   genres?: string[];
   /** Filter by tags (multi-select) - tuple IDs will be checked against tag table */
-  tagIds?: number[];
+  tagIds?: string[];
   /** Include user's private tunes */
   userId?: string;
 }
@@ -59,7 +60,7 @@ export interface SearchTunesOptions {
  */
 export async function getTuneById(
   db: SqliteDatabase,
-  tuneId: number
+  tuneId: string
 ): Promise<Tune | null> {
   const result = await db
     .select()
@@ -111,6 +112,7 @@ export async function createTune(
   const [tune] = await db
     .insert(schema.tune)
     .values({
+      id: generateId(),
       title: input.title || null,
       type: input.type || null,
       mode: input.mode || null,
@@ -136,7 +138,7 @@ export async function createTune(
  */
 export async function updateTune(
   db: SqliteDatabase,
-  tuneId: number,
+  tuneId: string,
   input: Partial<CreateTuneInput>
 ): Promise<Tune> {
   const now = new Date().toISOString();
@@ -175,7 +177,7 @@ export async function updateTune(
  */
 export async function deleteTune(
   db: SqliteDatabase,
-  tuneId: number
+  tuneId: string
 ): Promise<void> {
   const now = new Date().toISOString();
   const deviceId = getDeviceId();

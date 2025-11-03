@@ -141,15 +141,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
           params.userId
         );
         // Transform to Tune[] format by extracting the nested tune object
-        return playlistTunes.map((pt) => ({
-          ...pt.tune,
-          // Add the missing Tune fields with default values
-          deleted: 0,
-          syncVersion: 0,
-          lastModifiedAt: new Date().toISOString(),
-          deviceId: null,
-          privateFor: null,
-        }));
+        return playlistTunes.map((pt) => pt.tune);
       }
 
       // Otherwise, get all user's tunes
@@ -165,7 +157,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
     const modes = selectedModes();
     const genres = selectedGenres();
 
-    return tunes.filter((tune: Tune) => {
+    return tunes.filter((tune) => {
       // Search filter
       if (query) {
         const matchesTitle = tune.title?.toLowerCase().includes(query);
@@ -198,9 +190,9 @@ export const TuneList: Component<TuneListProps> = (props) => {
       }
 
       // Private filter
-      if (props.privateOnly && !tune.privateFor) {
-        return false;
-      }
+      // if (props.privateOnly && !tune.privateFor) {
+      //   return false;
+      // }
 
       return true;
     });
@@ -210,7 +202,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
   const availableTypes = createMemo(() => {
     const tunes = allTunes() || [];
     const types = new Set<string>();
-    tunes.forEach((tune: Tune) => {
+    tunes.forEach((tune) => {
       if (tune.type) types.add(tune.type);
     });
     return Array.from(types).sort();
@@ -219,7 +211,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
   const availableModes = createMemo(() => {
     const tunes = allTunes() || [];
     const modes = new Set<string>();
-    tunes.forEach((tune: Tune) => {
+    tunes.forEach((tune) => {
       if (tune.mode) modes.add(tune.mode);
     });
     return Array.from(modes).sort();
@@ -228,7 +220,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
   const availableGenres = createMemo(() => {
     const tunes = allTunes() || [];
     const genres = new Set<string>();
-    tunes.forEach((tune: Tune) => {
+    tunes.forEach((tune) => {
       if (tune.genre) genres.add(tune.genre);
     });
     return Array.from(genres).sort();
@@ -243,7 +235,8 @@ export const TuneList: Component<TuneListProps> = (props) => {
   };
 
   // Define table columns
-  const columns: ColumnDef<Tune>[] = [
+  type TuneRow = NonNullable<ReturnType<typeof allTunes>>[number];
+  const columns: ColumnDef<TuneRow>[] = [
     {
       id: "select",
       header: ({ table }) => (
@@ -395,8 +388,8 @@ export const TuneList: Component<TuneListProps> = (props) => {
     getRowId: (row) => String(row.id),
   });
 
-  const handleRowClick = (tune: Tune) => {
-    props.onTuneSelect?.(tune);
+  const handleRowClick = (tune: TuneRow) => {
+    props.onTuneSelect?.(tune as Tune);
   };
 
   // Get selected tunes
@@ -410,7 +403,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
     setShowPlaylistModal(true);
   };
 
-  const handlePlaylistSelect = async (playlistId: number) => {
+  const handlePlaylistSelect = async (playlistId: string) => {
     const tunes = selectedTunes();
     const db = localDb();
     const userId = user()?.id;

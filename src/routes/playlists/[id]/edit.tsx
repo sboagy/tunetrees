@@ -30,7 +30,7 @@ const EditPlaylistPage: Component = () => {
     () => {
       const userId = user()?.id;
       const db = localDb();
-      const playlistId = Number.parseInt(params.id, 10);
+      const playlistId = params.id;
       return userId && db && playlistId ? { userId, db, playlistId } : null;
     },
     async (params) => {
@@ -42,7 +42,7 @@ const EditPlaylistPage: Component = () => {
   const handleSave = async (playlistData: Partial<Playlist>) => {
     const userId = user()?.id;
     const db = localDb();
-    const playlistId = Number.parseInt(params.id, 10);
+    const playlistId = params.id;
 
     if (!userId || !db || !playlistId) {
       console.error("Cannot update playlist: missing user, database, or ID");

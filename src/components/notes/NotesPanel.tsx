@@ -34,7 +34,7 @@ export const NotesPanel: Component = () => {
   const { user } = useAuth();
 
   const [isAdding, setIsAdding] = createSignal(false);
-  const [editingNoteId, setEditingNoteId] = createSignal<number | null>(null);
+  const [editingNoteId, setEditingNoteId] = createSignal<string | null>(null); // UUID
   const [newNoteContent, setNewNoteContent] = createSignal("");
 
   // Load notes for current tune
@@ -67,7 +67,7 @@ export const NotesPanel: Component = () => {
       await createNote(db, {
         tuneRef: tuneId,
         noteText: newNoteContent(),
-        userRef: user()?.id ? parseInt(user()!.id, 10) : undefined,
+        userRef: user()?.id, // Already a UUID string
         public: false,
       });
 
@@ -83,7 +83,8 @@ export const NotesPanel: Component = () => {
   };
 
   // Handle updating a note
-  const handleUpdateNote = async (noteId: number, content: string) => {
+  const handleUpdateNote = async (noteId: string, content: string) => {
+    // UUID
     try {
       const db = getDb();
       await updateNote(db, noteId, {
@@ -98,7 +99,8 @@ export const NotesPanel: Component = () => {
   };
 
   // Handle deleting a note
-  const handleDeleteNote = async (noteId: number) => {
+  const handleDeleteNote = async (noteId: string) => {
+    // UUID
     if (!confirm("Delete this note?")) return;
 
     try {

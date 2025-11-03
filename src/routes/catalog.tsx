@@ -15,7 +15,6 @@
 
 import { useNavigate, useSearchParams } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
-import { sql } from "drizzle-orm";
 import {
   type Component,
   createEffect,
@@ -49,22 +48,8 @@ const CatalogPage: Component = () => {
   const { currentPlaylistId } = useCurrentPlaylist();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get current user's local database ID from user_profile
-  const [userId] = createResource(
-    () => {
-      const db = localDb();
-      const currentUser = user();
-      const version = syncVersion(); // Trigger refetch on sync
-      return db && currentUser ? { db, userId: currentUser.id, version } : null;
-    },
-    async (params) => {
-      if (!params) return null;
-      const result = await params.db.all<{ id: number }>(
-        sql`SELECT id FROM user_profile WHERE supabase_user_id = ${params.userId} LIMIT 1`
-      );
-      return result[0]?.id ?? null;
-    }
-  );
+  // Get current user ID (supabase UUID)
+  const userId = createMemo(() => user()?.id || null);
 
   // Helper to safely get string from searchParams
   const getParam = (value: string | string[] | undefined): string => {
@@ -90,10 +75,8 @@ const CatalogPage: Component = () => {
   const [selectedGenres, setSelectedGenres] = createSignal<string[]>(
     getParamArray(searchParams.genres)
   );
-  const [selectedPlaylistIds, setSelectedPlaylistIds] = createSignal<number[]>(
+  const [selectedPlaylistIds, setSelectedPlaylistIds] = createSignal<string[]>(
     getParamArray(searchParams.playlists)
-      .map((id) => Number.parseInt(id, 10))
-      .filter((id) => !Number.isNaN(id))
   );
 
   // Track selected rows count from grid
@@ -300,7 +283,7 @@ const CatalogPage: Component = () => {
         <Show when={userId()}>
           <TunesGridCatalog
             userId={userId()!}
-            playlistId={currentPlaylistId() || 0}
+            playlistId={currentPlaylistId() || "0"}
             tablePurpose="catalog"
             searchQuery={searchQuery()}
             selectedTypes={selectedTypes()}

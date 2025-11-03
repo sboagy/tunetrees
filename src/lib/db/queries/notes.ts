@@ -1,24 +1,14 @@
 import { and, desc, eq } from "drizzle-orm";
+import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
-
-export interface Note {
-  id: number;
-  userRef: number | null;
-  tuneRef: number;
-  playlistRef: number | null;
-  createdDate: string | null;
-  noteText: string | null;
-  public: number;
-  favorite: number | null;
-  deleted: number;
-}
+import type { Note } from "../types";
 
 export interface CreateNoteData {
-  tuneRef: number;
+  tuneRef: string; // UUID
   noteText: string;
-  userRef?: number;
-  playlistRef?: number;
+  userRef?: string; // UUID
+  playlistRef?: string; // UUID
   public?: boolean;
   favorite?: boolean;
 }
@@ -35,7 +25,7 @@ export interface UpdateNoteData {
  */
 export async function getNotesByTune(
   db: SqliteDatabase,
-  tuneId: number
+  tuneId: string // UUID
 ): Promise<Note[]> {
   return await db
     .select()
@@ -50,7 +40,7 @@ export async function getNotesByTune(
  */
 export async function getNotesByPlaylist(
   db: SqliteDatabase,
-  playlistId: number
+  playlistId: string // UUID
 ): Promise<Note[]> {
   return await db
     .select()
@@ -67,7 +57,7 @@ export async function getNotesByPlaylist(
  */
 export async function getNoteById(
   db: SqliteDatabase,
-  noteId: number
+  noteId: string // UUID
 ): Promise<Note | undefined> {
   const notes = await db
     .select()
@@ -91,6 +81,7 @@ export async function createNote(
   const result = await db
     .insert(schema.note)
     .values({
+      id: generateId(), // Generate UUID
       tuneRef: data.tuneRef,
       noteText: data.noteText,
       userRef: data.userRef || null,
@@ -114,7 +105,7 @@ export async function createNote(
  */
 export async function updateNote(
   db: SqliteDatabase,
-  noteId: number,
+  noteId: string, // UUID
   data: UpdateNoteData
 ): Promise<Note | undefined> {
   const now = new Date().toISOString();
@@ -151,7 +142,7 @@ export async function updateNote(
  */
 export async function deleteNote(
   db: SqliteDatabase,
-  noteId: number
+  noteId: string // UUID
 ): Promise<boolean> {
   const now = new Date().toISOString();
 
@@ -174,7 +165,7 @@ export async function deleteNote(
  */
 export async function permanentlyDeleteNote(
   db: SqliteDatabase,
-  noteId: number
+  noteId: string // UUID
 ): Promise<boolean> {
   const result = await db
     .delete(schema.note)

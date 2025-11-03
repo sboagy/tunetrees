@@ -37,7 +37,7 @@ import { AbcNotation } from "../tunes/AbcNotation";
  * ```
  */
 export const PracticeSession: Component<{
-  playlistId: number;
+  playlistId: string;
   onComplete?: () => void;
 }> = (props) => {
   const { user, localDb } = useAuth();

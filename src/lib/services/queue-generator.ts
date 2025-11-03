@@ -23,12 +23,13 @@
  * @module lib/services/queue-generator
  */
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { getDueTunesLegacy } from "../db/queries/practice";
 import { dailyPracticeQueue, playlistTune, userProfile } from "../db/schema";
 import type { DailyPracticeQueue, NewDailyPracticeQueue } from "../db/types";
 import { queueSync } from "../sync/queue";
+import { generateId } from "../utils/uuid";
 
 /**
  * Get user_profile.id from supabase_user_id (UUID)
@@ -37,7 +38,8 @@ import { queueSync } from "../sync/queue";
 async function getUserProfileId(
   db: SqliteDatabase,
   supabaseUserId: string
-): Promise<number | null> {
+): Promise<string | null> {
+  // Returns UUID string
   const result = await db
     .select({ id: userProfile.id })
     .from(userProfile)
@@ -48,7 +50,7 @@ async function getUserProfileId(
     return null;
   }
 
-  return result[0].id;
+  return result[0].id; // UUID string
 }
 
 /**
@@ -220,7 +222,7 @@ export function classifyQueueBucket(
 export async function generateDailyPracticeQueue(
   db: SqliteDatabase,
   userId: string,
-  playlistId: number,
+  playlistId: string, // UUID
   sitdownDate: Date = new Date(),
   options: QueueGenerationOptions = {}
 ): Promise<DailyPracticeQueue[]> {
@@ -306,6 +308,7 @@ export async function generateDailyPracticeQueue(
     }
 
     queueEntries.push({
+      id: generateId(), // Generate UUID for queue entry
       lastModifiedAt: now,
       userRef: userRef,
       playlistRef: playlistId,
@@ -377,7 +380,7 @@ export async function generateDailyPracticeQueue(
 export async function refillPracticeQueue(
   db: SqliteDatabase,
   userId: string,
-  playlistId: number,
+  playlistId: string, // UUID
   count = 5,
   sitdownDate: Date = new Date()
 ): Promise<DailyPracticeQueue[]> {
@@ -425,7 +428,7 @@ export async function refillPracticeQueue(
       and(
         eq(playlistTune.playlistRef, playlistId),
         eq(playlistTune.deleted, 0),
-        sql`${playlistTune.current} < ${windows.windowFloorUtc.toISOString()}`
+        lt(playlistTune.current, windows.windowFloorUtc.toISOString())
       )
     )
     .limit(count + existingTuneIds.length); // Over-fetch to account for filtering
@@ -444,6 +447,7 @@ export async function refillPracticeQueue(
   const nextOrderIndex = Math.max(...existing.map((e) => e.orderIndex)) + 1;
   const now = new Date().toISOString();
   const newEntries: NewDailyPracticeQueue[] = newBackfill.map((tune, idx) => ({
+    id: generateId(), // Generate UUID for queue entry
     lastModifiedAt: now,
     userRef: userRef,
     playlistRef: playlistId,
@@ -494,7 +498,7 @@ export async function refillPracticeQueue(
 export async function getQueueBucketCounts(
   db: SqliteDatabase,
   userId: string,
-  playlistId: number,
+  playlistId: string, // UUID
   windowStartUtc: string
 ): Promise<Record<number, number>> {
   // Map user UUID to integer ID

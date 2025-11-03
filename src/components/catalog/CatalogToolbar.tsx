@@ -63,9 +63,9 @@ export interface CatalogToolbarProps {
   /** Genres change handler */
   onGenresChange: (genres: string[]) => void;
   /** Selected playlist IDs */
-  selectedPlaylistIds: number[];
+  selectedPlaylistIds: string[];
   /** Playlist IDs change handler */
-  onPlaylistIdsChange: (playlistIds: number[]) => void;
+  onPlaylistIdsChange: (playlistIds: string[]) => void;
   /** Available types */
   availableTypes: string[];
   /** Available modes */

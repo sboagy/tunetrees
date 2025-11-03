@@ -51,7 +51,7 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
   const [genreDefault, setGenreDefault] = createSignal<string | null>(
     props.playlist?.genreDefault ?? null
   );
-  const [instrumentRef, setInstrumentRef] = createSignal<number | null>(
+  const [instrumentRef, setInstrumentRef] = createSignal<string | null>(
     props.playlist?.instrumentRef ?? null
   );
   const [srAlgType, setSrAlgType] = createSignal(
@@ -77,12 +77,6 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
 
     if (!name().trim()) {
       newErrors.name = "Playlist name is required";
-    }
-
-    // Validate instrument ref is a positive integer if provided
-    const instRef = instrumentRef();
-    if (instRef !== null && (instRef < 1 || !Number.isInteger(instRef))) {
-      newErrors.instrumentRef = "Instrument must be a positive integer";
     }
 
     setErrors(newErrors);
@@ -230,7 +224,7 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
               value={instrumentRef() ?? ""}
               onInput={(e) => {
                 const value = e.currentTarget.value;
-                setInstrumentRef(value ? Number.parseInt(value, 10) : null);
+                setInstrumentRef(value || null);
               }}
               placeholder="Leave blank for now"
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"

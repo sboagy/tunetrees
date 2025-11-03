@@ -20,7 +20,7 @@ import type { Component } from "solid-js";
 import { For } from "solid-js";
 
 interface RecallEvalComboBoxProps {
-  tuneId: number;
+  tuneId: string;
   value: string;
   onChange: (value: string) => void;
   // Controlled open state (optional). When provided, the dropdown will keep

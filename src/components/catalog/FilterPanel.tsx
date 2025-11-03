@@ -74,8 +74,8 @@ const FilterChip: Component<{
 const FilterDropdown: Component<{
   title: string;
   items: string[] | PlaylistWithSummary[];
-  selectedItems: string[] | number[];
-  onSelectionChange: (selected: string[] | number[]) => void;
+  selectedItems: string[];
+  onSelectionChange: (selected: string[]) => void;
   loading?: boolean;
   isPlaylist?: boolean;
 }> = (props) => {
@@ -109,7 +109,7 @@ const FilterDropdown: Component<{
   const toggleSelection = (item: any) => {
     if (props.isPlaylist) {
       const playlistId = (item as PlaylistWithSummary).playlistId;
-      const selected = props.selectedItems as number[];
+      const selected = props.selectedItems;
       if (selected.includes(playlistId)) {
         props.onSelectionChange(selected.filter((id) => id !== playlistId));
       } else {
@@ -117,7 +117,7 @@ const FilterDropdown: Component<{
       }
     } else {
       const value = item as string;
-      const selected = props.selectedItems as string[];
+      const selected = props.selectedItems;
       if (selected.includes(value)) {
         props.onSelectionChange(selected.filter((i) => i !== value));
       } else {
@@ -129,9 +129,9 @@ const FilterDropdown: Component<{
   const isSelected = (item: any): boolean => {
     if (props.isPlaylist) {
       const playlistId = (item as PlaylistWithSummary).playlistId;
-      return (props.selectedItems as number[]).includes(playlistId);
+      return props.selectedItems.includes(playlistId);
     } else {
-      return (props.selectedItems as string[]).includes(item as string);
+      return props.selectedItems.includes(item as string);
     }
   };
 
@@ -243,9 +243,9 @@ export interface FilterPanelProps {
   /** Available playlists */
   availablePlaylists: PlaylistWithSummary[];
   /** Selected playlist IDs */
-  selectedPlaylistIds: number[];
+  selectedPlaylistIds: string[];
   /** Playlist IDs change handler */
-  onPlaylistIdsChange: (playlistIds: number[]) => void;
+  onPlaylistIdsChange: (playlistIds: string[]) => void;
   /** Loading states */
   loading?: {
     genres?: boolean;
@@ -362,14 +362,14 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
     props.onGenresChange(props.selectedGenres.filter((g) => g !== genre));
   };
 
-  const removePlaylist = (playlistId: number) => {
+  const removePlaylist = (playlistId: string) => {
     props.onPlaylistIdsChange(
       props.selectedPlaylistIds.filter((id) => id !== playlistId)
     );
   };
 
   // Get playlist display name by ID
-  const getPlaylistNameById = (playlistId: number): string => {
+  const getPlaylistNameById = (playlistId: string): string => {
     const playlist = props.availablePlaylists.find(
       (p) => p.playlistId === playlistId
     );
@@ -524,7 +524,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                     items={props.availablePlaylists}
                     selectedItems={props.selectedPlaylistIds}
                     onSelectionChange={(selected) =>
-                      props.onPlaylistIdsChange(selected as number[])
+                      props.onPlaylistIdsChange(selected)
                     }
                     loading={props.loading?.playlists}
                     isPlaylist={true}

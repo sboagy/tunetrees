@@ -8,31 +8,19 @@
  */
 
 import { and, desc, eq } from "drizzle-orm";
+import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
+import type { Reference } from "../types";
 
-/**
- * Reference type definition
- */
-export interface Reference {
-  id: number;
-  url: string;
-  refType: string | null;
-  tuneRef: number;
-  userRef: number | null;
-  comment: string | null;
-  title: string | null;
-  public: number | null;
-  favorite: number | null;
-  deleted: number;
-}
+export type { Reference };
 
 /**
  * Data for creating a new reference
  */
 export interface CreateReferenceData {
   url: string;
-  tuneRef: number;
+  tuneRef: string; // UUID
   refType?: string;
   title?: string;
   comment?: string;
@@ -53,34 +41,17 @@ export interface UpdateReferenceData {
 }
 
 /**
- * Helper: Map Supabase UUID to integer user_profile.id
- * Same pattern as tags system
- */
-async function getUserProfileId(
-  db: SqliteDatabase,
-  supabaseUserId: string
-): Promise<number | null> {
-  const userProfile = await db
-    .select()
-    .from(schema.userProfile)
-    .where(eq(schema.userProfile.supabaseUserId, supabaseUserId))
-    .get();
-
-  return userProfile?.id ?? null;
-}
-
-/**
  * Get all references for a specific tune
  * Returns only non-deleted references
  *
  * @param db - Database instance
- * @param tuneId - Tune ID
+ * @param tuneId - Tune UUID
  * @param supabaseUserId - Supabase UUID (optional - filters to user's private references if provided)
  * @returns Array of references
  */
 export async function getReferencesByTune(
   db: SqliteDatabase,
-  tuneId: number,
+  tuneId: string, // UUID
   supabaseUserId?: string
 ): Promise<Reference[]> {
   const conditions = [
@@ -90,10 +61,7 @@ export async function getReferencesByTune(
 
   // If user ID provided, filter to user's references
   if (supabaseUserId) {
-    const userProfileId = await getUserProfileId(db, supabaseUserId);
-    if (userProfileId) {
-      conditions.push(eq(schema.reference.userRef, userProfileId));
-    }
+    conditions.push(eq(schema.reference.userRef, supabaseUserId));
   }
 
   return await db
@@ -108,12 +76,12 @@ export async function getReferencesByTune(
  * Get a single reference by ID
  *
  * @param db - Database instance
- * @param referenceId - Reference ID
+ * @param referenceId - Reference UUID
  * @returns Reference or undefined if not found
  */
 export async function getReferenceById(
   db: SqliteDatabase,
-  referenceId: number
+  referenceId: string // UUID
 ): Promise<Reference | undefined> {
   const references = await db
     .select()
@@ -139,19 +107,15 @@ export async function createReference(
   data: CreateReferenceData,
   supabaseUserId: string
 ): Promise<Reference> {
-  const userProfileId = await getUserProfileId(db, supabaseUserId);
-  if (!userProfileId) {
-    throw new Error("User profile not found");
-  }
-
   const now = new Date().toISOString();
 
   const result = await db
     .insert(schema.reference)
     .values({
+      id: generateId(),
       url: data.url,
       tuneRef: data.tuneRef,
-      userRef: userProfileId,
+      userRef: supabaseUserId,
       refType: data.refType || null,
       title: data.title || null,
       comment: data.comment || null,
@@ -171,13 +135,13 @@ export async function createReference(
  * Update an existing reference
  *
  * @param db - Database instance
- * @param referenceId - Reference ID to update
+ * @param referenceId - Reference UUID to update
  * @param data - Updated reference data
  * @returns Updated reference or undefined if not found
  */
 export async function updateReference(
   db: SqliteDatabase,
-  referenceId: number,
+  referenceId: string, // UUID
   data: UpdateReferenceData
 ): Promise<Reference | undefined> {
   const now = new Date().toISOString();
@@ -230,7 +194,7 @@ export async function updateReference(
  */
 export async function deleteReference(
   db: SqliteDatabase,
-  referenceId: number
+  referenceId: string // UUID
 ): Promise<boolean> {
   const now = new Date().toISOString();
 
@@ -251,12 +215,12 @@ export async function deleteReference(
  * Get count of references for a specific tune
  *
  * @param db - Database instance
- * @param tuneId - Tune ID
+ * @param tuneId - Tune UUID
  * @returns Count of non-deleted references
  */
 export async function getReferenceCount(
   db: SqliteDatabase,
-  tuneId: number
+  tuneId: string // UUID
 ): Promise<number> {
   const references = await getReferencesByTune(db, tuneId);
   return references.length;

@@ -12,11 +12,10 @@
  */
 
 import { type Component, Show } from "solid-js";
-import type { Tune } from "../../lib/db/types";
 
 interface BulkActionsBarProps {
   /** Array of selected tunes */
-  selectedTunes: Tune[];
+  selectedTunes: any[];
   /** Callback to add selected tunes to a playlist */
   onAddToPlaylist?: () => void;
   /** Callback to add tags to selected tunes */

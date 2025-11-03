@@ -31,13 +31,13 @@ const TuneDetailsPage: Component = () => {
   const [tune] = createResource(
     () => {
       const db = localDb();
-      const tuneId = params.id ? parseInt(params.id, 10) : null;
+      const tuneId = params.id || null;
       return db && tuneId ? { db, tuneId } : null;
     },
     async (params) => {
       if (!params) return null;
       return await getTuneById(params.db, params.tuneId);
-    },
+    }
   );
 
   const handleEdit = () => {
@@ -51,7 +51,7 @@ const TuneDetailsPage: Component = () => {
       return;
     }
 
-    const tuneId = params.id ? parseInt(params.id, 10) : null;
+    const tuneId = params.id || null;
     if (!tuneId) {
       console.error("Invalid tune ID");
       return;

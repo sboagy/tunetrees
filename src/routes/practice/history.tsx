@@ -54,7 +54,7 @@ const PracticeHistory: Component = () => {
   ]);
   const [filterQuality, setFilterQuality] = createSignal<string>("");
   const [filterGoal, setFilterGoal] = createSignal<string>("");
-  const [selectedPlaylistId] = createSignal(1); // TODO: Add playlist selector
+  const [selectedPlaylistId] = createSignal("1"); // TODO: Add playlist selector
   const [pageSize, setPageSize] = createSignal(25);
 
   // Fetch practice records from local database

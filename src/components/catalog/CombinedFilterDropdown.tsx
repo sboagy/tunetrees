@@ -45,9 +45,9 @@ export interface CombinedFilterDropdownProps {
   /** Available playlists */
   availablePlaylists: PlaylistWithSummary[];
   /** Selected playlist IDs */
-  selectedPlaylistIds: number[];
+  selectedPlaylistIds: string[];
   /** Playlist IDs change handler */
-  onPlaylistIdsChange: (playlistIds: number[]) => void;
+  onPlaylistIdsChange: (playlistIds: string[]) => void;
 }
 
 export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
