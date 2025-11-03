@@ -8,7 +8,7 @@
  */
 
 import { useNavigate } from "@solidjs/router";
-import { type Component, Show } from "solid-js";
+import { type Component, createEffect } from "solid-js";
 import { LoginForm } from "../components/auth";
 import { useAuth } from "../lib/auth/AuthContext";
 
@@ -30,10 +30,12 @@ const Login: Component = () => {
   const { user, loading } = useAuth();
 
   // Redirect to practice if already logged in (only after auth is loaded)
-  if (!loading() && user()) {
-    navigate("/", { replace: true });
-    return null;
-  }
+  // Use createEffect to avoid re-rendering the entire component on auth state changes
+  createEffect(() => {
+    if (!loading() && user()) {
+      navigate("/", { replace: true });
+    }
+  });
 
   const handleSuccess = () => {
     navigate("/");
@@ -61,13 +63,8 @@ const Login: Component = () => {
           </div>
         </div>
 
-        {/* Login Form */}
-        <Show
-          when={!loading()}
-          fallback={<div class="text-center text-gray-400">Loading...</div>}
-        >
-          <LoginForm onSuccess={handleSuccess} />
-        </Show>
+        {/* Login Form - Always render, LoginForm handles its own loading state */}
+        <LoginForm onSuccess={handleSuccess} />
       </div>
     </div>
   );
