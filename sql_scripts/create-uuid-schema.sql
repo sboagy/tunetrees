@@ -40,6 +40,7 @@ CREATE TABLE
         phone text,
         phone_verified timestamp,
         acceptable_delinquency_window integer DEFAULT 21,
+        avatar_url text,
         deleted boolean NOT NULL DEFAULT false,
         sync_version integer NOT NULL DEFAULT 1,
         last_modified_at timestamp NOT NULL DEFAULT now (),

@@ -147,7 +147,8 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
     try {
       for (const migrationPath of migrations) {
         console.log(`📄 Loading migration: ${migrationPath}`);
-        const response = await fetch(migrationPath);
+        // Always bypass HTTP cache to avoid serving stale migration assets
+        const response = await fetch(migrationPath, { cache: "no-store" });
         if (!response.ok) {
           throw new Error(
             `Failed to load migration ${migrationPath}: ${response.status} ${response.statusText}`
@@ -192,6 +193,13 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
 
   // Initialize database views
   await initializeViews(drizzleDb);
+
+  // Defensive: ensure critical columns exist even if an older DB slipped through
+  try {
+    ensureColumnExists("user_profile", "avatar_url", "avatar_url text");
+  } catch (err) {
+    console.warn("⚠️ Column ensure check failed:", err);
+  }
 
   // Create sync_queue table if it doesn't exist (missing from migration)
   try {
@@ -360,6 +368,35 @@ export function setupAutoPersist(): () => void {
 // ============================================================================
 // IndexedDB Helpers
 // ============================================================================
+
+/**
+ * Ensure a column exists on a table; if missing, add it.
+ * Safe to call repeatedly. Only supports ADD COLUMN operations that are backward compatible.
+ */
+function ensureColumnExists(
+  table: string,
+  column: string,
+  definition: string
+): void {
+  if (!sqliteDb) return;
+  try {
+    const result = sqliteDb.exec(`PRAGMA table_info(${table})`);
+    const values = result[0]?.values ?? [];
+    const hasColumn = values.some((row) => row?.[1] === column);
+    if (!hasColumn) {
+      console.log(
+        `🛠️  Missing column '${column}' on '${table}'. Adding via ALTER TABLE...`
+      );
+      sqliteDb.run(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+      console.log(`✅ Added column '${column}' to '${table}'`);
+    }
+  } catch (e) {
+    console.error(
+      `❌ Failed to ensure column '${column}' on table '${table}':`,
+      e
+    );
+  }
+}
 
 /**
  * Save database to IndexedDB

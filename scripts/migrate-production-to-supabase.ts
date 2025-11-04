@@ -439,16 +439,16 @@ async function migrateUsers() {
         await sql`
           INSERT INTO user_profile (
             id, supabase_user_id, name, email, sr_alg_type, phone, phone_verified,
-            acceptable_delinquency_window, deleted, sync_version, last_modified_at, device_id
+            acceptable_delinquency_window, avatar_url, deleted, sync_version, last_modified_at, device_id
           ) VALUES (
             ${userProfileId}, ${supabaseAuthUserId}, ${user.name}, ${
           user.email
         },
             ${user.sr_alg_type || null}, ${user.phone || null},
             ${sqliteTimestampToPostgres(user.phone_verified)},
-            ${
-              user.acceptable_delinquency_window || 21
-            }, false, 1, ${now()}, ${MIGRATION_DEVICE_ID}
+            ${user.acceptable_delinquency_window || 21}, ${
+          user.avatar_url || null
+        }, false, 1, ${now()}, ${MIGRATION_DEVICE_ID}
           )
           ON CONFLICT (supabase_user_id) DO UPDATE SET
             name = EXCLUDED.name,
@@ -457,6 +457,7 @@ async function migrateUsers() {
             phone = EXCLUDED.phone,
             phone_verified = EXCLUDED.phone_verified,
             acceptable_delinquency_window = EXCLUDED.acceptable_delinquency_window,
+            avatar_url = EXCLUDED.avatar_url,
             last_modified_at = EXCLUDED.last_modified_at
         `;
       } catch (profileError: any) {

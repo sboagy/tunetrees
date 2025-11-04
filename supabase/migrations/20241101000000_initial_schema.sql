@@ -541,6 +541,7 @@ CREATE TABLE IF NOT EXISTS "public"."user_profile" (
     "phone" "text",
     "phone_verified" timestamp without time zone,
     "acceptable_delinquency_window" integer DEFAULT 21,
+    "avatar_url" "text",
     "deleted" boolean DEFAULT false NOT NULL,
     "sync_version" integer DEFAULT 1 NOT NULL,
     "last_modified_at" timestamp without time zone DEFAULT "now"() NOT NULL,
