@@ -7,6 +7,7 @@
  */
 
 import { Route, Router, useNavigate } from "@solidjs/router";
+import { lazy } from "solid-js";
 import { Toaster } from "solid-sonner";
 import { ProtectedRoute } from "./components/auth";
 import { MainLayout } from "./components/layout";
@@ -24,6 +25,21 @@ import PracticeHistory from "./routes/practice/history";
 import TuneDetailsPage from "./routes/tunes/[id]";
 import EditTunePage from "./routes/tunes/[id]/edit";
 import NewTunePage from "./routes/tunes/new";
+
+// Lazy load settings pages
+const UserSettingsLayout = lazy(() => import("./routes/user-settings"));
+const AvatarPage = lazy(() => import("./routes/user-settings/avatar"));
+const AccountPage = lazy(() => import("./routes/user-settings/account"));
+const SchedulingOptionsPage = lazy(
+  () => import("./routes/user-settings/scheduling-options")
+);
+const SpacedRepetitionPage = lazy(
+  () => import("./routes/user-settings/spaced-repetition")
+);
+
+// Lazy load auth callback pages
+const AuthCallback = lazy(() => import("./routes/auth/callback"));
+const ResetPassword = lazy(() => import("./routes/reset-password"));
 
 /**
  * App Component
@@ -61,9 +77,25 @@ function App() {
             <Router>
               {/* Public Routes */}
               <Route path="/login" component={Login} />
+              <Route path="/auth/callback" component={AuthCallback} />
+              <Route path="/reset-password" component={ResetPassword} />
 
               {/* Main App - Home with MainLayout + tabs */}
               <Route path="/" component={Home} />
+
+              {/* User Settings Routes (Modal) */}
+              <Route path="/user-settings" component={UserSettingsLayout}>
+                <Route path="/avatar" component={AvatarPage} />
+                <Route
+                  path="/scheduling-options"
+                  component={SchedulingOptionsPage}
+                />
+                <Route
+                  path="/spaced-repetition"
+                  component={SpacedRepetitionPage}
+                />
+                <Route path="/account" component={AccountPage} />
+              </Route>
 
               {/* Tab Route Redirects - Redirect to home with tab parameter */}
               <Route

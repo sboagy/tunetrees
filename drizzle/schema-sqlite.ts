@@ -486,6 +486,7 @@ export const userProfile = sqliteTable(
     supabaseUserId: text("supabase_user_id").primaryKey().notNull(), // UUID PK
     name: text(),
     email: text(),
+    avatarUrl: text("avatar_url"), // User avatar image URL (predefined or custom upload)
     srAlgType: text("sr_alg_type"),
     phone: text(),
     phoneVerified: text("phone_verified"),

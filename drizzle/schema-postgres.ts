@@ -45,6 +45,7 @@ export const userProfile = pgTable("user_profile", {
   supabaseUserId: uuid("supabase_user_id").notNull().unique(),
   name: text("name"),
   email: text("email"), // Denormalized from auth.users for queries
+  avatarUrl: text("avatar_url"), // User avatar image URL (predefined or custom upload)
   srAlgType: text("sr_alg_type"), // 'SM2' | 'FSRS'
   phone: text("phone"),
   phoneVerified: timestamp("phone_verified"),

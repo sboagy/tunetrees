@@ -308,13 +308,41 @@ const PlaylistDropdown: Component = () => {
 };
 
 export const TopNav: Component = () => {
-  const { user, localDb, signOut, forceSyncDown } = useAuth();
+  const { user, localDb, signOut, forceSyncDown, syncVersion } = useAuth();
   const [isOnline, setIsOnline] = createSignal(navigator.onLine);
   const [pendingCount, setPendingCount] = createSignal(0);
   const [showUserMenu, setShowUserMenu] = createSignal(false);
   const [showDbMenu, setShowDbMenu] = createSignal(false);
   let userMenuContainerRef: HTMLDivElement | undefined;
   let dbMenuContainerRef: HTMLDivElement | undefined;
+
+  // Fetch user avatar (refetch when sync completes)
+  const [userAvatar] = createResource(
+    () => ({
+      db: localDb(),
+      userId: user()?.id,
+      version: syncVersion(),
+    }),
+    async ({ db, userId }) => {
+      if (!db || !userId) return null;
+
+      try {
+        const { userProfile } = await import("@/../drizzle/schema-sqlite");
+        const { eq } = await import("drizzle-orm");
+
+        const result = await db
+          .select({ avatarUrl: userProfile.avatarUrl })
+          .from(userProfile)
+          .where(eq(userProfile.supabaseUserId, userId))
+          .limit(1);
+
+        return result[0]?.avatarUrl || null;
+      } catch (error) {
+        console.error("Failed to load user avatar:", error);
+        return null;
+      }
+    }
+  );
 
   // Close user menu when clicking outside
   useClickOutside(
@@ -423,6 +451,23 @@ export const TopNav: Component = () => {
                     <span class="hidden sm:inline font-medium">
                       {u().email}
                     </span>
+                    {/* User Avatar */}
+                    <Show
+                      when={userAvatar()}
+                      fallback={
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                          {u().email?.charAt(0).toUpperCase()}
+                        </div>
+                      }
+                    >
+                      {(avatarUrl) => (
+                        <img
+                          src={avatarUrl()}
+                          alt="User avatar"
+                          class="w-8 h-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                        />
+                      )}
+                    </Show>
                     <svg
                       class="w-4 h-4 transition-transform"
                       classList={{ "rotate-180": showUserMenu() }}
@@ -486,9 +531,10 @@ export const TopNav: Component = () => {
                           class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                           onClick={() => {
                             setShowUserMenu(false);
-                            // TODO: Open user settings modal
-                            log.debug("User Settings clicked");
+                            window.location.href =
+                              "/user-settings/scheduling-options";
                           }}
+                          data-testid="user-settings-button"
                         >
                           <svg
                             class="w-4 h-4"
