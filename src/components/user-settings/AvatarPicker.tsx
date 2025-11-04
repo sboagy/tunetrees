@@ -13,9 +13,9 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { toast } from "solid-sonner";
 import { userProfile } from "@/../drizzle/schema-sqlite";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { supabase } from "@/lib/supabase/client";
+import { Card } from "../ui/card";
 
 /**
  * List of predefined avatar images in /public/avatars
