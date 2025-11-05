@@ -82,7 +82,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
   const [sorting, setSorting] = createSignal<SortingState>(
     initialState.sorting || []
   );
-  const [rowSelection, setRowSelection] = createSignal<RowSelectionState>({});
+  const [rowSelection, setRowSelection] = createSignal<RowSelectionState>(
+    initialState.rowSelection || {}
+  );
   const [columnSizing, setColumnSizing] = createSignal<ColumnSizingState>(
     initialState.columnSizing || {}
   );
@@ -249,6 +251,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
   createEffect(() => {
     const state = {
       sorting: sorting(),
+      rowSelection: rowSelection(),
       columnSizing: columnSizing(),
       columnOrder: columnOrder(),
       columnVisibility: columnVisibility(),
@@ -333,6 +336,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
         style={{ "touch-action": "pan-x pan-y" }}
       >
         <table
+          data-testid={`tunes-grid-${props.tablePurpose}`}
           class={TABLE_CLASSES}
           style={{ width: `${table.getCenterTotalSize()}px` }}
         >
@@ -345,6 +349,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                     {(header) => (
                       <th
                         data-column-id={header.column.id}
+                        data-testid={`ch-${header.column.id}`}
                         class={getHeaderCellClasses(
                           `${
                             draggedColumnId() === header.column.id

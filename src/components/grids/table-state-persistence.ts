@@ -77,6 +77,7 @@ export function getDefaultTableState(
     scrollTop: 0,
     sorting: [],
     globalFilter: "",
+    rowSelection: {},
   };
 
   // Purpose-specific defaults
@@ -155,5 +156,6 @@ export function mergeWithDefaults(
     scrollTop: loadedState.scrollTop ?? defaults.scrollTop,
     sorting: loadedState.sorting ?? defaults.sorting,
     globalFilter: loadedState.globalFilter ?? defaults.globalFilter,
+    rowSelection: loadedState.rowSelection ?? defaults.rowSelection,
   };
 }

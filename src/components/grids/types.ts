@@ -98,6 +98,7 @@ export interface ITableStateExtended {
   scrollTop?: number;
   sorting?: Array<{ id: string; desc: boolean }>;
   globalFilter?: string;
+  rowSelection?: { [key: string]: boolean };
 }
 
 /**
