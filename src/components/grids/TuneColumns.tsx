@@ -72,6 +72,13 @@ const SortableHeader: Component<{ column: any; title: string }> = (props) => {
 };
 
 /**
+ * Non-sortable column header component
+ */
+const StaticHeader: Component<{ title: string }> = (props) => {
+  return <span class="normal-case">{props.title}</span>;
+};
+
+/**
  * Get column definitions for Catalog grid
  */
 export function getCatalogColumns(
@@ -702,9 +709,8 @@ export function getScheduledColumns(
     {
       id: "evaluation",
       accessorFn: (row) => row.recall_eval || "",
-      header: ({ column }) => (
-        <SortableHeader column={column} title="Evaluation" />
-      ),
+      header: () => <StaticHeader title="Evaluation" />,
+      enableSorting: false,
       cell: (info) => {
         const row = info.row.original;
         const tuneId = row.tune?.id || row.tuneRef || row.id;
@@ -805,7 +811,6 @@ export function getScheduledColumns(
       size: 220,
       minSize: 120,
       maxSize: 280,
-      enableSorting: false, // Can't sort interactive controls
     },
 
     // Goal
