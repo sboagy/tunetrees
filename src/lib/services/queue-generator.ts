@@ -349,7 +349,7 @@ export async function generateDailyPracticeQueue(
 
   // Queue for background sync
   for (const entry of inserted) {
-    await queueSync(db, "daily_practice_queue", entry.id!, "insert");
+    await queueSync(db, "daily_practice_queue", "insert", entry);
   }
 
   return inserted;
@@ -477,7 +477,7 @@ export async function refillPracticeQueue(
     .returning();
 
   for (const entry of inserted) {
-    await queueSync(db, "daily_practice_queue", entry.id!, "insert");
+    await queueSync(db, "daily_practice_queue", "insert", entry);
   }
 
   console.log(`✅ Refilled queue with ${inserted.length} backfill tunes`);

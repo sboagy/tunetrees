@@ -446,13 +446,7 @@ export async function addTuneToPlaylist(
   }
 
   // Queue for sync with the full row data
-  await queueSync(
-    db,
-    "playlist_tune",
-    `${playlistId}-${tuneId}`,
-    "insert",
-    result[0]
-  );
+  await queueSync(db, "playlist_tune", "insert", result[0]);
 
   return result[0];
 }

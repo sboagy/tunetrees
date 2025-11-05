@@ -735,13 +735,7 @@ export async function addTunesToPracticeQueue(
         addedTuneIds.push(tuneId);
 
         // Queue playlist_tune update for sync
-        await queueSync(
-          db,
-          "playlist_tune",
-          `${playlistId}-${tuneId}`,
-          "update",
-          result[0]
-        );
+        await queueSync(db, "playlist_tune", "update", result[0]);
 
         // Check if practice record exists
         const existing = await db
@@ -786,13 +780,7 @@ export async function addTunesToPracticeQueue(
 
           // Queue practice_record insert for sync
           if (newRecord && newRecord.length > 0) {
-            await queueSync(
-              db,
-              "practice_record",
-              `${playlistId}-${tuneId}`,
-              "insert",
-              newRecord[0]
-            );
+            await queueSync(db, "practice_record", "insert", newRecord[0]);
           }
         }
       } else {

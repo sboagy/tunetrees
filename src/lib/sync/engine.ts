@@ -22,6 +22,38 @@ import {
   updateSyncStatus,
 } from "./queue";
 
+/**
+ * Configuration for tables with composite primary keys OR unique constraints
+ * For UPSERT operations, we need to specify which fields to match on conflict.
+ *
+ * Maps table name to array of key field names (in snake_case for Supabase)
+ */
+const COMPOSITE_KEY_TABLES: Record<string, string[]> = {
+  // Composite primary keys
+  table_transient_data: ["user_id", "tune_id", "playlist_id"],
+  playlist_tune: ["playlist_ref", "tune_ref"],
+  genre_tune_type: ["genre_id", "tune_type_id"],
+  prefs_spaced_repetition: ["user_id", "alg_type"],
+  table_state: ["user_id", "screen_size", "purpose", "playlist_id"],
+
+  // Tables with id PK but UNIQUE constraints that should be used for UPSERT
+  daily_practice_queue: [
+    "user_ref",
+    "playlist_ref",
+    "window_start_utc",
+    "tune_ref",
+  ],
+  practice_record: ["tune_ref", "playlist_ref", "practiced"],
+};
+
+/**
+ * Get composite key/unique constraint fields for a table (in snake_case)
+ * Returns null for simple id-only tables
+ */
+function getCompositeKeyFields(tableName: string): string[] | null {
+  return COMPOSITE_KEY_TABLES[tableName] || null;
+}
+
 // Debug flag for sync logging (set VITE_SYNC_DEBUG=true in .env to enable)
 const SYNC_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
 const syncLog = (...args: any[]) =>
@@ -188,9 +220,22 @@ export class SyncEngine {
           await markSynced(this.localDb, item.id!);
           synced++;
         } catch (error) {
-          const errorMsg =
-            error instanceof Error ? error.message : String(error);
-          log.error(`[SyncEngine] Failed to sync item ${item.id}:`, errorMsg);
+          // Properly extract error message from Supabase errors
+          let errorMsg: string;
+          if (error instanceof Error) {
+            errorMsg = error.message;
+          } else if (error && typeof error === "object" && "message" in error) {
+            errorMsg = String(error.message);
+          } else {
+            errorMsg = JSON.stringify(error);
+          }
+
+          log.error(
+            `[SyncEngine] Failed to sync item ${item.id} (${item.tableName} ${item.operation}):`,
+            errorMsg,
+            "\nItem data:",
+            item.data
+          );
 
           // Update item status based on retry count
           if (item.attempts >= this.config.maxRetries) {
@@ -347,14 +392,15 @@ export class SyncEngine {
    * @param item - Sync queue item to process
    */
   private async processQueueItem(item: SyncQueueItem): Promise<void> {
-    const { tableName, recordId, operation, data } = item;
+    const { tableName, operation, data } = item;
 
-    log.info(
-      `[SyncEngine] Processing ${operation} on ${tableName}:${recordId}`
-    );
+    log.info(`[SyncEngine] Processing ${operation} on ${tableName}`);
 
-    // Parse data if present
-    const recordData = data ? JSON.parse(data) : null;
+    // Parse data (required for all operations now)
+    if (!data) {
+      throw new Error(`${operation} operation requires data field`);
+    }
+    const recordData = JSON.parse(data);
 
     switch (operation) {
       case "insert": {
@@ -363,66 +409,93 @@ export class SyncEngine {
         }
         // Transform camelCase (local) → snake_case (Supabase)
         const remoteData = this.transformLocalToRemote(recordData);
-        const { error } = await this.supabase
-          .from(tableName)
-          .insert(remoteData);
-        if (error) throw error;
+
+        // Check if table has unique constraints (use UPSERT to handle duplicates)
+        const compositeKeys = getCompositeKeyFields(tableName);
+
+        if (compositeKeys) {
+          // Table has unique constraints - use UPSERT to avoid duplicate key errors
+          const { error } = await this.supabase
+            .from(tableName)
+            .upsert(remoteData, {
+              onConflict: compositeKeys.join(","),
+            });
+          if (error) throw error;
+        } else {
+          // Standard insert for tables without unique constraints
+          const { error } = await this.supabase
+            .from(tableName)
+            .insert(remoteData);
+          if (error) throw error;
+        }
         break;
       }
 
       case "update": {
-        if (!recordData) {
-          throw new Error("UPDATE operation requires data");
-        }
         // Transform camelCase (local) → snake_case (Supabase)
         const remoteData = this.transformLocalToRemote(recordData);
 
-        // Handle composite keys
-        if (tableName === "table_transient_data") {
-          // Composite key: userId + tuneId + playlistId (format: "1-1815-1")
-          // Use UPSERT for transient data - insert if not exists, update if exists
-          const [userId, tuneId, playlistId] = recordId.split("-");
+        // Check if table uses composite keys
+        const compositeKeys = getCompositeKeyFields(tableName);
 
-          // Ensure composite key columns are in the data
-          remoteData.user_id = userId;
-          remoteData.tune_id = tuneId;
-          remoteData.playlist_id = playlistId;
-
+        if (compositeKeys && !remoteData.id) {
+          // Composite key table WITHOUT id field - use UPSERT with onConflict
+          // This happens when we only have composite key fields (no id)
           const { error } = await this.supabase
             .from(tableName)
             .upsert(remoteData, {
-              onConflict: "user_id,tune_id,playlist_id",
+              onConflict: compositeKeys.join(","),
             });
           if (error) throw error;
         } else {
-          // Standard id column - regular UPDATE
+          // Standard id column OR composite key table with id field
+          // Use regular UPDATE by id (allows partial updates)
+          if (!remoteData.id) {
+            throw new Error(
+              `UPDATE operation requires id in data for table ${tableName}`
+            );
+          }
           const { error } = await this.supabase
             .from(tableName)
             .update(remoteData)
-            .eq("id", String(recordId));
+            .eq("id", String(remoteData.id));
           if (error) throw error;
         }
         break;
       }
 
       case "delete": {
-        // Handle composite keys
-        if (tableName === "table_transient_data") {
-          // Composite key: userId + tuneId + playlistId (format: "1-1815-1")
-          const [userId, tuneId, playlistId] = recordId.split("-");
-          const { error } = await this.supabase
-            .from(tableName)
-            .delete()
-            .eq("user_id", userId)
-            .eq("tune_id", tuneId)
-            .eq("playlist_id", playlistId);
+        const remoteData = this.transformLocalToRemote(recordData);
+
+        // Check if table uses composite keys
+        const compositeKeys = getCompositeKeyFields(tableName);
+
+        if (compositeKeys) {
+          // Composite key table - build DELETE query with all key fields
+          let query = this.supabase.from(tableName).delete();
+
+          for (const keyField of compositeKeys) {
+            if (!remoteData[keyField]) {
+              throw new Error(
+                `DELETE operation requires ${keyField} in data for composite key table ${tableName}`
+              );
+            }
+            query = query.eq(keyField, remoteData[keyField]);
+          }
+
+          const { error } = await query;
           if (error) throw error;
         } else {
           // Soft delete: set deleted flag
+          if (!remoteData.id) {
+            throw new Error(
+              `DELETE operation requires id in data for table ${tableName}`
+            );
+          }
           const { error } = await this.supabase
             .from(tableName)
             .update({ deleted: true })
-            .eq("id", String(recordId));
+            .eq("id", String(remoteData.id));
           if (error) throw error;
         }
         break;

@@ -312,9 +312,9 @@ export const reference = sqliteTable(
 export const syncQueue = sqliteTable("sync_queue", {
   id: text().primaryKey().notNull(), // UUID
   tableName: text("table_name").notNull(),
-  recordId: text("record_id").notNull(), // UUID of the record being synced
+  recordId: text("record_id"), // DEPRECATED - kept for backwards compatibility only. Use data field.
   operation: text().notNull(),
-  data: text(),
+  data: text().notNull(), // JSON with all record data including id/composite keys
   status: text().default("pending").notNull(),
   createdAt: text("created_at").notNull(),
   syncedAt: text("synced_at"),

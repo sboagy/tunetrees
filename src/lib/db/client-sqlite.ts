@@ -207,9 +207,8 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
       CREATE TABLE IF NOT EXISTS sync_queue (
         id TEXT PRIMARY KEY NOT NULL,
         table_name TEXT NOT NULL,
-        record_id TEXT NOT NULL,
         operation TEXT NOT NULL,
-        data TEXT,
+        data TEXT NOT NULL,
         status TEXT DEFAULT 'pending' NOT NULL,
         created_at TEXT NOT NULL,
         synced_at TEXT,

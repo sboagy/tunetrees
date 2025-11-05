@@ -57,25 +57,33 @@ export type SyncableTable =
  *
  * @param db - SQLite database instance
  * @param tableName - Name of the table
- * @param recordId - Primary key of the record (as string)
  * @param operation - Type of operation (insert, update, delete)
- * @param data - Record data (optional for delete)
+ * @param data - Record data containing all necessary fields (including id or composite keys)
  * @returns The created queue item
  *
  * @example
  * ```typescript
- * await queueSync(db, "tune", "123", "update", {
+ * // Single key table
+ * await queueSync(db, "tune", "update", {
+ *   id: "123",
  *   title: "New Title",
  *   type: "Reel"
+ * });
+ *
+ * // Composite key table
+ * await queueSync(db, "table_transient_data", "update", {
+ *   userId: "...",
+ *   tuneId: "...",
+ *   playlistId: "...",
+ *   quality: 3
  * });
  * ```
  */
 export async function queueSync(
   db: SqliteDatabase,
   tableName: SyncableTable,
-  recordId: string | number,
   operation: SyncOperation,
-  data?: Record<string, unknown>
+  data: Record<string, unknown>
 ): Promise<SyncQueueItem> {
   const now = new Date().toISOString();
 
@@ -84,9 +92,9 @@ export async function queueSync(
     .values({
       id: generateId(),
       tableName: tableName,
-      recordId: String(recordId),
+      recordId: generateId(), // Dummy UUID for backwards compatibility (field is deprecated)
       operation,
-      data: data ? JSON.stringify(data) : null,
+      data: JSON.stringify(data),
       createdAt: now,
       attempts: 0,
       status: "pending",

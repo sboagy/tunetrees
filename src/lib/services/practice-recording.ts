@@ -165,13 +165,12 @@ export async function recordPracticeRating(
       );
 
     // 8. Queue changes for background sync to Supabase
-    await queueSync(db, "practice_record", insertedRecord.id!, "insert");
-    await queueSync(
-      db,
-      "playlist_tune",
-      `${input.playlistRef}-${input.tuneRef}`,
-      "update"
-    );
+    // Use "update" operation so sync engine does UPSERT (handles duplicates gracefully)
+    await queueSync(db, "practice_record", "update", insertedRecord);
+    await queueSync(db, "playlist_tune", "update", {
+      playlistRef: input.playlistRef,
+      tuneRef: input.tuneRef,
+    });
 
     return {
       success: true,
@@ -336,11 +335,12 @@ export async function getPracticeStatistics(
  * @param db - SQLite database instance
  * @param userId - User ID
  * @param playlistId - Playlist ID
+ * @param windowStartUtc - Optional: specific queue window to commit (defaults to most recent)
  * @returns Result with count of committed evaluations
  *
  * @example
  * ```typescript
- * const result = await commitStagedEvaluations(db, 1, 5);
+ * const result = await commitStagedEvaluations(db, 1, 5, '2025-11-05 00:00:00');
  * if (result.success) {
  *   console.log(`Committed ${result.count} evaluations`);
  * }
@@ -349,19 +349,47 @@ export async function getPracticeStatistics(
 export async function commitStagedEvaluations(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string
+  playlistId: string,
+  windowStartUtc?: string
 ): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     console.log("=== commitStagedEvaluations START ===");
     console.log("Parameters:", {
       userId,
       playlistId,
+      windowStartUtc,
       userIdType: typeof userId,
       playlistIdType: typeof playlistId,
     });
 
     const { sql } = await import("drizzle-orm");
     const { persistDb } = await import("../db/client-sqlite");
+
+    // 2. Determine which queue window we're working with
+    let activeWindowStart: string;
+    if (windowStartUtc) {
+      // Use explicitly provided window
+      activeWindowStart = windowStartUtc;
+      console.log(`Using provided queue window: ${activeWindowStart}`);
+    } else {
+      // Find the most recent queue window for this playlist
+      const latestWindow = await db.get<{ window_start_utc: string }>(sql`
+        SELECT window_start_utc
+        FROM daily_practice_queue
+        WHERE user_ref = ${userId}
+          AND playlist_ref = ${playlistId}
+        ORDER BY window_start_utc DESC
+        LIMIT 1
+      `);
+
+      if (!latestWindow) {
+        console.log("No queue window found, returning early");
+        return { success: true, count: 0 };
+      }
+
+      activeWindowStart = latestWindow.window_start_utc;
+      console.log(`Using most recent queue window: ${activeWindowStart}`);
+    }
 
     // DEBUG: Check what's actually in table_transient_data
     const allTransientData = await db.all(sql`
@@ -429,14 +457,14 @@ export async function commitStagedEvaluations(
       return { success: true, count: 0 };
     }
 
-    // 2. Get tune_ids that are in the current practice queue (filter to current session only)
+    // 2. Get tune_ids that are in the active practice queue window
     console.log("Querying daily_practice_queue...");
     const queueTuneIds = await db.all<{ tune_ref: number }>(sql`
       SELECT DISTINCT tune_ref
       FROM daily_practice_queue
       WHERE user_ref = ${userId}
         AND playlist_ref = ${playlistId}
-        AND DATE(window_start_utc) = DATE('now')
+        AND window_start_utc = ${activeWindowStart}
     `);
 
     console.log("Queue tune IDs found:", queueTuneIds.length);
@@ -547,7 +575,28 @@ export async function commitStagedEvaluations(
       `);
 
       // Queue sync for the newly inserted record
-      await queueSync(db, "practice_record", recordId, "insert");
+      // Use "update" operation so sync engine does UPSERT (handles duplicates gracefully)
+      await queueSync(db, "practice_record", "update", {
+        id: recordId,
+        playlistRef: playlistId,
+        tuneRef: staged.tune_id,
+        practiced: practicedTimestamp,
+        quality: staged.quality,
+        easiness: null,
+        interval: staged.interval,
+        repetitions: staged.repetitions,
+        due: staged.due,
+        backupPracticed: null,
+        stability: staged.stability,
+        elapsedDays: staged.elapsed_days ?? null,
+        lapses: staged.lapses ?? 0,
+        state: staged.state,
+        difficulty: staged.difficulty,
+        step: staged.step,
+        goal: staged.goal,
+        technique: staged.technique,
+        lastModifiedAt: now,
+      });
 
       // Update playlist_tune.current (next review date)
       await db.run(sql`
@@ -558,12 +607,10 @@ export async function commitStagedEvaluations(
           AND tune_ref = ${staged.tune_id}
       `);
 
-      await queueSync(
-        db,
-        "playlist_tune",
-        `${playlistId}-${staged.tune_id}`,
-        "update"
-      );
+      await queueSync(db, "playlist_tune", "update", {
+        playlistRef: playlistId,
+        tuneRef: staged.tune_id,
+      });
 
       // Delete from table_transient_data
       console.log(`Deleting staged evaluation for tune ${staged.tune_id}...`);
@@ -574,32 +621,52 @@ export async function commitStagedEvaluations(
           AND playlist_id = ${playlistId}
       `);
 
-      await queueSync(
-        db,
-        "table_transient_data",
-        `${userId}-${staged.tune_id}-${playlistId}`,
-        "delete"
-      );
+      await queueSync(db, "table_transient_data", "delete", {
+        userId,
+        tuneId: staged.tune_id,
+        playlistId,
+      });
 
       // Mark queue item as completed
       console.log(
         `Marking queue item as completed for tune ${staged.tune_id}...`
       );
+
+      // Get the complete queue item for sync (need id, window_start_utc, and window_end_utc)
+      const queueItem = await db.get<{
+        id: string;
+        window_start_utc: string;
+        window_end_utc: string;
+      }>(sql`
+        SELECT id, window_start_utc, window_end_utc
+        FROM daily_practice_queue
+        WHERE user_ref = ${userId}
+          AND playlist_ref = ${playlistId}
+          AND tune_ref = ${staged.tune_id}
+          AND window_start_utc = ${activeWindowStart}
+        LIMIT 1
+      `);
+
       await db.run(sql`
         UPDATE daily_practice_queue
         SET completed_at = ${now}
         WHERE user_ref = ${userId}
           AND playlist_ref = ${playlistId}
           AND tune_ref = ${staged.tune_id}
-          AND DATE(window_start_utc) = DATE('now')
+          AND window_start_utc = ${activeWindowStart}
       `);
 
-      await queueSync(
-        db,
-        "daily_practice_queue",
-        `${userId}-${playlistId}-${staged.tune_id}`,
-        "update"
-      );
+      if (queueItem) {
+        await queueSync(db, "daily_practice_queue", "update", {
+          id: queueItem.id,
+          userRef: userId,
+          playlistRef: playlistId,
+          windowStartUtc: queueItem.window_start_utc,
+          windowEndUtc: queueItem.window_end_utc,
+          tuneRef: staged.tune_id,
+          completedAt: now,
+        });
+      }
 
       committedTuneIds.push(staged.tune_id);
       console.log(`✓ Completed processing tune ${staged.tune_id}`);
@@ -695,8 +762,11 @@ export async function undoLastPracticeRating(
       );
 
     // Queue sync operations
-    await queueSync(db, "practice_record", lastRecord.id!, "delete");
-    await queueSync(db, "playlist_tune", `${playlistId}-${tuneId}`, "update");
+    await queueSync(db, "practice_record", "delete", { id: lastRecord.id! });
+    await queueSync(db, "playlist_tune", "update", {
+      playlistRef: playlistId,
+      tuneRef: tuneId,
+    });
 
     return true;
   } catch (error) {

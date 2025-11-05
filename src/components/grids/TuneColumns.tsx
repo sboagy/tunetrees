@@ -28,6 +28,10 @@ const numericSortingFn = (rowA: any, rowB: any, columnId: string) => {
   return numA < numB ? -1 : numA > numB ? 1 : 0;
 };
 
+const noSortingFn = (_rowA: any, _rowB: any, _columnId: string) => {
+  return 1;
+};
+
 /**
  * Format date for display (matches legacy app format)
  */
@@ -711,6 +715,7 @@ export function getScheduledColumns(
       accessorFn: (row) => row.recall_eval || "",
       header: () => <StaticHeader title="Evaluation" />,
       enableSorting: false,
+      sortingFn: noSortingFn,
       cell: (info) => {
         const row = info.row.original;
         const tuneId = row.tune?.id || row.tuneRef || row.id;

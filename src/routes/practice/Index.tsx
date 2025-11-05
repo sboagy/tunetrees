@@ -308,8 +308,21 @@ const PracticeIndex: Component = () => {
     );
 
     try {
-      // Call new commit service
-      const result = await commitStagedEvaluations(db, userId, playlistId);
+      // Convert queueDate to window_start_utc format (YYYY-MM-DD 00:00:00)
+      const date = queueDate();
+      const windowStartUtc = `${date.getFullYear()}-${String(
+        date.getMonth() + 1
+      ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} 00:00:00`;
+
+      console.log(`Using queue window: ${windowStartUtc}`);
+
+      // Call new commit service with specific queue window
+      const result = await commitStagedEvaluations(
+        db,
+        userId,
+        playlistId,
+        windowStartUtc
+      );
 
       if (result.success) {
         // Success toast (auto-dismiss after 3 seconds)

@@ -237,7 +237,6 @@ export async function stagePracticeEvaluation(
   await queueSync(
     db,
     "table_transient_data",
-    `${userId}-${tuneId}-${playlistId}`, // Composite key as string
     "update", // Always update (UPSERT behavior)
     {
       userId,
@@ -287,12 +286,11 @@ export async function clearStagedEvaluation(
   `);
 
   // Queue deletion for sync to Supabase
-  await queueSync(
-    db,
-    "table_transient_data",
-    `${userId}-${tuneId}-${playlistId}`,
-    "delete"
-  );
+  await queueSync(db, "table_transient_data", "delete", {
+    userId,
+    tuneId,
+    playlistId,
+  });
 
   // Persist database to IndexedDB immediately
   await persistDb();

@@ -128,7 +128,7 @@ export async function createTune(
     .returning();
 
   // Queue for sync to Supabase
-  await queueSync(db, "tune", tune.id, "insert", tune);
+  await queueSync(db, "tune", "insert", tune);
 
   return tune;
 }
@@ -167,7 +167,7 @@ export async function updateTune(
     .returning();
 
   // Queue for sync to Supabase
-  await queueSync(db, "tune", tune.id, "update", tune);
+  await queueSync(db, "tune", "update", tune);
 
   return tune;
 }
@@ -192,7 +192,7 @@ export async function deleteTune(
     .where(eq(schema.tune.id, tuneId));
 
   // Queue for sync to Supabase
-  await queueSync(db, "tune", tuneId, "delete");
+  await queueSync(db, "tune", "delete", { id: tuneId });
 }
 
 /**
