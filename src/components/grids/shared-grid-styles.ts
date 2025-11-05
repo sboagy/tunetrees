@@ -40,7 +40,7 @@ export const CONTAINER_CLASSES = "flex-1 overflow-auto relative touch-pan-y";
 /**
  * Table element classes
  */
-export const TABLE_CLASSES = "w-full border-collapse";
+export const TABLE_CLASSES = "w-full border-collapse table-fixed";
 
 /**
  * Table body classes

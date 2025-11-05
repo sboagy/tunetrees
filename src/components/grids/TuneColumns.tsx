@@ -114,19 +114,27 @@ export function getCatalogColumns(
       enableResizing: false,
     },
 
-    // ID
+    // ID (prevent wrap for UUIDs; truncate with ellipsis)
     {
       accessorKey: "id",
       header: ({ column }) => <SortableHeader column={column} title="ID" />,
-      cell: (info) => (
-        <span class="text-gray-600 dark:text-gray-400">
-          {info.getValue() as number}
-        </span>
-      ),
+      cell: (info) => {
+        const value = info.getValue() as string | number | null;
+        const text = value == null ? "" : String(value);
+        return (
+          <span
+            class="font-mono text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap overflow-hidden text-ellipsis block max-w-full"
+            title={text}
+          >
+            {text}
+          </span>
+        );
+      },
+      // Keep numeric sorting for legacy numeric ids; string cast will yield NaN => sorts as 0 which groups UUIDs; acceptable fallback
       sortingFn: numericSortingFn,
-      size: 80,
-      minSize: 60,
-      maxSize: 36 * 10,
+      size: 140,
+      minSize: 80,
+      maxSize: 310,
     },
 
     // Title (with link)
@@ -151,7 +159,7 @@ export function getCatalogColumns(
         );
       },
       size: 250,
-      minSize: 150,
+      minSize: 100,
       maxSize: 400,
     },
 
@@ -795,7 +803,7 @@ export function getScheduledColumns(
         );
       },
       size: 220,
-      minSize: 180,
+      minSize: 120,
       maxSize: 280,
       enableSorting: false, // Can't sort interactive controls
     },
@@ -839,6 +847,7 @@ export function getScheduledColumns(
     baseColumns[2], // title
     baseColumns[3], // type
     baseColumns[4], // mode
+    baseColumns[5], // structure
     baseColumns[6], // incipit
     baseColumns[7], // status (private_for)
     // Add scheduling columns from repertoire

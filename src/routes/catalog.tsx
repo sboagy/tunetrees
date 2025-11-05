@@ -21,6 +21,7 @@ import {
   createMemo,
   createResource,
   createSignal,
+  on,
   Show,
 } from "solid-js";
 import { CatalogToolbar } from "../components/catalog";
@@ -64,20 +65,20 @@ const CatalogPage: Component = () => {
     return str.split(",").filter(Boolean);
   };
 
-  // Filter state from URL params
-  const [searchQuery, setSearchQuery] = createSignal(getParam(searchParams.q));
-  const [selectedTypes, setSelectedTypes] = createSignal<string[]>(
-    getParamArray(searchParams.types)
-  );
-  const [selectedModes, setSelectedModes] = createSignal<string[]>(
-    getParamArray(searchParams.modes)
-  );
-  const [selectedGenres, setSelectedGenres] = createSignal<string[]>(
-    getParamArray(searchParams.genres)
-  );
+  const arraysEqual = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((v, i) => v === b[i]);
+
+  // --- Filter State Signals (Initialized to empty defaults) ---
+  const [searchQuery, setSearchQuery] = createSignal("");
+  const [selectedTypes, setSelectedTypes] = createSignal<string[]>([]);
+  const [selectedModes, setSelectedModes] = createSignal<string[]>([]);
+  const [selectedGenres, setSelectedGenres] = createSignal<string[]>([]);
   const [selectedPlaylistIds, setSelectedPlaylistIds] = createSignal<string[]>(
-    getParamArray(searchParams.playlists)
+    []
   );
+
+  // --- Synchronization State Flag ---
+  const [isInitialized, setIsInitialized] = createSignal(false);
 
   // Track selected rows count from grid
   const [selectedRowsCount, setSelectedRowsCount] = createSignal(0);
@@ -87,32 +88,98 @@ const CatalogPage: Component = () => {
     null
   );
 
-  // Sync filter state to URL params
+  // === EFFECT 1: HYDRATION (URL -> Signal) ===
+  // Runs whenever searchParams changes. This resolves the initial race condition
+  // by ensuring signals are populated before the sync effect (Effect 2) runs.
+  createEffect(
+    on(
+      // Dependency Array: Explicitly list every parameter to watch.
+      () => [
+        searchParams.c_q,
+        searchParams.c_types,
+        searchParams.c_modes,
+        searchParams.c_genres,
+        searchParams.c_playlists,
+        searchParams.tab, // Crucial for re-hydration when switching tabs
+      ],
+      () => {
+        // 1. Read URL params
+        const q = getParam(searchParams.c_q);
+        const types = getParamArray(searchParams.c_types);
+        const modes = getParamArray(searchParams.c_modes);
+        const genres = getParamArray(searchParams.c_genres);
+        const playlists = getParamArray(searchParams.c_playlists);
+
+        // 2. Write to signals only if different (essential to prevent infinite loops)
+        if (q !== searchQuery()) setSearchQuery(q);
+        if (!arraysEqual(types, selectedTypes())) setSelectedTypes(types);
+        if (!arraysEqual(modes, selectedModes())) setSelectedModes(modes);
+        if (!arraysEqual(genres, selectedGenres())) setSelectedGenres(genres);
+        if (!arraysEqual(playlists, selectedPlaylistIds()))
+          setSelectedPlaylistIds(playlists);
+
+        // 3. Set initialization flag *after* the initial hydration is complete
+        if (!isInitialized()) {
+          setIsInitialized(true);
+          log.debug("CATALOG: Filter state initialized from URL.");
+        }
+      }
+    )
+  );
+
+  // === EFFECT 2: SYNCHRONIZATION (Signal -> URL) ===
+  // Runs whenever internal filter signals change (user interaction). Writes to URL.
   createEffect(() => {
-    const params: Record<string, string> = {};
+    if (!isInitialized()) return;
 
-    if (searchQuery()) {
-      params.q = searchQuery();
-    }
+    const current = {
+      q: getParam(searchParams.c_q),
+      types: getParamArray(searchParams.c_types),
+      modes: getParamArray(searchParams.c_modes),
+      genres: getParamArray(searchParams.c_genres),
+      playlists: getParamArray(searchParams.c_playlists),
+    };
 
-    if (selectedTypes().length > 0) {
-      params.types = selectedTypes().join(",");
-    }
+    const desired = {
+      q: searchQuery(),
+      types: selectedTypes(),
+      modes: selectedModes(),
+      genres: selectedGenres(),
+      playlists: selectedPlaylistIds(),
+    };
 
-    if (selectedModes().length > 0) {
-      params.modes = selectedModes().join(",");
-    }
+    const needsUpdate =
+      desired.q !== current.q ||
+      !arraysEqual(desired.types, current.types) ||
+      !arraysEqual(desired.modes, current.modes) ||
+      !arraysEqual(desired.genres, current.genres) ||
+      !arraysEqual(desired.playlists, current.playlists);
 
-    if (selectedGenres().length > 0) {
-      params.genres = selectedGenres().join(",");
-    }
+    if (!needsUpdate) return;
 
-    if (selectedPlaylistIds().length > 0) {
-      params.playlists = selectedPlaylistIds().join(",");
-    }
+    const params: Record<string, string | undefined> = {
+      // Explicitly set parameter keys, passing `undefined` if the signal is empty.
+      c_q: desired.q || undefined,
+      c_types: desired.types.length > 0 ? desired.types.join(",") : undefined,
+      c_modes: desired.modes.length > 0 ? desired.modes.join(",") : undefined,
+      c_genres:
+        desired.genres.length > 0 ? desired.genres.join(",") : undefined,
+      c_playlists:
+        desired.playlists.length > 0 ? desired.playlists.join(",") : undefined,
+      // Proactively clear other tab's filter keys (Repertoire)
+      r_q: undefined,
+      r_types: undefined,
+      r_modes: undefined,
+      r_genres: undefined,
+      // Clear any legacy/un-namespaced param that may linger from older builds
+      playlists: undefined,
+    };
 
-    setSearchParams(params, { replace: true });
+    setSearchParams(params as Record<string, string>, { replace: true });
   });
+
+  // Note: persistence is now handled centrally in Home.tsx by saving the tab's
+  // full query string on tab switches. Catalog hydrates purely from URL.
 
   // Fetch all tunes for filter options
   const [allTunes] = createResource(

@@ -17,6 +17,7 @@ import {
   createMemo,
   createResource,
   createSignal,
+  on,
   Show,
 } from "solid-js";
 import { TunesGridRepertoire } from "../components/grids";
@@ -28,6 +29,9 @@ import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
 import { getPlaylistTunes } from "../lib/db/queries/playlists";
 import * as schema from "../lib/db/schema";
 import { log } from "../lib/logger";
+
+const arraysEqual = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
 
 /**
  * Repertoire Page Component
@@ -65,48 +69,117 @@ const RepertoirePage: Component = () => {
     return str.split(",").filter(Boolean);
   };
 
-  // Filter state from URL params (NO playlist filter - that's implied by current playlist)
-  const [searchQuery, setSearchQuery] = createSignal(getParam(searchParams.q));
-  const [selectedTypes, setSelectedTypes] = createSignal<string[]>(
-    getParamArray(searchParams.types)
-  );
-  const [selectedModes, setSelectedModes] = createSignal<string[]>(
-    getParamArray(searchParams.modes)
-  );
-  const [selectedGenres, setSelectedGenres] = createSignal<string[]>(
-    getParamArray(searchParams.genres)
-  );
+  // --- Filter State Signals (Initialized to empty defaults) ---
+  const [searchQuery, setSearchQuery] = createSignal("");
+  const [selectedTypes, setSelectedTypes] = createSignal<string[]>([]);
+  const [selectedModes, setSelectedModes] = createSignal<string[]>([]);
+  const [selectedGenres, setSelectedGenres] = createSignal<string[]>([]);
 
-  // Track selected rows count from grid
+  // --- Synchronization State Flag ---
+  const [isInitialized, setIsInitialized] = createSignal(false);
+
   const [selectedRowsCount, setSelectedRowsCount] = createSignal(0);
 
-  // Track table instance for column visibility control
-  const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
-    null
+  // === EFFECT 1: HYDRATION (URL -> Signal) ===
+  // Runs whenever searchParams changes. This resolves the initial race condition
+  // by ensuring signals are populated before the sync effect (Effect 2) runs.
+  createEffect(
+    on(
+      // Dependency Array: Explicitly list every parameter to watch.
+      () => [
+        searchParams.r_q,
+        searchParams.r_types,
+        searchParams.r_modes,
+        searchParams.r_genres,
+        searchParams.tab, // Crucial for re-hydration when switching tabs
+      ],
+      () => {
+        // 1. Read URL params
+        const q = getParam(searchParams.r_q);
+        const types = getParamArray(searchParams.r_types);
+        const modes = getParamArray(searchParams.r_modes);
+        const genres = getParamArray(searchParams.r_genres);
+
+        // 2. Write to signals only if different (essential to prevent infinite loops)
+        if (q !== searchQuery()) setSearchQuery(q);
+        if (!arraysEqual(types, selectedTypes())) setSelectedTypes(types);
+        if (!arraysEqual(modes, selectedModes())) setSelectedModes(modes);
+        if (!arraysEqual(genres, selectedGenres())) setSelectedGenres(genres);
+
+        // 3. Set initialization flag *after* the initial hydration is complete
+        if (!isInitialized()) {
+          setIsInitialized(true);
+          log.debug("REPERTOIRE: Filter state initialized from URL.");
+        }
+      }
+    )
   );
 
-  // Sync filter state to URL params
+  // === EFFECT 2: SYNCHRONIZATION (Signal -> URL) ===
+  // Runs whenever internal filter signals change (user interaction). Writes to URL.
   createEffect(() => {
-    const params: Record<string, string> = {};
+    if (!isInitialized()) return;
 
-    if (searchQuery()) {
-      params.q = searchQuery();
-    }
+    const current = {
+      q: getParam(searchParams.r_q),
+      types: getParamArray(searchParams.r_types),
+      modes: getParamArray(searchParams.r_modes),
+      genres: getParamArray(searchParams.r_genres),
+    };
 
-    if (selectedTypes().length > 0) {
-      params.types = selectedTypes().join(",");
-    }
+    const desired = {
+      q: searchQuery(),
+      types: selectedTypes(),
+      modes: selectedModes(),
+      genres: selectedGenres(),
+    };
 
-    if (selectedModes().length > 0) {
-      params.modes = selectedModes().join(",");
-    }
+    const needsUpdate =
+      desired.q !== current.q ||
+      !arraysEqual(desired.types, current.types) ||
+      !arraysEqual(desired.modes, current.modes) ||
+      !arraysEqual(desired.genres, current.genres);
 
-    if (selectedGenres().length > 0) {
-      params.genres = selectedGenres().join(",");
-    }
+    if (!needsUpdate) return;
 
-    setSearchParams(params, { replace: true });
+    const params: Record<string, string | undefined> = {
+      r_q: desired.q || undefined,
+      r_types: desired.types.length > 0 ? desired.types.join(",") : undefined,
+      r_modes: desired.modes.length > 0 ? desired.modes.join(",") : undefined,
+      r_genres:
+        desired.genres.length > 0 ? desired.genres.join(",") : undefined,
+      // Proactively clear other tab's filter keys so URL doesn't perpetuate them
+      c_q: undefined,
+      c_types: undefined,
+      c_modes: undefined,
+      c_genres: undefined,
+      c_playlists: undefined,
+      // Clear any legacy/un-namespaced param that may linger from older builds
+      playlists: undefined,
+    };
+
+    setSearchParams(params as Record<string, string>, { replace: true });
   });
+
+  // Note: persistence is now handled centrally in Home.tsx by saving the tab's
+  // full query string on tab switches. Repertoire hydrates purely from URL.
+
+  // On mount, also clear other tab's filter keys once (in case nothing else changes)
+  // onMount(() => {
+  //   setSearchParams(
+  //     {
+  //       c_q: undefined,
+  //       c_types: undefined,
+  //       c_modes: undefined,
+  //       r_modes: undefined,
+  //       c_genres: undefined,
+  //       c_playlists: undefined,
+  //       // Also clear legacy/un-namespaced params on mount
+  //       playlists: undefined,
+  //     } as unknown as Record<string, string>,
+  //     { replace: true }
+  //   );
+  // });
 
   // Fetch tunes in current playlist for filter options
   const [playlistTunes] = createResource(
@@ -230,7 +303,10 @@ const RepertoirePage: Component = () => {
     navigate(`/tunes/${tune.id}`);
   };
 
-  // Handle remove from repertoire
+  const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
+    null
+  );
+
   const handleRemoveFromRepertoire = async () => {
     // TODO: Implement removal logic
     alert("Remove From Repertoire - Not yet implemented");

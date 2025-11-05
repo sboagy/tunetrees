@@ -41,13 +41,17 @@ import RepertoirePage from "./repertoire";
  */
 const Home: Component = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = createSignal<TabId>("practice");
 
   // Initialize active tab from URL parameter
   createEffect(() => {
     const tabFromUrl = searchParams.tab as TabId;
+    console.log(
+      "DEBUG: Updated Search Params:",
+      Object.fromEntries(Object.entries(searchParams))
+    );
     if (
       tabFromUrl &&
       ["practice", "repertoire", "catalog", "analysis"].includes(tabFromUrl)
@@ -65,8 +69,84 @@ const Home: Component = () => {
 
   // Handle tab changes and update URL
   const handleTabChange = (tabId: TabId) => {
+    // Clear cross-tab filter params when switching tabs to prevent leakage
+    const REPERTOIRE_URL_KEY = "tt:url:repertoire";
+    const CATALOG_URL_KEY = "tt:url:catalog";
+
+    // BEFORE setActiveTab, save the CURRENT (old) tab's query params
+    const currentTabId = activeTab(); // Capture the old tab before switching
+    try {
+      if (typeof window !== "undefined") {
+        // Read DIRECTLY from window.location.search to get the CURRENT URL state
+        // (searchParams signal may have been updated by previous setSearchParams calls)
+        const currentParams = new URLSearchParams(window.location.search);
+        currentParams.delete("tab"); // Remove tab param
+        const queryWithoutTab = currentParams.toString();
+
+        if (currentTabId === "repertoire") {
+          localStorage.setItem(REPERTOIRE_URL_KEY, queryWithoutTab);
+        } else if (currentTabId === "catalog") {
+          localStorage.setItem(CATALOG_URL_KEY, queryWithoutTab);
+        }
+      }
+    } catch (_e) {
+      // non-fatal: storage might be unavailable
+    }
+
     setActiveTab(tabId);
-    setSearchParams({ tab: tabId }, { replace: true });
+
+    // Helper to parse a query string (?a=1&b=2) to a record
+    const parseQuery = (qs: string): Record<string, string> => {
+      const s = qs.startsWith("?") ? qs.slice(1) : qs;
+      const params = new URLSearchParams(s);
+      const out: Record<string, string> = {};
+      params.forEach((value, key) => {
+        if (value !== "") out[key] = value;
+      });
+      return out;
+    };
+
+    if (tabId === "catalog") {
+      // Restore saved catalog URL (if any), but enforce tab=catalog and clear repertoire keys
+      let restoreObj: Record<string, string> = {};
+      try {
+        const saved = localStorage.getItem(CATALOG_URL_KEY);
+        if (saved) restoreObj = parseQuery(saved);
+      } catch {}
+      // Build params: clear repertoire/legacy, restore catalog
+      // Only include defined, non-empty values
+      const wantedParams: Record<string, string> = { tab: tabId };
+      Object.entries(restoreObj).forEach(([k, v]) => {
+        if (v && v !== "") wantedParams[k] = v;
+      });
+      // Navigate to clean URL with only wanted params
+      const queryString = new URLSearchParams(wantedParams).toString();
+      navigate(`/?${queryString}`, { replace: true });
+    } else if (tabId === "repertoire") {
+      // Restore saved repertoire URL (if any), but enforce tab=repertoire
+      let restoreObj: Record<string, string> = {};
+      try {
+        const saved = localStorage.getItem(REPERTOIRE_URL_KEY);
+        if (saved) restoreObj = parseQuery(saved);
+      } catch {}
+      // Only include defined, non-empty values
+      const wantedParams: Record<string, string> = { tab: tabId };
+      Object.entries(restoreObj).forEach(([k, v]) => {
+        if (v && v !== "") wantedParams[k] = v;
+      });
+      console.log("🔍 [Home] Switching to repertoire:", {
+        saved: localStorage.getItem(REPERTOIRE_URL_KEY),
+        restoreObj,
+        wantedParams,
+        queryString: new URLSearchParams(wantedParams).toString(),
+      });
+      // Navigate to clean URL with only wanted params
+      const queryString = new URLSearchParams(wantedParams).toString();
+      navigate(`/?${queryString}`, { replace: true });
+    } else {
+      // Other tabs: just set tab
+      navigate(`/?tab=${tabId}`, { replace: true });
+    }
   };
 
   return (
