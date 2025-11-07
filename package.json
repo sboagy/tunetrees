@@ -44,6 +44,8 @@
     "playwright:install": "playwright install",
     "audit:prod": "npm audit --production",
     "audit:summary": "npm audit || echo '⚠️  Known dev-only vulnerabilities (esbuild, lodash.template) - see SECURITY.md'",
+    "lighthouse": "npm run build && lhci autorun",
+    "lighthouse:view": "npm run build && lighthouse http://localhost:4173 --view",
     "deploy": "npm run build && wrangler pages deploy dist",
     "deploy:preview": "npm run build && wrangler pages deploy dist --branch=preview"
   },
