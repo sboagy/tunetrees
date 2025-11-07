@@ -193,9 +193,7 @@ export async function getPracticeList(
       AND dpq.active = 1
   `);
   console.log(
-    `[getPracticeList] Queue has ${
-      queueRows[0]?.count || 0
-    } active rows for user=${userId}, playlist=${playlistId}`
+    `[getPracticeList] Queue has ${queueRows[0]?.count || 0} active rows for user=${userId}, playlist=${playlistId}`
   );
 
   // Debug: Check view rows
@@ -206,9 +204,7 @@ export async function getPracticeList(
       AND pls.playlist_id = ${playlistId}
   `);
   console.log(
-    `[getPracticeList] View has ${
-      viewRows[0]?.count || 0
-    } rows for user=${userId}, playlist=${playlistId}`
+    `[getPracticeList] View has ${viewRows[0]?.count || 0} rows for user=${userId}, playlist=${playlistId}`
   );
 
   // Select from the MOST RECENT active queue snapshot rather than relying on DATE('now')

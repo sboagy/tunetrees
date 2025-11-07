@@ -73,7 +73,9 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     // Show a tunes count; value may vary depending on previous tests adding tunes
     await expect(
       ttPage.topNavManagePlaylistsPanel.getByText(/tunes/i, { exact: false })
-    ).toBeVisible({ timeout: 2000 });
+    ).toBeVisible({
+      timeout: 2000,
+    });
     await expect(
       ttPage.topNavManagePlaylistsPanel.getByText(/ITRAD/i, {
         exact: false,

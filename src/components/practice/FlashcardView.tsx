@@ -212,9 +212,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
         }
       } catch (error) {
         console.error(
-          `❌ [FlashcardView] Failed to ${
-            evaluation === "" ? "clear" : "stage"
-          } evaluation for tune ${tune.id}:`,
+          `❌ [FlashcardView] Failed to ${evaluation === "" ? "clear" : "stage"} evaluation for tune ${tune.id}:`,
           error
         );
       }

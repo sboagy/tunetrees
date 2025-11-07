@@ -116,10 +116,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
           top,
           left: wouldOverflowRight
             ? undefined
-            : `${Math.min(
-                rect.right - dropdownWidth,
-                viewportWidth - dropdownWidth - padding
-              )}px`,
+            : `${Math.min(rect.right - dropdownWidth, viewportWidth - dropdownWidth - padding)}px`,
           right: wouldOverflowRight
             ? `${Math.max(padding, viewportWidth - rect.right)}px`
             : undefined,

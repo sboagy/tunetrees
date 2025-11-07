@@ -100,9 +100,7 @@ export const OfflineIndicator: Component = () => {
 
     switch (variant) {
       case "offline-pending":
-        return `Offline. ${pending} change${
-          pending === 1 ? "" : "s"
-        } waiting to sync.`;
+        return `Offline. ${pending} change${pending === 1 ? "" : "s"} waiting to sync.`;
       case "offline":
         return "You're offline. Changes will sync when reconnected.";
       case "syncing":

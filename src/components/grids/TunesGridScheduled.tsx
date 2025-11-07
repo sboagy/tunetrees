@@ -186,9 +186,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         Object.keys(currentEvals).length === 0
       ) {
         console.log(
-          `📊 Initializing ${
-            Object.keys(initialEvals).length
-          } staged evaluations from database`
+          `📊 Initializing ${Object.keys(initialEvals).length} staged evaluations from database`
         );
         setEvaluations(initialEvals);
       }
@@ -315,9 +313,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         incrementSyncVersion();
       } catch (error) {
         console.error(
-          `❌ Failed to ${
-            evaluation === "" ? "clear" : "stage"
-          } evaluation for tune ${tuneId}:`,
+          `❌ Failed to ${evaluation === "" ? "clear" : "stage"} evaluation for tune ${tuneId}:`,
           error
         );
       }
