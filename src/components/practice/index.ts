@@ -5,6 +5,7 @@
  */
 
 export { AddTunesDialog } from "./AddTunesDialog";
+export { DateRolloverBanner } from "./DateRolloverBanner";
 export { FlashcardCard } from "./FlashcardCard";
 export { FlashcardFieldVisibilityMenu } from "./FlashcardFieldVisibilityMenu";
 export { FlashcardView } from "./FlashcardView";

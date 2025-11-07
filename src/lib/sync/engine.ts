@@ -10,6 +10,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { toast } from "solid-sonner";
 import * as localSchema from "../../../drizzle/schema-sqlite";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type { SyncQueueItem } from "../db/types";
@@ -242,6 +243,12 @@ export class SyncEngine {
             await updateSyncStatus(this.localDb, item.id!, "failed", errorMsg);
             failed++;
             errors.push(`Item ${item.id} (${item.tableName}): ${errorMsg}`);
+
+            // Show persistent toast for permanently failed items
+            toast.error(
+              `Sync failed permanently: ${item.tableName} (${item.operation})\n${errorMsg}`,
+              { duration: Number.POSITIVE_INFINITY }
+            );
           } else {
             // Mark for retry
             await updateSyncStatus(this.localDb, item.id!, "pending", errorMsg);
@@ -730,13 +737,8 @@ export class SyncEngine {
             ];
             break;
           case "practice_record":
-            // Composite key: tuneRef + playlistRef + practiced
-            // Use INSERT OR REPLACE to handle ID conflicts
-            conflictTarget = [
-              localTable.tuneRef,
-              localTable.playlistRef,
-              localTable.practiced,
-            ];
+            // Use id as primary key (has composite UNIQUE index but id is PRIMARY KEY)
+            conflictTarget = [localTable.id];
             break;
           default:
             // Most tables use 'id' as primary key

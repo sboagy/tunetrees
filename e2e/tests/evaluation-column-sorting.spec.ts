@@ -24,15 +24,14 @@ test.describe("Evaluation Column Sorting Disabled", () => {
       repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID],
       startTab: "practice",
     });
+    await page.waitForTimeout(200);
   });
 
   test("Evaluation column header is not clickable for sorting", async ({
     page,
   }) => {
     // Find the Evaluation column header
-    const evaluationHeader = page.locator(
-      '[data-testid="tunes-grid-practice"] th:has-text("Evaluation")'
-    );
+    const evaluationHeader = page.getByTestId("ch-evaluation");
 
     // Verify the header exists
     await expect(evaluationHeader).toBeVisible();
@@ -59,9 +58,7 @@ test.describe("Evaluation Column Sorting Disabled", () => {
     page,
   }) => {
     // Find the Evaluation column header
-    const evaluationHeader = page.locator(
-      '[data-testid="tunes-grid-practice"] th:has-text("Evaluation")'
-    );
+    const evaluationHeader = page.getByTestId("ch-evaluation");
 
     // Hover over the header
     await evaluationHeader.hover();
@@ -80,9 +77,7 @@ test.describe("Evaluation Column Sorting Disabled", () => {
 
   test("Other columns ARE sortable (control test)", async ({ page }) => {
     // Find a different column header (e.g., Title) that should be sortable
-    const titleHeader = page
-      .locator('[data-testid="tunes-grid-practice"] th:has-text("Title")')
-      .first();
+    const titleHeader = page.getByTestId("ch-title");
 
     // Verify the header exists
     await expect(titleHeader).toBeVisible();

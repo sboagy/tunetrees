@@ -9,8 +9,10 @@
 
 import type { Component } from "solid-js";
 import { createResource, createSignal, For, Show } from "solid-js";
+import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getSqliteInstance } from "@/lib/db/client-sqlite";
+import { getFailedSyncItems, retrySyncItem } from "@/lib/sync/queue";
 
 interface QueryResult {
   columns: string[];
@@ -63,6 +65,22 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       name: "Daily Practice Queue",
       sql: "SELECT * FROM daily_practice_queue ORDER BY queue_date DESC LIMIT 20;",
     },
+    {
+      name: "Daily Queue (Readable)",
+      sql: "SELECT * FROM view_daily_practice_queue_readable WHERE queue_date = '2025-11-05' LIMIT 50;",
+    },
+    {
+      name: "Sync Queue (All)",
+      sql: "SELECT id, table_name, operation, status, attempts, created_at, last_error FROM sync_queue ORDER BY created_at DESC LIMIT 50;",
+    },
+    {
+      name: "Sync Queue (Pending)",
+      sql: "SELECT id, table_name, operation, status, attempts, created_at FROM sync_queue WHERE status = 'pending' ORDER BY created_at;",
+    },
+    {
+      name: "Sync Queue (Failed)",
+      sql: "SELECT id, table_name, operation, status, attempts, last_error, created_at FROM sync_queue WHERE status = 'failed' ORDER BY created_at DESC;",
+    },
   ];
 
   const executeQuery = async () => {
@@ -105,6 +123,55 @@ export default function DatabaseBrowser(): ReturnType<Component> {
     // Execute query immediately after setting it
     // Use setTimeout to ensure the query signal has updated
     setTimeout(() => executeQuery(), 0);
+  };
+
+  const retryFailedSyncItems = async () => {
+    if (!localDb()) {
+      toast.error("Database not initialized");
+      return;
+    }
+
+    try {
+      const failedItems = await getFailedSyncItems(localDb()!);
+
+      if (failedItems.length === 0) {
+        toast.info("No failed sync items to retry");
+        return;
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const item of failedItems) {
+        try {
+          await retrySyncItem(localDb()!, item.id!);
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          console.error(`Failed to reset sync item ${item.id}:`, error);
+        }
+      }
+
+      if (errorCount === 0) {
+        toast.success(`Reset ${successCount} failed sync items for retry`);
+      } else {
+        toast.warning(`Reset ${successCount} items, ${errorCount} errors`, {
+          duration: 5000,
+        });
+      }
+
+      // Refresh the results if showing sync_queue
+      if (query().toLowerCase().includes("sync_queue")) {
+        executeQuery();
+      }
+    } catch (error) {
+      toast.error(
+        `Error retrying failed items: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        { duration: Number.POSITIVE_INFINITY }
+      );
+    }
   };
 
   return (
@@ -158,6 +225,17 @@ export default function DatabaseBrowser(): ReturnType<Component> {
                   </button>
                 )}
               </For>
+            </div>
+
+            {/* Sync Actions */}
+            <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={retryFailedSyncItems}
+                class="w-full px-3 py-2 text-sm rounded bg-amber-100 dark:bg-amber-900/20 hover:bg-amber-200 dark:hover:bg-amber-900/30 text-amber-900 dark:text-amber-300 font-medium transition-colors"
+              >
+                🔄 Retry Failed Sync Items
+              </button>
             </div>
           </div>
         </div>

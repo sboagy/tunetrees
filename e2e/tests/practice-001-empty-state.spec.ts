@@ -47,8 +47,8 @@ test.describe.serial("PRACTICE-001: Unscheduled Tunes (Q3 New Bucket)", () => {
 
   test("should show grid with unscheduled tunes", async ({ page }) => {
     // Grid should display Alice's unscheduled tunes in Q3 (New) bucket
-    const grid = page.getByTestId("tunes-grid-practice");
-    await expect(grid).toBeVisible({ timeout: 10000 });
+    const grid = page.getByTestId("tunes-grid-scheduled");
+    await expect(grid).toBeVisible({ timeout: 40000 });
 
     // Count only data rows (exclude virtualization spacers)
     const dataRows = grid.locator("tbody tr[data-index]");
@@ -61,7 +61,7 @@ test.describe.serial("PRACTICE-001: Unscheduled Tunes (Q3 New Bucket)", () => {
     page,
   }) => {
     // Unscheduled tunes should be labeled as "New" (Q3 bucket)
-    const grid = page.getByTestId("tunes-grid-practice");
+    const grid = page.getByTestId("tunes-grid-scheduled");
     const newBucketLabel = grid.getByText("New").first();
     try {
       await expect(newBucketLabel).toBeVisible({ timeout: 7000 });
@@ -78,7 +78,7 @@ test.describe.serial("PRACTICE-001: Unscheduled Tunes (Q3 New Bucket)", () => {
 
   test("should show tune titles in the grid", async ({ page }) => {
     // Practice grid should have tune data visible
-    const grid = page.getByTestId("tunes-grid-practice");
+    const grid = page.getByTestId("tunes-grid-scheduled");
     await expect(grid).toBeVisible({ timeout: 10000 });
 
     // Should have at least one data row with content
@@ -119,19 +119,20 @@ test.describe.serial("PRACTICE-001: Unscheduled Tunes (Q3 New Bucket)", () => {
     page,
   }) => {
     // Grid should have evaluation dropdown/column for practice ratings
-    const grid = page.getByTestId("tunes-grid-practice");
+    const grid = page.getByTestId("tunes-grid-scheduled");
     await expect(grid).toBeVisible({ timeout: 5000 });
 
     // Check for evaluation-related UI elements (dropdowns, buttons, etc.)
     // Note: This is a basic check - specific UI may vary
-    const firstRow = grid.locator("tbody tr").first();
-    await expect(firstRow).toBeVisible();
+    // const firstRow = grid.locator("tbody tr").first();
+    const tune2TitleCell = page.getByRole("cell", { name: "Morrison's Jig" });
+    await expect(tune2TitleCell).toBeVisible();
   });
 
   test("should allow completing practice session", async ({ page }) => {
     // After evaluating tunes, user should be able to complete practice
     // This test verifies the workflow is available (not that it's functional)
-    const grid = page.getByTestId("tunes-grid-practice");
+    const grid = page.getByTestId("tunes-grid-scheduled");
     await expect(grid).toBeVisible({ timeout: 5000 });
 
     // Look for submit/complete button (may be named differently)

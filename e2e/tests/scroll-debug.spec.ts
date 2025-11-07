@@ -207,7 +207,7 @@ test.describe("Scroll Reset Debugger", () => {
         .isVisible({ timeout: 3000 })
         .catch(() => false),
       page
-        .getByTestId("tunes-grid-practice")
+        .getByTestId("tunes-grid-scheduled")
         .isVisible({ timeout: 3000 })
         .catch(() => false),
     ]);
@@ -231,7 +231,7 @@ test.describe("Scroll Reset Debugger", () => {
         grid: "tunes-grid-repertoire",
         headerToSort: "title",
       },
-      { tab: "practice", grid: "tunes-grid-practice", headerToSort: "title" },
+      { tab: "practice", grid: "tunes-grid-scheduled", headerToSort: "title" },
     ];
     const present: Array<{ tab: TabId; grid: string; headerToSort: string }> =
       [];

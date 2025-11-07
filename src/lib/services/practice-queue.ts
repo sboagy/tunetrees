@@ -401,12 +401,32 @@ async function persistQueueRows(
   windows: SchedulingWindows
 ): Promise<DailyPracticeQueueRow[]> {
   try {
-    // Insert all rows
+    // Insert all rows and queue for sync
     for (const row of rows) {
-      await db
-        .insert(dailyPracticeQueue)
-        .values({ id: generateId(), ...row })
-        .run();
+      const id = generateId();
+      const fullRow = { id, ...row };
+
+      // Insert into local database
+      await db.insert(dailyPracticeQueue).values(fullRow).run();
+
+      // Transform to snake_case for Supabase (match Drizzle's internal transformation)
+      const snakeCaseRow: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(fullRow)) {
+        const snakeKey = key.replace(
+          /[A-Z]/g,
+          (letter) => `_${letter.toLowerCase()}`
+        );
+        snakeCaseRow[snakeKey] = value;
+      }
+
+      // Queue for sync to Supabase with snake_case column names
+      const { queueSync } = await import("../sync/queue");
+      await queueSync(
+        db as SqliteDatabase,
+        "daily_practice_queue",
+        "insert",
+        snakeCaseRow
+      );
     }
 
     // Fetch back the inserted rows
@@ -429,6 +449,77 @@ async function persistQueueRows(
       windows.startTs
     );
   }
+}
+
+/**
+ * Ensure daily queue exists for the given practice date
+ *
+ * Checks if a queue exists for the specified date. If not, generates one.
+ * This should be called on every page load to implement "create new queue every day" logic.
+ *
+ * @param db - SQLite database instance
+ * @param userRef - User ID
+ * @param playlistRef - Playlist ID
+ * @param practiceDate - The practice date (from getPracticeDate())
+ * @param localTzOffsetMinutes - Client timezone offset (optional)
+ * @returns True if queue was created, false if already existed
+ *
+ * @example
+ * ```typescript
+ * import { getPracticeDate } from '../utils/practice-date';
+ *
+ * const practiceDate = getPracticeDate();
+ * const created = await ensureDailyQueue(db, userId, playlistId, practiceDate);
+ * if (created) {
+ *   console.log('Created new daily queue');
+ * }
+ * ```
+ */
+export async function ensureDailyQueue(
+  db: AnyDatabase,
+  userRef: string,
+  playlistRef: string,
+  practiceDate: Date,
+  localTzOffsetMinutes: number | null = null
+): Promise<boolean> {
+  const { formatAsWindowStart } = await import("../utils/practice-date");
+  const windowStartUtc = formatAsWindowStart(practiceDate);
+
+  console.log(`[PracticeQueue] Ensuring queue exists for ${windowStartUtc}...`);
+
+  // Check if queue exists for this date
+  const existing = await db.all<{ count: number }>(
+    sql`SELECT COUNT(*) as count 
+        FROM daily_practice_queue 
+        WHERE user_ref = ${userRef} 
+          AND playlist_ref = ${playlistRef} 
+          AND window_start_utc = ${windowStartUtc}`
+  );
+
+  const queueExists = (existing[0]?.count ?? 0) > 0;
+
+  if (queueExists) {
+    console.log(`[PracticeQueue] ✓ Queue already exists for ${windowStartUtc}`);
+    return false;
+  }
+
+  // Generate new queue for this date
+  console.log(
+    `[PracticeQueue] 📅 Generating new queue for ${windowStartUtc}...`
+  );
+
+  await generateOrGetPracticeQueue(
+    db,
+    userRef,
+    playlistRef,
+    practiceDate,
+    localTzOffsetMinutes,
+    "per_day",
+    false // Don't force regen, we already checked it doesn't exist
+  );
+
+  console.log(`[PracticeQueue] ✅ Created new queue for ${windowStartUtc}`);
+  return true;
 }
 
 /**

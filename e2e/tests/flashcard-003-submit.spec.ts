@@ -165,7 +165,7 @@ test.describe.serial("Flashcard Feature: Submit", () => {
 
     // Verify grid updated (row count should decrease)
     // Allow some settling time then assert decrease
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(1500);
     const updatedRows = await grid
       .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
       .count();

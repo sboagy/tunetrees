@@ -21,6 +21,7 @@ import { toast } from "solid-sonner";
 import { TunesGridScheduled } from "../../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
 import {
+  DateRolloverBanner,
   type FlashcardFieldVisibilityByFace,
   FlashcardView,
   getDefaultFieldVisibility,
@@ -31,6 +32,10 @@ import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { dailyPracticeQueue } from "../../lib/db/schema";
 import { addTunesToQueue } from "../../lib/services/practice-queue";
 import { commitStagedEvaluations } from "../../lib/services/practice-recording";
+import {
+  formatAsWindowStart,
+  getPracticeDate,
+} from "../../lib/utils/practice-date";
 
 /**
  * Practice Index Page Component
@@ -121,42 +126,52 @@ const PracticeIndex: Component = () => {
     localStorage.setItem(STORAGE_KEY, String(showSubmitted()));
   });
 
-  // Queue Date state - persisted to localStorage
+  // Queue Date state - derived from practice date service
+  // In production: uses current date
+  // In test mode: uses ?practiceDate=YYYY-MM-DD from URL
   const QUEUE_DATE_STORAGE_KEY = "TT_PRACTICE_QUEUE_DATE";
   const QUEUE_DATE_MANUAL_FLAG_KEY = "TT_PRACTICE_QUEUE_DATE_MANUAL";
-  const [queueDate, setQueueDate] = createSignal(new Date());
+  const [queueDate, setQueueDate] = createSignal<Date>(getPracticeDate());
 
-  // Load queue date from localStorage on mount
+  // Store initial practice date for rollover detection
+  const [initialPracticeDate, setInitialPracticeDate] = createSignal<Date>(
+    getPracticeDate()
+  );
+
+  // Load queue date from localStorage on mount, or use practice date
   onMount(() => {
+    const practiceDate = getPracticeDate();
+    setInitialPracticeDate(practiceDate);
+
     const storedDate = localStorage.getItem(QUEUE_DATE_STORAGE_KEY);
     const isManual =
       localStorage.getItem(QUEUE_DATE_MANUAL_FLAG_KEY) === "true";
 
-    if (storedDate) {
+    if (storedDate && isManual) {
       const parsedDate = new Date(storedDate);
       if (!Number.isNaN(parsedDate.getTime())) {
-        // Check if date is in the past and not manually set
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        parsedDate.setHours(0, 0, 0, 0);
-
-        if (!isManual && parsedDate < today) {
-          // Auto-advance to today (midnight rollover protection)
-          const now = new Date();
-          now.setHours(12, 0, 0, 0); // Set to noon
-          setQueueDate(now);
-          localStorage.setItem(QUEUE_DATE_STORAGE_KEY, now.toISOString());
-          console.log("Auto-advanced queue date to today");
-        } else {
-          setQueueDate(parsedDate);
-        }
+        // Use manually selected date
+        setQueueDate(parsedDate);
+        console.log(
+          `[PracticeIndex] Using manual queue date: ${parsedDate.toLocaleDateString()}`
+        );
+        return;
       }
     }
+
+    // Use practice date (respects URL override for testing)
+    setQueueDate(practiceDate);
+    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, practiceDate.toISOString());
+    localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, "false");
+    console.log(
+      `[PracticeIndex] Using practice date: ${practiceDate.toLocaleDateString()}`
+    );
   });
 
   // Persist queue date to localStorage on change
   createEffect(() => {
-    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, queueDate().toISOString());
+    const date = queueDate();
+    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, date.toISOString());
   });
 
   // Flashcard Mode state - persisted to localStorage
@@ -308,11 +323,11 @@ const PracticeIndex: Component = () => {
     );
 
     try {
-      // Convert queueDate to window_start_utc format (YYYY-MM-DD 00:00:00)
+      // Use queue date (which is set from practice date on load)
       const date = queueDate();
-      const windowStartUtc = `${date.getFullYear()}-${String(
-        date.getMonth() + 1
-      ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} 00:00:00`;
+
+      // Convert to window_start_utc format (YYYY-MM-DD 00:00:00)
+      const windowStartUtc = formatAsWindowStart(date);
 
       console.log(`Using queue window: ${windowStartUtc}`);
 
@@ -535,6 +550,9 @@ const PracticeIndex: Component = () => {
 
   return (
     <div class="h-full flex flex-col">
+      {/* Date Rollover Banner - appears when practice date changes */}
+      <DateRolloverBanner initialDate={initialPracticeDate()} />
+
       {/* Sticky Control Banner */}
       <PracticeControlBanner
         evaluationsCount={evaluationsCount()}

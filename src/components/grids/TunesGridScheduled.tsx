@@ -19,8 +19,9 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getPracticeList } from "../../lib/db/queries/practice";
-import { generateOrGetPracticeQueue } from "../../lib/services/practice-queue";
+import { ensureDailyQueue } from "../../lib/services/practice-queue";
 import { stagePracticeEvaluation } from "../../lib/services/practice-staging";
+import { getPracticeDate } from "../../lib/utils/practice-date";
 import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
@@ -69,16 +70,21 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     async (params) => {
       if (!params) return false;
       try {
-        // Generate or fetch existing queue for today
-        await generateOrGetPracticeQueue(
+        // Ensure queue exists for practice date (respects URL override)
+        const practiceDate = getPracticeDate();
+        const created = await ensureDailyQueue(
           params.db,
           params.userId,
           params.playlistId,
-          new Date(), // sitdown date
-          null, // timezone offset (use UTC)
-          "per_day", // mode
-          false // don't force regeneration (queue stable for the day)
+          practiceDate
         );
+
+        if (created) {
+          console.log("[TunesGridScheduled] ✅ Created new daily queue");
+        } else {
+          console.log("[TunesGridScheduled] ✓ Queue already exists");
+        }
+
         return true;
       } catch (error) {
         console.error(

@@ -83,7 +83,7 @@ test.describe("Add To Review - Complete Workflow", () => {
     await page.waitForTimeout(2000);
 
     const practiceRows = page.locator(
-      '[data-testid="tunes-grid-practice"] tbody tr[data-index]'
+      '[data-testid="tunes-grid-scheduled"] tbody tr[data-index]'
     );
     const practiceCount = await practiceRows.count();
     console.log(`📊 Practice queue: ${practiceCount} tunes (expect 3)`);
@@ -93,7 +93,7 @@ test.describe("Add To Review - Complete Workflow", () => {
 
     // Verify the specific tune titles
     const tableText = await page
-      .locator('[data-testid="tunes-grid-practice"] tbody')
+      .locator('[data-testid="tunes-grid-scheduled"] tbody')
       .textContent();
 
     for (const title of selectedTitles) {
@@ -107,7 +107,7 @@ test.describe("Add To Review - Complete Workflow", () => {
     await page.waitForTimeout(3000);
 
     const practiceRowsAfter = page.locator(
-      '[data-testid="tunes-grid-practice"] tbody tr[data-index]'
+      '[data-testid="tunes-grid-scheduled"] tbody tr[data-index]'
     );
     const practiceCountAfter = await practiceRowsAfter.count();
     console.log(`📊 After reload: ${practiceCountAfter} tunes (expect 3)`);
@@ -115,7 +115,7 @@ test.describe("Add To Review - Complete Workflow", () => {
     expect(practiceCountAfter).toBe(3);
 
     const tableTextAfter = await page
-      .locator('[data-testid="tunes-grid-practice"] tbody')
+      .locator('[data-testid="tunes-grid-scheduled"] tbody')
       .textContent();
     for (const title of selectedTitles) {
       expect(tableTextAfter).toContain(title);

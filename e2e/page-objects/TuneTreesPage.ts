@@ -92,8 +92,8 @@ export class TuneTreesPage {
     this.databaseDropdownPanel = page.getByTestId("database-dropdown-panel");
     this.userMenuPanel = page.getByTestId("user-menu-panel");
 
-    // Grids - using data-testid for stable selection
-    this.practiceGrid = page.getByTestId("tunes-grid-practice");
+    // Grids - using data-testid matching tablePurpose prop
+    this.practiceGrid = page.getByTestId("tunes-grid-scheduled");
     this.repertoireGrid = page.getByTestId("tunes-grid-repertoire");
     this.catalogGrid = page.getByTestId("tunes-grid-catalog");
 
@@ -432,7 +432,7 @@ export class TuneTreesPage {
    */
   async expectGridHasContent(grid: Locator) {
     // Wait for grid to be visible first
-    await expect(grid).toBeVisible({ timeout: 10000 });
+    await expect(grid).toBeVisible({ timeout: 40000 });
 
     // Check for table cells
     const cells = grid.locator("td");

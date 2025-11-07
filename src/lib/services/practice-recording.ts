@@ -32,6 +32,7 @@ import type {
 } from "../db/types";
 import { FSRS_QUALITY_MAP, FSRSService } from "../scheduling/fsrs-service";
 import { queueSync } from "../sync/queue";
+import { getPracticeDate } from "../utils/practice-date";
 import { generateId } from "../utils/uuid";
 
 /**
@@ -115,7 +116,7 @@ export async function recordPracticeRating(
 
     const newRecord: NewPracticeRecord = {
       id: generateId(),
-      lastModifiedAt: new Date().toISOString(),
+      lastModifiedAt: getPracticeDate().toISOString(),
       playlistRef: input.playlistRef,
       tuneRef: input.tuneRef,
       practiced: practicedDateStr,
@@ -155,7 +156,7 @@ export async function recordPracticeRating(
       .update(playlistTune)
       .set({
         current: dueStr,
-        lastModifiedAt: new Date().toISOString(),
+        lastModifiedAt: getPracticeDate().toISOString(),
       })
       .where(
         and(
@@ -491,7 +492,7 @@ export async function commitStagedEvaluations(
 
     // 4. For each staged evaluation, create practice_record and update related tables
     const committedTuneIds: number[] = [];
-    const now = new Date().toISOString();
+    const now = getPracticeDate().toISOString();
 
     console.log("Starting to commit evaluations...");
     for (const staged of evaluationsToCommit) {

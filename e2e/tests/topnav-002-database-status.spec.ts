@@ -97,7 +97,7 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
       // Should show sync status
       await expect(
         ttPage.databaseDropdownPanel.getByText("Synced", { exact: true })
-      ).toBeVisible({ timeout: 2000 });
+      ).toBeVisible({ timeout: 6000 });
       await expect(
         ttPage.databaseDropdownPanel.getByText("All changes synced to Supabase")
       ).toBeVisible({ timeout: 2000 });

@@ -143,20 +143,13 @@ test.describe.serial("Flashcard Feature: Grid Coordination", () => {
     await app.submitEvaluationsButton.click();
     await page.waitForTimeout(1500);
 
-    // Exit flashcard via toolbar switch to avoid close-button races
-    const isFlashcardVisible = await app.flashcardView
-      .isVisible()
-      .catch(() => false);
-    if (isFlashcardVisible) {
-      await app.disableFlashcardMode().catch(() => {});
-    }
+    expect(app.flashcardView).toBeVisible();
+
+    await app.disableFlashcardMode();
 
     // If grid is not visible (e.g., empty state shown), accept empty-state as valid update
-    const gridVisible = await grid.isVisible().catch(() => false);
-    if (!gridVisible) {
-      await expect(page.getByText(/no tunes|empty/i)).toBeVisible();
-      return;
-    }
+    expect(grid).toBeVisible();
+    await page.waitForTimeout(500);
 
     // Otherwise verify grid row count decreased
     const updatedGridRows = await grid

@@ -95,7 +95,7 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
 
     // Navigate to Practice tab
     await page.getByTestId("tab-practice").click();
-    await page.waitForSelector('[data-testid="tunes-grid-practice"]', {
+    await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
       state: "visible",
       timeout: 10000,
     });
@@ -114,7 +114,7 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     console.log("🔍 Verifying the selected tunes appear in practice queue...");
 
     const practiceTable = page.locator(
-      '[data-testid="tunes-grid-practice"] table tbody'
+      '[data-testid="tunes-grid-scheduled"] table tbody'
     );
 
     // Look for each tune by name in the practice tab
@@ -147,7 +147,7 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
 
     // Navigate back to Practice tab
     await page.getByTestId("tab-practice").click();
-    await page.waitForSelector('[data-testid="tunes-grid-practice"]', {
+    await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
       state: "visible",
       timeout: 10000,
     });

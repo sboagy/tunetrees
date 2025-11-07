@@ -248,13 +248,13 @@ test.describe("Scroll Position Persistence", () => {
   }) => {
     // Navigate to Practice tab
     await page.click('button:has-text("Practice")');
-    await page.waitForSelector('[data-testid="tunes-grid-practice"]', {
+    await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
       timeout: 5000,
     });
 
     // Scroll down (practice grid has less content) - use mouse wheel for real scroll event
     const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-practice"])'
+      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
     );
 
     // Debug: Check grid dimensions
@@ -300,13 +300,13 @@ test.describe("Scroll Position Persistence", () => {
     await page.click('button:has-text("Catalog")');
     await page.waitForTimeout(500);
     await page.click('button:has-text("Practice")');
-    await page.waitForSelector('[data-testid="tunes-grid-practice"]', {
+    await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
       timeout: 5000,
     });
 
     // Verify scroll position restored
     const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-practice"])'
+      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
     );
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,
@@ -585,13 +585,13 @@ test.describe("Scroll Position Persistence", () => {
   }) => {
     // Navigate to Practice tab
     await page.click('button:has-text("Practice")');
-    await page.waitForSelector('[data-testid="tunes-grid-practice"]', {
+    await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
       timeout: 5000,
     });
 
     // Scroll down (reduced)
     const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-practice"])'
+      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
     );
     await gridContainer.evaluate((el) => {
       el.scrollTop = 25;
@@ -606,7 +606,7 @@ test.describe("Scroll Position Persistence", () => {
 
     // Navigate back to Practice tab
     await page.click('button:has-text("Practice")');
-    await page.waitForSelector('[data-testid="tunes-grid-practice"]', {
+    await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
       timeout: 5000,
     });
 
@@ -615,7 +615,7 @@ test.describe("Scroll Position Persistence", () => {
 
     // Verify scroll position restored from localStorage
     const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-practice"])'
+      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
     );
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,

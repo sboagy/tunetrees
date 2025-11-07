@@ -238,6 +238,59 @@ WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_r
 `;
 
 /**
+ * View 4: Daily Practice Queue with Human-Readable Names
+ *
+ * Joins daily_practice_queue with user, playlist, and tune information
+ * to show readable names instead of UUIDs. Useful for debugging in SQLite browser.
+ *
+ * Columns:
+ * - queue_id: Queue row UUID
+ * - user_name: User email/name
+ * - playlist_instrument: Instrument name
+ * - tune_title: Tune title
+ * - queue_date: Practice date (YYYY-MM-DD)
+ * - window_start_utc: Queue window start timestamp
+ * - bucket: Queue bucket (1=Due Today, 2=Lapsed, 3=New, 4=Old Lapsed)
+ * - order_index: Order within queue
+ * - completed_at: When submitted (NULL if not submitted)
+ * - active: Whether queue row is active
+ */
+const VIEW_DAILY_PRACTICE_QUEUE_READABLE = `
+CREATE VIEW IF NOT EXISTS view_daily_practice_queue_readable AS
+SELECT
+  dpq.id AS queue_id,
+  COALESCE(up.name, up.email) AS user_name,
+  i.instrument AS playlist_instrument,
+  COALESCE(tune_override.title, tune.title) AS tune_title,
+  dpq.queue_date,
+  dpq.window_start_utc,
+  dpq.window_end_utc,
+  dpq.bucket,
+  dpq.order_index,
+  dpq.completed_at,
+  dpq.active,
+  dpq.mode,
+  dpq.snapshot_coalesced_ts,
+  dpq.scheduled_snapshot,
+  dpq.generated_at,
+  dpq.user_ref,
+  dpq.playlist_ref,
+  dpq.tune_ref
+FROM
+  daily_practice_queue dpq
+  LEFT JOIN user_profile up ON up.id = dpq.user_ref
+  LEFT JOIN playlist p ON p.playlist_id = dpq.playlist_ref
+  LEFT JOIN instrument i ON i.id = p.instrument_ref
+  LEFT JOIN tune ON tune.id = dpq.tune_ref
+  LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
+    AND tune_override.user_ref = dpq.user_ref
+ORDER BY
+  dpq.queue_date DESC,
+  dpq.bucket ASC,
+  dpq.order_index ASC
+`;
+
+/**
  * Initialize database views in SQLite WASM
  *
  * Creates all essential views for the TuneTrees application.
@@ -270,6 +323,10 @@ export async function initializeViews(db: SqliteDatabase): Promise<void> {
     await db.run(PRACTICE_LIST_STAGED);
     console.log("✅ Created view: practice_list_staged");
 
+    // Create view_daily_practice_queue_readable
+    await db.run(VIEW_DAILY_PRACTICE_QUEUE_READABLE);
+    console.log("✅ Created view: view_daily_practice_queue_readable");
+
     console.log("✅ All database views initialized successfully");
   } catch (error) {
     console.error("❌ Error initializing database views:", error);
@@ -286,6 +343,7 @@ export async function dropViews(db: SqliteDatabase): Promise<void> {
   console.log("🗑️  Dropping SQLite database views...");
 
   try {
+    await db.run("DROP VIEW IF EXISTS view_daily_practice_queue_readable");
     await db.run("DROP VIEW IF EXISTS practice_list_staged");
     await db.run("DROP VIEW IF EXISTS practice_list_joined");
     await db.run("DROP VIEW IF EXISTS view_playlist_joined");
