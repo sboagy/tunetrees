@@ -122,14 +122,14 @@ test.describe.serial("Flashcard Feature: Show Submitted Filter", () => {
     // Turn ON Show Submitted to see all tunes
     const app = new TuneTreesPage(page);
     const showSubmittedToggle = app.displaySubmittedSwitch.getByRole("switch");
-    const isOn =
-      (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-    if (!isOn) {
-      await app.displaySubmittedSwitch.click();
-      await page.waitForTimeout(500);
-    }
+    expect(await showSubmittedToggle.getAttribute("aria-checked")).toBe(
+      "false"
+    );
 
-    await page.getByRole("cell", { name: "Lapsed" }).first().click();
+    await app.displaySubmittedSwitch.click();
+    await page.waitForTimeout(500);
+
+    await page.getByRole("cell", { name: "recall" }).first().click();
 
     // Open flashcard (will show first tune, which may be submitted)
     await app.enableFlashcardMode();
