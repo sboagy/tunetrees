@@ -18,6 +18,7 @@ import {
   onCleanup,
   Show,
 } from "solid-js";
+import { toast } from "solid-sonner";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { getUserPlaylists } from "../../lib/db/queries/playlists";
@@ -308,7 +309,8 @@ const PlaylistDropdown: Component = () => {
 };
 
 export const TopNav: Component = () => {
-  const { user, localDb, signOut, forceSyncDown, syncVersion } = useAuth();
+  const { user, localDb, signOut, forceSyncDown, forceSyncUp, syncVersion } =
+    useAuth();
   const [isOnline, setIsOnline] = createSignal(navigator.onLine);
   const [pendingCount, setPendingCount] = createSignal(0);
   const [showUserMenu, setShowUserMenu] = createSignal(false);
@@ -729,6 +731,60 @@ export const TopNav: Component = () => {
                       </div>
                     </div>
 
+                    {/* Force Sync Up Button */}
+                    <div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          console.log(
+                            "🔄 [Force Sync Up] Button clicked - starting sync..."
+                          );
+                          try {
+                            await forceSyncUp();
+                            console.log(
+                              "✅ [Force Sync Up] Sync completed successfully"
+                            );
+                            toast.success("Local changes uploaded to server");
+                            setShowDbMenu(false); // Close menu after successful sync
+                          } catch (error) {
+                            console.error(
+                              "❌ [Force Sync Up] Sync failed:",
+                              error
+                            );
+                            toast.error("Failed to upload changes");
+                            setShowDbMenu(false); // Close menu even on error
+                          }
+                        }}
+                        class="w-full px-4 py-2 text-left text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors flex items-center gap-2 rounded-md font-medium"
+                        disabled={!isOnline()}
+                        classList={{
+                          "opacity-50 cursor-not-allowed": !isOnline(),
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        Force Sync Up
+                        {!isOnline() && (
+                          <span class="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                            (Offline)
+                          </span>
+                        )}
+                      </button>
+                    </div>
+
                     {/* Force Sync Down Button */}
                     <div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
                       <button
@@ -742,12 +798,14 @@ export const TopNav: Component = () => {
                             console.log(
                               "✅ [Force Sync Down] Sync completed successfully"
                             );
+                            toast.success("Remote data downloaded");
                             setShowDbMenu(false); // Close menu after successful sync
                           } catch (error) {
                             console.error(
                               "❌ [Force Sync Down] Sync failed:",
                               error
                             );
+                            toast.error("Failed to download data");
                             setShowDbMenu(false); // Close menu even on error
                           }
                         }}
