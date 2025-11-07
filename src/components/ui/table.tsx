@@ -7,7 +7,7 @@ import { splitProps } from "solid-js";
 import { cn } from "../../lib/utils";
 
 export const Table: Component<JSX.HTMLAttributes<HTMLTableElement>> = (
-  props
+  props,
 ) => {
   const [local, others] = splitProps(props, ["class"]);
   return (
@@ -35,14 +35,14 @@ export const TableBody: Component<
 };
 
 export const TableRow: Component<JSX.HTMLAttributes<HTMLTableRowElement>> = (
-  props
+  props,
 ) => {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <tr
       class={cn(
         "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
-        local.class
+        local.class,
       )}
       {...others}
     />
@@ -57,7 +57,7 @@ export const TableHead: Component<
     <th
       class={cn(
         "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
-        local.class
+        local.class,
       )}
       {...others}
     />

@@ -2,6 +2,7 @@
  * Compact Filter Dropdown Component
  *
  * Multi-select dropdown for filtering (Type, Mode, Genre).
+ * Now using shadcn-solid Checkbox for better accessibility.
  * Designed to fit in control banner, similar to legacy design.
  *
  * @module components/catalog/CompactFilterDropdown
@@ -15,6 +16,7 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { Checkbox, CheckboxControl, CheckboxIndicator } from "../ui/checkbox";
 
 export interface CompactFilterDropdownProps {
   /** Label for the dropdown (e.g., "Type", "Mode", "Genre") */
@@ -43,7 +45,7 @@ export interface CompactFilterDropdownProps {
  * ```
  */
 export const CompactFilterDropdown: Component<CompactFilterDropdownProps> = (
-  props
+  props,
 ) => {
   const [isOpen, setIsOpen] = createSignal(false);
   let dropdownRef: HTMLDivElement | undefined;
@@ -119,17 +121,19 @@ export const CompactFilterDropdown: Component<CompactFilterDropdownProps> = (
             >
               <For each={props.options}>
                 {(option) => (
-                  <label class="flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 rounded">
-                    <input
-                      type="checkbox"
+                  <div class="flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 rounded">
+                    <Checkbox
                       checked={props.selectedValues.includes(option)}
                       onChange={() => toggleValue(option)}
-                      class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
+                    >
+                      <CheckboxControl class="h-4 w-4">
+                        <CheckboxIndicator />
+                      </CheckboxControl>
+                    </Checkbox>
                     <span class="text-sm text-gray-900 dark:text-white">
                       {option}
                     </span>
-                  </label>
+                  </div>
                 )}
               </For>
             </Show>
