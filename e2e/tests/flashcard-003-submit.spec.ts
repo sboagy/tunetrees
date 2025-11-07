@@ -178,6 +178,15 @@ test.describe.serial("Flashcard Feature: Submit", () => {
 
     // Get initial count
     const counter = app.flashcardHeaderCounter;
+
+    // Before we get the initial count, wait for it to be our expected count of 3.
+    // This is to hopefully fix this flaky test.
+    await expect(async () => {
+      const updatedText = await counter.textContent();
+      const updatedTotal = parseInt(updatedText?.split(" of ")[1] || "0", 10);
+      expect(updatedTotal).toBe(3);
+    }).toPass({ timeout: 5000 });
+
     const initialText = await counter.textContent();
     const initialTotal = parseInt(initialText?.split(" of ")[1] || "0", 10);
 
@@ -185,19 +194,36 @@ test.describe.serial("Flashcard Feature: Submit", () => {
     await app.selectFlashcardEvaluation("good");
     await page.waitForTimeout(300);
     await app.submitEvaluationsButton.click();
-    await page.waitForTimeout(1000);
 
     // Verify flashcard count updated (if Show Submitted OFF)
     const showSubmittedToggle = app.displaySubmittedSwitch.getByRole("switch");
 
     await expect(showSubmittedToggle).toHaveAttribute("aria-checked", "false");
 
-    // Wait for flashcard count to update
-    await expect(async () => {
-      const updatedText = await counter.textContent();
-      const updatedTotal = parseInt(updatedText?.split(" of ")[1] || "0", 10);
-      expect(updatedTotal).toBeLessThan(initialTotal);
-    }).toPass({ timeout: 5000 });
+    // Wait for flashcard count to update (poll until it decreases)
+    let attemptCount = 0;
+    await expect
+      .poll(
+        async () => {
+          const updatedText = (await counter.textContent()) || "";
+          const parts = updatedText.split(" of ");
+          const updatedTotal =
+            parts.length > 1 ? parseInt(parts[1] || "0", 10) : 0;
+          attemptCount++;
+          console.debug(
+            `[Poll #${attemptCount}] updatedTotal: ${updatedTotal}, initialTotal: ${initialTotal}`
+          );
+          return updatedTotal;
+        },
+        { timeout: 20000, intervals: [100, 500, 1000] }
+      )
+      .toBeLessThan(initialTotal);
+
+    // double-check
+    const updatedText = (await counter.textContent()) || "";
+    const parts = updatedText.split(" of ");
+    const updatedTotal = parts.length > 1 ? parseInt(parts[1] || "0", 10) : 0;
+    expect(updatedTotal).toBe(2);
   });
 
   test("07. Submit works from any card position", async ({ page }) => {
