@@ -703,9 +703,7 @@ export const TopNav: Component = () => {
                                 "All changes synced to Supabase"}
                               {isOnline() &&
                                 pendingCount() > 0 &&
-                                `${pendingCount()} change${
-                                  pendingCount() === 1 ? "" : "s"
-                                } syncing...`}
+                                `${pendingCount()} change${pendingCount() === 1 ? "" : "s"} syncing...`}
                             </div>
                           </div>
                         </div>
@@ -713,9 +711,7 @@ export const TopNav: Component = () => {
                         {/* Connection Status */}
                         <div class="flex items-start gap-2">
                           <span
-                            class={`text-sm ${
-                              isOnline() ? "text-green-500" : "text-yellow-500"
-                            }`}
+                            class={`text-sm ${isOnline() ? "text-green-500" : "text-yellow-500"}`}
                           >
                             {isOnline() ? "🌐" : "📴"}
                           </span>

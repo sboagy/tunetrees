@@ -763,9 +763,7 @@ export async function generateOrGetPracticeQueue(
   }
 
   console.log(
-    `[PracticeQueue] Generating new queue: ${
-      candidateRows.length
-    } candidate tunes (max: ${maxReviews || "uncapped"})`
+    `[PracticeQueue] Generating new queue: ${candidateRows.length} candidate tunes (max: ${maxReviews || "uncapped"})`
   );
 
   // Build queue rows - mark each with its actual bucket

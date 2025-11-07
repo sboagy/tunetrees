@@ -56,7 +56,9 @@ test.describe("TOPNAV-003: User Menu Dropdown", () => {
       page.getByText(
         /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
       )
-    ).toBeVisible({ timeout: 2000 });
+    ).toBeVisible({
+      timeout: 2000,
+    });
   });
 
   test("should show email address in dropdown", async () => {

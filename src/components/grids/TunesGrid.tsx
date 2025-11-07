@@ -351,11 +351,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                         data-column-id={header.column.id}
                         data-testid={`ch-${header.column.id}`}
                         class={getHeaderCellClasses(
-                          `${
-                            draggedColumnId() === header.column.id
-                              ? "opacity-50"
-                              : ""
-                          } ${
+                          `${draggedColumnId() === header.column.id ? "opacity-50" : ""} ${
                             isDragging() &&
                             hoverColumnId() === header.column.id &&
                             draggedColumnId() !== header.column.id
@@ -402,9 +398,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                               }
                               onDragEnd={handleDragEnd}
                               class="cursor-grab active:cursor-grabbing flex-shrink-0 p-0.5 border-0 bg-transparent"
-                              aria-label={`Drag to reorder ${
-                                header.column.columnDef.header as string
-                              } column`}
+                              aria-label={`Drag to reorder ${header.column.columnDef.header as string} column`}
                             >
                               <GripVertical
                                 size={14}
@@ -446,9 +440,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
             <Show when={rowVirtualizer().getVirtualItems().length > 0}>
               <tr
                 style={{
-                  height: `${
-                    rowVirtualizer().getVirtualItems()[0]?.start || 0
-                  }px`,
+                  height: `${rowVirtualizer().getVirtualItems()[0]?.start || 0}px`,
                 }}
               />
             </Show>

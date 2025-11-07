@@ -46,9 +46,7 @@ const FilterChip: Component<{
 
   return (
     <span
-      class={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ${
-        colorClasses[props.type]
-      }`}
+      class={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ${colorClasses[props.type]}`}
     >
       <span>{props.label}</span>
       <button
@@ -435,9 +433,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
           </span>
         </Show>
         <svg
-          class={`w-3.5 h-3.5 hidden sm:inline transition-transform ${
-            isExpanded() ? "rotate-180" : ""
-          }`}
+          class={`w-3.5 h-3.5 hidden sm:inline transition-transform ${isExpanded() ? "rotate-180" : ""}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
