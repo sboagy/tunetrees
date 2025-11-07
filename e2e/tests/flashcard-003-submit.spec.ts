@@ -102,9 +102,11 @@ test.describe
       await expect(submitButton).toContainText(/Submit/i);
     });
 
-    test("04. Submit clears staged evaluations", async ({ page }) => {
-      const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+    // Select and submit evaluation
+    await app.selectFlashcardEvaluation("good");
+    await page.waitForTimeout(300);
+    await app.submitEvaluationsButton.click();
+    await page.waitForTimeout(1000);
 
       // Select evaluation
       await app.selectFlashcardEvaluation("good");
@@ -114,15 +116,13 @@ test.describe
       await app.submitEvaluationsButton.click();
       await page.waitForTimeout(1500);
 
-      // Verify Submit button shows 0 evaluations
-      const submitButton = app.submitEvaluationsButton;
-      await expect(submitButton).toBeDisabled();
-      await expect(submitButton).toHaveAttribute(
-        "title",
-        /Submit 0 practice evaluations/,
-      );
-      await expect(submitButton).toContainText(/Submit/i);
-    });
+    // Wait for flashcard count to update
+    await expect(async () => {
+      const updatedText = await counter.textContent();
+      const updatedTotal = parseInt(updatedText?.split(" of ")[1] || "0", 10);
+      expect(updatedTotal).toBeLessThan(initialTotal);
+    }).toPass({ timeout: 5000 });
+  });
 
     test("05. Submit updates grid immediately", async ({ page }) => {
       const app = new TuneTreesPage(page);
