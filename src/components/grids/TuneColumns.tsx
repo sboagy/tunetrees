@@ -5,7 +5,7 @@
  * Ported from legacy React implementation to SolidJS with fine-grained reactivity.
  */
 
-import type { ColumnDef } from "@tanstack/solid-table";
+import type { ColumnDef, Table } from "@tanstack/solid-table";
 import { type Component, Show, createEffect } from "solid-js";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
@@ -86,7 +86,7 @@ const StaticHeader: Component<{ title: string }> = (props) => {
  * Select All Checkbox Header Component
  * Reactively updates indeterminate state when selection changes
  */
-const SelectAllCheckbox: Component<{ table: any }> = (props) => {
+const SelectAllCheckbox: Component<{ table: Table<any> }> = (props) => {
   let checkboxRef: HTMLInputElement | undefined;
 
   // Reactively update indeterminate property when selection state changes
