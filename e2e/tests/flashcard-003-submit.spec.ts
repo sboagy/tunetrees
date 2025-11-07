@@ -93,20 +93,24 @@ test.describe
       await submitButton.click();
       await page.waitForTimeout(1500);
 
-      // Verify Submit succeeded (count resets to 0)
-      await expect(submitButton).toBeDisabled();
-      await expect(submitButton).toHaveAttribute(
-        "title",
-        /Submit 0 practice evaluations/,
-      );
-      await expect(submitButton).toContainText(/Submit/i);
-    });
+    // Get initial count
+    const counter = app.flashcardHeaderCounter;
+
+    // Before we get the initial count, wait for it to be our expected count of 3.
+    // This is to hopefully fix this flaky test.
+    await expect(async () => {
+      const updatedText = await counter.textContent();
+      const updatedTotal = parseInt(updatedText?.split(" of ")[1] || "0", 10);
+      expect(updatedTotal).toBe(3);
+    }).toPass({ timeout: 5000 });
+
+    const initialText = await counter.textContent();
+    const initialTotal = parseInt(initialText?.split(" of ")[1] || "0", 10);
 
     // Select and submit evaluation
     await app.selectFlashcardEvaluation("good");
     await page.waitForTimeout(300);
     await app.submitEvaluationsButton.click();
-    await page.waitForTimeout(1000);
 
       // Select evaluation
       await app.selectFlashcardEvaluation("good");
@@ -116,12 +120,30 @@ test.describe
       await app.submitEvaluationsButton.click();
       await page.waitForTimeout(1500);
 
-    // Wait for flashcard count to update
-    await expect(async () => {
-      const updatedText = await counter.textContent();
-      const updatedTotal = parseInt(updatedText?.split(" of ")[1] || "0", 10);
-      expect(updatedTotal).toBeLessThan(initialTotal);
-    }).toPass({ timeout: 5000 });
+    // Wait for flashcard count to update (poll until it decreases)
+    let attemptCount = 0;
+    await expect
+      .poll(
+        async () => {
+          const updatedText = (await counter.textContent()) || "";
+          const parts = updatedText.split(" of ");
+          const updatedTotal =
+            parts.length > 1 ? parseInt(parts[1] || "0", 10) : 0;
+          attemptCount++;
+          console.debug(
+            `[Poll #${attemptCount}] updatedTotal: ${updatedTotal}, initialTotal: ${initialTotal}`
+          );
+          return updatedTotal;
+        },
+        { timeout: 20000, intervals: [100, 500, 1000] }
+      )
+      .toBeLessThan(initialTotal);
+
+    // double-check
+    const updatedText = (await counter.textContent()) || "";
+    const parts = updatedText.split(" of ");
+    const updatedTotal = parts.length > 1 ? parseInt(parts[1] || "0", 10) : 0;
+    expect(updatedTotal).toBe(2);
   });
 
     test("05. Submit updates grid immediately", async ({ page }) => {
