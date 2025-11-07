@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap (if you have one in the future)
+# Sitemap: https://tunetrees-pwa.pages.dev/sitemap.xml

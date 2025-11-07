@@ -113,8 +113,8 @@ export default defineConfig(() => {
     build: {
       // Increase chunk size warning limit (we'll optimize later)
       chunkSizeWarningLimit: 1000,
-      // Enable source maps for production debugging (optional)
-      sourcemap: false,
+      // Enable source maps for production debugging
+      sourcemap: true,
       // Rollup options for code splitting
       rollupOptions: {
         output: {
