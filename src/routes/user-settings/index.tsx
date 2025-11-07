@@ -72,10 +72,12 @@ const SidebarNav: Component<{ items: SidebarNavItem[] }> = (props) => {
  * User Settings Layout Component
  *
  * Renders as a modal dialog with sidebar navigation
+ * Responsive: hamburger menu on mobile, sidebar on desktop
  */
 const UserSettingsLayout: ParentComponent = (props) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = createSignal(true);
+  const [isSidebarOpen, setIsSidebarOpen] = createSignal(false);
 
   const handleClose = () => {
     setIsOpen(false);
@@ -86,6 +88,10 @@ const UserSettingsLayout: ParentComponent = (props) => {
     if (e.key === "Escape") {
       handleClose();
     }
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen());
   };
 
   return (
@@ -102,12 +108,12 @@ const UserSettingsLayout: ParentComponent = (props) => {
 
       {/* Modal Dialog */}
       <div
-        class="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-16 pointer-events-none"
+        class="fixed inset-0 z-50 flex items-start justify-center pt-2 md:pt-8 pb-2 md:pb-16 pointer-events-none"
         data-testid="settings-modal-wrapper"
       >
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: Event handled by backdrop */}
         <div
-          class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-6xl max-h-[calc(100vh-8rem)] flex flex-col pointer-events-auto"
+          class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-full md:max-w-6xl h-[calc(100vh-1rem)] md:max-h-[calc(100vh-8rem)] flex flex-col pointer-events-auto mx-2"
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-labelledby="settings-title"
@@ -115,22 +121,49 @@ const UserSettingsLayout: ParentComponent = (props) => {
           data-testid="settings-modal"
         >
           {/* Header */}
-          <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between">
-            <div>
-              <h2
-                id="settings-title"
-                class="text-2xl font-semibold text-gray-900 dark:text-gray-100"
+          <div class="px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between shrink-0">
+            <div class="flex items-center gap-3">
+              {/* Mobile Menu Toggle */}
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                class="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                aria-label="Toggle menu"
+                data-testid="settings-menu-toggle"
               >
-                Settings
-              </h2>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Manage your account settings and set scheduling preferences.
-              </p>
+                <svg
+                  class="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <title>Menu</title>
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
+              </button>
+
+              <div>
+                <h2
+                  id="settings-title"
+                  class="text-xl md:text-2xl font-semibold text-gray-900 dark:text-gray-100"
+                >
+                  Settings
+                </h2>
+                <p class="hidden md:block text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Manage your account settings and set scheduling preferences.
+                </p>
+              </div>
             </div>
+
             <button
               type="button"
               onClick={handleClose}
-              class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+              class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
               aria-label="Close settings"
               data-testid="settings-close-button"
             >
@@ -153,14 +186,37 @@ const UserSettingsLayout: ParentComponent = (props) => {
           </div>
 
           {/* Body */}
-          <div class="flex-1 flex min-h-0 overflow-hidden">
+          <div class="flex-1 flex min-h-0 overflow-hidden relative">
+            {/* Mobile Sidebar Overlay */}
+            <Show when={isSidebarOpen()}>
+              <button
+                type="button"
+                class="md:hidden fixed inset-0 bg-black/30 z-10"
+                onClick={toggleSidebar}
+                aria-label="Close menu"
+              />
+            </Show>
+
             {/* Sidebar */}
-            <aside class="w-64 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4">
+            <aside
+              class="absolute md:relative z-20 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 h-full transition-transform md:transition-none"
+              classList={{
+                "translate-x-0 w-64": isSidebarOpen(),
+                "-translate-x-full w-0 p-0": !isSidebarOpen(),
+                "md:translate-x-0 md:w-64 md:p-4": true,
+              }}
+              data-testid="settings-sidebar"
+            >
               <SidebarNav items={sidebarNavItems} />
             </aside>
 
-            {/* Content Area */}
-            <main class="flex-1 overflow-y-auto p-6">{props.children}</main>
+            {/* Content Area - Full width on mobile, respects sidebar on desktop */}
+            <main
+              class="flex-1 overflow-y-auto p-4 md:p-6 w-full"
+              data-testid="settings-content"
+            >
+              {props.children}
+            </main>
           </div>
         </div>
       </div>

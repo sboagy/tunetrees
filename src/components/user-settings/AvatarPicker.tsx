@@ -211,11 +211,7 @@ export function AvatarPicker() {
   return (
     <div class="space-y-6">
       {/* Current Avatar Preview */}
-      {/* Current Avatar Preview */}
       <div class="flex flex-col items-center gap-4">
-        <div class="text-sm font-medium text-muted-foreground">
-          Current Avatar
-        </div>
         <Show
           when={getDisplayAvatar()}
           fallback={
@@ -250,7 +246,7 @@ export function AvatarPicker() {
       {/* Predefined Avatars */}
       <div class="space-y-3">
         <h3 class="text-sm font-medium">Predefined Avatars</h3>
-        <div class="grid grid-cols-5 gap-3">
+        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 md:gap-3">
           <For each={PREDEFINED_AVATARS}>
             {(filename) => {
               const url = `/avatars/${filename}`;
