@@ -123,9 +123,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     } catch (error) {
       console.error("Failed to delete playlist:", error);
       alert(
-        `Failed to delete playlist: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+        `Failed to delete playlist: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     } finally {
       setDeletingId(null);

@@ -56,10 +56,7 @@ export function generateId(): string {
 
   // Time high and version (16 bits) - 4 bits version + 12 bits random
   // Version 7 = 0111, so we use "7" as the first nibble
-  const timeHiAndVersion = `7${randomBytes[0]
-    .toString(16)
-    .padStart(3, "0")
-    .slice(0, 3)}`;
+  const timeHiAndVersion = `7${randomBytes[0].toString(16).padStart(3, "0").slice(0, 3)}`;
 
   // Clock sequence and variant (16 bits) - 2 bits variant + 14 bits random
   // Variant 10 (RFC 4122), so we set the top two bits to 10

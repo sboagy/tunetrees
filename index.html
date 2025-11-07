@@ -4,7 +4,21 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>tunetrees</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#1e3a8a" />
+    <meta name="description" content="Spaced repetition practice system for musicians. Learn tunes faster with intelligent scheduling." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icon-192x192.png" />
+    
+    <!-- Preconnect to Supabase for faster API calls -->
+    <link rel="preconnect" href="https://nbowmctaebpfxqpzxfkb.supabase.co" crossorigin />
+    
+    <!-- Preload critical WASM file for offline SQLite -->
+    <link rel="preload" href="/sql-wasm/sql-wasm.wasm" as="fetch" crossorigin />
+    
+    <title>TuneTrees - Music Practice Manager</title>
+    
     <script>
       // Apply theme mode: light, dark, or system (follows OS preference)
       const themeMode = localStorage.getItem('themeMode') || 'system';
@@ -26,7 +40,7 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <main id="root"></main>
     <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>

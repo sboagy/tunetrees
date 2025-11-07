@@ -166,10 +166,10 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       }
     } catch (error) {
       toast.error(
-        `Error retrying failed items: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        { duration: Number.POSITIVE_INFINITY }
+        `Error retrying failed items: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          duration: Number.POSITIVE_INFINITY,
+        }
       );
     }
   };

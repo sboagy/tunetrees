@@ -85,9 +85,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
       );
     } else {
       console.warn(
-        `⚠️ Schema migration detected: ${
-          localVersion || "none"
-        } → ${currentVersion}`
+        `⚠️ Schema migration detected: ${localVersion || "none"} → ${currentVersion}`
       );
       console.warn("🔄 Clearing local database for migration...");
     }
@@ -169,9 +167,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
         }
 
         console.log(
-          `✅ Applied ${statements.length} statements from ${migrationPath
-            .split("/")
-            .pop()}`
+          `✅ Applied ${statements.length} statements from ${migrationPath.split("/").pop()}`
         );
       }
 
@@ -179,9 +175,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
     } catch (error) {
       console.error("❌ Failed to apply migrations:", error);
       throw new Error(
-        `Database migration failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Database migration failed: ${error instanceof Error ? error.message : String(error)}`
       );
     }
 

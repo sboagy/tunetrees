@@ -123,14 +123,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       // Show feedback
       let message = "";
       if (result.added > 0) {
-        message += `Added ${result.added} tune${
-          result.added > 1 ? "s" : ""
-        } to practice queue.`;
+        message += `Added ${result.added} tune${result.added > 1 ? "s" : ""} to practice queue.`;
       }
       if (result.skipped > 0) {
-        message += ` ${result.skipped} tune${
-          result.skipped > 1 ? "s were" : " was"
-        } already scheduled.`;
+        message += ` ${result.skipped} tune${result.skipped > 1 ? "s were" : " was"} already scheduled.`;
       }
       alert(message || "No tunes were added.");
 
@@ -168,11 +164,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     } catch (error) {
       console.error("Error adding tunes to practice queue:", error);
       alert(
-        `Error: ${
-          error instanceof Error
-            ? error.message
-            : "Failed to add tunes to practice queue"
-        }`
+        `Error: ${error instanceof Error ? error.message : "Failed to add tunes to practice queue"}`
       );
     }
   };

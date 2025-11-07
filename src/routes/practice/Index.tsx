@@ -87,9 +87,7 @@ const PracticeIndex: Component = () => {
     if (!db || !user()) return null;
 
     const result = await db.all<{ supabase_user_id: string }>(
-      sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${
-        user()!.id
-      } LIMIT 1`
+      sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${user()!.id} LIMIT 1`
     );
     return result[0]?.supabase_user_id ?? null;
   };
@@ -342,9 +340,7 @@ const PracticeIndex: Component = () => {
       if (result.success) {
         // Success toast (auto-dismiss after 3 seconds)
         toast.success(
-          `Successfully submitted ${result.count} evaluation${
-            result.count !== 1 ? "s" : ""
-          }`,
+          `Successfully submitted ${result.count} evaluation${result.count !== 1 ? "s" : ""}`,
           {
             duration: 3000,
           }

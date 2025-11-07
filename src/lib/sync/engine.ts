@@ -247,7 +247,9 @@ export class SyncEngine {
             // Show persistent toast for permanently failed items
             toast.error(
               `Sync failed permanently: ${item.tableName} (${item.operation})\n${errorMsg}`,
-              { duration: Number.POSITIVE_INFINITY }
+              {
+                duration: Number.POSITIVE_INFINITY,
+              }
             );
           } else {
             // Mark for retry

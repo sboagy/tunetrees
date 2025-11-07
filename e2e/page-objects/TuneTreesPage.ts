@@ -195,10 +195,10 @@ export class TuneTreesPage {
       tabId === "practice"
         ? this.practiceGrid
         : tabId === "repertoire"
-        ? this.repertoireGrid
-        : tabId === "catalog"
-        ? this.catalogGrid
-        : undefined;
+          ? this.repertoireGrid
+          : tabId === "catalog"
+            ? this.catalogGrid
+            : undefined;
     if (grid) {
       await expect(grid).toBeVisible({ timeout: 10000 });
     }
@@ -293,8 +293,8 @@ export class TuneTreesPage {
         tab === "catalog"
           ? this.catalogAddTuneButton
           : tab === "repertoire"
-          ? this.repertoireAddTuneButton
-          : this.addTuneButton;
+            ? this.repertoireAddTuneButton
+            : this.addTuneButton;
       await expect(button).toBeVisible({ timeout: 5000 });
     }
     if (options.addToRepertoire) {
@@ -307,8 +307,8 @@ export class TuneTreesPage {
         tab === "catalog"
           ? this.catalogDeleteButton
           : tab === "repertoire"
-          ? this.repertoireDeleteButton
-          : this.deleteButton;
+            ? this.repertoireDeleteButton
+            : this.deleteButton;
 
       if (options.delete) {
         await expect(deleteBtn).toBeVisible();
@@ -327,10 +327,10 @@ export class TuneTreesPage {
         tab === "catalog"
           ? this.catalogColumnsButton
           : tab === "repertoire"
-          ? this.repertoireColumnsButton
-          : tab === "practice"
-          ? this.practiceColumnsButton
-          : this.columnsButton;
+            ? this.repertoireColumnsButton
+            : tab === "practice"
+              ? this.practiceColumnsButton
+              : this.columnsButton;
       await expect(columnsBtn).toBeVisible({ timeout: 5000 });
     }
   }
