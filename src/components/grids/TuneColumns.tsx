@@ -156,7 +156,7 @@ export function getCatalogColumns(
         const tune = info.row.original;
         const title = (info.getValue() as string) || "";
         // Use favorite_url if available, otherwise use irishtune.info
-        const href = `https://www.irishtune.info/tune/${tune.id}/`;
+        const href = tune.favorite_url;
         return (
           <a
             href={href}
