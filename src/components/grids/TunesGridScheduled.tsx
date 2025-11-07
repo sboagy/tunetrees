@@ -229,7 +229,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
       4: "Old Lapsed",
     };
 
-    return filteredData.map((entry) => {
+    const mappedData = filteredData.map((entry) => {
       return {
         ...entry,
         tune_id: entry.id, // PracticeListStagedRow uses 'id' field
@@ -242,6 +242,21 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         // All latest_* fields already provided by VIEW via COALESCE
       };
     });
+    // console.log(
+    //   "[TunesGridScheduled] (before) Sorted tune IDs:",
+    //   mappedData.map((t) => t.id.slice(-6))
+    // );
+
+    // Sort by id (UUIDv7) for stable ordering across refetches
+    // This prevents grid jumping when data refetches due to sync
+    // mappedData.sort((a, b) => a.id.localeCompare(b.id));
+
+    // console.log(
+    //   "[TunesGridScheduled] (after) Sorted tune IDs:",
+    //   mappedData.map((t) => t.id.slice(-6))
+    // );
+
+    return mappedData;
   });
 
   // Track open state for RecallEvalComboBox per tune to preserve dropdowns across refreshes

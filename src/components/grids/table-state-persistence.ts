@@ -105,7 +105,7 @@ export function getDefaultTableState(
         id: false,
         structure: false,
       };
-      baseState.sorting = [{ id: "scheduled", desc: false }]; // Sort by scheduled date
+      baseState.sorting = [{ id: "id", desc: true }]; // Default sort by id
       break;
 
     case "repertoire":
