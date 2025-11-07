@@ -126,7 +126,25 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
       await page.waitForTimeout(500);
 
       // Should have Force Sync button
-      const forceSyncButton = page.getByRole("button", { name: /Force Sync/i });
+      const forceSyncButton = page.getByRole("button", {
+        name: "Force Sync Down",
+      });
+      await expect(forceSyncButton).toBeVisible({ timeout: 2000 });
+      await expect(forceSyncButton).toBeEnabled();
+    }
+  });
+
+  test("should show 'Force Sync Up' button", async ({ page }) => {
+    const dbButton = ttPage.databaseStatusDropdown;
+
+    if (await dbButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await dbButton.click();
+      await page.waitForTimeout(500);
+
+      // Should have Force Sync button
+      const forceSyncButton = page.getByRole("button", {
+        name: "Force Sync Up",
+      });
       await expect(forceSyncButton).toBeVisible({ timeout: 2000 });
       await expect(forceSyncButton).toBeEnabled();
     }
