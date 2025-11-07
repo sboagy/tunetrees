@@ -185,16 +185,19 @@ test.describe.serial("Flashcard Feature: Submit", () => {
     await app.selectFlashcardEvaluation("good");
     await page.waitForTimeout(300);
     await app.submitEvaluationsButton.click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1000);
 
     // Verify flashcard count updated (if Show Submitted OFF)
     const showSubmittedToggle = app.displaySubmittedSwitch.getByRole("switch");
 
     await expect(showSubmittedToggle).toHaveAttribute("aria-checked", "false");
 
-    const updatedText = await counter.textContent();
-    const updatedTotal = parseInt(updatedText?.split(" of ")[1] || "0", 10);
-    expect(updatedTotal).toBeLessThan(initialTotal);
+    // Wait for flashcard count to update
+    await expect(async () => {
+      const updatedText = await counter.textContent();
+      const updatedTotal = parseInt(updatedText?.split(" of ")[1] || "0", 10);
+      expect(updatedTotal).toBeLessThan(initialTotal);
+    }).toPass({ timeout: 5000 });
   });
 
   test("07. Submit works from any card position", async ({ page }) => {
