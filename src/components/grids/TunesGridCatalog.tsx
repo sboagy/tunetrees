@@ -41,7 +41,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
 
   // Column visibility is shared with parent (TunesGrid persists internally)
   const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
-    props.columnVisibility || {},
+    props.columnVisibility || {}
   );
 
   // Sync column visibility changes to parent
@@ -63,7 +63,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
 
       if (!syncComplete) {
         console.log(
-          "[TunesGridCatalog] Waiting for initial sync to complete...",
+          "[TunesGridCatalog] Waiting for initial sync to complete..."
         );
         return null;
       }
@@ -73,7 +73,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     async (params) => {
       if (!params) return [];
       return await getTunesForUser(params.db, params.userId);
-    },
+    }
   );
 
   // Fetch tunes from selected playlists (when playlist filter is active)
@@ -96,7 +96,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           const playlistData = await getPlaylistTunes(
             params.db,
             playlistId,
-            params.userId,
+            params.userId
           );
           // getPlaylistTunes returns PlaylistTuneWithDetails[], but we need the tune data
           // Let's extract the tune IDs and fetch them separately
@@ -109,24 +109,24 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
                 .where(eq(schema.tune.id, tuneId))
                 .limit(1);
               return result[0];
-            }),
+            })
           );
           allPlaylistTunes.push(...playlistTuneData.filter(Boolean));
         } catch (error) {
           console.warn(
             `Failed to fetch tunes for playlist ${playlistId}:`,
-            error,
+            error
           );
         }
       }
 
       // Remove duplicates (same tune could be in multiple selected playlists)
       const uniqueTunes = allPlaylistTunes.filter(
-        (tune, index, arr) => arr.findIndex((t) => t.id === tune.id) === index,
+        (tune, index, arr) => arr.findIndex((t) => t.id === tune.id) === index
       );
 
       return uniqueTunes;
-    },
+    }
   );
 
   // Apply client-side filtering

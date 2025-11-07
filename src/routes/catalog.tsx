@@ -74,7 +74,7 @@ const CatalogPage: Component = () => {
   const [selectedModes, setSelectedModes] = createSignal<string[]>([]);
   const [selectedGenres, setSelectedGenres] = createSignal<string[]>([]);
   const [selectedPlaylistIds, setSelectedPlaylistIds] = createSignal<string[]>(
-    [],
+    []
   );
 
   // --- Synchronization State Flag ---
@@ -85,7 +85,7 @@ const CatalogPage: Component = () => {
 
   // Track table instance for column visibility control
   const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
-    null,
+    null
   );
 
   // === EFFECT 1: HYDRATION (URL -> Signal) ===
@@ -123,8 +123,8 @@ const CatalogPage: Component = () => {
           setIsInitialized(true);
           log.debug("CATALOG: Filter state initialized from URL.");
         }
-      },
-    ),
+      }
+    )
   );
 
   // === EFFECT 2: SYNCHRONIZATION (Signal -> URL) ===
@@ -203,7 +203,7 @@ const CatalogPage: Component = () => {
       const result = await getTunesForUser(params.db, params.userId);
       log.debug("CATALOG allTunes result:", result.length, "tunes");
       return result;
-    },
+    }
   );
 
   // Fetch user playlists for filter options
@@ -228,7 +228,7 @@ const CatalogPage: Component = () => {
       const result = await getUserPlaylists(params.db, params.userId);
       log.debug("CATALOG userPlaylists result:", result.length, "playlists");
       return result;
-    },
+    }
   );
 
   // Fetch all genres for proper genre names
@@ -251,7 +251,7 @@ const CatalogPage: Component = () => {
       const result = await params.db.select().from(schema.genre).all();
       log.debug("CATALOG allGenres result:", result.length, "genres");
       return result;
-    },
+    }
   );
 
   // Get unique types, modes, genres for filter dropdowns

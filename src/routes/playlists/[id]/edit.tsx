@@ -36,7 +36,7 @@ const EditPlaylistPage: Component = () => {
     async (params) => {
       if (!params) return null;
       return await getPlaylistById(params.db, params.playlistId, params.userId);
-    },
+    }
   );
 
   const handleSave = async (playlistData: Partial<Playlist>) => {

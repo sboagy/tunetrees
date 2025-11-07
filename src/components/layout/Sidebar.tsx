@@ -126,7 +126,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
         const newSize = Math.max(
           minWidth(),
-          Math.min(maxWidth(), startSize + delta),
+          Math.min(maxWidth(), startSize + delta)
         );
         // Update local state only - fast and doesn't trigger parent re-render
         setLocalWidth(newSize);
@@ -192,7 +192,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
         const newSize = Math.max(
           minWidth(),
-          Math.min(maxWidth(), startSize + delta),
+          Math.min(maxWidth(), startSize + delta)
         );
         // Update local state only - fast and doesn't trigger parent re-render
         setLocalWidth(newSize);
@@ -295,8 +295,8 @@ export const Sidebar: Component<SidebarProps> = (props) => {
             isHorizontal()
               ? "top-0 left-12 right-0 h-4 md:h-1 cursor-row-resize hover:bg-blue-500 md:hover:h-1.5"
               : props.dockPosition === "right"
-                ? "top-0 left-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
-                : "top-0 right-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
+              ? "top-0 left-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
+              : "top-0 right-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
           } transition-all group border-0 bg-transparent p-0 touch-none`}
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
@@ -309,8 +309,8 @@ export const Sidebar: Component<SidebarProps> = (props) => {
               isHorizontal()
                 ? "left-1/2 -translate-x-1/2 -top-2"
                 : props.dockPosition === "right"
-                  ? "top-1/2 -translate-y-1/2 -left-2"
-                  : "top-1/2 -translate-y-1/2 -right-2"
+                ? "top-1/2 -translate-y-1/2 -left-2"
+                : "top-1/2 -translate-y-1/2 -right-2"
             }`}
           >
             <GripVertical
@@ -328,8 +328,8 @@ export const Sidebar: Component<SidebarProps> = (props) => {
           isHorizontal()
             ? "top-0.5 left-1/2 -translate-x-1/2 space-x-2"
             : props.dockPosition === "right"
-              ? "top-1/2 -translate-y-1/2 left-0.5 flex-col space-y-2"
-              : "top-1/2 -translate-y-1/2 right-0.5 flex-col space-y-2"
+            ? "top-1/2 -translate-y-1/2 left-0.5 flex-col space-y-2"
+            : "top-1/2 -translate-y-1/2 right-0.5 flex-col space-y-2"
         }`}
       >
         <button

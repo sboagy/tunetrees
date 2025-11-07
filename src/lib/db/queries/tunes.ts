@@ -60,7 +60,7 @@ export interface SearchTunesOptions {
  */
 export async function getTuneById(
   db: SqliteDatabase,
-  tuneId: string,
+  tuneId: string
 ): Promise<Tune | null> {
   const result = await db
     .select()
@@ -89,7 +89,7 @@ export async function getAllTunes(db: SqliteDatabase): Promise<Tune[]> {
  */
 export async function getTunesForUser(
   db: SqliteDatabase,
-  _userId: string,
+  _userId: string
 ): Promise<Tune[]> {
   // For catalog view, return ALL non-deleted tunes regardless of private_for
   // Catalog should show everything - filtering by user is for other views
@@ -104,7 +104,7 @@ export async function getTunesForUser(
  */
 export async function createTune(
   db: SqliteDatabase,
-  input: CreateTuneInput,
+  input: CreateTuneInput
 ): Promise<Tune> {
   const now = new Date().toISOString();
   const deviceId = getDeviceId();
@@ -139,7 +139,7 @@ export async function createTune(
 export async function updateTune(
   db: SqliteDatabase,
   tuneId: string,
-  input: Partial<CreateTuneInput>,
+  input: Partial<CreateTuneInput>
 ): Promise<Tune> {
   const now = new Date().toISOString();
   const deviceId = getDeviceId();
@@ -177,7 +177,7 @@ export async function updateTune(
  */
 export async function deleteTune(
   db: SqliteDatabase,
-  tuneId: string,
+  tuneId: string
 ): Promise<void> {
   const now = new Date().toISOString();
   const deviceId = getDeviceId();
@@ -225,7 +225,7 @@ function getDeviceId(): string {
  */
 export async function searchTunes(
   db: SqliteDatabase,
-  options: SearchTunesOptions = {},
+  options: SearchTunesOptions = {}
 ): Promise<Tune[]> {
   const { query, types, modes, genres, userId } = options;
 
@@ -242,8 +242,8 @@ export async function searchTunes(
     conditions.push(
       or(
         isNull(schema.tune.privateFor),
-        eq(schema.tune.privateFor, userId as any), // FIXME: Need UUID to integer mapping
-      ) as any,
+        eq(schema.tune.privateFor, userId as any) // FIXME: Need UUID to integer mapping
+      ) as any
     );
   } else {
     // Only public tunes
@@ -257,8 +257,8 @@ export async function searchTunes(
       or(
         like(schema.tune.title, searchPattern),
         like(schema.tune.incipit, searchPattern),
-        like(schema.tune.structure, searchPattern),
-      ) as any,
+        like(schema.tune.structure, searchPattern)
+      ) as any
     );
   }
 

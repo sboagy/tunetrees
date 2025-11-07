@@ -31,10 +31,10 @@ const UserSettingsLayout = lazy(() => import("./routes/user-settings"));
 const AvatarPage = lazy(() => import("./routes/user-settings/avatar"));
 const AccountPage = lazy(() => import("./routes/user-settings/account"));
 const SchedulingOptionsPage = lazy(
-  () => import("./routes/user-settings/scheduling-options"),
+  () => import("./routes/user-settings/scheduling-options")
 );
 const SpacedRepetitionPage = lazy(
-  () => import("./routes/user-settings/spaced-repetition"),
+  () => import("./routes/user-settings/spaced-repetition")
 );
 
 // Lazy load auth callback pages

@@ -37,7 +37,7 @@ import { generateId } from "../utils/uuid";
  */
 async function getUserProfileId(
   db: SqliteDatabase,
-  supabaseUserId: string,
+  supabaseUserId: string
 ): Promise<string | null> {
   // Returns UUID string
   const result = await db
@@ -105,11 +105,11 @@ export interface QueueGenerationOptions {
 export function computeSchedulingWindows(
   sitdownDate: Date = new Date(),
   delinquencyWindowDays = 7,
-  tzOffsetMinutes = 0,
+  tzOffsetMinutes = 0
 ): SchedulingWindows {
   // Adjust for local timezone
   const localDate = new Date(
-    sitdownDate.getTime() + tzOffsetMinutes * 60 * 1000,
+    sitdownDate.getTime() + tzOffsetMinutes * 60 * 1000
   );
 
   // Start of day (00:00:00)
@@ -123,7 +123,7 @@ export function computeSchedulingWindows(
   // Window floor (N days ago at 00:00:00)
   const windowFloorUtc = new Date(startOfDayUtc);
   windowFloorUtc.setUTCDate(
-    windowFloorUtc.getUTCDate() - delinquencyWindowDays,
+    windowFloorUtc.getUTCDate() - delinquencyWindowDays
   );
 
   return {
@@ -151,7 +151,7 @@ export function computeSchedulingWindows(
  */
 export function classifyQueueBucket(
   coalescedDate: string | null | undefined,
-  windows: SchedulingWindows,
+  windows: SchedulingWindows
 ): number {
   if (!coalescedDate) {
     return 1; // Default to bucket 1 (due today)
@@ -176,7 +176,7 @@ export function classifyQueueBucket(
     // Parse error - default to bucket 1
     console.warn(
       "Failed to parse date for bucket classification:",
-      coalescedDate,
+      coalescedDate
     );
     return 1;
   }
@@ -224,7 +224,7 @@ export async function generateDailyPracticeQueue(
   userId: string,
   playlistId: string, // UUID
   sitdownDate: Date = new Date(),
-  options: QueueGenerationOptions = {},
+  options: QueueGenerationOptions = {}
 ): Promise<DailyPracticeQueue[]> {
   const {
     enableBackfill = false,
@@ -243,7 +243,7 @@ export async function generateDailyPracticeQueue(
   const windows = computeSchedulingWindows(
     sitdownDate,
     delinquencyWindowDays,
-    tzOffsetMinutes,
+    tzOffsetMinutes
   );
 
   // Check for existing active queue
@@ -256,8 +256,8 @@ export async function generateDailyPracticeQueue(
           eq(dailyPracticeQueue.userRef, userRef),
           eq(dailyPracticeQueue.playlistRef, playlistId),
           eq(dailyPracticeQueue.windowStartUtc, windows.startTs),
-          eq(dailyPracticeQueue.active, 1),
-        ),
+          eq(dailyPracticeQueue.active, 1)
+        )
       );
 
     if (existing.length > 0) {
@@ -275,8 +275,8 @@ export async function generateDailyPracticeQueue(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
           eq(dailyPracticeQueue.playlistRef, playlistId),
-          eq(dailyPracticeQueue.windowStartUtc, windows.startTs),
-        ),
+          eq(dailyPracticeQueue.windowStartUtc, windows.startTs)
+        )
       );
   }
 
@@ -285,7 +285,7 @@ export async function generateDailyPracticeQueue(
     db,
     playlistId,
     sitdownDate,
-    delinquencyWindowDays,
+    delinquencyWindowDays
   );
 
   // Build queue entries
@@ -344,7 +344,7 @@ export async function generateDailyPracticeQueue(
     .returning();
 
   console.log(
-    `✅ Generated daily practice queue with ${inserted.length} tunes`,
+    `✅ Generated daily practice queue with ${inserted.length} tunes`
   );
 
   // Queue for background sync
@@ -382,7 +382,7 @@ export async function refillPracticeQueue(
   userId: string,
   playlistId: string, // UUID
   count = 5,
-  sitdownDate: Date = new Date(),
+  sitdownDate: Date = new Date()
 ): Promise<DailyPracticeQueue[]> {
   // Map user UUID to integer ID
   const userRef = await getUserProfileId(db, userId);
@@ -405,8 +405,8 @@ export async function refillPracticeQueue(
         eq(dailyPracticeQueue.userRef, userRef),
         eq(dailyPracticeQueue.playlistRef, playlistId),
         eq(dailyPracticeQueue.windowStartUtc, windows.startTs),
-        eq(dailyPracticeQueue.active, 1),
-      ),
+        eq(dailyPracticeQueue.active, 1)
+      )
     );
 
   if (existing.length === 0) {
@@ -428,8 +428,8 @@ export async function refillPracticeQueue(
       and(
         eq(playlistTune.playlistRef, playlistId),
         eq(playlistTune.deleted, 0),
-        lt(playlistTune.current, windows.windowFloorUtc.toISOString()),
-      ),
+        lt(playlistTune.current, windows.windowFloorUtc.toISOString())
+      )
     )
     .limit(count + existingTuneIds.length); // Over-fetch to account for filtering
 
@@ -499,7 +499,7 @@ export async function getQueueBucketCounts(
   db: SqliteDatabase,
   userId: string,
   playlistId: string, // UUID
-  windowStartUtc: string,
+  windowStartUtc: string
 ): Promise<Record<number, number>> {
   // Map user UUID to integer ID
   const userRef = await getUserProfileId(db, userId);
@@ -515,8 +515,8 @@ export async function getQueueBucketCounts(
         eq(dailyPracticeQueue.userRef, userRef),
         eq(dailyPracticeQueue.playlistRef, playlistId),
         eq(dailyPracticeQueue.windowStartUtc, windowStartUtc),
-        eq(dailyPracticeQueue.active, 1),
-      ),
+        eq(dailyPracticeQueue.active, 1)
+      )
     );
 
   const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0 };

@@ -51,7 +51,7 @@ export async function clearAllStorage(page: Page): Promise<void> {
  */
 export async function clearIndexedDB(
   page: Page,
-  dbName: string,
+  dbName: string
 ): Promise<void> {
   await page.evaluate((name) => {
     return new Promise<void>((resolve, reject) => {

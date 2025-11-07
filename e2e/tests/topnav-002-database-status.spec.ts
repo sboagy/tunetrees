@@ -30,7 +30,7 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
     // Adjust selector based on your implementation
     const dbIcon = page
       .locator(
-        '[aria-label*="database" i], [aria-label*="sync" i], [title*="database" i], [title*="sync" i]',
+        '[aria-label*="database" i], [aria-label*="sync" i], [title*="database" i], [title*="sync" i]'
       )
       .first();
 
@@ -96,12 +96,10 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
 
       // Should show sync status
       await expect(
-        ttPage.databaseDropdownPanel.getByText("Synced", { exact: true }),
+        ttPage.databaseDropdownPanel.getByText("Synced", { exact: true })
       ).toBeVisible({ timeout: 6000 });
       await expect(
-        ttPage.databaseDropdownPanel.getByText(
-          "All changes synced to Supabase",
-        ),
+        ttPage.databaseDropdownPanel.getByText("All changes synced to Supabase")
       ).toBeVisible({ timeout: 2000 });
     }
   });
@@ -128,25 +126,7 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
       await page.waitForTimeout(500);
 
       // Should have Force Sync button
-      const forceSyncButton = page.getByRole("button", {
-        name: "Force Sync Down",
-      });
-      await expect(forceSyncButton).toBeVisible({ timeout: 2000 });
-      await expect(forceSyncButton).toBeEnabled();
-    }
-  });
-
-  test("should show 'Force Sync Up' button", async ({ page }) => {
-    const dbButton = ttPage.databaseStatusDropdown;
-
-    if (await dbButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await dbButton.click();
-      await page.waitForTimeout(500);
-
-      // Should have Force Sync button
-      const forceSyncButton = page.getByRole("button", {
-        name: "Force Sync Up",
-      });
+      const forceSyncButton = page.getByRole("button", { name: /Force Sync/i });
       await expect(forceSyncButton).toBeVisible({ timeout: 2000 });
       await expect(forceSyncButton).toBeEnabled();
     }

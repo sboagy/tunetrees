@@ -62,13 +62,13 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
     const index = currentIndex();
 
     console.log(
-      `[FlashcardView] Tunes count: ${tunesLength}, currentIndex: ${index}`,
+      `[FlashcardView] Tunes count: ${tunesLength}, currentIndex: ${index}`
     );
 
     if (index >= tunesLength && tunesLength > 0) {
       // Current index out of bounds, go to last tune
       console.log(
-        `[FlashcardView] Index out of bounds, adjusting to ${tunesLength - 1}`,
+        `[FlashcardView] Index out of bounds, adjusting to ${tunesLength - 1}`
       );
       setCurrentIndex(tunesLength - 1);
     } else if (tunesLength === 0) {
@@ -163,7 +163,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
     if (!tune) return;
 
     console.log(
-      `[FlashcardView] Evaluation changed for tune ${tune.id}: ${evaluation}`,
+      `[FlashcardView] Evaluation changed for tune ${tune.id}: ${evaluation}`
     );
     console.log(`[FlashcardView] Current evaluations:`, evaluations());
 
@@ -188,7 +188,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
           );
           await clearStagedEvaluation(db, userId, tune.id, playlistId);
           console.log(
-            `🗑️  [FlashcardView] Cleared staged evaluation for tune ${tune.id}`,
+            `🗑️  [FlashcardView] Cleared staged evaluation for tune ${tune.id}`
           );
         } else {
           // Stage FSRS preview for actual evaluations
@@ -199,10 +199,10 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
             tune.id,
             evaluation,
             "recall", // Default goal
-            "fsrs", // FSRS is the default technique
+            "fsrs" // FSRS is the default technique
           );
           console.log(
-            `✅ [FlashcardView] Staged FSRS preview for tune ${tune.id}`,
+            `✅ [FlashcardView] Staged FSRS preview for tune ${tune.id}`
           );
         }
 
@@ -215,7 +215,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
           `❌ [FlashcardView] Failed to ${
             evaluation === "" ? "clear" : "stage"
           } evaluation for tune ${tune.id}:`,
-          error,
+          error
         );
       }
     }

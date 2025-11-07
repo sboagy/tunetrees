@@ -62,7 +62,7 @@ export interface ITunesGridProps<T extends { id: string | number }> {
 }
 
 export const TunesGrid = (<T extends { id: string | number }>(
-  props: ITunesGridProps<T>,
+  props: ITunesGridProps<T>
 ) => {
   // State persistence key
   const stateKey = createMemo(() => ({
@@ -75,25 +75,25 @@ export const TunesGrid = (<T extends { id: string | number }>(
   const loadedState = loadTableState(stateKey());
   const initialState = mergeWithDefaults(
     loadedState,
-    props.tablePurpose as any,
+    props.tablePurpose as any
   );
 
   // Table state signals
   const [sorting, setSorting] = createSignal<SortingState>(
-    initialState.sorting || [],
+    initialState.sorting || []
   );
   const [rowSelection, setRowSelection] = createSignal<RowSelectionState>(
-    initialState.rowSelection || {},
+    initialState.rowSelection || {}
   );
   const [columnSizing, setColumnSizing] = createSignal<ColumnSizingState>(
-    initialState.columnSizing || {},
+    initialState.columnSizing || {}
   );
   const [columnOrder, setColumnOrder] = createSignal<ColumnOrderState>(
-    initialState.columnOrder || [],
+    initialState.columnOrder || []
   );
   // Initialize from persisted state first; only adopt prop-driven visibility when it contains keys.
   const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
-    initialState.columnVisibility || {},
+    initialState.columnVisibility || {}
   );
 
   // If parent provides a non-empty controlled visibility, adopt it; otherwise keep persisted/internal
@@ -115,7 +115,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     // Use shared column factory by purpose; cast to the generic row type
     return getDefaultColumns(
       props.tablePurpose,
-      props.cellCallbacks,
+      props.cellCallbacks
     ) as unknown as ColumnDef<T, unknown>[];
   });
 
@@ -165,7 +165,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
   // Optional column drag-and-drop reordering
   const [isDragging, setIsDragging] = createSignal(false);
   const [draggedColumnId, setDraggedColumnId] = createSignal<string | null>(
-    null,
+    null
   );
   const [hoverColumnId, setHoverColumnId] = createSignal<string | null>(null);
   // When resizing, suppress drag-reorder entirely
@@ -244,7 +244,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
       },
       useAnimationFrameWithResizeObserver: true,
       isScrollingResetDelay: 200,
-    }),
+    })
   );
 
   // Persist table state (excluding scrollTop here)
@@ -361,19 +361,19 @@ export const TunesGrid = (<T extends { id: string | number }>(
                             draggedColumnId() !== header.column.id
                               ? "bg-blue-50 dark:bg-blue-900/20"
                               : ""
-                          }`,
+                          }`
                         )}
                         style={{ width: `${header.getSize()}px` }}
                         onDragOver={(e) =>
                           handleDragOver(
                             e as unknown as DragEvent,
-                            header.column.id,
+                            header.column.id
                           )
                         }
                         onDrop={(e) =>
                           handleDrop(
                             e as unknown as DragEvent,
-                            header.column.id,
+                            header.column.id
                           )
                         }
                       >
@@ -381,7 +381,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                           <span class="flex items-center gap-1 flex-1 min-w-0">
                             {flexRender(
                               header.column.columnDef.header,
-                              header.getContext(),
+                              header.getContext()
                             )}
                           </span>
                           <Show
@@ -397,7 +397,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                               onDragStart={(e) =>
                                 handleDragStart(
                                   e as unknown as DragEvent,
-                                  header.column.id,
+                                  header.column.id
                                 )
                               }
                               onDragEnd={handleDragEnd}
@@ -476,7 +476,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                         >
                           {flexRender(
                             cell.column.columnDef.cell,
-                            cell.getContext(),
+                            cell.getContext()
                           )}
                         </td>
                       )}

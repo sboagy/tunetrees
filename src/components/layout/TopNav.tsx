@@ -75,7 +75,7 @@ const PlaylistDropdown: Component = () => {
       if (showDropdown()) {
         setShowDropdown(false);
       }
-    },
+    }
   );
 
   // Fetch user playlists
@@ -115,7 +115,7 @@ const PlaylistDropdown: Component = () => {
       try {
         console.log(
           "🔄 [TopNav] Calling getUserPlaylists with userId:",
-          params.userId,
+          params.userId
         );
         const result = await getUserPlaylists(params.db, params.userId);
         console.log("✅ [TopNav] Got playlists:", result.length, result);
@@ -126,7 +126,7 @@ const PlaylistDropdown: Component = () => {
         log.error("TOPNAV playlists fetch error:", error);
         return [];
       }
-    },
+    }
   );
 
   // Additional debug effect to track playlists changes
@@ -343,7 +343,7 @@ export const TopNav: Component = () => {
         console.error("Failed to load user avatar:", error);
         return null;
       }
-    },
+    }
   );
 
   // Close user menu when clicking outside
@@ -353,7 +353,7 @@ export const TopNav: Component = () => {
       if (showUserMenu()) {
         setShowUserMenu(false);
       }
-    },
+    }
   );
 
   // Close database menu when clicking outside
@@ -363,7 +363,7 @@ export const TopNav: Component = () => {
       if (showDbMenu()) {
         setShowDbMenu(false);
       }
-    },
+    }
   );
 
   // Monitor online/offline status
@@ -737,19 +737,19 @@ export const TopNav: Component = () => {
                         type="button"
                         onClick={async () => {
                           console.log(
-                            "🔄 [Force Sync Up] Button clicked - starting sync...",
+                            "🔄 [Force Sync Up] Button clicked - starting sync..."
                           );
                           try {
                             await forceSyncUp();
                             console.log(
-                              "✅ [Force Sync Up] Sync completed successfully",
+                              "✅ [Force Sync Up] Sync completed successfully"
                             );
                             toast.success("Local changes uploaded to server");
                             setShowDbMenu(false); // Close menu after successful sync
                           } catch (error) {
                             console.error(
                               "❌ [Force Sync Up] Sync failed:",
-                              error,
+                              error
                             );
                             toast.error("Failed to upload changes");
                             setShowDbMenu(false); // Close menu even on error
@@ -791,19 +791,19 @@ export const TopNav: Component = () => {
                         type="button"
                         onClick={async () => {
                           console.log(
-                            "🔄 [Force Sync Down] Button clicked - starting sync...",
+                            "🔄 [Force Sync Down] Button clicked - starting sync..."
                           );
                           try {
                             await forceSyncDown();
                             console.log(
-                              "✅ [Force Sync Down] Sync completed successfully",
+                              "✅ [Force Sync Down] Sync completed successfully"
                             );
                             toast.success("Remote data downloaded");
                             setShowDbMenu(false); // Close menu after successful sync
                           } catch (error) {
                             console.error(
                               "❌ [Force Sync Down] Sync failed:",
-                              error,
+                              error
                             );
                             toast.error("Failed to download data");
                             setShowDbMenu(false); // Close menu even on error

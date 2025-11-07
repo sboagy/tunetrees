@@ -51,7 +51,7 @@ export interface CombinedFilterDropdownProps {
 }
 
 export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
-  props,
+  props
 ) => {
   const [isOpen, setIsOpen] = createSignal(false);
   let dropdownRef: HTMLDivElement | undefined;
@@ -59,11 +59,11 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
   // Debug logging
   console.log(
     "CombinedFilterDropdown render - availablePlaylists:",
-    props.availablePlaylists?.length || 0,
+    props.availablePlaylists?.length || 0
   );
   console.log(
     "CombinedFilterDropdown render - availableGenres:",
-    props.availableGenres?.length || 0,
+    props.availableGenres?.length || 0
   );
 
   // Get total selected count
@@ -94,7 +94,7 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
   const toggleSelection = (
     value: string,
     selected: string[],
-    onChange: (values: string[]) => void,
+    onChange: (values: string[]) => void
   ) => {
     if (selected.includes(value)) {
       onChange(selected.filter((item) => item !== value));
@@ -184,7 +184,7 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
                             toggleSelection(
                               type,
                               props.selectedTypes,
-                              props.onTypesChange,
+                              props.onTypesChange
                             )
                           }
                           class="w-4 h-4"
@@ -214,7 +214,7 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
                             toggleSelection(
                               mode,
                               props.selectedModes,
-                              props.onModesChange,
+                              props.onModesChange
                             )
                           }
                           class="w-4 h-4"
@@ -252,7 +252,7 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
                               toggleSelection(
                                 genre,
                                 props.selectedGenres,
-                                props.onGenresChange,
+                                props.onGenresChange
                               )
                             }
                             class="w-4 h-4"
@@ -287,7 +287,7 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
                           <input
                             type="checkbox"
                             checked={props.selectedPlaylistIds.includes(
-                              playlist.playlistId,
+                              playlist.playlistId
                             )}
                             onChange={() => {
                               const playlistId = playlist.playlistId;
@@ -296,8 +296,8 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
                               ) {
                                 props.onPlaylistIdsChange(
                                   props.selectedPlaylistIds.filter(
-                                    (id) => id !== playlistId,
-                                  ),
+                                    (id) => id !== playlistId
+                                  )
                                 );
                               } else {
                                 props.onPlaylistIdsChange([

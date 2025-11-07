@@ -82,7 +82,7 @@ export function createPracticeListStagedView(db: BetterSQLite3Database): void {
     "migrations",
     "sqlite",
     "test-views",
-    "practice_list_staged.sql",
+    "practice_list_staged.sql"
   );
 
   try {

@@ -18,7 +18,7 @@ export default function AuthCallback() {
     if (error) {
       console.error("Auth error:", error, error_description);
       navigate(
-        `/login?error=${encodeURIComponent(error_description || error)}`,
+        `/login?error=${encodeURIComponent(error_description || error)}`
       );
       return;
     }

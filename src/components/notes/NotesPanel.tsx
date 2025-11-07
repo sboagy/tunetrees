@@ -203,7 +203,7 @@ export const NotesPanel: Component = () => {
                     type="button"
                     onClick={() =>
                       setEditingNoteId(
-                        editingNoteId() === note.id ? null : note.id,
+                        editingNoteId() === note.id ? null : note.id
                       )
                     }
                     class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/30 rounded-sm transition-colors"

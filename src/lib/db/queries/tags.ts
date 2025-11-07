@@ -36,7 +36,7 @@ export interface TuneTag {
  */
 export async function getUserTags(
   db: SqliteDatabase,
-  supabaseUserId: string,
+  supabaseUserId: string
 ): Promise<TagWithUsageCount[]> {
   const results = await db
     .select({
@@ -61,7 +61,7 @@ export async function getUserTags(
 export async function getTuneTags(
   db: SqliteDatabase,
   tuneId: string,
-  supabaseUserId: string,
+  supabaseUserId: string
 ): Promise<TuneTag[]> {
   const results = await db
     .select({
@@ -72,8 +72,8 @@ export async function getTuneTags(
     .where(
       and(
         eq(schema.tag.tuneRef, tuneId),
-        eq(schema.tag.userRef, supabaseUserId),
-      ),
+        eq(schema.tag.userRef, supabaseUserId)
+      )
     )
     .orderBy(schema.tag.tagText)
     .all();
@@ -95,7 +95,7 @@ export async function addTagToTune(
   tuneId: string,
   supabaseUserId: string,
   tagText: string,
-  deviceId?: string,
+  deviceId?: string
 ): Promise<Tag | null> {
   const now = new Date().toISOString();
 
@@ -139,7 +139,7 @@ export async function removeTagFromTune(
   db: SqliteDatabase,
   tuneId: string,
   supabaseUserId: string,
-  tagText: string,
+  tagText: string
 ): Promise<boolean> {
   const result = await db
     .delete(schema.tag)
@@ -147,8 +147,8 @@ export async function removeTagFromTune(
       and(
         eq(schema.tag.tuneRef, tuneId),
         eq(schema.tag.userRef, supabaseUserId),
-        eq(schema.tag.tagText, tagText.trim().toLowerCase()),
-      ),
+        eq(schema.tag.tagText, tagText.trim().toLowerCase())
+      )
     )
     .returning()
     .all();
@@ -161,7 +161,7 @@ export async function removeTagFromTune(
  */
 export async function removeTagById(
   db: SqliteDatabase,
-  tagId: string,
+  tagId: string
 ): Promise<boolean> {
   const result = await db
     .delete(schema.tag)
@@ -181,7 +181,7 @@ export async function removeTagById(
 export async function getTagUsageCount(
   db: SqliteDatabase,
   supabaseUserId: string,
-  tagText: string,
+  tagText: string
 ): Promise<number> {
   const result = await db
     .select({
@@ -191,8 +191,8 @@ export async function getTagUsageCount(
     .where(
       and(
         eq(schema.tag.userRef, supabaseUserId),
-        eq(schema.tag.tagText, tagText),
-      ),
+        eq(schema.tag.tagText, tagText)
+      )
     )
     .get();
 
@@ -209,15 +209,15 @@ export async function getTagUsageCount(
 export async function deleteTagForUser(
   db: SqliteDatabase,
   supabaseUserId: string,
-  tagText: string,
+  tagText: string
 ): Promise<number> {
   const result = await db
     .delete(schema.tag)
     .where(
       and(
         eq(schema.tag.userRef, supabaseUserId),
-        eq(schema.tag.tagText, tagText),
-      ),
+        eq(schema.tag.tagText, tagText)
+      )
     )
     .returning()
     .all();
@@ -239,7 +239,7 @@ export async function renameTagForUser(
   supabaseUserId: string,
   oldTagText: string,
   newTagText: string,
-  deviceId?: string,
+  deviceId?: string
 ): Promise<number> {
   const now = new Date().toISOString();
 
@@ -254,8 +254,8 @@ export async function renameTagForUser(
     .where(
       and(
         eq(schema.tag.userRef, supabaseUserId),
-        eq(schema.tag.tagText, oldTagText),
-      ),
+        eq(schema.tag.tagText, oldTagText)
+      )
     )
     .returning()
     .all();
@@ -272,7 +272,7 @@ export async function renameTagForUser(
 export async function getTuneIdsByTags(
   db: SqliteDatabase,
   supabaseUserId: string,
-  tagTexts: string[],
+  tagTexts: string[]
 ): Promise<string[]> {
   if (tagTexts.length === 0) {
     return [];
@@ -288,8 +288,8 @@ export async function getTuneIdsByTags(
     .where(
       and(
         eq(schema.tag.userRef, supabaseUserId),
-        inArray(schema.tag.tagText, normalizedTags),
-      ),
+        inArray(schema.tag.tagText, normalizedTags)
+      )
     )
     .all();
 

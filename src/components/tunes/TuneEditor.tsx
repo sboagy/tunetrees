@@ -54,7 +54,7 @@ interface TuneEditorProps {
   tune?: TuneEditorData;
   /** Callback when save is requested (should return tune ID for new tunes) */
   onSave?: (
-    tuneData: Partial<TuneEditorData>,
+    tuneData: Partial<TuneEditorData>
   ) => Promise<string | undefined> | undefined;
   /** Callback when cancel is requested */
   onCancel?: () => void;
@@ -105,39 +105,39 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   const [incipit, setIncipit] = createSignal(props.tune?.incipit || "");
   const [selectedTags, setSelectedTags] = createSignal<string[]>([]);
   const [requestPublic, setRequestPublic] = createSignal(
-    props.tune?.request_public || false,
+    props.tune?.request_public || false
   );
 
   // User/Repertoire specific fields
   const [learned, setLearned] = createSignal(props.tune?.learned || "");
   const [practiced, setPracticed] = createSignal(props.tune?.practiced || "");
   const [quality, setQuality] = createSignal<number | null>(
-    props.tune?.quality || null,
+    props.tune?.quality || null
   );
   const [notes, setNotes] = createSignal(props.tune?.notes_private || "");
 
   // FSRS fields (collapsible)
   const [difficulty, setDifficulty] = createSignal<number | null>(
-    props.tune?.difficulty || null,
+    props.tune?.difficulty || null
   );
   const [stability, setStability] = createSignal<number | null>(
-    props.tune?.stability || null,
+    props.tune?.stability || null
   );
   const [step, setStep] = createSignal<number | null>(props.tune?.step || null);
   const [state, setState] = createSignal<number | null>(
-    props.tune?.state || null,
+    props.tune?.state || null
   );
   const [repetitions, setRepetitions] = createSignal<number | null>(
-    props.tune?.repetitions || null,
+    props.tune?.repetitions || null
   );
   const [due, setDue] = createSignal(props.tune?.due || "");
 
   // SM2 fields (collapsible)
   const [easiness, setEasiness] = createSignal<number | null>(
-    props.tune?.easiness || null,
+    props.tune?.easiness || null
   );
   const [interval, setInterval] = createSignal<number | null>(
-    props.tune?.interval || null,
+    props.tune?.interval || null
   );
 
   // UI state
@@ -267,7 +267,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                   db,
                   tuneId,
                   supabaseUserId,
-                  tag.tagText,
+                  tag.tagText
                 );
               }
             }
@@ -289,10 +289,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
   // Chevron rotation for collapsible sections
   const sm2ChevronRotation = createMemo(() =>
-    sm2Open() ? "rotate(90deg)" : "rotate(0deg)",
+    sm2Open() ? "rotate(90deg)" : "rotate(0deg)"
   );
   const fsrsChevronRotation = createMemo(() =>
-    fsrsOpen() ? "rotate(90deg)" : "rotate(0deg)",
+    fsrsOpen() ? "rotate(90deg)" : "rotate(0deg)"
   );
 
   return (
@@ -779,7 +779,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                           value={repetitions() ?? ""}
                           onInput={(e) =>
                             setRepetitions(
-                              e.currentTarget.valueAsNumber || null,
+                              e.currentTarget.valueAsNumber || null
                             )
                           }
                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"

@@ -38,12 +38,12 @@ export function getPracticeDate(): Date {
         // Set to noon to avoid timezone issues
         parsed.setHours(12, 0, 0, 0);
         console.log(
-          `🧪 [PracticeDate] Using URL override: ${testDate} (${parsed.toISOString()})`,
+          `🧪 [PracticeDate] Using URL override: ${testDate} (${parsed.toISOString()})`
         );
         return parsed;
       }
       console.warn(
-        `⚠️ [PracticeDate] Invalid practiceDate URL param: ${testDate}`,
+        `⚠️ [PracticeDate] Invalid practiceDate URL param: ${testDate}`
       );
     }
   }
@@ -72,7 +72,7 @@ export function getPracticeDate(): Date {
 export function formatAsWindowStart(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
     2,
-    "0",
+    "0"
   )}-${String(date.getDate()).padStart(2, "0")} 00:00:00`;
 }
 

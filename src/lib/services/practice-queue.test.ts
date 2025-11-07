@@ -64,11 +64,11 @@ beforeEach(() => {
   // Insert test data
   db.run(
     sql`INSERT INTO user_profile (id, supabase_user_id, email, name, last_modified_at) 
-        VALUES (${TEST_USER_UUID}, ${TEST_USER_UUID}, 'test@example.com', 'Test User', datetime('now'))`,
+        VALUES (${TEST_USER_UUID}, ${TEST_USER_UUID}, 'test@example.com', 'Test User', datetime('now'))`
   );
   db.run(
     sql`INSERT INTO playlist (playlist_id, user_ref, last_modified_at) 
-        VALUES (${TEST_PLAYLIST_UUID}, ${TEST_USER_UUID}, datetime('now'))`,
+        VALUES (${TEST_PLAYLIST_UUID}, ${TEST_USER_UUID}, datetime('now'))`
   );
 });
 
@@ -77,7 +77,7 @@ function insertTune(
   id: string,
   title: string,
   scheduled: string | null,
-  latestDue: string | null = null,
+  latestDue: string | null = null
 ) {
   // Insert tune with required fields from production schema
   db.run(sql`
@@ -118,7 +118,7 @@ function daysFromNow(days: number): Date {
     12, // Noon UTC
     0,
     0,
-    0,
+    0
   );
   return new Date(utcDate);
 }
@@ -193,7 +193,7 @@ describe("generateOrGetPracticeQueue - Empty Queue", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
     expect(queue).toEqual([]);
   });
@@ -205,7 +205,7 @@ describe("generateOrGetPracticeQueue - Empty Queue", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
     expect(queue).toEqual([]);
   });
@@ -218,7 +218,7 @@ describe("generateOrGetPracticeQueue - Bucket 1 (Due Today)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(1);
@@ -243,7 +243,7 @@ describe("generateOrGetPracticeQueue - Bucket 1 (Due Today)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(3);
@@ -262,7 +262,7 @@ describe("generateOrGetPracticeQueue - Bucket 1 (Due Today)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(10); // Capped at default max
@@ -278,7 +278,7 @@ describe("generateOrGetPracticeQueue - Bucket 2 (Recently Lapsed)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(2);
@@ -302,7 +302,7 @@ describe("generateOrGetPracticeQueue - Bucket 2 (Recently Lapsed)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(10); // 3 Q1 + 7 Q2
@@ -324,7 +324,7 @@ describe("generateOrGetPracticeQueue - Bucket 2 (Recently Lapsed)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(10); // Only Q1, capped
@@ -339,7 +339,7 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(1);
@@ -356,7 +356,7 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(3);
@@ -378,18 +378,18 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
     insertTune(
       tuneId(3),
       "Scheduled 30 Days",
-      formatTimestamp(daysFromNow(-30)),
+      formatTimestamp(daysFromNow(-30))
     );
     insertTune(
       tuneId(4),
       "Scheduled 20 Days",
-      formatTimestamp(daysFromNow(-20)),
+      formatTimestamp(daysFromNow(-20))
     );
 
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(4);
@@ -418,7 +418,7 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(10); // Capped at max capacity
@@ -438,7 +438,7 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
       tuneId(1),
       "Unscheduled But Recently Practiced",
       null,
-      formatTimestamp(daysFromNow(-5)),
+      formatTimestamp(daysFromNow(-5))
     );
 
     // Unscheduled tune never practiced = Q3
@@ -447,7 +447,7 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(2);
@@ -467,7 +467,7 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
       tuneId(1),
       "Unscheduled Long Ago",
       null,
-      formatTimestamp(daysFromNow(-30)),
+      formatTimestamp(daysFromNow(-30))
     );
 
     // Unscheduled tune never practiced
@@ -476,7 +476,7 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(2);
@@ -496,7 +496,7 @@ describe("generateOrGetPracticeQueue - Bucket 4 (Old Lapsed)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(2);
@@ -512,7 +512,7 @@ describe("generateOrGetPracticeQueue - Bucket 4 (Old Lapsed)", () => {
       insertTune(
         tuneId(i),
         `Today/Recent ${i}`,
-        formatTimestamp(daysFromNow(0)),
+        formatTimestamp(daysFromNow(0))
       );
     }
 
@@ -529,7 +529,7 @@ describe("generateOrGetPracticeQueue - Bucket 4 (Old Lapsed)", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(10); // Max capacity
@@ -567,7 +567,7 @@ describe("generateOrGetPracticeQueue - Multi-Bucket Integration", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(10); // 2 Q1 + 2 Q2 + 3 Q3 + 3 Q4
@@ -606,7 +606,7 @@ describe("generateOrGetPracticeQueue - Multi-Bucket Integration", () => {
     const queue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     expect(queue).toHaveLength(10); // 5 Q1 + 5 Q2
@@ -621,7 +621,7 @@ describe("generateOrGetPracticeQueue - Frozen Queue Behavior", () => {
     const queue1 = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
     expect(queue1).toHaveLength(1);
 
@@ -631,7 +631,7 @@ describe("generateOrGetPracticeQueue - Frozen Queue Behavior", () => {
     const queue2 = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
     expect(queue2).toHaveLength(1); // Still frozen at 1 tune
     expect(queue2[0].id).toBe(queue1[0].id); // Same queue row
@@ -643,7 +643,7 @@ describe("generateOrGetPracticeQueue - Frozen Queue Behavior", () => {
     const queue1 = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
     expect(queue1).toHaveLength(1);
 
@@ -657,7 +657,7 @@ describe("generateOrGetPracticeQueue - Frozen Queue Behavior", () => {
       new Date(),
       null,
       "per_day",
-      true, // Force regeneration
+      true // Force regeneration
     );
 
     expect(queue2).toHaveLength(2); // Now includes new tune
@@ -678,7 +678,7 @@ describe("addTunesToQueue - Refill Functionality", () => {
     const initialQueue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     // With 4-bucket system: 2 Q1 + 3 Q4 = 5 tunes (within max of 10)
@@ -696,7 +696,7 @@ describe("addTunesToQueue - Refill Functionality", () => {
       db,
       TEST_USER_UUID,
       TEST_PLAYLIST_UUID,
-      2,
+      2
     );
 
     expect(added).toHaveLength(2);
@@ -706,7 +706,7 @@ describe("addTunesToQueue - Refill Functionality", () => {
     const finalQueue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
     expect(finalQueue).toHaveLength(7); // 5 original + 2 added
   });
@@ -718,7 +718,7 @@ describe("addTunesToQueue - Refill Functionality", () => {
     const initialQueue = await generateOrGetPracticeQueue(
       db,
       TEST_USER_UUID,
-      TEST_PLAYLIST_UUID,
+      TEST_PLAYLIST_UUID
     );
 
     // With 4-bucket system, both tunes are in queue (Q1 + Q4)
@@ -729,7 +729,7 @@ describe("addTunesToQueue - Refill Functionality", () => {
       db,
       TEST_USER_UUID,
       TEST_PLAYLIST_UUID,
-      5,
+      5
     );
 
     expect(added).toHaveLength(0); // No new tunes to add
@@ -743,7 +743,7 @@ describe("addTunesToQueue - Refill Functionality", () => {
       db,
       TEST_USER_UUID,
       TEST_PLAYLIST_UUID,
-      0,
+      0
     );
     expect(added).toEqual([]);
   });
@@ -755,7 +755,7 @@ describe("addTunesToQueue - Refill Functionality", () => {
       db,
       TEST_USER_UUID,
       TEST_PLAYLIST_UUID,
-      5,
+      5
     );
     expect(added).toEqual([]);
   });

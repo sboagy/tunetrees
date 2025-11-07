@@ -41,7 +41,7 @@ interface PlaylistSelectorModalProps {
 }
 
 export const PlaylistSelectorModal: Component<PlaylistSelectorModalProps> = (
-  props,
+  props
 ) => {
   const { localDb, user } = useAuth();
   const [selectedPlaylistId, setSelectedPlaylistId] = createSignal<

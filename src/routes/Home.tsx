@@ -50,7 +50,7 @@ const Home: Component = () => {
     const tabFromUrl = searchParams.tab as TabId;
     console.log(
       "DEBUG: Updated Search Params:",
-      Object.fromEntries(Object.entries(searchParams)),
+      Object.fromEntries(Object.entries(searchParams))
     );
     if (
       tabFromUrl &&

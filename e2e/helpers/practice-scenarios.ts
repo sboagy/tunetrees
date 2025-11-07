@@ -23,7 +23,7 @@ log.setLevel("info");
  */
 export async function seedAddToReviewLocally(
   page: Page,
-  opts: { playlistId: string; tuneIds: string[]; userIdInt?: string },
+  opts: { playlistId: string; tuneIds: string[]; userIdInt?: string }
 ) {
   return await page.evaluate(async (input) => {
     if (!(window as any).__ttTestApi) {
@@ -68,7 +68,7 @@ export async function clearTunetreesStorageDB(page: Page) {
             // eslint-disable-next-line no-console
             console.warn(
               `IndexedDB delete error, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`,
-              req.error,
+              req.error
             );
             setTimeout(tryDelete, delay);
           } else {
@@ -81,7 +81,7 @@ export async function clearTunetreesStorageDB(page: Page) {
             const delay = 500 * attempt; // longer wait for blocked case
             // eslint-disable-next-line no-console
             console.warn(
-              `IndexedDB delete blocked, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`,
+              `IndexedDB delete blocked, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`
             );
             setTimeout(tryDelete, delay);
           } else {
@@ -156,7 +156,7 @@ export async function clearTunetreesStorageDB(page: Page) {
  */
 async function waitForSyncComplete(
   page: Page,
-  timeoutMs = 30000,
+  timeoutMs = 30000
 ): Promise<void> {
   const startTime = Date.now();
 
@@ -183,7 +183,7 @@ async function waitForSyncComplete(
 
   // Timeout - throw error since sync is critical
   throw new Error(
-    `⚠️ Initial sync did not complete within ${timeoutMs}ms - tests may fail`,
+    `⚠️ Initial sync did not complete within ${timeoutMs}ms - tests may fail`
   );
 }
 
@@ -205,7 +205,7 @@ export async function setupDeterministicTestParallel(
     clearRepertoire?: boolean;
     seedRepertoire?: string[];
     scheduleTunes?: { tuneIds: string[]; daysAgo: number };
-  } = {},
+  } = {}
 ) {
   log.debug(`🔧 [${user.name}] Setting up deterministic test state...`);
 
@@ -279,7 +279,7 @@ export async function setupDeterministicTestParallel(
 export async function seedUserRepertoire(
   user: TestUser,
   tuneIds: string[],
-  preCheck: boolean = false,
+  preCheck: boolean = false
 ) {
   const userKey = user.email.split(".")[0]; // alice.test@... → alice
   const { supabase } = await getTestUserClient(userKey);
@@ -315,7 +315,7 @@ export async function seedUserRepertoire(
 
       if (attempt >= maxAttempts) {
         throw new Error(
-          `Failed to seed tune ${tuneId} after ${attempt} attempts: ${error.message}`,
+          `Failed to seed tune ${tuneId} after ${attempt} attempts: ${error.message}`
         );
       }
 
@@ -324,7 +324,7 @@ export async function seedUserRepertoire(
       const delay = backoffMs + jitter;
 
       console.warn(
-        `[${user.name}] Transient error seeding tune ${tuneId} (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${delay}ms`,
+        `[${user.name}] Transient error seeding tune ${tuneId} (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${delay}ms`
       );
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
@@ -347,7 +347,7 @@ export async function seedUserRepertoire(
       if (error) {
         console.warn(
           `[${user.name}] Transient error reading playlist_tune count, retrying:`,
-          error.message,
+          error.message
         );
       } else {
         const currentCount = count ?? 0;
@@ -362,7 +362,7 @@ export async function seedUserRepertoire(
 
     if (!matched) {
       console.warn(
-        `⚠️ [${user.name}] Timed out waiting for playlist_tune to contain ${tuneIds.length} rows`,
+        `⚠️ [${user.name}] Timed out waiting for playlist_tune to contain ${tuneIds.length} rows`
       );
     }
   }
@@ -373,7 +373,7 @@ export async function seedUserRepertoire(
 function applyTableQueryFilters(
   tableName: string,
   query: PostgrestFilterBuilder<any, any, any, null, string, unknown, "DELETE">,
-  user: TestUser,
+  user: TestUser
 ) {
   if (tableName === "daily_practice_queue") {
     // Belt-and-suspenders: filter by both playlist and user for safety
@@ -400,7 +400,7 @@ function applyTableQueryFilters(
 async function verifyTableEmpty(
   user: TestUser,
   tableName: string,
-  supabase?: any,
+  supabase?: any
 ) {
   const userKey = user.email.split(".")[0];
   if (!supabase) {
@@ -427,7 +427,7 @@ async function verifyTableEmpty(
     if (countError) {
       console.warn(
         `[${user.name}] Transient error reading ${tableName} count, retrying:`,
-        countError.message,
+        countError.message
       );
     } else {
       finalCount = count ?? 0;
@@ -435,7 +435,7 @@ async function verifyTableEmpty(
         break;
       }
       log.debug(
-        `[${user.name}] Waiting for ${tableName} to drain: ${finalCount} remaining`,
+        `[${user.name}] Waiting for ${tableName} to drain: ${finalCount} remaining`
       );
     }
 
@@ -455,7 +455,7 @@ async function verifyTableEmpty(
     const { count: finalCountRead, error: finalReadError } = await finalQuery;
     if (finalReadError) {
       throw new Error(
-        `[${user.name}] Failed to verify ${tableName} deletion after retries: ${finalReadError.message}`,
+        `[${user.name}] Failed to verify ${tableName} deletion after retries: ${finalReadError.message}`
       );
     }
     finalCount = finalCountRead ?? 0;
@@ -463,7 +463,7 @@ async function verifyTableEmpty(
 
   if (finalCount == null || finalCount > 0) {
     throw new Error(
-      `[${user.name}] Failed to clear ${tableName}: expected 0 rows, last known count: ${finalCount}`,
+      `[${user.name}] Failed to clear ${tableName}: expected 0 rows, last known count: ${finalCount}`
     );
   }
 
@@ -476,7 +476,7 @@ async function verifyTableEmpty(
 async function verifyTablesEmpty(
   user: TestUser,
   tableNames: string[],
-  supabase?: any,
+  supabase?: any
 ) {
   const userKey = user.email.split(".")[0];
   if (!supabase) {
@@ -488,7 +488,7 @@ async function verifyTablesEmpty(
   const retryDelayMs = 500;
   const start = Date.now();
   const tableCounts = new Map<string, number | null>(
-    tableNames.map((t) => [t, null]),
+    tableNames.map((t) => [t, null])
   );
 
   // Polling loop with parallel queries for all tables
@@ -507,7 +507,7 @@ async function verifyTablesEmpty(
       if (countError) {
         console.warn(
           `[${user.name}] Transient error reading ${tableName} count, retrying:`,
-          countError.message,
+          countError.message
         );
         return { tableName, count: null, error: countError };
       }
@@ -525,7 +525,7 @@ async function verifyTablesEmpty(
         if (count > 0) {
           allEmpty = false;
           log.debug(
-            `[${user.name}] Waiting for ${tableName} to drain: ${count} remaining`,
+            `[${user.name}] Waiting for ${tableName} to drain: ${count} remaining`
           );
         }
       }
@@ -551,7 +551,7 @@ async function verifyTablesEmpty(
       const { count: finalCountRead, error: finalReadError } = await finalQuery;
       if (finalReadError) {
         throw new Error(
-          `[${user.name}] Failed to verify ${tableName} deletion after retries: ${finalReadError.message}`,
+          `[${user.name}] Failed to verify ${tableName} deletion after retries: ${finalReadError.message}`
         );
       }
       tableCounts.set(tableName, finalCountRead ?? 0);
@@ -576,7 +576,7 @@ async function verifyTablesEmpty(
   log.debug(
     `✅ [${user.name}] Verified ${
       tableNames.length
-    } tables are empty: ${tableNames.join(", ")}`,
+    } tables are empty: ${tableNames.join(", ")}`
   );
 }
 
@@ -587,7 +587,7 @@ async function verifyTablesEmpty(
 async function clearUserTable(
   user: TestUser,
   tableName: string,
-  check: boolean = false,
+  check: boolean = false
 ) {
   const userKey = user.email.split(".")[0]; // alice.test@... → alice
   const { supabase } = await getTestUserClient(userKey);
@@ -625,7 +625,7 @@ export async function setupForPracticeTestsParallel(
      * Ensures they appear in today's practice queue so flashcards have items.
      */
     scheduleDaysAgo?: number;
-  },
+  }
 ) {
   const {
     repertoireTunes = [],
@@ -673,7 +673,7 @@ export async function setupForPracticeTestsParallel(
 
       if (error) {
         console.warn(
-          `[${user.name}] Failed to schedule tune ${tuneId}: ${error.message}`,
+          `[${user.name}] Failed to schedule tune ${tuneId}: ${error.message}`
         );
       }
     }
@@ -704,7 +704,7 @@ export async function setupForPracticeTestsParallel(
   const isActive = await tabLocator.evaluate(
     (el) =>
       el.getAttribute("aria-selected") === "true" ||
-      el.classList.contains("active"),
+      el.classList.contains("active")
   );
 
   if (!isActive) {
@@ -714,7 +714,7 @@ export async function setupForPracticeTestsParallel(
   }
 
   log.debug(
-    `✅ [${user.name}] setupForPracticeTests Ready with ${repertoireTunes.length} tunes`,
+    `✅ [${user.name}] setupForPracticeTests Ready with ${repertoireTunes.length} tunes`
   );
 }
 
@@ -729,7 +729,7 @@ export async function setupForRepertoireTestsParallel(
     repertoireTunes: string[];
     scheduleTunes?: boolean;
     scheduleDaysAgo?: number;
-  },
+  }
 ) {
   const { repertoireTunes, scheduleTunes = false, scheduleDaysAgo = 0 } = opts;
 
@@ -772,7 +772,7 @@ export async function setupForRepertoireTestsParallel(
       if (error) {
         console.error(
           `[${user.name}] Failed to update scheduled date for tune ${tuneId}:`,
-          error,
+          error
         );
       }
     }
@@ -806,7 +806,7 @@ export async function setupForRepertoireTestsParallel(
   log.debug(
     `✅ [${user.name}] setupForRepertoireTests Ready with ${
       repertoireTunes.length
-    } tunes ${scheduleTunes ? "(scheduled)" : "(unscheduled)"}`,
+    } tunes ${scheduleTunes ? "(scheduled)" : "(unscheduled)"}`
   );
 }
 
@@ -820,7 +820,7 @@ export async function setupForCatalogTestsParallel(
   opts?: {
     emptyRepertoire?: boolean;
     startTab?: "practice" | "repertoire" | "catalog";
-  },
+  }
 ) {
   const { emptyRepertoire = true, startTab = "catalog" } = opts ?? {};
 
@@ -889,7 +889,7 @@ export async function setupForCatalogTestsParallel(
   await page.waitForTimeout(500);
 
   const catalogAddToRepertoireButton = page.getByTestId(
-    "catalog-add-to-repertoire-button",
+    "catalog-add-to-repertoire-button"
   );
   await catalogAddToRepertoireButton.waitFor({
     state: "visible",
@@ -916,7 +916,7 @@ export async function setupForCatalogTestsParallel(
       console.warn("⚠️ Failed to save snapshot:", String(err));
     }
     throw new Error(
-      `Tune count component not visible; snapshot saved as ${snapshotName}`,
+      `Tune count component not visible; snapshot saved as ${snapshotName}`
     );
   }
 

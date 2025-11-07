@@ -23,7 +23,7 @@ interface Tune {
 // Get all catalog tunes (non-deleted, non-private)
 const catalogTunes = sqlite
   .prepare(
-    "SELECT id, title, type, private_for FROM tune WHERE deleted = 0 AND private_for IS NULL ORDER BY id",
+    "SELECT id, title, type, private_for FROM tune WHERE deleted = 0 AND private_for IS NULL ORDER BY id"
   )
   .all() as Tune[];
 
@@ -75,7 +75,7 @@ export const CATALOG_TUNE_ID_MAP: Record<number, string> = {
 ${mappings
   .map(
     (m) =>
-      `  ${m.id}: "${m.uuid}", // ${m.title}${m.type ? ` (${m.type})` : ""}`,
+      `  ${m.id}: "${m.uuid}", // ${m.title}${m.type ? ` (${m.type})` : ""}`
   )
   .join("\n")}
 };
@@ -110,15 +110,15 @@ const outputPath = "src/lib/db/catalog-tune-ids.ts";
 writeFileSync(outputPath, fileContent);
 
 console.log(
-  `✅ Generated ${outputPath} with ${mappings.length} catalog tune mappings`,
+  `✅ Generated ${outputPath} with ${mappings.length} catalog tune mappings`
 );
 console.log(
-  `   First tune: ${mappings[0].id} → ${mappings[0].uuid} (${mappings[0].title})`,
+  `   First tune: ${mappings[0].id} → ${mappings[0].uuid} (${mappings[0].title})`
 );
 console.log(
   `   Last tune:  ${mappings[mappings.length - 1].id} → ${
     mappings[mappings.length - 1].uuid
-  } (${mappings[mappings.length - 1].title})`,
+  } (${mappings[mappings.length - 1].title})`
 );
 
 sqlite.close();

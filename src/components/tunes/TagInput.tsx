@@ -42,7 +42,7 @@ export const TagInput: Component<TagInputProps> = (props) => {
     return (
       userTags()
         ?.filter(
-          (tag) => tag.tagText.includes(input) && !selectedSet.has(tag.tagText),
+          (tag) => tag.tagText.includes(input) && !selectedSet.has(tag.tagText)
         )
         .slice(0, 10) ?? [] // Limit to 10 suggestions
     );
@@ -143,7 +143,7 @@ export const TagInput: Component<TagInputProps> = (props) => {
           disabled={props.disabled}
           placeholder={
             props.selectedTags.length === 0
-              ? (props.placeholder ?? "Add tags...")
+              ? props.placeholder ?? "Add tags..."
               : ""
           }
           class="flex-1 min-w-[120px] outline-none bg-transparent text-gray-900 dark:text-gray-100 disabled:opacity-50"

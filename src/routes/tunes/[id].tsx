@@ -37,7 +37,7 @@ const TuneDetailsPage: Component = () => {
     async (params) => {
       if (!params) return null;
       return await getTuneById(params.db, params.tuneId);
-    },
+    }
   );
 
   const handleEdit = () => {

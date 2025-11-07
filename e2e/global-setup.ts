@@ -43,7 +43,7 @@ async function globalSetup(_config: FullConfig) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
         } else {
           throw new Error(
-            `❌ Dev server not available at ${baseURL} after 60 seconds`,
+            `❌ Dev server not available at ${baseURL} after 60 seconds`
           );
         }
       }

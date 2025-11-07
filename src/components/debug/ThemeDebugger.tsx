@@ -17,7 +17,7 @@ export const ThemeDebugger: Component = () => {
       setHtmlClass(document.documentElement.className);
       setThemeMode(localStorage.getItem("themeMode") || "not set");
       setThemeAttr(
-        document.documentElement.getAttribute("data-kb-theme") || "not set",
+        document.documentElement.getAttribute("data-kb-theme") || "not set"
       );
     };
 

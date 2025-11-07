@@ -83,7 +83,7 @@ export async function queueSync(
   db: SqliteDatabase,
   tableName: SyncableTable,
   operation: SyncOperation,
-  data: Record<string, unknown>,
+  data: Record<string, unknown>
 ): Promise<SyncQueueItem> {
   const now = new Date().toISOString();
 
@@ -113,7 +113,7 @@ export async function queueSync(
  */
 export async function getPendingSyncItems(
   db: SqliteDatabase,
-  limit = 100,
+  limit = 100
 ): Promise<SyncQueueItem[]> {
   return await db
     .select()
@@ -132,7 +132,7 @@ export async function getPendingSyncItems(
  */
 export async function getFailedSyncItems(
   db: SqliteDatabase,
-  limit = 100,
+  limit = 100
 ): Promise<SyncQueueItem[]> {
   return await db
     .select()
@@ -154,7 +154,7 @@ export async function updateSyncStatus(
   db: SqliteDatabase,
   itemId: string,
   status: SyncStatus,
-  error?: string,
+  error?: string
 ): Promise<void> {
   await db
     .update(syncQueue)
@@ -174,7 +174,7 @@ export async function updateSyncStatus(
  */
 export async function markSynced(
   db: SqliteDatabase,
-  itemId: string,
+  itemId: string
 ): Promise<void> {
   await db.delete(syncQueue).where(eq(syncQueue.id, itemId));
 }
@@ -187,7 +187,7 @@ export async function markSynced(
  */
 export async function retrySyncItem(
   db: SqliteDatabase,
-  itemId: string,
+  itemId: string
 ): Promise<void> {
   await db
     .update(syncQueue)

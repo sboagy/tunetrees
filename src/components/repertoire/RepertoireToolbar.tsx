@@ -103,7 +103,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       const selectedRows = props.table.getSelectedRowModel().rows;
       if (selectedRows.length === 0) {
         alert(
-          "No tunes selected. Please select tunes to add to practice queue.",
+          "No tunes selected. Please select tunes to add to practice queue."
         );
         return;
       }
@@ -117,7 +117,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       const result = await addTunesToPracticeQueue(
         db,
         props.playlistId,
-        tuneIds,
+        tuneIds
       );
 
       // Show feedback
@@ -149,7 +149,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             new Date(),
             null,
             "per_day",
-            true, // force regeneration to pick up newly added tunes
+            true // force regeneration to pick up newly added tunes
           );
           console.log("✅ Practice queue regenerated");
         } catch (err) {
@@ -172,7 +172,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           error instanceof Error
             ? error.message
             : "Failed to add tunes to practice queue"
-        }`,
+        }`
       );
     }
   };

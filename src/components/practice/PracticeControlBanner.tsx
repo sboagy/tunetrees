@@ -57,7 +57,7 @@ export interface PracticeControlBannerProps {
   flashcardFieldVisibility?: FlashcardFieldVisibilityByFace;
   /** Handler for flashcard field visibility change */
   onFlashcardFieldVisibilityChange?: (
-    visibility: FlashcardFieldVisibilityByFace,
+    visibility: FlashcardFieldVisibilityByFace
   ) => void;
   /** Handler for add tunes action */
   onAddTunes?: (count: number) => void;
@@ -70,7 +70,7 @@ export interface PracticeControlBannerProps {
 }
 
 export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
-  props,
+  props
 ) => {
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showQueueSelector, setShowQueueSelector] = createSignal(false);

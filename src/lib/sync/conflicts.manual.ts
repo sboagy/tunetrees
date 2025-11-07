@@ -142,6 +142,6 @@ export function runAllConflictTests() {
 
   console.log("\n✅ All manual tests completed!");
   console.log(
-    "Run in browser console: import { runAllConflictTests } from '@/lib/sync/conflicts.test'; runAllConflictTests();",
+    "Run in browser console: import { runAllConflictTests } from '@/lib/sync/conflicts.test'; runAllConflictTests();"
   );
 }

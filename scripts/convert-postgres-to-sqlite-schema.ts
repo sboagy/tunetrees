@@ -32,7 +32,7 @@ const __dirname = path.dirname(__filename);
 
 const INPUT_FILE = path.join(
   __dirname,
-  "../drizzle/migrations/postgres/schema.ts",
+  "../drizzle/migrations/postgres/schema.ts"
 );
 const OUTPUT_FILE = path.join(__dirname, "../drizzle/schema-sqlite.ts");
 const BACKUP_FILE = path.join(__dirname, "../drizzle/schema-sqlite.backup.ts");
@@ -86,14 +86,14 @@ function convert(): void {
   // TOFIX: This pattern doesn't handle closing ) on separate lines properly
   content = content.replace(
     /\s*check\("[^"]*",\s*sql`[^`]*`\s*\),?\s*\n?/gs,
-    "",
+    ""
   );
 
   // 5. Transform imports
   console.log("  5. Converting imports...");
   content = content.replace(
     /from "drizzle-orm\/pg-core"/g,
-    'from "drizzle-orm/sqlite-core"',
+    'from "drizzle-orm/sqlite-core"'
   );
   content = content.replace(/pgTable/g, "sqliteTable");
   content = content.replace(/, pgPolicy/g, "");
@@ -106,11 +106,11 @@ function convert(): void {
   // serial
   content = content.replace(
     /(\w+): serial\("([^"]+)"\)\.primaryKey\(\)/g,
-    '$1: integer("$2").primaryKey({ autoIncrement: true })',
+    '$1: integer("$2").primaryKey({ autoIncrement: true })'
   );
   content = content.replace(
     /(\w+): serial\(\)\.primaryKey\(\)/g,
-    '$1: integer("$1").primaryKey({ autoIncrement: true })',
+    '$1: integer("$1").primaryKey({ autoIncrement: true })'
   );
   content = content.replace(/(\w+): serial\("([^"]+)"\)/g, '$1: integer("$2")');
   content = content.replace(/(\w+): serial\(\)/g, '$1: integer("$1")');
@@ -118,23 +118,23 @@ function convert(): void {
   // boolean
   content = content.replace(
     /(\w+): boolean\("([^"]+)"\)\.default\(true\)/g,
-    '$1: integer("$2").default(1)',
+    '$1: integer("$2").default(1)'
   );
   content = content.replace(
     /(\w+): boolean\("([^"]+)"\)\.default\(false\)/g,
-    '$1: integer("$2").default(0)',
+    '$1: integer("$2").default(0)'
   );
   content = content.replace(
     /(\w+): boolean\(\)\.default\(true\)/g,
-    '$1: integer("$1").default(1)',
+    '$1: integer("$1").default(1)'
   );
   content = content.replace(
     /(\w+): boolean\(\)\.default\(false\)/g,
-    '$1: integer("$1").default(0)',
+    '$1: integer("$1").default(0)'
   );
   content = content.replace(
     /(\w+): boolean\("([^"]+)"\)/g,
-    '$1: integer("$2")',
+    '$1: integer("$2")'
   );
   content = content.replace(/(\w+): boolean\(\)/g, '$1: integer("$1")');
 
@@ -142,7 +142,7 @@ function convert(): void {
   content = content.replace(/(\w+): timestamp\([^)]*\)/g, '$1: text("$1")');
   content = content.replace(
     /\.defaultNow\(\)/g,
-    ".$defaultFn(() => new Date().toISOString())",
+    ".$defaultFn(() => new Date().toISOString())"
   );
 
   // uuid
@@ -194,7 +194,7 @@ function convert(): void {
   console.log("\nNext Steps:");
   console.log("   1. Review: drizzle/schema-sqlite.ts");
   console.log(
-    "   2. Apply:  npx drizzle-kit push --config=drizzle.config.sqlite.ts",
+    "   2. Apply:  npx drizzle-kit push --config=drizzle.config.sqlite.ts"
   );
   console.log('   3. Verify: sqlite3 tunetrees_local.sqlite3 ".tables"');
 }

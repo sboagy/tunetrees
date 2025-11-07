@@ -21,7 +21,7 @@ const NewTunePage: Component = () => {
   const { localDb } = useAuth();
 
   const handleSave = async (
-    tuneData: Partial<TuneEditorData>,
+    tuneData: Partial<TuneEditorData>
   ): Promise<string> => {
     const db = localDb();
     if (!db) {

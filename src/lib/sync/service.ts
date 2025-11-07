@@ -72,7 +72,7 @@ export class SyncService {
         batchSize: 100,
         maxRetries: 3,
         timeoutMs: 30000,
-      },
+      }
     );
 
     // Initialize Realtime if enabled
@@ -198,7 +198,7 @@ export class SyncService {
       const stats = await this.syncEngine.getSyncQueueStats();
       if (stats.pending > 0) {
         console.log(
-          `[SyncService] Uploading ${stats.pending} pending changes before syncDown...`,
+          `[SyncService] Uploading ${stats.pending} pending changes before syncDown...`
         );
         try {
           await this.syncEngine.syncUp();
@@ -206,7 +206,7 @@ export class SyncService {
         } catch (error) {
           console.error(
             "[SyncService] Failed to upload pending changes before syncDown:",
-            error,
+            error
           );
           // Continue with syncDown anyway - user should see remote data even if upload failed
         }
@@ -252,7 +252,7 @@ export class SyncService {
         // Safety check: ensure database is initialized
         if (!this.db) {
           console.warn(
-            "[SyncService] Database not initialized yet, skipping syncUp check",
+            "[SyncService] Database not initialized yet, skipping syncUp check"
           );
           return;
         }
@@ -263,7 +263,7 @@ export class SyncService {
 
         if (hasPendingChanges) {
           console.log(
-            `[SyncService] Running periodic syncUp (${stats.pending} pending changes)...`,
+            `[SyncService] Running periodic syncUp (${stats.pending} pending changes)...`
           );
           await this.syncUp();
         } else {
@@ -283,7 +283,7 @@ export class SyncService {
     console.log(
       `[SyncService] Auto sync started:`,
       `syncUp every ${syncUpIntervalMs / 1000}s (only if changes pending),`,
-      `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`,
+      `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`
     );
   }
 
@@ -345,7 +345,7 @@ export class SyncService {
  */
 export function startSyncWorker(
   db: SqliteDatabase,
-  config: SyncServiceConfig,
+  config: SyncServiceConfig
 ): { service: SyncService; stop: () => void } {
   const syncService = new SyncService(db, config);
 

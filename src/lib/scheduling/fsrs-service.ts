@@ -143,7 +143,7 @@ export class FSRSService {
    */
   processReview(
     input: RecordPracticeInput,
-    latestRecord: PracticeRecord,
+    latestRecord: PracticeRecord
   ): NextReviewSchedule {
     // Reconstruct FSRS card from latest practice record
     const card: Card = {
@@ -196,7 +196,7 @@ export class FSRSService {
    */
   calculateGoalSpecificDue(
     input: RecordPracticeInput,
-    latestRecord?: PracticeRecord,
+    latestRecord?: PracticeRecord
   ): Date {
     const goal = input.goal ?? "recall";
     const technique = input.technique;
@@ -211,7 +211,7 @@ export class FSRSService {
     if (latestRecord?.repetitions) {
       currentStep = Math.min(
         latestRecord.repetitions,
-        baseIntervals.length - 1,
+        baseIntervals.length - 1
       );
     }
 
@@ -249,7 +249,7 @@ export class FSRSService {
   createPracticeRecord(
     input: RecordPracticeInput,
     schedule: NextReviewSchedule,
-    playlistRef: string,
+    playlistRef: string
   ): NewPracticeRecord {
     return {
       id: generateId(),

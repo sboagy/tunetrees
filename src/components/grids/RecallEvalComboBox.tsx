@@ -30,7 +30,7 @@ interface RecallEvalComboBoxProps {
 }
 
 export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
-  props,
+  props
 ) => {
   const options = [
     {

@@ -70,9 +70,9 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
       return await getUserPlaylists(
         params.db,
         params.userId,
-        props.includeDeleted ?? false,
+        props.includeDeleted ?? false
       );
-    },
+    }
   );
 
   // Filter playlists based on search
@@ -107,7 +107,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
 
     // Confirm deletion
     const confirmed = window.confirm(
-      "Are you sure you want to delete this playlist? All associated tune assignments will be removed.",
+      "Are you sure you want to delete this playlist? All associated tune assignments will be removed."
     );
     if (!confirmed) return;
 
@@ -125,7 +125,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
       alert(
         `Failed to delete playlist: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`,
+        }`
       );
     } finally {
       setDeletingId(null);
@@ -390,7 +390,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
                               <div class="flex items-center gap-2">
                                 {flexRender(
                                   header.column.columnDef.header,
-                                  header.getContext(),
+                                  header.getContext()
                                 )}
                                 <span class="text-gray-400">
                                   {{
@@ -419,7 +419,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
                             <td class="px-4 py-2 whitespace-nowrap text-sm">
                               {flexRender(
                                 cell.column.columnDef.cell,
-                                cell.getContext(),
+                                cell.getContext()
                               )}
                             </td>
                           )}

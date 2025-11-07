@@ -26,12 +26,12 @@ test.describe("Avatar Picker", () => {
   test("displays avatar settings page", async ({ page }) => {
     // Check page title
     await expect(
-      page.getByRole("heading", { name: "Profile Avatar" }),
+      page.getByRole("heading", { name: "Profile Avatar" })
     ).toBeVisible();
 
     // Check description
     await expect(
-      page.getByText("Choose a predefined avatar or upload your own"),
+      page.getByText("Choose a predefined avatar or upload your own")
     ).toBeVisible();
   });
 
@@ -71,7 +71,7 @@ test.describe("Avatar Picker", () => {
 
     // Check help text
     await expect(
-      page.getByText("Upload a custom .png, .jpg, or .webp image"),
+      page.getByText("Upload a custom .png, .jpg, or .webp image")
     ).toBeVisible();
   });
 

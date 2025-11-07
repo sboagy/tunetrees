@@ -33,7 +33,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
 
   // Column visibility: ensure select column hidden and only valid keys propagate
   const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
-    { select: false },
+    { select: false }
   );
   createEffect(() => {
     props.onColumnVisibilityChange?.(columnVisibility());
@@ -52,13 +52,13 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
       console.log(
         `[TunesGridScheduled] queueInitialized deps: db=${!!db}, userId=${
           props.userId
-        }, playlist=${playlistId}, version=${version}, syncComplete=${syncComplete}`,
+        }, playlist=${playlistId}, version=${version}, syncComplete=${syncComplete}`
       );
 
       // Don't attempt to run until initial sync completes
       if (!syncComplete) {
         console.log(
-          "[TunesGridScheduled] Waiting for initial sync to complete...",
+          "[TunesGridScheduled] Waiting for initial sync to complete..."
         );
         return null;
       }
@@ -76,7 +76,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           params.db,
           params.userId,
           params.playlistId,
-          practiceDate,
+          practiceDate
         );
 
         if (created) {
@@ -89,11 +89,11 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
       } catch (error) {
         console.error(
           "[TunesGridScheduled] Queue initialization failed:",
-          error,
+          error
         );
         return false;
       }
-    },
+    }
   );
 
   // Fetch practice list from practice_list_staged VIEW (JOINed with queue)
@@ -110,7 +110,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
       console.log(
         `[TunesGridScheduled] dueTunesData deps: db=${!!db}, userId=${
           props.userId
-        }, playlist=${playlistId}, version=${version}, queueInit=${initialized}`,
+        }, playlist=${playlistId}, version=${version}, queueInit=${initialized}`
       );
 
       // Only proceed if ALL dependencies are ready
@@ -127,13 +127,13 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     async (params) => {
       if (!params) {
         console.log(
-          `[TunesGridScheduled] dueTunesData: params null, returning empty`,
+          `[TunesGridScheduled] dueTunesData: params null, returning empty`
         );
         return [];
       }
       const delinquencyWindowDays = 7; // Show tunes due in last 7 days
       console.log(
-        `[TunesGridScheduled] Fetching practice list with queue (queueReady=${params.queueReady})`,
+        `[TunesGridScheduled] Fetching practice list with queue (queueReady=${params.queueReady})`
       );
       // Query practice_list_staged VIEW INNER JOIN daily_practice_queue
       // Queue provides frozen snapshot with bucket/order_index/completed_at
@@ -141,9 +141,9 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         params.db,
         params.userId,
         params.playlistId,
-        delinquencyWindowDays,
+        delinquencyWindowDays
       );
-    },
+    }
   );
 
   // Use shared evaluations from parent - NO local state!
@@ -151,11 +151,11 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   const setEvaluations = (
     evalsOrUpdater:
       | Record<string, string>
-      | ((prev: Record<string, string>) => Record<string, string>),
+      | ((prev: Record<string, string>) => Record<string, string>)
   ) => {
     if (!props.onEvaluationsChange) {
       console.error(
-        "[TunesGridScheduled] No onEvaluationsChange callback provided!",
+        "[TunesGridScheduled] No onEvaluationsChange callback provided!"
       );
       return;
     }
@@ -188,7 +188,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         console.log(
           `📊 Initializing ${
             Object.keys(initialEvals).length
-          } staged evaluations from database`,
+          } staged evaluations from database`
         );
         setEvaluations(initialEvals);
       }
@@ -306,7 +306,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
             tuneId,
             evaluation,
             "recall", // Default goal
-            "fsrs", // FSRS is the default technique
+            "fsrs" // FSRS is the default technique
           );
           console.log(`✅ Staged FSRS preview for tune ${tuneId}`);
         }
@@ -318,7 +318,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           `❌ Failed to ${
             evaluation === "" ? "clear" : "stage"
           } evaluation for tune ${tuneId}:`,
-          error,
+          error
         );
       }
     }

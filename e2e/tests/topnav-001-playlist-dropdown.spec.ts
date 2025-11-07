@@ -39,7 +39,7 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
 
     // Should show playlist name or instrument name
     await expect(playlistButton).toContainText(
-      new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+      new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i")
     );
   });
 
@@ -72,12 +72,12 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     // Should show the playlist item with subtitle
     // Show a tunes count; value may vary depending on previous tests adding tunes
     await expect(
-      ttPage.topNavManagePlaylistsPanel.getByText(/tunes/i, { exact: false }),
+      ttPage.topNavManagePlaylistsPanel.getByText(/tunes/i, { exact: false })
     ).toBeVisible({ timeout: 2000 });
     await expect(
       ttPage.topNavManagePlaylistsPanel.getByText(/ITRAD/i, {
         exact: false,
-      }),
+      })
     ).toBeVisible({
       timeout: 2000,
     });
@@ -96,7 +96,7 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
 
     // Look for "Manage Playlists" button
     await expect(
-      page.getByRole("button", { name: /Manage Playlists/i }),
+      page.getByRole("button", { name: /Manage Playlists/i })
     ).toBeVisible({ timeout: 2000 });
   });
 

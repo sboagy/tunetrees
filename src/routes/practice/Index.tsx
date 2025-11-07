@@ -70,10 +70,10 @@ const PracticeIndex: Component = () => {
     async (params) => {
       if (!params) return null;
       const result = await params.db.all<{ supabase_user_id: string }>(
-        sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${params.userId} LIMIT 1`,
+        sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${params.userId} LIMIT 1`
       );
       return result[0]?.supabase_user_id ?? null;
-    },
+    }
   );
 
   // Helper to get current user ID (for non-reactive contexts)
@@ -89,7 +89,7 @@ const PracticeIndex: Component = () => {
     const result = await db.all<{ supabase_user_id: string }>(
       sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${
         user()!.id
-      } LIMIT 1`,
+      } LIMIT 1`
     );
     return result[0]?.supabase_user_id ?? null;
   };
@@ -99,7 +99,7 @@ const PracticeIndex: Component = () => {
 
   // Shared evaluation state between grid and flashcard views
   const [evaluations, setEvaluations] = createSignal<Record<number, string>>(
-    {},
+    {}
   );
 
   // Update count when evaluations change
@@ -135,7 +135,7 @@ const PracticeIndex: Component = () => {
 
   // Store initial practice date for rollover detection
   const [initialPracticeDate, setInitialPracticeDate] = createSignal<Date>(
-    getPracticeDate(),
+    getPracticeDate()
   );
 
   // Load queue date from localStorage on mount, or use practice date
@@ -153,7 +153,7 @@ const PracticeIndex: Component = () => {
         // Use manually selected date
         setQueueDate(parsedDate);
         console.log(
-          `[PracticeIndex] Using manual queue date: ${parsedDate.toLocaleDateString()}`,
+          `[PracticeIndex] Using manual queue date: ${parsedDate.toLocaleDateString()}`
         );
         return;
       }
@@ -164,7 +164,7 @@ const PracticeIndex: Component = () => {
     localStorage.setItem(QUEUE_DATE_STORAGE_KEY, practiceDate.toISOString());
     localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, "false");
     console.log(
-      `[PracticeIndex] Using practice date: ${practiceDate.toLocaleDateString()}`,
+      `[PracticeIndex] Using practice date: ${practiceDate.toLocaleDateString()}`
     );
   });
 
@@ -200,7 +200,7 @@ const PracticeIndex: Component = () => {
         if (parsed.type !== undefined && !parsed.front) {
           // Old format - migrate to new per-face structure
           console.info(
-            "Migrating old flashcard field visibility format to new front/back structure",
+            "Migrating old flashcard field visibility format to new front/back structure"
           );
           setFlashcardFieldVisibility({
             front: { ...parsed },
@@ -212,7 +212,7 @@ const PracticeIndex: Component = () => {
         } else {
           // Unrecognized format - use defaults
           console.warn(
-            "Unrecognized flashcard field visibility format, using defaults",
+            "Unrecognized flashcard field visibility format, using defaults"
           );
         }
       } catch (e) {
@@ -230,7 +230,7 @@ const PracticeIndex: Component = () => {
   createEffect(() => {
     localStorage.setItem(
       FLASHCARD_FIELDS_STORAGE_KEY,
-      JSON.stringify(flashcardFieldVisibility()),
+      JSON.stringify(flashcardFieldVisibility())
     );
   });
 
@@ -255,9 +255,9 @@ const PracticeIndex: Component = () => {
         params.db,
         params.userId,
         params.playlistId,
-        delinquencyWindowDays,
+        delinquencyWindowDays
       );
-    },
+    }
   );
 
   // Filtered tunes for flashcard - applies showSubmitted filter
@@ -319,7 +319,7 @@ const PracticeIndex: Component = () => {
     }
 
     console.log(
-      `Submitting ${count} staged evaluations for playlist ${playlistId}`,
+      `Submitting ${count} staged evaluations for playlist ${playlistId}`
     );
 
     try {
@@ -336,7 +336,7 @@ const PracticeIndex: Component = () => {
         db,
         userId,
         playlistId,
-        windowStartUtc,
+        windowStartUtc
       );
 
       if (result.success) {
@@ -347,7 +347,7 @@ const PracticeIndex: Component = () => {
           }`,
           {
             duration: 3000,
-          },
+          }
         );
 
         // Force sync up to Supabase BEFORE triggering UI refresh
@@ -369,7 +369,7 @@ const PracticeIndex: Component = () => {
         incrementSyncVersion();
 
         console.log(
-          `✅ Submit complete: ${result.count} evaluations committed`,
+          `✅ Submit complete: ${result.count} evaluations committed`
         );
       } else {
         // Error toast (requires manual dismiss)
@@ -377,7 +377,7 @@ const PracticeIndex: Component = () => {
           `Failed to submit evaluations: ${result.error || "Unknown error"}`,
           {
             duration: Number.POSITIVE_INFINITY, // Requires manual dismiss
-          },
+          }
         );
 
         console.error("Submit failed:", result.error);
@@ -413,7 +413,7 @@ const PracticeIndex: Component = () => {
     }
 
     console.log(
-      `Adding ${count} tunes to practice queue for playlist ${playlistId}`,
+      `Adding ${count} tunes to practice queue for playlist ${playlistId}`
     );
 
     try {
@@ -424,7 +424,7 @@ const PracticeIndex: Component = () => {
           `Added ${added.length} tune${added.length !== 1 ? "s" : ""} to queue`,
           {
             duration: 3000,
-          },
+          }
         );
 
         // Force sync up to Supabase BEFORE triggering UI refresh
@@ -453,7 +453,7 @@ const PracticeIndex: Component = () => {
   // Handle queue date change
   const handleQueueDateChange = (date: Date, isPreview: boolean) => {
     console.log(
-      `Queue date changed to: ${date.toISOString()}, preview: ${isPreview}`,
+      `Queue date changed to: ${date.toISOString()}, preview: ${isPreview}`
     );
 
     // Set to noon to avoid timezone issues
@@ -471,7 +471,7 @@ const PracticeIndex: Component = () => {
     const isToday = selectedDay.getTime() === today.getTime();
     localStorage.setItem(
       QUEUE_DATE_MANUAL_FLAG_KEY,
-      isToday ? "false" : "true",
+      isToday ? "false" : "true"
     );
 
     // Trigger grid refresh
@@ -523,8 +523,8 @@ const PracticeIndex: Component = () => {
             eq(dailyPracticeQueue.userRef, userId),
             eq(dailyPracticeQueue.playlistRef, playlistId),
             gte(dailyPracticeQueue.windowStartUtc, today.toISOString()),
-            lt(dailyPracticeQueue.windowStartUtc, tomorrow.toISOString()),
-          ),
+            lt(dailyPracticeQueue.windowStartUtc, tomorrow.toISOString())
+          )
         )
         .run();
 

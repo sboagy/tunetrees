@@ -23,7 +23,7 @@ function getStorageKey(key: ITableStateKey): string {
  */
 export function saveTableState(
   key: ITableStateKey,
-  state: ITableStateExtended,
+  state: ITableStateExtended
 ): void {
   try {
     const storageKey = getStorageKey(key);
@@ -38,7 +38,7 @@ export function saveTableState(
  * Load table state from localStorage
  */
 export function loadTableState(
-  key: ITableStateKey,
+  key: ITableStateKey
 ): ITableStateExtended | null {
   try {
     const storageKey = getStorageKey(key);
@@ -68,7 +68,7 @@ export function clearTableState(key: ITableStateKey): void {
  * Get default table state for a given purpose
  */
 export function getDefaultTableState(
-  purpose: TablePurpose,
+  purpose: TablePurpose
 ): ITableStateExtended {
   const baseState: ITableStateExtended = {
     columnSizing: {},
@@ -143,7 +143,7 @@ export function getDefaultTableState(
  */
 export function mergeWithDefaults(
   loadedState: ITableStateExtended | null,
-  purpose: TablePurpose,
+  purpose: TablePurpose
 ): ITableStateExtended {
   const defaults = getDefaultTableState(purpose);
 

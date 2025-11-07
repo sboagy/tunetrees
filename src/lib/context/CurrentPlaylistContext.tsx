@@ -40,7 +40,7 @@ const CurrentPlaylistContext = createContext<CurrentPlaylistContextValue>();
  */
 export const CurrentPlaylistProvider: ParentComponent = (props) => {
   const [currentPlaylistId, setCurrentPlaylistId] = createSignal<string | null>(
-    null,
+    null
   );
 
   const value: CurrentPlaylistContextValue = {
@@ -64,7 +64,7 @@ export function useCurrentPlaylist(): CurrentPlaylistContextValue {
   const context = useContext(CurrentPlaylistContext);
   if (!context) {
     throw new Error(
-      "useCurrentPlaylist must be used within CurrentPlaylistProvider",
+      "useCurrentPlaylist must be used within CurrentPlaylistProvider"
     );
   }
   return context;

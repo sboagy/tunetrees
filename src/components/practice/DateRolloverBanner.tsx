@@ -40,7 +40,7 @@ export interface DateRolloverBannerProps {
  * ```
  */
 export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
-  props,
+  props
 ) => {
   const [showBanner, setShowBanner] = createSignal(false);
   const [newDate, setNewDate] = createSignal<string>("");
@@ -53,7 +53,7 @@ export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
         setNewDate(current.toLocaleDateString());
         setShowBanner(true);
         console.log(
-          `🔄 [DateRollover] Practice date changed from ${props.initialDate.toLocaleDateString()} to ${current.toLocaleDateString()}`,
+          `🔄 [DateRollover] Practice date changed from ${props.initialDate.toLocaleDateString()} to ${current.toLocaleDateString()}`
         );
       }
     }, 60000); // Check every minute

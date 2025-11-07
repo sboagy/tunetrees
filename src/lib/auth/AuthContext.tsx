@@ -58,19 +58,19 @@ interface AuthState {
   /** Sign in with email and password */
   signIn: (
     email: string,
-    password: string,
+    password: string
   ) => Promise<{ error: AuthError | null }>;
 
   /** Sign up with email and password */
   signUp: (
     email: string,
     password: string,
-    name: string,
+    name: string
   ) => Promise<{ error: AuthError | null }>;
 
   /** Sign in with OAuth provider */
   signInWithOAuth: (
-    provider: "google" | "github",
+    provider: "google" | "github"
   ) => Promise<{ error: AuthError | null }>;
 
   /** Sign out and clear local data */
@@ -135,7 +135,7 @@ export const AuthProvider: ParentComponent = (props) => {
     // Prevent double initialization
     if (isInitializing || localDb()) {
       log.debug(
-        "Skipping database initialization (already initialized or in progress)",
+        "Skipping database initialization (already initialized or in progress)"
       );
       return;
     }
@@ -187,7 +187,7 @@ export const AuthProvider: ParentComponent = (props) => {
             if (!initialSyncComplete()) {
               setInitialSyncComplete(true);
               console.log(
-                "✅ [AuthContext] Initial sync complete, UI can now load data",
+                "✅ [AuthContext] Initial sync complete, UI can now load data"
               );
             }
           },
@@ -393,13 +393,13 @@ export const AuthProvider: ParentComponent = (props) => {
       setSyncVersion((prev) => {
         const newVersion = prev + 1;
         console.log(
-          `🔄 [ForceSyncDown] Sync version updated: ${prev} → ${newVersion}`,
+          `🔄 [ForceSyncDown] Sync version updated: ${prev} → ${newVersion}`
         );
         log.debug(
           "Sync version changed after force sync:",
           prev,
           "->",
-          newVersion,
+          newVersion
         );
         return newVersion;
       });
@@ -419,7 +419,7 @@ export const AuthProvider: ParentComponent = (props) => {
     setSyncVersion((prev) => {
       const newVersion = prev + 1;
       console.log(
-        `🔄 [incrementSyncVersion] Sync version updated: ${prev} → ${newVersion}`,
+        `🔄 [incrementSyncVersion] Sync version updated: ${prev} → ${newVersion}`
       );
       return newVersion;
     });
@@ -454,13 +454,13 @@ export const AuthProvider: ParentComponent = (props) => {
       setSyncVersion((prev) => {
         const newVersion = prev + 1;
         console.log(
-          `🔄 [ForceSyncUp] Sync version updated: ${prev} → ${newVersion}`,
+          `🔄 [ForceSyncUp] Sync version updated: ${prev} → ${newVersion}`
         );
         log.debug(
           "Sync version changed after force sync:",
           prev,
           "->",
-          newVersion,
+          newVersion
         );
         return newVersion;
       });

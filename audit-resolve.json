@@ -1,18 +1,18 @@
 {
-  "decisions": {
-    "1102341|esbuild": {
-      "decision": "ignore",
-      "madeAt": 1734739200000,
-      "expiresAt": 1750377600000,
-      "reason": "Dev dependency only (drizzle-kit). esbuild vulnerability only affects development server, not production builds. No fix available that doesn't break drizzle-kit functionality."
+    "decisions": {
+        "1102341|esbuild": {
+            "decision": "ignore",
+            "madeAt": 1734739200000,
+            "expiresAt": 1750377600000,
+            "reason": "Dev dependency only (drizzle-kit). esbuild vulnerability only affects development server, not production builds. No fix available that doesn't break drizzle-kit functionality."
+        },
+        "1106902|lodash.template": {
+            "decision": "ignore",
+            "madeAt": 1734739200000,
+            "expiresAt": 1750377600000,
+            "reason": "Dev dependency only (shadcn-solid CLI tool). Used only for installing UI components during development, not in runtime code. No fix available."
+        }
     },
-    "1106902|lodash.template": {
-      "decision": "ignore",
-      "madeAt": 1734739200000,
-      "expiresAt": 1750377600000,
-      "reason": "Dev dependency only (shadcn-solid CLI tool). Used only for installing UI components during development, not in runtime code. No fix available."
-    }
-  },
-  "rules": {},
-  "version": 2
+    "rules": {},
+    "version": 2
 }

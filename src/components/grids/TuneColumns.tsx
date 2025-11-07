@@ -63,8 +63,8 @@ const SortableHeader: Component<{ column: any; title: string }> = (props) => {
         sortState() === "asc"
           ? "Sorted ascending - click to sort descending"
           : sortState() === "desc"
-            ? "Sorted descending - click to clear sort"
-            : "Not sorted - click to sort ascending"
+          ? "Sorted descending - click to clear sort"
+          : "Not sorted - click to sort ascending"
       }
     >
       <span>{props.title}</span>
@@ -86,7 +86,7 @@ const StaticHeader: Component<{ title: string }> = (props) => {
  * Get column definitions for Catalog grid
  */
 export function getCatalogColumns(
-  _callbacks?: ICellEditorCallbacks,
+  _callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
   return [
     // Selection checkbox
@@ -285,7 +285,7 @@ export function getCatalogColumns(
  * Shows practice-related fields from practice_list_staged view
  */
 export function getRepertoireColumns(
-  callbacks?: ICellEditorCallbacks,
+  callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
   const catalogColumns = getCatalogColumns(callbacks);
 
@@ -671,7 +671,7 @@ export function getRepertoireColumns(
  * Includes embedded RecallEvalComboBox in Evaluation column
  */
 export function getScheduledColumns(
-  callbacks?: ICellEditorCallbacks,
+  callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
   const baseColumns = getCatalogColumns(callbacks);
 
@@ -875,7 +875,7 @@ export function getScheduledColumns(
         const date = new Date(value);
         const now = new Date();
         const diffDays = Math.floor(
-          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
         );
 
         let color = "text-gray-600 dark:text-gray-400";
@@ -888,12 +888,12 @@ export function getScheduledColumns(
           diffDays === 0
             ? "Today"
             : diffDays === -1
-              ? "Yesterday"
-              : diffDays < 0
-                ? `${Math.abs(diffDays)}d overdue`
-                : diffDays === 1
-                  ? "Tomorrow"
-                  : `In ${diffDays}d`;
+            ? "Yesterday"
+            : diffDays < 0
+            ? `${Math.abs(diffDays)}d overdue`
+            : diffDays === 1
+            ? "Tomorrow"
+            : `In ${diffDays}d`;
 
         return (
           <span
@@ -1079,7 +1079,7 @@ export function getScheduledColumns(
  */
 export function getColumns(
   purpose: TablePurpose,
-  callbacks?: ICellEditorCallbacks,
+  callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
   switch (purpose) {
     case "catalog":

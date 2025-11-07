@@ -22,7 +22,7 @@ export interface TabState {
 
 export async function getTabState(
   db: SqliteDatabase,
-  userId: string,
+  userId: string
 ): Promise<TabState> {
   const result = await db
     .select({
@@ -55,7 +55,7 @@ export async function getTabState(
 export async function saveActiveTab(
   db: SqliteDatabase,
   userId: string,
-  tabId: TabId,
+  tabId: TabId
 ): Promise<void> {
   const existing = await db
     .select({ id: tabGroupMainState.id })

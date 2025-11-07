@@ -32,11 +32,11 @@ const EditTunePage: Component = () => {
     async (params) => {
       if (!params) return null;
       return await getTuneById(params.db, params.tuneId);
-    },
+    }
   );
 
   const handleSave = async (
-    tuneData: Partial<TuneEditorData>,
+    tuneData: Partial<TuneEditorData>
   ): Promise<string | undefined> => {
     const db = localDb();
     if (!db) {

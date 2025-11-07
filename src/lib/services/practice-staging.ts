@@ -56,7 +56,7 @@ function mapEvaluationToRating(evaluation: string): Rating {
 async function getLatestPracticeRecord(
   db: SqliteDatabase,
   tuneId: string,
-  playlistId: string,
+  playlistId: string
 ): Promise<Card | null> {
   const result = await db.all<{
     stability: number | null;
@@ -136,7 +136,7 @@ export async function stagePracticeEvaluation(
   tuneId: string,
   evaluation: string,
   goal: string = "recall",
-  technique: string = "",
+  technique: string = ""
 ): Promise<FSRSPreviewMetrics> {
   // Get latest practice state
   const latestCard = await getLatestPracticeRecord(db, tuneId, playlistId);
@@ -246,7 +246,7 @@ export async function stagePracticeEvaluation(
       recallEval: evaluation,
       syncVersion: 1,
       lastModifiedAt,
-    },
+    }
   );
 
   // Persist database to IndexedDB immediately so page refresh shows staged data
@@ -254,8 +254,8 @@ export async function stagePracticeEvaluation(
 
   console.log(
     `✅ Staged evaluation for tune ${tuneId}: ${evaluation} (stability: ${preview.stability?.toFixed(
-      2,
-    )}, due: ${preview.due})`,
+      2
+    )}, due: ${preview.due})`
   );
 
   return preview;
@@ -276,7 +276,7 @@ export async function clearStagedEvaluation(
   db: SqliteDatabase,
   userId: string,
   tuneId: string,
-  playlistId: string,
+  playlistId: string
 ): Promise<void> {
   await db.run(sql`
     DELETE FROM table_transient_data
@@ -308,7 +308,7 @@ export async function clearStagedEvaluation(
  */
 export async function clearAllStagedForPlaylist(
   db: SqliteDatabase,
-  playlistId: string,
+  playlistId: string
 ): Promise<void> {
   await db.run(sql`
     DELETE FROM table_transient_data

@@ -81,13 +81,13 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
 
     if (forcedReset) {
       console.warn(
-        "🔄 FORCED RESET via URL parameter - clearing all local data",
+        "🔄 FORCED RESET via URL parameter - clearing all local data"
       );
     } else {
       console.warn(
         `⚠️ Schema migration detected: ${
           localVersion || "none"
-        } → ${currentVersion}`,
+        } → ${currentVersion}`
       );
       console.warn("🔄 Clearing local database for migration...");
     }
@@ -113,7 +113,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
     // Load existing database with matching version
     sqliteDb = new SQL.Database(existingData);
     console.log(
-      `✅ Loaded existing SQLite database from IndexedDB (v${CURRENT_DB_VERSION})`,
+      `✅ Loaded existing SQLite database from IndexedDB (v${CURRENT_DB_VERSION})`
     );
 
     // CRITICAL: Always recreate views on load to ensure latest definitions
@@ -126,7 +126,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
     // Create new database (either first time or version mismatch)
     if (existingData) {
       console.log(
-        `🔄 Database version mismatch (stored: ${storedVersionNum}, current: ${CURRENT_DB_VERSION}). Recreating...`,
+        `🔄 Database version mismatch (stored: ${storedVersionNum}, current: ${CURRENT_DB_VERSION}). Recreating...`
       );
       // Clear old database
       await deleteFromIndexedDB(DB_KEY);
@@ -151,7 +151,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
         const response = await fetch(migrationPath, { cache: "no-store" });
         if (!response.ok) {
           throw new Error(
-            `Failed to load migration ${migrationPath}: ${response.status} ${response.statusText}`,
+            `Failed to load migration ${migrationPath}: ${response.status} ${response.statusText}`
           );
         }
         const migrationSql = await response.text();
@@ -171,7 +171,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
         console.log(
           `✅ Applied ${statements.length} statements from ${migrationPath
             .split("/")
-            .pop()}`,
+            .pop()}`
         );
       }
 
@@ -181,7 +181,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
       throw new Error(
         `Database migration failed: ${
           error instanceof Error ? error.message : String(error)
-        }`,
+        }`
       );
     }
 
@@ -239,7 +239,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
         console.log("✅ Forced reset complete. Local database cleared.");
       } else {
         console.log(
-          "✅ Schema migration complete. Ready for re-sync from Supabase.",
+          "✅ Schema migration complete. Ready for re-sync from Supabase."
         );
       }
     } catch (error) {
@@ -258,12 +258,12 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
   const tuneCount = sqliteDb.exec("SELECT COUNT(*) as count FROM tune");
   const count = Number(tuneCount[0]?.values[0]?.[0] || 0);
   console.log(
-    `🔍 DEBUG: Found ${count} tunes in database after initialization`,
+    `🔍 DEBUG: Found ${count} tunes in database after initialization`
   );
 
   if (count > 0) {
     const sampleTunes = sqliteDb.exec(
-      "SELECT id, title, genre FROM tune LIMIT 5",
+      "SELECT id, title, genre FROM tune LIMIT 5"
     );
     console.log("🔍 DEBUG: Sample tunes:", sampleTunes[0]?.values || []);
   }
@@ -280,7 +280,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
 export function getDb(): ReturnType<typeof drizzle> {
   if (!drizzleDb) {
     throw new Error(
-      "SQLite database not initialized. Call initializeDb() first.",
+      "SQLite database not initialized. Call initializeDb() first."
     );
   }
   return drizzleDb;
@@ -375,7 +375,7 @@ export function setupAutoPersist(): () => void {
 function ensureColumnExists(
   table: string,
   column: string,
-  definition: string,
+  definition: string
 ): void {
   if (!sqliteDb) return;
   try {
@@ -384,7 +384,7 @@ function ensureColumnExists(
     const hasColumn = values.some((row) => row?.[1] === column);
     if (!hasColumn) {
       console.log(
-        `🛠️  Missing column '${column}' on '${table}'. Adding via ALTER TABLE...`,
+        `🛠️  Missing column '${column}' on '${table}'. Adding via ALTER TABLE...`
       );
       sqliteDb.run(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
       console.log(`✅ Added column '${column}' to '${table}'`);
@@ -392,7 +392,7 @@ function ensureColumnExists(
   } catch (e) {
     console.error(
       `❌ Failed to ensure column '${column}' on table '${table}':`,
-      e,
+      e
     );
   }
 }

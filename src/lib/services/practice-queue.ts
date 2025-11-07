@@ -94,7 +94,7 @@ const addDays = (d: Date, days: number): Date =>
 export function computeSchedulingWindows(
   reviewSitdownDate: Date,
   acceptableDelinquencyWindow: number,
-  localTzOffsetMinutes: number | null,
+  localTzOffsetMinutes: number | null
 ): SchedulingWindows {
   const sitdownUtc = new Date(reviewSitdownDate.toISOString());
 
@@ -114,8 +114,8 @@ export function computeSchedulingWindows(
         0,
         0,
         0,
-        0,
-      ),
+        0
+      )
     );
 
     // Convert back to UTC
@@ -128,7 +128,7 @@ export function computeSchedulingWindows(
   const endOfDayUtc: Date = addDays(startOfDayUtc, 1);
   const windowFloorUtc: Date = addDays(
     startOfDayUtc,
-    -acceptableDelinquencyWindow,
+    -acceptableDelinquencyWindow
   );
 
   // Format as YYYY-MM-DD HH:MM:SS (legacy format for lexicographic comparison)
@@ -178,7 +178,7 @@ export function computeSchedulingWindows(
  */
 export function classifyQueueBucket(
   coalescedRaw: string | null | undefined,
-  windows: SchedulingWindows,
+  windows: SchedulingWindows
 ): number {
   if (!coalescedRaw) {
     return 1; // Lenient default for null/undefined
@@ -193,7 +193,7 @@ export function classifyQueueBucket(
   // Parse as YYYY-MM-DD HH:MM:SS (assume UTC) - try this FIRST
   try {
     const match = norm19.match(
-      /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/,
+      /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
     );
     if (match) {
       const [, year, month, day, hour, minute, second] = match;
@@ -204,8 +204,8 @@ export function classifyQueueBucket(
           parseInt(day, 10),
           parseInt(hour, 10),
           parseInt(minute, 10),
-          parseInt(second, 10),
-        ),
+          parseInt(second, 10)
+        )
       );
     }
   } catch {
@@ -290,7 +290,7 @@ async function fetchExistingActiveQueue(
   db: AnyDatabase,
   userRef: string,
   playlistRef: string,
-  windowStartKey: string,
+  windowStartKey: string
 ): Promise<DailyPracticeQueueRow[]> {
   const results = await db
     .select()
@@ -300,8 +300,8 @@ async function fetchExistingActiveQueue(
         eq(dailyPracticeQueue.userRef, userRef),
         eq(dailyPracticeQueue.playlistRef, playlistRef),
         eq(dailyPracticeQueue.windowStartUtc, windowStartKey),
-        eq(dailyPracticeQueue.active, 1),
-      ),
+        eq(dailyPracticeQueue.active, 1)
+      )
     )
     .orderBy(dailyPracticeQueue.orderIndex) // ← ADD THIS
     .all();
@@ -335,7 +335,7 @@ function buildQueueRows(
   playlistRef: string,
   mode: string,
   localTzOffsetMinutes: number | null,
-  forceBucket?: number,
+  forceBucket?: number
 ): Omit<DailyPracticeQueueRow, "id">[] {
   const results: Omit<DailyPracticeQueueRow, "id">[] = [];
   const now = new Date();
@@ -398,7 +398,7 @@ async function persistQueueRows(
   rows: Omit<DailyPracticeQueueRow, "id">[],
   userRef: string,
   playlistRef: string,
-  windows: SchedulingWindows,
+  windows: SchedulingWindows
 ): Promise<DailyPracticeQueueRow[]> {
   try {
     // Insert all rows and queue for sync
@@ -414,7 +414,7 @@ async function persistQueueRows(
       for (const [key, value] of Object.entries(fullRow)) {
         const snakeKey = key.replace(
           /[A-Z]/g,
-          (letter) => `_${letter.toLowerCase()}`,
+          (letter) => `_${letter.toLowerCase()}`
         );
         snakeCaseRow[snakeKey] = value;
       }
@@ -425,7 +425,7 @@ async function persistQueueRows(
         db as SqliteDatabase,
         "daily_practice_queue",
         "insert",
-        snakeCaseRow,
+        snakeCaseRow
       );
     }
 
@@ -434,19 +434,19 @@ async function persistQueueRows(
       db,
       userRef,
       playlistRef,
-      windows.startTs,
+      windows.startTs
     );
   } catch (error) {
     // On conflict, return existing rows
     console.warn(
       "[PracticeQueue] Insert conflict, returning existing queue:",
-      error,
+      error
     );
     return await fetchExistingActiveQueue(
       db,
       userRef,
       playlistRef,
-      windows.startTs,
+      windows.startTs
     );
   }
 }
@@ -480,7 +480,7 @@ export async function ensureDailyQueue(
   userRef: string,
   playlistRef: string,
   practiceDate: Date,
-  localTzOffsetMinutes: number | null = null,
+  localTzOffsetMinutes: number | null = null
 ): Promise<boolean> {
   const { formatAsWindowStart } = await import("../utils/practice-date");
   const windowStartUtc = formatAsWindowStart(practiceDate);
@@ -493,7 +493,7 @@ export async function ensureDailyQueue(
         FROM daily_practice_queue 
         WHERE user_ref = ${userRef} 
           AND playlist_ref = ${playlistRef} 
-          AND window_start_utc = ${windowStartUtc}`,
+          AND window_start_utc = ${windowStartUtc}`
   );
 
   const queueExists = (existing[0]?.count ?? 0) > 0;
@@ -505,7 +505,7 @@ export async function ensureDailyQueue(
 
   // Generate new queue for this date
   console.log(
-    `[PracticeQueue] 📅 Generating new queue for ${windowStartUtc}...`,
+    `[PracticeQueue] 📅 Generating new queue for ${windowStartUtc}...`
   );
 
   await generateOrGetPracticeQueue(
@@ -515,7 +515,7 @@ export async function ensureDailyQueue(
     practiceDate,
     localTzOffsetMinutes,
     "per_day",
-    false, // Don't force regen, we already checked it doesn't exist
+    false // Don't force regen, we already checked it doesn't exist
   );
 
   console.log(`[PracticeQueue] ✅ Created new queue for ${windowStartUtc}`);
@@ -565,7 +565,7 @@ export async function generateOrGetPracticeQueue(
   reviewSitdownDate: Date = new Date(),
   localTzOffsetMinutes: number | null = null,
   mode: string = "per_day",
-  forceRegen: boolean = false,
+  forceRegen: boolean = false
 ): Promise<DailyPracticeQueueRow[]> {
   // Get preferences (stub - hardcoded for now)
   const prefs = DEFAULT_PREFS;
@@ -574,7 +574,7 @@ export async function generateOrGetPracticeQueue(
   const windows = computeSchedulingWindows(
     reviewSitdownDate,
     prefs.acceptableDelinquencyWindow,
-    localTzOffsetMinutes,
+    localTzOffsetMinutes
   );
 
   const windowStartKey = windows.startTs;
@@ -584,13 +584,13 @@ export async function generateOrGetPracticeQueue(
   // If practice_list_staged is empty, return empty queue and let sync trigger reload
   const stagedCount = await db.all<{ count: number }>(
     sql`SELECT COUNT(*) as count FROM practice_list_staged 
-        WHERE user_ref = ${userRef} AND playlist_id = ${playlistRef}`,
+        WHERE user_ref = ${userRef} AND playlist_id = ${playlistRef}`
   );
   const hasData = (stagedCount[0]?.count ?? 0) > 0;
 
   if (!hasData && !forceRegen) {
     console.log(
-      "[PracticeQueue] ⏳ Database not yet populated (waiting for sync), returning empty queue",
+      "[PracticeQueue] ⏳ Database not yet populated (waiting for sync), returning empty queue"
     );
     return [];
   }
@@ -600,12 +600,12 @@ export async function generateOrGetPracticeQueue(
     db,
     userRef,
     playlistRef,
-    windowStartKey,
+    windowStartKey
   );
 
   if (existing.length > 0 && !forceRegen) {
     console.log(
-      `[PracticeQueue] Using existing queue: ${existing.length} rows`,
+      `[PracticeQueue] Using existing queue: ${existing.length} rows`
     );
     return existing;
   }
@@ -619,8 +619,8 @@ export async function generateOrGetPracticeQueue(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
           eq(dailyPracticeQueue.playlistRef, playlistRef),
-          eq(dailyPracticeQueue.windowStartUtc, windowStartKey),
-        ),
+          eq(dailyPracticeQueue.windowStartUtc, windowStartKey)
+        )
       )
       .run();
   }
@@ -765,7 +765,7 @@ export async function generateOrGetPracticeQueue(
   console.log(
     `[PracticeQueue] Generating new queue: ${
       candidateRows.length
-    } candidate tunes (max: ${maxReviews || "uncapped"})`,
+    } candidate tunes (max: ${maxReviews || "uncapped"})`
   );
 
   // Build queue rows - mark each with its actual bucket
@@ -778,7 +778,7 @@ export async function generateOrGetPracticeQueue(
     playlistRef,
     mode,
     localTzOffsetMinutes,
-    1, // Force bucket 1 (Due Today)
+    1 // Force bucket 1 (Due Today)
   );
 
   const q2Built = buildQueueRows(
@@ -789,7 +789,7 @@ export async function generateOrGetPracticeQueue(
     playlistRef,
     mode,
     localTzOffsetMinutes,
-    2, // Force bucket 2 (Recently Lapsed)
+    2 // Force bucket 2 (Recently Lapsed)
   );
 
   const q3Built = buildQueueRows(
@@ -800,7 +800,7 @@ export async function generateOrGetPracticeQueue(
     playlistRef,
     mode,
     localTzOffsetMinutes,
-    3, // Force bucket 3 (New/Unscheduled)
+    3 // Force bucket 3 (New/Unscheduled)
   );
 
   const q4Built = buildQueueRows(
@@ -811,7 +811,7 @@ export async function generateOrGetPracticeQueue(
     playlistRef,
     mode,
     localTzOffsetMinutes,
-    4, // Force bucket 4 (Old Lapsed)
+    4 // Force bucket 4 (Old Lapsed)
   );
 
   // Combine and renumber order indices
@@ -828,11 +828,11 @@ export async function generateOrGetPracticeQueue(
     built,
     userRef,
     playlistRef,
-    windows,
+    windows
   );
 
   console.log(
-    `[PracticeQueue] Generated queue: ${persisted.length} rows persisted`,
+    `[PracticeQueue] Generated queue: ${persisted.length} rows persisted`
   );
 
   return persisted;
@@ -867,7 +867,7 @@ export async function addTunesToQueue(
   playlistRef: string,
   count: number,
   reviewSitdownDate: Date = new Date(),
-  localTzOffsetMinutes: number | null = null,
+  localTzOffsetMinutes: number | null = null
 ): Promise<DailyPracticeQueueRow[]> {
   if (count <= 0) {
     console.warn("[AddTunes] Count must be >= 1, returning empty");
@@ -881,7 +881,7 @@ export async function addTunesToQueue(
   const windows = computeSchedulingWindows(
     reviewSitdownDate,
     prefs.acceptableDelinquencyWindow,
-    localTzOffsetMinutes,
+    localTzOffsetMinutes
   );
 
   const windowStartKey = windows.startTs;
@@ -891,7 +891,7 @@ export async function addTunesToQueue(
     db,
     userRef,
     playlistRef,
-    windowStartKey,
+    windowStartKey
   );
 
   if (existing.length === 0) {
@@ -903,7 +903,7 @@ export async function addTunesToQueue(
   const existingTuneIds = new Set(existing.map((r) => r.tuneRef));
 
   console.log(
-    `[AddTunes] Existing queue has ${existing.length} tunes, adding ${count} more`,
+    `[AddTunes] Existing queue has ${existing.length} tunes, adding ${count} more`
   );
 
   // Query backlog tunes (older than delinquency window)
@@ -953,7 +953,7 @@ export async function addTunesToQueue(
     userRef,
     playlistRef,
     "per_day",
-    localTzOffsetMinutes,
+    localTzOffsetMinutes
   );
 
   // Adjust order indices to append sequentially after existing queue
@@ -986,8 +986,8 @@ export async function addTunesToQueue(
         eq(dailyPracticeQueue.playlistRef, playlistRef),
         eq(dailyPracticeQueue.windowStartUtc, windowStartKey),
         eq(dailyPracticeQueue.active, 1),
-        inArray(dailyPracticeQueue.tuneRef, addedTuneIds),
-      ),
+        inArray(dailyPracticeQueue.tuneRef, addedTuneIds)
+      )
     )
     .all();
 
