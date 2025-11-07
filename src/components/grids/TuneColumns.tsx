@@ -6,7 +6,7 @@
  */
 
 import type { ColumnDef } from "@tanstack/solid-table";
-import { type Component, Show } from "solid-js";
+import { type Component, Show, createEffect } from "solid-js";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
@@ -83,6 +83,35 @@ const StaticHeader: Component<{ title: string }> = (props) => {
 };
 
 /**
+ * Select All Checkbox Header Component
+ * Reactively updates indeterminate state when selection changes
+ */
+const SelectAllCheckbox: Component<{ table: any }> = (props) => {
+  let checkboxRef: HTMLInputElement | undefined;
+
+  // Reactively update indeterminate property when selection state changes
+  createEffect(() => {
+    const allSelected = props.table.getIsAllRowsSelected();
+    const someSelected = props.table.getIsSomeRowsSelected();
+    
+    if (checkboxRef) {
+      checkboxRef.indeterminate = someSelected && !allSelected;
+    }
+  });
+
+  return (
+    <input
+      ref={checkboxRef}
+      type="checkbox"
+      checked={props.table.getIsAllRowsSelected()}
+      onChange={props.table.getToggleAllRowsSelectedHandler()}
+      class="w-4 h-4 cursor-pointer"
+      aria-label="Select all rows"
+    />
+  );
+};
+
+/**
  * Get column definitions for Catalog grid
  */
 export function getCatalogColumns(
@@ -92,21 +121,7 @@ export function getCatalogColumns(
     // Selection checkbox
     {
       id: "select",
-      header: ({ table }) => (
-        <input
-          type="checkbox"
-          checked={table.getIsAllRowsSelected()}
-          ref={(el) => {
-            if (el) {
-              el.indeterminate =
-                table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected();
-            }
-          }}
-          onChange={table.getToggleAllRowsSelectedHandler()}
-          class="w-4 h-4 cursor-pointer"
-          aria-label="Select all rows"
-        />
-      ),
+      header: ({ table }) => <SelectAllCheckbox table={table} />,
       cell: ({ row }) => (
         <input
           type="checkbox"
