@@ -283,38 +283,6 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
             props.onTableReady?.(tbl as any);
           }}
         />
-
-        {/* Footer with tune count and selection info */}
-        <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2 flex-shrink-0">
-          <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-            <span>
-              {filteredTunes().length}{" "}
-              {filteredTunes().length === 1 ? "tune" : "tunes"}
-              {props.selectedPlaylistIds &&
-                props.selectedPlaylistIds.length > 0 && (
-                  <span class="ml-1 text-gray-500 dark:text-gray-500">
-                    in selected{" "}
-                    {props.selectedPlaylistIds.length === 1
-                      ? "playlist"
-                      : "playlists"}
-                  </span>
-                )}
-            </span>
-            <Show when={selectedCount() > 0}>
-              <span class="text-blue-700 dark:text-blue-300">
-                {selectedCount()} {selectedCount() === 1 ? "tune" : "tunes"}{" "}
-                selected
-                <button
-                  type="button"
-                  class="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
-                  onClick={() => innerTable?.toggleAllRowsSelected?.(false)}
-                >
-                  Clear selection
-                </button>
-              </span>
-            </Show>
-          </div>
-        </div>
       </Show>{" "}
       {/* Empty state */}
       <Show
@@ -339,6 +307,38 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           </div>
         </div>
       </Show>
+
+      {/* Footer with tune count and selection info - Always visible */}
+      <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2 flex-shrink-0">
+        <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+          <span>
+            {filteredTunes().length}{" "}
+            {filteredTunes().length === 1 ? "tune" : "tunes"}
+            {props.selectedPlaylistIds &&
+              props.selectedPlaylistIds.length > 0 && (
+                <span class="ml-1 text-gray-500 dark:text-gray-500">
+                  in selected{" "}
+                  {props.selectedPlaylistIds.length === 1
+                    ? "playlist"
+                    : "playlists"}
+                </span>
+              )}
+          </span>
+          <Show when={selectedCount() > 0}>
+            <span class="text-blue-700 dark:text-blue-300">
+              {selectedCount()} {selectedCount() === 1 ? "tune" : "tunes"}{" "}
+              selected
+              <button
+                type="button"
+                class="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
+                onClick={() => innerTable?.toggleAllRowsSelected?.(false)}
+              >
+                Clear selection
+              </button>
+            </span>
+          </Show>
+        </div>
+      </div>
     </div>
   );
 };
