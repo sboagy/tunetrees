@@ -13,7 +13,7 @@ import type {
 } from "@kobalte/core/checkbox";
 import { Checkbox as CheckboxPrimitive } from "@kobalte/core/checkbox";
 import type { PolymorphicProps } from "@kobalte/core/polymorphic";
-import type { ValidComponent, VoidProps } from "solid-js";
+import type { ValidComponent, ParentProps } from "solid-js";
 import { splitProps } from "solid-js";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +40,7 @@ export const Checkbox = <T extends ValidComponent = "div">(
 };
 
 type CheckboxControlPropsWithClass<T extends ValidComponent = "div"> =
-  VoidProps<CheckboxControlProps<T> & { class?: string }>;
+	ParentProps<CheckboxControlProps<T> & { class?: string }>;
 
 export const CheckboxControl = <T extends ValidComponent = "div">(
   props: PolymorphicProps<T, CheckboxControlPropsWithClass<T>>,
@@ -64,7 +64,7 @@ export const CheckboxControl = <T extends ValidComponent = "div">(
 };
 
 type CheckboxIndicatorPropsWithClass<T extends ValidComponent = "div"> =
-  VoidProps<CheckboxIndicatorProps<T> & { class?: string }>;
+	ParentProps<CheckboxIndicatorProps<T> & { class?: string }>;
 
 export const CheckboxIndicator = <T extends ValidComponent = "div">(
   props: PolymorphicProps<T, CheckboxIndicatorPropsWithClass<T>>,

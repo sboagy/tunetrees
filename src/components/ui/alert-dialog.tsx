@@ -8,11 +8,10 @@
  */
 
 import type {
-  DialogContentProps,
-  DialogDescriptionProps,
-  DialogRootProps,
-  DialogTitleProps,
-  DialogTriggerProps,
+	DialogContentProps,
+	DialogDescriptionProps,
+	DialogTitleProps,
+	DialogTriggerProps,
 } from "@kobalte/core/dialog";
 import { Dialog as DialogPrimitive } from "@kobalte/core/dialog";
 import type { PolymorphicProps } from "@kobalte/core/polymorphic";
@@ -22,13 +21,7 @@ import { cn } from "@/lib/utils";
 
 export const AlertDialogTrigger = DialogPrimitive.Trigger;
 
-type AlertDialogRootPropsWithClass = DialogRootProps & { class?: string };
-
-export const AlertDialog = (props: AlertDialogRootPropsWithClass) => {
-  const [local, rest] = splitProps(props, ["class"]);
-
-  return <DialogPrimitive class={cn("", local.class)} {...rest} />;
-};
+export const AlertDialog = DialogPrimitive;
 
 type AlertDialogContentPropsWithClass<T extends ValidComponent = "div"> =
   ParentProps<DialogContentProps<T> & { class?: string }>;

@@ -127,7 +127,7 @@ export const CompactFilterDropdown: Component<CompactFilterDropdownProps> = (
                       onChange={() => toggleValue(option)}
                     >
                       <CheckboxControl class="h-4 w-4">
-                        <CheckboxIndicator />
+                        <CheckboxIndicator></CheckboxIndicator>
                       </CheckboxControl>
                     </Checkbox>
                     <span class="text-sm text-gray-900 dark:text-white">
