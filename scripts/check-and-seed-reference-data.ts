@@ -22,7 +22,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.error("   VITE_SUPABASE_URL:", supabaseUrl ? "✓" : "✗");
   console.error(
     "   SUPABASE_SERVICE_ROLE_KEY:",
-    supabaseServiceKey ? "✓" : "✗"
+    supabaseServiceKey ? "✓" : "✗",
   );
   process.exit(1);
 }
@@ -280,7 +280,7 @@ async function seedTuneTypes(): Promise<void> {
     if (error) {
       console.error(
         `  ❌ Failed to insert tune type ${tuneType.id}:`,
-        error.message
+        error.message,
       );
     } else {
       console.log(`  ✅ ${tuneType.name}`);
@@ -304,7 +304,7 @@ async function seedGenreTuneTypes(): Promise<void> {
   }
 
   console.log(
-    `✅ Seeded ${GENRE_TUNE_TYPE.length} genre-tune_type relationships`
+    `✅ Seeded ${GENRE_TUNE_TYPE.length} genre-tune_type relationships`,
   );
 }
 
@@ -348,7 +348,7 @@ async function main() {
 
   if (instrumentCount === 0) {
     console.log(
-      "\n⚠️  Instrument table is empty - this should be seeded separately"
+      "\n⚠️  Instrument table is empty - this should be seeded separately",
     );
   } else {
     console.log(`\n✅ Instrument table has ${instrumentCount} rows`);

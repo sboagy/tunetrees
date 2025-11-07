@@ -74,7 +74,7 @@ function updateFile(filePath: string): void {
   if (content.includes('test.use({ storageState: "e2e/.auth/alice.json" });')) {
     content = content.replace(
       /test\.use\(\{ storageState: "e2e\/\.auth\/alice\.json" \}\);\n\n/,
-      ""
+      "",
     );
     changed = true;
   }
@@ -98,7 +98,7 @@ function updateFile(filePath: string): void {
   // Update beforeEach signatures to include testUser
   content = content.replace(
     /test\.beforeEach\(async \(\{ page \}\)/g,
-    "test.beforeEach(async ({ page, testUser })"
+    "test.beforeEach(async ({ page, testUser })",
   );
 
   if (changed) {
@@ -113,7 +113,7 @@ function updateFile(filePath: string): void {
 const files = fs.readdirSync(testsDir).filter((f) => f.endsWith(".spec.ts"));
 
 console.log(
-  `\nConverting ${files.length} test files to parallel-safe setup...\n`
+  `\nConverting ${files.length} test files to parallel-safe setup...\n`,
 );
 
 for (const file of files) {

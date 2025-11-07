@@ -54,8 +54,8 @@ test.describe("TOPNAV-003: User Menu Dropdown", () => {
     // Should show user ID (UUID format) - just check for UUID pattern
     await expect(
       page.getByText(
-        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
-      )
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+      ),
     ).toBeVisible({ timeout: 2000 });
   });
 
@@ -64,7 +64,7 @@ test.describe("TOPNAV-003: User Menu Dropdown", () => {
 
     // Email should be visible within the dropdown content
     const emailInDropdown = ttPage.userMenuPanel.getByText(
-      currentTestUser.email
+      currentTestUser.email,
     );
     await expect(emailInDropdown).toBeVisible({ timeout: 2000 });
   });

@@ -38,7 +38,7 @@ export const ReferencesPanel: Component = () => {
       if (!params.tuneId || !params.userId) return [];
       const db = getDb();
       return await getReferencesByTune(db, params.tuneId, params.userId);
-    }
+    },
   );
 
   // Handle creating a new reference

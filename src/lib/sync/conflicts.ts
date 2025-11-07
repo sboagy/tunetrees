@@ -86,7 +86,7 @@ export function detectConflict(localRecord: any, remoteRecord: any): boolean {
  */
 export function resolveConflict(
   conflict: SyncConflict,
-  strategy: ConflictStrategy = "last-write-wins"
+  strategy: ConflictStrategy = "last-write-wins",
 ): ConflictResolution {
   const timestamp = new Date().toISOString();
 
@@ -113,7 +113,7 @@ export function resolveConflict(
     case "manual":
       throw new Error(
         "Manual conflict resolution requires user interaction. " +
-          "Show conflict UI and call resolveConflict with chosen strategy."
+          "Show conflict UI and call resolveConflict with chosen strategy.",
       );
 
     default:
@@ -134,7 +134,7 @@ export function resolveConflict(
  */
 function resolveLastWriteWins(
   conflict: SyncConflict,
-  timestamp: string
+  timestamp: string,
 ): ConflictResolution {
   const localTime = new Date(conflict.localTimestamp).getTime();
   const remoteTime = new Date(conflict.remoteTimestamp).getTime();
@@ -180,7 +180,7 @@ export function createConflict(
   tableName: string,
   recordId: string,
   localRecord: any,
-  remoteRecord: any
+  remoteRecord: any,
 ): SyncConflict {
   return {
     tableName,
@@ -208,7 +208,7 @@ export function createConflict(
  * @returns Merged record (union of both changes)
  */
 export function mergeNonConflictingFields(
-  conflict: SyncConflict
+  conflict: SyncConflict,
 ): Record<string, unknown> {
   const merged = { ...conflict.remoteData }; // Start with remote (authoritative)
 
@@ -236,12 +236,12 @@ export function mergeNonConflictingFields(
  */
 export function logConflict(
   conflict: SyncConflict,
-  resolution: ConflictResolution
+  resolution: ConflictResolution,
 ): void {
   console.warn(
     `[Conflict] ${conflict.tableName}:${conflict.recordId}`,
     `\n  Local:  v${conflict.localVersion} @ ${conflict.localTimestamp}`,
     `\n  Remote: v${conflict.remoteVersion} @ ${conflict.remoteTimestamp}`,
-    `\n  Winner: ${resolution.winner} (${resolution.strategy})`
+    `\n  Winner: ${resolution.winner} (${resolution.strategy})`,
   );
 }

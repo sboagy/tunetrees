@@ -58,7 +58,7 @@ function getTypeLabel(refType: string | null): string {
  * Group references by type
  */
 function groupReferencesByType(
-  references: Reference[]
+  references: Reference[],
 ): Map<string, Reference[]> {
   const groups = new Map<string, Reference[]>();
 

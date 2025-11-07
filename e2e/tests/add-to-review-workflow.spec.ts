@@ -39,7 +39,7 @@ test.describe("Add To Review - Complete Workflow", () => {
 
     // Verify we have exactly 6 tunes (use data-index to exclude spacer rows)
     const repRows = page.locator(
-      '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
+      '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]',
     );
     const repCount = await repRows.count();
     console.log(`📊 Repertoire has ${repCount} tunes (expect 6)`);
@@ -83,7 +83,7 @@ test.describe("Add To Review - Complete Workflow", () => {
     await page.waitForTimeout(2000);
 
     const practiceRows = page.locator(
-      '[data-testid="tunes-grid-scheduled"] tbody tr[data-index]'
+      '[data-testid="tunes-grid-scheduled"] tbody tr[data-index]',
     );
     const practiceCount = await practiceRows.count();
     console.log(`📊 Practice queue: ${practiceCount} tunes (expect 3)`);
@@ -107,7 +107,7 @@ test.describe("Add To Review - Complete Workflow", () => {
     await page.waitForTimeout(3000);
 
     const practiceRowsAfter = page.locator(
-      '[data-testid="tunes-grid-scheduled"] tbody tr[data-index]'
+      '[data-testid="tunes-grid-scheduled"] tbody tr[data-index]',
     );
     const practiceCountAfter = await practiceRowsAfter.count();
     console.log(`📊 After reload: ${practiceCountAfter} tunes (expect 3)`);

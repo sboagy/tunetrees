@@ -14,10 +14,7 @@
     "port": 3001,
     "host": "localhost"
   },
-  "capabilities": [
-    "core",
-    "vision"
-  ],
+  "capabilities": ["core", "vision"],
   "saveTrace": false,
   "outputDir": "./playwright-output"
 }

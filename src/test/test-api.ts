@@ -43,7 +43,7 @@ async function resolveUserId(db: SqliteDatabase): Promise<string> {
   if (!userId) throw new Error("No authenticated user in test session");
 
   const result = await db.all<{ id: string }>(
-    sql`SELECT id FROM user_profile WHERE supabase_user_id = ${userId} LIMIT 1`
+    sql`SELECT id FROM user_profile WHERE supabase_user_id = ${userId} LIMIT 1`,
   );
   const id = result[0]?.id;
   if (!id) throw new Error("user_profile row not found for current user");
@@ -70,8 +70,8 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
         and(
           eq(playlistTune.playlistRef, input.playlistId),
           eq(playlistTune.tuneRef, tuneId),
-          eq(playlistTune.deleted, 0)
-        )
+          eq(playlistTune.deleted, 0),
+        ),
       )
       .returning();
     if (res && res.length > 0) updated++;
@@ -85,8 +85,8 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       .where(
         and(
           eq(practiceRecord.playlistRef, input.playlistId),
-          eq(practiceRecord.tuneRef, tuneId)
-        )
+          eq(practiceRecord.tuneRef, tuneId),
+        ),
       )
       .limit(1);
 
@@ -128,8 +128,8 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       and(
         eq(dailyPracticeQueue.userRef, userRef),
         eq(dailyPracticeQueue.playlistRef, input.playlistId),
-        eq(dailyPracticeQueue.active, 1)
-      )
+        eq(dailyPracticeQueue.active, 1),
+      ),
     )
     .orderBy(desc(dailyPracticeQueue.windowStartUtc))
     .limit(1);
@@ -141,8 +141,8 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
         and(
           eq(dailyPracticeQueue.userRef, userRef),
           eq(dailyPracticeQueue.playlistRef, input.playlistId),
-          eq(dailyPracticeQueue.windowStartUtc, latestWindow[0].windowStart)
-        )
+          eq(dailyPracticeQueue.windowStartUtc, latestWindow[0].windowStart),
+        ),
       )
       .run();
   }
@@ -155,7 +155,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
     new Date(),
     null,
     "per_day",
-    true
+    true,
   );
 
   // Return a compact summary

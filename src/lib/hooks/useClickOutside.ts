@@ -35,7 +35,7 @@ import { type Accessor, onCleanup, onMount } from "solid-js";
  */
 export function useClickOutside(
   ref: Accessor<HTMLElement | undefined>,
-  handler: (event: MouseEvent | TouchEvent) => void
+  handler: (event: MouseEvent | TouchEvent) => void,
 ): void {
   const handleClickOutside = (event: MouseEvent | TouchEvent) => {
     const element = ref();

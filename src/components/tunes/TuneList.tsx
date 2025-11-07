@@ -84,13 +84,13 @@ export const TuneList: Component<TuneListProps> = (props) => {
   // Filter state from URL params
   const [searchQuery, setSearchQuery] = createSignal(getParam(searchParams.q));
   const [selectedTypes, setSelectedTypes] = createSignal<string[]>(
-    getParamArray(searchParams.types)
+    getParamArray(searchParams.types),
   );
   const [selectedModes, setSelectedModes] = createSignal<string[]>(
-    getParamArray(searchParams.modes)
+    getParamArray(searchParams.modes),
   );
   const [selectedGenres, setSelectedGenres] = createSignal<string[]>(
-    getParamArray(searchParams.genres)
+    getParamArray(searchParams.genres),
   );
   const [sorting, setSorting] = createSignal<SortingState>([]);
   const [rowSelection, setRowSelection] = createSignal<RowSelectionState>({});
@@ -138,7 +138,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
         const playlistTunes = await getPlaylistTunes(
           params.db,
           params.playlistId,
-          params.userId
+          params.userId,
         );
         // Transform to Tune[] format by extracting the nested tune object
         return playlistTunes.map((pt) => pt.tune);
@@ -146,7 +146,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
 
       // Otherwise, get all user's tunes
       return await getTunesForUser(params.db, params.userId);
-    }
+    },
   );
 
   // Filter tunes based on search and filters
@@ -416,7 +416,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
     try {
       // Add all selected tunes to the playlist
       await Promise.all(
-        tunes.map((tune) => addTuneToPlaylist(db, playlistId, tune.id, userId))
+        tunes.map((tune) => addTuneToPlaylist(db, playlistId, tune.id, userId)),
       );
 
       // Clear selection and close modal
@@ -434,7 +434,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
   const handleAddTags = () => {
     console.log(
       "Add tags:",
-      selectedTunes().map((t) => t.title)
+      selectedTunes().map((t) => t.title),
     );
     // TODO: Implement tag input modal
   };
@@ -572,7 +572,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
                               <div class="flex items-center gap-2">
                                 {flexRender(
                                   header.column.columnDef.header,
-                                  header.getContext()
+                                  header.getContext(),
                                 )}
                                 <span class="text-gray-400">
                                   {{
@@ -601,7 +601,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
                             <td class="px-4 py-2 whitespace-nowrap text-sm">
                               {flexRender(
                                 cell.column.columnDef.cell,
-                                cell.getContext()
+                                cell.getContext(),
                               )}
                             </td>
                           )}

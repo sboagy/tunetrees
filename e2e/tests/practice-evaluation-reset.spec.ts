@@ -33,7 +33,7 @@ test.describe("Practice Evaluation Interaction", () => {
   async function selectEvalFor(
     page: import("@playwright/test").Page,
     tuneId: string,
-    optionKey: "not-set" | "again" | "hard" | "good" | "easy"
+    optionKey: "not-set" | "again" | "hard" | "good" | "easy",
   ) {
     const trigger = page.getByTestId(`recall-eval-${tuneId}`);
     const menu = page.getByTestId(`recall-eval-menu-${tuneId}`);
@@ -59,20 +59,20 @@ test.describe("Practice Evaluation Interaction", () => {
         // Check if page is still alive before waiting
         if (page.isClosed()) {
           throw new Error(
-            `Page closed during eval selection for tune ${tuneId}`
+            `Page closed during eval selection for tune ${tuneId}`,
           );
         }
         await page.waitForTimeout(150);
       }
     }
     throw new Error(
-      `Failed to select option ${optionKey} for tune ${tuneId} after retries`
+      `Failed to select option ${optionKey} for tune ${tuneId} after retries`,
     );
   }
 
   async function getNotSetIds(
     page: import("@playwright/test").Page,
-    needed: number
+    needed: number,
   ): Promise<string[]> {
     const loc = page.locator('[data-testid^="recall-eval-"]', {
       hasText: "(Not Set)",
@@ -127,7 +127,7 @@ test.describe("Practice Evaluation Interaction", () => {
 
     // Verify dropdown now shows Good and Submit is enabled
     await expect(page.getByTestId(`recall-eval-${targetId}`)).toContainText(
-      "Good"
+      "Good",
     );
     await expect(submitButton).toBeEnabled();
   });
@@ -154,7 +154,7 @@ test.describe("Practice Evaluation Interaction", () => {
     // Verify the UI reflects the change (row no longer shows "(Not Set)")
     await expect(submitButton).toBeEnabled();
     await expect(page.getByTestId(`recall-eval-${targetId}`)).not.toContainText(
-      "(Not Set)"
+      "(Not Set)",
     );
 
     // Verify count increased by 1
@@ -188,13 +188,13 @@ test.describe("Practice Evaluation Interaction", () => {
     if (ids.length >= 1) {
       await selectEvalFor(page, ids[0], "good");
       await expect(page.getByTestId(`recall-eval-${ids[0]}`)).not.toContainText(
-        "(Not Set)"
+        "(Not Set)",
       );
     }
     if (ids.length >= 2) {
       await selectEvalFor(page, ids[1], "easy");
       await expect(page.getByTestId(`recall-eval-${ids[1]}`)).not.toContainText(
-        "(Not Set)"
+        "(Not Set)",
       );
     }
     const afterAll = await submitButton.textContent();

@@ -142,7 +142,7 @@ export function getCatalogInstrumentUuid(legacyId: number): string {
   const uuid = CATALOG_INSTRUMENT_ID_MAP[legacyId];
   if (!uuid) {
     throw new Error(
-      `No catalog instrument UUID mapping for legacy ID: ${legacyId}`
+      `No catalog instrument UUID mapping for legacy ID: ${legacyId}`,
     );
   }
   return uuid;
@@ -152,7 +152,7 @@ export function getCatalogInstrumentUuid(legacyId: number): string {
  * Get catalog instrument by UUID
  */
 export function getCatalogInstrumentById(
-  uuid: string
+  uuid: string,
 ): CatalogInstrument | undefined {
   return CATALOG_INSTRUMENTS.find((inst) => inst.id === uuid);
 }
@@ -161,7 +161,7 @@ export function getCatalogInstrumentById(
  * Get catalog instrument by legacy ID
  */
 export function getCatalogInstrumentByLegacyId(
-  legacyId: number
+  legacyId: number,
 ): CatalogInstrument | undefined {
   return CATALOG_INSTRUMENTS.find((inst) => inst.legacyId === legacyId);
 }

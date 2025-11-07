@@ -62,7 +62,7 @@ test.describe("Catalog: Add To Repertoire - Fresh Database", () => {
 
     // Select tunes by ID (using IDs that exist in first page of catalog)
     console.log(
-      `🎯 Selecting tunes with IDs: ${CATALOG_TUNE_MORRISON_ID}, ${CATALOG_TUNE_43_ID}, ${CATALOG_TUNE_54_ID}, ${CATALOG_TUNE_55_ID}`
+      `🎯 Selecting tunes with IDs: ${CATALOG_TUNE_MORRISON_ID}, ${CATALOG_TUNE_43_ID}, ${CATALOG_TUNE_54_ID}, ${CATALOG_TUNE_55_ID}`,
     );
 
     const tune1 = page.getByRole("checkbox", {

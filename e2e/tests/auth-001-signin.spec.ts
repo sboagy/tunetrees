@@ -67,7 +67,7 @@ test.describe("AUTH-001: User Authentication", () => {
 
     if (!ALICE_PASSWORD) {
       throw new Error(
-        "ALICE_TEST_PASSWORD environment variable is not set; please set ALICE_TEST_PASSWORD to the test user's password before running E2E tests."
+        "ALICE_TEST_PASSWORD environment variable is not set; please set ALICE_TEST_PASSWORD to the test user's password before running E2E tests.",
       );
     }
 

@@ -52,7 +52,7 @@ export interface UpdateReferenceData {
 export async function getReferencesByTune(
   db: SqliteDatabase,
   tuneId: string, // UUID
-  supabaseUserId?: string
+  supabaseUserId?: string,
 ): Promise<Reference[]> {
   const conditions = [
     eq(schema.reference.tuneRef, tuneId),
@@ -81,13 +81,16 @@ export async function getReferencesByTune(
  */
 export async function getReferenceById(
   db: SqliteDatabase,
-  referenceId: string // UUID
+  referenceId: string, // UUID
 ): Promise<Reference | undefined> {
   const references = await db
     .select()
     .from(schema.reference)
     .where(
-      and(eq(schema.reference.id, referenceId), eq(schema.reference.deleted, 0))
+      and(
+        eq(schema.reference.id, referenceId),
+        eq(schema.reference.deleted, 0),
+      ),
     )
     .all();
 
@@ -105,7 +108,7 @@ export async function getReferenceById(
 export async function createReference(
   db: SqliteDatabase,
   data: CreateReferenceData,
-  supabaseUserId: string
+  supabaseUserId: string,
 ): Promise<Reference> {
   const now = new Date().toISOString();
 
@@ -142,7 +145,7 @@ export async function createReference(
 export async function updateReference(
   db: SqliteDatabase,
   referenceId: string, // UUID
-  data: UpdateReferenceData
+  data: UpdateReferenceData,
 ): Promise<Reference | undefined> {
   const now = new Date().toISOString();
 
@@ -194,7 +197,7 @@ export async function updateReference(
  */
 export async function deleteReference(
   db: SqliteDatabase,
-  referenceId: string // UUID
+  referenceId: string, // UUID
 ): Promise<boolean> {
   const now = new Date().toISOString();
 
@@ -220,7 +223,7 @@ export async function deleteReference(
  */
 export async function getReferenceCount(
   db: SqliteDatabase,
-  tuneId: string // UUID
+  tuneId: string, // UUID
 ): Promise<number> {
   const references = await getReferencesByTune(db, tuneId);
   return references.length;

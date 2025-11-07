@@ -42,15 +42,15 @@ setup("authenticate as Alice", async ({ page }) => {
       const hasAliceData = origins.some((origin: any) => {
         const localStorage = origin.localStorage || [];
         return localStorage.some((item: any) =>
-          item.value?.includes(ALICE_EMAIL)
+          item.value?.includes(ALICE_EMAIL),
         );
       });
 
       if (hasAliceData && fileAgeMinutes < AUTH_EXPIRY_MINUTES) {
         console.log(
           `✅ Using cached auth for Alice (${Math.round(
-            fileAgeMinutes
-          )} min old)`
+            fileAgeMinutes,
+          )} min old)`,
         );
         console.log("   (Set RESET_DB=true to force fresh login)");
         return; // Skip login flow
@@ -59,8 +59,8 @@ setup("authenticate as Alice", async ({ page }) => {
       } else {
         console.log(
           `⚠️  Cached auth is stale (${Math.round(
-            fileAgeMinutes
-          )} min old), logging in fresh...`
+            fileAgeMinutes,
+          )} min old), logging in fresh...`,
         );
       }
     } catch {
@@ -79,7 +79,7 @@ setup("authenticate as Alice", async ({ page }) => {
       // Step 1: Reset the database
       const { stdout: resetStdout, stderr: resetStderr } = await execAsync(
         "cd /Users/sboag/gittt/tunetrees && supabase db reset",
-        { timeout: 60000 }
+        { timeout: 60000 },
       );
       if (resetStdout) console.log(resetStdout);
       if (resetStderr) console.error(resetStderr);
@@ -98,7 +98,7 @@ setup("authenticate as Alice", async ({ page }) => {
         try {
           const { stdout: statusStdout } = await execAsync(
             "cd /Users/sboag/gittt/tunetrees && supabase status",
-            { timeout: 5000 }
+            { timeout: 5000 },
           );
 
           // Check if status output indicates services are running
@@ -107,7 +107,7 @@ setup("authenticate as Alice", async ({ page }) => {
             console.log(
               `   ✅ Supabase ready after ${attempt} attempts (${
                 4 + attempt * 2
-              }s total)`
+              }s total)`,
             );
           }
         } catch {
@@ -120,7 +120,7 @@ setup("authenticate as Alice", async ({ page }) => {
 
       if (!isReady) {
         throw new Error(
-          "Supabase did not become ready after 30 seconds of polling"
+          "Supabase did not become ready after 30 seconds of polling",
         );
       }
 
@@ -135,7 +135,7 @@ setup("authenticate as Alice", async ({ page }) => {
         {
           timeout: 30000,
           env: process.env, // Pass through all environment variables (from .env.local or CI)
-        }
+        },
       );
       if (setupStdout) console.log(setupStdout);
       if (setupStderr) console.error(setupStderr);
@@ -160,10 +160,10 @@ setup("authenticate as Alice", async ({ page }) => {
   if (!ALICE_PASSWORD) {
     if (!ALICE_PASSWORD) {
       console.error(
-        "🛑 Missing ALICE_TEST_PASSWORD. Set ALICE_TEST_PASSWORD in your environment to run E2E tests."
+        "🛑 Missing ALICE_TEST_PASSWORD. Set ALICE_TEST_PASSWORD in your environment to run E2E tests.",
       );
       throw new Error(
-        "ALICE_TEST_PASSWORD environment variable is not set. Export ALICE_TEST_PASSWORD or provide it in CI secrets."
+        "ALICE_TEST_PASSWORD environment variable is not set. Export ALICE_TEST_PASSWORD or provide it in CI secrets.",
       );
     }
   }

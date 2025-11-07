@@ -52,12 +52,12 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     const tune3Name = await rows.nth(2).locator("td").nth(1).textContent();
 
     console.log(
-      `📝 Selecting tunes: "${tune1Name}", "${tune2Name}", "${tune3Name}"`
+      `📝 Selecting tunes: "${tune1Name}", "${tune2Name}", "${tune3Name}"`,
     );
 
     // Select those 3 tunes
     const checkboxes = page.locator(
-      'input[type="checkbox"][aria-label^="Select row"]'
+      'input[type="checkbox"][aria-label^="Select row"]',
     );
     await checkboxes.nth(0).check();
     await page.waitForTimeout(200);
@@ -84,7 +84,7 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     expect(dialogMessage).toMatch(/Added \d+ tune/);
     const addedCount = Number.parseInt(
       dialogMessage.match(/Added (\d+)/)?.[1] || "0",
-      10
+      10,
     );
     console.log(`📨 Dialog says added: ${addedCount} tunes`);
     expect(addedCount).toBe(3);
@@ -114,7 +114,7 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     console.log("🔍 Verifying the selected tunes appear in practice queue...");
 
     const practiceTable = page.locator(
-      '[data-testid="tunes-grid-scheduled"] table tbody'
+      '[data-testid="tunes-grid-scheduled"] table tbody',
     );
 
     // Look for each tune by name in the practice tab

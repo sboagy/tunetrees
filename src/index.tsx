@@ -38,9 +38,12 @@ if ("serviceWorker" in navigator) {
           // Service worker registered successfully
           console.log("[PWA] Service Worker registered:", registration);
           // Check for updates every hour
-          setInterval(() => {
-            registration?.update();
-          }, 60 * 60 * 1000);
+          setInterval(
+            () => {
+              registration?.update();
+            },
+            60 * 60 * 1000,
+          );
         },
         onRegisterError(error: unknown) {
           console.error("[PWA] Service Worker registration failed:", error);

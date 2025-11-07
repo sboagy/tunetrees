@@ -134,7 +134,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
         db,
         props.playlistId,
         tuneIds,
-        auth.user()!.id
+        auth.user()!.id,
       );
 
       // Show feedback
@@ -162,7 +162,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
           error instanceof Error
             ? error.message
             : "Failed to add tunes to repertoire"
-        }`
+        }`,
       );
     }
   };

@@ -64,7 +64,7 @@ export function needsMigration(): boolean {
 
   if (needsUpdate && localVersion !== null) {
     console.warn(
-      `⚠️ Schema version mismatch: local=${localVersion}, current=${CURRENT_SCHEMA_VERSION}`
+      `⚠️ Schema version mismatch: local=${localVersion}, current=${CURRENT_SCHEMA_VERSION}`,
     );
   }
 
@@ -94,7 +94,7 @@ export function isForcedReset(): boolean {
  * @param db - The Drizzle database instance
  */
 export async function clearLocalDatabaseForMigration(
-  db: any // TODO: Type this properly when we have the db client type
+  db: any, // TODO: Type this properly when we have the db client type
 ): Promise<void> {
   console.log("🔄 Schema migration detected - clearing local database...");
 

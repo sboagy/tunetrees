@@ -22,14 +22,14 @@ const setDebugFlags = async (page: import("@playwright/test").Page) => {
 // Scroll utility: find the scroll container for a grid table by test id
 async function getGridContainer(
   page: import("@playwright/test").Page,
-  gridTestId: string
+  gridTestId: string,
 ) {
   const table = page.getByTestId(gridTestId);
   await expect(table).toBeVisible({ timeout: 15000 });
   const handle = await table.elementHandle();
   if (!handle) throw new Error(`Table ${gridTestId} not found`);
   const container = await handle.evaluateHandle(
-    (el) => el.parentElement as HTMLElement
+    (el) => el.parentElement as HTMLElement,
   );
   return container;
 }
@@ -37,7 +37,7 @@ async function getGridContainer(
 async function scrollTo(
   _page: import("@playwright/test").Page,
   containerHandle: any,
-  top: number
+  top: number,
 ) {
   await containerHandle.evaluate((el: Element, y: number) => {
     (el as HTMLElement).scrollTop = y;
@@ -46,10 +46,10 @@ async function scrollTo(
 
 async function getScrollTop(
   _page: import("@playwright/test").Page,
-  containerHandle: any
+  containerHandle: any,
 ) {
   return containerHandle.evaluate(
-    (el: Element) => (el as HTMLElement).scrollTop as number
+    (el: Element) => (el as HTMLElement).scrollTop as number,
   );
 }
 
@@ -61,7 +61,7 @@ async function clickHeader(page: import("@playwright/test").Page, id: string) {
 // Navigate via page object to ensure robust waits
 async function gotoTab(
   app: TuneTreesPage,
-  tab: "practice" | "repertoire" | "catalog"
+  tab: "practice" | "repertoire" | "catalog",
 ) {
   await app.navigateToTab(tab);
 }
@@ -297,7 +297,7 @@ test.describe("Scroll Reset Debugger", () => {
         didAnyScroll = true;
         const s1 = await getScrollTop(page, container);
         console.log(
-          `[DEBUG] after initial scroll: ${flow.tab} scrollTop=${s1}`
+          `[DEBUG] after initial scroll: ${flow.tab} scrollTop=${s1}`,
         );
         attempts.push(`${flow.tab}: scrolled to ${s1}`);
 
@@ -309,12 +309,12 @@ test.describe("Scroll Reset Debugger", () => {
             });
             const stored = await page.evaluate(
               (uid) => localStorage.getItem(`TT_CATALOG_SCROLL_${uid}`),
-              currentTestUser.userId
+              currentTestUser.userId,
             );
             throw new Error(
               `Catalog failed to scroll to >=900 (got ${s1}). stored=${stored}. Attempts=\n${attempts.join(
-                "\n"
-              )}`
+                "\n",
+              )}`,
             );
           }
         }
@@ -352,15 +352,15 @@ test.describe("Scroll Reset Debugger", () => {
           if (s4 < 800) {
             const stored = await page.evaluate(
               (uid) => localStorage.getItem(`TT_CATALOG_SCROLL_${uid}`),
-              currentTestUser.userId
+              currentTestUser.userId,
             );
             await page.screenshot({
               path: `test-results/scroll-debug-catalog-regressed-${Date.now()}.png`,
             });
             throw new Error(
               `Catalog scroll regressed (<800) after interactions (got ${s4}). stored=${stored}. Attempts=\n${attempts.join(
-                "\n"
-              )}`
+                "\n",
+              )}`,
             );
           }
         }
@@ -375,11 +375,11 @@ test.describe("Scroll Reset Debugger", () => {
         l.includes("[PRACTICE_SCROLL]") ||
         l.includes("[CATALOG_SCROLL]") ||
         l.includes("scrollTo invoked") ||
-        l.includes("scroll event: scrollTop")
+        l.includes("scroll event: scrollTop"),
     );
 
     console.log(
-      `\n===== Scroll Debug Console Snippets =====\n${interesting.join("\n")}`
+      `\n===== Scroll Debug Console Snippets =====\n${interesting.join("\n")}`,
     );
 
     // If we couldn't interact with any grid, fail loudly with diagnostics
@@ -389,8 +389,8 @@ test.describe("Scroll Reset Debugger", () => {
       });
       throw new Error(
         `No grids became visible within timeouts. Attempts: \n${attempts.join(
-          "\n"
-        )}`
+          "\n",
+        )}`,
       );
     }
 

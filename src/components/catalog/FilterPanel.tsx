@@ -364,14 +364,14 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
 
   const removePlaylist = (playlistId: string) => {
     props.onPlaylistIdsChange(
-      props.selectedPlaylistIds.filter((id) => id !== playlistId)
+      props.selectedPlaylistIds.filter((id) => id !== playlistId),
     );
   };
 
   // Get playlist display name by ID
   const getPlaylistNameById = (playlistId: string): string => {
     const playlist = props.availablePlaylists.find(
-      (p) => p.playlistId === playlistId
+      (p) => p.playlistId === playlistId,
     );
     return playlist
       ? getPlaylistDisplayName(playlist)

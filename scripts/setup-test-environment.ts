@@ -20,7 +20,7 @@ function getSupabaseServiceRoleKey(): string {
     return status.SERVICE_ROLE_KEY;
   } catch {
     throw new Error(
-      "Failed to get Supabase service role key. Make sure Supabase is running (supabase start)."
+      "Failed to get Supabase service role key. Make sure Supabase is running (supabase start).",
     );
   }
 }
@@ -205,7 +205,7 @@ async function setup() {
     console.error("   ❌ Private tunes failed:", privateTunesError);
   } else {
     console.log(
-      `   ✅ ${privateTunes.length} private tunes created (2 per user)`
+      `   ✅ ${privateTunes.length} private tunes created (2 per user)`,
     );
   }
 
@@ -234,7 +234,7 @@ async function setup() {
     console.error("   ❌ Playlist_tune links failed:", playlistTuneError);
   } else {
     console.log(
-      `   ✅ ${playlistTuneLinks.length} playlist_tune links created`
+      `   ✅ ${playlistTuneLinks.length} playlist_tune links created`,
     );
   }
 
@@ -242,7 +242,7 @@ async function setup() {
   console.log("\n📋 Test users created:");
   TEST_USERS.forEach((user) => {
     console.log(
-      `   - ${user.email} (id: ${user.id}, playlist: ${user.playlistId})`
+      `   - ${user.email} (id: ${user.id}, playlist: ${user.playlistId})`,
     );
   });
 }

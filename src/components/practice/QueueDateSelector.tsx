@@ -85,7 +85,7 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
   const handleReset = () => {
     if (
       confirm(
-        "Reset the current active queue? This will regenerate the queue on next access."
+        "Reset the current active queue? This will regenerate the queue on next access.",
       )
     ) {
       props.onReset();

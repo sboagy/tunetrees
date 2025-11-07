@@ -25,7 +25,7 @@ export interface UpdateNoteData {
  */
 export async function getNotesByTune(
   db: SqliteDatabase,
-  tuneId: string // UUID
+  tuneId: string, // UUID
 ): Promise<Note[]> {
   return await db
     .select()
@@ -40,13 +40,13 @@ export async function getNotesByTune(
  */
 export async function getNotesByPlaylist(
   db: SqliteDatabase,
-  playlistId: string // UUID
+  playlistId: string, // UUID
 ): Promise<Note[]> {
   return await db
     .select()
     .from(schema.note)
     .where(
-      and(eq(schema.note.playlistRef, playlistId), eq(schema.note.deleted, 0))
+      and(eq(schema.note.playlistRef, playlistId), eq(schema.note.deleted, 0)),
     )
     .orderBy(desc(schema.note.createdDate))
     .all();
@@ -57,7 +57,7 @@ export async function getNotesByPlaylist(
  */
 export async function getNoteById(
   db: SqliteDatabase,
-  noteId: string // UUID
+  noteId: string, // UUID
 ): Promise<Note | undefined> {
   const notes = await db
     .select()
@@ -74,7 +74,7 @@ export async function getNoteById(
  */
 export async function createNote(
   db: SqliteDatabase,
-  data: CreateNoteData
+  data: CreateNoteData,
 ): Promise<Note> {
   const now = new Date().toISOString();
 
@@ -106,7 +106,7 @@ export async function createNote(
 export async function updateNote(
   db: SqliteDatabase,
   noteId: string, // UUID
-  data: UpdateNoteData
+  data: UpdateNoteData,
 ): Promise<Note | undefined> {
   const now = new Date().toISOString();
 
@@ -142,7 +142,7 @@ export async function updateNote(
  */
 export async function deleteNote(
   db: SqliteDatabase,
-  noteId: string // UUID
+  noteId: string, // UUID
 ): Promise<boolean> {
   const now = new Date().toISOString();
 
@@ -165,7 +165,7 @@ export async function deleteNote(
  */
 export async function permanentlyDeleteNote(
   db: SqliteDatabase,
-  noteId: string // UUID
+  noteId: string, // UUID
 ): Promise<boolean> {
   const result = await db
     .delete(schema.note)

@@ -117,16 +117,16 @@ export class TuneTreesPage {
     this.catalogAddTuneButton = page.getByTestId("catalog-add-tune-button");
     this.catalogColumnsButton = page.getByTestId("catalog-columns-button");
     this.catalogAddToRepertoireButton = page.getByTestId(
-      "catalog-add-to-repertoire-button"
+      "catalog-add-to-repertoire-button",
     );
     this.catalogDeleteButton = page.getByTestId("catalog-delete-button");
 
     // Tab-specific Toolbar Buttons - Repertoire
     this.repertoireAddTuneButton = page.getByTestId(
-      "repertoire-add-tune-button"
+      "repertoire-add-tune-button",
     );
     this.repertoireColumnsButton = page.getByTestId(
-      "repertoire-columns-button"
+      "repertoire-columns-button",
     );
     this.repertoireAddToReviewButton = page.getByTestId("add-to-review-button");
     this.repertoireDeleteButton = page.getByTestId("repertoire-delete-button");
@@ -134,7 +134,7 @@ export class TuneTreesPage {
     // Tab-specific Toolbar Buttons - Practice
     this.practiceColumnsButton = page.getByTestId("practice-columns-button");
     this.submitEvaluationsButton = page.getByTestId(
-      "submit-evaluations-button"
+      "submit-evaluations-button",
     );
     this.displaySubmittedSwitch = page.getByTestId("display-submitted-switch");
     this.flashcardModeSwitch = page.getByTestId("flashcard-mode-switch");
@@ -148,12 +148,12 @@ export class TuneTreesPage {
     this.flashcardTitle = page.getByTestId("flashcard-tune-title");
     this.flashcardRevealToggle = page.getByTestId("flashcard-reveal-toggle");
     this.flashcardRevealButtonMobile = page.getByTestId(
-      "flashcard-reveal-button"
+      "flashcard-reveal-button",
     );
     this.flashcardFieldsMenu = page.getByTestId("flashcard-fields-menu");
 
     this.topNavManagePlaylistsPanel = page.getByTestId(
-      "top-nav-manage-playlists-panel"
+      "top-nav-manage-playlists-panel",
     );
   }
 
@@ -170,7 +170,7 @@ export class TuneTreesPage {
    * Navigate to a specific tab by ID
    */
   async navigateToTab(
-    tabId: "practice" | "repertoire" | "catalog" | "analysis"
+    tabId: "practice" | "repertoire" | "catalog" | "analysis",
   ) {
     const tab = this.page.getByTestId(`tab-${tabId}`);
 
@@ -195,10 +195,10 @@ export class TuneTreesPage {
       tabId === "practice"
         ? this.practiceGrid
         : tabId === "repertoire"
-        ? this.repertoireGrid
-        : tabId === "catalog"
-        ? this.catalogGrid
-        : undefined;
+          ? this.repertoireGrid
+          : tabId === "catalog"
+            ? this.catalogGrid
+            : undefined;
     if (grid) {
       await expect(grid).toBeVisible({ timeout: 10000 });
     }
@@ -284,7 +284,7 @@ export class TuneTreesPage {
       delete?: boolean;
       columns?: boolean;
       tab?: "catalog" | "repertoire" | "practice";
-    } = {}
+    } = {},
   ) {
     const tab = options.tab || "catalog"; // Default to catalog for backwards compat
 
@@ -293,8 +293,8 @@ export class TuneTreesPage {
         tab === "catalog"
           ? this.catalogAddTuneButton
           : tab === "repertoire"
-          ? this.repertoireAddTuneButton
-          : this.addTuneButton;
+            ? this.repertoireAddTuneButton
+            : this.addTuneButton;
       await expect(button).toBeVisible({ timeout: 5000 });
     }
     if (options.addToRepertoire) {
@@ -307,8 +307,8 @@ export class TuneTreesPage {
         tab === "catalog"
           ? this.catalogDeleteButton
           : tab === "repertoire"
-          ? this.repertoireDeleteButton
-          : this.deleteButton;
+            ? this.repertoireDeleteButton
+            : this.deleteButton;
 
       if (options.delete) {
         await expect(deleteBtn).toBeVisible();
@@ -327,10 +327,10 @@ export class TuneTreesPage {
         tab === "catalog"
           ? this.catalogColumnsButton
           : tab === "repertoire"
-          ? this.repertoireColumnsButton
-          : tab === "practice"
-          ? this.practiceColumnsButton
-          : this.columnsButton;
+            ? this.repertoireColumnsButton
+            : tab === "practice"
+              ? this.practiceColumnsButton
+              : this.columnsButton;
       await expect(columnsBtn).toBeVisible({ timeout: 5000 });
     }
   }
@@ -525,7 +525,7 @@ export class TuneTreesPage {
 
   async waitForNextCardButtonToBeEnabled(
     maxRetries: number = 100,
-    retryDelayMs: number = 200
+    retryDelayMs: number = 200,
   ): Promise<number> {
     for (let i = 0; i < maxRetries; i++) {
       const isEnabled = await this.flashcardNextButton
@@ -542,7 +542,7 @@ export class TuneTreesPage {
 
   async waitForPrevCardButtonToBeEnabled(
     maxRetries: number = 100,
-    retryDelayMs: number = 200
+    retryDelayMs: number = 200,
   ): Promise<number> {
     for (let i = 0; i < maxRetries; i++) {
       const isEnabled = await this.flashcardPrevButton
@@ -616,7 +616,7 @@ export class TuneTreesPage {
   }
 
   async selectFlashcardEvaluation(
-    value: "again" | "hard" | "good" | "easy" | "not-set" = "good"
+    value: "again" | "hard" | "good" | "easy" | "not-set" = "good",
   ) {
     // Open the first (and only) evaluation combobox in the card
     const evalButton = this.page
@@ -642,7 +642,7 @@ export class TuneTreesPage {
   async toggleFlashcardField(
     face: "front" | "back",
     fieldId: string,
-    desired?: boolean
+    desired?: boolean,
   ) {
     await this.openFlashcardFieldsMenu();
     const checkbox = this.page.getByTestId(`ffv-${face}-${fieldId}`);
@@ -677,7 +677,7 @@ export class TuneTreesPage {
     maxRetries: number = 100,
     retryDelayMs: number = 200,
     countToWaitUpTo = 1,
-    waitGTE = true
+    waitGTE = true,
   ): Promise<number> {
     let total = 0;
     for (let i = 0; i < maxRetries; i++) {
@@ -694,7 +694,7 @@ export class TuneTreesPage {
       path: `test-results/flashcard-counter-timeout-${Date.now()}.png`,
     });
     throw new Error(
-      `Counter value did not stabilize within ${maxRetries * retryDelayMs}ms`
+      `Counter value did not stabilize within ${maxRetries * retryDelayMs}ms`,
     );
   }
 }

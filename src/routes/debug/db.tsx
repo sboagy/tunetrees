@@ -22,7 +22,7 @@ interface QueryResult {
 export default function DatabaseBrowser(): ReturnType<Component> {
   const { localDb } = useAuth();
   const [query, setQuery] = createSignal(
-    "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+    "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;",
   );
   const [results, setResults] = createSignal<QueryResult | null>(null);
   const [error, setError] = createSignal<string | null>(null);
@@ -36,7 +36,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
     if (!sqliteDb) return [];
 
     const result = sqliteDb.exec(
-      "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+      "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;",
     );
     if (result.length === 0) return [];
     return result[0].values.map((row: unknown[]) => row[0] as string);
@@ -169,7 +169,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
         `Error retrying failed items: ${
           error instanceof Error ? error.message : String(error)
         }`,
-        { duration: Number.POSITIVE_INFINITY }
+        { duration: Number.POSITIVE_INFINITY },
       );
     }
   };

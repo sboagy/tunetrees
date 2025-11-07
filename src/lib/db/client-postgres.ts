@@ -26,7 +26,7 @@ const connectionString = import.meta.env.VITE_SUPABASE_DATABASE_URL;
 if (!connectionString) {
   throw new Error(
     "VITE_SUPABASE_DATABASE_URL environment variable is required. " +
-      "Please add it to your .env file with your Supabase connection string."
+      "Please add it to your .env file with your Supabase connection string.",
   );
 }
 

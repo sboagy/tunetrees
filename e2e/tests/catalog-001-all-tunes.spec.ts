@@ -56,7 +56,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     // Verify user's private tune row exists
     const userPrivateTune = await ttPage.getTuneRowById(
       privateTune1Id,
-      ttPage.catalogGrid
+      ttPage.catalogGrid,
     );
     await expect(userPrivateTune).toBeVisible({ timeout: 3000 });
 
@@ -76,7 +76,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     // Check if user's private tune row exists
     const userPrivateTune = await ttPage.getTuneRowById(
       privateTune1Id,
-      ttPage.catalogGrid
+      ttPage.catalogGrid,
     );
 
     // Verify the row exists

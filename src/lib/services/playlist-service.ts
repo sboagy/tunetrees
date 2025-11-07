@@ -30,7 +30,7 @@ import type { Playlist } from "../db/types";
  */
 export async function ensureDefaultPlaylist(
   db: SqliteDatabase,
-  userId: string
+  userId: string,
 ): Promise<Playlist> {
   // Check if user already has playlists
   const existingPlaylists = await getUserPlaylists(db, userId);
@@ -49,7 +49,7 @@ export async function ensureDefaultPlaylist(
   });
 
   console.log(
-    `✅ Created default playlist ${defaultPlaylist.playlistId} for user ${userId}`
+    `✅ Created default playlist ${defaultPlaylist.playlistId} for user ${userId}`,
   );
 
   return defaultPlaylist;
@@ -67,7 +67,7 @@ export async function ensureDefaultPlaylist(
  */
 export async function getOrCreateDefaultPlaylist(
   db: SqliteDatabase,
-  userId: string
+  userId: string,
 ): Promise<Playlist | null> {
   try {
     return await ensureDefaultPlaylist(db, userId);
@@ -102,7 +102,7 @@ export function getSelectedPlaylistId(userId: string): string | null {
  */
 export function setSelectedPlaylistId(
   userId: string,
-  playlistId: string
+  playlistId: string,
 ): void {
   if (typeof window === "undefined") return;
 

@@ -66,7 +66,7 @@ export interface FilterBarProps {
  */
 export const FilterBar: Component<FilterBarProps> = (props) => {
   const [localSearchQuery, setLocalSearchQuery] = createSignal(
-    props.searchQuery
+    props.searchQuery,
   );
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -111,7 +111,7 @@ export const FilterBar: Component<FilterBarProps> = (props) => {
   const handleMultiSelect = (
     currentValues: string[],
     newValue: string,
-    onChange: (values: string[]) => void
+    onChange: (values: string[]) => void,
   ) => {
     if (currentValues.includes(newValue)) {
       onChange(currentValues.filter((v) => v !== newValue));
@@ -175,7 +175,7 @@ export const FilterBar: Component<FilterBarProps> = (props) => {
                         handleMultiSelect(
                           props.selectedTypes,
                           type,
-                          props.onTypesChange
+                          props.onTypesChange,
                         )
                       }
                       class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
@@ -214,7 +214,7 @@ export const FilterBar: Component<FilterBarProps> = (props) => {
                         handleMultiSelect(
                           props.selectedModes,
                           mode,
-                          props.onModesChange
+                          props.onModesChange,
                         )
                       }
                       class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
@@ -253,7 +253,7 @@ export const FilterBar: Component<FilterBarProps> = (props) => {
                         handleMultiSelect(
                           props.selectedGenres,
                           genre,
-                          props.onGenresChange
+                          props.onGenresChange,
                         )
                       }
                       class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"

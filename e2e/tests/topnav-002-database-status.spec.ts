@@ -30,7 +30,7 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
     // Adjust selector based on your implementation
     const dbIcon = page
       .locator(
-        '[aria-label*="database" i], [aria-label*="sync" i], [title*="database" i], [title*="sync" i]'
+        '[aria-label*="database" i], [aria-label*="sync" i], [title*="database" i], [title*="sync" i]',
       )
       .first();
 
@@ -96,10 +96,12 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
 
       // Should show sync status
       await expect(
-        ttPage.databaseDropdownPanel.getByText("Synced", { exact: true })
+        ttPage.databaseDropdownPanel.getByText("Synced", { exact: true }),
       ).toBeVisible({ timeout: 6000 });
       await expect(
-        ttPage.databaseDropdownPanel.getByText("All changes synced to Supabase")
+        ttPage.databaseDropdownPanel.getByText(
+          "All changes synced to Supabase",
+        ),
       ).toBeVisible({ timeout: 2000 });
     }
   });

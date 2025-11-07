@@ -30,7 +30,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
 
   // Column visibility shared with parent; TunesGrid also persists internally
   const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
-    props.columnVisibility || {}
+    props.columnVisibility || {},
   );
 
   createEffect(() => {
@@ -55,9 +55,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       return await getPlaylistTunesStaged(
         params.db,
         params.playlistId,
-        params.userId
+        params.userId,
       );
-    }
+    },
   );
 
   // Fetch genres for name→id mapping
@@ -70,7 +70,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     async (params) => {
       if (!params) return [];
       return await params.db.select().from(schema.genre).all();
-    }
+    },
   );
 
   // The view already returns ITuneOverview rows

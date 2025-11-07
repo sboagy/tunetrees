@@ -174,7 +174,7 @@ async function createTestUsers() {
 
           if (updateError) {
             console.log(
-              `  ❌ Failed to update password: ${updateError.message}`
+              `  ❌ Failed to update password: ${updateError.message}`,
             );
             errorCount++;
           } else {

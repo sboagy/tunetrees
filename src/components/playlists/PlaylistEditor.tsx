@@ -49,13 +49,13 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
   // Form state signals
   const [name, setName] = createSignal(props.playlist?.name || "");
   const [genreDefault, setGenreDefault] = createSignal<string | null>(
-    props.playlist?.genreDefault ?? null
+    props.playlist?.genreDefault ?? null,
   );
   const [instrumentRef, setInstrumentRef] = createSignal<string | null>(
-    props.playlist?.instrumentRef ?? null
+    props.playlist?.instrumentRef ?? null,
   );
   const [srAlgType, setSrAlgType] = createSignal(
-    props.playlist?.srAlgType || "fsrs"
+    props.playlist?.srAlgType || "fsrs",
   );
 
   // UI state
@@ -68,7 +68,7 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
     async (db) => {
       if (!db) return [];
       return await db.select().from(genre).all();
-    }
+    },
   );
 
   // Validate form

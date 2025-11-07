@@ -54,8 +54,8 @@ function isAuthFresh(authFile: string, userEmail: string): boolean {
     if (fileAgeMinutes >= AUTH_EXPIRY_MINUTES) {
       console.log(
         `⚠️  Auth file is stale (${Math.round(
-          fileAgeMinutes
-        )} min old): ${authFile}`
+          fileAgeMinutes,
+        )} min old): ${authFile}`,
       );
       return false;
     }
@@ -86,14 +86,14 @@ export const test = base.extend<TestUserFixture>({
 
   testUserKey: async ({ testUser }, use) => {
     const userKey = Object.keys(TEST_USERS).find(
-      (key) => TEST_USERS[key].email === testUser.email
+      (key) => TEST_USERS[key].email === testUser.email,
     );
 
     if (!userKey || userKey.trim() === "") {
       throw new Error(
         `No test user key found for email "${
           testUser.email
-        }". Available keys: ${Object.keys(TEST_USERS).join(", ")}`
+        }". Available keys: ${Object.keys(TEST_USERS).join(", ")}`,
       );
     }
 
@@ -107,10 +107,10 @@ export const test = base.extend<TestUserFixture>({
     // Check if auth file is fresh, warn if stale
     if (!isAuthFresh(authFile, testUser.email)) {
       console.log(
-        `❌ STALE AUTH: ${authFile} - Run 'npm run db:local:reset' to regenerate auth files`
+        `❌ STALE AUTH: ${authFile} - Run 'npm run db:local:reset' to regenerate auth files`,
       );
       throw new Error(
-        `Authentication expired for ${testUser.email}. Run: npm run db:local:reset`
+        `Authentication expired for ${testUser.email}. Run: npm run db:local:reset`,
       );
     }
 

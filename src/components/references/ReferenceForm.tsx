@@ -42,11 +42,11 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
   const [url, setUrl] = createSignal(props.reference?.url || "");
   const [title, setTitle] = createSignal(props.reference?.title || "");
   const [refType, setRefType] = createSignal(
-    props.reference?.refType || "other"
+    props.reference?.refType || "other",
   );
   const [comment, setComment] = createSignal(props.reference?.comment || "");
   const [favorite, setFavorite] = createSignal(
-    props.reference?.favorite === 1 || false
+    props.reference?.favorite === 1 || false,
   );
 
   // Validation state
@@ -72,7 +72,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
       }
     } else if (currentUrl) {
       setUrlError(
-        "Please enter a valid URL (must start with http:// or https://)"
+        "Please enter a valid URL (must start with http:// or https://)",
       );
     }
   });

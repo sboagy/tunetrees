@@ -56,7 +56,7 @@ import type {
 export async function getUserPlaylists(
   db: SqliteDatabase,
   userId: string,
-  includeDeleted = false
+  includeDeleted = false,
 ): Promise<PlaylistWithSummary[]> {
   // First, get the user_profile id from supabase_user_id
   const userRecord = await db
@@ -69,7 +69,7 @@ export async function getUserPlaylists(
   // This is normal on first login before syncDown populates the table
   if (!userRecord || userRecord.length === 0) {
     console.log(
-      `⚠️ User profile not found yet for ${userId}, returning empty playlists`
+      `⚠️ User profile not found yet for ${userId}, returning empty playlists`,
     );
     return [];
   }
@@ -136,7 +136,7 @@ export async function getUserPlaylists(
 export async function getPlaylistById(
   db: SqliteDatabase,
   playlistId: string,
-  userId: string
+  userId: string,
 ): Promise<Playlist | null> {
   // Get user_ref from supabase_user_id
   const userRecord = await db
@@ -155,7 +155,7 @@ export async function getPlaylistById(
     .select()
     .from(playlist)
     .where(
-      and(eq(playlist.playlistId, playlistId), eq(playlist.userRef, userRef))
+      and(eq(playlist.playlistId, playlistId), eq(playlist.userRef, userRef)),
     )
     .limit(1);
 
@@ -192,7 +192,7 @@ export async function createPlaylist(
   data: Omit<
     NewPlaylist,
     "playlistId" | "userRef" | "syncVersion" | "lastModifiedAt" | "deviceId"
-  >
+  >,
 ): Promise<Playlist> {
   // Get user_ref from supabase_user_id
   const userRecord = await db
@@ -262,7 +262,7 @@ export async function updatePlaylist(
   db: SqliteDatabase,
   playlistId: string,
   userId: string,
-  data: Partial<Omit<NewPlaylist, "userRef" | "id">>
+  data: Partial<Omit<NewPlaylist, "userRef" | "id">>,
 ): Promise<Playlist | null> {
   // Verify ownership
   const existing = await getPlaylistById(db, playlistId, userId);
@@ -317,7 +317,7 @@ export async function updatePlaylist(
 export async function deletePlaylist(
   db: SqliteDatabase,
   playlistId: string,
-  userId: string
+  userId: string,
 ): Promise<boolean> {
   // Verify ownership
   const existing = await getPlaylistById(db, playlistId, userId);
@@ -375,7 +375,7 @@ export async function addTuneToPlaylist(
   db: SqliteDatabase,
   playlistId: string,
   tuneId: string,
-  userId: string
+  userId: string,
 ): Promise<PlaylistTune> {
   // Verify playlist ownership
   const playlistRecord = await getPlaylistById(db, playlistId, userId);
@@ -390,8 +390,8 @@ export async function addTuneToPlaylist(
     .where(
       and(
         eq(playlistTune.playlistRef, playlistId),
-        eq(playlistTune.tuneRef, tuneId)
-      )
+        eq(playlistTune.tuneRef, tuneId),
+      ),
     )
     .limit(1);
 
@@ -409,8 +409,8 @@ export async function addTuneToPlaylist(
         .where(
           and(
             eq(playlistTune.playlistRef, playlistId),
-            eq(playlistTune.tuneRef, tuneId)
-          )
+            eq(playlistTune.tuneRef, tuneId),
+          ),
         )
         .returning();
 
@@ -474,7 +474,7 @@ export async function removeTuneFromPlaylist(
   db: SqliteDatabase,
   playlistId: string,
   tuneId: string,
-  userId: string
+  userId: string,
 ): Promise<boolean> {
   // Verify playlist ownership
   const playlistRecord = await getPlaylistById(db, playlistId, userId);
@@ -494,8 +494,8 @@ export async function removeTuneFromPlaylist(
     .where(
       and(
         eq(playlistTune.playlistRef, playlistId),
-        eq(playlistTune.tuneRef, tuneId)
-      )
+        eq(playlistTune.tuneRef, tuneId),
+      ),
     )
     .returning();
 
@@ -528,7 +528,7 @@ export async function removeTuneFromPlaylist(
 export async function getPlaylistTunes(
   db: SqliteDatabase,
   playlistId: string,
-  userId: string
+  userId: string,
 ) {
   // Verify playlist ownership
   const playlistRecord = await getPlaylistById(db, playlistId, userId);
@@ -561,8 +561,8 @@ export async function getPlaylistTunes(
       and(
         eq(playlistTune.playlistRef, playlistId),
         eq(playlistTune.deleted, 0),
-        eq(tune.deleted, 0)
-      )
+        eq(tune.deleted, 0),
+      ),
     )
     .orderBy(tune.title);
 
@@ -605,7 +605,7 @@ export async function getPlaylistTunes(
 export async function getPlaylistTunesStaged(
   db: SqliteDatabase,
   playlistId: string,
-  userId: string
+  userId: string,
 ) {
   // Verify playlist ownership
   const playlistRecord = await getPlaylistById(db, playlistId, userId);
@@ -661,7 +661,7 @@ export async function addTunesToPlaylist(
   db: SqliteDatabase,
   playlistId: string,
   tuneIds: string[],
-  userId: string
+  userId: string,
 ): Promise<{ added: number; skipped: number; tuneIds: string[] }> {
   // Verify playlist ownership
   const playlistRecord = await getPlaylistById(db, playlistId, userId);
@@ -682,8 +682,8 @@ export async function addTunesToPlaylist(
         .where(
           and(
             eq(playlistTune.playlistRef, playlistId),
-            eq(playlistTune.tuneRef, tuneId)
-          )
+            eq(playlistTune.tuneRef, tuneId),
+          ),
         )
         .limit(1);
 

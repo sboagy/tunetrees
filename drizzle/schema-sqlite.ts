@@ -25,7 +25,7 @@ export const dailyPracticeQueue = sqliteTable(
     scheduledSnapshot: text("scheduled_snapshot"),
     latestDueSnapshot: text("latest_due_snapshot"),
     acceptableDelinquencyWindowSnapshot: integer(
-      "acceptable_delinquency_window_snapshot"
+      "acceptable_delinquency_window_snapshot",
     ),
     tzOffsetMinutesSnapshot: integer("tz_offset_minutes_snapshot"),
     generatedAt: text("generated_at").notNull(),
@@ -40,25 +40,25 @@ export const dailyPracticeQueue = sqliteTable(
   },
   (table) => [
     uniqueIndex(
-      "daily_practice_queue_user_ref_playlist_ref_window_start_utc_tune_ref_unique"
+      "daily_practice_queue_user_ref_playlist_ref_window_start_utc_tune_ref_unique",
     ).on(table.userRef, table.playlistRef, table.windowStartUtc, table.tuneRef),
     index("idx_queue_generated_at").on(table.generatedAt),
     index("idx_queue_user_playlist_bucket").on(
       table.userRef,
       table.playlistRef,
-      table.bucket
+      table.bucket,
     ),
     index("idx_queue_user_playlist_active").on(
       table.userRef,
       table.playlistRef,
-      table.active
+      table.active,
     ),
     index("idx_queue_user_playlist_window").on(
       table.userRef,
       table.playlistRef,
-      table.windowStartUtc
+      table.windowStartUtc,
     ),
-  ]
+  ],
 );
 
 export const genre = sqliteTable("genre", {
@@ -83,7 +83,7 @@ export const genreTuneType = sqliteTable(
       columns: [table.genreId, table.tuneTypeId],
       name: "genre_tune_type_genre_id_tune_type_id_pk",
     }),
-  ]
+  ],
 );
 
 export const instrument = sqliteTable(
@@ -91,7 +91,7 @@ export const instrument = sqliteTable(
   {
     id: text().primaryKey().notNull(), // UUID
     privateToUser: text("private_to_user").references(
-      () => userProfile.supabaseUserId
+      () => userProfile.supabaseUserId,
     ), // UUID FK
     instrument: text(),
     description: text(),
@@ -104,11 +104,11 @@ export const instrument = sqliteTable(
   (table) => [
     uniqueIndex("instrument_private_to_user_instrument_unique").on(
       table.privateToUser,
-      table.instrument
+      table.instrument,
     ),
     index("idx_instrument_private_to_user").on(table.privateToUser),
     index("idx_instrument_instrument").on(table.instrument),
-  ]
+  ],
 );
 
 export const note = sqliteTable(
@@ -135,10 +135,10 @@ export const note = sqliteTable(
       table.tuneRef,
       table.playlistRef,
       table.userRef,
-      table.public
+      table.public,
     ),
     index("idx_note_tune_playlist").on(table.tuneRef, table.playlistRef),
-  ]
+  ],
 );
 
 export const playlist = sqliteTable(
@@ -160,9 +160,9 @@ export const playlist = sqliteTable(
   (table) => [
     uniqueIndex("playlist_user_ref_instrument_ref_unique").on(
       table.userRef,
-      table.instrumentRef
+      table.instrumentRef,
     ),
-  ]
+  ],
 );
 
 export const playlistTune = sqliteTable(
@@ -188,7 +188,7 @@ export const playlistTune = sqliteTable(
       columns: [table.playlistRef, table.tuneRef],
       name: "playlist_tune_playlist_ref_tune_ref_pk",
     }),
-  ]
+  ],
 );
 
 export const practiceRecord = sqliteTable(
@@ -224,16 +224,16 @@ export const practiceRecord = sqliteTable(
     uniqueIndex("practice_record_tune_ref_playlist_ref_practiced_unique").on(
       table.tuneRef,
       table.playlistRef,
-      table.practiced
+      table.practiced,
     ),
     index("idx_practice_record_practiced").on(table.practiced),
     index("idx_practice_record_tune_playlist_practiced").on(
       table.tuneRef,
       table.playlistRef,
-      table.practiced
+      table.practiced,
     ),
     index("idx_practice_record_id").on(table.id),
-  ]
+  ],
 );
 
 export const prefsSchedulingOptions = sqliteTable("prefs_scheduling_options", {
@@ -276,7 +276,7 @@ export const prefsSpacedRepetition = sqliteTable(
       columns: [table.userId, table.algType],
       name: "prefs_spaced_repetition_user_id_alg_type_pk",
     }),
-  ]
+  ],
 );
 
 export const reference = sqliteTable(
@@ -302,11 +302,11 @@ export const reference = sqliteTable(
     index("idx_reference_user_tune_public").on(
       table.userRef,
       table.tuneRef,
-      table.public
+      table.public,
     ),
     index("idx_reference_tune_user_ref").on(table.tuneRef, table.userRef),
     index("idx_reference_tune_public").on(table.tuneRef, table.public),
-  ]
+  ],
 );
 
 export const syncQueue = sqliteTable("sync_queue", {
@@ -365,7 +365,7 @@ export const tableState = sqliteTable(
       ],
       name: "table_state_user_id_screen_size_purpose_playlist_id_pk",
     }),
-  ]
+  ],
 );
 
 export const tableTransientData = sqliteTable(
@@ -406,7 +406,7 @@ export const tableTransientData = sqliteTable(
       columns: [table.userId, table.tuneId, table.playlistId],
       name: "table_transient_data_user_id_tune_id_playlist_id_pk",
     }),
-  ]
+  ],
 );
 
 export const tag = sqliteTable(
@@ -428,11 +428,11 @@ export const tag = sqliteTable(
     uniqueIndex("tag_user_ref_tune_ref_tag_text_unique").on(
       table.userRef,
       table.tuneRef,
-      table.tagText
+      table.tagText,
     ),
     index("idx_tag_user_ref_tune_ref").on(table.userRef, table.tuneRef),
     index("idx_tag_user_ref_tag_text").on(table.userRef, table.tagText),
-  ]
+  ],
 );
 
 export const tune = sqliteTable("tune", {
@@ -491,7 +491,7 @@ export const userProfile = sqliteTable(
     phone: text(),
     phoneVerified: text("phone_verified"),
     acceptableDelinquencyWindow: integer(
-      "acceptable_delinquency_window"
+      "acceptable_delinquency_window",
     ).default(21),
     deleted: integer().default(0).notNull(),
     syncVersion: integer("sync_version").default(1).notNull(),
@@ -500,7 +500,7 @@ export const userProfile = sqliteTable(
   },
   (table) => [
     uniqueIndex("user_profile_supabase_user_id_unique").on(
-      table.supabaseUserId
+      table.supabaseUserId,
     ),
-  ]
+  ],
 );

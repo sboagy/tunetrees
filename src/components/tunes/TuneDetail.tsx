@@ -85,7 +85,7 @@ export const TuneDetail: Component<TuneDetailProps> = (props) => {
       const db = getDb();
       const tags = await getTuneTags(db, params.tuneId, params.userId); // params.userId is already a UUID string
       return tags.map((t) => t.tagText);
-    }
+    },
   );
 
   // Load references for this tune - reactive: refetches when tune.id or user changes
@@ -96,7 +96,7 @@ export const TuneDetail: Component<TuneDetailProps> = (props) => {
 
       const db = getDb();
       return await getReferencesByTune(db, params.tuneId, params.userId); // params.userId is UUID string
-    }
+    },
   );
 
   const handleEdit = () => {

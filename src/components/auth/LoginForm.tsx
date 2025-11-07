@@ -84,7 +84,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
         const { error: signUpError } = await signUp(
           emailVal,
           passwordVal,
-          nameVal
+          nameVal,
         );
         if (signUpError) {
           setError(signUpError.message);
@@ -158,7 +158,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
         emailVal,
         {
           redirectTo: `${window.location.origin}/auth/callback`,
-        }
+        },
       );
 
       if (resetError) {

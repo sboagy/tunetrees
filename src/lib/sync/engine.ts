@@ -118,7 +118,7 @@ export class SyncEngine {
     localDb: SqliteDatabase,
     supabase: SupabaseClient,
     userId: string,
-    config: Partial<SyncConfig> = {}
+    config: Partial<SyncConfig> = {},
   ) {
     this.localDb = localDb;
     this.supabase = supabase;
@@ -197,7 +197,7 @@ export class SyncEngine {
       // Get pending sync items in batches
       const pendingItems = await getPendingSyncItems(
         this.localDb,
-        this.config.batchSize
+        this.config.batchSize,
       );
 
       if (pendingItems.length === 0) {
@@ -235,7 +235,7 @@ export class SyncEngine {
             `[SyncEngine] Failed to sync item ${item.id} (${item.tableName} ${item.operation}):`,
             errorMsg,
             "\nItem data:",
-            item.data
+            item.data,
           );
 
           // Update item status based on retry count
@@ -247,7 +247,7 @@ export class SyncEngine {
             // Show persistent toast for permanently failed items
             toast.error(
               `Sync failed permanently: ${item.tableName} (${item.operation})\n${errorMsg}`,
-              { duration: Number.POSITIVE_INFINITY }
+              { duration: Number.POSITIVE_INFINITY },
             );
           } else {
             // Mark for retry
@@ -298,7 +298,7 @@ export class SyncEngine {
       // TODO: Optimize with incremental sync using last_modified_at timestamps
 
       console.log(
-        "🔽 [SyncEngine] Starting syncDown - pulling changes from Supabase..."
+        "🔽 [SyncEngine] Starting syncDown - pulling changes from Supabase...",
       );
       syncLog("[SyncEngine] Pulling changes from Supabase...");
 
@@ -350,7 +350,7 @@ export class SyncEngine {
           console.error(`   ✗ ${tableName}: ${errorMsg}`);
           log.error(
             `[SyncEngine] Failed to sync table ${tableName}:`,
-            errorMsg
+            errorMsg,
           );
           errors.push(`Table ${tableName}: ${errorMsg}`);
         }
@@ -365,7 +365,7 @@ export class SyncEngine {
           success: errors.length === 0,
           synced,
           errors: errors.length,
-        }
+        },
       );
 
       return {
@@ -459,7 +459,7 @@ export class SyncEngine {
           // Use regular UPDATE by id (allows partial updates)
           if (!remoteData.id) {
             throw new Error(
-              `UPDATE operation requires id in data for table ${tableName}`
+              `UPDATE operation requires id in data for table ${tableName}`,
             );
           }
           const { error } = await this.supabase
@@ -484,7 +484,7 @@ export class SyncEngine {
           for (const keyField of compositeKeys) {
             if (!remoteData[keyField]) {
               throw new Error(
-                `DELETE operation requires ${keyField} in data for composite key table ${tableName}`
+                `DELETE operation requires ${keyField} in data for composite key table ${tableName}`,
               );
             }
             query = query.eq(keyField, remoteData[keyField]);
@@ -496,7 +496,7 @@ export class SyncEngine {
           // Soft delete: set deleted flag
           if (!remoteData.id) {
             throw new Error(
-              `DELETE operation requires id in data for table ${tableName}`
+              `DELETE operation requires id in data for table ${tableName}`,
             );
           }
           const { error } = await this.supabase
@@ -549,7 +549,7 @@ export class SyncEngine {
           // For catalog, sync ALL tunes (public + private to this user)
           // NULL = public (available to all), user_id = private to that user
           log.info(
-            `[SyncEngine] Syncing ALL tunes (public + private for user ${this.userId})`
+            `[SyncEngine] Syncing ALL tunes (public + private for user ${this.userId})`,
           );
           query = query.or(`private_for.is.null,private_for.eq.${this.userId}`);
           break;
@@ -617,7 +617,7 @@ export class SyncEngine {
         filteredRecords = remoteRecords.filter((record) => {
           if ("user_id" in record && record.user_id !== this.userId) {
             log.warn(
-              `[SyncEngine] Filtered out record from ${tableName} (wrong user_id: ${record.user_id})`
+              `[SyncEngine] Filtered out record from ${tableName} (wrong user_id: ${record.user_id})`,
             );
             return false;
           }
@@ -633,7 +633,7 @@ export class SyncEngine {
         filteredRecords = remoteRecords.filter((record) => {
           if ("user_ref" in record && record.user_ref !== this.userId) {
             log.warn(
-              `[SyncEngine] Filtered out record ${record.id} from ${tableName} (wrong user_ref: ${record.user_ref})`
+              `[SyncEngine] Filtered out record ${record.id} from ${tableName} (wrong user_ref: ${record.user_ref})`,
             );
             return false;
           }
@@ -657,7 +657,7 @@ export class SyncEngine {
         if (filteredRecords.indexOf(record) === 0) {
           console.log(
             `🔍 [SyncEngine] First ${tableName} record from Supabase:`,
-            record
+            record,
           );
           console.log(`🔍 [SyncEngine] Transformed to SQLite:`, transformed);
         }
@@ -756,14 +756,14 @@ export class SyncEngine {
       } catch (error) {
         log.error(
           `[SyncEngine] Failed to upsert record in ${tableName}:`,
-          error
+          error,
         );
         throw error;
       }
     }
 
     syncLog(
-      `[SyncEngine] Synced ${filteredRecords.length} records from ${tableName}`
+      `[SyncEngine] Synced ${filteredRecords.length} records from ${tableName}`,
     );
     return remoteRecords.length;
   }
@@ -827,7 +827,7 @@ export class SyncEngine {
     for (const [key, value] of Object.entries(record)) {
       // Convert snake_case to camelCase
       const camelKey = key.replace(/_([a-z])/g, (_, letter) =>
-        letter.toUpperCase()
+        letter.toUpperCase(),
       );
 
       // Apply type conversions
@@ -862,7 +862,7 @@ export class SyncEngine {
       // Convert camelCase to snake_case
       const snakeKey = key.replace(
         /[A-Z]/g,
-        (letter) => `_${letter.toLowerCase()}`
+        (letter) => `_${letter.toLowerCase()}`,
       );
 
       // Note: We don't convert booleans back here because:
@@ -921,7 +921,7 @@ export function createSyncEngine(
   localDb: SqliteDatabase,
   supabase: SupabaseClient,
   userId: string,
-  config?: Partial<SyncConfig>
+  config?: Partial<SyncConfig>,
 ): SyncEngine {
   return new SyncEngine(localDb, supabase, userId, config);
 }

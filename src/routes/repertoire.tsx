@@ -111,8 +111,8 @@ const RepertoirePage: Component = () => {
           setIsInitialized(true);
           log.debug("REPERTOIRE: Filter state initialized from URL.");
         }
-      }
-    )
+      },
+    ),
   );
 
   // === EFFECT 2: SYNCHRONIZATION (Signal -> URL) ===
@@ -207,11 +207,11 @@ const RepertoirePage: Component = () => {
       const result = await getPlaylistTunes(
         params.db,
         params.playlistId,
-        params.userId
+        params.userId,
       );
       log.debug("REPERTOIRE playlistTunes result:", result.length, "tunes");
       return result;
-    }
+    },
   );
 
   // Fetch all genres for proper genre names
@@ -234,7 +234,7 @@ const RepertoirePage: Component = () => {
       const result = await params.db.select().from(schema.genre).all();
       log.debug("REPERTOIRE allGenres result:", result.length, "genres");
       return result;
-    }
+    },
   );
 
   // Get unique types, modes, genres for filter dropdowns
@@ -304,7 +304,7 @@ const RepertoirePage: Component = () => {
   };
 
   const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
-    null
+    null,
   );
 
   const handleRemoveFromRepertoire = async () => {

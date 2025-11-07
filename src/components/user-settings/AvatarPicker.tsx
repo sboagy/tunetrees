@@ -56,7 +56,7 @@ export function AvatarPicker() {
         .limit(1);
 
       return result[0]?.avatarUrl || null;
-    }
+    },
   );
 
   // Get the current or selected avatar for display
@@ -166,7 +166,7 @@ export function AvatarPicker() {
     } catch (error) {
       console.error("Upload error:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to upload avatar"
+        error instanceof Error ? error.message : "Failed to upload avatar",
       );
     } finally {
       setUploading(false);

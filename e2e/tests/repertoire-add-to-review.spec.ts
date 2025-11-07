@@ -190,10 +190,11 @@ test.describe("Repertoire: Add To Review", () => {
 
     // Check console logs for success message
     const addLogs = consoleLogs.filter(
-      (log) => log.includes("Adding") && log.includes("tunes to practice queue")
+      (log) =>
+        log.includes("Adding") && log.includes("tunes to practice queue"),
     );
     const completedLogs = consoleLogs.filter((log) =>
-      log.includes("Add to review completed")
+      log.includes("Add to review completed"),
     );
 
     expect(addLogs.length).toBeGreaterThan(0);

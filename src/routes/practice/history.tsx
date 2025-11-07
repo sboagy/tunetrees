@@ -66,7 +66,7 @@ const PracticeHistory: Component = () => {
     async (params) => {
       if (!params) return [];
       return await getPracticeRecords(params.db, params.playlistId, 500); // Get more for filtering
-    }
+    },
   );
 
   // Filter records based on filters
@@ -457,7 +457,7 @@ const PracticeHistory: Component = () => {
                               <div class="flex items-center gap-2">
                                 {flexRender(
                                   header.column.columnDef.header,
-                                  header.getContext()
+                                  header.getContext(),
                                 )}
                                 <Show
                                   when={header.column.getIsSorted()}
@@ -489,7 +489,7 @@ const PracticeHistory: Component = () => {
                             <td class="px-4 py-3 whitespace-nowrap">
                               {flexRender(
                                 cell.column.columnDef.cell,
-                                cell.getContext()
+                                cell.getContext(),
                               )}
                             </td>
                           )}

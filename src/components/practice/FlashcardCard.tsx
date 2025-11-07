@@ -340,8 +340,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
                     : "—"}
                 </p>
                 <p>
-                  Next review:{" "}
-                  {(() => {
+                  Next review: {(() => {
                     const scheduled = props.tune.scheduled;
                     if (scheduled === null || scheduled === undefined)
                       return "—";
@@ -349,7 +348,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
                     const date = new Date(scheduled * 1000);
                     const now = new Date();
                     const diffDays = Math.floor(
-                      (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+                      (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
                     );
 
                     return diffDays === 0 ? "Today" : date.toLocaleDateString();

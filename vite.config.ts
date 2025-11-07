@@ -129,10 +129,7 @@ export default defineConfig(() => {
               "clsx",
               "tailwind-merge",
             ],
-            "vendor-data": [
-              "@tanstack/solid-table",
-              "@tanstack/solid-virtual",
-            ],
+            "vendor-data": ["@tanstack/solid-table", "@tanstack/solid-virtual"],
             "vendor-supabase": ["@supabase/supabase-js"],
             // Large libraries that should be separate
             "vendor-drizzle": ["drizzle-orm"],

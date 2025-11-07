@@ -38,7 +38,7 @@ export interface ColumnVisibilityMenuProps {
  * Uses Portal to render outside parent containers to avoid clipping.
  */
 export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
-  props
+  props,
 ) => {
   let menuRef: HTMLDivElement | undefined;
 
@@ -72,7 +72,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
         const availableHeight = Math.max(spaceBelow, spaceAbove);
         const actualMaxHeight = Math.min(
           dropdownMaxHeight,
-          availableHeight - gap
+          availableHeight - gap,
         );
 
         setDropdownStyle({
@@ -93,7 +93,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
         const availableHeight = Math.max(spaceBelow, spaceAbove);
         const actualMaxHeight = Math.min(
           dropdownMaxHeight,
-          availableHeight - gap
+          availableHeight - gap,
         );
 
         // Determine vertical position (prefer below, but use above if more space)
@@ -118,7 +118,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
             ? undefined
             : `${Math.min(
                 rect.right - dropdownWidth,
-                viewportWidth - dropdownWidth - padding
+                viewportWidth - dropdownWidth - padding,
               )}px`,
           right: wouldOverflowRight
             ? `${Math.max(padding, viewportWidth - rect.right)}px`

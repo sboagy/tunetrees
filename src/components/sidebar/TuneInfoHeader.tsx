@@ -32,7 +32,7 @@ export const TuneInfoHeader: Component = () => {
     async (params) => {
       if (!params.tuneId || !params.db) return null;
       return await getTuneById(params.db, params.tuneId);
-    }
+    },
   );
 
   return (

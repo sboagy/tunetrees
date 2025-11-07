@@ -81,7 +81,7 @@ export class RealtimeManager {
     }
 
     console.log(
-      `[Realtime] Starting Realtime subscriptions for user ${this.config.userId}`
+      `[Realtime] Starting Realtime subscriptions for user ${this.config.userId}`,
     );
     this.state.status = "connecting";
 
@@ -127,7 +127,7 @@ export class RealtimeManager {
     const channelName = `realtime:${tableName}:${this.config.userId}`;
 
     console.log(
-      `[Realtime] Subscribing to ${tableName} (channel: ${channelName})`
+      `[Realtime] Subscribing to ${tableName} (channel: ${channelName})`,
     );
 
     // Create channel
@@ -145,7 +145,7 @@ export class RealtimeManager {
         },
         (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
           this.handleChange(tableName, payload);
-        }
+        },
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
@@ -170,7 +170,7 @@ export class RealtimeManager {
    */
   private handleChange(
     tableName: string,
-    payload: RealtimePostgresChangesPayload<Record<string, unknown>>
+    payload: RealtimePostgresChangesPayload<Record<string, unknown>>,
   ): void {
     const { eventType, new: newRecord, old: oldRecord } = payload;
 
@@ -283,7 +283,7 @@ export class RealtimeManager {
  */
 export function createRealtimeManager(
   syncEngine: SyncEngine,
-  config: RealtimeConfig
+  config: RealtimeConfig,
 ): RealtimeManager {
   return new RealtimeManager(syncEngine, config);
 }

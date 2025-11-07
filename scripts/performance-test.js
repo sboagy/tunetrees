@@ -2,13 +2,13 @@
 
 /**
  * Performance Testing Script
- * 
+ *
  * Runs Lighthouse audits locally and generates reports.
  * Useful for quick performance checks during development.
- * 
+ *
  * Usage:
  *   npm run build && node scripts/performance-test.js
- *   
+ *
  * Options:
  *   --desktop   Test desktop performance (default)
  *   --mobile    Test mobile performance (Moto G4)
@@ -16,20 +16,21 @@
  *   --view      Open reports in browser
  */
 
-import { spawn } from 'child_process';
-import { existsSync } from 'fs';
-import { mkdir } from 'fs/promises';
-import { join } from 'path';
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 
 const args = process.argv.slice(2);
-const testDesktop = args.includes('--desktop') || args.includes('--both') || args.length === 0;
-const testMobile = args.includes('--mobile') || args.includes('--both');
-const openReports = args.includes('--view');
+const testDesktop =
+  args.includes("--desktop") || args.includes("--both") || args.length === 0;
+const testMobile = args.includes("--mobile") || args.includes("--both");
+const openReports = args.includes("--view");
 
 const LIGHTHOUSE_CONFIG = {
   desktop: {
-    preset: 'desktop',
-    formFactor: 'desktop',
+    preset: "desktop",
+    formFactor: "desktop",
     throttling: {
       rttMs: 40,
       throughputKbps: 10240,
@@ -43,8 +44,8 @@ const LIGHTHOUSE_CONFIG = {
     },
   },
   mobile: {
-    preset: 'mobile',
-    formFactor: 'mobile',
+    preset: "mobile",
+    formFactor: "mobile",
     throttling: {
       rttMs: 150,
       throughputKbps: 1600,
@@ -60,7 +61,7 @@ const LIGHTHOUSE_CONFIG = {
 };
 
 async function ensureReportsDir() {
-  const reportsDir = join(process.cwd(), 'lighthouse-reports');
+  const reportsDir = join(process.cwd(), "lighthouse-reports");
   if (!existsSync(reportsDir)) {
     await mkdir(reportsDir, { recursive: true });
   }
@@ -71,8 +72,8 @@ function runLighthouse(url, config, outputPath) {
   return new Promise((resolve, reject) => {
     const args = [
       url,
-      '--output=html',
-      '--output=json',
+      "--output=html",
+      "--output=json",
       `--output-path=${outputPath}`,
       `--preset=${config.preset}`,
       `--throttling.rttMs=${config.throttling.rttMs}`,
@@ -86,19 +87,19 @@ function runLighthouse(url, config, outputPath) {
     ];
 
     if (openReports) {
-      args.push('--view');
+      args.push("--view");
     }
 
     console.log(`\n🔦 Running Lighthouse (${config.preset})...`);
     console.log(`   URL: ${url}`);
     console.log(`   Output: ${outputPath}.html`);
 
-    const lighthouse = spawn('npx', ['lighthouse', ...args], {
-      stdio: 'inherit',
+    const lighthouse = spawn("npx", ["lighthouse", ...args], {
+      stdio: "inherit",
       shell: true,
     });
 
-    lighthouse.on('close', (code) => {
+    lighthouse.on("close", (code) => {
       if (code === 0) {
         console.log(`✅ Lighthouse audit complete (${config.preset})`);
         resolve();
@@ -111,17 +112,17 @@ function runLighthouse(url, config, outputPath) {
 
 async function startPreviewServer() {
   return new Promise((resolve, reject) => {
-    console.log('\n🚀 Starting preview server...');
-    
-    const preview = spawn('npm', ['run', 'preview'], {
-      stdio: 'pipe',
+    console.log("\n🚀 Starting preview server...");
+
+    const preview = spawn("npm", ["run", "preview"], {
+      stdio: "pipe",
       shell: true,
     });
 
-    preview.stdout.on('data', (data) => {
+    preview.stdout.on("data", (data) => {
       const output = data.toString();
       console.log(output);
-      
+
       // Look for "Local: http://localhost:4173"
       const match = output.match(/Local:\s+(http:\/\/localhost:\d+)/);
       if (match) {
@@ -130,11 +131,11 @@ async function startPreviewServer() {
       }
     });
 
-    preview.stderr.on('data', (data) => {
+    preview.stderr.on("data", (data) => {
       console.error(data.toString());
     });
 
-    preview.on('close', (code) => {
+    preview.on("close", (code) => {
       if (code !== 0 && code !== null) {
         reject(new Error(`Preview server exited with code ${code}`));
       }
@@ -142,25 +143,25 @@ async function startPreviewServer() {
 
     // Timeout after 30 seconds
     setTimeout(() => {
-      reject(new Error('Preview server failed to start within 30 seconds'));
+      reject(new Error("Preview server failed to start within 30 seconds"));
     }, 30000);
   });
 }
 
 async function main() {
-  console.log('='.repeat(60));
-  console.log('TuneTrees Performance Testing');
-  console.log('='.repeat(60));
+  console.log("=".repeat(60));
+  console.log("TuneTrees Performance Testing");
+  console.log("=".repeat(60));
 
   // Check if dist exists
-  if (!existsSync(join(process.cwd(), 'dist'))) {
-    console.error('\n❌ Error: dist/ folder not found');
-    console.error('   Please run: npm run build');
+  if (!existsSync(join(process.cwd(), "dist"))) {
+    console.error("\n❌ Error: dist/ folder not found");
+    console.error("   Please run: npm run build");
     process.exit(1);
   }
 
   const reportsDir = await ensureReportsDir();
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
 
   let server;
   try {
@@ -169,7 +170,7 @@ async function main() {
     const url = server.url;
 
     // Wait a bit for server to be fully ready
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Run audits
     if (testDesktop) {
@@ -182,24 +183,23 @@ async function main() {
       await runLighthouse(url, LIGHTHOUSE_CONFIG.mobile, outputPath);
     }
 
-    console.log('\n='.repeat(60));
-    console.log('✅ All audits complete!');
+    console.log("\n=".repeat(60));
+    console.log("✅ All audits complete!");
     console.log(`📊 Reports saved to: ${reportsDir}`);
-    console.log('='.repeat(60));
-
+    console.log("=".repeat(60));
   } catch (error) {
-    console.error('\n❌ Error:', error.message);
+    console.error("\n❌ Error:", error.message);
     process.exit(1);
   } finally {
     // Clean up
     if (server?.process) {
-      console.log('\n🛑 Stopping preview server...');
+      console.log("\n🛑 Stopping preview server...");
       server.process.kill();
     }
   }
 }
 
-main().catch(error => {
-  console.error('Fatal error:', error);
+main().catch((error) => {
+  console.error("Fatal error:", error);
   process.exit(1);
 });

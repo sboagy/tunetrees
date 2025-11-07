@@ -83,7 +83,7 @@ export interface RecordPracticeResult {
 export async function recordPracticeRating(
   db: SqliteDatabase,
   userId: string,
-  input: RecordPracticeInput
+  input: RecordPracticeInput,
 ): Promise<RecordPracticeResult> {
   try {
     // 1. Get user FSRS preferences
@@ -102,7 +102,7 @@ export async function recordPracticeRating(
     const latestRecord = await getLatestPracticeRecord(
       db,
       input.tuneRef,
-      input.playlistRef
+      input.playlistRef,
     );
 
     // 4. Calculate next review schedule using FSRS
@@ -161,8 +161,8 @@ export async function recordPracticeRating(
       .where(
         and(
           eq(playlistTune.playlistRef, input.playlistRef),
-          eq(playlistTune.tuneRef, input.tuneRef)
-        )
+          eq(playlistTune.tuneRef, input.tuneRef),
+        ),
       );
 
     // 8. Queue changes for background sync to Supabase
@@ -212,7 +212,7 @@ export async function recordPracticeRating(
 export async function batchRecordPracticeRatings(
   db: SqliteDatabase,
   userId: string,
-  inputs: RecordPracticeInput[]
+  inputs: RecordPracticeInput[],
 ): Promise<RecordPracticeResult[]> {
   const results: RecordPracticeResult[] = [];
 
@@ -254,7 +254,7 @@ export async function batchRecordPracticeRatings(
 export async function getPracticeStatistics(
   db: SqliteDatabase,
   tuneId: string,
-  playlistId: string
+  playlistId: string,
 ): Promise<{
   totalCount: number;
   successRate: number;
@@ -267,8 +267,8 @@ export async function getPracticeStatistics(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
-      )
+        eq(practiceRecord.playlistRef, playlistId),
+      ),
     )
     .orderBy(practiceRecord.practiced);
 
@@ -284,7 +284,8 @@ export async function getPracticeStatistics(
   // Calculate success rate (Good=3 or Easy=4)
   const successCount = records.filter(
     (r) =>
-      r.quality === FSRS_QUALITY_MAP.GOOD || r.quality === FSRS_QUALITY_MAP.EASY
+      r.quality === FSRS_QUALITY_MAP.GOOD ||
+      r.quality === FSRS_QUALITY_MAP.EASY,
   ).length;
   const successRate = (successCount / records.length) * 100;
 
@@ -351,7 +352,7 @@ export async function commitStagedEvaluations(
   db: SqliteDatabase,
   userId: string,
   playlistId: string,
-  windowStartUtc?: string
+  windowStartUtc?: string,
 ): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     console.log("=== commitStagedEvaluations START ===");
@@ -477,12 +478,12 @@ export async function commitStagedEvaluations(
 
     // 3. Filter staged evaluations to only include tunes in current queue
     const evaluationsToCommit = stagedEvaluations.filter((eval_) =>
-      queueTuneIdSet.has(eval_.tune_id)
+      queueTuneIdSet.has(eval_.tune_id),
     );
 
     console.log(
       "Evaluations to commit (after filtering):",
-      evaluationsToCommit.length
+      evaluationsToCommit.length,
     );
 
     if (evaluationsToCommit.length === 0) {
@@ -525,7 +526,7 @@ export async function commitStagedEvaluations(
 
       if (attempts >= maxAttempts) {
         throw new Error(
-          `Failed to find unique practiced timestamp for tune ${staged.tune_id} after ${maxAttempts} attempts`
+          `Failed to find unique practiced timestamp for tune ${staged.tune_id} after ${maxAttempts} attempts`,
         );
       }
 
@@ -630,7 +631,7 @@ export async function commitStagedEvaluations(
 
       // Mark queue item as completed
       console.log(
-        `Marking queue item as completed for tune ${staged.tune_id}...`
+        `Marking queue item as completed for tune ${staged.tune_id}...`,
       );
 
       // Get the complete queue item for sync (need id, window_start_utc, and window_end_utc)
@@ -678,7 +679,7 @@ export async function commitStagedEvaluations(
     await persistDb();
 
     console.log(
-      `✅ Committed ${committedTuneIds.length} staged evaluations for playlist ${playlistId}`
+      `✅ Committed ${committedTuneIds.length} staged evaluations for playlist ${playlistId}`,
     );
     console.log("=== commitStagedEvaluations END ===");
 
@@ -718,7 +719,7 @@ export async function commitStagedEvaluations(
 export async function undoLastPracticeRating(
   db: SqliteDatabase,
   tuneId: string,
-  playlistId: string
+  playlistId: string,
 ): Promise<boolean> {
   try {
     // Get the last two practice records
@@ -728,8 +729,8 @@ export async function undoLastPracticeRating(
       .where(
         and(
           eq(practiceRecord.tuneRef, tuneId),
-          eq(practiceRecord.playlistRef, playlistId)
-        )
+          eq(practiceRecord.playlistRef, playlistId),
+        ),
       )
       .orderBy(practiceRecord.practiced)
       .limit(2);
@@ -758,8 +759,8 @@ export async function undoLastPracticeRating(
       .where(
         and(
           eq(playlistTune.playlistRef, playlistId),
-          eq(playlistTune.tuneRef, tuneId)
-        )
+          eq(playlistTune.tuneRef, tuneId),
+        ),
       );
 
     // Queue sync operations

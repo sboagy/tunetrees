@@ -16,7 +16,9 @@
       } else if (typeof window !== "undefined") {
         // No stored preference, use system preference
         try {
-          mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+          mq = window.matchMedia
+            ? window.matchMedia("(prefers-color-scheme: dark)")
+            : null;
           if (mq?.matches) {
             document.documentElement.classList.add("dark");
           }

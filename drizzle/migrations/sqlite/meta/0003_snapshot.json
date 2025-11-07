@@ -192,36 +192,22 @@
         },
         "idx_queue_generated_at": {
           "name": "idx_queue_generated_at",
-          "columns": [
-            "generated_at"
-          ],
+          "columns": ["generated_at"],
           "isUnique": false
         },
         "idx_queue_user_playlist_bucket": {
           "name": "idx_queue_user_playlist_bucket",
-          "columns": [
-            "user_ref",
-            "playlist_ref",
-            "bucket"
-          ],
+          "columns": ["user_ref", "playlist_ref", "bucket"],
           "isUnique": false
         },
         "idx_queue_user_playlist_active": {
           "name": "idx_queue_user_playlist_active",
-          "columns": [
-            "user_ref",
-            "playlist_ref",
-            "active"
-          ],
+          "columns": ["user_ref", "playlist_ref", "active"],
           "isUnique": false
         },
         "idx_queue_user_playlist_window": {
           "name": "idx_queue_user_playlist_window",
-          "columns": [
-            "user_ref",
-            "playlist_ref",
-            "window_start_utc"
-          ],
+          "columns": ["user_ref", "playlist_ref", "window_start_utc"],
           "isUnique": false
         }
       },
@@ -292,12 +278,8 @@
           "name": "genre_tune_type_genre_id_genre_id_fk",
           "tableFrom": "genre_tune_type",
           "tableTo": "genre",
-          "columnsFrom": [
-            "genre_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["genre_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -305,22 +287,15 @@
           "name": "genre_tune_type_tune_type_id_tune_type_id_fk",
           "tableFrom": "genre_tune_type",
           "tableTo": "tune_type",
-          "columnsFrom": [
-            "tune_type_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tune_type_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "genre_tune_type_genre_id_tune_type_id_pk": {
-          "columns": [
-            "genre_id",
-            "tune_type_id"
-          ],
+          "columns": ["genre_id", "tune_type_id"],
           "name": "genre_tune_type_genre_id_tune_type_id_pk"
         }
       },
@@ -399,24 +374,17 @@
       "indexes": {
         "instrument_private_to_user_instrument_unique": {
           "name": "instrument_private_to_user_instrument_unique",
-          "columns": [
-            "private_to_user",
-            "instrument"
-          ],
+          "columns": ["private_to_user", "instrument"],
           "isUnique": true
         },
         "idx_instrument_private_to_user": {
           "name": "idx_instrument_private_to_user",
-          "columns": [
-            "private_to_user"
-          ],
+          "columns": ["private_to_user"],
           "isUnique": false
         },
         "idx_instrument_instrument": {
           "name": "idx_instrument_instrument",
-          "columns": [
-            "instrument"
-          ],
+          "columns": ["instrument"],
           "isUnique": false
         }
       },
@@ -425,12 +393,8 @@
           "name": "instrument_private_to_user_user_profile_supabase_user_id_fk",
           "tableFrom": "instrument",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "private_to_user"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["private_to_user"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -533,28 +497,17 @@
       "indexes": {
         "idx_note_tune_user": {
           "name": "idx_note_tune_user",
-          "columns": [
-            "tune_ref",
-            "user_ref"
-          ],
+          "columns": ["tune_ref", "user_ref"],
           "isUnique": false
         },
         "idx_note_tune_playlist_user_public": {
           "name": "idx_note_tune_playlist_user_public",
-          "columns": [
-            "tune_ref",
-            "playlist_ref",
-            "user_ref",
-            "public"
-          ],
+          "columns": ["tune_ref", "playlist_ref", "user_ref", "public"],
           "isUnique": false
         },
         "idx_note_tune_playlist": {
           "name": "idx_note_tune_playlist",
-          "columns": [
-            "tune_ref",
-            "playlist_ref"
-          ],
+          "columns": ["tune_ref", "playlist_ref"],
           "isUnique": false
         }
       },
@@ -563,12 +516,8 @@
           "name": "note_user_ref_user_profile_supabase_user_id_fk",
           "tableFrom": "note",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "user_ref"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["user_ref"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -576,12 +525,8 @@
           "name": "note_tune_ref_tune_id_fk",
           "tableFrom": "note",
           "tableTo": "tune",
-          "columnsFrom": [
-            "tune_ref"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -589,12 +534,8 @@
           "name": "note_playlist_ref_playlist_playlist_id_fk",
           "tableFrom": "note",
           "tableTo": "playlist",
-          "columnsFrom": [
-            "playlist_ref"
-          ],
-          "columnsTo": [
-            "playlist_id"
-          ],
+          "columnsFrom": ["playlist_ref"],
+          "columnsTo": ["playlist_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -682,10 +623,7 @@
       "indexes": {
         "playlist_user_ref_instrument_ref_unique": {
           "name": "playlist_user_ref_instrument_ref_unique",
-          "columns": [
-            "user_ref",
-            "instrument_ref"
-          ],
+          "columns": ["user_ref", "instrument_ref"],
           "isUnique": true
         }
       },
@@ -694,12 +632,8 @@
           "name": "playlist_user_ref_user_profile_supabase_user_id_fk",
           "tableFrom": "playlist",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "user_ref"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["user_ref"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -707,12 +641,8 @@
           "name": "playlist_genre_default_genre_id_fk",
           "tableFrom": "playlist",
           "tableTo": "genre",
-          "columnsFrom": [
-            "genre_default"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["genre_default"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -804,12 +734,8 @@
           "name": "playlist_tune_playlist_ref_playlist_playlist_id_fk",
           "tableFrom": "playlist_tune",
           "tableTo": "playlist",
-          "columnsFrom": [
-            "playlist_ref"
-          ],
-          "columnsTo": [
-            "playlist_id"
-          ],
+          "columnsFrom": ["playlist_ref"],
+          "columnsTo": ["playlist_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -817,22 +743,15 @@
           "name": "playlist_tune_tune_ref_tune_id_fk",
           "tableFrom": "playlist_tune",
           "tableTo": "tune",
-          "columnsFrom": [
-            "tune_ref"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "playlist_tune_playlist_ref_tune_ref_pk": {
-          "columns": [
-            "playlist_ref",
-            "tune_ref"
-          ],
+          "columns": ["playlist_ref", "tune_ref"],
           "name": "playlist_tune_playlist_ref_tune_ref_pk"
         }
       },
@@ -995,34 +914,22 @@
       "indexes": {
         "practice_record_tune_ref_playlist_ref_practiced_unique": {
           "name": "practice_record_tune_ref_playlist_ref_practiced_unique",
-          "columns": [
-            "tune_ref",
-            "playlist_ref",
-            "practiced"
-          ],
+          "columns": ["tune_ref", "playlist_ref", "practiced"],
           "isUnique": true
         },
         "idx_practice_record_practiced": {
           "name": "idx_practice_record_practiced",
-          "columns": [
-            "practiced"
-          ],
+          "columns": ["practiced"],
           "isUnique": false
         },
         "idx_practice_record_tune_playlist_practiced": {
           "name": "idx_practice_record_tune_playlist_practiced",
-          "columns": [
-            "tune_ref",
-            "playlist_ref",
-            "practiced"
-          ],
+          "columns": ["tune_ref", "playlist_ref", "practiced"],
           "isUnique": false
         },
         "idx_practice_record_id": {
           "name": "idx_practice_record_id",
-          "columns": [
-            "id"
-          ],
+          "columns": ["id"],
           "isUnique": false
         }
       },
@@ -1031,12 +938,8 @@
           "name": "practice_record_playlist_ref_playlist_playlist_id_fk",
           "tableFrom": "practice_record",
           "tableTo": "playlist",
-          "columnsFrom": [
-            "playlist_ref"
-          ],
-          "columnsTo": [
-            "playlist_id"
-          ],
+          "columnsFrom": ["playlist_ref"],
+          "columnsTo": ["playlist_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1044,12 +947,8 @@
           "name": "practice_record_tune_ref_tune_id_fk",
           "tableFrom": "practice_record",
           "tableTo": "tune",
-          "columnsFrom": [
-            "tune_ref"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1140,12 +1039,8 @@
           "name": "prefs_scheduling_options_user_id_user_profile_supabase_user_id_fk",
           "tableFrom": "prefs_scheduling_options",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1242,22 +1137,15 @@
           "name": "prefs_spaced_repetition_user_id_user_profile_supabase_user_id_fk",
           "tableFrom": "prefs_spaced_repetition",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "prefs_spaced_repetition_user_id_alg_type_pk": {
-          "columns": [
-            "user_id",
-            "alg_type"
-          ],
+          "columns": ["user_id", "alg_type"],
           "name": "prefs_spaced_repetition_user_id_alg_type_pk"
         }
       },
@@ -1364,27 +1252,17 @@
       "indexes": {
         "idx_reference_user_tune_public": {
           "name": "idx_reference_user_tune_public",
-          "columns": [
-            "user_ref",
-            "tune_ref",
-            "public"
-          ],
+          "columns": ["user_ref", "tune_ref", "public"],
           "isUnique": false
         },
         "idx_reference_tune_user_ref": {
           "name": "idx_reference_tune_user_ref",
-          "columns": [
-            "tune_ref",
-            "user_ref"
-          ],
+          "columns": ["tune_ref", "user_ref"],
           "isUnique": false
         },
         "idx_reference_tune_public": {
           "name": "idx_reference_tune_public",
-          "columns": [
-            "tune_ref",
-            "public"
-          ],
+          "columns": ["tune_ref", "public"],
           "isUnique": false
         }
       },
@@ -1393,12 +1271,8 @@
           "name": "reference_tune_ref_tune_id_fk",
           "tableFrom": "reference",
           "tableTo": "tune",
-          "columnsFrom": [
-            "tune_ref"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1406,12 +1280,8 @@
           "name": "reference_user_ref_user_profile_supabase_user_id_fk",
           "tableFrom": "reference",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "user_ref"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["user_ref"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1594,12 +1464,8 @@
           "name": "tab_group_main_state_user_id_user_profile_supabase_user_id_fk",
           "tableFrom": "tab_group_main_state",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1682,12 +1548,8 @@
           "name": "table_state_user_id_user_profile_supabase_user_id_fk",
           "tableFrom": "table_state",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1695,24 +1557,15 @@
           "name": "table_state_playlist_id_playlist_playlist_id_fk",
           "tableFrom": "table_state",
           "tableTo": "playlist",
-          "columnsFrom": [
-            "playlist_id"
-          ],
-          "columnsTo": [
-            "playlist_id"
-          ],
+          "columnsFrom": ["playlist_id"],
+          "columnsTo": ["playlist_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "table_state_user_id_screen_size_purpose_playlist_id_pk": {
-          "columns": [
-            "user_id",
-            "screen_size",
-            "purpose",
-            "playlist_id"
-          ],
+          "columns": ["user_id", "screen_size", "purpose", "playlist_id"],
           "name": "table_state_user_id_screen_size_purpose_playlist_id_pk"
         }
       },
@@ -1892,12 +1745,8 @@
           "name": "table_transient_data_user_id_user_profile_supabase_user_id_fk",
           "tableFrom": "table_transient_data",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1905,12 +1754,8 @@
           "name": "table_transient_data_tune_id_tune_id_fk",
           "tableFrom": "table_transient_data",
           "tableTo": "tune",
-          "columnsFrom": [
-            "tune_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tune_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1918,23 +1763,15 @@
           "name": "table_transient_data_playlist_id_playlist_playlist_id_fk",
           "tableFrom": "table_transient_data",
           "tableTo": "playlist",
-          "columnsFrom": [
-            "playlist_id"
-          ],
-          "columnsTo": [
-            "playlist_id"
-          ],
+          "columnsFrom": ["playlist_id"],
+          "columnsTo": ["playlist_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "table_transient_data_user_id_tune_id_playlist_id_pk": {
-          "columns": [
-            "user_id",
-            "tune_id",
-            "playlist_id"
-          ],
+          "columns": ["user_id", "tune_id", "playlist_id"],
           "name": "table_transient_data_user_id_tune_id_playlist_id_pk"
         }
       },
@@ -1998,27 +1835,17 @@
       "indexes": {
         "tag_user_ref_tune_ref_tag_text_unique": {
           "name": "tag_user_ref_tune_ref_tag_text_unique",
-          "columns": [
-            "user_ref",
-            "tune_ref",
-            "tag_text"
-          ],
+          "columns": ["user_ref", "tune_ref", "tag_text"],
           "isUnique": true
         },
         "idx_tag_user_ref_tune_ref": {
           "name": "idx_tag_user_ref_tune_ref",
-          "columns": [
-            "user_ref",
-            "tune_ref"
-          ],
+          "columns": ["user_ref", "tune_ref"],
           "isUnique": false
         },
         "idx_tag_user_ref_tag_text": {
           "name": "idx_tag_user_ref_tag_text",
-          "columns": [
-            "user_ref",
-            "tag_text"
-          ],
+          "columns": ["user_ref", "tag_text"],
           "isUnique": false
         }
       },
@@ -2027,12 +1854,8 @@
           "name": "tag_user_ref_user_profile_supabase_user_id_fk",
           "tableFrom": "tag",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "user_ref"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["user_ref"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2040,12 +1863,8 @@
           "name": "tag_tune_ref_tune_id_fk",
           "tableFrom": "tag",
           "tableTo": "tune",
-          "columnsFrom": [
-            "tune_ref"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2165,12 +1984,8 @@
           "name": "tune_genre_genre_id_fk",
           "tableFrom": "tune",
           "tableTo": "genre",
-          "columnsFrom": [
-            "genre"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["genre"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2178,12 +1993,8 @@
           "name": "tune_private_for_user_profile_supabase_user_id_fk",
           "tableFrom": "tune",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "private_for"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["private_for"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2295,12 +2106,8 @@
           "name": "tune_override_tune_ref_tune_id_fk",
           "tableFrom": "tune_override",
           "tableTo": "tune",
-          "columnsFrom": [
-            "tune_ref"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2308,12 +2115,8 @@
           "name": "tune_override_user_ref_user_profile_supabase_user_id_fk",
           "tableFrom": "tune_override",
           "tableTo": "user_profile",
-          "columnsFrom": [
-            "user_ref"
-          ],
-          "columnsTo": [
-            "supabase_user_id"
-          ],
+          "columnsFrom": ["user_ref"],
+          "columnsTo": ["supabase_user_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2321,12 +2124,8 @@
           "name": "tune_override_genre_genre_id_fk",
           "tableFrom": "tune_override",
           "tableTo": "genre",
-          "columnsFrom": [
-            "genre"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["genre"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2467,9 +2266,7 @@
       "indexes": {
         "user_profile_supabase_user_id_unique": {
           "name": "user_profile_supabase_user_id_unique",
-          "columns": [
-            "supabase_user_id"
-          ],
+          "columns": ["supabase_user_id"],
           "isUnique": true
         }
       },

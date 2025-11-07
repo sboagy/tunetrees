@@ -82,7 +82,7 @@ export const PracticeSession: Component<{
         db,
         props.playlistId,
         new Date(),
-        7
+        7,
       );
       setDueTunes(tunes);
     } catch (err) {
@@ -129,7 +129,7 @@ export const PracticeSession: Component<{
     } catch (err) {
       console.error("Error recording practice:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to record practice"
+        err instanceof Error ? err.message : "Failed to record practice",
       );
     } finally {
       setSubmitting(false);

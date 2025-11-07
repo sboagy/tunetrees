@@ -79,7 +79,7 @@ for (const pattern of fkPatterns) {
     console.log(
       `✓ Replaced ${matches.length} integer("${
         pattern.from.source.match(/"([^"]+)"/)?.[1]
-      }") with uuid()`
+      }") with uuid()`,
     );
   }
 }
@@ -100,5 +100,5 @@ console.log("\nNext steps:");
 console.log("1. Review the changes: git diff drizzle/schema-postgres.ts");
 console.log("2. Check TypeScript errors: npm run typecheck");
 console.log(
-  "3. Push schema to Supabase: npx drizzle-kit push --config=drizzle.config.ts"
+  "3. Push schema to Supabase: npx drizzle-kit push --config=drizzle.config.ts",
 );

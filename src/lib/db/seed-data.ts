@@ -43,13 +43,13 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
       ) 
       VALUES (?, 'test@example.com', 'Test User', 1, ?)
     `,
-      [userId, now]
+      [userId, now],
     );
 
     // Get the user_profile ID
     const userProfileResult = db.exec(
       `SELECT id FROM user_profile WHERE supabase_user_id = ?`,
-      [userId]
+      [userId],
     );
 
     if (
@@ -75,7 +75,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
       ) 
       VALUES (1, ?, NULL, 1, ?)
     `,
-      [userProfileId, now]
+      [userProfileId, now],
     );
 
     // Create sample tunes
@@ -153,7 +153,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
           tune.incipit,
           tune.genre, // Now using genre ID
           now,
-        ]
+        ],
       );
 
       // Add to playlist
@@ -168,7 +168,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
         ) 
         VALUES (1, ?, 0, 1, ?)
       `,
-        [tune.id, now]
+        [tune.id, now],
       );
     }
 
