@@ -189,14 +189,12 @@ test.describe.serial("Flashcard Feature: Submit", () => {
 
     // Verify flashcard count updated (if Show Submitted OFF)
     const showSubmittedToggle = app.displaySubmittedSwitch.getByRole("switch");
-    const isShowSubmitted =
-      (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
 
-    if (!isShowSubmitted) {
-      const updatedText = await counter.textContent();
-      const updatedTotal = parseInt(updatedText?.split(" of ")[1] || "0", 10);
-      expect(updatedTotal).toBeLessThan(initialTotal);
-    }
+    await expect(showSubmittedToggle).toHaveAttribute("aria-checked", "false");
+
+    const updatedText = await counter.textContent();
+    const updatedTotal = parseInt(updatedText?.split(" of ")[1] || "0", 10);
+    expect(updatedTotal).toBeLessThan(initialTotal);
   });
 
   test("07. Submit works from any card position", async ({ page }) => {
