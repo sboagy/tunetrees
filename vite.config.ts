@@ -109,6 +109,40 @@ export default defineConfig(() => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    // Build optimizations
+    build: {
+      // Increase chunk size warning limit (we'll optimize later)
+      chunkSizeWarningLimit: 1000,
+      // Enable source maps for production debugging
+      sourcemap: true,
+      // Rollup options for code splitting
+      rollupOptions: {
+        output: {
+          // Manual chunk splitting for better caching
+          manualChunks: {
+            // Vendor chunks
+            "vendor-solid": ["solid-js", "@solidjs/router"],
+            "vendor-ui": [
+              "@kobalte/core",
+              "solid-sonner",
+              "class-variance-authority",
+              "clsx",
+              "tailwind-merge",
+            ],
+            "vendor-data": [
+              "@tanstack/solid-table",
+              "@tanstack/solid-virtual",
+            ],
+            "vendor-supabase": ["@supabase/supabase-js"],
+            // Large libraries that should be separate
+            "vendor-drizzle": ["drizzle-orm"],
+            "vendor-sql": ["sql.js"],
+            // Heavy features loaded on-demand
+            // Note: abcjs and jodit should be lazy-loaded in components
+          },
+        },
+      },
+    },
     // Define global constant to suppress Workbox logs at build time
     define: {
       __WB_DISABLE_DEV_LOGS: !showWorkboxLogs,
