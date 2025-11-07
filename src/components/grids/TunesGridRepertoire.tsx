@@ -130,6 +130,11 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   const [selectedCount, setSelectedCount] = createSignal<number>(0);
   let innerTable: any | null = null;
 
+  // Debug: Log selectedCount changes
+  createEffect(() => {
+    console.log(`[TunesGridRepertoire] selectedCount signal changed to: ${selectedCount()}`);
+  });
+
   return (
     <div class="h-full flex flex-col">
       {/* Loading */}
@@ -162,6 +167,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
               onGoalChange: props.onGoalChange,
             }}
             onSelectionChange={(count) => {
+              console.log(`[TunesGridRepertoire] onSelectionChange called with count: ${count}`);
               setSelectedCount(count);
               props.onSelectionChange?.(count);
             }}

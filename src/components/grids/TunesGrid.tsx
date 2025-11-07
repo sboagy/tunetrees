@@ -322,7 +322,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
   // Notify selection count
   createEffect(() => {
-    props.onSelectionChange?.(Object.keys(rowSelection()).length);
+    const count = Object.keys(rowSelection()).length;
+    console.log(`[TunesGrid ${props.tablePurpose}] Selection changed: ${count} rows selected`, rowSelection());
+    props.onSelectionChange?.(count);
   });
 
   return (
