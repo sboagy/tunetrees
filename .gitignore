@@ -36,6 +36,8 @@ playwright-report/
 coverage/
 *.spec.js.map
 *debug-*.png
+lighthouse-reports/
+.lighthouseci/
 
 # Python bytecode/cache
 __pycache__/
