@@ -146,29 +146,31 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
 
       {/* Grid */}
       <Show when={!playlistTunesData.loading && filteredTunes().length > 0}>
-        <TunesGrid
-          tablePurpose="repertoire"
-          userId={props.userId}
-          playlistId={currentPlaylistId() || undefined}
-          data={filteredTunes()}
-          currentRowId={currentTuneId() || undefined}
-          enableColumnReorder={true}
-          onRowClick={(row) => handleRowClick(row as Tune)}
-          columnVisibility={columnVisibility()}
-          onColumnVisibilityChange={setColumnVisibility}
-          cellCallbacks={{
-            onRecallEvalChange: props.onRecallEvalChange,
-            onGoalChange: props.onGoalChange,
-          }}
-          onSelectionChange={(count) => {
-            setSelectedCount(count);
-            props.onSelectionChange?.(count);
-          }}
-          onTableReady={(tbl) => {
-            innerTable = tbl as any;
-            props.onTableReady?.(tbl as any);
-          }}
-        />
+        <div class="flex-1 overflow-hidden">
+          <TunesGrid
+            tablePurpose="repertoire"
+            userId={props.userId}
+            playlistId={currentPlaylistId() || undefined}
+            data={filteredTunes()}
+            currentRowId={currentTuneId() || undefined}
+            enableColumnReorder={true}
+            onRowClick={(row) => handleRowClick(row as Tune)}
+            columnVisibility={columnVisibility()}
+            onColumnVisibilityChange={setColumnVisibility}
+            cellCallbacks={{
+              onRecallEvalChange: props.onRecallEvalChange,
+              onGoalChange: props.onGoalChange,
+            }}
+            onSelectionChange={(count) => {
+              setSelectedCount(count);
+              props.onSelectionChange?.(count);
+            }}
+            onTableReady={(tbl) => {
+              innerTable = tbl as any;
+              props.onTableReady?.(tbl as any);
+            }}
+          />
+        </div>
       </Show>
 
       {/* Empty state */}

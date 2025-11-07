@@ -260,29 +260,31 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           filteredTunes().length > 0
         }
       >
-        <TunesGrid
-          tablePurpose="catalog"
-          userId={props.userId}
-          playlistId={currentPlaylistId() || undefined}
-          data={filteredTunes()}
-          currentRowId={currentTuneId() || undefined}
-          enableColumnReorder={true}
-          onRowClick={(row) => handleRowClick(row as Tune)}
-          columnVisibility={columnVisibility()}
-          onColumnVisibilityChange={setColumnVisibility}
-          cellCallbacks={{
-            onRecallEvalChange: props.onRecallEvalChange,
-            onGoalChange: props.onGoalChange,
-          }}
-          onSelectionChange={(count) => {
-            setSelectedCount(count);
-            props.onSelectionChange?.(count);
-          }}
-          onTableReady={(tbl) => {
-            innerTable = tbl as any;
-            props.onTableReady?.(tbl as any);
-          }}
-        />
+        <div class="flex-1 overflow-hidden">
+          <TunesGrid
+            tablePurpose="catalog"
+            userId={props.userId}
+            playlistId={currentPlaylistId() || undefined}
+            data={filteredTunes()}
+            currentRowId={currentTuneId() || undefined}
+            enableColumnReorder={true}
+            onRowClick={(row) => handleRowClick(row as Tune)}
+            columnVisibility={columnVisibility()}
+            onColumnVisibilityChange={setColumnVisibility}
+            cellCallbacks={{
+              onRecallEvalChange: props.onRecallEvalChange,
+              onGoalChange: props.onGoalChange,
+            }}
+            onSelectionChange={(count) => {
+              setSelectedCount(count);
+              props.onSelectionChange?.(count);
+            }}
+            onTableReady={(tbl) => {
+              innerTable = tbl as any;
+              props.onTableReady?.(tbl as any);
+            }}
+          />
+        </div>
       </Show>{" "}
       {/* Empty state */}
       <Show
