@@ -128,12 +128,7 @@ test.describe
       const app = new TuneTreesPage(page);
       // Ensure Show Submitted is OFF for deterministic row decrease
       const showSwitch = app.displaySubmittedSwitch.getByRole("switch");
-      const isOnAtStart =
-        (await showSwitch.getAttribute("aria-checked")) === "true";
-      if (isOnAtStart) {
-        await app.displaySubmittedSwitch.click();
-        await page.waitForTimeout(200);
-      }
+      await expect(showSwitch).toHaveAttribute("aria-checked", "false");
 
       // Count initial grid rows (evaluation triggers as proxy)
       const grid = app.practiceGrid;
@@ -169,7 +164,24 @@ test.describe
 
       // Verify grid updated (row count should decrease)
       // Allow some settling time then assert decrease
-      await page.waitForTimeout(1500);
+
+      let attemptCount = 0;
+      await expect
+        .poll(
+          async () => {
+            const updatedRows = await grid
+              .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+              .count();
+            attemptCount++;
+            console.debug(
+              `[Poll #${attemptCount}] updatedTotal: ${updatedRows}, initialTotal: ${initialRows}`
+            );
+            return updatedRows;
+          },
+          { timeout: 20000, intervals: [100, 500, 1000] }
+        )
+        .toBeLessThan(initialRows);
+
       const updatedRows = await grid
         .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
         .count();
