@@ -1,585 +1,1425 @@
-# Daily Practice Queue Snapshot Flow (Updated)
+# Practice Flow: Code Map (SolidJS PWA)
 
-This document describes the current (snapshot-based) practice scheduling and display flow. The legacy `scheduled_tunes_overview` + direct windowed SELECT has been replaced by a **daily immutable practice queue snapshot** that freezes the set & ordering of today's tunes while allowing controlled additions (priority / backlog) during the day. Single‑tune feedback processing (FSRS / SM2 / goal heuristics) is unchanged at its core; what changed is how the UI obtains and styles the "due today" population.
+This document maps the complete practice flow in the current SolidJS PWA implementation, from queue generation to submission and sync.
 
-## High-Level Overview
-
-1. At first access each day (per user+playlist) the backend generates (or fetches if already generated) a frozen snapshot of the practice queue.
-2. Snapshot rows include bucket classification (1=Due Today, 2=Recently Lapsed, 3=Backfill) plus captured scheduling fields for consistency the entire day.
-3. User submits practice feedback in `TunesGridScheduled`; backend appends a new `PracticeRecord` and updates `playlist_tune.scheduled` (authoritative next review date for future snapshots, not mutating the current snapshot).
-4. UI continues to show the frozen snapshot ordering; newly scheduled future dates won't reshuffle today's list.
-5. User may explicitly append backlog or priority tunes into the snapshot via dedicated actions (these return only the new snapshot entries to merge client-side).
-6. A gap counter reflects tunes that became newly due (bucket 1) after snapshot creation (e.g., manual schedule adjustments); optional force regeneration can create a fresh snapshot (rare path).
-
-### Sequence Diagram
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant U as User
-  participant C as ClientUI
-  participant SA as ServerAction
-  participant API as FastAPIRoutes
-  participant SCH as Scheduler
-  participant SNAP as SnapshotGen
-  participant DB as Database
-
-  U->>C: Load Practice Tab
-  C->>API: GET /practice_queue_snapshot
-  API->>SNAP: generate_or_fetch_daily_snapshot
-  SNAP->>DB: Read scheduling + prefs
-  DB-->>SNAP: Candidate set
-  SNAP-->>API: Frozen snapshot rows
-  API-->>C: Snapshot JSON
-  C-->>U: Render queue
-
-  %% Staging (preview) path for the FIRST tune the user touches this session
-  U->>C: Select recall evaluation (Tune X)
-  C->>SA: stagePracticeFeedback (tune_id, feedback, goal)
-  SA->>API: POST submit_feedbacks?stage=true
-  API->>SCH: _stage_practice_feedbacks
-  SCH->>DB: UPSERT table_transient_data (preview metrics)
-  DB-->>SCH: OK
-  SCH-->>API: {status:ok, staged:1, count:1, preview:*}
-  API-->>SA: JSON
-  SA-->>C: Merge preview metrics
-  C->>C: Update row (recall_eval + latest_* preview)
-
-  %% Subsequent staging events. This can be either:
-  %%  a) Selecting a recall evaluation for a DIFFERENT tune (Tune Y, Z...)
-  %%  b) Adjusting the evaluation for a tune already staged (overwriting preview)
-  loop Additional tune selections or adjustments
-    U->>C: Select/adjust recall evaluation (Tune Y or restage Tune X)
-    C->>SA: stagePracticeFeedback
-    SA->>API: POST submit_feedbacks?stage=true
-    API->>SCH: _stage_practice_feedbacks
-    SCH->>DB: UPSERT transient row
-    SCH-->>API: {status:ok, staged:1, count:1}
-    API-->>SA: JSON
-    SA-->>C: Update row preview
-  end
-
-  %% Final commit of all staged feedbacks
-  U->>C: Submit practice batch
-  C->>SA: submitPracticeFeedbacks (multi-tune)
-  SA->>API: POST submit_feedbacks?stage=false
-  API->>SCH: update_practice_feedbacks
-  loop Each tune
-    SCH->>SCH: _process_single_tune_feedback
-    SCH->>DB: INSERT PracticeRecord
-    SCH->>DB: UPDATE playlist_tune.scheduled
-  end
-  SCH-->>API: {status:ok, staged:false, count:n}
-  API-->>SA: JSON
-  SA-->>C: Ack (count + timings)
-  C->>API: DELETE /table_transient_data (bulk clear)
-  API-->>C: 204
-  C->>C: Clear local staged state
-
-  %% Append flows
-  U->>C: Append backlog tunes
-  C->>API: POST /practice_queue_snapshot/append_backlog
-  API->>SNAP: append_backlog
-  SNAP->>DB: Persist new rows
-  DB-->>SNAP: OK
-  SNAP-->>API: New rows
-  API-->>C: New snapshot entries
-  C-->>U: Merge + render new tunes
-
-  U->>C: Priority add tunes
-  C->>API: POST /practice_queue_snapshot/append_priority
-  API->>SNAP: append_priority
-  SNAP->>DB: Persist new rows
-  DB-->>SNAP: OK
-  SNAP-->>API: New rows
-  API-->>C: New snapshot entries
-  C-->>U: Merge + render new tunes
-```
-
-Clarification: The first staging event ("Select recall evaluation (Tune X)") represents the user choosing a rating for the first tune they interact with during the session. The loop labeled "Additional tune selections or adjustments" covers BOTH (a) picking evaluations for new, previously untouched tunes and (b) changing (restaging) the evaluation for a tune already staged—each triggers the same `stagePracticeFeedback` call and overwrites the transient preview row for that tune.
-
-## Core Entities & Fields
-
-Captured once per day per (user_ref, playlist_ref):
-
-| Field                                     | Purpose                                                                                   |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `snapshot_coalesced_ts`                   | Canonical date/time basis for ordering (string).                                          |
-| `scheduled_snapshot`                      | The scheduled (next review) timestamp captured at snapshot time (may be null for lapsed). |
-| `latest_due_snapshot`                     | Last actual practice time at snapshot creation (null if none).                            |
-| `acceptable_delinquency_window_snapshot`  | Window (days) used to include recently lapsed items.                                      |
-| `tz_offset_minutes_snapshot`              | Client tz offset captured for stable local-day semantics.                                 |
-| `bucket` (frontend derived / transmitted) | 1=Due Today, 2=Recently Lapsed, 3=Backfill (older backlog pulled in).                     |
-
-The snapshot rows deliberately **do not mutate** when subsequent feedback updates underlying `playlist_tune.scheduled`; those changes influence _future_ snapshots only.
-
-## Bucket Classification Logic (Conceptual)
-
-1. Bucket 1 (Due Today): Tunes whose scheduled date (or derived coalesced timestamp) is within the current local day or overdue but inside the delinquency window and prioritized as today's core work.
-2. Bucket 2 (Recently Lapsed): Slightly overdue beyond today's principal slice but still inside acceptable delinquency window; surfaced after bucket 1 items or visually distinct.
-3. Bucket 3 (Backfill): Older material intentionally appended (user/backlog action) to fill excess capacity.
-
-Tunes absent from the snapshot but later detected as newly due (e.g., manual schedule adjustments) increment the "new tunes due since snapshot" counter; user can choose to force regenerate or manually append.
-
-## Feedback Submission & Scheduling (Unchanged Core)
-
-The core processing of a practice event remains as previously documented; only the refetch model changed. Summary below (for recall + non-recall):
-
-1. Client builds `updates` (tune_id -> { feedback, goal }).
-2. POST `/practice/submit_feedbacks/{playlist_id}?sitdown_date=...`.
-3. `update_practice_feedbacks()` loops tunes, resolves algorithm prefs, calls `_process_single_tune_feedback()`.
-4. Recall goal: FSRS/SM2 scheduler yields next review date; non-recall: heuristic `_process_non_recall_goal()` computes interval.
-5. Append new `PracticeRecord`; update `playlist_tune.scheduled` with computed next review.
-6. Transaction commit; client clears transient per-row state (no need to refetch entire snapshot just for local feedback clearing).
-
-Snapshot ordering is stable: we _do not_ remove items practiced earlier in the same day; they remain visible (optionally styled as completed) to support session review context.
-
-## Snapshot Lifecycle
-
-Generation triggers:
-
-- First GET of the day for `/practice_queue_snapshot/{user}/{playlist}` (endpoint naming abstracted here) generates if absent.
-- Manual force regeneration (developer or advanced control) can explicitly rebuild (invalidating prior snapshot) – rare, because it discards user mental model of day's plan.
-- Next calendar day (local tz) automatically leads to a new snapshot on first access.
-
-Appending:
-
-- Backlog append: Adds a batch of older unscheduled / low-priority tunes as bucket 3.
-- Priority add: Injects selected tunes immediately (idempotent) respecting max daily size.
-- These calls return only the new rows; client merges into existing in-memory snapshot array.
-
-Gap Detection:
-
-- After feedback updates, some tunes may now qualify as bucket 1 but were absent when snapshot froze.
-- The frontend displays a counter (from snapshot API response) for "new tunes due since snapshot" enabling user decision: append vs force regenerate tomorrow.
-
-## Edge Cases & Consistency
-
-| Scenario                                             | Handling                                                                                                                       |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Duplicate submission same tune + same sitdown minute | Uniqueness on `(tune_ref, playlist_ref, practiced)` prevents; client debounces.                                                |
-| Timezone change mid-day                              | Snapshot retains original `tz_offset_minutes_snapshot`; visual local-day drift possible; recommend force regen if significant. |
-| Large backlog append exceeding cap                   | Backend truncates to max allowed; returns only accepted rows.                                                                  |
-| Tune deleted after snapshot                          | UI may gray or hide; backend can soft filter on subsequent append responses.                                                   |
-| Prefs change (e.g., delinquency window) midday       | Does not retroactively re-bucket; affects next snapshot.                                                                       |
-
-## Data Structures (Key)
-
-Submission payload (unchanged):
-
-```ts
-interface ITuneUpdate {
-  feedback: string;
-  goal?: string | null;
-}
-type UpdatesPayload = { [tuneId: string]: ITuneUpdate };
-```
-
-Snapshot entry (frontend `QueueEntry` subset):
-
-```ts
-interface IQueueEntry {
-  tune_ref: number;
-  bucket: 1 | 2 | 3;
-  snapshot_coalesced_ts: string;
-  scheduled_snapshot?: string | null;
-  latest_due_snapshot?: string | null;
-  acceptable_delinquency_window_snapshot?: number | null;
-  tz_offset_minutes_snapshot?: number | null;
-  // ...additional tune metadata fields
-}
-```
-
-PracticeRecord (unchanged core subset):
-
-```python
-PracticeRecord(
-  tune_ref: int,
-  playlist_ref: int,
-  quality: int,
-  practiced: str,      # UTC practice timestamp
-  due: str,    # (currently same as practiced; next review stored on playlist_tune)
-  interval: int,
-  easiness: float | None,
-  repetitions: int,
-  step: int | None,
-  goal: str,
-  technique: str | None,
-)
-```
-
-### Practice Record Schema Reference
-
-Full field reference for the `practice_record` table:
-
-| Type    | Name             | Description                                                                                                 |
-| ------- | ---------------- | ----------------------------------------------------------------------------------------------------------- |
-| INTEGER | id               | Primary key, autoincrement                                                                                  |
-| INTEGER | playlist_ref     | References the playlist (`playlist.playlist_id`)                                                            |
-| INTEGER | tune_ref         | References the tune (`tune.id`)                                                                             |
-| TEXT    | practiced        | UTC timestamp when the practice occurred                                                                    |
-| INTEGER | quality          | Quality rating of the practice event (0–5 mapped per algorithm)                                             |
-| REAL    | easiness         | Easiness factor (SM2 path)                                                                                  |
-| INTEGER | interval         | Interval (days) until next review (output of scheduler/heuristic)                                           |
-| INTEGER | repetitions      | Number of successful reviews (algorithm-specific increment semantics)                                       |
-| TEXT    | due              | Historical field; currently set equal to `practiced` (next review now tracked on `playlist_tune.scheduled`) |
-| TEXT    | backup_practiced | Deprecated legacy field (retained for migration safety)                                                     |
-| REAL    | stability        | FSRS stability metric                                                                                       |
-| INTEGER | elapsed_days     | Days elapsed since last review (algorithm input)                                                            |
-| INTEGER | lapses           | Count of lapses/forget events                                                                               |
-| INTEGER | state            | Learning state enum (Learning=1, Review=2, Relearning=3, NEW/0/null)                                        |
-| REAL    | difficulty       | FSRS difficulty metric                                                                                      |
-| INTEGER | step             | Current step in learning/relearning sequence (or null in Review state)                                      |
-
-Notes:
-
-1. The authoritative NEXT review date is **not** this table's `due`; instead it is stored on `playlist_tune.scheduled` and captured into snapshots (`scheduled_snapshot`).
-2. Future migration could repurpose `due` or introduce a dedicated `next_review` column once legacy semantics fully retired.
-3. Uniqueness of a practice event is enforced by timestamp precision on `(tune_ref, playlist_ref, practiced)`.
-
-### Daily Practice Queue Schema Reference
-
-Full field reference for the `daily_practice_queue` table. Represents the frozen (and appendable) daily snapshot rows for a user + playlist + day window. Each row captures bucket classification and snapshot-time scheduling attributes. New practice events do **not** mutate existing rows; appends add new rows preserving order.
-
-| Type    | Name                                   | Description                                                                               |
-| ------- | -------------------------------------- | ----------------------------------------------------------------------------------------- |
-| INTEGER | id                                     | Primary key, autoincrement                                                                |
-| INTEGER | user_ref                               | Owning user id                                                                            |
-| INTEGER | playlist_ref                           | Playlist identifier                                                                       |
-| TEXT    | window_start_utc                       | Inclusive UTC start of snapshot window (anchored local day)                               |
-| TEXT    | window_end_utc                         | Exclusive UTC end of snapshot window                                                      |
-| INTEGER | tune_ref                               | Tune id included in the snapshot                                                          |
-| INTEGER | bucket                                 | Classification (1=Due Today, 2=Recently Lapsed, 3=Backfill)                               |
-| INTEGER | order_index                            | Stable ordering within bucket/day (dense, 0-based or 1-based per generator)               |
-| TEXT    | snapshot_coalesced_ts                  | Canonical ordering timestamp (coalesced scheduled / latest review) captured at generation |
-| TEXT    | generated_at                           | Timestamp when this row (or batch) was generated/appended                                 |
-| TEXT    | mode                                   | Tune mode cached for display/styling                                                      |
-| TEXT    | queue_date                             | Local date string (for resilience when tz shifts)                                         |
-| TEXT    | scheduled_snapshot                     | Next review date captured at snapshot time (nullable)                                     |
-| TEXT    | latest_due_snapshot                    | Latest practice time captured at snapshot time (nullable)                                 |
-| INTEGER | acceptable_delinquency_window_snapshot | Window (days) value used during classification                                            |
-| INTEGER | tz_offset_minutes_snapshot             | Client timezone offset minutes captured for local-day logic                               |
-| TEXT    | completed_at                           | When user completed this tune today (set once; row retained)                              |
-| INTEGER | exposures_required                     | Target exposures within session/day (future readiness; may be null)                       |
-| INTEGER | exposures_completed                    | Count of completed exposures (default 0)                                                  |
-| TEXT    | outcome                                | Optional outcome summary / qualitative label                                              |
-| BOOLEAN | active                                 | Row still active for today's display (false if logically retired / superseded)            |
-
-Notes:
-
-1. Uniqueness prevents duplicate tune insertion for same `(user_ref, playlist_ref, window_start_utc, tune_ref)`.
-2. `active` allows future soft-retirement (e.g., after force regen) without deleting history for analytics.
-3. `order_index` remains stable; appended rows get indexes after existing max preserving earlier mental model.
-4. `exposures_*` fields anticipate multi-exposure learning strategies (e.g., multiple passes in one day); currently optional.
-5. Snapshot generation indexes facilitate efficient queries by user/playlist/day and filtering by `active` & `bucket`.
-
-### Rationale: Why Both `practice_record` and `daily_practice_queue`?
-
-Although both tables contain per‑tune rows, they serve **orthogonal concerns** and intentionally avoid consolidation.
-
-| Aspect                 | `practice_record`                                                                                      | `daily_practice_queue`                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| Core Purpose           | Immutable historical log of every practice event (inputs for algorithms, analytics, FSRS optimization) | Frozen daily snapshot + UX scaffold (stable ordering, buckets, completion & append flows) |
-| Lifecycle              | Append-only; never mutated after insert                                                                | Regenerated each day; rows appended during day; may be soft-retired (`active=false`)      |
-| Temporal Semantics     | One row per discrete feedback action (practice event)                                                  | One row per tune selected for the day's plan within a window                              |
-| Scheduling Authority   | Source of truth for past performance metrics (interval, ease, stability, reps, lapses)                 | Derived view capturing next-review snapshot fields for _display_, not algorithm evolution |
-| Mutation on Practice   | New row appended (no in-place updates)                                                                 | Existing row left intact; optional `completed_at` set; no reordering                      |
-| Ordering               | Not ordered beyond timestamp queries                                                                   | Explicit `order_index` for deterministic UX across refreshes                              |
-| Bucket Classification  | Not stored; can be recomputed if needed                                                                | Stored (1/2/3) to provide inexpensive styling & filtering                                 |
-| Timezone Handling      | Raw UTC timestamps, interpretation deferred                                                            | Captures `tz_offset_minutes_snapshot` to freeze local-day boundaries                      |
-| Derived / Regenerable  | Canonical dataset (cannot be recomputed if lost)                                                       | Fully regenerable from `practice_record`, `playlist_tune.scheduled`, prefs                |
-| Multi-Exposure Support | Each exposure = separate record (future)                                                               | `exposures_required/completed` allow intra-day tracking without inflating historical rows |
-| Performance Motivation | Optimized for write simplicity and analytical reads                                                    | Avoids recomputing due list + buckets on every refresh; enables cheap delta appends       |
-| UX Stability           | Not directly rendered as the live queue                                                                | Ensures user’s plan does not “jump” after each submission or new due arrival              |
-
-#### Key Design Drivers
-
-1. **Stable Daily Plan**: Users retain a consistent visual queue even while underlying next-review dates shift; historical table alone would cause re-sorting jitter.
-2. **Cheap Delta Operations**: Appending backlog or priority tunes only touches snapshot rows; historical log remains pure and focused.
-3. **Algorithm Integrity**: Scheduling logic consumes _practice history_ metrics that require a complete chronological series; mixing transient ordering data would add noise.
-4. **Snapshot Regeneration Safety**: Because queue rows are derivable, we can discard/regenerate without risking loss of essential spaced repetition signals.
-5. **Extensibility**: Future features (multi-exposure tracking, partial completions, per-day outcome notes) land in the snapshot without schema churn in `practice_record`.
-
-#### Why Not a Single Table + Flags?
-
-Combining concerns would either (a) bloat historical rows with ephemeral per-day fields or (b) require complex partial indexes and cascading updates that erode the immutability guarantees the algorithms rely on. Separation maintains clean invariants: historical rows are never rewritten; snapshot rows are cheap, discardable, and optimized for UI semantics.
-
-#### Potential Future Convergence
-
-If future performance profiling shows regeneration is trivial and daily UX demands more real-time adaptability, a _materialized view_ or _on-demand generated cache_ could replace the physical snapshot table—retaining `practice_record` as the only persisted source. Current choice balances development velocity with UX stability.
-
-## Transient Feedback Staging (`table_transient_data`)
-
-Purpose: Provide **per-row, pre-submission persistence plus preview scheduler metrics** (interval, easiness, repetitions, difficulty, stability, step) for an in‑progress recall evaluation so that refresh/navigation does not lose intent and the user can see projected results before committing historical `PracticeRecord` entries.
-
-### When It Is Used
-
-1. User selects a recall evaluation (Again/Hard/Good/Easy...) in grid or flashcard mode.
-2. UI updates row locally (optimistic) then calls server action `stagePracticeFeedback()` which sends a single‑tune POST: `/practice/submit_feedbacks/{playlist_id}?stage=true&sitdown_date=...` with body `{ "<tuneId>": { "feedback": "good", "goal": "recall" } }`.
-3. Backend `_stage_practice_feedbacks` computes scheduler preview and UPSERTs row into `table_transient_data` (purpose='practice').
-4. Optional lightweight refetch of snapshot merges new preview metrics for that tune (latest\_\* fields) into UI.
-5. User can change the evaluation again; each change overwrites the transient row with new preview metrics.
-6. Batch submit (`submitPracticeFeedbacks` with `stage=false`) creates real `PracticeRecord` rows, marks snapshot queue rows completed, then client bulk clears staging rows (DELETE legacy `/table_transient_data/{userId}/-1/{playlistId}/practice`).
-
-### Data Model Subset
-
-Request payload (staging single tune):
-
-```json
-{
-  "123": { "feedback": "good", "goal": "recall" }
-}
-```
-
-Stored transient columns used now: `recall_eval`, `practiced`, `quality`, `easiness`, `difficulty`, `interval`, `step`, `repetitions`, `due`, `goal`, `technique`, `stability` (notes fields currently unused in staging path).
-
-### Lifecycle Summary
-
-| Phase                    | Action                                                       | Persistence Effect                                              |
-| ------------------------ | ------------------------------------------------------------ | --------------------------------------------------------------- |
-| Row edit (optimistic)    | Local state updated (`recall_eval`)                          | None (client memory)                                            |
-| Stage call               | POST submit_feedbacks?stage=true                             | UPSERT preview metrics into `table_transient_data`              |
-| Subsequent edits         | Repeat stage call                                            | Overwrite transient row                                         |
-| Optional per-row preview | Lightweight refetch merges updated latest\_\* preview fields | UI shows predicted interval/easiness/etc.                       |
-| Batch submission         | POST submit_feedbacks?stage=false (multi-tune body)          | PracticeRecords appended; snapshot rows `completed_at` set      |
-| Post-submit clean        | DELETE /table_transient_data (bulk clear)                    | Remove transient rows (history now solely in `practice_record`) |
-
-### Why Not Only Client Memory?
-
-1. **Resilience**: Browser refresh / tab crash does not force re-selection of dozens of pending evaluations.
-2. **Cross-device continuity (future)**: Could allow starting on one device, finishing on another before submit.
-3. **Explicit Intent Tracking**: Distinguishes _pending_ evaluations (staged) from _completed_ (historical PracticeRecords) without altering snapshot ordering.
-
-### Interaction With Snapshot
-
-`table_transient_data` does **not** influence daily snapshot generation or bucket ordering. It is purely a scratch layer. Snapshot rows remain stable; staging only pre-populates what the user _plans_ to submit. If a user stages a value but never submits before day rollover, that staged row can be pruned (future housekeeping) without affecting scheduling correctness.
-
-### Cleanup & Pruning
-
-Currently cleanup is manual (client DELETE post-submit). A future cron / background task could prune:
-
-- Staged rows older than N hours with no corresponding `PracticeRecord` on the same (tune, playlist, user).
-- Rows whose tunes left the playlist or were deleted.
-
-### Potential Extensions
-
-1. Store _predicted next interval_ so UI can preview effect before commit.
-2. Support staging of multi-exposure counts (previewing partial completions).
-3. Encrypt / redact private notes client-side before staging for privacy.
-
-### Trade-offs
-
-- Added write per row edit (small overhead) vs zero-loss UX for longer selection sessions.
-- Requires disciplined bulk delete post-submit to prevent stale residue; mitigated by potential TTL pruning.
-
-## Future Improvements
-
-1. Include per-row completion state in snapshot to eliminate client transient flag after practicing.
-2. Server-delivered deltas (updated rows + counters) instead of reusing full snapshot for append responses.
-3. Optional mid-day mini-snapshot for large gap counts (configurable threshold).
-4. Persist practice completion markers to hide or collapse finished tunes without losing ordering context.
-5. Evaluate storing next review date directly on PracticeRecord for simplified provenance.
+**Architecture:** Offline-first with local SQLite WASM + Supabase sync  
+**Last Updated:** November 8, 2025
 
 ---
 
-Document version: 2.0 (snapshot model)
-Maintainer: (auto-generated)
+## Overview
 
-## Practice Feedback -> Scheduling Flow
+The practice flow consists of five major phases:
 
-This document describes the end-to-end flow from the user submitting practice feedback in the frontend to the scheduling data being persisted and re-fetched for display. It covers both recall (FSRS/SM2 spaced repetition) and non-recall goal-specific paths.
+1. **Queue Generation** - Create frozen daily practice snapshot
+2. **Evaluation Staging** - FSRS preview calculations on dropdown selection
+3. **Submission** - Commit evaluations to practice_record and mark queue completed
+4. **Sync** - Bidirectional sync with Supabase PostgreSQL
+5. **UI Refresh** - React to database changes via reactive signals
 
-### 1. Frontend Submission (Client Component)
+---
 
-File: `frontend/app/(main)/pages/practice/components/TunesGridScheduled.tsx`
+## Architecture Diagram
 
-Key function: `submitPracticeFeedbacksHandler()`
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant UI as SolidJS UI
+    participant DB as SQLite WASM
+    participant Q as Practice Queue
+    participant S as Staging Service
+    participant C as Commit Service
+    participant Sync as Sync Engine
+    participant SB as Supabase
 
-Steps:
+    Note over U,SB: PHASE 1: Queue Generation (On Page Load)
+    U->>UI: Navigate to /practice
+    UI->>DB: Check if queue exists for today
+    alt Queue exists
+        DB-->>UI: Return existing queue
+    else No queue
+        UI->>Q: generateOrGetPracticeQueue()
+        Q->>DB: Query practice_list_staged VIEW
+        Note over Q,DB: Q1: Due Today<br/>Q2: Recently Lapsed<br/>Q3: New/Unscheduled<br/>Q4: Old Lapsed
+        Q->>DB: INSERT daily_practice_queue rows
+        Q->>Sync: queueSync() for new rows
+        DB-->>UI: Return queue snapshot
+    end
+    UI-->>U: Display practice grid (ordered by bucket/order_index)
 
-1. Iterate over current `tunes` array (from `useScheduledTunes()` context).
-2. For each tune, read the row from the TanStack table and extract `recall_eval` (feedback) and `goal`.
-3. Build `updates: { [tuneId: { feedback, goal } }` (only include tunes with a feedback value).
-4. Clear current tune selection (and persist that cleared state) if the currently focused tune is being submitted.
-5. Read `sitdownDate` from `getSitdownDateFromBrowser()` (must be client supplied for correct temporal anchoring).
-6. Call server function `submitPracticeFeedbacks({ playlistId, updates, sitdownDate })` (in `commands.ts`).
-7. On success: trigger global refresh via `triggerRefresh()` so the latest scheduled tunes are re-fetched; show toast.
-8. Fire-and-forget deletion of transient table state (`deleteTableTransientData`).
+    Note over U,SB: PHASE 2: Evaluation Staging (Per Tune)
+    U->>UI: Select "Good" evaluation
+    UI->>S: stagePracticeEvaluation()
+    S->>DB: Get latest practice_record
+    S->>S: Run FSRS calculation
+    Note over S: Convert "good" → Rating.Good<br/>Compute stability, difficulty, interval
+    S->>DB: UPSERT table_transient_data
+    S->>Sync: queueSync() for staging row
+    S->>DB: persistDb() to IndexedDB
+    S-->>UI: Return preview metrics
+    UI->>UI: incrementSyncVersion()
+    UI->>DB: Re-query practice_list_staged
+    Note over DB: VIEW COALESCEs staging + historical
+    UI-->>U: Show preview (stability, due date, etc.)
 
-### 2. Server Action / Network Request
+    loop Additional Evaluations
+        U->>UI: Select evaluation for another tune
+        UI->>S: stagePracticeEvaluation()
+        Note over S,DB: Same staging process (UPSERT)
+    end
 
-File: `frontend/app/(main)/pages/practice/commands.ts`
+    Note over U,SB: PHASE 3: Submission
+    U->>UI: Click "Submit" button
+    UI->>C: commitStagedEvaluations(windowStartUtc)
+    C->>DB: SELECT from table_transient_data<br/>(filter by user/playlist/practiced IS NOT NULL)
+    C->>DB: SELECT tune_refs from daily_practice_queue<br/>(filter by windowStartUtc)
+    C->>C: Filter staging rows to only current queue
 
-Function: `submitPracticeFeedbacks()`
+    loop For Each Staged Evaluation
+        C->>DB: Check for duplicate practice_record<br/>(unique: tune_ref, playlist_ref, practiced)
+        alt Duplicate exists
+            C->>C: Increment practiced timestamp by 1 second
+        end
+        C->>DB: INSERT practice_record
+        C->>Sync: queueSync("practice_record", "update")
+        C->>DB: UPDATE playlist_tune.current (next review date)
+        C->>Sync: queueSync("playlist_tune", "update")
+        C->>DB: UPDATE daily_practice_queue.completed_at
+        C->>Sync: queueSync("daily_practice_queue", "update")
+        C->>DB: DELETE from table_transient_data
+        C->>Sync: queueSync("table_transient_data", "delete")
+    end
 
-Steps:
+    C->>DB: persistDb() to IndexedDB
+    C-->>UI: Return {success: true, count: N}
+    UI->>UI: toast.success()
+    UI->>Sync: forceSyncUp()
 
-1. Validate presence and validity of `sitdownDate` (must be a Date object, non-NaN).
-2. POST JSON body `updates` to: `POST {TT_API_BASE_URL}/tunetrees/practice/submit_feedbacks/{playlistId}?sitdown_date=<UTC_ISO>`.
-3. `sitdown_date` is converted to Python-compatible UTC string (`convertToPythonUTCString`).
-4. Returns JSON `{ "status": "ok", "staged": false, "count": <n> }` (or `staged: true` for staging calls with `?stage=true`).
+    Note over U,SB: PHASE 4: Sync to Supabase
+    Sync->>DB: getPendingSyncItems()
+    loop For Each Sync Queue Item
+        Sync->>Sync: Transform camelCase → snake_case
+        Sync->>SB: Supabase API (INSERT/UPDATE/DELETE)
+        SB-->>Sync: Success
+        Sync->>DB: markSynced(item.id)
+    end
+    Sync-->>UI: Sync complete
 
-Payload Shape (per tune):
+    UI->>UI: setEvaluations({})
+    UI->>UI: setEvaluationsCount(0)
+    UI->>UI: incrementSyncVersion()
 
-```json
-{
-  "<tune_id>": {
-    "feedback": "good|again|easy|...",
-    "goal": "recall|fluency|initial_learn|..."
+    Note over U,SB: PHASE 5: UI Refresh
+    UI->>DB: getPracticeList() [triggered by syncVersion change]
+    DB->>DB: Query practice_list_staged<br/>INNER JOIN daily_practice_queue<br/>WHERE completed_at IS NULL
+    DB-->>UI: Return uncompleted tunes
+    UI-->>U: Grid refreshes (submitted tunes disappear)
+
+    Note over U,SB: Background: Supabase → Local Sync
+    SB->>Sync: Realtime notification (other device changed data)
+    Sync->>SB: syncDown() - fetch updated records
+    Sync->>DB: UPSERT into local tables
+    Sync->>UI: Trigger incrementSyncVersion()
+    UI->>DB: Re-query practice_list_staged
+    UI-->>U: Grid updates with changes
+```
+
+---
+
+## Phase 1: Queue Generation
+
+### Entry Point: Page Load
+
+**File:** `src/routes/practice/Index.tsx`  
+**Lines:** 1-110
+
+```typescript
+const PracticeIndex: Component = () => {
+  const { user, localDb, incrementSyncVersion, forceSyncUp, syncVersion } = useAuth();
+  const { currentPlaylistId } = useCurrentPlaylist();
+
+  // Resource to get user ID from user_profile table
+  const [userId] = createResource(/* ... */); // Lines 60-75
+
+  // Shared evaluation state
+  const [evaluations, setEvaluations] = createSignal<Record<number, string>>({});
+  const [evaluationsCount, setEvaluationsCount] = createSignal(0);
+```
+
+### Queue Generation Service
+
+**File:** `src/lib/services/practice-queue.ts`  
+**Lines:** 547-820 (main function)
+
+**Entry Function:** `generateOrGetPracticeQueue()`
+
+```typescript
+export async function generateOrGetPracticeQueue(
+  db: AnyDatabase,
+  userRef: string,
+  playlistRef: string,
+  reviewSitdownDate: Date = new Date(),
+  localTzOffsetMinutes: number | null = null,
+  mode: string = "per_day",
+  forceRegen: boolean = false
+): Promise<DailyPracticeQueueRow[]>
+```
+
+**Key Steps:**
+
+1. **Compute Windows** (Lines 570-577)
+   ```typescript
+   const windows = computeSchedulingWindows(
+     reviewSitdownDate,
+     prefs.acceptableDelinquencyWindow,
+     localTzOffsetMinutes
+   );
+   ```
+   - **Function:** `computeSchedulingWindows()` in `src/lib/services/queue-generator.ts:131-151`
+   - **Returns:** `{ startTs, endTs, windowFloorTs }` (ISO format timestamps)
+
+2. **Check Existing Queue** (Lines 595-607)
+   ```typescript
+   const existing = await fetchExistingActiveQueue(db, userRef, playlistRef, windowStartKey);
+   if (existing.length > 0 && !forceRegen) {
+     return existing;
+   }
+   ```
+   - **Function:** `fetchExistingActiveQueue()` in `src/lib/services/practice-queue.ts:198-220`
+
+3. **Query Practice List Staged** (Lines 636-668, 679-700, 709-730, 740-764)
+   - **Q1 (Bucket 1):** Due today
+     ```sql
+     SELECT * FROM practice_list_staged
+     WHERE scheduled >= startTs AND scheduled < endTs
+     ORDER BY COALESCE(scheduled, latest_due) ASC
+     ```
+   - **Q2 (Bucket 2):** Recently lapsed (within delinquency window)
+     ```sql
+     WHERE scheduled >= windowFloorTs AND scheduled < startTs
+     ```
+   - **Q3 (Bucket 3):** New/unscheduled tunes
+     ```sql
+     WHERE scheduled IS NULL AND (latest_due IS NULL OR latest_due < windowFloorTs)
+     ```
+   - **Q4 (Bucket 4):** Old lapsed (disabled by default)
+
+4. **Build Queue Rows** (Lines 774-803)
+   ```typescript
+   const q1Built = buildQueueRows(q1Rows, windows, prefs, userRef, playlistRef, mode, localTzOffsetMinutes, 1);
+   ```
+   - **Function:** `buildQueueRows()` in `src/lib/services/practice-queue.ts:340-381`
+   - **Creates:** `DailyPracticeQueueRow` objects with:
+     - `bucket` (1-4)
+     - `orderIndex` (0-based sequential)
+     - `windowStartUtc`, `windowEndUtc`
+     - `snapshotCoalescedTs` (captured scheduling timestamp)
+     - `completedAt: null` (initially)
+
+5. **Persist to Database** (Lines 805-817)
+   ```typescript
+   await db.insert(dailyPracticeQueue).values(allBuiltRows).run();
+   ```
+   - **Table:** `daily_practice_queue`
+   - **Schema:** `drizzle/schema-postgres.ts:286-346` (23 fields, UNIQUE constraint)
+
+### Window Format Utility
+
+**File:** `src/lib/utils/practice-date.ts`  
+**Lines:** 57-76
+
+```typescript
+export function formatAsWindowStart(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} 00:00:00`;
+}
+// Returns: "2025-11-08 00:00:00" (space format)
+```
+
+**Critical Note:** Database may contain BOTH formats:
+- `'2025-11-08T00:00:00'` (ISO with T - from earlier code)
+- `'2025-11-08 00:00:00'` (space format - from formatAsWindowStart)
+
+---
+
+## Phase 2: Evaluation Staging
+
+### User Interaction: Selecting Evaluation
+
+**File:** `src/components/grids/TunesGridScheduled.tsx`  
+**Lines:** 275-325
+
+**Handler:** `handleRecallEvalChange()`
+
+```typescript
+const handleRecallEvalChange = async (tuneId: string, evaluation: string) => {
+  console.log(`Tune ${tuneId} recall eval changed to: ${evaluation}`);
+  
+  // Update local state immediately (optimistic UI)
+  setEvaluations((prev) => ({ ...prev, [tuneId]: evaluation }));
+
+  const db = localDb();
+  const playlistId = currentPlaylistId();
+  if (!db || !playlistId || !props.userId) return;
+
+  if (evaluation === "") {
+    // Clear staged data when "(not set)" selected
+    await clearStagedEvaluation(db, props.userId, tuneId, playlistId);
+  } else {
+    // Stage FSRS preview
+    await stagePracticeEvaluation(db, props.userId, playlistId, tuneId, evaluation, "recall", "");
   }
 }
 ```
 
-### 3. FastAPI Endpoint
+### Evaluation Dropdown Component
 
-File: `tunetrees/api/tunetrees.py`
+**File:** `src/components/grids/RecallEvalComboBox.tsx`  
+**Lines:** 1-107
 
-Endpoint:
-
-```python
-@router.post("/practice/submit_feedbacks/{playlist_id}")
-async def submit_feedbacks(playlist_id: str, tune_updates: Dict[str, TuneFeedbackUpdate], sitdown_date: datetime = Query(...))
-```
-
-Steps:
-
-1. Ensure `sitdown_date` is timezone-aware; if naive, patch UTC tzinfo.
-2. If `stage=true`: call `_stage_practice_feedbacks()` which computes preview scheduling metrics and UPSERTs `table_transient_data`; respond with JSON including `staged: true` and count.
-3. If commit (`stage=false` or absent): call `update_practice_feedbacks(tune_updates, playlist_id, review_sitdown_date=sitdown_date)` writing `PracticeRecord` rows and updating `playlist_tune.scheduled`.
-4. Return JSON `{status, staged:false, count}` (or raise HTTP 500 with detail on failure).
-
-### 4. Core Scheduling Orchestration
-
-File: `tunetrees/app/schedule.py`
-
-Function: `update_practice_feedbacks()`
-
-Steps:
-
-1. Resolve `user_ref` from `playlist_ref` (playlist ownership) via DB.
-2. Determine algorithm type preference (`fetch_algorithm_type`).
-3. Loop each `(tune_id, tune_update)`:
-   - Invoke `_process_single_tune_feedback()`.
-4. Commit transaction; rollback + re-raise on exception.
-
-### 5. Processing Single Tune Feedback (Recall Path)
-
-Function: `_process_single_tune_feedback()` (same file)
-
-Steps (recall goal):
-
-1. Validate UTC timezone of `sitdown_date`.
-2. Load latest practice record for reference (historical continuity) but always create a NEW record.
-3. Extract `quality_int` via `validate_and_get_quality()`; skip if quality is placeholder.
-4. Extract `goal` (defaults to `recall`) and fetch user default technique (`get_default_technique_for_user`).
-5. If goal != `recall`, delegate to `_process_non_recall_goal()` (see §6).
-6. Fetch spaced repetition prefs (`get_prefs_spaced_repetition`) for the algorithm (FSRS or SM2 config); includes weights, desired retention, intervals, fuzzing flags, steps.
-7. Instantiate scheduler via `SpacedRepetitionScheduler.factory(...)`.
-8. Compute review outcome:
-   - `first_review()` if NEW / RESCHEDULED quality marker.
-   - Otherwise `review()` with previous easiness, interval, repetitions, etc.
-9. Derive `due_str` from scheduler output (next review datetime) and `practiced_str` from `sitdown_date` (current session timestamp).
-10. Create new `PracticeRecord` (ALWAYS appending; never updating previous) with:
-    - `due` set to the ACTUAL practice date (current design decision: track when practiced; next review date is stored separately in playlist_tune.scheduled).
-11. Add record to session.
-12. If a valid next review date was produced, call `update_playlist_tune_scheduled()` to mirror it into `playlist_tune.scheduled` (migration Step 2 toward playlist-based scheduling).
-
-### 6. Processing Non-Recall Goals
-
-Function: `_process_non_recall_goal()`
-
-Differences:
-
-1. Goal-specific intervals chosen from preset arrays (e.g., `initial_learn`, `fluency`, `session_ready`, `performance_polish`).
-2. Adjust step based on prior repetitions and current quality.
-3. Derive next review date via `_calculate_goal_specific_due()` (technique modifiers: `daily_practice`, `motor_skills`, `metronome`).
-4. Create new `PracticeRecord` (includes interval estimation and repetition increment) with `due` still set to practice time (consistency) and update `playlist_tune.scheduled` with computed next review date.
-
-### 7. Data Persistence & Uniqueness
-
-`PracticeRecord` uniqueness relies on distinct `(tune_ref, playlist_ref, practiced)` timestamps. Each submission uses the exact `sitdown_date` down to minute precision (seconds zeroed earlier in pipeline when parsed); multiple updates in the same minute for the same tune would violate uniqueness—frontend avoids rapid duplicate submissions per tune in a single session scope.
-
-### 7b. Scheduled Tunes Query (Backend Selection Logic)
-
-Core selector: `query_practice_list_scheduled(db, ...)` in `tunetrees/app/queries.py`.
-
-Responsibilities:
-
-- Accepts `review_sitdown_date` (UTC) + `acceptable_delinquency_window` to define a sliding window: `(sitdown_date - window_days, sitdown_date]`.
-- Filters rows from `t_practice_list_staged` for the current user + playlist.
-- Uses `COALESCE(playlist_tune.scheduled, latest_due)` so new playlist-based scheduling supersedes legacy practice record scheduling but still works during migration.
-- Excludes deleted tunes / deleted playlists unless flags set.
-- Orders by (coalesced) scheduled/review date descending, then performs a secondary in-memory sort by tune type for stable UI grouping.
-- Returns rows consumed by `/scheduled_tunes_overview/{user}/{playlist}` endpoint which the frontend calls via `getScheduledTunesOverviewAction()`.
-
-Why it matters:
-
-- Central place where the migration from historical `PracticeRecord.due` to `playlist_tune.scheduled` is abstracted away.
-- Ensures users see both slightly delinquent (within window) and due-today tunes in one list.
-- Prevents N+1 queries by operating entirely in a single SELECT over the staged view.
-
-Data Fallback Behavior:
-
-- If `playlist_tune.scheduled` is NULL (older entries), the previous `latest_due` (from practice history) still governs visibility.
-- Once a tune receives new feedback under the new system, `playlist_tune.scheduled` is populated, taking precedence.
-
-### 8. Refresh Cycle Back to UI
-
-1. After successful POST, frontend triggers `triggerRefresh()`.
-2. `TunesGridScheduled` `useEffect` detects `refreshId` change and calls `getScheduledTunesOverviewAction()`.
-3. Server action wraps `getScheduledTunesOverview()` (in `practice/queries.ts`).
-4. Query executes `GET /scheduled_tunes_overview/{userId}/{playlistId}` passing `sitdown_date` (converted to UTC string) and `acceptable_delinquency_window`.
-5. API responds with updated schedule including any newly scheduled tunes or changed intervals.
-6. State updated → table re-renders with cleared `recall_eval` and updated scheduling info.
-
-### 9. Key Data Structures
-
-Practice Feedback Update (frontend to backend):
-
-```ts
-interface ITuneUpdate {
-  feedback: string;
-  goal?: string | null;
+```typescript
+interface RecallEvalComboBoxProps {
+  value: string;
+  onChange: (value: string) => void;
+  testId: string;
 }
-type UpdatesPayload = { [tuneId: string]: ITuneUpdate };
+
+export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (props) => {
+  const options = [
+    { value: "", label: "(Not Set)", color: "text-gray-500" },
+    { value: "again", label: "Again", color: "text-red-600" },
+    { value: "hard", label: "Hard", color: "text-orange-600" },
+    { value: "good", label: "Good", color: "text-green-600" },
+    { value: "easy", label: "Easy", color: "text-blue-600" },
+  ];
+  
+  return <DropdownMenu.Root>{/* Kobalte DropdownMenu */}</DropdownMenu.Root>;
+};
 ```
 
-PracticeRecord (subset of fields relevant here):
+### Staging Service
 
-```python
-PracticeRecord(
-  tune_ref: int,
-  playlist_ref: int,
-  quality: int,
-  practiced: str,         # UTC timestamp of review session
-  due: str,       # (Design) also set to practiced timestamp
-  interval: int,
-  easiness: float | None,
-  repetitions: int,
-  step: int | None,
-  goal: str,
-  technique: str | None,
-)
+**File:** `src/lib/services/practice-staging.ts`  
+**Lines:** 128-262
+
+**Main Function:** `stagePracticeEvaluation()`
+
+```typescript
+export async function stagePracticeEvaluation(
+  db: SqliteDatabase,
+  userId: string,
+  playlistId: string,
+  tuneId: string,
+  evaluation: string,
+  goal: string = "recall",
+  technique: string = ""
+): Promise<FSRSPreviewMetrics>
 ```
 
-### 10. Edge Cases & Validation
+**Key Steps:**
 
-1. Missing or invalid `sitdownDate` → client throws before POST.
-2. Naive (timezone-less) `sitdown_date` query param → server upgrades to UTC.
-3. Unknown goal string → warning + fallback to recall path.
-4. Quality not provided or unexpected → raises ValueError (tune skipped or aborts if unhandled).
-5. Non-recall scheduling uses heuristic arrays; may revisit for adaptive intervals.
-6. Race condition (duplicate submissions) could attempt identical `(tune_ref, playlist_ref, practiced)`; mitigated by single-click + client state clear.
+1. **Get Latest Practice Record** (Lines 141-143)
+   ```typescript
+   const latestCard = await getLatestPracticeRecord(db, tuneId, playlistId);
+   ```
+   - **Function:** `getLatestPracticeRecord()` in same file, lines 67-122
+   - **Returns:** FSRS `Card` object or null if never practiced
 
-### 11. Future Improvements (Optional)
+2. **Run FSRS Calculation** (Lines 145-161)
+   ```typescript
+   const f = fsrs();
+   const rating = mapEvaluationToRating(evaluation); // "good" → Rating.Good
+   const card: Card = latestCard ?? createEmptyCard(now);
+   const schedulingCards = f.repeat(card, now);
+   const nextCard = schedulingCards[ratingKey].card;
+   ```
+   - **Library:** `ts-fsrs` (imported line 17)
+   - **Ratings:** Again=1, Hard=2, Good=3, Easy=4
 
-- Store next review date directly in PracticeRecord (separate column) to reduce dual-source complexity during migration.
-- Add explicit server response payload (e.g., list of updated tune IDs + next review dates) to allow optimistic UI without full refetch.
-- Batch fetch of prefs/technique outside per-tune loop (already done for algorithm/prefs; good practice maintained).
-- Add idempotency key or server-side de-duplication for rapid double submissions.
-- Consolidate NEW/RESCHEDULED markers into a typed enum returned from frontend UI rather than raw strings.
+3. **Build Preview Metrics** (Lines 164-175)
+   ```typescript
+   const preview: FSRSPreviewMetrics = {
+     quality: rating,
+     difficulty: nextCard.difficulty,
+     stability: nextCard.stability,
+     interval: Math.round(nextCard.scheduled_days),
+     step: nextCard.state,
+     repetitions: nextCard.reps,
+     practiced: now.toISOString(),
+     due: nextCard.due.toISOString(),
+     state: nextCard.state,
+     goal,
+     technique,
+   };
+   ```
+
+4. **UPSERT to Transient Table** (Lines 178-225)
+   ```typescript
+   await db.run(sql`
+     INSERT INTO table_transient_data (
+       user_id, tune_id, playlist_id, quality, difficulty, stability, 
+       interval, step, repetitions, practiced, due, state, goal, 
+       technique, recall_eval, sync_version, last_modified_at
+     ) VALUES (${userId}, ${tuneId}, ${playlistId}, /* ... */)
+     ON CONFLICT(user_id, tune_id, playlist_id) DO UPDATE SET
+       quality = excluded.quality,
+       difficulty = excluded.difficulty,
+       /* ... all fields ... */
+   `);
+   ```
+   - **Table:** `table_transient_data`
+   - **Constraint:** UNIQUE on (user_id, tune_id, playlist_id)
+
+5. **Queue for Sync** (Lines 228-240)
+   ```typescript
+   await queueSync(db, "table_transient_data", "update", {
+     userId, tuneId, playlistId, ...preview, recallEval: evaluation
+   });
+   ```
+
+6. **Persist to IndexedDB** (Lines 243-244)
+   ```typescript
+   await persistDb();
+   ```
+
+### Clear Staged Evaluation
+
+**File:** `src/lib/services/practice-staging.ts`  
+**Lines:** 264-289
+
+```typescript
+export async function clearStagedEvaluation(
+  db: SqliteDatabase,
+  userId: string,
+  tuneId: string,
+  playlistId: string
+): Promise<void> {
+  await db.run(sql`
+    DELETE FROM table_transient_data
+    WHERE user_id = ${userId} AND tune_id = ${tuneId} AND playlist_id = ${playlistId}
+  `);
+  
+  await queueSync(db, "table_transient_data", "delete", { userId, tuneId, playlistId });
+  await persistDb();
+}
+```
 
 ---
 
-Document version: 1.0
-Maintainer: (auto-generated)
+## Phase 3: Submission
+
+### User Action: Click Submit Button
+
+**File:** `src/routes/practice/Index.tsx`  
+**Lines:** 291-389
+
+**Handler:** `handleSubmitEvaluations()`
+
+```typescript
+const handleSubmitEvaluations = async () => {
+  const db = localDb();
+  const playlistId = currentPlaylistId();
+  const userId = await getUserId();
+  
+  if (!db || !playlistId || !userId) {
+    toast.error("Cannot submit: Missing required data");
+    return;
+  }
+
+  const count = evaluationsCount();
+  if (count === 0) {
+    toast.warning("No evaluations to submit");
+    return;
+  }
+
+  // Convert queue date to window_start_utc format
+  const date = queueDate();
+  const windowStartUtc = formatAsWindowStart(date); // "2025-11-08 00:00:00"
+
+  // Call commit service
+  const result = await commitStagedEvaluations(db, userId, playlistId, windowStartUtc);
+
+  if (result.success) {
+    toast.success(`Successfully submitted ${result.count} evaluation(s)`);
+    
+    // Force sync to Supabase
+    await forceSyncUp();
+    
+    // Clear local state
+    setEvaluations({});
+    setEvaluationsCount(0);
+    
+    // Trigger UI refresh
+    incrementSyncVersion();
+  } else {
+    toast.error(`Failed to submit: ${result.error}`);
+  }
+};
+```
+
+### Commit Service
+
+**File:** `src/lib/services/practice-recording.ts`  
+**Lines:** 356-710
+
+**Main Function:** `commitStagedEvaluations()`
+
+```typescript
+export async function commitStagedEvaluations(
+  db: SqliteDatabase,
+  userId: string,
+  playlistId: string,
+  windowStartUtc?: string
+): Promise<{ success: boolean; count: number; error?: string }>
+```
+
+**Key Steps:**
+
+1. **Determine Active Window** (Lines 370-394)
+   ```typescript
+   let activeWindowStart: string;
+   if (windowStartUtc) {
+     activeWindowStart = windowStartUtc;
+   } else {
+     const latestWindow = await db.get<{ window_start_utc: string }>(sql`
+       SELECT window_start_utc FROM daily_practice_queue
+       WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
+       ORDER BY window_start_utc DESC LIMIT 1
+     `);
+     activeWindowStart = latestWindow.window_start_utc;
+   }
+   ```
+
+2. **Fetch Staged Evaluations** (Lines 407-449)
+   ```typescript
+   const stagedEvaluations = await db.all<{
+     tune_id: number;
+     quality: number;
+     difficulty: number;
+     stability: number;
+     interval: number;
+     step: number | null;
+     repetitions: number;
+     practiced: string;
+     due: string;
+     state: number;
+     goal: string;
+     technique: string;
+     recall_eval: string;
+     elapsed_days: number | null;
+     lapses: number | null;
+   }>(sql`
+     SELECT tune_id, quality, difficulty, stability, interval, step, 
+            repetitions, practiced, due, state, goal, technique, recall_eval
+     FROM table_transient_data
+     WHERE user_id = ${userId}
+       AND playlist_id = ${playlistId}
+       AND practiced IS NOT NULL
+   `);
+   ```
+
+3. **Filter to Queue Tunes** (Lines 452-471)
+   ```typescript
+   const queueTuneIds = await db.all<{ tune_ref: number }>(sql`
+     SELECT DISTINCT tune_ref FROM daily_practice_queue
+     WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
+       AND window_start_utc = ${activeWindowStart}
+   `);
+   
+   const queueTuneIdSet = new Set(queueTuneIds.map(row => row.tune_ref));
+   const evaluationsToCommit = stagedEvaluations.filter(eval_ => 
+     queueTuneIdSet.has(eval_.tune_id)
+   );
+   ```
+
+4. **For Each Evaluation** (Lines 490-706):
+
+   **a. Ensure Unique Timestamp** (Lines 494-521)
+   ```typescript
+   let practicedTimestamp = staged.practiced;
+   let attempts = 0;
+   while (attempts < maxAttempts) {
+     const existing = await db.all<{ id: number }>(sql`
+       SELECT id FROM practice_record
+       WHERE tune_ref = ${staged.tune_id}
+         AND playlist_ref = ${playlistId}
+         AND practiced = ${practicedTimestamp}
+     `);
+     
+     if (existing.length === 0) break;
+     
+     // Increment by 1 second if duplicate
+     const date = new Date(practicedTimestamp);
+     date.setSeconds(date.getSeconds() + 1);
+     practicedTimestamp = date.toISOString();
+     attempts++;
+   }
+   ```
+
+   **b. Insert Practice Record** (Lines 524-571)
+   ```typescript
+   const recordId = generateId();
+   await db.run(sql`
+     INSERT INTO practice_record (
+       id, playlist_ref, tune_ref, practiced, quality, easiness, interval, 
+       repetitions, due, backup_practiced, stability, elapsed_days, lapses, 
+       state, difficulty, step, goal, technique, last_modified_at
+     ) VALUES (
+       ${recordId}, ${playlistId}, ${staged.tune_id}, ${practicedTimestamp},
+       ${staged.quality}, NULL, ${staged.interval}, ${staged.repetitions},
+       ${staged.due}, NULL, ${staged.stability}, ${staged.elapsed_days ?? null},
+       ${staged.lapses ?? 0}, ${staged.state}, ${staged.difficulty},
+       ${staged.step}, ${staged.goal}, ${staged.technique}, ${now}
+     )
+   `);
+   ```
+
+   **c. Queue Sync for Practice Record** (Lines 573-591)
+   ```typescript
+   await queueSync(db, "practice_record", "update", {
+     id: recordId,
+     playlistRef: playlistId,
+     tuneRef: staged.tune_id,
+     practiced: practicedTimestamp,
+     quality: staged.quality,
+     // ... all fields ...
+   });
+   ```
+
+   **d. Update Playlist Tune** (Lines 593-606)
+   ```typescript
+   await db.run(sql`
+     UPDATE playlist_tune
+     SET current = ${staged.due}, last_modified_at = ${now}
+     WHERE playlist_ref = ${playlistId} AND tune_ref = ${staged.tune_id}
+   `);
+   
+   await queueSync(db, "playlist_tune", "update", {
+     playlistRef: playlistId,
+     tuneRef: staged.tune_id,
+   });
+   ```
+
+   **e. Update Queue Completed At** (Lines 639-683)
+   ```typescript
+   const queueItem = await db.get<{ id: string; window_start_utc: string }>(sql`
+     SELECT id, window_start_utc, window_end_utc
+     FROM daily_practice_queue
+     WHERE user_ref = ${userId}
+       AND playlist_ref = ${playlistId}
+       AND tune_ref = ${staged.tune_id}
+       AND window_start_utc = ${activeWindowStart}
+     LIMIT 1
+   `);
+   
+   await db.run(sql`
+     UPDATE daily_practice_queue
+     SET completed_at = ${now}
+     WHERE user_ref = ${userId}
+       AND playlist_ref = ${playlistId}
+       AND tune_ref = ${staged.tune_id}
+       AND window_start_utc = ${activeWindowStart}
+   `);
+   
+   // Verify the update
+   const verifyQueue = await db.get<{ completed_at: string | null }>(sql`
+     SELECT completed_at FROM daily_practice_queue
+     WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
+       AND tune_ref = ${staged.tune_id} AND window_start_utc = ${activeWindowStart}
+     LIMIT 1
+   `);
+   console.log(`✓ Verified completed_at in DB:`, verifyQueue?.completed_at);
+   
+   await queueSync(db, "daily_practice_queue", "update", {
+     id: queueItem.id,
+     userRef: userId,
+     playlistRef: playlistId,
+     completedAt: now,
+   });
+   ```
+
+   **f. Delete from Transient Table** (Lines 686-691)
+   ```typescript
+   await db.run(sql`
+     DELETE FROM table_transient_data
+     WHERE user_id = ${userId} AND tune_id = ${staged.tune_id}
+       AND playlist_id = ${playlistId}
+   `);
+   ```
+
+5. **Persist and Return** (Lines 704-709)
+   ```typescript
+   await persistDb();
+   
+   return {
+     success: true,
+     count: committedTuneIds.length,
+   };
+   ```
+
+---
+
+## Phase 4: Synchronization
+
+### Force Sync Up (Manual Trigger)
+
+**File:** `src/lib/auth/AuthContext.tsx`  
+**Lines:** 342-372 (forceSyncUp implementation)
+
+```typescript
+const forceSyncUp = async () => {
+  const syncServiceInstance = syncService();
+  if (!syncServiceInstance) return;
+
+  console.log("🔄 [ForceSyncUp] Starting sync up to Supabase...");
+  
+  const result = await syncServiceInstance.syncUp();
+  
+  console.log("✅ [ForceSyncUp] Sync up completed:", {
+    success: result.success,
+    itemsSynced: result.itemsSynced,
+    itemsFailed: result.itemsFailed,
+  });
+  
+  // Increment sync version to trigger UI updates
+  setSyncVersion((prev) => prev + 1);
+};
+```
+
+### Sync Service
+
+**File:** `src/lib/sync/service.ts`  
+**Lines:** 159-179
+
+```typescript
+export class SyncService {
+  public async syncUp(): Promise<SyncResult> {
+    if (this.isSyncing) {
+      throw new Error("Sync already in progress");
+    }
+    
+    this.isSyncing = true;
+    
+    try {
+      const result = await this.syncEngine.syncUp();
+      this.config.onSyncComplete?.(result);
+      return result;
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+}
+```
+
+### Sync Engine
+
+**File:** `src/lib/sync/engine.ts`  
+**Lines:** 192-284
+
+**Main Function:** `syncUp()`
+
+```typescript
+async syncUp(): Promise<SyncResult> {
+  const startTime = new Date().toISOString();
+  const errors: string[] = [];
+  let synced = 0;
+  let failed = 0;
+
+  // Get pending sync items in batches
+  const pendingItems = await getPendingSyncItems(this.localDb, this.config.batchSize);
+
+  if (pendingItems.length === 0) {
+    return { success: true, itemsSynced: 0, itemsFailed: 0, conflicts: 0, errors: [], timestamp: startTime };
+  }
+
+  // Process each item
+  for (const item of pendingItems) {
+    try {
+      await this.processQueueItem(item);
+      await markSynced(this.localDb, item.id!);
+      synced++;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      errors.push(`Item ${item.id} (${item.tableName} ${item.operation}): ${errorMsg}`);
+      await updateSyncStatus(this.localDb, item.id!, "failed", errorMsg);
+      failed++;
+    }
+  }
+
+  return {
+    success: failed === 0,
+    itemsSynced: synced,
+    itemsFailed: failed,
+    conflicts: 0,
+    errors,
+    timestamp: startTime,
+  };
+}
+```
+
+**Process Queue Item** (Lines 404-505)
+
+```typescript
+private async processQueueItem(item: SyncQueueItem): Promise<void> {
+  const remoteTable = this.supabase.from(item.tableName);
+  const recordData = JSON.parse(item.recordData);
+  
+  // Transform camelCase (local) → snake_case (Supabase API)
+  const transformed = this.transformLocalToRemote(recordData);
+
+  if (item.operation === "insert" || item.operation === "update") {
+    const { error } = await remoteTable.upsert(transformed);
+    if (error) throw error;
+  } else if (item.operation === "delete") {
+    const compositeFields = getCompositeKeyFields(item.tableName);
+    if (compositeFields) {
+      // Handle composite keys
+      const filters: any = {};
+      for (const field of compositeFields) {
+        filters[field] = transformed[field];
+      }
+      const { error } = await remoteTable.delete().match(filters);
+      if (error) throw error;
+    } else {
+      const { error } = await remoteTable.delete().eq("id", transformed.id);
+      if (error) throw error;
+    }
+  }
+}
+```
+
+### Field Transformation
+
+**File:** `src/lib/sync/engine.ts`  
+**Lines:** 938-998 (transformLocalToRemote)
+
+```typescript
+private transformLocalToRemote(record: any): any {
+  const transformed: any = {};
+  
+  for (const [key, value] of Object.entries(record)) {
+    // camelCase → snake_case
+    const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+    
+    // Handle timestamp fields (text → timestamp)
+    if (value && typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+      transformed[snakeKey] = value; // Already ISO 8601
+    }
+    // Handle boolean (0/1 → true/false)
+    else if (typeof value === "number" && (value === 0 || value === 1)) {
+      transformed[snakeKey] = value === 1;
+    }
+    else {
+      transformed[snakeKey] = value;
+    }
+  }
+  
+  return transformed;
+}
+```
+
+### Sync Queue Management
+
+**File:** `src/lib/sync/queue.ts`  
+**Lines:** 1-300
+
+**Main Functions:**
+
+1. **queueSync()** - Add item to sync queue (Lines 76-157)
+   ```typescript
+   export async function queueSync(
+     db: SqliteDatabase,
+     tableName: SyncableTable,
+     operation: "insert" | "update" | "delete",
+     recordData: any
+   ): Promise<void> {
+     const queueId = generateId();
+     const now = new Date().toISOString();
+     
+     await db.insert(syncQueue).values({
+       id: queueId,
+       tableName,
+       operation,
+       recordData: JSON.stringify(recordData),
+       status: "pending",
+       createdAt: now,
+       lastModifiedAt: now,
+     });
+   }
+   ```
+
+2. **getPendingSyncItems()** - Get items to sync (Lines 174-187)
+   ```typescript
+   export async function getPendingSyncItems(
+     db: SqliteDatabase,
+     limit = 100
+   ): Promise<SyncQueueItem[]> {
+     return await db
+       .select()
+       .from(syncQueue)
+       .where(eq(syncQueue.status, "pending"))
+       .orderBy(syncQueue.createdAt)
+       .limit(limit);
+   }
+   ```
+
+3. **markSynced()** - Mark item as completed (Lines 189-196)
+   ```typescript
+   export async function markSynced(
+     db: SqliteDatabase,
+     queueId: string
+   ): Promise<void> {
+     await db.delete(syncQueue).where(eq(syncQueue.id, queueId));
+   }
+   ```
+
+---
+
+## Phase 5: UI Refresh
+
+### Grid Data Query
+
+**File:** `src/components/grids/TunesGridScheduled.tsx`  
+**Lines:** 81-140
+
+**Resource:** `dueTunesData`
+
+```typescript
+const [dueTunesData] = createResource(
+  () => {
+    const db = localDb();
+    const playlistId = currentPlaylistId();
+    const version = syncVersion(); // ← Triggers refetch on change
+    const initialized = queueInitialized();
+    
+    return db && props.userId && playlistId && initialized
+      ? { db, userId: props.userId, playlistId, version, queueReady: initialized }
+      : null;
+  },
+  async (params) => {
+    if (!params) return [];
+    
+    const delinquencyWindowDays = 7;
+    return await getPracticeList(
+      params.db,
+      params.userId,
+      params.playlistId,
+      delinquencyWindowDays
+    );
+  }
+);
+```
+
+### Practice List Query
+
+**File:** `src/lib/db/queries/practice.ts`  
+**Lines:** 161-280
+
+**Main Function:** `getPracticeList()`
+
+```typescript
+export async function getPracticeList(
+  db: SqliteDatabase,
+  userId: string,
+  playlistId: string,
+  _delinquencyWindowDays: number = 7
+): Promise<PracticeListStagedWithQueue[]>
+```
+
+**Key Steps:**
+
+1. **Debug Queue Status** (Lines 184-223)
+   ```typescript
+   const queueRows = await db.all<{ count: number }>(sql`
+     SELECT COUNT(*) as count FROM daily_practice_queue dpq
+     WHERE dpq.user_ref = ${userId} AND dpq.playlist_ref = ${playlistId}
+       AND dpq.active = 1
+   `);
+   
+   const windowCheck = await db.all<{ window_start_utc: string; count: number }>(sql`
+     SELECT window_start_utc, COUNT(*) as count
+     FROM daily_practice_queue
+     WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
+       AND active = 1
+     GROUP BY window_start_utc ORDER BY window_start_utc DESC
+   `);
+   ```
+
+2. **Get Max Window** (Lines 225-234)
+   ```typescript
+   const maxWindow = await db.get<{ max_window: string }>(sql`
+     SELECT MAX(window_start_utc) as max_window
+     FROM daily_practice_queue
+     WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
+       AND active = 1
+   `);
+   
+   const isoFormat = maxWindow?.max_window; // '2025-11-08T00:00:00'
+   const spaceFormat = isoFormat?.replace("T", " "); // '2025-11-08 00:00:00'
+   ```
+
+3. **Query with GROUP BY** (Lines 246-267)
+   ```sql
+   SELECT 
+     pls.*,
+     MIN(dpq.bucket) as bucket,
+     MIN(dpq.order_index) as order_index,
+     MIN(dpq.completed_at) as completed_at
+   FROM practice_list_staged pls
+   INNER JOIN daily_practice_queue dpq 
+     ON dpq.tune_ref = pls.id
+     AND dpq.user_ref = pls.user_ref
+     AND dpq.playlist_ref = pls.playlist_id
+   WHERE dpq.user_ref = ${userId}
+     AND dpq.playlist_ref = ${playlistId}
+     AND dpq.active = 1
+     AND dpq.completed_at IS NULL
+     AND (
+       dpq.window_start_utc = ${isoFormat}
+       OR dpq.window_start_utc = ${spaceFormat}
+     )
+   GROUP BY pls.id
+   ORDER BY MIN(dpq.bucket) ASC, MIN(dpq.order_index) ASC
+   ```
+
+4. **Return Rows** (Lines 269-280)
+   ```typescript
+   rows.forEach((row, i) => {
+     console.log(`[getPracticeList] Row ${i}: tune=${row.id}, completed_at=${row.completed_at}`);
+   });
+   
+   return rows;
+   ```
+
+### Practice List Staged VIEW
+
+**File:** `src/lib/db/init-views.ts`  
+**Lines:** 141-238
+
+**Critical View:** Merges all data sources
+
+```sql
+CREATE VIEW IF NOT EXISTS practice_list_staged AS
+SELECT
+  tune.id,
+  COALESCE(tune_override.title, tune.title) AS title,
+  COALESCE(tune_override.type, tune.type) AS type,
+  COALESCE(tune_override.mode, tune.mode) AS mode,
+  playlist_tune.learned,
+  
+  -- COALESCE staging (table_transient_data) with historical (practice_record)
+  COALESCE(td.goal, COALESCE(pr.goal, 'recall')) AS goal,
+  playlist_tune.scheduled,
+  playlist.user_ref,
+  playlist.playlist_id,
+  
+  -- Latest practice state (staging OVERRIDES historical)
+  COALESCE(td.state, pr.state) AS latest_state,
+  COALESCE(td.practiced, pr.practiced) AS latest_practiced,
+  COALESCE(td.quality, pr.quality) AS latest_quality,
+  COALESCE(td.difficulty, pr.difficulty) AS latest_difficulty,
+  COALESCE(td.easiness, pr.easiness) AS latest_easiness,
+  COALESCE(td.stability, pr.stability) AS latest_stability,
+  COALESCE(td.interval, pr.interval) AS latest_interval,
+  COALESCE(td.repetitions, pr.repetitions) AS latest_repetitions,
+  COALESCE(td.step, pr.step) AS latest_step,
+  COALESCE(td.due, pr.due) AS latest_due,
+  COALESCE(td.goal, pr.goal) AS latest_goal,
+  COALESCE(td.technique, pr.technique) AS latest_technique,
+  
+  -- Evaluation from staging (if exists)
+  td.recall_eval,
+  CASE WHEN td.tune_id IS NOT NULL THEN 1 ELSE 0 END AS has_staged
+  
+FROM tune
+INNER JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
+INNER JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
+  AND (tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref)
+  
+-- Latest practice_record for this tune/playlist
+LEFT JOIN (
+  SELECT pr.*
+  FROM practice_record pr
+  INNER JOIN (
+    SELECT tune_ref, playlist_ref, MAX(id) as max_id
+    FROM practice_record
+    GROUP BY tune_ref, playlist_ref
+  ) latest ON pr.tune_ref = latest.tune_ref
+    AND pr.playlist_ref = latest.playlist_ref
+    AND pr.id = latest.max_id
+) practice_record ON practice_record.tune_ref = tune.id
+  AND practice_record.playlist_ref = playlist_tune.playlist_ref
+  
+-- Staged/transient data (preview from evaluation staging)
+LEFT JOIN table_transient_data td ON td.tune_id = tune.id
+  AND td.playlist_id = playlist_tune.playlist_ref
+  AND td.user_id = playlist.user_ref
+```
+
+**Key Point:** This VIEW does ALL the COALESCE operations. The grid query just filters by queue.
+
+---
+
+## Database Tables
+
+### Core Tables
+
+1. **tune** - Tune metadata (title, type, mode, structure, etc.)
+2. **playlist** - User playlists
+3. **playlist_tune** - Tunes in playlist (scheduled, learned)
+4. **practice_record** - Historical practice events (immutable)
+5. **daily_practice_queue** - Frozen daily snapshot (bucket, order_index, completed_at)
+6. **table_transient_data** - Staging area for uncommitted evaluations
+7. **user_profile** - Maps Supabase UUID to local integer ID
+
+### daily_practice_queue Schema
+
+**File:** `drizzle/schema-postgres.ts`  
+**Lines:** 286-346
+
+**Fields:**
+- `id` (UUID, primary key)
+- `user_ref` (UUID, references user_profile)
+- `playlist_ref` (UUID, references playlist)
+- `tune_ref` (UUID, references tune)
+- `bucket` (integer: 1=Due Today, 2=Lapsed, 3=Backfill, 4=Old Lapsed)
+- `order_index` (integer: stable ordering within bucket)
+- `window_start_utc` (timestamp: start of practice window)
+- `window_end_utc` (timestamp: end of practice window)
+- `snapshot_coalesced_ts` (timestamp: captured scheduled/due date)
+- `scheduled_snapshot` (timestamp: captured scheduled date)
+- `latest_due_snapshot` (timestamp: captured latest practice date)
+- `completed_at` (timestamp: when user submitted evaluation - NULL if not completed)
+- `active` (boolean: 1=current queue, 0=superseded)
+- ... (additional FSRS snapshot fields)
+
+**Constraints:**
+- UNIQUE (user_ref, playlist_ref, window_start_utc, tune_ref)
+- Indexes on user/playlist/window/bucket/active
+
+### practice_record Schema
+
+**File:** `drizzle/schema-postgres.ts`  
+**Lines:** 242-285
+
+**Fields:**
+- `id` (UUID, primary key)
+- `playlist_ref` (UUID)
+- `tune_ref` (UUID)
+- `practiced` (timestamp: when evaluation was submitted)
+- `quality` (integer: 1-4 rating from FSRS)
+- `easiness` (real: SM2 field, NULL for FSRS)
+- `interval` (integer: days until next review)
+- `repetitions` (integer: successful review count)
+- `due` (timestamp: next review date - ALSO stored in playlist_tune.current)
+- `stability` (real: FSRS stability metric)
+- `difficulty` (real: FSRS difficulty metric)
+- `state` (integer: 1=Learning, 2=Review, 3=Relearning)
+- `step` (integer: current step in learning sequence)
+- `goal` (text: "recall", "fluency", etc.)
+- `technique` (text: practice technique)
+- `elapsed_days` (integer: days since last review)
+- `lapses` (integer: forget events count)
+
+**Constraints:**
+- UNIQUE (tune_ref, playlist_ref, practiced)
+
+### table_transient_data Schema
+
+**File:** `supabase/migrations/20241101000000_initial_schema.sql`  
+**Lines:** 335-360
+
+**Fields:**
+- `user_id` (UUID)
+- `tune_id` (UUID)
+- `playlist_id` (UUID)
+- `purpose` (text)
+- `recall_eval` (text: "again", "hard", "good", "easy")
+- `practiced` (timestamp)
+- `quality` (integer)
+- `easiness` (real)
+- `difficulty` (real)
+- `stability` (real)
+- `interval` (integer)
+- `step` (integer)
+- `repetitions` (integer)
+- `due` (timestamp)
+- `goal` (text)
+- `technique` (text)
+- `state` (integer)
+- ... (sync metadata)
+
+**Constraints:**
+- UNIQUE (user_id, tune_id, playlist_id)
+
+---
+
+## Background Sync
+
+### Automatic Sync Service
+
+**File:** `src/lib/sync/service.ts`  
+**Lines:** 269-299
+
+**Auto Sync Strategy:**
+
+```typescript
+public startAutoSync(): void {
+  // Periodic syncUp (frequent - push local changes)
+  this.syncIntervalId = window.setInterval(async () => {
+    const stats = await this.syncEngine.getSyncQueueStats();
+    if (stats.pending > 0) {
+      console.log(`[SyncService] Auto syncUp (${stats.pending} pending items)`);
+      await this.syncUp();
+    }
+  }, 5 * 60 * 1000); // 5 minutes
+
+  // Periodic syncDown (infrequent - pull remote changes)
+  this.syncDownIntervalId = window.setInterval(() => {
+    console.log("[SyncService] Running periodic syncDown...");
+    void this.syncDown();
+  }, 20 * 60 * 1000); // 20 minutes
+}
+```
+
+### Supabase Realtime
+
+**File:** `src/lib/sync/realtime.ts`  
+**Lines:** 1-200
+
+**Subscriptions:** Listen for changes from other devices
+
+```typescript
+export class RealtimeManager {
+  public subscribe(config: RealtimeConfig): void {
+    for (const tableName of config.tables) {
+      const channel = this.supabase
+        .channel(`public:${tableName}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: tableName,
+            filter: `user_ref=eq.${this.userId}`,
+          },
+          (payload) => {
+            console.log(`[Realtime] ${tableName} change:`, payload);
+            this.handleChange(tableName, payload);
+          }
+        )
+        .subscribe();
+
+      this.channels.push(channel);
+    }
+  }
+
+  private async handleChange(tableName: string, payload: any): Promise<void> {
+    // Transform and merge into local database
+    await this.syncEngine.syncDown(); // Pull latest from Supabase
+    this.config.onUpdate?.(tableName, payload);
+  }
+}
+```
+
+---
+
+## Key Invariants
+
+1. **Immutability:**
+   - `practice_record` rows are NEVER updated or deleted
+   - `daily_practice_queue` rows remain stable throughout the day
+
+2. **Uniqueness:**
+   - `practice_record`: (tune_ref, playlist_ref, practiced) must be unique
+   - `table_transient_data`: (user_id, tune_id, playlist_id) must be unique
+   - `daily_practice_queue`: (user_ref, playlist_ref, window_start_utc, tune_ref) must be unique
+
+3. **Timestamp Formats:**
+   - SQLite stores as TEXT (ISO 8601: `'2025-11-08T12:00:00'`)
+   - Supabase expects timestamp (also accepts ISO 8601)
+   - Window keys use space format: `'2025-11-08 00:00:00'` (but may exist as ISO format too)
+
+4. **Sync Order:**
+   - ALWAYS syncUp before syncDown to prevent data loss
+   - Persist to IndexedDB immediately after local changes
+   - Queue all database changes for sync (never direct Supabase writes)
+
+5. **Conflict Resolution:**
+   - Last-write-wins (based on `last_modified_at` timestamp)
+   - Duplicate practice_record timestamps handled by incrementing seconds
+
+6. **UI Reactivity:**
+   - `syncVersion` signal triggers resource refetch
+   - Grid re-queries on sync version change
+   - Completed items disappear when `completed_at IS NULL` filter applies
+
+---
+
+## Error Handling
+
+### Submit Validation
+
+**File:** `src/routes/practice/Index.tsx`  
+**Lines:** 291-389
+
+```typescript
+if (!db || !playlistId || !userId) {
+  toast.error("Cannot submit: Missing database or playlist data");
+  return;
+}
+
+if (evaluationsCount() === 0) {
+  toast.warning("No evaluations to submit");
+  return;
+}
+```
+
+### Sync Error Handling
+
+**File:** `src/lib/sync/engine.ts`  
+**Lines:** 219-283
+
+```typescript
+for (const item of pendingItems) {
+  try {
+    await this.processQueueItem(item);
+    await markSynced(this.localDb, item.id!);
+    synced++;
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    errors.push(`Item ${item.id} (${item.tableName} ${item.operation}): ${errorMsg}`);
+    await updateSyncStatus(this.localDb, item.id!, "failed", errorMsg);
+    failed++;
+  }
+}
+```
+
+### Toast Notifications
+
+**File:** `src/routes/practice/Index.tsx`  
+**Lines:** 338-370
+
+```typescript
+if (result.success) {
+  toast.success(`Successfully submitted ${result.count} evaluation(s)`, {
+    duration: 3000, // Auto-dismiss after 3 seconds
+  });
+} else {
+  toast.error(`Failed to submit: ${result.error}`, {
+    duration: Number.POSITIVE_INFINITY, // Requires manual dismiss
+  });
+}
+```
+
+---
+
+## Future Work
+
+### Known Issues
+
+1. **Dual Window Formats:**
+   - Database contains both `'2025-11-08T00:00:00'` and `'2025-11-08 00:00:00'`
+   - Query uses OR clause to match both
+   - GROUP BY may be filtering incorrectly (only 10 rows returned instead of 15)
+
+2. **Missing User Profile Lookup:**
+   - `getDailyPracticeQueue()` expects integer user_profile.id
+   - Currently receives Supabase UUID
+   - Need to add user_profile.id lookup layer
+
+### Planned Features
+
+1. **Multi-Exposure Support:**
+   - `exposures_required`, `exposures_completed` fields exist but unused
+   - Support multiple passes of same tune in one session
+
+2. **Bucket 3 & 4 (Backfill):**
+   - Currently disabled
+   - Enable user control over backfill quota
+
+3. **Timezone Support:**
+   - Capture timezone offset in queue generation
+   - Handle mid-day timezone changes gracefully
+
+4. **Optimistic UI:**
+   - Show submitted tunes as "grayed out" instead of disappearing
+   - Allow undo before sync completes
+
+---
+
+## Testing
+
+### E2E Test Coverage
+
+**File:** `e2e/tests/practice-003-submit.spec.ts`  
+**Lines:** 1-150
+
+**Key Tests:**
+- Stage evaluation → verify preview in grid
+- Change evaluation → verify preview updates
+- Submit → verify practice_record created
+- Submit → verify queue.completed_at set
+- Submit → verify transient data cleared
+- Show Submitted toggle → verify filtering
+
+### Manual Testing
+
+**File:** `_notes/practice-evaluation-staging-implementation.md`  
+**Lines:** 660-690
+
+**Checklist:**
+1. Select evaluation → verify latest_* columns update
+2. Change evaluation → verify preview updates (no duplicates)
+3. Submit → verify practice_record, completed_at, staging cleared
+4. Show Submitted toggle → verify visibility changes
+5. Page reload → verify staged evaluation persists
+
+---
+
+## Performance Considerations
+
+1. **Queue Generation:**
+   - Runs once per day per playlist
+   - Guards against empty database (waits for sync)
+   - Capacity limits prevent oversized queries (max 10 tunes default)
+
+2. **Staging:**
+   - FSRS calculation is synchronous but fast (<10ms)
+   - UPSERT to transient table is immediate
+   - persistDb() writes to IndexedDB asynchronously
+
+3. **Submission:**
+   - Batch processes all staged evaluations
+   - Each tune requires 4 database writes + 4 sync queue inserts
+   - Typical session: 5-10 tunes = 40-80 operations
+
+4. **Sync:**
+   - Batched (100 items at a time)
+   - Background (5min intervals for upload, 20min for download)
+   - Realtime subscriptions for instant updates from other devices
+
+5. **Grid Refresh:**
+   - Triggered by syncVersion signal change
+   - Re-queries practice_list_staged JOIN daily_practice_queue
+   - Typical: 10-20 rows returned
+
+---
+
+## Summary
+
+The practice flow follows an offline-first architecture with five distinct phases:
+
+1. **Queue Generation** creates a frozen snapshot of tunes to practice
+2. **Evaluation Staging** runs FSRS previews and stores in transient table
+3. **Submission** commits evaluations to practice_record and marks queue completed
+4. **Sync** uploads changes to Supabase asynchronously
+5. **UI Refresh** re-queries database when sync completes
+
+All database writes go through the sync queue to ensure offline resilience and eventual consistency with Supabase. The practice_list_staged VIEW automatically merges staging data with historical data, providing seamless preview capabilities.
+
+---
+
+**Document Version:** 1.0  
+**Maintainer:** GitHub Copilot (per user @sboagy)
