@@ -85,7 +85,7 @@ export interface CatalogToolbarProps {
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const navigate = useNavigate();
   const auth = useAuth();
-  const { incrementSyncVersion, forceSyncUp } = useAuth();
+  const { incrementRepertoireListChanged, forceSyncUp } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsButtonRef: HTMLButtonElement | undefined;
 
@@ -142,8 +142,8 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
       console.log("🔄 [AddToRepertoire] Syncing changes to Supabase...");
       await forceSyncUp();
 
-      // Trigger sync to refresh UI
-      incrementSyncVersion();
+      // Trigger repertoire list refresh using view-specific signal
+      incrementRepertoireListChanged();
 
       console.log("Add to repertoire completed:", result);
     } catch (error) {

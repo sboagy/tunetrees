@@ -82,7 +82,7 @@ export interface RepertoireToolbarProps {
 
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   const navigate = useNavigate();
-  const { incrementSyncVersion, forceSyncUp, userIdInt } = useAuth();
+  const { incrementPracticeListStagedChanged, forceSyncUp, userIdInt } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
@@ -157,8 +157,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       console.log("🔄 [AddToReview] Syncing changes to Supabase...");
       await forceSyncUp();
 
-      // Trigger sync to refresh UI
-      incrementSyncVersion();
+      // Trigger practice list refresh using view-specific signal
+      incrementPracticeListStagedChanged();
 
       console.log("Add to review completed:", result);
     } catch (error) {

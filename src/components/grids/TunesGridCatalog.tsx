@@ -35,7 +35,7 @@ import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
-  const { localDb, syncVersion, initialSyncComplete } = useAuth();
+  const { localDb, catalogListChanged, initialSyncComplete } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -58,7 +58,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     () => {
       const db = localDb();
       const userId = useAuth().user()?.id;
-      const version = syncVersion(); // Triggers refetch when sync completes
+      const version = catalogListChanged(); // Refetch when catalog changes
       const syncComplete = initialSyncComplete(); // Wait for initial sync
 
       if (!syncComplete) {

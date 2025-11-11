@@ -63,10 +63,11 @@ const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
  */
 const PlaylistDropdown: Component = () => {
   const navigate = useNavigate();
-  const { user, localDb, syncVersion } = useAuth();
+  const { user, localDb, repertoireListChanged } = useAuth();
   const { currentPlaylistId, setCurrentPlaylistId } = useCurrentPlaylist();
   const [showDropdown, setShowDropdown] = createSignal(false);
   let dropdownContainerRef: HTMLDivElement | undefined;
+  const { initialSyncComplete } = useAuth();
 
   // Close dropdown when clicking outside
   useClickOutside(
@@ -80,35 +81,37 @@ const PlaylistDropdown: Component = () => {
 
   // Fetch user playlists
   // Fetch immediately if data exists in SQLite, don't wait for sync
-  // syncVersion is still tracked as a dependency to trigger refetch after sync
+  // repertoireListChanged is tracked as a dependency to trigger refetch after playlist changes
   const [playlists] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const version = syncVersion(); // Triggers refetch when sync completes
+      const version = repertoireListChanged(); // Triggers refetch when playlists change
+      const syncComplete = initialSyncComplete();
+      if (!syncComplete) return null;
 
       console.log("🔍 [TopNav] Playlists dependency check:", {
         hasDb: !!db,
         userId,
         userObject: user(),
-        syncVersion: version,
+        repertoireListChanged: version,
         shouldFetch: !!(db && userId),
       });
       log.debug("TOPNAV playlists dependency:", {
         hasDb: !!db,
         userId,
-        syncVersion: version,
+        repertoireListChanged: version,
       });
 
       // Fetch if database and user are ready
-      // Will return empty array on first login, then refetch when sync completes (version increments)
+      // Will return empty array on first login, then refetch when repertoire changes (version increments)
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
       console.log("📋 [TopNav] Fetching playlists with params:", params);
       log.debug("TOPNAV playlists fetcher:", {
         hasParams: !!params,
-        syncVersion: params?.version,
+        repertoireListChanged: params?.version,
       });
       if (!params) return [];
 
@@ -309,8 +312,14 @@ const PlaylistDropdown: Component = () => {
 };
 
 export const TopNav: Component = () => {
-  const { user, localDb, signOut, forceSyncDown, forceSyncUp, syncVersion } =
-    useAuth();
+  const {
+    user,
+    localDb,
+    signOut,
+    forceSyncDown,
+    forceSyncUp,
+    remoteSyncDownCompletionVersion,
+  } = useAuth();
   const [isOnline, setIsOnline] = createSignal(navigator.onLine);
   const [pendingCount, setPendingCount] = createSignal(0);
   const [showUserMenu, setShowUserMenu] = createSignal(false);
@@ -318,12 +327,12 @@ export const TopNav: Component = () => {
   let userMenuContainerRef: HTMLDivElement | undefined;
   let dbMenuContainerRef: HTMLDivElement | undefined;
 
-  // Fetch user avatar (refetch when sync completes)
+  // Fetch user avatar (refetch when remote sync completes)
   const [userAvatar] = createResource(
     () => ({
       db: localDb(),
       userId: user()?.id,
-      version: syncVersion(),
+      version: remoteSyncDownCompletionVersion(),
     }),
     async ({ db, userId }) => {
       if (!db || !userId) return null;

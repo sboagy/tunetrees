@@ -3,7 +3,7 @@
 This document maps the complete practice flow in the current SolidJS PWA implementation, from queue generation to submission and sync.
 
 **Architecture:** Offline-first with local SQLite WASM + Supabase sync  
-**Last Updated:** November 8, 2025
+**Last Updated:** November 10, 2025
 
 ---
 
@@ -26,104 +26,138 @@ sequenceDiagram
     autonumber
     participant U as User
     participant UI as SolidJS UI
-    participant DB as SQLite WASM
     participant Q as Practice Queue
     participant S as Staging Service
     participant C as Commit Service
-    participant Sync as Sync Engine
-    participant SB as Supabase
+    participant DB_L as SQLite WASM<br/>(Local)
+    participant SQ as Sync Queue
+    participant SE as Sync Engine
+    participant DB_R as PostgreSQL<br/>(Supabase)
 
-    Note over U,SB: PHASE 1: Queue Generation (On Page Load)
+    link UI: Practice Page @ https://github.com/sboagy/tunetrees/blob/main/src/routes/practice/Index.tsx#L291-L389
+    link UI: Grid Component @ https://github.com/sboagy/tunetrees/blob/main/src/components/grids/TunesGridScheduled.tsx#L275-L325
+    link Q: Queue Service @ https://github.com/sboagy/tunetrees/blob/main/src/lib/services/practice-queue.ts#L547-L820
+    link S: Staging Service @ https://github.com/sboagy/tunetrees/blob/main/src/lib/services/practice-staging.ts#L128-L262
+    link C: Commit Service @ https://github.com/sboagy/tunetrees/blob/main/src/lib/services/practice-recording.ts#L356-L710
+    link SE: Sync Engine @ https://github.com/sboagy/tunetrees/blob/main/src/lib/sync/engine.ts#L192-L505
+
+    Note over U,DB_R: PHASE 1: Queue Generation (On Page Load)
     U->>UI: Navigate to /practice
-    UI->>DB: Check if queue exists for today
+    UI->>DB_L: Check if queue exists for today
     alt Queue exists
-        DB-->>UI: Return existing queue
+        DB_L-->>UI: Return existing queue
     else No queue
         UI->>Q: generateOrGetPracticeQueue()
-        Q->>DB: Query practice_list_staged VIEW
-        Note over Q,DB: Q1: Due Today<br/>Q2: Recently Lapsed<br/>Q3: New/Unscheduled<br/>Q4: Old Lapsed
-        Q->>DB: INSERT daily_practice_queue rows
-        Q->>Sync: queueSync() for new rows
-        DB-->>UI: Return queue snapshot
+        Q->>DB_L: Query practice_list_staged VIEW
+        Note over Q,DB_L: Q1: Due Today<br/>Q2: Recently Lapsed<br/>Q3: New/Unscheduled<br/>Q4: Old Lapsed
+        Q->>DB_L: INSERT daily_practice_queue rows
+        Q->>SQ: queueSync() for new rows
+        Q->>DB_L: persistDb() to IndexedDB
+        DB_L-->>UI: Return queue snapshot
     end
     UI-->>U: Display practice grid (ordered by bucket/order_index)
 
-    Note over U,SB: PHASE 2: Evaluation Staging (Per Tune)
+    Note over U,DB_R: PHASE 2: Evaluation Staging (Per Tune)
     U->>UI: Select "Good" evaluation
     UI->>S: stagePracticeEvaluation()
-    S->>DB: Get latest practice_record
+    S->>DB_L: Get latest practice_record
     S->>S: Run FSRS calculation
     Note over S: Convert "good" → Rating.Good<br/>Compute stability, difficulty, interval
-    S->>DB: UPSERT table_transient_data
-    S->>Sync: queueSync() for staging row
-    S->>DB: persistDb() to IndexedDB
+    S->>DB_L: UPSERT table_transient_data
+    S->>SQ: queueSync() for staging row
+    S->>DB_L: persistDb() to IndexedDB
     S-->>UI: Return preview metrics
     UI->>UI: incrementSyncVersion()
-    UI->>DB: Re-query practice_list_staged
-    Note over DB: VIEW COALESCEs staging + historical
+    UI->>DB_L: Re-query practice_list_staged
+    Note over DB_L: VIEW COALESCEs staging + historical
     UI-->>U: Show preview (stability, due date, etc.)
 
     loop Additional Evaluations
         U->>UI: Select evaluation for another tune
         UI->>S: stagePracticeEvaluation()
-        Note over S,DB: Same staging process (UPSERT)
+        Note over S,DB_L: Same staging process (UPSERT)
     end
 
-    Note over U,SB: PHASE 3: Submission
+    Note over U,DB_R: PHASE 3: Submission
     U->>UI: Click "Submit" button
     UI->>C: commitStagedEvaluations(windowStartUtc)
-    C->>DB: SELECT from table_transient_data<br/>(filter by user/playlist/practiced IS NOT NULL)
-    C->>DB: SELECT tune_refs from daily_practice_queue<br/>(filter by windowStartUtc)
+    C->>DB_L: SELECT from table_transient_data<br/>(filter by user/playlist/practiced IS NOT NULL)
+    C->>DB_L: SELECT tune_refs from daily_practice_queue<br/>(filter by windowStartUtc)
     C->>C: Filter staging rows to only current queue
 
     loop For Each Staged Evaluation
-        C->>DB: Check for duplicate practice_record<br/>(unique: tune_ref, playlist_ref, practiced)
+        C->>DB_L: Check for duplicate practice_record<br/>(unique: tune_ref, playlist_ref, practiced)
         alt Duplicate exists
             C->>C: Increment practiced timestamp by 1 second
         end
-        C->>DB: INSERT practice_record
-        C->>Sync: queueSync("practice_record", "update")
-        C->>DB: UPDATE playlist_tune.current (next review date)
-        C->>Sync: queueSync("playlist_tune", "update")
-        C->>DB: UPDATE daily_practice_queue.completed_at
-        C->>Sync: queueSync("daily_practice_queue", "update")
-        C->>DB: DELETE from table_transient_data
-        C->>Sync: queueSync("table_transient_data", "delete")
+        C->>DB_L: INSERT practice_record
+        C->>SQ: queueSync("practice_record", "update")
+        C->>DB_L: UPDATE playlist_tune.current (next review date)
+        C->>SQ: queueSync("playlist_tune", "update")
+        C->>DB_L: UPDATE daily_practice_queue.completed_at
+        C->>SQ: queueSync("daily_practice_queue", "update")
+        C->>DB_L: DELETE from table_transient_data
+        C->>SQ: queueSync("table_transient_data", "delete")
     end
 
-    C->>DB: persistDb() to IndexedDB
+    C->>DB_L: persistDb() to IndexedDB
     C-->>UI: Return {success: true, count: N}
     UI->>UI: toast.success()
-    UI->>Sync: forceSyncUp()
+    UI->>SE: forceSyncUp()
 
-    Note over U,SB: PHASE 4: Sync to Supabase
-    Sync->>DB: getPendingSyncItems()
+    Note over U,DB_R: PHASE 4: Sync to Supabase (Background Upload)
+    SE->>DB_L: getPendingSyncItems() from sync_queue
     loop For Each Sync Queue Item
-        Sync->>Sync: Transform camelCase → snake_case
-        Sync->>SB: Supabase API (INSERT/UPDATE/DELETE)
-        SB-->>Sync: Success
-        Sync->>DB: markSynced(item.id)
+        SE->>SE: Transform camelCase → snake_case
+        SE->>DB_R: Supabase API (INSERT/UPDATE/DELETE)
+        DB_R-->>SE: Success/Error
+        alt Success
+            SE->>DB_L: markSynced(item.id) - delete from sync_queue
+        else Error
+            SE->>DB_L: updateSyncStatus(item.id, "failed")
+        end
     end
-    Sync-->>UI: Sync complete
+    SE-->>UI: Sync complete
 
     UI->>UI: setEvaluations({})
     UI->>UI: setEvaluationsCount(0)
     UI->>UI: incrementSyncVersion()
 
-    Note over U,SB: PHASE 5: UI Refresh
-    UI->>DB: getPracticeList() [triggered by syncVersion change]
-    DB->>DB: Query practice_list_staged<br/>INNER JOIN daily_practice_queue<br/>WHERE completed_at IS NULL
-    DB-->>UI: Return uncompleted tunes
+    Note over U,DB_R: PHASE 5: UI Refresh
+    UI->>DB_L: getPracticeList() [triggered by syncVersion change]
+    DB_L->>DB_L: Query practice_list_staged<br/>INNER JOIN daily_practice_queue<br/>WHERE completed_at IS NULL
+    DB_L-->>UI: Return uncompleted tunes
     UI-->>U: Grid refreshes (submitted tunes disappear)
 
-    Note over U,SB: Background: Supabase → Local Sync
-    SB->>Sync: Realtime notification (other device changed data)
-    Sync->>SB: syncDown() - fetch updated records
-    Sync->>DB: UPSERT into local tables
-    Sync->>UI: Trigger incrementSyncVersion()
-    UI->>DB: Re-query practice_list_staged
-    UI-->>U: Grid updates with changes
+    Note over U,DB_R: Background: Realtime Sync (Other Devices → Local)
+    DB_R->>SE: Realtime notification via websocket<br/>(other device changed data)
+    SE->>DB_R: syncDown() - fetch updated records<br/>(SELECT * WHERE last_modified_at > lastSyncTimestamp)
+    DB_R-->>SE: Return modified records
+    SE->>SE: Transform snake_case → camelCase
+    SE->>DB_L: UPSERT into local tables
+    SE->>DB_L: persistDb() to IndexedDB
+    SE->>UI: Trigger incrementSyncVersion()
+    UI->>DB_L: Re-query practice_list_staged
+    DB_L-->>UI: Return updated data
+    UI-->>U: Grid updates with changes from other device
 ```
+
+---
+
+## Code Reference: Jump to Implementation
+
+| Component | Description | File | Key Functions |
+|-----------|-------------|------|---------------|
+| **Practice Page** | Main practice UI with submit handler | `src/routes/practice/Index.tsx` | `PracticeIndex`, `handleSubmitEvaluations`, `handleRecallEvalChange` |
+| **Grid Component** | Practice grid with evaluation dropdowns | `src/components/grids/TunesGridScheduled.tsx` | `TunesGridScheduled` component |
+| **Flashcard View** | Flashcard interface with evaluation controls | `src/components/practice/FlashcardView.tsx` | `FlashcardView` component |
+| **Queue Service** | Generate and manage daily practice queue | `src/lib/services/practice-queue.ts` | `generateOrGetPracticeQueue`, `ensureDailyQueue`, `addTunesToQueue` |
+| **Staging Service** | FSRS preview calculations | `src/lib/services/practice-staging.ts` | `stagePracticeEvaluation`, `clearStagedEvaluation` |
+| **Commit Service** | Batch commit evaluations | `src/lib/services/practice-recording.ts` | `commitStagedEvaluations` |
+| **Sync Service** | Orchestrates sync operations | `src/lib/sync/service.ts` | `SyncService.syncUp`, `SyncService.syncDown` |
+| **Sync Engine** | Handles data transformation and upload/download | `src/lib/sync/engine.ts` | `SyncEngine.syncUp`, `SyncEngine.syncDown`, `processQueueItem` |
+| **Realtime Manager** | Supabase realtime subscriptions | `src/lib/sync/realtime.ts` | `RealtimeManager` class |
+| **Auth Context** | Global auth state and sync signals | `src/lib/auth/AuthContext.tsx` | `AuthProvider`, `useAuth` hook |
 
 ---
 
@@ -132,27 +166,42 @@ sequenceDiagram
 ### Entry Point: Page Load
 
 **File:** `src/routes/practice/Index.tsx`  
-**Lines:** 1-110
+**Component:** `PracticeIndex`
 
 ```typescript
 const PracticeIndex: Component = () => {
-  const { user, localDb, incrementSyncVersion, forceSyncUp, syncVersion } = useAuth();
+  const {
+    user,
+    localDb,
+    incrementPracticeListStagedChanged,
+    practiceListStagedChanged,
+    initialSyncComplete,
+  } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
 
   // Resource to get user ID from user_profile table
-  const [userId] = createResource(/* ... */); // Lines 60-75
+  const [userId] = createResource(/* params */, async (params) => {
+    const result = await db.get(sql`
+      SELECT supabase_user_id FROM user_profile 
+      WHERE supabase_user_id = ${params.userId}
+    `);
+    return result?.supabase_user_id || null;
+  });
 
-  // Shared evaluation state
-  const [evaluations, setEvaluations] = createSignal<Record<number, string>>({});
+  // Shared evaluation state (parent manages, children consume)
+  const [evaluations, setEvaluations] = createSignal<Record<string, string>>({});
   const [evaluationsCount, setEvaluationsCount] = createSignal(0);
 ```
+
+**Key Architecture Changes:**
+- **View-specific signals:** Replaced global `syncVersion` with `practiceListStagedChanged` for practice data
+- **Parent-managed state:** Evaluation staging logic centralized in `Index.tsx`'s `handleRecallEvalChange`
+- **Children as presentational:** Grid and Flashcard components only call parent callback, no local staging
 
 ### Queue Generation Service
 
 **File:** `src/lib/services/practice-queue.ts`  
-**Lines:** 547-820 (main function)
-
-**Entry Function:** `generateOrGetPracticeQueue()`
+**Function:** `generateOrGetPracticeQueue`
 
 ```typescript
 export async function generateOrGetPracticeQueue(
@@ -168,7 +217,7 @@ export async function generateOrGetPracticeQueue(
 
 **Key Steps:**
 
-1. **Compute Windows** (Lines 570-577)
+1. **Compute Windows**
    ```typescript
    const windows = computeSchedulingWindows(
      reviewSitdownDate,
@@ -176,19 +225,24 @@ export async function generateOrGetPracticeQueue(
      localTzOffsetMinutes
    );
    ```
-   - **Function:** `computeSchedulingWindows()` in `src/lib/services/queue-generator.ts:131-151`
+   - **Function:** `computeSchedulingWindows` in same file
    - **Returns:** `{ startTs, endTs, windowFloorTs }` (ISO format timestamps)
 
-2. **Check Existing Queue** (Lines 595-607)
+2. **Check Existing Queue**
    ```typescript
-   const existing = await fetchExistingActiveQueue(db, userRef, playlistRef, windowStartKey);
+   const existing = await db.all(sql`
+     SELECT * FROM daily_practice_queue
+     WHERE user_ref = ${userRef} AND playlist_ref = ${playlistRef}
+       AND (window_start_utc = ${isoFormat} OR window_start_utc = ${spaceFormat})
+       AND active = 1
+   `);
    if (existing.length > 0 && !forceRegen) {
      return existing;
    }
    ```
-   - **Function:** `fetchExistingActiveQueue()` in `src/lib/services/practice-queue.ts:198-220`
+   - **Note:** Handles both ISO ('2025-11-08T00:00:00') and space ('2025-11-08 00:00:00') formats for backward compatibility
 
-3. **Query Practice List Staged** (Lines 636-668, 679-700, 709-730, 740-764)
+3. **Query Practice List Staged**
    - **Q1 (Bucket 1):** Due today
      ```sql
      SELECT * FROM practice_list_staged
@@ -205,40 +259,42 @@ export async function generateOrGetPracticeQueue(
      ```
    - **Q4 (Bucket 4):** Old lapsed (disabled by default)
 
-4. **Build Queue Rows** (Lines 774-803)
+4. **Build Queue Rows**
    ```typescript
    const q1Built = buildQueueRows(q1Rows, windows, prefs, userRef, playlistRef, mode, localTzOffsetMinutes, 1);
    ```
-   - **Function:** `buildQueueRows()` in `src/lib/services/practice-queue.ts:340-381`
+   - **Function:** `buildQueueRows` in same file
    - **Creates:** `DailyPracticeQueueRow` objects with:
      - `bucket` (1-4)
      - `orderIndex` (0-based sequential)
-     - `windowStartUtc`, `windowEndUtc`
+     - `windowStartUtc`, `windowEndUtc` (ISO format with 'T')
      - `snapshotCoalescedTs` (captured scheduling timestamp)
      - `completedAt: null` (initially)
 
-5. **Persist to Database** (Lines 805-817)
+5. **Persist to Database**
    ```typescript
    await db.insert(dailyPracticeQueue).values(allBuiltRows).run();
    ```
    - **Table:** `daily_practice_queue`
-   - **Schema:** `drizzle/schema-postgres.ts:286-346` (23 fields, UNIQUE constraint)
+   - **Schema:** `drizzle/schema-sqlite.ts`
+   - **Constraint:** UNIQUE (user_ref, playlist_ref, window_start_utc, tune_ref)
 
 ### Window Format Utility
 
 **File:** `src/lib/utils/practice-date.ts`  
-**Lines:** 57-76
+**Function:** `formatAsWindowStart`
 
 ```typescript
 export function formatAsWindowStart(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} 00:00:00`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(date.getDate()).padStart(2, "0")}T00:00:00`;
 }
-// Returns: "2025-11-08 00:00:00" (space format)
+// Returns: "2025-11-08T00:00:00" (ISO format with T)
 ```
 
-**Critical Note:** Database may contain BOTH formats:
-- `'2025-11-08T00:00:00'` (ISO with T - from earlier code)
-- `'2025-11-08 00:00:00'` (space format - from formatAsWindowStart)
+**Critical Note:** SQLite TEXT columns store dates as-is. We now use ISO format (with 'T') consistently because SQLite WASM prefers this format. Older data may still have space format ('2025-11-08 00:00:00'), so queries match both formats during transition.
 
 ---
 
@@ -246,31 +302,49 @@ export function formatAsWindowStart(date: Date): string {
 
 ### User Interaction: Selecting Evaluation
 
-**File:** `src/components/grids/TunesGridScheduled.tsx`  
-**Lines:** 275-325
-
-**Handler:** `handleRecallEvalChange()`
+**File:** `src/routes/practice/Index.tsx`  
+**Handler:** `handleRecallEvalChange` (centralized in parent)
 
 ```typescript
 const handleRecallEvalChange = async (tuneId: string, evaluation: string) => {
-  console.log(`Tune ${tuneId} recall eval changed to: ${evaluation}`);
-  
-  // Update local state immediately (optimistic UI)
+  console.log(`Recall evaluation for tune ${tuneId}: ${evaluation}`);
+
+  // 1) Optimistic shared-state update (drives both grid and flashcard)
   setEvaluations((prev) => ({ ...prev, [tuneId]: evaluation }));
 
+  // 2) Stage/clear in local DB
   const db = localDb();
   const playlistId = currentPlaylistId();
-  if (!db || !playlistId || !props.userId) return;
+  const userIdVal = await getUserId();
 
-  if (evaluation === "") {
-    // Clear staged data when "(not set)" selected
-    await clearStagedEvaluation(db, props.userId, tuneId, playlistId);
-  } else {
-    // Stage FSRS preview
-    await stagePracticeEvaluation(db, props.userId, playlistId, tuneId, evaluation, "recall", "");
+  if (!db || !playlistId || !userIdVal) return;
+
+  try {
+    if (evaluation === "") {
+      // Clear staged data when "(Not Set)" selected
+      await clearStagedEvaluation(db, userIdVal, tuneId, playlistId);
+    } else {
+      // Stage FSRS preview for actual evaluations
+      await stagePracticeEvaluation(
+        db,
+        userIdVal,
+        playlistId,
+        tuneId,
+        evaluation,
+        "recall",
+        "fsrs"
+      );
+    }
+
+    // 3) Trigger practice list refresh using view-specific signal
+    incrementPracticeListStagedChanged();
+  } catch (error) {
+    console.error(`Failed to stage evaluation:`, error);
   }
-}
+};
 ```
+
+**Architecture Note:** Grid and Flashcard components receive `onRecallEvalChange` prop and call it directly. No staging logic in child components - all centralized in parent.
 
 ### Evaluation Dropdown Component
 
@@ -300,9 +374,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (props) =>
 ### Staging Service
 
 **File:** `src/lib/services/practice-staging.ts`  
-**Lines:** 128-262
-
-**Main Function:** `stagePracticeEvaluation()`
+**Function:** `stagePracticeEvaluation`
 
 ```typescript
 export async function stagePracticeEvaluation(
@@ -318,16 +390,16 @@ export async function stagePracticeEvaluation(
 
 **Key Steps:**
 
-1. **Get Latest Practice Record** (Lines 141-143)
+**Key Steps:**
+
+1. **Get Latest Practice Record**
    ```typescript
    const latestCard = await getLatestPracticeRecord(db, tuneId, playlistId);
    ```
-   - **Function:** `getLatestPracticeRecord()` in same file, lines 67-122
+   - **Function:** `getLatestPracticeRecord` in same file
    - **Returns:** FSRS `Card` object or null if never practiced
 
-2. **Run FSRS Calculation** (Lines 145-161)
-   ```typescript
-   const f = fsrs();
+2. **Run FSRS Calculation**
    const rating = mapEvaluationToRating(evaluation); // "good" → Rating.Good
    const card: Card = latestCard ?? createEmptyCard(now);
    const schedulingCards = f.repeat(card, now);
@@ -353,7 +425,7 @@ export async function stagePracticeEvaluation(
    };
    ```
 
-4. **UPSERT to Transient Table** (Lines 178-225)
+4. **UPSERT to Transient Table**
    ```typescript
    await db.run(sql`
      INSERT INTO table_transient_data (
@@ -370,22 +442,22 @@ export async function stagePracticeEvaluation(
    - **Table:** `table_transient_data`
    - **Constraint:** UNIQUE on (user_id, tune_id, playlist_id)
 
-5. **Queue for Sync** (Lines 228-240)
+5. **Queue for Sync**
    ```typescript
    await queueSync(db, "table_transient_data", "update", {
      userId, tuneId, playlistId, ...preview, recallEval: evaluation
    });
    ```
+   - **Function:** `queueSync` in `src/lib/sync/queue.ts`
+   - **Purpose:** Stage write for background upload to Supabase
 
-6. **Persist to IndexedDB** (Lines 243-244)
+6. **Persist to IndexedDB**
    ```typescript
    await persistDb();
-   ```
-
 ### Clear Staged Evaluation
 
 **File:** `src/lib/services/practice-staging.ts`  
-**Lines:** 264-289
+**Function:** `clearStagedEvaluation`
 
 ```typescript
 export async function clearStagedEvaluation(
@@ -404,14 +476,19 @@ export async function clearStagedEvaluation(
 }
 ```
 
----
+**When Called:** User selects "(Not Set)" in evaluation dropdown to clear previous staging.);
+  
+  await queueSync(db, "table_transient_data", "delete", { userId, tuneId, playlistId });
+  await persistDb();
+}
+```
 
-## Phase 3: Submission
+---
 
 ### User Action: Click Submit Button
 
 **File:** `src/routes/practice/Index.tsx`  
-**Lines:** 291-389
+**Handler:** `handleSubmitEvaluations`
 
 **Handler:** `handleSubmitEvaluations()`
 
@@ -442,28 +519,27 @@ const handleSubmitEvaluations = async () => {
   if (result.success) {
     toast.success(`Successfully submitted ${result.count} evaluation(s)`);
     
-    // Force sync to Supabase
-    await forceSyncUp();
-    
     // Clear local state
     setEvaluations({});
     setEvaluationsCount(0);
     
-    // Trigger UI refresh
-    incrementSyncVersion();
+    // Trigger UI refresh using view-specific signal
+    incrementPracticeListStagedChanged();
+    
+    console.log(`✅ Submit complete: ${result.count} evaluations committed`);
   } else {
     toast.error(`Failed to submit: ${result.error}`);
   }
 };
 ```
 
+**Note:** No longer calls `forceSyncUp()` after submit - background sync handles upload automatically. View-specific signal (`incrementPracticeListStagedChanged`) triggers grid refresh immediately.
+
+### Commit Service
 ### Commit Service
 
 **File:** `src/lib/services/practice-recording.ts`  
-**Lines:** 356-710
-
-**Main Function:** `commitStagedEvaluations()`
-
+**Function:** `commitStagedEvaluations`
 ```typescript
 export async function commitStagedEvaluations(
   db: SqliteDatabase,
@@ -474,9 +550,9 @@ export async function commitStagedEvaluations(
 ```
 
 **Key Steps:**
+**Key Steps:**
 
-1. **Determine Active Window** (Lines 370-394)
-   ```typescript
+1. **Determine Active Window**
    let activeWindowStart: string;
    if (windowStartUtc) {
      activeWindowStart = windowStartUtc;
@@ -492,7 +568,7 @@ export async function commitStagedEvaluations(
 
 2. **Fetch Staged Evaluations** (Lines 407-449)
    ```typescript
-   const stagedEvaluations = await db.all<{
+2. **Fetch Staged Evaluations**
      tune_id: number;
      quality: number;
      difficulty: number;
@@ -518,7 +594,7 @@ export async function commitStagedEvaluations(
    `);
    ```
 
-3. **Filter to Queue Tunes** (Lines 452-471)
+3. **Filter to Queue Tunes**
    ```typescript
    const queueTuneIds = await db.all<{ tune_ref: number }>(sql`
      SELECT DISTINCT tune_ref FROM daily_practice_queue
@@ -532,9 +608,9 @@ export async function commitStagedEvaluations(
    );
    ```
 
-4. **For Each Evaluation** (Lines 490-706):
+4. **For Each Evaluation:**
 
-   **a. Ensure Unique Timestamp** (Lines 494-521)
+   **a. Ensure Unique Timestamp**
    ```typescript
    let practicedTimestamp = staged.practiced;
    let attempts = 0;
@@ -556,7 +632,7 @@ export async function commitStagedEvaluations(
    }
    ```
 
-   **b. Insert Practice Record** (Lines 524-571)
+   **b. Insert Practice Record**
    ```typescript
    const recordId = generateId();
    await db.run(sql`
@@ -574,7 +650,7 @@ export async function commitStagedEvaluations(
    `);
    ```
 
-   **c. Queue Sync for Practice Record** (Lines 573-591)
+   **c. Queue Sync for Practice Record**
    ```typescript
    await queueSync(db, "practice_record", "update", {
      id: recordId,
@@ -586,7 +662,7 @@ export async function commitStagedEvaluations(
    });
    ```
 
-   **d. Update Playlist Tune** (Lines 593-606)
+   **d. Update Playlist Tune**
    ```typescript
    await db.run(sql`
      UPDATE playlist_tune
@@ -600,7 +676,7 @@ export async function commitStagedEvaluations(
    });
    ```
 
-   **e. Update Queue Completed At** (Lines 639-683)
+   **e. Update Queue Completed At**
    ```typescript
    const queueItem = await db.get<{ id: string; window_start_utc: string }>(sql`
      SELECT id, window_start_utc, window_end_utc
@@ -638,7 +714,7 @@ export async function commitStagedEvaluations(
    });
    ```
 
-   **f. Delete from Transient Table** (Lines 686-691)
+   **f. Delete from Transient Table**
    ```typescript
    await db.run(sql`
      DELETE FROM table_transient_data
@@ -647,7 +723,7 @@ export async function commitStagedEvaluations(
    `);
    ```
 
-5. **Persist and Return** (Lines 704-709)
+5. **Persist and Return**
    ```typescript
    await persistDb();
    
@@ -661,10 +737,10 @@ export async function commitStagedEvaluations(
 
 ## Phase 4: Synchronization
 
-### Force Sync Up (Manual Trigger)
+### Sync Service Architecture
 
 **File:** `src/lib/auth/AuthContext.tsx`  
-**Lines:** 342-372 (forceSyncUp implementation)
+**Functions:** `forceSyncUp`, `forceSyncDown`
 
 ```typescript
 const forceSyncUp = async () => {
@@ -681,27 +757,59 @@ const forceSyncUp = async () => {
     itemsFailed: result.itemsFailed,
   });
   
-  // Increment sync version to trigger UI updates
-  setSyncVersion((prev) => prev + 1);
+  // Increment remote sync down completion version to trigger UI updates
+  setRemoteSyncDownCompletionVersion((prev) => prev + 1);
 };
 ```
 
 ### Sync Service
 
 **File:** `src/lib/sync/service.ts`  
-**Lines:** 159-179
+**Class:** `SyncService`
 
+**Key Methods:**
+- `syncUp()` - Upload pending changes to Supabase
+- `syncDown()` - Download remote changes (BLOCKS if pending local changes exist)
+- `sync()` - Full bidirectional sync (up then down)
+- `startAutoSync()` - Begin background sync intervals
+- `stopAutoSync()` - Stop background sync
+
+**Critical syncDown Behavior:**
 ```typescript
-export class SyncService {
-  public async syncUp(): Promise<SyncResult> {
-    if (this.isSyncing) {
-      throw new Error("Sync already in progress");
+public async syncDown(): Promise<SyncResult> {
+  this.isSyncing = true;
+
+  try {
+    // CRITICAL: Upload pending changes BEFORE downloading remote changes
+    // This prevents race conditions where:
+    // 1. User deletes a row locally
+    // 2. DELETE is queued but not yet sent to Supabase
+    // 3. syncDown runs and re-downloads the "deleted" row from Supabase
+    // 4. Row reappears in local DB (zombie record)
+    const stats = await this.syncEngine.getSyncQueueStats();
+### Sync Engine
+
+**File:** `src/lib/sync/engine.ts`  
+**Class:** `SyncEngine`
+
+**Function:** `syncUp`
+        // CRITICAL: DO NOT proceed with syncDown if upload failed
+        throw new Error(
+          "Cannot syncDown while pending changes exist - upload failed. Local data preserved."
+        );
+      }
     }
-    
-    this.isSyncing = true;
-    
-    try {
-      const result = await this.syncEngine.syncUp();
+
+    const result = await this.syncEngine.syncDown();
+    this.config.onSyncComplete?.(result);
+    return result;
+  } finally {
+    this.isSyncing = false;
+  }
+}
+```
+
+**Why Block syncDown?** For offline-first PWA, local changes are the source of truth. If sync upload fails (network issue), we must NOT pull down remote data that might conflict with unsaved local changes. User remains functional with local data until network recovers.   const result = await this.syncEngine.syncUp();
       this.config.onSyncComplete?.(result);
       return result;
     } finally {
@@ -725,7 +833,7 @@ async syncUp(): Promise<SyncResult> {
   let synced = 0;
   let failed = 0;
 
-  // Get pending sync items in batches
+**Function:** `processQueueItem`
   const pendingItems = await getPendingSyncItems(this.localDb, this.config.batchSize);
 
   if (pendingItems.length === 0) {
@@ -756,10 +864,10 @@ async syncUp(): Promise<SyncResult> {
   };
 }
 ```
+### Field Transformation
 
-**Process Queue Item** (Lines 404-505)
-
-```typescript
+**File:** `src/lib/sync/engine.ts`  
+**Function:** `transformLocalToRemote`
 private async processQueueItem(item: SyncQueueItem): Promise<void> {
   const remoteTable = this.supabase.from(item.tableName);
   const recordData = JSON.parse(item.recordData);
@@ -786,14 +894,13 @@ private async processQueueItem(item: SyncQueueItem): Promise<void> {
     }
   }
 }
-```
+### Sync Queue Management
 
-### Field Transformation
+**File:** `src/lib/sync/queue.ts`
 
-**File:** `src/lib/sync/engine.ts`  
-**Lines:** 938-998 (transformLocalToRemote)
+**Main Functions:**
 
-```typescript
+1. **queueSync** - Add item to sync queue
 private transformLocalToRemote(record: any): any {
   const transformed: any = {};
   
@@ -817,7 +924,7 @@ private transformLocalToRemote(record: any): any {
   return transformed;
 }
 ```
-
+2. **getPendingSyncItems** - Get items to sync
 ### Sync Queue Management
 
 **File:** `src/lib/sync/queue.ts`  
@@ -832,7 +939,7 @@ private transformLocalToRemote(record: any): any {
      tableName: SyncableTable,
      operation: "insert" | "update" | "delete",
      recordData: any
-   ): Promise<void> {
+3. **markSynced** - Mark item as completed
      const queueId = generateId();
      const now = new Date().toISOString();
      
@@ -854,42 +961,82 @@ private transformLocalToRemote(record: any): any {
      db: SqliteDatabase,
      limit = 100
    ): Promise<SyncQueueItem[]> {
-     return await db
-       .select()
-       .from(syncQueue)
-       .where(eq(syncQueue.status, "pending"))
-       .orderBy(syncQueue.createdAt)
-       .limit(limit);
-   }
-   ```
-
-3. **markSynced()** - Mark item as completed (Lines 189-196)
-   ```typescript
-   export async function markSynced(
-     db: SqliteDatabase,
-     queueId: string
-   ): Promise<void> {
-     await db.delete(syncQueue).where(eq(syncQueue.id, queueId));
-   }
-   ```
-
----
-
-## Phase 5: UI Refresh
-
 ### Grid Data Query
 
-**File:** `src/components/grids/TunesGridScheduled.tsx`  
-**Lines:** 81-140
-
-**Resource:** `dueTunesData`
+**File:** `src/routes/practice/Index.tsx`  
+**Resource:** `practiceListData` (shared between grid and flashcard)
 
 ```typescript
-const [dueTunesData] = createResource(
+// Initialize daily practice queue (must run BEFORE fetching practice list)
+const [queueInitialized] = createResource(
   () => {
     const db = localDb();
     const playlistId = currentPlaylistId();
-    const version = syncVersion(); // ← Triggers refetch on change
+    const date = queueDate();
+    const syncComplete = initialSyncComplete();
+
+    if (!syncComplete) return null;
+
+    return db && userId() && playlistId
+      ? { db, userId: userId()!, playlistId, date }
+      : null;
+  },
+  async (params) => {
+    if (!params) return false;
+
+    const { ensureDailyQueue } = await import("../../lib/services/practice-queue");
+    
+    const created = await ensureDailyQueue(
+      params.db,
+      params.userId,
+      params.playlistId,
+      params.date
+    );
+    
+    return true;
+### Practice List Query
+
+**File:** `src/lib/db/queries/practice.ts`  
+**Function:** `getPracticeList`
+    const db = localDb();
+    const playlistId = currentPlaylistId();
+    const version = practiceListStagedChanged(); // ← Triggers refetch on practice data change
+    const initialized = queueInitialized();
+    
+    return db && userId() && playlistId && initialized
+      ? { db, userId: userId()!, playlistId, version, queueReady: initialized }
+      : null;
+  },
+  async (params) => {
+    if (!params) return [];
+    
+    const { getPracticeList } = await import("../../lib/db/queries/practice");
+    return await getPracticeList(
+      params.db,
+      params.userId,
+      params.playlistId,
+      7 // delinquencyWindowDays
+    );
+  }
+);
+
+// Filtered list (removes completed tunes unless "Show Submitted" is enabled)
+const filteredPracticeList = createMemo(() => {
+  const data = practiceListData() || [];
+  const shouldShow = showSubmitted();
+  
+  return shouldShow ? data : data.filter((tune: any) => !tune.completed_at);
+});
+```
+
+**Architecture Changes:**
+- Grid no longer manages its own data query - parent (`Index.tsx`) fetches and filters
+- Grid receives `practiceListData` prop with pre-filtered data
+- Single source of truth for both grid and flashcard viewsst [dueTunesData] = createResource(
+  () => {
+**Key Steps:**
+
+1. **Debug Queue Status**riggers refetch on change
     const initialized = queueInitialized();
     
     return db && props.userId && playlistId && initialized
@@ -906,7 +1053,7 @@ const [dueTunesData] = createResource(
       params.playlistId,
       delinquencyWindowDays
     );
-  }
+2. **Get Max Window**
 );
 ```
 
@@ -919,7 +1066,7 @@ const [dueTunesData] = createResource(
 
 ```typescript
 export async function getPracticeList(
-  db: SqliteDatabase,
+3. **Query with GROUP BY**
   userId: string,
   playlistId: string,
   _delinquencyWindowDays: number = 7
@@ -943,7 +1090,7 @@ export async function getPracticeList(
        AND active = 1
      GROUP BY window_start_utc ORDER BY window_start_utc DESC
    `);
-   ```
+4. **Return Rows**
 
 2. **Get Max Window** (Lines 225-234)
    ```typescript
@@ -952,12 +1099,12 @@ export async function getPracticeList(
      FROM daily_practice_queue
      WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
        AND active = 1
-   `);
-   
-   const isoFormat = maxWindow?.max_window; // '2025-11-08T00:00:00'
-   const spaceFormat = isoFormat?.replace("T", " "); // '2025-11-08 00:00:00'
-   ```
+### Practice List Staged VIEW
 
+**File:** `src/lib/db/init-views.ts`  
+**View:** `practice_list_staged`
+
+**Purpose:** Merges all data sources (tune, playlist_tune, practice_record, table_transient_data)
 3. **Query with GROUP BY** (Lines 246-267)
    ```sql
    SELECT 
@@ -1144,12 +1291,12 @@ LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 - `interval` (integer)
 - `step` (integer)
 - `repetitions` (integer)
-- `due` (timestamp)
-- `goal` (text)
-- `technique` (text)
-- `state` (integer)
-- ... (sync metadata)
+### Supabase Realtime
 
+**File:** `src/lib/sync/realtime.ts`  
+**Class:** `RealtimeManager`
+
+**Purpose:** Listen for changes from other devices via Supabase Realtime websockets
 **Constraints:**
 - UNIQUE (user_id, tune_id, playlist_id)
 
@@ -1176,37 +1323,55 @@ public startAutoSync(): void {
   }, 5 * 60 * 1000); // 5 minutes
 
   // Periodic syncDown (infrequent - pull remote changes)
-  this.syncDownIntervalId = window.setInterval(() => {
-    console.log("[SyncService] Running periodic syncDown...");
-    void this.syncDown();
-  }, 20 * 60 * 1000); // 20 minutes
-}
-```
+  private async handleChange(tableName: string, payload: any): Promise<void> {
+    // CRITICAL: Use SyncService.syncDown() instead of SyncEngine.syncDown()
+    // SyncService ensures pending local changes are uploaded BEFORE downloading
+    // This prevents race conditions where:
+    // 1. User deletes a row locally
+    // 2. Realtime triggers syncDown before DELETE is uploaded
+    // 3. Deleted row gets re-downloaded (zombie record)
+    await this.syncService.syncDown(); // Uses SyncService for queue protection
+    this.config.onUpdate?.(tableName, payload);
+## Key Invariants
 
-### Supabase Realtime
+1. **Immutability:**
+   - `practice_record` rows are NEVER updated or deleted
+   - `daily_practice_queue` rows remain stable throughout the day
 
-**File:** `src/lib/sync/realtime.ts`  
-**Lines:** 1-200
+2. **Uniqueness:**
+   - `practice_record`: (tune_ref, playlist_ref, practiced) must be unique
+   - `table_transient_data`: (user_id, tune_id, playlist_id) must be unique
+   - `daily_practice_queue`: (user_ref, playlist_ref, window_start_utc, tune_ref) must be unique
 
-**Subscriptions:** Listen for changes from other devices
+3. **Timestamp Formats:**
+   - SQLite stores as TEXT (ISO 8601: `'2025-11-08T12:00:00'` with 'T')
+   - Supabase expects timestamp (also accepts ISO 8601)
+   - Window keys now use ISO format consistently: `'2025-11-08T00:00:00'`
+   - Queries handle both formats during transition: `window_start_utc = ${iso} OR window_start_utc = ${space}`
 
-```typescript
-export class RealtimeManager {
-  public subscribe(config: RealtimeConfig): void {
-    for (const tableName of config.tables) {
-      const channel = this.supabase
-        .channel(`public:${tableName}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: tableName,
-            filter: `user_ref=eq.${this.userId}`,
-          },
-          (payload) => {
-            console.log(`[Realtime] ${tableName} change:`, payload);
-            this.handleChange(tableName, payload);
+4. **Sync Order:**
+   - **CRITICAL:** ALWAYS syncUp before syncDown to prevent zombie records
+   - SyncService.syncDown() **blocks** if pending local changes exist until upload succeeds
+   - Persist to IndexedDB immediately after local changes
+   - Queue all database changes for sync (never direct Supabase writes)
+
+5. **Conflict Resolution:**
+   - Last-write-wins (based on `last_modified_at` timestamp)
+   - Duplicate practice_record timestamps handled by incrementing seconds
+
+6. **UI Reactivity:**
+   - **View-specific signals** prevent unnecessary re-queries:
+     - `practiceListStagedChanged` - Practice data changes
+     - `catalogListChanged` - Catalog data changes
+     - `repertoireListChanged` - Repertoire data changes
+     - `remoteSyncDownCompletionVersion` - Remote sync completion
+   - Components subscribe to relevant signal only
+   - Completed items disappear when `completed_at IS NULL` filter applies
+
+7. **Parent-Child Architecture:**
+   - Parent (`Index.tsx`) manages all state and staging logic
+   - Children (Grid, Flashcard) are presentational - only call parent callbacks
+   - Single source of truth for evaluations and practice list data
           }
         )
         .subscribe();
@@ -1293,12 +1458,11 @@ for (const item of pendingItems) {
     await updateSyncStatus(this.localDb, item.id!, "failed", errorMsg);
     failed++;
   }
-}
-```
+### E2E Test Coverage
 
-### Toast Notifications
+**File:** `e2e/tests/practice-003-submit.spec.ts`
 
-**File:** `src/routes/practice/Index.tsx`  
+**Key Tests:**/routes/practice/Index.tsx`  
 **Lines:** 338-370
 
 ```typescript
@@ -1307,12 +1471,9 @@ if (result.success) {
     duration: 3000, // Auto-dismiss after 3 seconds
   });
 } else {
-  toast.error(`Failed to submit: ${result.error}`, {
-    duration: Number.POSITIVE_INFINITY, // Requires manual dismiss
-  });
-}
-```
+### Manual Testing
 
+**Checklist:**
 ---
 
 ## Future Work
@@ -1367,8 +1528,11 @@ if (result.success) {
 ### Manual Testing
 
 **File:** `_notes/practice-evaluation-staging-implementation.md`  
-**Lines:** 660-690
-
+**Document Version:** 2.0  
+**Maintainer:** GitHub Copilot (per user @sboagy)  
+**Change Log:**
+- v2.0 (Nov 10, 2025): Updated for view-specific signals architecture, parent-child evaluation flow, ISO timestamp format, blocking syncDown behavior
+- v1.0 (Nov 8, 2025): Initial version
 **Checklist:**
 1. Select evaluation → verify latest_* columns update
 2. Change evaluation → verify preview updates (no duplicates)

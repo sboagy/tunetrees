@@ -24,7 +24,7 @@ import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
-  const { localDb, syncVersion, initialSyncComplete, user } = useAuth();
+  const { localDb, repertoireListChanged, catalogListChanged, initialSyncComplete, user } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -43,7 +43,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       const db = localDb();
       const userId = user()?.id;
       const playlistId = currentPlaylistId();
-      const version = syncVersion();
+      const version = repertoireListChanged(); // Refetch when repertoire changes
       const syncComplete = initialSyncComplete();
       if (!syncComplete) return null;
       return db && userId && playlistId
@@ -64,7 +64,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   const [allGenres] = createResource(
     () => {
       const db = localDb();
-      const version = syncVersion();
+      const version = catalogListChanged(); // Refetch when catalog changes (genres are catalog data)
       return db ? { db, version } : null;
     },
     async (params) => {

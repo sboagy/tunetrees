@@ -19,24 +19,20 @@ import type { Component } from "solid-js";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import type { SqliteDatabase } from "../../lib/db/client-sqlite";
-import { stagePracticeEvaluation } from "../../lib/services/practice-staging";
 import type { ITuneOverview } from "../grids/types";
 import { FlashcardCard } from "./FlashcardCard";
 import type { FlashcardFieldVisibilityByFace } from "./flashcard-fields";
 
 export interface FlashcardViewProps {
   tunes: ITuneOverview[];
-  onEvaluationChange?: (tuneId: string, value: string) => void;
+  onRecallEvalChange?: (tuneId: string, value: string) => void;
   fieldVisibility?: FlashcardFieldVisibilityByFace;
   // Shared evaluation state (same as TunesGridScheduled)
   evaluations?: Record<string, string>;
-  onEvaluationsChange?: (evals: Record<string, string>) => void;
   // For staging to table_transient_data
   localDb?: () => SqliteDatabase | null;
   userId?: string;
   playlistId?: string;
-  // For incrementing sync version after staging
-  incrementSyncVersion?: () => void;
 }
 
 export const FlashcardView: Component<FlashcardViewProps> = (props) => {
@@ -44,8 +40,11 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
   const [currentIndex, setCurrentIndex] = createSignal(0);
   const [isRevealed, setIsRevealed] = createSignal(false);
   const [didInitFromSelection, setDidInitFromSelection] = createSignal(false);
+  // Auth context currently only needed if future features require local staging directly
+  // (evaluation staging now centralized in parent PracticeIndex)
+  // const { incrementPracticeListStagedChanged } = useAuth();
 
-  // Use shared evaluations from parent, or fall back to empty object
+  // Use shared evaluations from parent (single source of truth)
   const evaluations = () => props.evaluations || {};
 
   // Get current tune
@@ -167,61 +166,8 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
     );
     console.log(`[FlashcardView] Current evaluations:`, evaluations());
 
-    // Update shared evaluations state via parent callback
-    if (props.onEvaluationsChange) {
-      const currentEvals = evaluations();
-      const newEvals = { ...currentEvals, [tune.id]: evaluation };
-      console.log(`[FlashcardView] Updating shared state with:`, newEvals);
-      props.onEvaluationsChange(newEvals);
-    }
-
-    // Stage to table_transient_data for FSRS preview (same as grid)
-    const db = props.localDb?.();
-    const playlistId = props.playlistId;
-    const userId = props.userId;
-    if (db && playlistId && userId) {
-      try {
-        if (evaluation === "") {
-          // Clear staged data when evaluation removed
-          const { clearStagedEvaluation } = await import(
-            "../../lib/services/practice-staging"
-          );
-          await clearStagedEvaluation(db, userId, tune.id, playlistId);
-          console.log(
-            `🗑️  [FlashcardView] Cleared staged evaluation for tune ${tune.id}`
-          );
-        } else {
-          // Stage FSRS preview for actual evaluations
-          await stagePracticeEvaluation(
-            db,
-            userId,
-            playlistId,
-            tune.id,
-            evaluation,
-            "recall", // Default goal
-            "fsrs" // FSRS is the default technique
-          );
-          console.log(
-            `✅ [FlashcardView] Staged FSRS preview for tune ${tune.id}`
-          );
-        }
-
-        // Increment sync version to trigger grid refresh (if callback provided)
-        if (props.incrementSyncVersion) {
-          props.incrementSyncVersion();
-        }
-      } catch (error) {
-        console.error(
-          `❌ [FlashcardView] Failed to ${evaluation === "" ? "clear" : "stage"} evaluation for tune ${tune.id}:`,
-          error
-        );
-      }
-    }
-
-    // Also call the legacy onEvaluationChange callback if provided
-    if (props.onEvaluationChange) {
-      props.onEvaluationChange(tune.id, evaluation);
-    }
+    // Delegate to parent handler (single source of truth)
+    props.onRecallEvalChange?.(tune.id, evaluation);
   };
 
   // Set up keyboard listeners
@@ -364,9 +310,11 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
               {/* Card */}
               <FlashcardCard
                 tune={tune()}
-                currentEvaluation={
-                  evaluations()[tune().id] || tune().recall_eval || ""
-                }
+                currentEvaluation={(() => {
+                  const evals = evaluations();
+                  const id = tune().id;
+                  return id in evals ? evals[id] : tune().recall_eval || "";
+                })()}
                 isRevealed={isRevealed()}
                 fieldVisibility={props.fieldVisibility}
                 onRecallEvalChange={handleRecallEvalChange}

@@ -124,7 +124,8 @@ export interface IGridBaseProps {
   // Practice toolbar callbacks
   onEvaluationsCountChange?: (count: number) => void;
   onTableInstanceChange?: (table: any) => void;
-  onClearEvaluationsReady?: (callback: () => void) => void;
+  // Deprecated: onClearEvaluationsReady removed in favor of parent-managed clearing
+  // onClearEvaluationsReady?: (callback: () => void) => void;
   // Flashcard mode callback
   onTunesChange?: (tunes: ITuneOverview[]) => void;
   // Table instance callback
@@ -146,10 +147,9 @@ export interface IGridBaseProps {
   }>;
   selectedPlaylistIds?: string[];
   // Practice-specific props
-  showSubmitted?: boolean; // Display already-submitted tunes in practice queue
+  practiceListData?: any[]; // Pre-fetched practice list data (required for TunesGridScheduled)
   // Evaluation state management (for flashcard/grid coordination)
   evaluations?: Record<string, string>; // External evaluation state (keyed by tune ID string)
-  onEvaluationsChange?: (evals: Record<string, string>) => void; // Callback when evaluations change
 }
 
 /**
