@@ -478,9 +478,7 @@ export const TuneList: Component<TuneListProps> = (props) => {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `tunetrees-export-${
-      new Date().toISOString().split("T")[0]
-    }.json`;
+    link.download = `tunetrees-export-${new Date().toISOString().split("T")[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };

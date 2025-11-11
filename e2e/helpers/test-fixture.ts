@@ -53,9 +53,7 @@ function isAuthFresh(authFile: string, userEmail: string): boolean {
 
     if (fileAgeMinutes >= AUTH_EXPIRY_MINUTES) {
       console.log(
-        `⚠️  Auth file is stale (${Math.round(
-          fileAgeMinutes
-        )} min old): ${authFile}`
+        `⚠️  Auth file is stale (${Math.round(fileAgeMinutes)} min old): ${authFile}`
       );
       return false;
     }
@@ -91,9 +89,7 @@ export const test = base.extend<TestUserFixture>({
 
     if (!userKey || userKey.trim() === "") {
       throw new Error(
-        `No test user key found for email "${
-          testUser.email
-        }". Available keys: ${Object.keys(TEST_USERS).join(", ")}`
+        `No test user key found for email "${testUser.email}". Available keys: ${Object.keys(TEST_USERS).join(", ")}`
       );
     }
 

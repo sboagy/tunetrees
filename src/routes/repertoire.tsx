@@ -49,7 +49,8 @@ const arraysEqual = (a: string[], b: string[]) =>
  */
 const RepertoirePage: Component = () => {
   const navigate = useNavigate();
-  const { user, localDb, syncVersion } = useAuth();
+  const { user, localDb, repertoireListChanged, catalogListChanged } =
+    useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -187,12 +188,12 @@ const RepertoirePage: Component = () => {
       const db = localDb();
       const userId = user()?.id;
       const playlistId = currentPlaylistId();
-      const version = syncVersion(); // Triggers refetch when sync completes
+      const version = repertoireListChanged(); // Refetch when repertoire changes
       log.debug("REPERTOIRE playlistTunes dependency:", {
         hasDb: !!db,
         userId,
         playlistId,
-        syncVersion: version,
+        repertoireListChanged: version,
       });
       return db && userId && playlistId
         ? { db, userId, playlistId, version }
@@ -218,10 +219,10 @@ const RepertoirePage: Component = () => {
   const [allGenres] = createResource(
     () => {
       const db = localDb();
-      const version = syncVersion(); // Triggers refetch when sync completes
+      const version = catalogListChanged(); // Refetch when catalog changes (genres are catalog data)
       log.debug("REPERTOIRE allGenres dependency:", {
         hasDb: !!db,
-        syncVersion: version,
+        catalogListChanged: version,
       });
       return db ? { db, version } : null;
     },

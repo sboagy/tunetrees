@@ -109,8 +109,8 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
           dockPosition() === "bottom"
             ? "flex-col-reverse"
             : dockPosition() === "right"
-            ? "flex-row-reverse"
-            : "flex-row"
+              ? "flex-row-reverse"
+              : "flex-row"
         }`}
       >
         {/* Drop Zone Overlays (shown during drag) */}

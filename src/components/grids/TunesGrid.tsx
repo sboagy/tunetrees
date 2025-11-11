@@ -96,6 +96,22 @@ export const TunesGrid = (<T extends { id: string | number }>(
     initialState.columnVisibility || {}
   );
 
+  // Restore rowSelection when userId becomes available (after initial render)
+  createEffect(() => {
+    const key = stateKey();
+    const loaded = loadTableState(key);
+    if (loaded?.rowSelection && Object.keys(loaded.rowSelection).length > 0) {
+      const current = rowSelection();
+      // Only restore if current state is empty (avoid overwriting user's new selections)
+      if (Object.keys(current).length === 0) {
+        console.log(
+          `[TunesGrid ${props.tablePurpose}] Restoring ${Object.keys(loaded.rowSelection).length} row selections from localStorage`
+        );
+        setRowSelection(loaded.rowSelection);
+      }
+    }
+  });
+
   // If parent provides a non-empty controlled visibility, adopt it; otherwise keep persisted/internal
   createEffect(() => {
     const v = props.columnVisibility;
@@ -322,7 +338,12 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
   // Notify selection count
   createEffect(() => {
-    props.onSelectionChange?.(Object.keys(rowSelection()).length);
+    const count = Object.keys(rowSelection()).length;
+    console.log(
+      `[TunesGrid ${props.tablePurpose}] Selection changed: ${count} rows selected`,
+      rowSelection()
+    );
+    props.onSelectionChange?.(count);
   });
 
   return (
@@ -351,11 +372,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                         data-column-id={header.column.id}
                         data-testid={`ch-${header.column.id}`}
                         class={getHeaderCellClasses(
-                          `${
-                            draggedColumnId() === header.column.id
-                              ? "opacity-50"
-                              : ""
-                          } ${
+                          `${draggedColumnId() === header.column.id ? "opacity-50" : ""} ${
                             isDragging() &&
                             hoverColumnId() === header.column.id &&
                             draggedColumnId() !== header.column.id
@@ -402,9 +419,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                               }
                               onDragEnd={handleDragEnd}
                               class="cursor-grab active:cursor-grabbing flex-shrink-0 p-0.5 border-0 bg-transparent"
-                              aria-label={`Drag to reorder ${
-                                header.column.columnDef.header as string
-                              } column`}
+                              aria-label={`Drag to reorder ${header.column.columnDef.header as string} column`}
                             >
                               <GripVertical
                                 size={14}
@@ -446,9 +461,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
             <Show when={rowVirtualizer().getVirtualItems().length > 0}>
               <tr
                 style={{
-                  height: `${
-                    rowVirtualizer().getVirtualItems()[0]?.start || 0
-                  }px`,
+                  height: `${rowVirtualizer().getVirtualItems()[0]?.start || 0}px`,
                 }}
               />
             </Show>

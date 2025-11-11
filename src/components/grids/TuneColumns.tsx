@@ -5,8 +5,8 @@
  * Ported from legacy React implementation to SolidJS with fine-grained reactivity.
  */
 
-import type { ColumnDef } from "@tanstack/solid-table";
-import { type Component, Show } from "solid-js";
+import type { ColumnDef, Table } from "@tanstack/solid-table";
+import { type Component, createEffect, Show } from "solid-js";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
@@ -63,8 +63,8 @@ const SortableHeader: Component<{ column: any; title: string }> = (props) => {
         sortState() === "asc"
           ? "Sorted ascending - click to sort descending"
           : sortState() === "desc"
-          ? "Sorted descending - click to clear sort"
-          : "Not sorted - click to sort ascending"
+            ? "Sorted descending - click to clear sort"
+            : "Not sorted - click to sort ascending"
       }
     >
       <span>{props.title}</span>
@@ -83,6 +83,35 @@ const StaticHeader: Component<{ title: string }> = (props) => {
 };
 
 /**
+ * Select All Checkbox Header Component
+ * Reactively updates indeterminate state when selection changes
+ */
+const SelectAllCheckbox: Component<{ table: Table<any> }> = (props) => {
+  let checkboxRef: HTMLInputElement | undefined;
+
+  // Reactively update indeterminate property when selection state changes
+  createEffect(() => {
+    const allSelected = props.table.getIsAllRowsSelected();
+    const someSelected = props.table.getIsSomeRowsSelected();
+
+    if (checkboxRef) {
+      checkboxRef.indeterminate = someSelected && !allSelected;
+    }
+  });
+
+  return (
+    <input
+      ref={checkboxRef}
+      type="checkbox"
+      checked={props.table.getIsAllRowsSelected()}
+      onChange={props.table.getToggleAllRowsSelectedHandler()}
+      class="w-4 h-4 cursor-pointer"
+      aria-label="Select all rows"
+    />
+  );
+};
+
+/**
  * Get column definitions for Catalog grid
  */
 export function getCatalogColumns(
@@ -92,21 +121,7 @@ export function getCatalogColumns(
     // Selection checkbox
     {
       id: "select",
-      header: ({ table }) => (
-        <input
-          type="checkbox"
-          checked={table.getIsAllRowsSelected()}
-          ref={(el) => {
-            if (el) {
-              el.indeterminate =
-                table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected();
-            }
-          }}
-          onChange={table.getToggleAllRowsSelectedHandler()}
-          class="w-4 h-4 cursor-pointer"
-          aria-label="Select all rows"
-        />
-      ),
+      header: ({ table }) => <SelectAllCheckbox table={table} />,
       cell: ({ row }) => (
         <input
           type="checkbox"
@@ -411,9 +426,7 @@ export function getRepertoireColumns(
         };
         return (
           <span
-            class={`text-sm font-medium ${
-              colors[value as keyof typeof colors] || "text-gray-400"
-            }`}
+            class={`text-sm font-medium ${colors[value as keyof typeof colors] || "text-gray-400"}`}
           >
             {ratings[value as keyof typeof ratings] || value}
           </span>
@@ -888,12 +901,12 @@ export function getScheduledColumns(
           diffDays === 0
             ? "Today"
             : diffDays === -1
-            ? "Yesterday"
-            : diffDays < 0
-            ? `${Math.abs(diffDays)}d overdue`
-            : diffDays === 1
-            ? "Tomorrow"
-            : `In ${diffDays}d`;
+              ? "Yesterday"
+              : diffDays < 0
+                ? `${Math.abs(diffDays)}d overdue`
+                : diffDays === 1
+                  ? "Tomorrow"
+                  : `In ${diffDays}d`;
 
         return (
           <span

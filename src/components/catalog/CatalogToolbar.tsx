@@ -85,7 +85,7 @@ export interface CatalogToolbarProps {
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const navigate = useNavigate();
   const auth = useAuth();
-  const { incrementSyncVersion, forceSyncUp } = useAuth();
+  const { incrementRepertoireListChanged, forceSyncUp } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsButtonRef: HTMLButtonElement | undefined;
 
@@ -128,14 +128,10 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
       // Show feedback
       let message = "";
       if (result.added > 0) {
-        message += `Added ${result.added} tune${
-          result.added > 1 ? "s" : ""
-        } to repertoire.`;
+        message += `Added ${result.added} tune${result.added > 1 ? "s" : ""} to repertoire.`;
       }
       if (result.skipped > 0) {
-        message += ` ${result.skipped} tune${
-          result.skipped > 1 ? "s were" : " was"
-        } already in repertoire.`;
+        message += ` ${result.skipped} tune${result.skipped > 1 ? "s were" : " was"} already in repertoire.`;
       }
       alert(message || "No tunes were added.");
 
@@ -146,18 +142,14 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
       console.log("🔄 [AddToRepertoire] Syncing changes to Supabase...");
       await forceSyncUp();
 
-      // Trigger sync to refresh UI
-      incrementSyncVersion();
+      // Trigger repertoire list refresh using view-specific signal
+      incrementRepertoireListChanged();
 
       console.log("Add to repertoire completed:", result);
     } catch (error) {
       console.error("Error adding tunes to repertoire:", error);
       alert(
-        `Error: ${
-          error instanceof Error
-            ? error.message
-            : "Failed to add tunes to repertoire"
-        }`
+        `Error: ${error instanceof Error ? error.message : "Failed to add tunes to repertoire"}`
       );
     }
   };

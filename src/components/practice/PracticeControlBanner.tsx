@@ -20,6 +20,7 @@ import type { Table } from "@tanstack/solid-table";
 import { Columns, Plus, Send } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import {
   TOOLBAR_BADGE,
@@ -76,6 +77,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   const [showQueueSelector, setShowQueueSelector] = createSignal(false);
   const [showAddTunesDialog, setShowAddTunesDialog] = createSignal(false);
   const [isSubmitting, setIsSubmitting] = createSignal(false);
+  const { incrementPracticeListStagedChanged } = useAuth();
 
   let columnsButtonRef: HTMLButtonElement | undefined;
 
@@ -99,6 +101,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   const handleDisplaySubmittedToggle = () => {
     if (props.onShowSubmittedChange) {
       props.onShowSubmittedChange(!(props.showSubmitted ?? false));
+      incrementPracticeListStagedChanged();
     }
   };
 
