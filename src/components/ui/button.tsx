@@ -58,6 +58,7 @@ export const Button = <T extends ValidComponent = "button">(
           size: local.size,
           variant: local.variant,
         }),
+
         local.class
       )}
       {...rest}
