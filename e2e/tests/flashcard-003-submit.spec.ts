@@ -210,6 +210,7 @@ test.describe
       await app.selectFlashcardEvaluation("good");
       await page.waitForTimeout(300);
       await app.submitEvaluationsButton.click();
+      await page.waitForTimeout(300);
 
       // Verify flashcard count updated (if Show Submitted OFF)
       const showSubmittedToggle =

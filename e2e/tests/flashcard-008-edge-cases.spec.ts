@@ -68,13 +68,9 @@ test.describe
       const app = new TuneTreesPage(page);
       const showSubmittedToggle =
         app.displaySubmittedSwitch.getByRole("switch");
-      const isOn =
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        // Click the container to avoid pointer interception on the inner switch
-        await app.displaySubmittedSwitch.click();
-        await page.waitForTimeout(500);
-      }
+      expect(
+        (await showSubmittedToggle.getAttribute("aria-checked")) === "true"
+      ).toBe(false);
 
       // Submit all tunes via grid (use evaluation triggers as proxy for rows)
       const grid = app.practiceGrid;
@@ -100,6 +96,7 @@ test.describe
         await option.click();
         await page.waitForTimeout(300);
         await app.submitEvaluationsButton.click();
+        await page.waitForTimeout(500);
         // Wait for grid to reflect one fewer trigger
         await expect(grid.getByTestId(/^recall-eval-[0-9a-f-]+$/i)).toHaveCount(
           preCount - 1,
