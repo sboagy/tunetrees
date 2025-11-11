@@ -14,127 +14,134 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * Tests that Show Notation, Show Audio, and Show Links toggles work correctly
  * in flashcard mode, persist across cards, and remain independent from grid.
  */
-test.describe.serial("Flashcard Feature: Field Visibility", () => {
-  test.beforeEach(async ({ page, testUser }) => {
-    await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [
-        TEST_TUNE_BANISH_ID,
-        TEST_TUNE_MASONS_ID,
-        TEST_TUNE_MORRISON_ID,
-      ], // ensure >= 2 cards available
-      scheduleDaysAgo: 1, // Ensure multiple cards are available
-      startTab: "practice",
+test.describe
+  .serial("Flashcard Feature: Field Visibility", () => {
+    test.beforeEach(async ({ page, testUser }) => {
+      await setupForPracticeTestsParallel(page, testUser, {
+        repertoireTunes: [
+          TEST_TUNE_BANISH_ID,
+          TEST_TUNE_MASONS_ID,
+          TEST_TUNE_MORRISON_ID,
+        ], // ensure >= 2 cards available
+        scheduleDaysAgo: 1, // Ensure multiple cards are available
+        startTab: "practice",
+      });
     });
-  });
 
-  test("01. Default hides back-only fields until toggled", async ({ page }) => {
-    const app = new TuneTreesPage(page);
-    await app.enableFlashcardMode();
+    test("01. Default hides back-only fields until toggled", async ({
+      page,
+    }) => {
+      const app = new TuneTreesPage(page);
+      await app.enableFlashcardMode();
 
-    // Back-only field 'incipit' should be hidden until revealed and enabled
-    const incipit = page.getByTestId("flashcard-field-incipit");
-    await expect(incipit).toBeHidden();
-  });
+      // Back-only field 'incipit' should be hidden until revealed and enabled
+      const incipit = page.getByTestId("flashcard-field-incipit");
+      await expect(incipit).toBeHidden();
+    });
 
-  test("02. Toggle back field 'incipit' via Fields menu", async ({ page }) => {
-    const app = new TuneTreesPage(page);
-    await app.enableFlashcardMode();
+    test("02. Toggle back field 'incipit' via Fields menu", async ({
+      page,
+    }) => {
+      const app = new TuneTreesPage(page);
+      await app.enableFlashcardMode();
 
-    const incipit = page.getByTestId("flashcard-field-incipit");
-    await expect(incipit).toBeHidden();
+      const incipit = page.getByTestId("flashcard-field-incipit");
+      await expect(incipit).toBeHidden();
 
-    // Enable 'incipit' on back face and reveal card
-    await app.toggleFlashcardField("back", "incipit", true);
-    await app.revealCard();
-    await page.waitForTimeout(200);
-
-    await expect(incipit).toBeVisible();
-
-    // Disable again -> should hide
-    await app.toggleFlashcardField("back", "incipit", false);
-    await page.waitForTimeout(200);
-    await expect(incipit).toBeHidden();
-  });
-
-  test("03. Toggle back field 'favorite_url' (links)", async ({ page }) => {
-    const app = new TuneTreesPage(page);
-    await app.enableFlashcardMode();
-
-    const links = page.getByTestId("flashcard-field-favorite_url");
-    await expect(links).toBeHidden();
-
-    await app.toggleFlashcardField("back", "favorite_url", true);
-    await app.revealCard();
-    await page.waitForTimeout(200);
-    await expect(links).toBeVisible();
-
-    await app.toggleFlashcardField("back", "favorite_url", false);
-    await page.waitForTimeout(200);
-    await expect(links).toBeHidden();
-  });
-
-  test("04. Multiple field toggles persist across cards", async ({ page }) => {
-    const app = new TuneTreesPage(page);
-    await app.enableFlashcardMode();
-
-    // Ensure we have at least 2 cards before navigating (total >= 2)
-    const counter = app.flashcardHeaderCounter;
-    const counterText = (await counter.textContent())?.trim() || "";
-    const totalMatch = /of\s+(\d+)/.exec(counterText);
-    const total = totalMatch ? parseInt(totalMatch[1], 10) : 0;
-    if (total < 2) {
-      test.fixme(
-        true,
-        `Only ${total} card(s) available; skipping multi-card persistence test.`
-      );
-      return;
-    }
-
-    // Enable incipit and favorite_url on back
-    await app.toggleFlashcardField("back", "incipit", true);
-    await app.toggleFlashcardField("back", "favorite_url", true);
-    await app.revealCard();
-    await page.waitForTimeout(200);
-
-    const incipit = page.getByTestId("flashcard-field-incipit");
-    const links = page.getByTestId("flashcard-field-favorite_url");
-    await expect(incipit).toBeVisible();
-    await expect(links).toBeVisible();
-
-    // Navigate next and verify still visible (reveal back again)
-    await app.goNextCard();
-    await page.waitForTimeout(200);
-    await app.revealCard();
-    await expect(incipit).toBeVisible();
-    await expect(links).toBeVisible();
-  });
-
-  test("05. Field visibility independent from grid", async ({ page }) => {
-    const app = new TuneTreesPage(page);
-    // Ensure grid toggle doesn't impact flashcard (simulate grid-only toggle if present)
-    const gridShowNotation = page.getByTestId("grid-show-notation");
-    const gridToggleVisible = await gridShowNotation
-      .isVisible()
-      .catch(() => false);
-    if (gridToggleVisible) {
-      await gridShowNotation.click();
+      // Enable 'incipit' on back face and reveal card
+      await app.toggleFlashcardField("back", "incipit", true);
+      await app.revealCard();
       await page.waitForTimeout(200);
-    }
 
-    await app.enableFlashcardMode();
-    const incipit = page.getByTestId("flashcard-field-incipit");
-    await expect(incipit).toBeHidden();
+      await expect(incipit).toBeVisible();
 
-    await app.toggleFlashcardField("back", "incipit", true);
-    await app.revealCard();
-    await expect(incipit).toBeVisible();
+      // Disable again -> should hide
+      await app.toggleFlashcardField("back", "incipit", false);
+      await page.waitForTimeout(200);
+      await expect(incipit).toBeHidden();
+    });
 
-    // Close and reopen to verify persistence
-    await app.disableFlashcardMode();
-    await page.waitForTimeout(500);
-    await app.enableFlashcardMode();
-    await app.revealCard();
-    await expect(incipit).toBeVisible();
+    test("03. Toggle back field 'favorite_url' (links)", async ({ page }) => {
+      const app = new TuneTreesPage(page);
+      await app.enableFlashcardMode();
+
+      const links = page.getByTestId("flashcard-field-favorite_url");
+      await expect(links).toBeHidden();
+
+      await app.toggleFlashcardField("back", "favorite_url", true);
+      await app.revealCard();
+      await page.waitForTimeout(200);
+      await expect(links).toBeVisible();
+
+      await app.toggleFlashcardField("back", "favorite_url", false);
+      await page.waitForTimeout(200);
+      await expect(links).toBeHidden();
+    });
+
+    test("04. Multiple field toggles persist across cards", async ({
+      page,
+    }) => {
+      const app = new TuneTreesPage(page);
+      await app.enableFlashcardMode();
+
+      // Ensure we have at least 2 cards before navigating (total >= 2)
+      const counter = app.flashcardHeaderCounter;
+      const counterText = (await counter.textContent())?.trim() || "";
+      const totalMatch = /of\s+(\d+)/.exec(counterText);
+      const total = totalMatch ? parseInt(totalMatch[1], 10) : 0;
+      if (total < 2) {
+        test.fixme(
+          true,
+          `Only ${total} card(s) available; skipping multi-card persistence test.`
+        );
+        return;
+      }
+
+      // Enable incipit and favorite_url on back
+      await app.toggleFlashcardField("back", "incipit", true);
+      await app.toggleFlashcardField("back", "favorite_url", true);
+      await app.revealCard();
+      await page.waitForTimeout(200);
+
+      const incipit = page.getByTestId("flashcard-field-incipit");
+      const links = page.getByTestId("flashcard-field-favorite_url");
+      await expect(incipit).toBeVisible();
+      await expect(links).toBeVisible();
+
+      // Navigate next and verify still visible (reveal back again)
+      await app.goNextCard();
+      await page.waitForTimeout(200);
+      await app.revealCard();
+      await expect(incipit).toBeVisible();
+      await expect(links).toBeVisible();
+    });
+
+    test("05. Field visibility independent from grid", async ({ page }) => {
+      const app = new TuneTreesPage(page);
+      // Ensure grid toggle doesn't impact flashcard (simulate grid-only toggle if present)
+      const gridShowNotation = page.getByTestId("grid-show-notation");
+      const gridToggleVisible = await gridShowNotation
+        .isVisible()
+        .catch(() => false);
+      if (gridToggleVisible) {
+        await gridShowNotation.click();
+        await page.waitForTimeout(200);
+      }
+
+      await app.enableFlashcardMode();
+      const incipit = page.getByTestId("flashcard-field-incipit");
+      await expect(incipit).toBeHidden();
+
+      await app.toggleFlashcardField("back", "incipit", true);
+      await app.revealCard();
+      await expect(incipit).toBeVisible();
+
+      // Close and reopen to verify persistence
+      await app.disableFlashcardMode();
+      await page.waitForTimeout(500);
+      await app.enableFlashcardMode();
+      await app.revealCard();
+      await expect(incipit).toBeVisible();
+    });
+    // Note: Persistence across open/close covered above
   });
-  // Note: Persistence across open/close covered above
-});

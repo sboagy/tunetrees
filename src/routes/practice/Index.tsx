@@ -55,8 +55,13 @@ import {
  * ```
  */
 const PracticeIndex: Component = () => {
-  const { user, localDb, incrementSyncVersion, forceSyncUp, syncVersion } =
-    useAuth();
+  const {
+    user,
+    localDb,
+    incrementPracticeListStagedChanged,
+    practiceListStagedChanged,
+    initialSyncComplete,
+  } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
 
   // Get current user's local database ID from user_profile
@@ -64,7 +69,14 @@ const PracticeIndex: Component = () => {
     () => {
       const db = localDb();
       const currentUser = user();
-      const version = syncVersion(); // Trigger refetch on sync
+      const version = practiceListStagedChanged(); // Refetch when practice list changes
+      const syncComplete = initialSyncComplete(); // Wait for initial sync
+
+      if (!syncComplete) {
+        console.log("[PracticeIndex] Waiting for initial sync to complete...");
+        return null;
+      }
+
       return db && currentUser ? { db, userId: currentUser.id, version } : null;
     },
     async (params) => {
@@ -87,9 +99,7 @@ const PracticeIndex: Component = () => {
     if (!db || !user()) return null;
 
     const result = await db.all<{ supabase_user_id: string }>(
-      sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${
-        user()!.id
-      } LIMIT 1`
+      sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${user()!.id} LIMIT 1`
     );
     return result[0]?.supabase_user_id ?? null;
   };
@@ -236,20 +246,92 @@ const PracticeIndex: Component = () => {
 
   const [tableInstance, setTableInstance] = createSignal<any>(null);
 
-  // Store tunes for flashcard view - directly reactive to syncVersion
-  const [tunesForFlashcard] = createResource(
+  // Initialize daily practice queue (must run BEFORE fetching practice list)
+  // getPracticeList does INNER JOIN with daily_practice_queue, so queue must exist first
+  // IMPORTANT: Only re-runs when queueDate changes, NOT on every practice list change
+  const [queueInitialized] = createResource(
     () => {
       const db = localDb();
       const playlistId = currentPlaylistId();
-      const version = syncVersion(); // Reactive to sync changes
+      const date = queueDate(); // Use user-controlled queue date, not getPracticeDate()
+      const syncComplete = initialSyncComplete(); // Wait for initial sync
+
+      if (!syncComplete) {
+        console.log(
+          "[PracticeIndex] Waiting for initial sync before initializing queue..."
+        );
+        return null;
+      }
+
       return db && userId() && playlistId
-        ? { db, userId: userId()!, playlistId, version }
+        ? { db, userId: userId()!, playlistId, date }
+        : null;
+    },
+    async (params) => {
+      if (!params) return false;
+
+      const { ensureDailyQueue } = await import(
+        "../../lib/services/practice-queue"
+      );
+
+      try {
+        // ensureDailyQueue checks if queue exists and only creates if missing
+        const created = await ensureDailyQueue(
+          params.db,
+          params.userId,
+          params.playlistId,
+          params.date
+        );
+
+        if (created) {
+          console.log(
+            `[PracticeIndex] ✅ Created new daily queue for ${params.date.toLocaleDateString()}`
+          );
+        } else {
+          console.log(
+            `[PracticeIndex] ✓ Queue already exists for ${params.date.toLocaleDateString()}`
+          );
+        }
+
+        return true;
+      } catch (error) {
+        console.error("[PracticeIndex] Queue initialization failed:", error);
+        return false;
+      }
+    }
+  );
+
+  // Fetch practice list (shared between grid and flashcard views)
+  // CRITICAL: Must wait for queueInitialized() to complete before fetching
+  const [practiceListData] = createResource(
+    () => {
+      const db = localDb();
+      const playlistId = currentPlaylistId();
+      const version = practiceListStagedChanged(); // Refetch when practice list changes
+      const initialized = queueInitialized(); // Wait for queue to be ready
+
+      console.log(
+        `[PracticeIndex] practiceListData deps: db=${!!db}, userId=${userId()}, playlist=${playlistId}, version=${version}, queueInit=${initialized}`
+      );
+
+      // Only proceed if ALL dependencies are ready (including queue)
+      return db && userId() && playlistId && initialized
+        ? {
+            db,
+            userId: userId()!,
+            playlistId,
+            version,
+            queueReady: initialized,
+          }
         : null;
     },
     async (params) => {
       if (!params) return [];
       const { getPracticeList } = await import("../../lib/db/queries/practice");
       const delinquencyWindowDays = 7;
+      console.log(
+        `[PracticeIndex] Fetching practice list for playlist ${params.playlistId} (queueReady=${params.queueReady})`
+      );
       // Returns PracticeListStagedWithQueue[] which is compatible with ITuneOverview
       return await getPracticeList(
         params.db,
@@ -260,31 +342,92 @@ const PracticeIndex: Component = () => {
     }
   );
 
-  // Filtered tunes for flashcard - applies showSubmitted filter
-  const filteredTunesForFlashcard = createMemo(() => {
-    const tunes = tunesForFlashcard() || [];
-    if (showSubmitted()) {
-      return tunes; // Show all tunes including submitted
-    }
-    return tunes.filter((tune: any) => !tune.completed_at); // Filter out submitted tunes
+  // Filtered practice list - applies showSubmitted filter
+  // This is the single source of truth for both grid and flashcard views
+  const filteredPracticeList = createMemo(() => {
+    const data = practiceListData() || [];
+    const shouldShow = showSubmitted();
+
+    console.log(
+      `[PracticeIndex] Filtering practice list: ${data.length} total, showSubmitted=${shouldShow}`
+    );
+
+    // When showSubmitted is true, show all tunes including completed ones
+    // When showSubmitted is false, hide completed tunes (where completed_at is not null)
+    const filtered = shouldShow
+      ? data
+      : data.filter((tune: any) => !tune.completed_at);
+
+    console.log(`[PracticeIndex] After filtering: ${filtered.length} tunes`);
+    return filtered;
   });
 
-  // Callback from grid to clear evaluations after submit
-  let clearEvaluationsCallback: (() => void) | undefined;
-  const setClearEvaluationsCallback = (callback: () => void) => {
-    clearEvaluationsCallback = callback;
-  };
+  // Grid no longer provides a clear-evaluations callback; parent clears evaluations directly
 
-  // Handle recall evaluation changes
-  const handleRecallEvalChange = (tuneId: string, evaluation: string) => {
+  // Handle recall evaluation changes (single source of truth)
+  // Children (grid/flashcard) call into this; we optimistically update shared
+  // state, then stage or clear in the local DB, and notify the grid via
+  // incrementPracticeListStagedChanged so the joined view refreshes.
+  const handleRecallEvalChange = async (tuneId: string, evaluation: string) => {
     console.log(`Recall evaluation for tune ${tuneId}: ${evaluation}`);
 
-    // Update shared evaluation state
-    setEvaluations((prev) => {
-      // Store explicit empty string for "(Not Set)" to avoid truthy fallbacks
-      // and ensure immediate UI update without DB re-seeding overriding it.
-      return { ...prev, [tuneId]: evaluation };
-    });
+    // 1) Optimistic shared-state update (drives both grid and flashcard)
+    setEvaluations((prev) => ({ ...prev, [tuneId]: evaluation }));
+
+    // 2) Stage/clear in local DB
+    const db = localDb();
+    const playlistId = currentPlaylistId();
+    const userIdVal = await getUserId();
+
+    if (!db || !playlistId || !userIdVal) {
+      console.warn(
+        "[PracticeIndex] Skipping staging: missing db/playlist/userId",
+        {
+          hasDb: !!db,
+          playlistId,
+          userIdVal,
+        }
+      );
+      return; // Still keep optimistic state
+    }
+
+    try {
+      if (evaluation === "") {
+        // Clear staged data when "(Not Set)" selected
+        const { clearStagedEvaluation } = await import(
+          "../../lib/services/practice-staging"
+        );
+        await clearStagedEvaluation(db, userIdVal, tuneId, playlistId);
+        console.log(
+          `🗑️  [PracticeIndex] Cleared staged evaluation for tune ${tuneId}`
+        );
+      } else {
+        // Stage FSRS preview for actual evaluations
+        const { stagePracticeEvaluation } = await import(
+          "../../lib/services/practice-staging"
+        );
+        await stagePracticeEvaluation(
+          db,
+          userIdVal,
+          playlistId,
+          tuneId,
+          evaluation,
+          "recall",
+          "fsrs"
+        );
+        console.log(
+          `✅ [PracticeIndex] Staged FSRS preview for tune ${tuneId}`
+        );
+      }
+
+      // 3) Let grid re-query its VIEW join without forcing dropdown close in child
+      incrementPracticeListStagedChanged();
+    } catch (error) {
+      console.error(
+        `❌ [PracticeIndex] Failed to ${evaluation === "" ? "clear" : "stage"} evaluation for ${tuneId}:`,
+        error
+      );
+    }
   };
 
   // Handle goal changes
@@ -342,31 +485,22 @@ const PracticeIndex: Component = () => {
       if (result.success) {
         // Success toast (auto-dismiss after 3 seconds)
         toast.success(
-          `Successfully submitted ${result.count} evaluation${
-            result.count !== 1 ? "s" : ""
-          }`,
+          `Successfully submitted ${result.count} evaluation${result.count !== 1 ? "s" : ""}`,
           {
             duration: 3000,
           }
         );
 
-        // Force sync up to Supabase BEFORE triggering UI refresh
-        console.log("🔄 [CommitEvaluations] Syncing changes to Supabase...");
-        await forceSyncUp();
-
         // Clear shared evaluations state (used by both grid and flashcard)
         setEvaluations({});
 
-        // Clear evaluations in grid (if callback exists)
-        if (clearEvaluationsCallback) {
-          clearEvaluationsCallback();
-        }
+        // Grid reacts via shared evaluations signal; no per-grid callback needed
 
         // Reset count
         setEvaluationsCount(0);
 
-        // Trigger grid refresh
-        incrementSyncVersion();
+        // Trigger grid refresh using view-specific signal
+        incrementPracticeListStagedChanged();
 
         console.log(
           `✅ Submit complete: ${result.count} evaluations committed`
@@ -427,12 +561,8 @@ const PracticeIndex: Component = () => {
           }
         );
 
-        // Force sync up to Supabase BEFORE triggering UI refresh
-        console.log("🔄 [AddTunesToQueue] Syncing changes to Supabase...");
-        await forceSyncUp();
-
-        // Trigger grid refresh
-        incrementSyncVersion();
+        // Trigger grid refresh using view-specific signal
+        incrementPracticeListStagedChanged();
 
         console.log(`✅ Added ${added.length} tunes to queue`);
       } else {
@@ -474,8 +604,8 @@ const PracticeIndex: Component = () => {
       isToday ? "false" : "true"
     );
 
-    // Trigger grid refresh
-    incrementSyncVersion();
+    // Trigger grid refresh using view-specific signal
+    incrementPracticeListStagedChanged();
 
     // Show appropriate message
     const dateStr = dateAtNoon.toLocaleDateString();
@@ -531,12 +661,8 @@ const PracticeIndex: Component = () => {
       toast.success("Queue reset successfully. It will be regenerated.");
       console.log(`✅ Queue reset complete`);
 
-      // Force sync up to Supabase BEFORE triggering UI refresh
-      console.log("🔄 [QueueReset] Syncing changes to Supabase...");
-      await forceSyncUp();
-
       // Trigger grid refresh to regenerate queue
-      incrementSyncVersion();
+      incrementPracticeListStagedChanged();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error occurred";
@@ -573,46 +699,46 @@ const PracticeIndex: Component = () => {
       {/* Main Content Area - Grid or Flashcard fills remaining space */}
       <div class={GRID_CONTENT_CONTAINER}>
         <Show
-          when={user() && localDb() && currentPlaylistId()}
+          when={
+            user() &&
+            localDb() &&
+            currentPlaylistId() &&
+            initialSyncComplete() &&
+            !userId.loading &&
+            userId()
+          }
           fallback={
             <div class="flex items-center justify-center h-full">
               <p class="text-gray-500 dark:text-gray-400">
-                Loading practice queue...
+                Loading practice queue... (top)
               </p>
             </div>
           }
         >
-          {/* Use a derivation to get the stable number value */}
-          <Show when={currentPlaylistId() && userId()}>
-            <Show
-              when={!flashcardMode()}
-              fallback={
-                <FlashcardView
-                  tunes={filteredTunesForFlashcard() as any}
-                  fieldVisibility={flashcardFieldVisibility()}
-                  evaluations={evaluations()}
-                  onEvaluationsChange={setEvaluations}
-                  onEvaluationChange={handleRecallEvalChange}
-                  localDb={localDb}
-                  userId={userId() || undefined}
-                  playlistId={currentPlaylistId() || undefined}
-                  incrementSyncVersion={incrementSyncVersion}
-                />
-              }
-            >
-              <TunesGridScheduled
+          <Show
+            when={!flashcardMode()}
+            fallback={
+              <FlashcardView
+                tunes={filteredPracticeList() as any}
+                fieldVisibility={flashcardFieldVisibility()}
+                evaluations={evaluations()}
+                onRecallEvalChange={handleRecallEvalChange}
+                localDb={localDb}
                 userId={userId()!}
                 playlistId={currentPlaylistId()!}
-                tablePurpose="scheduled"
-                onRecallEvalChange={handleRecallEvalChange}
-                onGoalChange={handleGoalChange}
-                evaluations={evaluations()}
-                onEvaluationsChange={setEvaluations}
-                onTableInstanceChange={setTableInstance}
-                onClearEvaluationsReady={setClearEvaluationsCallback}
-                showSubmitted={showSubmitted()}
               />
-            </Show>
+            }
+          >
+            <TunesGridScheduled
+              userId={userId()!}
+              playlistId={currentPlaylistId()!}
+              tablePurpose="scheduled"
+              onRecallEvalChange={handleRecallEvalChange}
+              onGoalChange={handleGoalChange}
+              evaluations={evaluations()}
+              onTableInstanceChange={setTableInstance}
+              practiceListData={filteredPracticeList()}
+            />
           </Show>
         </Show>
       </div>

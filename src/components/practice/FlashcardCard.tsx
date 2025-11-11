@@ -340,8 +340,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
                     : "—"}
                 </p>
                 <p>
-                  Next review:{" "}
-                  {(() => {
+                  Next review: {(() => {
                     const scheduled = props.tune.scheduled;
                     if (scheduled === null || scheduled === undefined)
                       return "—";

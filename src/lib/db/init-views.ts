@@ -290,6 +290,107 @@ ORDER BY
   dpq.order_index ASC
 `;
 
+const VIEW_TRANSIENT_DATA_READABLE = `
+CREATE VIEW IF NOT EXISTS view_transient_data_readable AS
+SELECT
+  COALESCE(up.name, up.email) AS user_name,
+  ttd.user_id,
+  COALESCE(tune_override.title, tune.title) AS tune_title,
+  ttd.tune_id,
+  i.instrument AS playlist_instrument,
+  ttd.playlist_id,
+  ttd.purpose,
+  ttd.note_private,
+  ttd.note_public,
+  ttd.recall_eval,
+  ttd.practiced,
+  ttd.quality,
+  ttd.easiness,
+  ttd.difficulty,
+  ttd.interval,
+  ttd.step,
+  ttd.repetitions,
+  ttd.due,
+  ttd.backup_practiced,
+  ttd.goal,
+  ttd.technique,
+  ttd.stability,
+  ttd.state,
+  ttd.sync_version,
+  ttd.last_modified_at,
+  ttd.device_id
+FROM
+  table_transient_data ttd
+  LEFT JOIN user_profile up ON up.supabase_user_id = ttd.user_id
+  LEFT JOIN tune ON tune.id = ttd.tune_id
+  LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
+    AND tune_override.user_ref = ttd.user_id
+  LEFT JOIN playlist p ON p.playlist_id = ttd.playlist_id
+  LEFT JOIN instrument i ON i.id = p.instrument_ref
+ORDER BY
+  ttd.last_modified_at DESC
+`;
+
+/**
+ * View: view_practice_record_readable
+ *
+ * Human-readable practice records with resolved foreign keys.
+ * Shows user names, tune titles, and playlist instruments instead of UUIDs.
+ * Useful for debugging and data inspection in SQLite WASM Browser.
+ */
+const VIEW_PRACTICE_RECORD_READABLE = `
+CREATE VIEW IF NOT EXISTS view_practice_record_readable AS
+SELECT
+  COALESCE(up.name, up.email) AS user_name,
+  COALESCE(tune_override.title, tune.title) AS tune_title,
+  pr.tune_ref,
+  i.instrument AS playlist_instrument,
+  pr.playlist_ref,
+  pr.practiced,
+  pr.quality,
+  CASE pr.quality
+    WHEN 1 THEN 'Again'
+    WHEN 2 THEN 'Hard'
+    WHEN 3 THEN 'Good'
+    WHEN 4 THEN 'Easy'
+    ELSE 'Unknown'
+  END AS quality_label,
+  pr.easiness,
+  pr.difficulty,
+  pr.stability,
+  pr.interval,
+  pr.step,
+  pr.repetitions,
+  pr.lapses,
+  pr.elapsed_days,
+  pr.state,
+  CASE pr.state
+    WHEN 0 THEN 'New'
+    WHEN 1 THEN 'Learning'
+    WHEN 2 THEN 'Review'
+    WHEN 3 THEN 'Relearning'
+    ELSE 'Unknown'
+  END AS state_label,
+  pr.due,
+  pr.backup_practiced,
+  pr.goal,
+  pr.technique,
+  pr.sync_version,
+  pr.last_modified_at,
+  pr.device_id,
+  pr.id
+FROM
+  practice_record pr
+  LEFT JOIN playlist p ON p.playlist_id = pr.playlist_ref
+  LEFT JOIN user_profile up ON up.supabase_user_id = p.user_ref
+  LEFT JOIN tune ON tune.id = pr.tune_ref
+  LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
+    AND tune_override.user_ref = p.user_ref
+  LEFT JOIN instrument i ON i.id = p.instrument_ref
+ORDER BY
+  pr.practiced DESC
+`;
+
 /**
  * Initialize database views in SQLite WASM
  *
@@ -327,6 +428,14 @@ export async function initializeViews(db: SqliteDatabase): Promise<void> {
     await db.run(VIEW_DAILY_PRACTICE_QUEUE_READABLE);
     console.log("✅ Created view: view_daily_practice_queue_readable");
 
+    // Create view_transient_data_readable
+    await db.run(VIEW_TRANSIENT_DATA_READABLE);
+    console.log("✅ Created view: view_transient_data_readable");
+
+    // Create view_practice_record_readable
+    await db.run(VIEW_PRACTICE_RECORD_READABLE);
+    console.log("✅ Created view: view_practice_record_readable");
+
     console.log("✅ All database views initialized successfully");
   } catch (error) {
     console.error("❌ Error initializing database views:", error);
@@ -343,6 +452,8 @@ export async function dropViews(db: SqliteDatabase): Promise<void> {
   console.log("🗑️  Dropping SQLite database views...");
 
   try {
+    await db.run("DROP VIEW IF EXISTS view_practice_record_readable");
+    await db.run("DROP VIEW IF EXISTS view_transient_data_readable");
     await db.run("DROP VIEW IF EXISTS view_daily_practice_queue_readable");
     await db.run("DROP VIEW IF EXISTS practice_list_staged");
     await db.run("DROP VIEW IF EXISTS practice_list_joined");

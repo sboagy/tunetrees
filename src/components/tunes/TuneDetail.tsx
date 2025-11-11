@@ -313,9 +313,7 @@ export const TuneDetail: Component<TuneDetailProps> = (props) => {
 
           {/* Render ABC notation */}
           <AbcNotation
-            notation={`X:1\nT:${
-              props.tune.title || "Untitled"
-            }\nM:4/4\nL:1/8\nK:${props.tune.mode || "D"}\n${
+            notation={`X:1\nT:${props.tune.title || "Untitled"}\nM:4/4\nL:1/8\nK:${props.tune.mode || "D"}\n${
               props.tune.incipit
             }`}
             responsive={true}

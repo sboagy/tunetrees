@@ -488,12 +488,17 @@ export async function ensureDailyQueue(
   console.log(`[PracticeQueue] Ensuring queue exists for ${windowStartUtc}...`);
 
   // Check if queue exists for this date
+  // NOTE: We now use ISO format (YYYY-MM-DDTHH:MM:SS) consistently
+  // For backward compatibility, also check space-separated format during transition
   const existing = await db.all<{ count: number }>(
     sql`SELECT COUNT(*) as count 
         FROM daily_practice_queue 
         WHERE user_ref = ${userRef} 
           AND playlist_ref = ${playlistRef} 
-          AND window_start_utc = ${windowStartUtc}`
+          AND (
+            window_start_utc = ${windowStartUtc}
+            OR window_start_utc = ${windowStartUtc.replace("T", " ")}
+          )`
   );
 
   const queueExists = (existing[0]?.count ?? 0) > 0;
@@ -763,9 +768,7 @@ export async function generateOrGetPracticeQueue(
   }
 
   console.log(
-    `[PracticeQueue] Generating new queue: ${
-      candidateRows.length
-    } candidate tunes (max: ${maxReviews || "uncapped"})`
+    `[PracticeQueue] Generating new queue: ${candidateRows.length} candidate tunes (max: ${maxReviews || "uncapped"})`
   );
 
   // Build queue rows - mark each with its actual bucket
