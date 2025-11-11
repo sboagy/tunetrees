@@ -46,14 +46,34 @@ interface AuthState {
   /** Local SQLite database instance (null if not initialized) */
   localDb: Accessor<SqliteDatabase | null>;
 
-  /** Sync version - increments when sync completes (triggers UI updates) */
-  syncVersion: Accessor<number>;
+  /** Remote sync down completion version - increments when syncDown completes (triggers UI updates) */
+  remoteSyncDownCompletionVersion: Accessor<number>;
 
   /** Initial sync completed (true after first successful sync down) */
   initialSyncComplete: Accessor<boolean>;
 
-  /** Increment sync version to trigger UI refresh */
-  incrementSyncVersion: () => void;
+  /** Increment remote sync down completion version to trigger UI refresh */
+  incrementRemoteSyncDownCompletion: () => void;
+
+  /** View-specific change signals for optimistic local updates */
+
+  /** Practice list staged VIEW changed - increments after local writes affecting practice data */
+  practiceListStagedChanged: Accessor<number>;
+
+  /** Increment practice list staged change counter */
+  incrementPracticeListStagedChanged: () => void;
+
+  /** Catalog list VIEW changed - increments after local writes affecting catalog */
+  catalogListChanged: Accessor<number>;
+
+  /** Increment catalog list change counter */
+  incrementCatalogListChanged: () => void;
+
+  /** Repertoire list VIEW changed - increments after local writes affecting repertoire */
+  repertoireListChanged: Accessor<number>;
+
+  /** Increment repertoire list change counter */
+  incrementRepertoireListChanged: () => void;
 
   /** Sign in with email and password */
   signIn: (
@@ -117,8 +137,15 @@ export const AuthProvider: ParentComponent = (props) => {
   const [session, setSession] = createSignal<Session | null>(null);
   const [loading, setLoading] = createSignal(true);
   const [localDb, setLocalDb] = createSignal<SqliteDatabase | null>(null);
-  const [syncVersion, setSyncVersion] = createSignal(0);
+  const [remoteSyncDownCompletionVersion, setRemoteSyncDownCompletionVersion] =
+    createSignal(0);
   const [initialSyncComplete, setInitialSyncComplete] = createSignal(false);
+
+  // View-specific change signals for optimistic updates
+  const [practiceListStagedChanged, setPracticeListStagedChanged] =
+    createSignal(0);
+  const [catalogListChanged, setCatalogListChanged] = createSignal(0);
+  const [repertoireListChanged, setRepertoireListChanged] = createSignal(0);
 
   // Sync worker cleanup function and service instance
   let stopSyncWorker: (() => void) | null = null;
@@ -177,10 +204,17 @@ export const AuthProvider: ParentComponent = (props) => {
           realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
           syncIntervalMs: 5000, // Sync every 5 seconds (fast upload of local changes)
           onSyncComplete: () => {
-            log.debug("Sync completed, incrementing sync version");
-            setSyncVersion((prev) => {
+            log.debug(
+              "Sync completed, incrementing remote sync down completion version"
+            );
+            setRemoteSyncDownCompletionVersion((prev) => {
               const newVersion = prev + 1;
-              log.debug("Sync version changed:", prev, "->", newVersion);
+              log.debug(
+                "Remote sync down completion version changed:",
+                prev,
+                "->",
+                newVersion
+              );
               return newVersion;
             });
             // Mark initial sync as complete on first sync
@@ -389,14 +423,14 @@ export const AuthProvider: ParentComponent = (props) => {
       });
       log.info("Force sync down completed:", result);
 
-      // Increment sync version to trigger UI updates
-      setSyncVersion((prev) => {
+      // Increment remote sync down completion version to trigger UI updates
+      setRemoteSyncDownCompletionVersion((prev) => {
         const newVersion = prev + 1;
         console.log(
-          `🔄 [ForceSyncDown] Sync version updated: ${prev} → ${newVersion}`
+          `🔄 [ForceSyncDown] Remote sync down completion version updated: ${prev} → ${newVersion}`
         );
         log.debug(
-          "Sync version changed after force sync:",
+          "Remote sync down completion version changed after force sync:",
           prev,
           "->",
           newVersion
@@ -411,15 +445,67 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   /**
-   * Increment sync version to trigger UI refresh
+   * Increment remote sync down completion version to trigger UI refresh
+   * DEPRECATED: This should only be called by SyncService after syncDown completes.
+   * For local data changes, use view-specific signals (e.g., incrementPracticeListStagedChanged).
    * Call this after local database mutations (staging, deletions, etc.)
    * to force grids and queries to refetch data
    */
-  const incrementSyncVersion = () => {
-    setSyncVersion((prev) => {
+  const incrementRemoteSyncDownCompletion = () => {
+    setRemoteSyncDownCompletionVersion((prev) => {
       const newVersion = prev + 1;
       console.log(
-        `🔄 [incrementSyncVersion] Sync version updated: ${prev} → ${newVersion}`
+        `🔄 [incrementRemoteSyncDownCompletion] Remote sync down completion version updated: ${prev} → ${newVersion}`
+      );
+      return newVersion;
+    });
+  };
+
+  /**
+   * View-specific change signal increment functions
+   * These are called immediately after local writes to trigger optimistic UI updates
+   */
+
+  /**
+   * Increment practice list staged changed counter
+   * Call after writes affecting practice_list_staged VIEW
+   * (evaluations, queue operations, staging operations)
+   */
+  const incrementPracticeListStagedChanged = () => {
+    setPracticeListStagedChanged((prev) => {
+      const newVersion = prev + 1;
+      console.log(
+        `🔄 [incrementPracticeListStagedChanged] Practice list version: ${prev} → ${newVersion}`
+      );
+      return newVersion;
+    });
+  };
+
+  /**
+   * Increment catalog list changed counter
+   * Call after writes affecting catalog VIEWs
+   * (catalog metadata changes, tune additions/deletions)
+   */
+  const incrementCatalogListChanged = () => {
+    setCatalogListChanged((prev) => {
+      const newVersion = prev + 1;
+      console.log(
+        `🔄 [incrementCatalogListChanged] Catalog list version: ${prev} → ${newVersion}`
+      );
+      return newVersion;
+    });
+  };
+
+  /**
+   * Increment repertoire list changed counter
+   * Call after writes affecting repertoire VIEWs
+   * (repertoire metadata changes, playlist additions/deletions)
+   */
+  const incrementRepertoireListChanged = () => {
+    setRepertoireListChanged((prev) => {
+      const newVersion = prev + 1;
+      console.log(
+        `🔄 [incrementRepertoireListChanged] Repertoire list version: ${prev} → ${newVersion}`
       );
       return newVersion;
     });
@@ -450,14 +536,14 @@ export const AuthProvider: ParentComponent = (props) => {
       });
       log.info("Force sync up completed:", result);
 
-      // Increment sync version to trigger UI updates
-      setSyncVersion((prev) => {
+      // Increment remote sync down completion version to trigger UI updates
+      setRemoteSyncDownCompletionVersion((prev) => {
         const newVersion = prev + 1;
         console.log(
-          `🔄 [ForceSyncUp] Sync version updated: ${prev} → ${newVersion}`
+          `🔄 [ForceSyncUp] Remote sync down completion version updated: ${prev} → ${newVersion}`
         );
         log.debug(
-          "Sync version changed after force sync:",
+          "Remote sync down completion version changed after force sync:",
           prev,
           "->",
           newVersion
@@ -477,9 +563,15 @@ export const AuthProvider: ParentComponent = (props) => {
     session,
     loading,
     localDb,
-    syncVersion,
+    remoteSyncDownCompletionVersion,
     initialSyncComplete,
-    incrementSyncVersion,
+    incrementRemoteSyncDownCompletion,
+    practiceListStagedChanged,
+    incrementPracticeListStagedChanged,
+    catalogListChanged,
+    incrementCatalogListChanged,
+    repertoireListChanged,
+    incrementRepertoireListChanged,
     signIn,
     signUp,
     signInWithOAuth,
@@ -492,7 +584,7 @@ export const AuthProvider: ParentComponent = (props) => {
     <AuthContext.Provider value={authState}>
       <div
         data-auth-initialized={!loading()}
-        data-sync-version={syncVersion()}
+        data-sync-version={remoteSyncDownCompletionVersion()}
         style={{ display: "contents" }}
       >
         {props.children}

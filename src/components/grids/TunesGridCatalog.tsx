@@ -35,7 +35,7 @@ import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
-  const { localDb, syncVersion, initialSyncComplete } = useAuth();
+  const { localDb, catalogListChanged, initialSyncComplete } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -58,7 +58,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     () => {
       const db = localDb();
       const userId = useAuth().user()?.id;
-      const version = syncVersion(); // Triggers refetch when sync completes
+      const version = catalogListChanged(); // Refetch when catalog changes
       const syncComplete = initialSyncComplete(); // Wait for initial sync
 
       if (!syncComplete) {
@@ -230,24 +230,13 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   const [selectedCount, setSelectedCount] = createSignal<number>(0);
   let innerTable: any | null = null;
 
+  // Debug: Log selectedCount changes
+  createEffect(() => {
+    console.log(`[TunesGridCatalog] selectedCount signal changed to: ${selectedCount()}`);
+  });
+
   return (
     <div class="h-full flex flex-col">
-      {/* Selection summary */}
-      <Show when={selectedCount() > 0}>
-        <div class="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
-          <span class="text-sm text-blue-700 dark:text-blue-300">
-            {selectedCount()} {selectedCount() === 1 ? "tune" : "tunes"}{" "}
-            selected
-          </span>
-          <button
-            type="button"
-            class="ml-4 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            onClick={() => innerTable?.toggleAllRowsSelected?.(false)}
-          >
-            Clear selection
-          </button>
-        </div>
-      </Show>
       {/* Loading state */}
       <Show
         when={
@@ -276,47 +265,31 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           filteredTunes().length > 0
         }
       >
-        <TunesGrid
-          tablePurpose="catalog"
-          userId={props.userId}
-          playlistId={currentPlaylistId() || undefined}
-          data={filteredTunes()}
-          currentRowId={currentTuneId() || undefined}
-          enableColumnReorder={true}
-          onRowClick={(row) => handleRowClick(row as Tune)}
-          columnVisibility={columnVisibility()}
-          onColumnVisibilityChange={setColumnVisibility}
-          cellCallbacks={{
-            onRecallEvalChange: props.onRecallEvalChange,
-            onGoalChange: props.onGoalChange,
-          }}
-          onSelectionChange={(count) => {
-            setSelectedCount(count);
-            props.onSelectionChange?.(count);
-          }}
-          onTableReady={(tbl) => {
-            innerTable = tbl as any;
-            props.onTableReady?.(tbl as any);
-          }}
-        />
-
-        {/* Footer with tune count */}
-        <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2 flex-shrink-0">
-          <div class="text-sm text-gray-600 dark:text-gray-400">
-            <span>
-              {filteredTunes().length}{" "}
-              {filteredTunes().length === 1 ? "tune" : "tunes"}
-              {props.selectedPlaylistIds &&
-                props.selectedPlaylistIds.length > 0 && (
-                  <span class="ml-1 text-gray-500 dark:text-gray-500">
-                    in selected{" "}
-                    {props.selectedPlaylistIds.length === 1
-                      ? "playlist"
-                      : "playlists"}
-                  </span>
-                )}
-            </span>
-          </div>
+        <div class="flex-1 overflow-hidden">
+          <TunesGrid
+            tablePurpose="catalog"
+            userId={props.userId}
+            playlistId={currentPlaylistId() || undefined}
+            data={filteredTunes()}
+            currentRowId={currentTuneId() || undefined}
+            enableColumnReorder={true}
+            onRowClick={(row) => handleRowClick(row as Tune)}
+            columnVisibility={columnVisibility()}
+            onColumnVisibilityChange={setColumnVisibility}
+            cellCallbacks={{
+              onRecallEvalChange: props.onRecallEvalChange,
+              onGoalChange: props.onGoalChange,
+            }}
+            onSelectionChange={(count) => {
+              console.log(`[TunesGridCatalog] onSelectionChange called with count: ${count}`);
+              setSelectedCount(count);
+              props.onSelectionChange?.(count);
+            }}
+            onTableReady={(tbl) => {
+              innerTable = tbl as any;
+              props.onTableReady?.(tbl as any);
+            }}
+          />
         </div>
       </Show>{" "}
       {/* Empty state */}
@@ -342,6 +315,38 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           </div>
         </div>
       </Show>
+
+      {/* Footer with tune count and selection info - Always visible */}
+      <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2 flex-shrink-0">
+        <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+          <span>
+            {filteredTunes().length}{" "}
+            {filteredTunes().length === 1 ? "tune" : "tunes"}
+            {props.selectedPlaylistIds &&
+              props.selectedPlaylistIds.length > 0 && (
+                <span class="ml-1 text-gray-500 dark:text-gray-500">
+                  in selected{" "}
+                  {props.selectedPlaylistIds.length === 1
+                    ? "playlist"
+                    : "playlists"}
+                </span>
+              )}
+          </span>
+          <Show when={selectedCount() > 0}>
+            <span class="text-blue-700 dark:text-blue-300">
+              {selectedCount()} {selectedCount() === 1 ? "tune" : "tunes"}{" "}
+              selected
+              <button
+                type="button"
+                class="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
+                onClick={() => innerTable?.toggleAllRowsSelected?.(false)}
+              >
+                Clear selection
+              </button>
+            </span>
+          </Show>
+        </div>
+      </div>
     </div>
   );
 };
