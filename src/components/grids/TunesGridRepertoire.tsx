@@ -24,7 +24,13 @@ import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
-  const { localDb, repertoireListChanged, catalogListChanged, initialSyncComplete, user } = useAuth();
+  const {
+    localDb,
+    repertoireListChanged,
+    catalogListChanged,
+    initialSyncComplete,
+    user,
+  } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -132,7 +138,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
 
   // Debug: Log selectedCount changes
   createEffect(() => {
-    console.log(`[TunesGridRepertoire] selectedCount signal changed to: ${selectedCount()}`);
+    console.log(
+      `[TunesGridRepertoire] selectedCount signal changed to: ${selectedCount()}`
+    );
   });
 
   return (
@@ -167,7 +175,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
               onGoalChange: props.onGoalChange,
             }}
             onSelectionChange={(count) => {
-              console.log(`[TunesGridRepertoire] onSelectionChange called with count: ${count}`);
+              console.log(
+                `[TunesGridRepertoire] onSelectionChange called with count: ${count}`
+              );
               setSelectedCount(count);
               props.onSelectionChange?.(count);
             }}

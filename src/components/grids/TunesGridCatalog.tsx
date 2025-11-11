@@ -232,7 +232,9 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
 
   // Debug: Log selectedCount changes
   createEffect(() => {
-    console.log(`[TunesGridCatalog] selectedCount signal changed to: ${selectedCount()}`);
+    console.log(
+      `[TunesGridCatalog] selectedCount signal changed to: ${selectedCount()}`
+    );
   });
 
   return (
@@ -281,7 +283,9 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
               onGoalChange: props.onGoalChange,
             }}
             onSelectionChange={(count) => {
-              console.log(`[TunesGridCatalog] onSelectionChange called with count: ${count}`);
+              console.log(
+                `[TunesGridCatalog] onSelectionChange called with count: ${count}`
+              );
               setSelectedCount(count);
               props.onSelectionChange?.(count);
             }}
@@ -315,7 +319,6 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           </div>
         </div>
       </Show>
-
       {/* Footer with tune count and selection info - Always visible */}
       <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2 flex-shrink-0">
         <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
