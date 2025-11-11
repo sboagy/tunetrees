@@ -16,8 +16,8 @@ import type {
   RealtimePostgresChangesPayload,
 } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
-import type { SyncEngine } from "./engine";
 import type { SyncableTable } from "./queue";
+import type { SyncService } from "./service";
 
 // Debug flag for realtime logging
 const REALTIME_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
@@ -51,12 +51,12 @@ export interface RealtimeState {
  * Manages Supabase Realtime subscriptions for live sync
  */
 export class RealtimeManager {
-  private syncEngine: SyncEngine;
+  private syncService: SyncService;
   private config: RealtimeConfig;
   private state: RealtimeState;
 
-  constructor(syncEngine: SyncEngine, config: RealtimeConfig) {
-    this.syncEngine = syncEngine;
+  constructor(syncService: SyncService, config: RealtimeConfig) {
+    this.syncService = syncService;
     this.config = config;
     this.state = {
       status: "disconnected",
@@ -197,12 +197,16 @@ export class RealtimeManager {
     try {
       console.log(`[Realtime] Syncing ${tableName} down from Supabase...`);
 
-      // Call sync engine's syncDown for this specific table
-      // TODO: Add syncTableDown method to SyncEngine class
-      // await this.syncEngine.syncTableDown(tableName);
-
-      // For now, do a full syncDown
-      await this.syncEngine.syncDown();
+      // CRITICAL: Use SyncService.syncDown() instead of SyncEngine.syncDown()
+      // SyncService ensures pending local changes are uploaded BEFORE downloading
+      // This prevents race conditions where:
+      // 1. User deletes a row locally
+      // 2. Realtime triggers syncDown before DELETE is uploaded
+      // 3. Deleted row gets re-downloaded (zombie record)
+      //
+      // TODO: Add syncTableDown method to SyncEngine class for per-table syncing
+      // For now, do a full syncDown through SyncService (has queue protection)
+      await this.syncService.syncDown();
 
       // Update last sync timestamp
       this.state.lastSync.set(tableName, new Date());
@@ -282,8 +286,8 @@ export class RealtimeManager {
  * Create and configure Realtime manager
  */
 export function createRealtimeManager(
-  syncEngine: SyncEngine,
+  syncService: SyncService,
   config: RealtimeConfig
 ): RealtimeManager {
-  return new RealtimeManager(syncEngine, config);
+  return new RealtimeManager(syncService, config);
 }

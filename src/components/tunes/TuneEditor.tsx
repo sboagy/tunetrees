@@ -167,9 +167,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     if (abcPreviewRef && incipitValue) {
       try {
         // Simple ABC structure for preview
-        const abcNotation = `X:1\nT:${title() || "Preview"}\nM:4/4\nL:1/8\nK:${
-          mode() || "D"
-        }\n${incipitValue}`;
+        const abcNotation = `X:1\nT:${title() || "Preview"}\nM:4/4\nL:1/8\nK:${mode() || "D"}\n${incipitValue}`;
         abcjs.renderAbc(abcPreviewRef, abcNotation, {
           responsive: "resize",
           scale: 0.8,

@@ -90,9 +90,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
             <For each={options}>
               {(option) => (
                 <DropdownMenu.Item
-                  data-testid={`recall-eval-option-${
-                    option.value || "not-set"
-                  }`}
+                  data-testid={`recall-eval-option-${option.value || "not-set"}`}
                   class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                   onSelect={() => props.onChange(option.value)}
                 >

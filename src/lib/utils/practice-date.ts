@@ -55,25 +55,30 @@ export function getPracticeDate(): Date {
 }
 
 /**
- * Format practice date to window_start_utc format
+ * Format date as window start timestamp
  *
- * Converts a Date to "YYYY-MM-DD 00:00:00" format used by daily_practice_queue
+ * Returns ISO 8601 format without timezone/milliseconds for consistency
+ * with SQLite WASM's date handling. Format: "YYYY-MM-DDTHH:MM:SS"
+ *
+ * NOTE: SQLite TEXT columns store dates as-is. We use ISO format (with T)
+ * because SQLite WASM prefers this format and converts space-separated
+ * formats to ISO internally, causing query mismatches.
  *
  * @param date - Date to format
- * @returns Formatted string for database queries
+ * @returns ISO timestamp string (e.g., "2025-11-10T00:00:00")
  *
  * @example
  * ```typescript
  * const date = new Date('2025-11-05T12:00:00');
  * const formatted = formatAsWindowStart(date);
- * // Returns: "2025-11-05 00:00:00"
+ * // Returns: "2025-11-05T00:00:00"
  * ```
  */
 export function formatAsWindowStart(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
     2,
     "0"
-  )}-${String(date.getDate()).padStart(2, "0")} 00:00:00`;
+  )}-${String(date.getDate()).padStart(2, "0")}T00:00:00`;
 }
 
 /**

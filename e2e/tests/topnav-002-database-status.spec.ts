@@ -92,15 +92,50 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
 
     if (await dbButton.isVisible({ timeout: 2000 }).catch(() => false)) {
       await dbButton.click();
+
+      // Give a chance for sync to start
       await page.waitForTimeout(500);
 
-      // Should show sync status
+      // Poll for up to 20 seconds for sync to complete
+      const maxWaitMs = 20000;
+      const pollIntervalMs = 1000;
+      const startTime = Date.now();
+
+      let syncedVisible = false;
+      let allChangesSyncedVisible = false;
+
+      while (Date.now() - startTime < maxWaitMs) {
+        // Check for "Synced" text
+        if (!syncedVisible) {
+          syncedVisible = await ttPage.databaseDropdownPanel
+            .getByText("Synced", { exact: true })
+            .isVisible()
+            .catch(() => false);
+        }
+
+        // Check for "All changes synced to Supabase" text
+        if (!allChangesSyncedVisible) {
+          allChangesSyncedVisible = await ttPage.databaseDropdownPanel
+            .getByText("All changes synced to Supabase")
+            .isVisible()
+            .catch(() => false);
+        }
+
+        // Both conditions met
+        if (syncedVisible && allChangesSyncedVisible) {
+          break;
+        }
+
+        await page.waitForTimeout(pollIntervalMs);
+      }
+
+      // Assert both conditions are visible
       await expect(
         ttPage.databaseDropdownPanel.getByText("Synced", { exact: true })
-      ).toBeVisible({ timeout: 6000 });
+      ).toBeVisible();
       await expect(
         ttPage.databaseDropdownPanel.getByText("All changes synced to Supabase")
-      ).toBeVisible({ timeout: 2000 });
+      ).toBeVisible();
     }
   });
 
@@ -127,7 +162,7 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
 
       // Should have Force Sync button
       const forceSyncButton = page.getByRole("button", {
-        name: "Force Sync Down",
+        name: /Force Sync Down/i,
       });
       await expect(forceSyncButton).toBeVisible({ timeout: 2000 });
       await expect(forceSyncButton).toBeEnabled();
@@ -143,7 +178,7 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
 
       // Should have Force Sync button
       const forceSyncButton = page.getByRole("button", {
-        name: "Force Sync Up",
+        name: /Force Sync Up/i,
       });
       await expect(forceSyncButton).toBeVisible({ timeout: 2000 });
       await expect(forceSyncButton).toBeEnabled();

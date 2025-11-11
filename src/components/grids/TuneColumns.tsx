@@ -63,8 +63,8 @@ const SortableHeader: Component<{ column: any; title: string }> = (props) => {
         sortState() === "asc"
           ? "Sorted ascending - click to sort descending"
           : sortState() === "desc"
-          ? "Sorted descending - click to clear sort"
-          : "Not sorted - click to sort ascending"
+            ? "Sorted descending - click to clear sort"
+            : "Not sorted - click to sort ascending"
       }
     >
       <span>{props.title}</span>
@@ -426,9 +426,7 @@ export function getRepertoireColumns(
         };
         return (
           <span
-            class={`text-sm font-medium ${
-              colors[value as keyof typeof colors] || "text-gray-400"
-            }`}
+            class={`text-sm font-medium ${colors[value as keyof typeof colors] || "text-gray-400"}`}
           >
             {ratings[value as keyof typeof ratings] || value}
           </span>
@@ -903,12 +901,12 @@ export function getScheduledColumns(
           diffDays === 0
             ? "Today"
             : diffDays === -1
-            ? "Yesterday"
-            : diffDays < 0
-            ? `${Math.abs(diffDays)}d overdue`
-            : diffDays === 1
-            ? "Tomorrow"
-            : `In ${diffDays}d`;
+              ? "Yesterday"
+              : diffDays < 0
+                ? `${Math.abs(diffDays)}d overdue`
+                : diffDays === 1
+                  ? "Tomorrow"
+                  : `In ${diffDays}d`;
 
         return (
           <span

@@ -574,9 +574,7 @@ async function verifyTablesEmpty(
   }
 
   log.debug(
-    `✅ [${user.name}] Verified ${
-      tableNames.length
-    } tables are empty: ${tableNames.join(", ")}`
+    `✅ [${user.name}] Verified ${tableNames.length} tables are empty: ${tableNames.join(", ")}`
   );
 }
 
@@ -906,9 +904,7 @@ export async function setupForCatalogTestsParallel(
 
   const isVisible = await tuneCountComponent.isVisible();
   if (!isVisible) {
-    const snapshotName = `e2e/tests/artifacts/catalog-missing-${
-      user.email.split(".")[0]
-    }-${Date.now()}.png`;
+    const snapshotName = `e2e/tests/artifacts/catalog-missing-${user.email.split(".")[0]}-${Date.now()}.png`;
     try {
       await page.screenshot({ path: snapshotName, fullPage: true });
       console.error(`📸 Snapshot saved: ${snapshotName}`);

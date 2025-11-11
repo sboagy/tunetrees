@@ -128,37 +128,12 @@ export interface DueTuneEntry {
 }
 
 /**
- * Get practice list (with optional queue filtering)
- *
- * Queries practice_list_staged VIEW for complete enriched data.
- * The VIEW contains all COALESCE operations merging transient and historical data.
- *
- * Filters for:
- * - Scheduled tunes (playlist_tune.scheduled IS NOT NULL)
- * - Due for practice (scheduled <= today OR within delinquency window)
- *
- * TODO: Add daily_practice_queue filtering once queue infrastructure is created.
- *
- * Replaces: legacy/tunetrees/app/queries.py#query_practice_list_scheduled
- *
- * @param db - SQLite database instance
- * @param userId - User ID
- * @param playlistId - Playlist to query
- * @param delinquencyWindowDays - How many days overdue to include (default 7)
- * @returns Array of practice list rows for scheduled/due tunes
- *
- * @example
- * ```typescript
- * const db = getDb();
- * const practices = await getPracticeList(db, 1, 5, 7);
- * // Returns scheduled tunes due today or within 7-day window
- * ```
- */
-/**
  * Get practice list filtered by daily practice queue
  *
  * Queries practice_list_staged VIEW JOINed with daily_practice_queue.
- * The queue provides the frozen snapshot of which tunes to practice today.
+ * The queue provides the frozen snapshot of which tunes to practice today,
+ * including tunes already submitted (filtering for completed_at should be done
+ * by caller).
  *
  * Returns tunes in queue order (bucket, order_index) with completed_at tracking.
  *
@@ -193,9 +168,7 @@ export async function getPracticeList(
       AND dpq.active = 1
   `);
   console.log(
-    `[getPracticeList] Queue has ${
-      queueRows[0]?.count || 0
-    } active rows for user=${userId}, playlist=${playlistId}`
+    `[getPracticeList] Queue has ${queueRows[0]?.count || 0} active rows for user=${userId}, playlist=${playlistId}`
   );
 
   // Debug: Check view rows
@@ -206,19 +179,54 @@ export async function getPracticeList(
       AND pls.playlist_id = ${playlistId}
   `);
   console.log(
-    `[getPracticeList] View has ${
-      viewRows[0]?.count || 0
-    } rows for user=${userId}, playlist=${playlistId}`
+    `[getPracticeList] View has ${viewRows[0]?.count || 0} rows for user=${userId}, playlist=${playlistId}`
   );
 
-  // Select from the MOST RECENT active queue snapshot rather than relying on DATE('now')
-  // This avoids timezone edge-cases and ensures we always show the latest generated queue
+  // DEBUG: Check what windows exist and which one we're selecting
+  const windowCheck = await db.all<{
+    window_start_utc: string;
+    count: number;
+  }>(sql`
+    SELECT window_start_utc, COUNT(*) as count
+    FROM daily_practice_queue
+    WHERE user_ref = ${userId}
+      AND playlist_ref = ${playlistId}
+      AND active = 1
+    GROUP BY window_start_utc
+    ORDER BY window_start_utc DESC
+  `);
+  console.log(`[getPracticeList] Available windows:`, windowCheck);
+
+  // CRITICAL: There are TWO window formats in the database for the same date:
+  // '2025-11-08T00:00:00' (ISO with T) and '2025-11-08 00:00:00' (space format)
+  // We need to query BOTH to get all items for today
+  const maxWindow = await db.get<{ max_window: string }>(sql`
+    SELECT MAX(window_start_utc) as max_window
+    FROM daily_practice_queue
+    WHERE user_ref = ${userId}
+      AND playlist_ref = ${playlistId}
+      AND active = 1
+  `);
+  console.log(`[getPracticeList] Using max window: ${maxWindow?.max_window}`);
+
+  // Generate both format variants for the same date
+  const isoFormat = maxWindow?.max_window; // e.g., '2025-11-08T00:00:00'
+  const spaceFormat = isoFormat?.replace("T", " "); // e.g., '2025-11-08 00:00:00'
+  console.log(
+    `[getPracticeList] Matching both formats: ISO='${isoFormat}', Space='${spaceFormat}'`
+  );
+
+  // Select from the MOST RECENT active queue snapshot
+  // Match BOTH '2025-11-08T00:00:00' AND '2025-11-08 00:00:00' formats
+  // Use GROUP BY to eliminate duplicates (some tunes may exist in both windows)
+  // Take the MIN bucket/order_index if duplicates exist
+  // The result must include tunes with non-null completed_at values.
   const rows = await db.all<PracticeListStagedWithQueue>(sql`
     SELECT 
       pls.*,
-      dpq.bucket,
-      dpq.order_index,
-      dpq.completed_at
+      MIN(dpq.bucket) as bucket,
+      MIN(dpq.order_index) as order_index,
+      MIN(dpq.completed_at) as completed_at
     FROM practice_list_staged pls
     INNER JOIN daily_practice_queue dpq 
       ON dpq.tune_ref = pls.id
@@ -227,17 +235,22 @@ export async function getPracticeList(
     WHERE dpq.user_ref = ${userId}
       AND dpq.playlist_ref = ${playlistId}
       AND dpq.active = 1
-      AND dpq.window_start_utc = (
-        SELECT MAX(window_start_utc)
-        FROM daily_practice_queue
-        WHERE user_ref = ${userId}
-          AND playlist_ref = ${playlistId}
-          AND active = 1
+      AND (
+        dpq.window_start_utc = ${isoFormat}
+        OR dpq.window_start_utc = ${spaceFormat}
       )
-    ORDER BY dpq.bucket ASC, dpq.order_index ASC
+    GROUP BY pls.id
+    ORDER BY MIN(dpq.bucket) ASC, MIN(dpq.order_index) ASC
   `);
 
   console.log(`[getPracticeList] JOIN returned ${rows.length} rows`);
+
+  // DEBUG: Log completed_at values to verify filter is working
+  rows.forEach((row, i) => {
+    console.log(
+      `[getPracticeList] Row ${i}: tune=${row.id}, completed_at=${row.completed_at}`
+    );
+  });
 
   return rows;
 }

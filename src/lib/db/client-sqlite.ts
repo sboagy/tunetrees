@@ -85,9 +85,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
       );
     } else {
       console.warn(
-        `⚠️ Schema migration detected: ${
-          localVersion || "none"
-        } → ${currentVersion}`
+        `⚠️ Schema migration detected: ${localVersion || "none"} → ${currentVersion}`
       );
       console.warn("🔄 Clearing local database for migration...");
     }
@@ -169,9 +167,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
         }
 
         console.log(
-          `✅ Applied ${statements.length} statements from ${migrationPath
-            .split("/")
-            .pop()}`
+          `✅ Applied ${statements.length} statements from ${migrationPath.split("/").pop()}`
         );
       }
 
@@ -179,9 +175,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
     } catch (error) {
       console.error("❌ Failed to apply migrations:", error);
       throw new Error(
-        `Database migration failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Database migration failed: ${error instanceof Error ? error.message : String(error)}`
       );
     }
 
@@ -310,6 +304,49 @@ export async function persistDb(): Promise<void> {
   // Save version number
   await saveToIndexedDB(DB_VERSION_KEY, new Uint8Array([CURRENT_DB_VERSION]));
   console.log("💾 Database persisted to IndexedDB");
+
+  // DEV VERIFICATION: load saved blob and verify critical table counts match
+  try {
+    // Only run verification in development builds to avoid extra overhead in prod
+    if (import.meta.env.MODE !== "production") {
+      const SQL = await initSqlJs({
+        locateFile: (file: string) => `/sql-wasm/${file}`,
+      });
+      const savedDb = new SQL.Database(data);
+
+      // Count rows in table_transient_data in-memory vs saved blob
+      const inMemRes = sqliteDb.exec(
+        "SELECT COUNT(*) as c FROM table_transient_data;"
+      );
+      const savedRes = savedDb.exec(
+        "SELECT COUNT(*) as c FROM table_transient_data;"
+      );
+
+      const inMemCount =
+        (inMemRes[0] && (inMemRes[0].values[0][0] as number)) || 0;
+      const savedCount =
+        (savedRes[0] && (savedRes[0].values[0][0] as number)) || 0;
+
+      if (inMemCount !== savedCount) {
+        console.error(
+          `Persist verification failed: in-memory table_transient_data=${inMemCount}, saved=${savedCount}`
+        );
+      } else {
+        console.log(
+          `✅ Persist verification OK - table_transient_data count=${inMemCount}`
+        );
+      }
+
+      // free temporary DB
+      try {
+        savedDb.close();
+      } catch (_) {
+        // ignore
+      }
+    }
+  } catch (err) {
+    console.error("Error during persist verification:", err);
+  }
 }
 
 /**

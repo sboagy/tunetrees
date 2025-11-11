@@ -312,9 +312,7 @@ test.describe("Scroll Reset Debugger", () => {
               currentTestUser.userId
             );
             throw new Error(
-              `Catalog failed to scroll to >=900 (got ${s1}). stored=${stored}. Attempts=\n${attempts.join(
-                "\n"
-              )}`
+              `Catalog failed to scroll to >=900 (got ${s1}). stored=${stored}. Attempts=\n${attempts.join("\n")}`
             );
           }
         }
@@ -388,9 +386,7 @@ test.describe("Scroll Reset Debugger", () => {
         path: `test-results/scroll-debug-no-grids-${Date.now()}.png`,
       });
       throw new Error(
-        `No grids became visible within timeouts. Attempts: \n${attempts.join(
-          "\n"
-        )}`
+        `No grids became visible within timeouts. Attempts: \n${attempts.join("\n")}`
       );
     }
 

@@ -8,7 +8,7 @@ on:
   push:
     branches: [main, feat/pwa1]
   pull_request:
-    branches: [main]
+    branches: [main, feat/pwa1]
 
 # Cancel in-progress runs when new commit pushed
 concurrency:

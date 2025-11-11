@@ -45,7 +45,7 @@ import { log } from "../lib/logger";
  */
 const CatalogPage: Component = () => {
   const navigate = useNavigate();
-  const { user, localDb, syncVersion } = useAuth();
+  const { user, localDb, catalogListChanged } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -186,11 +186,11 @@ const CatalogPage: Component = () => {
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const version = syncVersion(); // Triggers refetch when sync completes
+      const version = catalogListChanged(); // Refetch when catalog changes
       log.debug("CATALOG allTunes dependency:", {
         hasDb: !!db,
         userId,
-        syncVersion: version,
+        catalogListChanged: version,
       });
       return db && userId ? { db, userId, version } : null;
     },
@@ -211,11 +211,11 @@ const CatalogPage: Component = () => {
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const version = syncVersion(); // Triggers refetch when sync completes
+      const version = catalogListChanged(); // Refetch when catalog changes (playlists are catalog metadata)
       log.debug("CATALOG userPlaylists dependency:", {
         hasDb: !!db,
         userId,
-        syncVersion: version,
+        catalogListChanged: version,
       });
       return db && userId ? { db, userId, version } : null;
     },
@@ -235,10 +235,10 @@ const CatalogPage: Component = () => {
   const [allGenres] = createResource(
     () => {
       const db = localDb();
-      const version = syncVersion(); // Triggers refetch when sync completes
+      const version = catalogListChanged(); // Refetch when catalog changes (genres are catalog data)
       log.debug("CATALOG allGenres dependency:", {
         hasDb: !!db,
-        syncVersion: version,
+        catalogListChanged: version,
       });
       return db ? { db, version } : null;
     },

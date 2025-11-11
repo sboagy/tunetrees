@@ -48,9 +48,7 @@ setup("authenticate as Alice", async ({ page }) => {
 
       if (hasAliceData && fileAgeMinutes < AUTH_EXPIRY_MINUTES) {
         console.log(
-          `✅ Using cached auth for Alice (${Math.round(
-            fileAgeMinutes
-          )} min old)`
+          `✅ Using cached auth for Alice (${Math.round(fileAgeMinutes)} min old)`
         );
         console.log("   (Set RESET_DB=true to force fresh login)");
         return; // Skip login flow
@@ -58,9 +56,7 @@ setup("authenticate as Alice", async ({ page }) => {
         console.log("⚠️  Cached auth is not for Alice, logging in fresh...");
       } else {
         console.log(
-          `⚠️  Cached auth is stale (${Math.round(
-            fileAgeMinutes
-          )} min old), logging in fresh...`
+          `⚠️  Cached auth is stale (${Math.round(fileAgeMinutes)} min old), logging in fresh...`
         );
       }
     } catch {
@@ -98,16 +94,16 @@ setup("authenticate as Alice", async ({ page }) => {
         try {
           const { stdout: statusStdout } = await execAsync(
             "cd /Users/sboag/gittt/tunetrees && supabase status",
-            { timeout: 5000 }
+            {
+              timeout: 5000,
+            }
           );
 
           // Check if status output indicates services are running
           if (statusStdout?.includes("API URL")) {
             isReady = true;
             console.log(
-              `   ✅ Supabase ready after ${attempt} attempts (${
-                4 + attempt * 2
-              }s total)`
+              `   ✅ Supabase ready after ${attempt} attempts (${4 + attempt * 2}s total)`
             );
           }
         } catch {
