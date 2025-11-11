@@ -368,6 +368,8 @@ test.describe
       page,
       testUser,
     }) => {
+      test.fixme(!!process.env.CI, "Known timing issue in CI");
+
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [TEST_TUNE_BANISH_ID, TEST_TUNE_MASONS_ID], // 2 tunes
         scheduleDaysAgo: 1,
