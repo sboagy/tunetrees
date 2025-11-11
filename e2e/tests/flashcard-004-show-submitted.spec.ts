@@ -146,7 +146,7 @@ test.describe
 
       // Toggle Show Submitted OFF
       await app.displaySubmittedSwitch.click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
 
       // Verify current card changed (should skip submitted tune)
       const newTitle = await app.flashcardTitle.textContent();

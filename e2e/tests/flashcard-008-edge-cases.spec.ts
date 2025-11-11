@@ -246,39 +246,23 @@ test.describe
       text = (await counter.textContent())?.trim() || text;
       const match = text.match(/^(\d+) of (\d+)$/);
       const total = match ? parseInt(match[2], 10) : 1;
+      expect(total).toBe(2);
 
       // Evaluate the first card
       await app.selectFlashcardEvaluation("good");
       await page.waitForTimeout(300);
 
-      if (total >= 2) {
-        // Move to next and evaluate the second
-        const nextDisabled = await app.flashcardNextButton
-          .isDisabled()
-          .catch(() => false);
-        if (!nextDisabled) {
-          await app.goNextCard();
-          await page.waitForTimeout(300);
-          await app.selectFlashcardEvaluation("good");
-          await page.waitForTimeout(300);
-        }
-      }
+      // Move to next and evaluate the second
+      await app.goNextCard();
+      await page.waitForTimeout(500);
+      await app.selectFlashcardEvaluation("good");
+      await page.waitForTimeout(300);
 
       // Submit staged evaluations
       await app.submitEvaluationsButton.click();
       await page.waitForTimeout(1500);
 
-      // Flashcard should auto-close or show empty state
-      const flashcardContainer = app.flashcardView;
-      const isVisible = await flashcardContainer.isVisible();
-
-      if (isVisible) {
-        // If still visible, should show empty state message
-        await expect(page.getByText(/no tunes|empty/i)).toBeVisible();
-      } else {
-        // Or flashcard closed automatically
-        await expect(page.getByTestId("practice-grid")).toBeVisible();
-      }
+      await expect(page.getByText(/no tunes|empty/i)).toBeVisible();
     });
 
     test("06. Rapid Submit clicks are debounced", async ({
@@ -390,6 +374,7 @@ test.describe
       });
 
       const app = new TuneTreesPage(page);
+      await page.waitForTimeout(500);
       // Submit one tune first
       const gridEvalTrigger = app.practiceGrid
         .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
@@ -412,6 +397,7 @@ test.describe
         await showSubmittedToggle.click();
         await page.waitForTimeout(100);
       }
+      await page.waitForTimeout(300);
 
       // Verify flashcard still functional
       await expect(counter).toBeVisible();
