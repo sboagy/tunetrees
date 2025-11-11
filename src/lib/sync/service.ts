@@ -109,7 +109,9 @@ export class SyncService {
       },
     };
 
-    this.realtimeManager = new RealtimeManager(this.syncEngine, realtimeConfig);
+    // Pass 'this' (SyncService) instead of syncEngine so Realtime can use
+    // the protected syncDown() that blocks when pending changes exist
+    this.realtimeManager = new RealtimeManager(this, realtimeConfig);
     void this.realtimeManager.start();
   }
 
@@ -193,22 +195,32 @@ export class SyncService {
     this.isSyncing = true;
 
     try {
-      // IMPORTANT: Upload pending changes BEFORE downloading remote changes
-      // This prevents overwriting local changes with older remote data
+      // CRITICAL: Upload pending changes BEFORE downloading remote changes
+      // This prevents race conditions where:
+      // 1. User deletes a row locally
+      // 2. DELETE is queued but not yet sent to Supabase
+      // 3. syncDown runs and re-downloads the "deleted" row from Supabase
+      // 4. Row reappears in local DB (zombie record)
       const stats = await this.syncEngine.getSyncQueueStats();
       if (stats.pending > 0) {
         console.log(
-          `[SyncService] Uploading ${stats.pending} pending changes before syncDown...`
+          `[SyncService] ⚠️  BLOCKING syncDown: ${stats.pending} pending changes must upload first`
         );
         try {
           await this.syncEngine.syncUp();
-          console.log("[SyncService] Pending changes uploaded successfully");
+          console.log(
+            "[SyncService] ✅ Pending changes uploaded - safe to syncDown"
+          );
         } catch (error) {
           console.error(
-            "[SyncService] Failed to upload pending changes before syncDown:",
+            "[SyncService] ❌ Failed to upload pending changes:",
             error
           );
-          // Continue with syncDown anyway - user should see remote data even if upload failed
+          // CRITICAL: DO NOT proceed with syncDown if upload failed
+          // This would cause zombie records (deleted items reappearing)
+          throw new Error(
+            "Cannot syncDown while pending changes exist - upload failed. Local data preserved."
+          );
         }
       }
 

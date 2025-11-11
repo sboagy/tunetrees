@@ -70,6 +70,14 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       sql: "SELECT * FROM view_daily_practice_queue_readable WHERE queue_date = '2025-11-05' LIMIT 50;",
     },
     {
+      name: "Transient Data (Readable)",
+      sql: "SELECT * FROM view_transient_data_readable LIMIT 50;",
+    },
+    {
+      name: "Practice Records (Readable)",
+      sql: "SELECT * FROM view_practice_record_readable LIMIT 50;",
+    },
+    {
       name: "Sync Queue (All)",
       sql: "SELECT id, table_name, operation, status, attempts, created_at, last_error FROM sync_queue ORDER BY created_at DESC LIMIT 50;",
     },
@@ -86,6 +94,12 @@ export default function DatabaseBrowser(): ReturnType<Component> {
   const executeQuery = async () => {
     setError(null);
     setResults(null);
+
+    const db = localDb();
+    if (!db) {
+      setError("Database not initialized. Please log in first.");
+      return;
+    }
 
     const sqliteDb = await getSqliteInstance();
     if (!sqliteDb) {
@@ -166,10 +180,10 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       }
     } catch (error) {
       toast.error(
-        `Error retrying failed items: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        { duration: Number.POSITIVE_INFINITY }
+        `Error retrying failed items: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          duration: Number.POSITIVE_INFINITY,
+        }
       );
     }
   };
@@ -179,6 +193,18 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       {/* Header */}
       <div class="p-6 flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
         <h1 class="text-3xl font-bold">SQLite WASM Database Browser</h1>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+          💡 <strong>Tip:</strong> Each browser tab has its own database copy.
+          After making changes in another tab,{" "}
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            class="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+          >
+            refresh this page
+          </button>{" "}
+          to see the latest data from IndexedDB.
+        </p>
       </div>
 
       {/* Main Content - Flex to fill remaining space */}

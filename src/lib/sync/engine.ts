@@ -10,6 +10,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { and, eq } from "drizzle-orm";
 import { toast } from "solid-sonner";
 import * as localSchema from "../../../drizzle/schema-sqlite";
 import type { SqliteDatabase } from "../db/client-sqlite";
@@ -37,7 +38,7 @@ const COMPOSITE_KEY_TABLES: Record<string, string[]> = {
   prefs_spaced_repetition: ["user_id", "alg_type"],
   table_state: ["user_id", "screen_size", "purpose", "playlist_id"],
 
-  // Tables with id PK but UNIQUE constraints that should be used for UPSERT
+  // Tables with id PK but composite UNIQUE constraints (natural business keys)
   daily_practice_queue: [
     "user_ref",
     "playlist_ref",
@@ -247,7 +248,9 @@ export class SyncEngine {
             // Show persistent toast for permanently failed items
             toast.error(
               `Sync failed permanently: ${item.tableName} (${item.operation})\n${errorMsg}`,
-              { duration: Number.POSITIVE_INFINITY }
+              {
+                duration: Number.POSITIVE_INFINITY,
+              }
             );
           } else {
             // Mark for retry
@@ -662,6 +665,89 @@ export class SyncEngine {
           console.log(`🔍 [SyncEngine] Transformed to SQLite:`, transformed);
         }
 
+        // Special handling for daily_practice_queue to handle datetime format migration
+        // This table can have conflicts on BOTH id (PK) and composite UNIQUE constraint
+        // when old records use space format ('2025-11-06 00:00:00') vs ISO format ('2025-11-06T00:00:00')
+        if (tableName === "daily_practice_queue") {
+          // Check if a record with this ID already exists
+          const existingById = await this.localDb
+            .select()
+            .from(localSchema.dailyPracticeQueue)
+            .where(eq(localSchema.dailyPracticeQueue.id, transformed.id))
+            .limit(1);
+
+          // Check if datetime format mismatch exists (old space format vs new ISO format)
+          let hasDatetimeFormatMismatch = false;
+          if (existingById.length > 0) {
+            const existingFormat = existingById[0].windowStartUtc;
+            const incomingFormat = transformed.windowStartUtc;
+            // Mismatch if one has 'T' and the other doesn't, but they represent same time
+            hasDatetimeFormatMismatch =
+              existingFormat.replace("T", " ") ===
+                incomingFormat.replace("T", " ") &&
+              existingFormat !== incomingFormat;
+          }
+
+          // If there's a datetime format mismatch, we need to delete-then-insert
+          // to avoid dual constraint conflicts
+          if (hasDatetimeFormatMismatch) {
+            console.log(
+              `🔍 [SyncEngine] daily_practice_queue datetime format migration - fixing record ${transformed.id}`
+            );
+
+            // Check for records with same composite key but different ID
+            const allWithCompositeKey = await this.localDb
+              .select()
+              .from(localSchema.dailyPracticeQueue)
+              .where(
+                and(
+                  eq(
+                    localSchema.dailyPracticeQueue.userRef,
+                    transformed.userRef
+                  ),
+                  eq(
+                    localSchema.dailyPracticeQueue.playlistRef,
+                    transformed.playlistRef
+                  ),
+                  eq(
+                    localSchema.dailyPracticeQueue.tuneRef,
+                    transformed.tuneRef
+                  )
+                )
+              );
+
+            const normalizedWindowStart = transformed.windowStartUtc.replace(
+              "T",
+              " "
+            );
+            const existingByCompositeKey = allWithCompositeKey.filter(
+              (record) =>
+                record.windowStartUtc.replace("T", " ") ===
+                  normalizedWindowStart && record.id !== transformed.id
+            );
+
+            // Delete record with same ID
+            await this.localDb
+              .delete(localSchema.dailyPracticeQueue)
+              .where(eq(localSchema.dailyPracticeQueue.id, transformed.id));
+
+            // Delete records with same composite key but different ID
+            for (const existing of existingByCompositeKey) {
+              await this.localDb
+                .delete(localSchema.dailyPracticeQueue)
+                .where(eq(localSchema.dailyPracticeQueue.id, existing.id));
+            }
+
+            // Now insert the clean record
+            await this.localDb
+              .insert(localSchema.dailyPracticeQueue)
+              .values(transformed);
+
+            continue; // Skip the normal upsert logic
+          }
+          // Otherwise fall through to normal upsert logic
+        }
+
         // Determine conflict target based on table structure
         let conflictTarget: any[];
 
@@ -727,8 +813,8 @@ export class SyncEngine {
             conflictTarget = [localTable.playlistRef, localTable.tuneRef];
             break;
           case "daily_practice_queue":
-            // Composite key: userRef + playlistRef + windowStartUtc + tuneRef
-            // Use INSERT OR REPLACE to handle ID conflicts from stale local data
+            // Composite UNIQUE constraint is the natural business key
+            // (user + playlist + time window + tune = unique queue entry)
             conflictTarget = [
               localTable.userRef,
               localTable.playlistRef,

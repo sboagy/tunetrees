@@ -269,9 +269,7 @@ export const PracticeSession: Component<{
                 </div>
                 <Show when={showNotation()}>
                   <AbcNotation
-                    notation={`X:1\nT:${
-                      tune().tune.title || "Practice"
-                    }\nM:4/4\nL:1/8\nK:${tune().mode || "D"}\n${
+                    notation={`X:1\nT:${tune().tune.title || "Practice"}\nM:4/4\nL:1/8\nK:${tune().mode || "D"}\n${
                       tune().tune.incipit
                     }`}
                     responsive={true}
