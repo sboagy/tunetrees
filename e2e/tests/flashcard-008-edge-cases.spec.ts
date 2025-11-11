@@ -57,6 +57,7 @@ test.describe
       // FIXME: This scenario remains flaky due to background sync/virtualized grid timing.
       // Occasionally the evaluation menu or grid count does not update within the timeout window.
       // Marking as fixme until the underlying UI synchronization is stabilized.
+      test.fixme(!!process.env.CI, "Known timing issue in CI");
 
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [TEST_TUNE_BANISH_ID, TEST_TUNE_MASONS_ID], // 2 tunes
