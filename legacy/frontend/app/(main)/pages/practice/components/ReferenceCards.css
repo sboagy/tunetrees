@@ -1,0 +1,9 @@
+.no-hover {
+  cursor: default;
+  background-color: lightgreen;
+  transition: none;
+}
+
+.no-hover:hover {
+  background-color: lightgreen;
+}

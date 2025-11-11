@@ -63,10 +63,7 @@ certbot-etc/**/*
 dhparam/localhost-key.pem
 dhparam/localhost.pem
 iti_import_output/dump_tunes.cvs
-legacy/frontend/playwright-output/**/*
-legacy/frontend/archive/**/*
-legacy/frontend/babel.config.js.bak
-legacy/frontend/tsconfig.json.bak
+
 mcp-memory/Dockerfile
 scratch/**/*
 
@@ -81,8 +78,6 @@ compiled_requirements.txt
 tunetrees_test_clean.sqlite3-shm
 tunetrees_test_clean.sqlite3-wal
 tunetrees_test_clean_with_queue.sqlite3
-legacy/**/*
-legacy
 iti_import_output
 
 # Local/personal config files
@@ -93,7 +88,6 @@ iti_import_output
 *.sqlite3
 *.sqlite3-shm
 *.sqlite3-wal
-!tunetrees_test_clean.sqlite3
 
 # Workspace-specific linter configs
 scripts/.eslintrc.json
@@ -134,3 +128,22 @@ scripts/test-login.ts
 supabase/query_duplicates.ts
 _notes/phase-4-3-playwright-update-plan.md
 _notes/phase-5-migration-script-complete.md
+
+# 1. Broad Ignore (Allows Traversal)
+legacy/**
+legacy/*
+
+# 2. Expose the Parent Container (The Crucial Step)
+!legacy/frontend/
+
+# 3. Re-ignore everything inside the container (to catch anything missed)
+legacy/frontend/**
+
+# 4. Final Negations (To keep specific files/folders)
+!legacy/frontend/app/
+!legacy/frontend/auth/
+!legacy/frontend/components/
+
+!legacy/frontend/app/**
+!legacy/frontend/auth/**
+!legacy/frontend/components/**

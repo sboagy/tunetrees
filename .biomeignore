@@ -1,0 +1,5 @@
+# Ignore the entire node_modules directory
+node_modules/
+
+# Ignore all contents of the legacy folder
+legacy/**/*

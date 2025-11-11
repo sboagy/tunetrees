@@ -13,7 +13,7 @@ import type {
 } from "@kobalte/core/checkbox";
 import { Checkbox as CheckboxPrimitive } from "@kobalte/core/checkbox";
 import type { PolymorphicProps } from "@kobalte/core/polymorphic";
-import type { ValidComponent, ParentProps } from "solid-js";
+import type { ParentProps, ValidComponent } from "solid-js";
 import { splitProps } from "solid-js";
 import { cn } from "@/lib/utils";
 
