@@ -6,7 +6,7 @@
  */
 
 import type { ColumnDef, Table } from "@tanstack/solid-table";
-import { type Component, Show, createEffect } from "solid-js";
+import { type Component, createEffect, Show } from "solid-js";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
@@ -93,7 +93,7 @@ const SelectAllCheckbox: Component<{ table: Table<any> }> = (props) => {
   createEffect(() => {
     const allSelected = props.table.getIsAllRowsSelected();
     const someSelected = props.table.getIsSomeRowsSelected();
-    
+
     if (checkboxRef) {
       checkboxRef.indeterminate = someSelected && !allSelected;
     }
