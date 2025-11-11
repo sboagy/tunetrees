@@ -25,7 +25,7 @@ type CheckboxRootPropsWithClass<T extends ValidComponent = "div"> =
   CheckboxRootProps<T> & { class?: string };
 
 export const Checkbox = <T extends ValidComponent = "div">(
-  props: PolymorphicProps<T, CheckboxRootPropsWithClass<T>>,
+  props: PolymorphicProps<T, CheckboxRootPropsWithClass<T>>
 ) => {
   const [local, rest] = splitProps(props as CheckboxRootPropsWithClass, [
     "class",
@@ -40,10 +40,10 @@ export const Checkbox = <T extends ValidComponent = "div">(
 };
 
 type CheckboxControlPropsWithClass<T extends ValidComponent = "div"> =
-	ParentProps<CheckboxControlProps<T> & { class?: string }>;
+  ParentProps<CheckboxControlProps<T> & { class?: string }>;
 
 export const CheckboxControl = <T extends ValidComponent = "div">(
-  props: PolymorphicProps<T, CheckboxControlPropsWithClass<T>>,
+  props: PolymorphicProps<T, CheckboxControlPropsWithClass<T>>
 ) => {
   const [local, rest] = splitProps(props as CheckboxControlPropsWithClass, [
     "class",
@@ -55,7 +55,7 @@ export const CheckboxControl = <T extends ValidComponent = "div">(
       <CheckboxPrimitive.Control
         class={cn(
           "peer h-4 w-4 shrink-0 rounded-sm border border-primary shadow focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[checked]:bg-primary data-[checked]:text-primary-foreground",
-          local.class,
+          local.class
         )}
         {...rest}
       />
@@ -64,10 +64,10 @@ export const CheckboxControl = <T extends ValidComponent = "div">(
 };
 
 type CheckboxIndicatorPropsWithClass<T extends ValidComponent = "div"> =
-	ParentProps<CheckboxIndicatorProps<T> & { class?: string }>;
+  ParentProps<CheckboxIndicatorProps<T> & { class?: string }>;
 
 export const CheckboxIndicator = <T extends ValidComponent = "div">(
-  props: PolymorphicProps<T, CheckboxIndicatorPropsWithClass<T>>,
+  props: PolymorphicProps<T, CheckboxIndicatorPropsWithClass<T>>
 ) => {
   const [local, rest] = splitProps(props as CheckboxIndicatorPropsWithClass, [
     "class",

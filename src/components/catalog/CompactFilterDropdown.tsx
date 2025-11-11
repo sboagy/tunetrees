@@ -45,7 +45,7 @@ export interface CompactFilterDropdownProps {
  * ```
  */
 export const CompactFilterDropdown: Component<CompactFilterDropdownProps> = (
-  props,
+  props
 ) => {
   const [isOpen, setIsOpen] = createSignal(false);
   let dropdownRef: HTMLDivElement | undefined;

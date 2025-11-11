@@ -29,7 +29,7 @@ export const SelectHiddenSelect = SelectPrimitive.HiddenSelect;
 type SelectRootPropsWithClass<T> = SelectRootProps<T> & { class?: string };
 
 export const Select = <T extends ValidComponent = "div", Option = unknown>(
-  props: PolymorphicProps<T, SelectRootPropsWithClass<Option>>,
+  props: PolymorphicProps<T, SelectRootPropsWithClass<Option>>
 ) => {
   const [local, rest] = splitProps(props as SelectRootPropsWithClass<Option>, [
     "class",
@@ -42,7 +42,7 @@ type SelectTriggerPropsWithClass<T extends ValidComponent = "button"> =
   ParentProps<SelectTriggerProps<T> & { class?: string }>;
 
 export const SelectTrigger = <T extends ValidComponent = "button">(
-  props: PolymorphicProps<T, SelectTriggerPropsWithClass<T>>,
+  props: PolymorphicProps<T, SelectTriggerPropsWithClass<T>>
 ) => {
   const [local, rest] = splitProps(props as SelectTriggerPropsWithClass, [
     "class",
@@ -53,7 +53,7 @@ export const SelectTrigger = <T extends ValidComponent = "button">(
     <SelectPrimitive.Trigger
       class={cn(
         "flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-[1.5px] focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
-        local.class,
+        local.class
       )}
       {...rest}
     >
@@ -81,7 +81,7 @@ type SelectContentPropsWithClass<T extends ValidComponent = "div"> =
   ParentProps<SelectContentProps<T> & { class?: string }>;
 
 export const SelectContent = <T extends ValidComponent = "div">(
-  props: PolymorphicProps<T, SelectContentPropsWithClass<T>>,
+  props: PolymorphicProps<T, SelectContentPropsWithClass<T>>
 ) => {
   const [local, rest] = splitProps(props as SelectContentPropsWithClass, [
     "class",
@@ -93,7 +93,7 @@ export const SelectContent = <T extends ValidComponent = "div">(
       <SelectPrimitive.Content
         class={cn(
           "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0 data-[closed]:zoom-out-95 data-[expanded]:zoom-in-95",
-          local.class,
+          local.class
         )}
         {...rest}
       >
@@ -108,7 +108,7 @@ type SelectItemPropsWithClass<T extends ValidComponent = "li"> = ParentProps<
 >;
 
 export const SelectItem = <T extends ValidComponent = "li">(
-  props: PolymorphicProps<T, SelectItemPropsWithClass<T>>,
+  props: PolymorphicProps<T, SelectItemPropsWithClass<T>>
 ) => {
   const [local, rest] = splitProps(props as SelectItemPropsWithClass, [
     "class",
@@ -119,7 +119,7 @@ export const SelectItem = <T extends ValidComponent = "li">(
     <SelectPrimitive.Item
       class={cn(
         "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        local.class,
+        local.class
       )}
       {...rest}
     >

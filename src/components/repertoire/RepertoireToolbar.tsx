@@ -82,7 +82,8 @@ export interface RepertoireToolbarProps {
 
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   const navigate = useNavigate();
-  const { incrementPracticeListStagedChanged, forceSyncUp, userIdInt } = useAuth();
+  const { incrementPracticeListStagedChanged, forceSyncUp, userIdInt } =
+    useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
