@@ -73,7 +73,7 @@ SELECT
   ttd.device_id
 FROM
   table_transient_data ttd
-  LEFT JOIN user_profile up ON up.supabase_user_id = ttd.user_id
+  LEFT JOIN user_profile up ON up.id = ttd.user_id
   LEFT JOIN tune ON tune.id = ttd.tune_id
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
     AND tune_override.user_ref = ttd.user_id
@@ -131,7 +131,7 @@ SELECT
 FROM
   practice_record pr
   LEFT JOIN playlist p ON p.playlist_id = pr.playlist_ref
-  LEFT JOIN user_profile up ON up.supabase_user_id = p.user_ref
+  LEFT JOIN user_profile up ON up.id = p.user_ref
   LEFT JOIN tune ON tune.id = pr.tune_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
     AND tune_override.user_ref = p.user_ref
