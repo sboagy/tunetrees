@@ -1,0 +1,277 @@
+/**
+ * User Settings Queries
+ *
+ * Database queries for user preferences:
+ * - Scheduling Options (prefs_scheduling_options table)
+ * - Spaced Repetition (prefs_spaced_repetition table)
+ * - Account/Profile (user_profile table)
+ *
+ * @module lib/db/queries/user-settings
+ */
+
+import { eq } from "drizzle-orm";
+import { db } from "../client-sqlite";
+import {
+  prefsSchedulingOptions,
+  prefsSpacedRepetition,
+  userProfile,
+} from "../../../../drizzle/schema-sqlite";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface SchedulingOptions {
+  userId: string;
+  acceptableDelinquencyWindow: number | null;
+  minReviewsPerDay: number | null;
+  maxReviewsPerDay: number | null;
+  daysPerWeek: number | null;
+  weeklyRules: string | null;
+  exceptions: string | null;
+}
+
+export interface SpacedRepetitionPrefs {
+  userId: string;
+  algType: string;
+  fsrsWeights: string | null;
+  requestRetention: number | null;
+  maximumInterval: number | null;
+}
+
+export interface UserProfileData {
+  supabaseUserId: string;
+  name: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  phone: string | null;
+  phoneVerified: string | null;
+}
+
+// ============================================================================
+// Scheduling Options Queries
+// ============================================================================
+
+/**
+ * Get scheduling options for a user
+ */
+export async function getSchedulingOptions(
+  userId: string
+): Promise<SchedulingOptions | null> {
+  const result = await db
+    .select()
+    .from(prefsSchedulingOptions)
+    .where(eq(prefsSchedulingOptions.userId, userId))
+    .limit(1);
+
+  if (result.length === 0) {
+    return null;
+  }
+
+  return {
+    userId: result[0].userId,
+    acceptableDelinquencyWindow: result[0].acceptableDelinquencyWindow,
+    minReviewsPerDay: result[0].minReviewsPerDay,
+    maxReviewsPerDay: result[0].maxReviewsPerDay,
+    daysPerWeek: result[0].daysPerWeek,
+    weeklyRules: result[0].weeklyRules,
+    exceptions: result[0].exceptions,
+  };
+}
+
+/**
+ * Update scheduling options for a user
+ */
+export async function updateSchedulingOptions(
+  data: Partial<SchedulingOptions> & { userId: string }
+): Promise<SchedulingOptions> {
+  const now = new Date().toISOString();
+
+  // Check if record exists
+  const existing = await getSchedulingOptions(data.userId);
+
+  if (existing) {
+    // Update existing record
+    await db
+      .update(prefsSchedulingOptions)
+      .set({
+        acceptableDelinquencyWindow: data.acceptableDelinquencyWindow ?? existing.acceptableDelinquencyWindow,
+        minReviewsPerDay: data.minReviewsPerDay ?? existing.minReviewsPerDay,
+        maxReviewsPerDay: data.maxReviewsPerDay ?? existing.maxReviewsPerDay,
+        daysPerWeek: data.daysPerWeek ?? existing.daysPerWeek,
+        weeklyRules: data.weeklyRules ?? existing.weeklyRules,
+        exceptions: data.exceptions ?? existing.exceptions,
+        lastModifiedAt: now,
+      })
+      .where(eq(prefsSchedulingOptions.userId, data.userId));
+  } else {
+    // Insert new record
+    await db.insert(prefsSchedulingOptions).values({
+      userId: data.userId,
+      acceptableDelinquencyWindow: data.acceptableDelinquencyWindow ?? 21,
+      minReviewsPerDay: data.minReviewsPerDay ?? null,
+      maxReviewsPerDay: data.maxReviewsPerDay ?? null,
+      daysPerWeek: data.daysPerWeek ?? null,
+      weeklyRules: data.weeklyRules ?? null,
+      exceptions: data.exceptions ?? null,
+      lastModifiedAt: now,
+    });
+  }
+
+  // Return updated data
+  const updated = await getSchedulingOptions(data.userId);
+  if (!updated) {
+    throw new Error("Failed to retrieve updated scheduling options");
+  }
+  return updated;
+}
+
+// ============================================================================
+// Spaced Repetition Queries
+// ============================================================================
+
+/**
+ * Get spaced repetition preferences for a user
+ */
+export async function getSpacedRepetitionPrefs(
+  userId: string,
+  algType: string = "FSRS"
+): Promise<SpacedRepetitionPrefs | null> {
+  const result = await db
+    .select()
+    .from(prefsSpacedRepetition)
+    .where(eq(prefsSpacedRepetition.userId, userId))
+    .where(eq(prefsSpacedRepetition.algType, algType))
+    .limit(1);
+
+  if (result.length === 0) {
+    return null;
+  }
+
+  return {
+    userId: result[0].userId,
+    algType: result[0].algType,
+    fsrsWeights: result[0].fsrsWeights,
+    requestRetention: result[0].requestRetention,
+    maximumInterval: result[0].maximumInterval,
+  };
+}
+
+/**
+ * Update spaced repetition preferences for a user
+ */
+export async function updateSpacedRepetitionPrefs(
+  data: Partial<SpacedRepetitionPrefs> & { userId: string; algType: string }
+): Promise<SpacedRepetitionPrefs> {
+  const now = new Date().toISOString();
+
+  // Check if record exists
+  const existing = await getSpacedRepetitionPrefs(data.userId, data.algType);
+
+  if (existing) {
+    // Update existing record
+    await db
+      .update(prefsSpacedRepetition)
+      .set({
+        fsrsWeights: data.fsrsWeights ?? existing.fsrsWeights,
+        requestRetention: data.requestRetention ?? existing.requestRetention,
+        maximumInterval: data.maximumInterval ?? existing.maximumInterval,
+        lastModifiedAt: now,
+      })
+      .where(eq(prefsSpacedRepetition.userId, data.userId))
+      .where(eq(prefsSpacedRepetition.algType, data.algType));
+  } else {
+    // Insert new record
+    await db.insert(prefsSpacedRepetition).values({
+      userId: data.userId,
+      algType: data.algType,
+      fsrsWeights: data.fsrsWeights ?? null,
+      requestRetention: data.requestRetention ?? 0.9,
+      maximumInterval: data.maximumInterval ?? 365,
+      lastModifiedAt: now,
+    });
+  }
+
+  // Return updated data
+  const updated = await getSpacedRepetitionPrefs(data.userId, data.algType);
+  if (!updated) {
+    throw new Error("Failed to retrieve updated spaced repetition preferences");
+  }
+  return updated;
+}
+
+// ============================================================================
+// User Profile Queries
+// ============================================================================
+
+/**
+ * Get user profile data
+ */
+export async function getUserProfile(
+  userId: string
+): Promise<UserProfileData | null> {
+  const result = await db
+    .select()
+    .from(userProfile)
+    .where(eq(userProfile.supabaseUserId, userId))
+    .limit(1);
+
+  if (result.length === 0) {
+    return null;
+  }
+
+  return {
+    supabaseUserId: result[0].supabaseUserId,
+    name: result[0].name,
+    email: result[0].email,
+    avatarUrl: result[0].avatarUrl,
+    phone: result[0].phone,
+    phoneVerified: result[0].phoneVerified,
+  };
+}
+
+/**
+ * Update user profile data
+ */
+export async function updateUserProfile(
+  data: Partial<UserProfileData> & { supabaseUserId: string }
+): Promise<UserProfileData> {
+  const now = new Date().toISOString();
+
+  // Check if record exists
+  const existing = await getUserProfile(data.supabaseUserId);
+
+  if (existing) {
+    // Update existing record
+    await db
+      .update(userProfile)
+      .set({
+        name: data.name ?? existing.name,
+        email: data.email ?? existing.email,
+        avatarUrl: data.avatarUrl ?? existing.avatarUrl,
+        phone: data.phone ?? existing.phone,
+        phoneVerified: data.phoneVerified ?? existing.phoneVerified,
+        lastModifiedAt: now,
+      })
+      .where(eq(userProfile.supabaseUserId, data.supabaseUserId));
+  } else {
+    // Insert new record (should rarely happen with proper auth flow)
+    await db.insert(userProfile).values({
+      id: crypto.randomUUID(),
+      supabaseUserId: data.supabaseUserId,
+      name: data.name ?? null,
+      email: data.email ?? null,
+      avatarUrl: data.avatarUrl ?? null,
+      phone: data.phone ?? null,
+      phoneVerified: data.phoneVerified ?? null,
+      lastModifiedAt: now,
+    });
+  }
+
+  // Return updated data
+  const updated = await getUserProfile(data.supabaseUserId);
+  if (!updated) {
+    throw new Error("Failed to retrieve updated user profile");
+  }
+  return updated;
+}
