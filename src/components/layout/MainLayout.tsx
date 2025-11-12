@@ -12,8 +12,11 @@
  * @module components/layout/MainLayout
  */
 
+import { useNavigate } from "@solidjs/router";
 import type { ParentComponent } from "solid-js";
-import { createSignal, onMount } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
+import { AnonymousBanner } from "../auth/AnonymousBanner";
+import { useAuth } from "../../lib/auth/AuthContext";
 import { DropZoneOverlays } from "./DropZoneOverlays";
 import { Sidebar } from "./Sidebar";
 import { useSidebarDock } from "./SidebarDockContext";
@@ -39,6 +42,8 @@ interface MainLayoutProps {
  */
 export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
   const { position: dockPosition } = useSidebarDock();
+  const { isAnonymous } = useAuth();
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false);
   const [sidebarWidth, setSidebarWidth] = createSignal(320); // Default 320px
   const [isDragging, setIsDragging] = createSignal(false);
@@ -103,6 +108,11 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
     <div class="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Top Navigation Bar */}
       <TopNav />
+
+      {/* Anonymous User Banner */}
+      <Show when={isAnonymous()}>
+        <AnonymousBanner onConvert={() => navigate("/login?convert=true")} />
+      </Show>
 
       <div
         class={`flex flex-1 overflow-hidden relative ${

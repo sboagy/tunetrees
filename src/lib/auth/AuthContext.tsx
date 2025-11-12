@@ -52,6 +52,9 @@ interface AuthState {
   /** Initial sync completed (true after first successful sync down) */
   initialSyncComplete: Accessor<boolean>;
 
+  /** Anonymous mode - user is using app without account */
+  isAnonymous: Accessor<boolean>;
+
   /** Increment remote sync down completion version to trigger UI refresh */
   incrementRemoteSyncDownCompletion: () => void;
 
@@ -93,6 +96,16 @@ interface AuthState {
     provider: "google" | "github"
   ) => Promise<{ error: AuthError | null }>;
 
+  /** Sign in anonymously (local-only, no account) */
+  signInAnonymously: () => Promise<{ error: Error | null }>;
+
+  /** Convert anonymous user to registered account */
+  convertAnonymousToRegistered: (
+    email: string,
+    password: string,
+    name: string
+  ) => Promise<{ error: AuthError | Error | null }>;
+
   /** Sign out and clear local data */
   signOut: () => Promise<void>;
 
@@ -131,6 +144,17 @@ const AuthContext = createContext<AuthState>();
  * }
  * ```
  */
+// Anonymous user storage keys
+const ANONYMOUS_USER_KEY = "tunetrees:anonymous:user";
+const ANONYMOUS_USER_ID_KEY = "tunetrees:anonymous:userId";
+
+/**
+ * Generate a unique anonymous user ID
+ */
+function generateAnonymousUserId(): string {
+  return `anon_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+}
+
 export const AuthProvider: ParentComponent = (props) => {
   const [user, setUser] = createSignal<User | null>(null);
   const [userIdInt, setUserIdInt] = createSignal<string | null>(null);
@@ -140,6 +164,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const [remoteSyncDownCompletionVersion, setRemoteSyncDownCompletionVersion] =
     createSignal(0);
   const [initialSyncComplete, setInitialSyncComplete] = createSignal(false);
+  const [isAnonymous, setIsAnonymous] = createSignal(false);
 
   // View-specific change signals for optimistic updates
   const [practiceListStagedChanged, setPracticeListStagedChanged] =
@@ -154,6 +179,47 @@ export const AuthProvider: ParentComponent = (props) => {
 
   // Track if database is being initialized to prevent double initialization
   let isInitializing = false;
+
+  /**
+   * Initialize local database for anonymous user (no Supabase sync)
+   */
+  async function initializeAnonymousDatabase(anonymousUserId: string) {
+    // Prevent double initialization
+    if (isInitializing || localDb()) {
+      log.debug(
+        "Skipping anonymous database initialization (already initialized or in progress)"
+      );
+      return;
+    }
+
+    isInitializing = true;
+    try {
+      log.info(
+        "Initializing local database for anonymous user",
+        anonymousUserId
+      );
+
+      const db = await initializeSqliteDb();
+      setLocalDb(db);
+
+      // Set up auto-persistence (store cleanup for later)
+      autoPersistCleanup = setupAutoPersist();
+
+      // Set anonymous user ID
+      setUserIdInt(anonymousUserId);
+      setIsAnonymous(true);
+
+      // Mark sync as complete immediately (no remote sync for anonymous users)
+      setInitialSyncComplete(true);
+      console.log("✅ [AuthContext] Anonymous mode - local database ready");
+
+      log.info("Anonymous local database ready");
+    } catch (error) {
+      log.error("Failed to initialize anonymous local database:", error);
+    } finally {
+      isInitializing = false;
+    }
+  }
 
   /**
    * Initialize local database for authenticated user
@@ -281,6 +347,20 @@ export const AuthProvider: ParentComponent = (props) => {
     // Wrap async logic inside effect (SolidJS effects can't be async)
     void (async () => {
       try {
+        // Check for anonymous mode first
+        const isAnonymousMode =
+          localStorage.getItem(ANONYMOUS_USER_KEY) === "true";
+        const anonymousUserId = localStorage.getItem(ANONYMOUS_USER_ID_KEY);
+
+        if (isAnonymousMode && anonymousUserId) {
+          // Restore anonymous session
+          console.log("🔄 Restoring anonymous session:", anonymousUserId);
+          await initializeAnonymousDatabase(anonymousUserId);
+          setLoading(false);
+          return;
+        }
+
+        // Otherwise, check for Supabase session
         const {
           data: { session: existingSession },
         } = await supabase.auth.getSession();
@@ -387,10 +467,111 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   /**
+   * Sign in anonymously (local-only, no account)
+   */
+  const signInAnonymously = async () => {
+    setLoading(true);
+    console.log("🔐 Anonymous sign-in attempt");
+
+    try {
+      // Generate anonymous user ID
+      const anonymousUserId = generateAnonymousUserId();
+
+      // Store in localStorage
+      localStorage.setItem(ANONYMOUS_USER_KEY, "true");
+      localStorage.setItem(ANONYMOUS_USER_ID_KEY, anonymousUserId);
+
+      // Initialize local database without Supabase
+      await initializeAnonymousDatabase(anonymousUserId);
+
+      console.log("✅ Anonymous sign-in successful:", anonymousUserId);
+      setLoading(false);
+      return { error: null };
+    } catch (error) {
+      console.error("❌ Anonymous sign-in failed:", error);
+      setLoading(false);
+      return { error: error as Error };
+    }
+  };
+
+  /**
+   * Convert anonymous user to registered account
+   * Preserves local data and starts syncing
+   */
+  const convertAnonymousToRegistered = async (
+    email: string,
+    password: string,
+    name: string
+  ) => {
+    setLoading(true);
+    console.log("🔄 Converting anonymous user to registered account");
+
+    try {
+      if (!isAnonymous()) {
+        throw new Error("User is not in anonymous mode");
+      }
+
+      const anonymousUserId = userIdInt();
+      if (!anonymousUserId) {
+        throw new Error("No anonymous user ID found");
+      }
+
+      // Sign up with Supabase
+      const { error: signUpError, data } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+          },
+        },
+      });
+
+      if (signUpError) {
+        console.error("❌ Sign up failed during conversion:", signUpError);
+        setLoading(false);
+        return { error: signUpError };
+      }
+
+      // Clear anonymous mode flags
+      localStorage.removeItem(ANONYMOUS_USER_KEY);
+      localStorage.removeItem(ANONYMOUS_USER_ID_KEY);
+      setIsAnonymous(false);
+
+      console.log("✅ Account created, user data will be preserved");
+      console.log("⏳ Starting sync with Supabase...");
+
+      // The onAuthStateChange handler will trigger and initialize authenticated database
+      // Local data will be preserved because we don't clear the database
+
+      setLoading(false);
+      return { error: null };
+    } catch (error) {
+      console.error("❌ Conversion failed:", error);
+      setLoading(false);
+      return { error: error as Error };
+    }
+  };
+
+  /**
    * Sign out and clear local data
    */
   const signOut = async () => {
     setLoading(true);
+
+    // If anonymous, just clear local data
+    if (isAnonymous()) {
+      await clearLocalDatabase();
+      localStorage.removeItem(ANONYMOUS_USER_KEY);
+      localStorage.removeItem(ANONYMOUS_USER_ID_KEY);
+      setUserIdInt(null);
+      setIsAnonymous(false);
+      setInitialSyncComplete(false);
+      setLoading(false);
+      return;
+    }
+
+    // Otherwise, sign out from Supabase
     await supabase.auth.signOut();
     await clearLocalDatabase();
     setUserIdInt(null);
@@ -565,6 +746,7 @@ export const AuthProvider: ParentComponent = (props) => {
     localDb,
     remoteSyncDownCompletionVersion,
     initialSyncComplete,
+    isAnonymous,
     incrementRemoteSyncDownCompletion,
     practiceListStagedChanged,
     incrementPracticeListStagedChanged,
@@ -575,6 +757,8 @@ export const AuthProvider: ParentComponent = (props) => {
     signIn,
     signUp,
     signInWithOAuth,
+    signInAnonymously,
+    convertAnonymousToRegistered,
     signOut,
     forceSyncDown,
     forceSyncUp,

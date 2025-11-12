@@ -42,7 +42,7 @@ import RepertoirePage from "./repertoire";
 const Home: Component = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading } = useAuth();
+  const { user, loading, isAnonymous } = useAuth();
   const [activeTab, setActiveTab] = createSignal<TabId>("practice");
 
   // Initialize active tab from URL parameter
@@ -60,9 +60,9 @@ const Home: Component = () => {
     }
   });
 
-  // Redirect unauthenticated users to login
+  // Redirect unauthenticated users to login (but allow anonymous users)
   createEffect(() => {
-    if (!loading() && !user()) {
+    if (!loading() && !user() && !isAnonymous()) {
       navigate("/login", { replace: true });
     }
   });
@@ -158,7 +158,7 @@ const Home: Component = () => {
         </div>
       }
     >
-      <Show when={user()}>
+      <Show when={user() || isAnonymous()}>
         <MainLayout activeTab={activeTab()} onTabChange={handleTabChange}>
           <Switch>
             <Match when={activeTab() === "practice"}>

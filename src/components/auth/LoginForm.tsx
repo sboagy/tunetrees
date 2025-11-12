@@ -10,7 +10,8 @@
  */
 
 import { Eye, EyeOff } from "lucide-solid";
-import { type Component, createSignal, Show } from "solid-js";
+import { type Component, createEffect, createSignal, Show } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { supabase } from "../../lib/supabase/client";
 
@@ -38,7 +39,19 @@ interface LoginFormProps {
  * ```
  */
 export const LoginForm: Component<LoginFormProps> = (props) => {
-  const { signIn, signUp, signInWithOAuth, loading } = useAuth();
+  const {
+    signIn,
+    signUp,
+    signInWithOAuth,
+    signInAnonymously,
+    convertAnonymousToRegistered,
+    isAnonymous,
+    loading,
+  } = useAuth();
+  const [searchParams] = useSearchParams();
+
+  // Check if user is converting from anonymous mode
+  const isConverting = () => searchParams.convert === "true" && isAnonymous();
 
   const [isSignUp, setIsSignUp] = createSignal(props.defaultToSignUp ?? false);
   const [email, setEmail] = createSignal("");
@@ -50,6 +63,34 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
   const [showForgotPassword, setShowForgotPassword] = createSignal(false);
   const [resetEmail, setResetEmail] = createSignal("");
   const [resetSuccess, setResetSuccess] = createSignal(false);
+
+  // Auto-switch to sign up mode when converting
+  createEffect(() => {
+    if (isConverting()) {
+      setIsSignUp(true);
+    }
+  });
+
+  /**
+   * Handle anonymous sign-in
+   */
+  const handleAnonymousSignIn = async () => {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const { error: anonymousError } = await signInAnonymously();
+      if (anonymousError) {
+        setError(anonymousError.message);
+        return;
+      }
+
+      // Success!
+      props.onSuccess?.();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   /**
    * Handle email/password form submission
@@ -81,18 +122,33 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
           return;
         }
 
-        const { error: signUpError } = await signUp(
-          emailVal,
-          passwordVal,
-          nameVal
-        );
-        if (signUpError) {
-          setError(signUpError.message);
-          return;
+        // Check if converting from anonymous mode
+        if (isConverting()) {
+          const { error: convertError } = await convertAnonymousToRegistered(
+            emailVal,
+            passwordVal,
+            nameVal
+          );
+          if (convertError) {
+            setError(convertError.message);
+            return;
+          }
+          // Success! Data preserved
+          props.onSuccess?.();
+        } else {
+          // Regular sign up
+          const { error: signUpError } = await signUp(
+            emailVal,
+            passwordVal,
+            nameVal
+          );
+          if (signUpError) {
+            setError(signUpError.message);
+            return;
+          }
+          // Success!
+          props.onSuccess?.();
         }
-
-        // Success!
-        props.onSuccess?.();
       } else {
         const { error: signInError } = await signIn(emailVal, passwordVal);
         if (signInError) {
@@ -288,14 +344,34 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
       <div class="w-full max-w-md mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
         {/* Header */}
         <div class="mb-6 text-center">
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            {isSignUp() ? "Create Account" : "Welcome Back"}
-          </h1>
-          <p class="text-gray-600 dark:text-gray-400">
-            {isSignUp()
-              ? "Sign up to start practicing"
-              : "Sign in to continue practicing"}
-          </p>
+          <Show
+            when={isConverting()}
+            fallback={
+              <>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                  {isSignUp() ? "Create Account" : "Welcome Back"}
+                </h1>
+                <p class="text-gray-600 dark:text-gray-400">
+                  {isSignUp()
+                    ? "Sign up to start practicing"
+                    : "Sign in to continue practicing"}
+                </p>
+              </>
+            }
+          >
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Backup Your Data
+            </h1>
+            <p class="text-gray-600 dark:text-gray-400">
+              Create an account to save and sync your tunes across devices
+            </p>
+            <div class="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+              <p class="text-sm text-blue-700 dark:text-blue-300">
+                ✨ Your local data will be preserved and start syncing
+                automatically
+              </p>
+            </div>
+          </Show>
         </div>
 
         {/* Error Display */}
@@ -471,22 +547,60 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
         </div>
 
         {/* Toggle Sign Up/Sign In */}
-        <div class="text-center">
-          <button
-            type="button"
-            onClick={toggleMode}
-            class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-          >
-            {isSignUp() ? (
-              <>
-                Already have an account? <span class="underline">Sign in</span>
-              </>
-            ) : (
-              <>
-                Don't have an account? <span class="underline">Sign up</span>
-              </>
-            )}
-          </button>
+        <div class="text-center space-y-3">
+          {/* Anonymous Sign In Option - hide when converting */}
+          <Show when={!isConverting()}>
+            <div>
+              <button
+                type="button"
+                onClick={handleAnonymousSignIn}
+                disabled={isSubmitting() || loading()}
+                class="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Show
+                  when={!isSubmitting() && !loading()}
+                  fallback={<span>Loading...</span>}
+                >
+                  Use on this Device Only
+                </Show>
+              </button>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Try TuneTrees without an account. Your data will only be stored
+                on this device and won't sync to other devices.
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div class="relative">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-gray-300 dark:border-gray-600" />
+              </div>
+              <div class="relative flex justify-center text-sm">
+                <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
+                  Or
+                </span>
+              </div>
+            </div>
+          </Show>
+
+          <Show when={!isConverting()}>
+            <button
+              type="button"
+              onClick={toggleMode}
+              class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+            >
+              {isSignUp() ? (
+                <>
+                  Already have an account?{" "}
+                  <span class="underline">Sign in</span>
+                </>
+              ) : (
+                <>
+                  Don't have an account? <span class="underline">Sign up</span>
+                </>
+              )}
+            </button>
+          </Show>
         </div>
       </div>
     </>
