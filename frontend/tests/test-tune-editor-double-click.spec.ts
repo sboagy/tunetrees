@@ -63,9 +63,7 @@ test.describe.serial("Tune Editor Double-Click Tests", () => {
     });
 
     // Verify tabs are visible before opening editor
-    const tabsContainer = page
-      .locator('[data-testid="tt-tabs-container"]')
-      .or(page.locator("#tab-group-main"));
+    const tabsContainer = page.locator('[data-testid="tt-main-tabs"]');
     await expect(tabsContainer).toBeVisible({ timeout: 10_000 });
 
     // Double-click to open editor
@@ -79,7 +77,7 @@ test.describe.serial("Tune Editor Double-Click Tests", () => {
     await expect(ttPO.IdTitle).toContainText("Tune #", { timeout: 10_000 });
 
     // Verify tabs are NOT visible (editor replaced them)
-    await expect(tabsContainer).not.toBeVisible();
+    await expect(tabsContainer).not.toBeVisible({ timeout: 5_000 });
 
     // Verify the tune title field matches selected tune
     const titleInput = ttPO.ffTitle.locator("input");
@@ -141,9 +139,7 @@ test.describe.serial("Tune Editor Double-Click Tests", () => {
     await expect(ttPO.form).not.toBeVisible({ timeout: 15_000 });
 
     // Verify tabs are visible again
-    const tabsContainer = page
-      .locator('[data-testid="tt-tabs-container"]')
-      .or(page.locator("#tab-group-main"));
+    const tabsContainer = page.locator('[data-testid="tt-main-tabs"]');
     await expect(tabsContainer).toBeVisible({ timeout: 10_000 });
 
     // Verify the tune was NOT changed in the grid
@@ -187,9 +183,7 @@ test.describe.serial("Tune Editor Double-Click Tests", () => {
     await expect(ttPO.form).not.toBeVisible({ timeout: 15_000 });
 
     // Verify tabs are visible again
-    const tabsContainer = page
-      .locator('[data-testid="tt-tabs-container"]')
-      .or(page.locator("#tab-group-main"));
+    const tabsContainer = page.locator('[data-testid="tt-main-tabs"]');
     await expect(tabsContainer).toBeVisible({ timeout: 10_000 });
 
     // Verify the tune was changed
@@ -267,9 +261,7 @@ test.describe.serial("Tune Editor Double-Click Tests", () => {
     await expect(ttPO.form).not.toBeVisible({ timeout: 15_000 });
 
     // Verify tabs are visible again
-    const tabsContainer = page
-      .locator('[data-testid="tt-tabs-container"]')
-      .or(page.locator("#tab-group-main"));
+    const tabsContainer = page.locator('[data-testid="tt-main-tabs"]');
     await expect(tabsContainer).toBeVisible({ timeout: 10_000 });
 
     console.log("===> Test completed: Escape key closes editor");
