@@ -8,7 +8,7 @@
  * - Add To Repertoire button with icon
  * - Responsive filter textbox (min-width 12ch)
  * - Combined filter dropdown
- * - Add Tune button with + icon
+ * - Add Tune button with + icon (opens AddTuneDialog)
  * - Delete Tunes button with trash icon
  * - Columns dropdown
  * - Tooltips for all controls
@@ -17,7 +17,6 @@
  * @module components/catalog/CatalogToolbar
  */
 
-import { useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import { Columns } from "lucide-solid";
 import type { Component } from "solid-js";
@@ -44,6 +43,7 @@ import {
 import type { ITuneOverview } from "../grids/types";
 import { ColumnVisibilityMenu } from "./ColumnVisibilityMenu";
 import { FilterPanel } from "./FilterPanel";
+import { AddTuneDialog } from "../import/AddTuneDialog";
 
 export interface CatalogToolbarProps {
   /** Search query */
@@ -83,10 +83,10 @@ export interface CatalogToolbarProps {
 }
 
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
-  const navigate = useNavigate();
   const auth = useAuth();
   const { incrementRepertoireListChanged, forceSyncUp } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
+  const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
   let columnsButtonRef: HTMLButtonElement | undefined;
 
   const handleAddToRepertoire = async () => {
@@ -155,7 +155,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   };
 
   const handleAddTune = () => {
-    navigate("/tunes/new");
+    setShowAddTuneDialog(true);
   };
 
   const handleDeleteTunes = () => {
@@ -336,6 +336,12 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
           </div>
         </div>
       </div>
+
+      {/* Add Tune Dialog */}
+      <AddTuneDialog
+        open={showAddTuneDialog()}
+        onOpenChange={setShowAddTuneDialog}
+      />
     </div>
   );
 };
