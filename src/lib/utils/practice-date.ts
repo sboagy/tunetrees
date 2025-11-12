@@ -135,3 +135,51 @@ export function getTestDateFromUrl(): string | null {
 export function isTestMode(): boolean {
   return getTestDateFromUrl() !== null;
 }
+
+/**
+ * Ensure a due date is at least tomorrow (next day minimum)
+ *
+ * For tune practice, we never schedule for the same day. This function
+ * ensures the due date is at least the start of the next day, even if
+ * FSRS calculates a same-day interval (e.g., for "Again" ratings).
+ *
+ * @param dueDate - The calculated due date from FSRS
+ * @param referenceDate - The reference date (usually "now") to compare against (defaults to current practice date)
+ * @returns Adjusted due date guaranteed to be at least tomorrow at 00:00:00
+ *
+ * @example
+ * ```typescript
+ * const now = new Date('2025-11-10T14:30:00');
+ * const sameDayDue = new Date('2025-11-10T18:00:00'); // Same day
+ * const adjusted = ensureMinimumNextDay(sameDayDue, now);
+ * // Returns: '2025-11-11T00:00:00' (tomorrow at midnight)
+ *
+ * const tomorrowDue = new Date('2025-11-11T10:00:00'); // Already tomorrow
+ * const notAdjusted = ensureMinimumNextDay(tomorrowDue, now);
+ * // Returns: '2025-11-11T00:00:00' (unchanged, keeps tomorrow)
+ * ```
+ */
+export function ensureMinimumNextDay(
+  dueDate: Date,
+  referenceDate: Date = getPracticeDate()
+): Date {
+  // Get the start of the reference day (midnight)
+  const refDayStart = new Date(referenceDate);
+  refDayStart.setHours(0, 0, 0, 0);
+
+  // Get the start of the due date's day
+  const dueDayStart = new Date(dueDate);
+  dueDayStart.setHours(0, 0, 0, 0);
+
+  // If due date is same day or earlier, set to next day at midnight
+  if (dueDayStart.getTime() <= refDayStart.getTime()) {
+    const nextDay = new Date(refDayStart);
+    nextDay.setDate(nextDay.getDate() + 1);
+    nextDay.setHours(0, 0, 0, 0);
+    return nextDay;
+  }
+
+  // Due date is already in the future, keep it but normalize to midnight
+  dueDayStart.setHours(0, 0, 0, 0);
+  return dueDayStart;
+}
