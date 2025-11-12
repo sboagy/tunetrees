@@ -315,9 +315,9 @@ const CatalogPage: Component = () => {
     return genreNames.sort();
   });
 
-  // Handle tune selection
+  // Handle tune selection (double-click opens editor)
   const handleTuneSelect = (tune: ITuneOverview) => {
-    navigate(`/tunes/${tune.id}`);
+    navigate(`/tunes/${tune.id}/edit`);
   };
 
   return (

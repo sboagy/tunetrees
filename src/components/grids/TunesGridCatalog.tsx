@@ -197,33 +197,14 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
 
   // (Scroll, DnD, and virtualizer are handled inside TunesGrid)
 
-  // Handle row click
-  let clickTimeout: ReturnType<typeof setTimeout> | null = null;
-  let clickCount = 0;
-
+  // Handle row click and double-click
   const handleRowClick = (tune: Tune): void => {
-    clickCount++;
+    setCurrentTuneId(tune.id);
+  };
 
-    if (clickTimeout) {
-      clearTimeout(clickTimeout);
-    }
-
-    if (clickCount === 1) {
-      // Single click: wait to see if it becomes a double click
-      clickTimeout = setTimeout(() => {
-        // Single click confirmed: set current tune
-        setCurrentTuneId(tune.id);
-        clickCount = 0;
-      }, 250);
-    } else if (clickCount === 2) {
-      // Double click: open tune editor via callback
-      clickCount = 0;
-      if (clickTimeout) {
-        clearTimeout(clickTimeout);
-      }
-      // Cast to ITuneOverview for compatibility with the interface
-      props.onTuneSelect?.(tune as unknown as ITuneOverview);
-    }
+  const handleRowDoubleClick = (tune: Tune): void => {
+    // Double click: open tune editor via callback
+    props.onTuneSelect?.(tune as unknown as ITuneOverview);
   };
 
   // Selection count provided by TunesGrid
@@ -276,6 +257,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
             currentRowId={currentTuneId() || undefined}
             enableColumnReorder={true}
             onRowClick={(row) => handleRowClick(row as Tune)}
+            onRowDoubleClick={(row) => handleRowDoubleClick(row as Tune)}
             columnVisibility={columnVisibility()}
             onColumnVisibilityChange={setColumnVisibility}
             cellCallbacks={{

@@ -115,21 +115,13 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   });
 
   // Row click: single selects, double opens editor
-  let clickTimeout: ReturnType<typeof setTimeout> | null = null;
-  let clickCount = 0;
   const handleRowClick = (tune: Tune): void => {
-    clickCount++;
-    if (clickTimeout) clearTimeout(clickTimeout);
-    if (clickCount === 1) {
-      clickTimeout = setTimeout(() => {
-        setCurrentTuneId(tune.id);
-        clickCount = 0;
-      }, 250);
-    } else if (clickCount === 2) {
-      clickCount = 0;
-      if (clickTimeout) clearTimeout(clickTimeout);
-      props.onTuneSelect?.(tune as unknown as ITuneOverview);
-    }
+    setCurrentTuneId(tune.id);
+  };
+
+  const handleRowDoubleClick = (tune: Tune): void => {
+    // Double click: open tune editor via callback
+    props.onTuneSelect?.(tune as unknown as ITuneOverview);
   };
 
   // Selection summary from inner grid
@@ -168,6 +160,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
             currentRowId={currentTuneId() || undefined}
             enableColumnReorder={true}
             onRowClick={(row) => handleRowClick(row as Tune)}
+            onRowDoubleClick={(row) => handleRowDoubleClick(row as Tune)}
             columnVisibility={columnVisibility()}
             onColumnVisibilityChange={setColumnVisibility}
             cellCallbacks={{
