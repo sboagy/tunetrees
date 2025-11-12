@@ -163,23 +163,21 @@ export function ensureMinimumNextDay(
   dueDate: Date,
   referenceDate: Date = getPracticeDate()
 ): Date {
-  // Get the start of the reference day (midnight)
-  const refDayStart = new Date(referenceDate);
-  refDayStart.setHours(0, 0, 0, 0);
+  // Calculate days difference using the SAME logic as the UI
+  // UI uses: Math.floor((date - now) / (1000 * 60 * 60 * 24))
+  // We need to ensure this results in at least 1 (to show "Tomorrow" not "Today")
+  
+  const millisPerDay = 1000 * 60 * 60 * 24;
+  const daysDiff = Math.floor(
+    (dueDate.getTime() - referenceDate.getTime()) / millisPerDay
+  );
 
-  // Get the start of the due date's day
-  const dueDayStart = new Date(dueDate);
-  dueDayStart.setHours(0, 0, 0, 0);
-
-  // If due date is same day or earlier, set to next day at midnight
-  if (dueDayStart.getTime() <= refDayStart.getTime()) {
-    const nextDay = new Date(refDayStart);
-    nextDay.setDate(nextDay.getDate() + 1);
-    nextDay.setHours(0, 0, 0, 0);
-    return nextDay;
+  // If difference is less than 1 day, set to exactly 24 hours from now
+  // This ensures Math.floor((adjustedDue - now) / millisPerDay) >= 1
+  if (daysDiff < 1) {
+    return new Date(referenceDate.getTime() + millisPerDay);
   }
 
-  // Due date is already in the future, keep it but normalize to midnight
-  dueDayStart.setHours(0, 0, 0, 0);
-  return dueDayStart;
+  // Due date is already at least 1 day away, keep it as-is
+  return dueDate;
 }
