@@ -517,7 +517,7 @@ export const AuthProvider: ParentComponent = (props) => {
       }
 
       // Sign up with Supabase
-      const { error: signUpError, data } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
