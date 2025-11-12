@@ -167,6 +167,28 @@ export class TuneTreesPage {
   }
 
   /**
+   * Finds the index of a column in a grid by its header text.
+   * @param gridTestId The data-testid of the grid container.
+   * @param columnHeaderText The text to search for in the header (case-insensitive).
+   * @returns The zero-based index of the column.
+   */
+  async getColumnIndexByHeaderText(
+    gridTestId: string,
+    columnHeaderText: string
+  ) {
+    const headers = this.page.locator(`[data-testid='${gridTestId}'] thead th`);
+    const headerTexts = await headers.allTextContents();
+    const columnIndex = headerTexts.findIndex((text) =>
+      new RegExp(columnHeaderText, "i").test(text)
+    );
+
+    // Ensure the column was found
+    expect(columnIndex).toBeGreaterThan(-1);
+
+    return columnIndex;
+  }
+
+  /**
    * Navigate to a specific tab by ID
    */
   async navigateToTab(
