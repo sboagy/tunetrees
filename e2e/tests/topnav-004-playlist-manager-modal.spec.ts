@@ -12,12 +12,11 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * instead of navigating to a separate page, matching the legacy app behavior.
  */
 
-let ttPage: TuneTreesPage;
 let currentTestUser: TestUser;
 
 test.describe("TOPNAV-004: Playlist Manager Modal", () => {
   test.beforeEach(async ({ page, testUser }) => {
-    ttPage = new TuneTreesPage(page);
+    new TuneTreesPage(page);
     currentTestUser = testUser;
 
     await setupDeterministicTestParallel(page, testUser, {

@@ -82,6 +82,7 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
       />
 
       {/* Dialog */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Dialog is modal and has backdrop for closing */}
       <div
         class="fixed left-1/2 top-1/2 z-50 w-full max-w-6xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
         role="dialog"
