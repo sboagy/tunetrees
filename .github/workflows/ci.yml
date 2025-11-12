@@ -26,8 +26,8 @@ jobs:
         shard: [1, 2, 3, 4] # Creates 4 separate jobs (Run 1/4, Run 2/4, etc.)
 
     timeout-minutes: 60
-    # Only require environment approval for main branch pushes, not PRs
-    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'vite_pwa_env' || null }}
+    # Skip environment approval for all PRs - only require for main branch pushes
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'vite_pwa_env' || '' }}
     env:
       ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
       TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
