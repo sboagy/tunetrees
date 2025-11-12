@@ -416,6 +416,49 @@ export class TuneEditorPageObject extends TuneTreesPageObject {
     console.log("===> tune-editor.po.ts:32 ~ ");
   }
 
+  /**
+   * Opens the tune editor by double-clicking the current tune row in the grid.
+   * This method assumes a tune is already selected (highlighted) in the grid.
+   */
+  async openTuneEditorByDoubleClick(): Promise<void> {
+    await this.page.waitForLoadState("domcontentloaded");
+
+    // Find the currently selected row (has outline-blue-500 class)
+    const selectedRow = this.page
+      .locator("tr.outline.outline-blue-500")
+      .first();
+
+    // Wait for the row to be available and visible
+    await selectedRow.waitFor({ state: "attached", timeout: 15_000 });
+    await selectedRow.waitFor({ state: "visible", timeout: 15_000 });
+
+    // Double-click the row and wait for the editor form to appear
+    const tryOpen = async (): Promise<boolean> => {
+      try {
+        await selectedRow.dblclick();
+        await this.form.waitFor({ state: "visible", timeout: 12_000 });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    let opened = await tryOpen();
+    if (!opened) {
+      console.warn(
+        "[TuneEditor] Edit form failed to appear after double-click. Retrying once...",
+      );
+      await this.page.waitForTimeout(500);
+      opened = await tryOpen();
+    }
+    if (!opened) {
+      throw new Error("Tune editor form did not appear after double-click");
+    }
+
+    await this.IdTitle.waitFor({ state: "visible", timeout: 15_000 });
+    console.log("===> tune-editor.po.ts: Opened editor via double-click");
+  }
+
   async navigateToFormFieldById(formFieldTestId: string): Promise<Locator> {
     console.log("===> tune-editor.po.ts:17 ~ ");
 
