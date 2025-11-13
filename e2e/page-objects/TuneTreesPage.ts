@@ -72,6 +72,11 @@ export class TuneTreesPage {
 
   readonly topNavManagePlaylistsPanel: Locator;
 
+  // Tune Editor
+  readonly tuneEditorForm: Locator;
+  readonly tuneEditorSubmitButton: Locator;
+  readonly tuneEditorCancelButton: Locator;
+
   constructor(page: Page) {
     this.page = page;
 
@@ -155,6 +160,11 @@ export class TuneTreesPage {
     this.topNavManagePlaylistsPanel = page.getByTestId(
       "top-nav-manage-playlists-panel"
     );
+
+    // Tune Editor
+    this.tuneEditorForm = page.getByTestId("tune-editor-form");
+    this.tuneEditorSubmitButton = page.getByTestId("tune-editor-submit-button");
+    this.tuneEditorCancelButton = page.getByTestId("tune-editor-cancel-button");
   }
 
   /**
