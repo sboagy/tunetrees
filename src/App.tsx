@@ -196,7 +196,9 @@ function App() {
                 path="/tunes/:id/edit"
                 component={() => (
                   <ProtectedRoute>
-                    <EditTunePage />
+                    <MainLayout>
+                      <EditTunePage />
+                    </MainLayout>
                   </ProtectedRoute>
                 )}
               />

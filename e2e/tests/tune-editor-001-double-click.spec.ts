@@ -4,11 +4,12 @@
  *
  * Tests the complete tune editor functionality:
  * 1. Double-clicking a tune row opens the editor
- * 2. Editor displays in full-screen mode (no tabs visible)
- * 3. Submit/Cancel buttons are visible and functional
- * 4. Form fields can be edited
- * 5. Submit saves changes and returns to home
- * 6. Cancel discards changes and returns to home
+ * 2. Editor displays in main content area with sidebar visible
+ * 3. Show Public toggle is visible
+ * 4. Submit/Cancel buttons are visible and functional
+ * 5. Form fields can be edited
+ * 6. Submit saves changes and returns to home
+ * 7. Cancel discards changes and returns to home
  *
  * User Flow:
  * 1. Log in as test user
@@ -47,7 +48,7 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     });
   });
 
-  test("should open full-screen editor when double-clicking catalog row", async ({
+  test("should open editor in main content area when double-clicking catalog row", async ({
     page,
   }) => {
     // ARRANGE: Wait for catalog grid to be visible
@@ -73,14 +74,13 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
       timeout: 10000,
     });
 
-    // Verify tabs are NOT visible (full-screen mode)
-    await expect(page.getByTestId("tab-practice")).not.toBeVisible();
-    await expect(page.getByTestId("tab-catalog")).not.toBeVisible();
-
-    // Verify tune ID header is displayed
-    await expect(page.getByText(new RegExp(`Tune #${tuneId}`))).toBeVisible({
+    // Verify tune ID is displayed (small, grayed out)
+    await expect(page.getByText(new RegExp(`#${tuneId}`))).toBeVisible({
       timeout: 5000,
     });
+
+    // Verify Show Public toggle is visible
+    await expect(page.getByTestId("show-public-toggle")).toBeVisible();
 
     // Verify Submit and Cancel buttons are visible
     await expect(
@@ -186,8 +186,8 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     // ASSERT: Verify navigation to edit page
     await expect(page).toHaveURL(/\/tunes\/\d+\/edit/, { timeout: 10000 });
 
-    // Verify full-screen mode (no tabs)
-    await expect(page.getByTestId("tab-repertoire")).not.toBeVisible();
+    // Verify Show Public toggle is visible
+    await expect(page.getByTestId("show-public-toggle")).toBeVisible();
 
     // Verify Submit and Cancel buttons are visible
     await expect(
@@ -222,5 +222,33 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     // Verify form is inside scrollable area
     const form = page.getByTestId("tune-editor-form");
     await expect(form).toBeVisible();
+  });
+
+  test("should toggle Show Public switch", async ({ page }) => {
+    // ARRANGE: Open editor
+    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(500);
+
+    const tuneRow = page
+      .locator('[data-testid="tunes-grid-catalog"] tbody tr')
+      .first();
+
+    await tuneRow.dblclick();
+
+    const toggle = page.getByTestId("show-public-toggle");
+    await expect(toggle).toBeVisible({ timeout: 10000 });
+
+    // ACT: Toggle the switch
+    const initialState = await toggle.getAttribute("aria-checked");
+    await toggle.click();
+
+    // ASSERT: Verify toggle changed state
+    const newState = await toggle.getAttribute("aria-checked");
+    expect(newState).not.toBe(initialState);
+
+    // Toggle back
+    await toggle.click();
+    const finalState = await toggle.getAttribute("aria-checked");
+    expect(finalState).toBe(initialState);
   });
 });

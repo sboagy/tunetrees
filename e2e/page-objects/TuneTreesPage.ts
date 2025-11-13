@@ -76,6 +76,7 @@ export class TuneTreesPage {
   readonly tuneEditorForm: Locator;
   readonly tuneEditorSubmitButton: Locator;
   readonly tuneEditorCancelButton: Locator;
+  readonly showPublicToggle: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -165,6 +166,7 @@ export class TuneTreesPage {
     this.tuneEditorForm = page.getByTestId("tune-editor-form");
     this.tuneEditorSubmitButton = page.getByTestId("tune-editor-submit-button");
     this.tuneEditorCancelButton = page.getByTestId("tune-editor-cancel-button");
+    this.showPublicToggle = page.getByTestId("show-public-toggle");
   }
 
   /**
