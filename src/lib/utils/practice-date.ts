@@ -172,10 +172,17 @@ export function ensureMinimumNextDay(
     (dueDate.getTime() - referenceDate.getTime()) / millisPerDay
   );
 
-  // If difference is less than 1 day, set to exactly 24 hours from now
-  // This ensures Math.floor((adjustedDue - now) / millisPerDay) >= 1
+  // If difference is less than 1 day, we need to ensure at least 1 full day
+  // CRITICAL: The UI will render at a later time with a fresh new Date(),
+  // so we must ensure the due date remains at least 1 day away even after
+  // delays. Adding exactly 24 hours isn't enough because of render delays.
+  // Solution: Add 25 hours (24h + 1h buffer) to guarantee it stays >= 1 day.
   if (daysDiff < 1) {
-    return new Date(referenceDate.getTime() + millisPerDay);
+    // Add 25 hours (1 day + 1 hour buffer for render delays)
+    const twentyFiveHoursLater = new Date(
+      referenceDate.getTime() + millisPerDay + 60 * 60 * 1000
+    );
+    return twentyFiveHoursLater;
   }
 
   // Due date is already at least 1 day away, keep it as-is
