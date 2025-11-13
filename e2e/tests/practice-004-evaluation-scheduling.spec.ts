@@ -168,6 +168,7 @@ test.describe
       await expect(page.getByText(/Successfully submitted/i)).toBeVisible({
         timeout: 5000,
       });
+      await page.waitForTimeout(500);
 
       // Verify tune disappeared from grid
       const afterRows = ttPage.practiceGrid.locator("tbody tr[data-index]");
