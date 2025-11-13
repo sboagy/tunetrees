@@ -91,8 +91,9 @@ export async function getUserPlaylists(
       name: playlist.name,
       instrumentRef: playlist.instrumentRef,
       instrumentName: instrument.instrument,
-      // Resolve genre: use playlist's genreDefault if set, otherwise use instrument's genreDefault
-      genreDefault: sql<string | null>`COALESCE(${playlist.genreDefault}, ${instrument.genreDefault})`,
+      // Select both genre columns for post-query resolution
+      playlistGenre: playlist.genreDefault,
+      instrumentGenre: instrument.genreDefault,
       srAlgType: playlist.srAlgType,
       deleted: playlist.deleted,
       syncVersion: playlist.syncVersion,
@@ -112,8 +113,13 @@ export async function getUserPlaylists(
 
   return playlists.map((p) => ({
     ...p,
+    // Resolve genre: use playlist's genreDefault if set, otherwise use instrument's genreDefault
+    genreDefault: p.playlistGenre ?? p.instrumentGenre,
     tuneCount: Number(p.tuneCount) || 0,
     instrumentName: p.instrumentName || undefined, // Convert null to undefined
+    // Remove the temporary fields from the result
+    playlistGenre: undefined,
+    instrumentGenre: undefined,
   }));
 }
 
