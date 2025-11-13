@@ -97,12 +97,24 @@ export async function updateSchedulingOptions(
     await db
       .update(prefsSchedulingOptions)
       .set({
-        acceptableDelinquencyWindow: data.acceptableDelinquencyWindow === null ? undefined : (data.acceptableDelinquencyWindow ?? existing.acceptableDelinquencyWindow),
-        minReviewsPerDay: data.minReviewsPerDay === null ? undefined : (data.minReviewsPerDay ?? existing.minReviewsPerDay),
-        maxReviewsPerDay: data.maxReviewsPerDay === null ? undefined : (data.maxReviewsPerDay ?? existing.maxReviewsPerDay),
-        daysPerWeek: data.daysPerWeek === null ? undefined : (data.daysPerWeek ?? existing.daysPerWeek),
-        weeklyRules: data.weeklyRules === null ? undefined : (data.weeklyRules ?? existing.weeklyRules),
-        exceptions: data.exceptions === null ? undefined : (data.exceptions ?? existing.exceptions),
+        acceptableDelinquencyWindow: data.acceptableDelinquencyWindow === null 
+          ? undefined 
+          : (data.acceptableDelinquencyWindow ?? (existing.acceptableDelinquencyWindow === null ? undefined : existing.acceptableDelinquencyWindow)),
+        minReviewsPerDay: data.minReviewsPerDay === null 
+          ? undefined 
+          : (data.minReviewsPerDay ?? (existing.minReviewsPerDay === null ? undefined : existing.minReviewsPerDay)),
+        maxReviewsPerDay: data.maxReviewsPerDay === null 
+          ? undefined 
+          : (data.maxReviewsPerDay ?? (existing.maxReviewsPerDay === null ? undefined : existing.maxReviewsPerDay)),
+        daysPerWeek: data.daysPerWeek === null 
+          ? undefined 
+          : (data.daysPerWeek ?? (existing.daysPerWeek === null ? undefined : existing.daysPerWeek)),
+        weeklyRules: data.weeklyRules === null 
+          ? undefined 
+          : (data.weeklyRules ?? (existing.weeklyRules === null ? undefined : existing.weeklyRules)),
+        exceptions: data.exceptions === null 
+          ? undefined 
+          : (data.exceptions ?? (existing.exceptions === null ? undefined : existing.exceptions)),
         lastModifiedAt: now,
       })
       .where(eq(prefsSchedulingOptions.userId, data.userId));
@@ -181,9 +193,15 @@ export async function updateSpacedRepetitionPrefs(
     await db
       .update(prefsSpacedRepetition)
       .set({
-        fsrsWeights: data.fsrsWeights === null ? undefined : (data.fsrsWeights ?? existing.fsrsWeights),
-        requestRetention: data.requestRetention === null ? undefined : (data.requestRetention ?? existing.requestRetention),
-        maximumInterval: data.maximumInterval === null ? undefined : (data.maximumInterval ?? existing.maximumInterval),
+        fsrsWeights: data.fsrsWeights === null 
+          ? undefined 
+          : (data.fsrsWeights ?? (existing.fsrsWeights === null ? undefined : existing.fsrsWeights)),
+        requestRetention: data.requestRetention === null 
+          ? undefined 
+          : (data.requestRetention ?? (existing.requestRetention === null ? undefined : existing.requestRetention)),
+        maximumInterval: data.maximumInterval === null 
+          ? undefined 
+          : (data.maximumInterval ?? (existing.maximumInterval === null ? undefined : existing.maximumInterval)),
         lastModifiedAt: now,
       })
       .where(
@@ -260,11 +278,21 @@ export async function updateUserProfile(
     await db
       .update(userProfile)
       .set({
-        name: data.name === null ? undefined : (data.name ?? existing.name),
-        email: data.email === null ? undefined : (data.email ?? existing.email),
-        avatarUrl: data.avatarUrl === null ? undefined : (data.avatarUrl ?? existing.avatarUrl),
-        phone: data.phone === null ? undefined : (data.phone ?? existing.phone),
-        phoneVerified: data.phoneVerified === null ? undefined : (data.phoneVerified ?? existing.phoneVerified),
+        name: data.name === null 
+          ? undefined 
+          : (data.name ?? (existing.name === null ? undefined : existing.name)),
+        email: data.email === null 
+          ? undefined 
+          : (data.email ?? (existing.email === null ? undefined : existing.email)),
+        avatarUrl: data.avatarUrl === null 
+          ? undefined 
+          : (data.avatarUrl ?? (existing.avatarUrl === null ? undefined : existing.avatarUrl)),
+        phone: data.phone === null 
+          ? undefined 
+          : (data.phone ?? (existing.phone === null ? undefined : existing.phone)),
+        phoneVerified: data.phoneVerified === null 
+          ? undefined 
+          : (data.phoneVerified ?? (existing.phoneVerified === null ? undefined : existing.phoneVerified)),
         lastModifiedAt: now,
       })
       .where(eq(userProfile.supabaseUserId, data.supabaseUserId));
