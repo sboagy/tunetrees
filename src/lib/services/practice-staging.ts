@@ -17,6 +17,7 @@ import { sql } from "drizzle-orm";
 import { type Card, createEmptyCard, fsrs, Rating } from "ts-fsrs";
 import { persistDb, type SqliteDatabase } from "../db/client-sqlite";
 import { queueSync } from "../sync/queue";
+import { ensureMinimumNextDay } from "../utils/practice-date";
 
 /**
  * Preview metrics from FSRS calculation
@@ -160,17 +161,28 @@ export async function stagePracticeEvaluation(
     | Rating.Easy;
   const nextCard = schedulingCards[ratingKey].card;
 
+  // CRITICAL: Ensure tunes are never scheduled for the same day
+  // FSRS can schedule very soon (same day) for "Again" ratings, but for
+  // tune practice, we enforce a minimum of next day.
+  const adjustedDue = ensureMinimumNextDay(nextCard.due, now);
+
+  // Recalculate interval based on adjusted due date
+  const adjustedInterval = Math.max(
+    1,
+    Math.round((adjustedDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  );
+
   // Extract preview metrics
   const preview: FSRSPreviewMetrics = {
     quality: rating,
     easiness: null, // FSRS doesn't use easiness (SM2 concept)
     difficulty: nextCard.difficulty,
     stability: nextCard.stability,
-    interval: Math.round(nextCard.scheduled_days),
+    interval: adjustedInterval, // Use adjusted interval (minimum 1 day)
     step: nextCard.state,
     repetitions: nextCard.reps,
     practiced: now.toISOString(),
-    due: nextCard.due.toISOString(),
+    due: adjustedDue.toISOString(), // Use adjusted due date (minimum next day)
     state: nextCard.state,
     goal,
     technique,

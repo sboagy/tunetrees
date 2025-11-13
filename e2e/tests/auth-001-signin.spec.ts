@@ -1,8 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-const ALICE_EMAIL = "alice.test@tunetrees.test";
-const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD;
-
 /**
  * AUTH-001: Sign in with valid credentials
  * Priority: Critical
@@ -16,7 +13,19 @@ const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD;
  */
 
 test.describe("AUTH-001: User Authentication", () => {
+  const ALICE_EMAIL = "alice.test@tunetrees.test";
+  let ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD;
+
   test.beforeEach(async ({ context }) => {
+    // An act of desperation, experemental.
+    ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD;
+
+    if (!ALICE_PASSWORD) {
+      throw new Error(
+        "ALICE_TEST_PASSWORD environment variable is not set; please set ALICE_TEST_PASSWORD to the test user's password before running E2E tests."
+      );
+    }
+
     // Clear all cookies to ensure completely clean auth state
     await context.clearCookies();
   });

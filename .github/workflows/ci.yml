@@ -26,12 +26,13 @@ jobs:
         shard: [1, 2, 3, 4] # Creates 4 separate jobs (Run 1/4, Run 2/4, etc.)
 
     timeout-minutes: 60
+    # All tests require vite_pwa_env for ALICE_TEST_PASSWORD and Supabase credentials
     environment: vite_pwa_env
     env:
       ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
       TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
-      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+      SUPABASE_URL: ""
+      SUPABASE_ANON_KEY: ""
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
     steps:
@@ -165,6 +166,9 @@ jobs:
 
       # 14. Run Playwright Tests (webServer in playwright.config.ts handles dev server)
       - name: Run Playwright Tests (Shard ${{ matrix.shard }}/4)
+        env:
+          ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
         run: |
           echo "🎭 Starting Playwright tests (shard ${{ matrix.shard }}/4)..."
           echo "📊 Environment check:"
