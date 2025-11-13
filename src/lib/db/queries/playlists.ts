@@ -83,6 +83,7 @@ export async function getUserPlaylists(
   }
 
   // Get playlists with tune count and instrument names
+  // Uses logic similar to view_playlist_joined to resolve genre_default from instrument if needed
   const playlists = await db
     .select({
       playlistId: playlist.playlistId,
@@ -90,7 +91,8 @@ export async function getUserPlaylists(
       name: playlist.name,
       instrumentRef: playlist.instrumentRef,
       instrumentName: instrument.instrument,
-      genreDefault: playlist.genreDefault,
+      // Resolve genre: use playlist's genreDefault if set, otherwise use instrument's genreDefault
+      genreDefault: sql<string | null>`COALESCE(${playlist.genreDefault}, ${instrument.genreDefault})`,
       srAlgType: playlist.srAlgType,
       deleted: playlist.deleted,
       syncVersion: playlist.syncVersion,

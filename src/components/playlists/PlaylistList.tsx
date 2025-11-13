@@ -20,6 +20,7 @@ import {
   getSortedRowModel,
   type SortingState,
 } from "@tanstack/solid-table";
+import { Pencil, Trash2 } from "lucide-solid";
 import {
   type Component,
   createMemo,
@@ -233,17 +234,19 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
         const isDeleting = deletingId() === playlist.playlistId;
 
         return (
-          <div class="flex gap-2">
+          <div class="flex gap-2 items-center">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 props.onPlaylistSelect?.(playlist);
               }}
-              class="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+              class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors p-1"
               disabled={isDeleting}
+              title="Edit playlist"
+              aria-label="Edit playlist"
             >
-              Edit
+              <Pencil size={16} />
             </button>
             <button
               type="button"
@@ -251,10 +254,12 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
                 e.stopPropagation();
                 handleDelete(playlist.playlistId);
               }}
-              class="text-red-600 dark:text-red-400 hover:underline text-sm"
+              class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
               disabled={isDeleting}
+              title={isDeleting ? "Deleting..." : "Delete playlist"}
+              aria-label={isDeleting ? "Deleting playlist" : "Delete playlist"}
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              <Trash2 size={16} />
             </button>
           </div>
         );
