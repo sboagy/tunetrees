@@ -97,7 +97,7 @@ export async function updateSchedulingOptions(
     await db
       .update(prefsSchedulingOptions)
       .set({
-        acceptableDelinquencyWindow: data.acceptableDelinquencyWindow ?? existing.acceptableDelinquencyWindow,
+        acceptableDelinquencyWindow: data.acceptableDelinquencyWindow === null ? undefined : (data.acceptableDelinquencyWindow ?? existing.acceptableDelinquencyWindow),
         minReviewsPerDay: data.minReviewsPerDay === null ? undefined : (data.minReviewsPerDay ?? existing.minReviewsPerDay),
         maxReviewsPerDay: data.maxReviewsPerDay === null ? undefined : (data.maxReviewsPerDay ?? existing.maxReviewsPerDay),
         daysPerWeek: data.daysPerWeek === null ? undefined : (data.daysPerWeek ?? existing.daysPerWeek),
@@ -110,7 +110,7 @@ export async function updateSchedulingOptions(
     // Insert new record
     await db.insert(prefsSchedulingOptions).values({
       userId: data.userId,
-      acceptableDelinquencyWindow: data.acceptableDelinquencyWindow ?? 21,
+      acceptableDelinquencyWindow: data.acceptableDelinquencyWindow === null ? undefined : (data.acceptableDelinquencyWindow ?? 21),
       minReviewsPerDay: data.minReviewsPerDay === null ? undefined : data.minReviewsPerDay,
       maxReviewsPerDay: data.maxReviewsPerDay === null ? undefined : data.maxReviewsPerDay,
       daysPerWeek: data.daysPerWeek === null ? undefined : data.daysPerWeek,
