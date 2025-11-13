@@ -135,12 +135,20 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     {
       accessorKey: "playlistId",
       header: "ID",
-      size: 60,
-      cell: (info) => (
-        <span class="text-gray-600 dark:text-gray-400">
-          {info.getValue() as number}
-        </span>
-      ),
+      size: 80,
+      cell: (info) => {
+        const fullId = info.getValue() as string;
+        // Show last 8 characters of UUID for readability
+        const shortId = fullId.slice(-8);
+        return (
+          <span
+            class="text-gray-600 dark:text-gray-400 font-mono text-xs"
+            title={fullId}
+          >
+            {shortId}
+          </span>
+        );
+      },
     },
     {
       accessorKey: "name",
@@ -176,15 +184,15 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
       },
     },
     {
-      accessorKey: "instrumentRef",
+      accessorKey: "instrumentName",
       header: "Instrument",
       size: 150,
       cell: (info) => {
-        const value = info.getValue() as number | null;
+        const value = info.getValue() as string | null;
         return (
           <Show when={value} fallback={<span class="text-gray-400">—</span>}>
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
-              Instrument {value}
+              {value}
             </span>
           </Show>
         );
@@ -193,7 +201,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     {
       accessorKey: "srAlgType",
       header: "Algorithm",
-      size: 100,
+      size: 90,
       cell: (info) => {
         const value = (info.getValue() as string | null) || "fsrs";
         return (
@@ -206,44 +214,13 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     {
       accessorKey: "tuneCount",
       header: "Tunes",
-      size: 80,
+      size: 70,
       cell: (info) => {
         const count = info.getValue() as number;
         return (
           <span class="font-semibold text-gray-900 dark:text-white">
             {count}
           </span>
-        );
-      },
-    },
-    {
-      accessorKey: "lastModifiedAt",
-      header: "Last Modified",
-      size: 180,
-      cell: (info) => {
-        const value = info.getValue() as string | null;
-        if (!value) return <span class="text-gray-400">—</span>;
-
-        const date = new Date(value);
-        return (
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {date.toLocaleDateString()}{" "}
-            {date.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
-        );
-      },
-    },
-    {
-      accessorKey: "syncVersion",
-      header: "Version",
-      size: 80,
-      cell: (info) => {
-        const value = info.getValue() as number;
-        return (
-          <span class="text-xs text-gray-500 dark:text-gray-400">v{value}</span>
         );
       },
     },

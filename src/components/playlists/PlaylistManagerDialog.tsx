@@ -84,7 +84,7 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
       {/* Dialog */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: Dialog is modal and has backdrop for closing */}
       <div
-        class="fixed left-1/2 top-1/2 z-50 w-full max-w-6xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
+        class="fixed left-1/2 top-1/2 z-50 w-[95vw] max-w-4xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="playlist-manager-title"
@@ -92,27 +92,27 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
         data-testid="playlist-manager-dialog"
       >
         {/* Header */}
-        <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <div>
+        <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+          <div class="min-w-0 flex-1">
             <h2
               id="playlist-manager-title"
-              class="text-2xl font-bold text-gray-900 dark:text-white"
+              class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate"
             >
               Manage Playlists
             </h2>
-            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 hidden sm:block">
               Create, edit, and organize your practice playlists
             </p>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0 ml-2">
             <button
               type="button"
               onClick={handleCreateNew}
-              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
+              class="px-3 py-2 sm:px-4 text-xs sm:text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-1 sm:gap-2"
               data-testid="create-playlist-button"
             >
               <svg
-                class="w-5 h-5"
+                class="w-4 h-4 sm:w-5 sm:h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -125,7 +125,8 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
                   d="M12 4v16m8-8H4"
                 />
               </svg>
-              Create New Playlist
+              <span class="hidden sm:inline">Create New Playlist</span>
+              <span class="sm:hidden">New</span>
             </button>
             <button
               type="button"
@@ -134,13 +135,14 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
               aria-label="Close dialog"
               data-testid="close-playlist-manager"
             >
-              <X size={24} />
+              <X size={20} class="sm:hidden" />
+              <X size={24} class="hidden sm:block" />
             </button>
           </div>
         </div>
 
         {/* Content - Scrollable */}
-        <div class="flex-1 overflow-y-auto p-6">
+        <div class="flex-1 overflow-auto p-4 sm:p-6">
           <PlaylistList
             onPlaylistSelect={handlePlaylistSelect}
             onPlaylistDeleted={handlePlaylistDeleted}
