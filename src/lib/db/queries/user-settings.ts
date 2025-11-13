@@ -10,7 +10,7 @@
  */
 
 import { and, eq } from "drizzle-orm";
-import { db } from "../client-sqlite";
+import type { SqliteDatabase } from "../client-sqlite";
 import {
   prefsSchedulingOptions,
   prefsSpacedRepetition,
@@ -56,6 +56,7 @@ export interface UserProfileData {
  * Get scheduling options for a user
  */
 export async function getSchedulingOptions(
+  db: SqliteDatabase,
   userId: string
 ): Promise<SchedulingOptions | null> {
   const result = await db
@@ -83,12 +84,13 @@ export async function getSchedulingOptions(
  * Update scheduling options for a user
  */
 export async function updateSchedulingOptions(
+  db: SqliteDatabase,
   data: Partial<SchedulingOptions> & { userId: string }
 ): Promise<SchedulingOptions> {
   const now = new Date().toISOString();
 
   // Check if record exists
-  const existing = await getSchedulingOptions(data.userId);
+  const existing = await getSchedulingOptions(db, data.userId);
 
   if (existing) {
     // Update existing record
@@ -119,7 +121,7 @@ export async function updateSchedulingOptions(
   }
 
   // Return updated data
-  const updated = await getSchedulingOptions(data.userId);
+  const updated = await getSchedulingOptions(db, data.userId);
   if (!updated) {
     throw new Error("Failed to retrieve updated scheduling options");
   }
@@ -134,6 +136,7 @@ export async function updateSchedulingOptions(
  * Get spaced repetition preferences for a user
  */
 export async function getSpacedRepetitionPrefs(
+  db: SqliteDatabase,
   userId: string,
   algType: string = "FSRS"
 ): Promise<SpacedRepetitionPrefs | null> {
@@ -165,12 +168,13 @@ export async function getSpacedRepetitionPrefs(
  * Update spaced repetition preferences for a user
  */
 export async function updateSpacedRepetitionPrefs(
+  db: SqliteDatabase,
   data: Partial<SpacedRepetitionPrefs> & { userId: string; algType: string }
 ): Promise<SpacedRepetitionPrefs> {
   const now = new Date().toISOString();
 
   // Check if record exists
-  const existing = await getSpacedRepetitionPrefs(data.userId, data.algType);
+  const existing = await getSpacedRepetitionPrefs(db, data.userId, data.algType);
 
   if (existing) {
     // Update existing record
@@ -201,7 +205,7 @@ export async function updateSpacedRepetitionPrefs(
   }
 
   // Return updated data
-  const updated = await getSpacedRepetitionPrefs(data.userId, data.algType);
+  const updated = await getSpacedRepetitionPrefs(db, data.userId, data.algType);
   if (!updated) {
     throw new Error("Failed to retrieve updated spaced repetition preferences");
   }
@@ -216,6 +220,7 @@ export async function updateSpacedRepetitionPrefs(
  * Get user profile data
  */
 export async function getUserProfile(
+  db: SqliteDatabase,
   userId: string
 ): Promise<UserProfileData | null> {
   const result = await db
@@ -242,12 +247,13 @@ export async function getUserProfile(
  * Update user profile data
  */
 export async function updateUserProfile(
+  db: SqliteDatabase,
   data: Partial<UserProfileData> & { supabaseUserId: string }
 ): Promise<UserProfileData> {
   const now = new Date().toISOString();
 
   // Check if record exists
-  const existing = await getUserProfile(data.supabaseUserId);
+  const existing = await getUserProfile(db, data.supabaseUserId);
 
   if (existing) {
     // Update existing record
@@ -277,7 +283,7 @@ export async function updateUserProfile(
   }
 
   // Return updated data
-  const updated = await getUserProfile(data.supabaseUserId);
+  const updated = await getUserProfile(db, data.supabaseUserId);
   if (!updated) {
     throw new Error("Failed to retrieve updated user profile");
   }

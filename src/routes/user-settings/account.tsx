@@ -10,6 +10,7 @@
 import { A } from "@solidjs/router";
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { getDb } from "@/lib/db/client-sqlite";
 import {
   getUserProfile,
   updateUserProfile,
@@ -40,7 +41,8 @@ const AccountPage: Component = () => {
     const currentUser = user();
     if (currentUser?.id) {
       setIsLoading(true);
-      getUserProfile(currentUser.id)
+      const db = getDb();
+      getUserProfile(db, currentUser.id)
         .then((profile) => {
           if (profile) {
             setName(profile.name ?? "");
@@ -119,8 +121,9 @@ const AccountPage: Component = () => {
     setIsSubmitting(true);
 
     try {
+      const db = getDb();
       // Update local profile
-      await updateUserProfile({
+      await updateUserProfile(db, {
         supabaseUserId: currentUser.id,
         name: name().trim() || null,
         email: email().trim() || null,

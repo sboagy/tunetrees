@@ -9,6 +9,7 @@
 
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { getDb } from "@/lib/db/client-sqlite";
 import {
   getSchedulingOptions,
   updateSchedulingOptions,
@@ -41,7 +42,8 @@ const SchedulingOptionsPage: Component = () => {
     const currentUser = user();
     if (currentUser?.id) {
       setIsLoading(true);
-      getSchedulingOptions(currentUser.id)
+      const db = getDb();
+      getSchedulingOptions(db, currentUser.id)
         .then((prefs) => {
           if (prefs) {
             setAcceptableDelinquencyWindow(
@@ -172,7 +174,8 @@ const SchedulingOptionsPage: Component = () => {
     setIsSubmitting(true);
 
     try {
-      await updateSchedulingOptions({
+      const db = getDb();
+      await updateSchedulingOptions(db, {
         userId: currentUser.id,
         acceptableDelinquencyWindow: acceptableDelinquencyWindow(),
         minReviewsPerDay: parseIntOrNull(minReviewsPerDay()),

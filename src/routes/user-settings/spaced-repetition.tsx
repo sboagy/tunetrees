@@ -9,6 +9,7 @@
 
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { getDb } from "@/lib/db/client-sqlite";
 import {
   getSpacedRepetitionPrefs,
   updateSpacedRepetitionPrefs,
@@ -45,7 +46,8 @@ const SpacedRepetitionPage: Component = () => {
     const currentUser = user();
     if (currentUser?.id) {
       setIsLoading(true);
-      getSpacedRepetitionPrefs(currentUser.id, algType())
+      const db = getDb();
+      getSpacedRepetitionPrefs(db, currentUser.id, algType())
         .then((prefs) => {
           if (prefs) {
             setAlgType(prefs.algType as "SM2" | "FSRS");
@@ -142,7 +144,8 @@ const SpacedRepetitionPage: Component = () => {
     setIsSubmitting(true);
 
     try {
-      await updateSpacedRepetitionPrefs({
+      const db = getDb();
+      await updateSpacedRepetitionPrefs(db, {
         userId: currentUser.id,
         algType: algType(),
         fsrsWeights: algType() === "FSRS" ? fsrsWeights().trim() : null,
