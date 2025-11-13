@@ -98,11 +98,11 @@ export async function updateSchedulingOptions(
       .update(prefsSchedulingOptions)
       .set({
         acceptableDelinquencyWindow: data.acceptableDelinquencyWindow ?? existing.acceptableDelinquencyWindow,
-        minReviewsPerDay: data.minReviewsPerDay ?? existing.minReviewsPerDay,
-        maxReviewsPerDay: data.maxReviewsPerDay ?? existing.maxReviewsPerDay,
-        daysPerWeek: data.daysPerWeek ?? existing.daysPerWeek,
-        weeklyRules: data.weeklyRules ?? existing.weeklyRules,
-        exceptions: data.exceptions ?? existing.exceptions,
+        minReviewsPerDay: data.minReviewsPerDay === null ? undefined : (data.minReviewsPerDay ?? existing.minReviewsPerDay),
+        maxReviewsPerDay: data.maxReviewsPerDay === null ? undefined : (data.maxReviewsPerDay ?? existing.maxReviewsPerDay),
+        daysPerWeek: data.daysPerWeek === null ? undefined : (data.daysPerWeek ?? existing.daysPerWeek),
+        weeklyRules: data.weeklyRules === null ? undefined : (data.weeklyRules ?? existing.weeklyRules),
+        exceptions: data.exceptions === null ? undefined : (data.exceptions ?? existing.exceptions),
         lastModifiedAt: now,
       })
       .where(eq(prefsSchedulingOptions.userId, data.userId));
@@ -111,11 +111,11 @@ export async function updateSchedulingOptions(
     await db.insert(prefsSchedulingOptions).values({
       userId: data.userId,
       acceptableDelinquencyWindow: data.acceptableDelinquencyWindow ?? 21,
-      minReviewsPerDay: data.minReviewsPerDay ?? null,
-      maxReviewsPerDay: data.maxReviewsPerDay ?? null,
-      daysPerWeek: data.daysPerWeek ?? null,
-      weeklyRules: data.weeklyRules ?? null,
-      exceptions: data.exceptions ?? null,
+      minReviewsPerDay: data.minReviewsPerDay === null ? undefined : data.minReviewsPerDay,
+      maxReviewsPerDay: data.maxReviewsPerDay === null ? undefined : data.maxReviewsPerDay,
+      daysPerWeek: data.daysPerWeek === null ? undefined : data.daysPerWeek,
+      weeklyRules: data.weeklyRules === null ? undefined : data.weeklyRules,
+      exceptions: data.exceptions === null ? undefined : data.exceptions,
       lastModifiedAt: now,
     });
   }
@@ -181,9 +181,9 @@ export async function updateSpacedRepetitionPrefs(
     await db
       .update(prefsSpacedRepetition)
       .set({
-        fsrsWeights: data.fsrsWeights ?? existing.fsrsWeights,
-        requestRetention: data.requestRetention ?? existing.requestRetention,
-        maximumInterval: data.maximumInterval ?? existing.maximumInterval,
+        fsrsWeights: data.fsrsWeights === null ? undefined : (data.fsrsWeights ?? existing.fsrsWeights),
+        requestRetention: data.requestRetention === null ? undefined : (data.requestRetention ?? existing.requestRetention),
+        maximumInterval: data.maximumInterval === null ? undefined : (data.maximumInterval ?? existing.maximumInterval),
         lastModifiedAt: now,
       })
       .where(
@@ -197,9 +197,9 @@ export async function updateSpacedRepetitionPrefs(
     await db.insert(prefsSpacedRepetition).values({
       userId: data.userId,
       algType: data.algType,
-      fsrsWeights: data.fsrsWeights ?? null,
-      requestRetention: data.requestRetention ?? 0.9,
-      maximumInterval: data.maximumInterval ?? 365,
+      fsrsWeights: data.fsrsWeights === null ? undefined : data.fsrsWeights,
+      requestRetention: data.requestRetention === null ? undefined : (data.requestRetention ?? 0.9),
+      maximumInterval: data.maximumInterval === null ? undefined : (data.maximumInterval ?? 365),
       lastModifiedAt: now,
     });
   }
@@ -260,11 +260,11 @@ export async function updateUserProfile(
     await db
       .update(userProfile)
       .set({
-        name: data.name ?? existing.name,
-        email: data.email ?? existing.email,
-        avatarUrl: data.avatarUrl ?? existing.avatarUrl,
-        phone: data.phone ?? existing.phone,
-        phoneVerified: data.phoneVerified ?? existing.phoneVerified,
+        name: data.name === null ? undefined : (data.name ?? existing.name),
+        email: data.email === null ? undefined : (data.email ?? existing.email),
+        avatarUrl: data.avatarUrl === null ? undefined : (data.avatarUrl ?? existing.avatarUrl),
+        phone: data.phone === null ? undefined : (data.phone ?? existing.phone),
+        phoneVerified: data.phoneVerified === null ? undefined : (data.phoneVerified ?? existing.phoneVerified),
         lastModifiedAt: now,
       })
       .where(eq(userProfile.supabaseUserId, data.supabaseUserId));
@@ -273,11 +273,11 @@ export async function updateUserProfile(
     await db.insert(userProfile).values({
       id: crypto.randomUUID(),
       supabaseUserId: data.supabaseUserId,
-      name: data.name ?? null,
-      email: data.email ?? null,
-      avatarUrl: data.avatarUrl ?? null,
-      phone: data.phone ?? null,
-      phoneVerified: data.phoneVerified ?? null,
+      name: data.name === null ? undefined : data.name,
+      email: data.email === null ? undefined : data.email,
+      avatarUrl: data.avatarUrl === null ? undefined : data.avatarUrl,
+      phone: data.phone === null ? undefined : data.phone,
+      phoneVerified: data.phoneVerified === null ? undefined : data.phoneVerified,
       lastModifiedAt: now,
     });
   }
