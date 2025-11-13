@@ -9,13 +9,13 @@
  * @module lib/db/queries/user-settings
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../client-sqlite";
 import {
   prefsSchedulingOptions,
   prefsSpacedRepetition,
   userProfile,
-} from "../../../../drizzle/schema-sqlite";
+} from "../schema";
 
 // ============================================================================
 // Types
@@ -140,8 +140,12 @@ export async function getSpacedRepetitionPrefs(
   const result = await db
     .select()
     .from(prefsSpacedRepetition)
-    .where(eq(prefsSpacedRepetition.userId, userId))
-    .where(eq(prefsSpacedRepetition.algType, algType))
+    .where(
+      and(
+        eq(prefsSpacedRepetition.userId, userId),
+        eq(prefsSpacedRepetition.algType, algType)
+      )
+    )
     .limit(1);
 
   if (result.length === 0) {
@@ -178,8 +182,12 @@ export async function updateSpacedRepetitionPrefs(
         maximumInterval: data.maximumInterval ?? existing.maximumInterval,
         lastModifiedAt: now,
       })
-      .where(eq(prefsSpacedRepetition.userId, data.userId))
-      .where(eq(prefsSpacedRepetition.algType, data.algType));
+      .where(
+        and(
+          eq(prefsSpacedRepetition.userId, data.userId),
+          eq(prefsSpacedRepetition.algType, data.algType)
+        )
+      );
   } else {
     // Insert new record
     await db.insert(prefsSpacedRepetition).values({
