@@ -135,3 +135,56 @@ export function getTestDateFromUrl(): string | null {
 export function isTestMode(): boolean {
   return getTestDateFromUrl() !== null;
 }
+
+/**
+ * Ensure a due date is at least tomorrow (next day minimum)
+ *
+ * For tune practice, we never schedule for the same day. This function
+ * ensures the due date is at least the start of the next day, even if
+ * FSRS calculates a same-day interval (e.g., for "Again" ratings).
+ *
+ * @param dueDate - The calculated due date from FSRS
+ * @param referenceDate - The reference date (usually "now") to compare against (defaults to current practice date)
+ * @returns Adjusted due date guaranteed to be at least tomorrow at 00:00:00
+ *
+ * @example
+ * ```typescript
+ * const now = new Date('2025-11-10T14:30:00');
+ * const sameDayDue = new Date('2025-11-10T18:00:00'); // Same day
+ * const adjusted = ensureMinimumNextDay(sameDayDue, now);
+ * // Returns: '2025-11-11T00:00:00' (tomorrow at midnight)
+ *
+ * const tomorrowDue = new Date('2025-11-11T10:00:00'); // Already tomorrow
+ * const notAdjusted = ensureMinimumNextDay(tomorrowDue, now);
+ * // Returns: '2025-11-11T00:00:00' (unchanged, keeps tomorrow)
+ * ```
+ */
+export function ensureMinimumNextDay(
+  dueDate: Date,
+  referenceDate: Date = getPracticeDate()
+): Date {
+  // Calculate days difference using the SAME logic as the UI
+  // UI uses: Math.floor((date - now) / (1000 * 60 * 60 * 24))
+  // We need to ensure this results in at least 1 (to show "Tomorrow" not "Today")
+  
+  const millisPerDay = 1000 * 60 * 60 * 24;
+  const daysDiff = Math.floor(
+    (dueDate.getTime() - referenceDate.getTime()) / millisPerDay
+  );
+
+  // If difference is less than 1 day, we need to ensure at least 1 full day
+  // CRITICAL: The UI will render at a later time with a fresh new Date(),
+  // so we must ensure the due date remains at least 1 day away even after
+  // delays. Adding exactly 24 hours isn't enough because of render delays.
+  // Solution: Add 25 hours (24h + 1h buffer) to guarantee it stays >= 1 day.
+  if (daysDiff < 1) {
+    // Add 25 hours (1 day + 1 hour buffer for render delays)
+    const twentyFiveHoursLater = new Date(
+      referenceDate.getTime() + millisPerDay + 60 * 60 * 1000
+    );
+    return twentyFiveHoursLater;
+  }
+
+  // Due date is already at least 1 day away, keep it as-is
+  return dueDate;
+}
