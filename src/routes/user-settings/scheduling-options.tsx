@@ -9,14 +9,13 @@
 
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getDb } from "@/lib/db/client-sqlite";
 import {
   getSchedulingOptions,
   updateSchedulingOptions,
 } from "@/lib/db/queries/user-settings";
 
 const SchedulingOptionsPage: Component = () => {
-  const { user } = useAuth();
+  const { user, localDb } = useAuth();
 
   // Form state
   const [acceptableDelinquencyWindow, setAcceptableDelinquencyWindow] =
@@ -40,9 +39,9 @@ const SchedulingOptionsPage: Component = () => {
   // Load existing preferences
   createEffect(() => {
     const currentUser = user();
-    if (currentUser?.id) {
+    const db = localDb();
+    if (currentUser?.id && db) {
       setIsLoading(true);
-      const db = getDb();
       getSchedulingOptions(db, currentUser.id)
         .then((prefs) => {
           if (prefs) {
@@ -166,15 +165,15 @@ const SchedulingOptionsPage: Component = () => {
     }
 
     const currentUser = user();
-    if (!currentUser?.id) {
-      setErrorMessage("User not authenticated");
+    const db = localDb();
+    if (!currentUser?.id || !db) {
+      setErrorMessage("User not authenticated or database not ready");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const db = getDb();
       await updateSchedulingOptions(db, {
         userId: currentUser.id,
         acceptableDelinquencyWindow: acceptableDelinquencyWindow(),

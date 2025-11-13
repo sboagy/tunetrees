@@ -9,7 +9,6 @@
 
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getDb } from "@/lib/db/client-sqlite";
 import {
   getSpacedRepetitionPrefs,
   updateSpacedRepetitionPrefs,
@@ -20,7 +19,7 @@ const DEFAULT_FSRS_WEIGHTS =
   "0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621";
 
 const SpacedRepetitionPage: Component = () => {
-  const { user } = useAuth();
+  const { user, localDb } = useAuth();
 
   // Form state
   const [algType, setAlgType] = createSignal<"SM2" | "FSRS">("FSRS");
@@ -44,9 +43,9 @@ const SpacedRepetitionPage: Component = () => {
   // Load existing preferences
   createEffect(() => {
     const currentUser = user();
-    if (currentUser?.id) {
+    const db = localDb();
+    if (currentUser?.id && db) {
       setIsLoading(true);
-      const db = getDb();
       getSpacedRepetitionPrefs(db, currentUser.id, algType())
         .then((prefs) => {
           if (prefs) {
@@ -136,15 +135,15 @@ const SpacedRepetitionPage: Component = () => {
     }
 
     const currentUser = user();
-    if (!currentUser?.id) {
-      setErrorMessage("User not authenticated");
+    const db = localDb();
+    if (!currentUser?.id || !db) {
+      setErrorMessage("User not authenticated or database not ready");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const db = getDb();
       await updateSpacedRepetitionPrefs(db, {
         userId: currentUser.id,
         algType: algType(),

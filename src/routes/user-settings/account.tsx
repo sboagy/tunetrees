@@ -10,7 +10,6 @@
 import { A } from "@solidjs/router";
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getDb } from "@/lib/db/client-sqlite";
 import {
   getUserProfile,
   updateUserProfile,
@@ -18,7 +17,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 
 const AccountPage: Component = () => {
-  const { user } = useAuth();
+  const { user, localDb } = useAuth();
 
   // Form state
   const [name, setName] = createSignal<string>("");
@@ -39,9 +38,9 @@ const AccountPage: Component = () => {
   // Load existing profile
   createEffect(() => {
     const currentUser = user();
-    if (currentUser?.id) {
+    const db = localDb();
+    if (currentUser?.id && db) {
       setIsLoading(true);
-      const db = getDb();
       getUserProfile(db, currentUser.id)
         .then((profile) => {
           if (profile) {
@@ -113,15 +112,15 @@ const AccountPage: Component = () => {
     }
 
     const currentUser = user();
-    if (!currentUser?.id) {
-      setErrorMessage("User not authenticated");
+    const db = localDb();
+    if (!currentUser?.id || !db) {
+      setErrorMessage("User not authenticated or database not ready");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const db = getDb();
       // Update local profile
       await updateUserProfile(db, {
         supabaseUserId: currentUser.id,
