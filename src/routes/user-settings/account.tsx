@@ -7,7 +7,6 @@
  * @module routes/user-settings/account
  */
 
-import { A } from "@solidjs/router";
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
@@ -169,42 +168,6 @@ const AccountPage: Component = () => {
           }
         >
           <form onSubmit={handleSubmit} class="space-y-6">
-            {/* Avatar Section */}
-            <div class="space-y-2">
-              <div class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Avatar
-              </div>
-              <div class="flex items-center gap-4">
-                <Show
-                  when={avatarUrl()}
-                  fallback={
-                    <div class="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                      <span class="text-2xl text-gray-500 dark:text-gray-400">
-                        {name()
-                          ? name().charAt(0).toUpperCase()
-                          : "?"}
-                      </span>
-                    </div>
-                  }
-                >
-                  <img
-                    src={avatarUrl()!}
-                    alt="User avatar"
-                    class="w-16 h-16 rounded-full object-cover"
-                  />
-                </Show>
-                <A
-                  href="/user-settings/avatar"
-                  class="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-md transition-colors"
-                >
-                  Change Avatar
-                </A>
-              </div>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                Visit the Avatar page to select or upload a new avatar image.
-              </p>
-            </div>
-
             {/* Name Field */}
             <div class="space-y-1.5">
               <label
