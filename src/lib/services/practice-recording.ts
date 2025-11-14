@@ -657,6 +657,38 @@ export async function commitStagedEvaluations(
           AND window_start_utc = ${activeWindowStart}
       `);
 
+      // CRITICAL: Verify the update succeeded
+      const verifyQueue = await db.get<{ completed_at: string | null }>(sql`
+        SELECT completed_at
+        FROM daily_practice_queue
+        WHERE user_ref = ${userId}
+          AND playlist_ref = ${playlistId}
+          AND tune_ref = ${staged.tune_id}
+          AND window_start_utc = ${activeWindowStart}
+        LIMIT 1
+      `);
+
+      if (!verifyQueue || !verifyQueue.completed_at) {
+        console.error(
+          `❌ CRITICAL: completed_at NOT SET for tune ${staged.tune_id}!`,
+          {
+            verifyQueue,
+            userId,
+            playlistId,
+            tuneId: staged.tune_id,
+            windowStart: activeWindowStart,
+          }
+        );
+        throw new Error(
+          `Failed to set completed_at for tune ${staged.tune_id} in daily_practice_queue`
+        );
+      }
+
+      console.log(
+        `✓ Verified completed_at set for tune ${staged.tune_id}:`,
+        verifyQueue.completed_at
+      );
+
       if (queueItem) {
         await queueSync(db, "daily_practice_queue", "update", {
           id: queueItem.id,
