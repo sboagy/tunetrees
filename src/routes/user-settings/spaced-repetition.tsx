@@ -23,9 +23,8 @@ const SpacedRepetitionPage: Component = () => {
 
   // Form state
   const [algType, setAlgType] = createSignal<"SM2" | "FSRS">("FSRS");
-  const [fsrsWeights, setFsrsWeights] = createSignal<string>(
-    DEFAULT_FSRS_WEIGHTS
-  );
+  const [fsrsWeights, setFsrsWeights] =
+    createSignal<string>(DEFAULT_FSRS_WEIGHTS);
   const [requestRetention, setRequestRetention] = createSignal<string>("0.9");
   const [maximumInterval, setMaximumInterval] = createSignal<string>("365");
 
@@ -111,7 +110,9 @@ const SpacedRepetitionPage: Component = () => {
       } else {
         // Check if it's a valid comma-separated list of numbers
         const parts = weights.split(",").map((s) => s.trim());
-        const allNumbers = parts.every((part) => !Number.isNaN(Number.parseFloat(part)));
+        const allNumbers = parts.every(
+          (part) => !Number.isNaN(Number.parseFloat(part))
+        );
         if (!allNumbers) {
           errors.fsrsWeights =
             "Must be comma-separated numbers (e.g., 0.4, 1.2, 3.1)";

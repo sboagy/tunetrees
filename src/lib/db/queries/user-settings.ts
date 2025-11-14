@@ -97,24 +97,46 @@ export async function updateSchedulingOptions(
     await db
       .update(prefsSchedulingOptions)
       .set({
-        acceptableDelinquencyWindow: data.acceptableDelinquencyWindow === null 
-          ? undefined 
-          : (data.acceptableDelinquencyWindow ?? (existing.acceptableDelinquencyWindow === null ? undefined : existing.acceptableDelinquencyWindow)),
-        minReviewsPerDay: data.minReviewsPerDay === null 
-          ? undefined 
-          : (data.minReviewsPerDay ?? (existing.minReviewsPerDay === null ? undefined : existing.minReviewsPerDay)),
-        maxReviewsPerDay: data.maxReviewsPerDay === null 
-          ? undefined 
-          : (data.maxReviewsPerDay ?? (existing.maxReviewsPerDay === null ? undefined : existing.maxReviewsPerDay)),
-        daysPerWeek: data.daysPerWeek === null 
-          ? undefined 
-          : (data.daysPerWeek ?? (existing.daysPerWeek === null ? undefined : existing.daysPerWeek)),
-        weeklyRules: data.weeklyRules === null 
-          ? undefined 
-          : (data.weeklyRules ?? (existing.weeklyRules === null ? undefined : existing.weeklyRules)),
-        exceptions: data.exceptions === null 
-          ? undefined 
-          : (data.exceptions ?? (existing.exceptions === null ? undefined : existing.exceptions)),
+        acceptableDelinquencyWindow:
+          data.acceptableDelinquencyWindow === null
+            ? undefined
+            : (data.acceptableDelinquencyWindow ??
+              (existing.acceptableDelinquencyWindow === null
+                ? undefined
+                : existing.acceptableDelinquencyWindow)),
+        minReviewsPerDay:
+          data.minReviewsPerDay === null
+            ? undefined
+            : (data.minReviewsPerDay ??
+              (existing.minReviewsPerDay === null
+                ? undefined
+                : existing.minReviewsPerDay)),
+        maxReviewsPerDay:
+          data.maxReviewsPerDay === null
+            ? undefined
+            : (data.maxReviewsPerDay ??
+              (existing.maxReviewsPerDay === null
+                ? undefined
+                : existing.maxReviewsPerDay)),
+        daysPerWeek:
+          data.daysPerWeek === null
+            ? undefined
+            : (data.daysPerWeek ??
+              (existing.daysPerWeek === null
+                ? undefined
+                : existing.daysPerWeek)),
+        weeklyRules:
+          data.weeklyRules === null
+            ? undefined
+            : (data.weeklyRules ??
+              (existing.weeklyRules === null
+                ? undefined
+                : existing.weeklyRules)),
+        exceptions:
+          data.exceptions === null
+            ? undefined
+            : (data.exceptions ??
+              (existing.exceptions === null ? undefined : existing.exceptions)),
         lastModifiedAt: now,
       })
       .where(eq(prefsSchedulingOptions.userId, data.userId));
@@ -122,9 +144,14 @@ export async function updateSchedulingOptions(
     // Insert new record
     await db.insert(prefsSchedulingOptions).values({
       userId: data.userId,
-      acceptableDelinquencyWindow: data.acceptableDelinquencyWindow === null ? undefined : (data.acceptableDelinquencyWindow ?? 21),
-      minReviewsPerDay: data.minReviewsPerDay === null ? undefined : data.minReviewsPerDay,
-      maxReviewsPerDay: data.maxReviewsPerDay === null ? undefined : data.maxReviewsPerDay,
+      acceptableDelinquencyWindow:
+        data.acceptableDelinquencyWindow === null
+          ? undefined
+          : (data.acceptableDelinquencyWindow ?? 21),
+      minReviewsPerDay:
+        data.minReviewsPerDay === null ? undefined : data.minReviewsPerDay,
+      maxReviewsPerDay:
+        data.maxReviewsPerDay === null ? undefined : data.maxReviewsPerDay,
       daysPerWeek: data.daysPerWeek === null ? undefined : data.daysPerWeek,
       weeklyRules: data.weeklyRules === null ? undefined : data.weeklyRules,
       exceptions: data.exceptions === null ? undefined : data.exceptions,
@@ -186,22 +213,38 @@ export async function updateSpacedRepetitionPrefs(
   const now = new Date().toISOString();
 
   // Check if record exists
-  const existing = await getSpacedRepetitionPrefs(db, data.userId, data.algType);
+  const existing = await getSpacedRepetitionPrefs(
+    db,
+    data.userId,
+    data.algType
+  );
 
   if (existing) {
     // Update existing record
     await db
       .update(prefsSpacedRepetition)
       .set({
-        fsrsWeights: data.fsrsWeights === null 
-          ? undefined 
-          : (data.fsrsWeights ?? (existing.fsrsWeights === null ? undefined : existing.fsrsWeights)),
-        requestRetention: data.requestRetention === null 
-          ? undefined 
-          : (data.requestRetention ?? (existing.requestRetention === null ? undefined : existing.requestRetention)),
-        maximumInterval: data.maximumInterval === null 
-          ? undefined 
-          : (data.maximumInterval ?? (existing.maximumInterval === null ? undefined : existing.maximumInterval)),
+        fsrsWeights:
+          data.fsrsWeights === null
+            ? undefined
+            : (data.fsrsWeights ??
+              (existing.fsrsWeights === null
+                ? undefined
+                : existing.fsrsWeights)),
+        requestRetention:
+          data.requestRetention === null
+            ? undefined
+            : (data.requestRetention ??
+              (existing.requestRetention === null
+                ? undefined
+                : existing.requestRetention)),
+        maximumInterval:
+          data.maximumInterval === null
+            ? undefined
+            : (data.maximumInterval ??
+              (existing.maximumInterval === null
+                ? undefined
+                : existing.maximumInterval)),
         lastModifiedAt: now,
       })
       .where(
@@ -216,8 +259,14 @@ export async function updateSpacedRepetitionPrefs(
       userId: data.userId,
       algType: data.algType,
       fsrsWeights: data.fsrsWeights === null ? undefined : data.fsrsWeights,
-      requestRetention: data.requestRetention === null ? undefined : (data.requestRetention ?? 0.9),
-      maximumInterval: data.maximumInterval === null ? undefined : (data.maximumInterval ?? 365),
+      requestRetention:
+        data.requestRetention === null
+          ? undefined
+          : (data.requestRetention ?? 0.9),
+      maximumInterval:
+        data.maximumInterval === null
+          ? undefined
+          : (data.maximumInterval ?? 365),
       lastModifiedAt: now,
     });
   }
@@ -278,21 +327,33 @@ export async function updateUserProfile(
     await db
       .update(userProfile)
       .set({
-        name: data.name === null 
-          ? undefined 
-          : (data.name ?? (existing.name === null ? undefined : existing.name)),
-        email: data.email === null 
-          ? undefined 
-          : (data.email ?? (existing.email === null ? undefined : existing.email)),
-        avatarUrl: data.avatarUrl === null 
-          ? undefined 
-          : (data.avatarUrl ?? (existing.avatarUrl === null ? undefined : existing.avatarUrl)),
-        phone: data.phone === null 
-          ? undefined 
-          : (data.phone ?? (existing.phone === null ? undefined : existing.phone)),
-        phoneVerified: data.phoneVerified === null 
-          ? undefined 
-          : (data.phoneVerified ?? (existing.phoneVerified === null ? undefined : existing.phoneVerified)),
+        name:
+          data.name === null
+            ? undefined
+            : (data.name ??
+              (existing.name === null ? undefined : existing.name)),
+        email:
+          data.email === null
+            ? undefined
+            : (data.email ??
+              (existing.email === null ? undefined : existing.email)),
+        avatarUrl:
+          data.avatarUrl === null
+            ? undefined
+            : (data.avatarUrl ??
+              (existing.avatarUrl === null ? undefined : existing.avatarUrl)),
+        phone:
+          data.phone === null
+            ? undefined
+            : (data.phone ??
+              (existing.phone === null ? undefined : existing.phone)),
+        phoneVerified:
+          data.phoneVerified === null
+            ? undefined
+            : (data.phoneVerified ??
+              (existing.phoneVerified === null
+                ? undefined
+                : existing.phoneVerified)),
         lastModifiedAt: now,
       })
       .where(eq(userProfile.supabaseUserId, data.supabaseUserId));
@@ -305,7 +366,8 @@ export async function updateUserProfile(
       email: data.email === null ? undefined : data.email,
       avatarUrl: data.avatarUrl === null ? undefined : data.avatarUrl,
       phone: data.phone === null ? undefined : data.phone,
-      phoneVerified: data.phoneVerified === null ? undefined : data.phoneVerified,
+      phoneVerified:
+        data.phoneVerified === null ? undefined : data.phoneVerified,
       lastModifiedAt: now,
     });
   }

@@ -48,12 +48,8 @@ const SchedulingOptionsPage: Component = () => {
             setAcceptableDelinquencyWindow(
               prefs.acceptableDelinquencyWindow ?? 21
             );
-            setMinReviewsPerDay(
-              prefs.minReviewsPerDay?.toString() ?? ""
-            );
-            setMaxReviewsPerDay(
-              prefs.maxReviewsPerDay?.toString() ?? ""
-            );
+            setMinReviewsPerDay(prefs.minReviewsPerDay?.toString() ?? "");
+            setMaxReviewsPerDay(prefs.maxReviewsPerDay?.toString() ?? "");
             setDaysPerWeek(prefs.daysPerWeek?.toString() ?? "");
             setWeeklyRules(prefs.weeklyRules ?? "");
             setExceptions(prefs.exceptions ?? "");
@@ -114,8 +110,7 @@ const SchedulingOptionsPage: Component = () => {
     // Validate acceptable delinquency window
     const adw = acceptableDelinquencyWindow();
     if (adw < 0 || adw > 365) {
-      errors.acceptableDelinquencyWindow =
-        "Must be between 0 and 365 days";
+      errors.acceptableDelinquencyWindow = "Must be between 0 and 365 days";
     }
 
     // Validate min/max reviews per day
@@ -135,11 +130,7 @@ const SchedulingOptionsPage: Component = () => {
     }
 
     // Validate JSON fields
-    const weeklyRulesError = validateJSON(
-      weeklyRules(),
-      "Weekly Rules",
-      false
-    );
+    const weeklyRulesError = validateJSON(weeklyRules(), "Weekly Rules", false);
     if (weeklyRulesError) {
       errors.weeklyRules = weeklyRulesError;
     }

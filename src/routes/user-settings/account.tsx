@@ -89,7 +89,8 @@ const AccountPage: Component = () => {
     // Phone is optional, but validate format if provided
     if (phone().trim()) {
       // Basic phone validation (allow various formats)
-      const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
+      const phoneRegex =
+        /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
       if (!phoneRegex.test(phone().replace(/\s/g, ""))) {
         errors.phone = "Invalid phone format";
       }
@@ -156,16 +157,14 @@ const AccountPage: Component = () => {
           Account
         </h3>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Update your account settings and avatar.
+          Manage your account information.
         </p>
       </div>
 
       <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
         <Show
           when={!isLoading()}
-          fallback={
-            <div class="text-sm text-gray-500">Loading profile...</div>
-          }
+          fallback={<div class="text-sm text-gray-500">Loading profile...</div>}
         >
           <form onSubmit={handleSubmit} class="space-y-6">
             {/* Name Field */}
@@ -268,7 +267,10 @@ const AccountPage: Component = () => {
                       "Password reset email sent. Check your inbox."
                     );
                   } catch (error) {
-                    console.error("Failed to send password reset email:", error);
+                    console.error(
+                      "Failed to send password reset email:",
+                      error
+                    );
                     setErrorMessage("Failed to send password reset email");
                   }
                 }}
