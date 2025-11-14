@@ -40,6 +40,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # --- NEW AGGRESSIVE CLEANUP STEP ---
+      - name: AGGRESSIVE DISK CLEANUP (Maximize Space)
+        if: runner.os == 'Linux'
+        run: |
+          echo "🧹 Removing large pre-installed SDKs..."
+          # Removes the large .NET SDK
+          sudo rm -rf /usr/share/dotnet
+          # Removes the large Android SDK
+          sudo rm -rf /usr/local/lib/android
+          # Clears package manager cache
+          sudo apt-get clean
+          # Clean up any residual docker files from previous jobs
+          docker system prune -a -f || true
+          echo "✅ Estimated 5-8 GB space reclaimed."
+
       # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,19 +65,6 @@ jobs:
       # 3. Install dependencies
       - name: Install dependencies
         run: npm ci
-
-      - name: Free up disk space (Critical)
-        if: runner.os == 'Linux'
-        run: |
-          # echo "Cleaning system caches and large SDKs..."
-          # # 1. Remove large, unnecessary pre-installed tools
-          # sudo rm -rf /usr/share/dotnet
-          # sudo rm -rf /usr/local/lib/android # Android SDK is massive
-          # # 2. Clear package manager cache
-          # sudo apt-get clean
-          # # 3. Clean up old Docker layers (if a previous step failed)
-          docker system prune -a -f
-          echo "Disk cleanup complete."
 
       # 4. Cache Supabase CLI
       - name: Cache Supabase CLI
