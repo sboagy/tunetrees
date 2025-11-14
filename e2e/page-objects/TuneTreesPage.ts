@@ -72,6 +72,15 @@ export class TuneTreesPage {
 
   readonly topNavManagePlaylistsPanel: Locator;
 
+  readonly userSettingsButton: Locator;
+
+  readonly userSettingsSchedulingOptionsButton: Locator;
+  readonly userSettuserSettingSpacedRepetitionButton: Locator;
+  readonly userSettuserSettingAccountButton: Locator;
+  readonly userSettuserSettingAvatarButton: Locator;
+
+  readonly settingsMenuToggle: Locator;
+
   constructor(page: Page) {
     this.page = page;
 
@@ -155,6 +164,23 @@ export class TuneTreesPage {
     this.topNavManagePlaylistsPanel = page.getByTestId(
       "top-nav-manage-playlists-panel"
     );
+
+    this.userSettingsButton = page.getByTestId("user-settings-button");
+
+    this.userSettingsSchedulingOptionsButton = page.getByRole("link", {
+      name: "Scheduling Options",
+    });
+    this.userSettuserSettingSpacedRepetitionButton = page.getByRole("link", {
+      name: "Spaced Repetition",
+    });
+    this.userSettuserSettingAccountButton = page.getByRole("link", {
+      name: "Account",
+    });
+    this.userSettuserSettingAvatarButton = page.getByRole("link", {
+      name: "Avatar",
+    });
+
+    this.settingsMenuToggle = page.getByTestId("settings-menu-toggle");
   }
 
   /**
