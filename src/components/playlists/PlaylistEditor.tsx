@@ -116,12 +116,8 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
   };
 
   return (
-    <div class="w-full max-w-2xl mx-auto">
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-          {props.playlist ? "Edit Playlist" : "New Playlist"}
-        </h2>
-
+    <div class="w-full">
+      <div>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -129,22 +125,22 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
           }}
           class="space-y-6"
         >
-          {/* Action Buttons - at top */}
-          <div class="flex justify-start gap-3 pb-4 border-b border-gray-200 dark:border-gray-700">
+          {/* Action Buttons - at top as text links */}
+          <div class="flex justify-start gap-4 pb-4 border-b border-gray-200 dark:border-gray-700">
             <button
               type="submit"
               disabled={isSaving()}
-              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <Show when={isSaving()} fallback={<>Save</>}>
-                <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                <div class="animate-spin h-4 w-4 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full" />
                 Saving...
               </Show>
             </button>
             <button
               type="button"
               onClick={handleCancel}
-              class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium"
             >
               Cancel
             </button>
