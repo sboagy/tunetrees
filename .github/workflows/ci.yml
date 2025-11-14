@@ -40,6 +40,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # --- NEW AGGRESSIVE CLEANUP STEP ---
+      - name: AGGRESSIVE DISK CLEANUP (Maximize Space)
+        if: runner.os == 'Linux'
+        run: |
+          echo "🧹 Removing large pre-installed SDKs..."
+          # Removes the large .NET SDK
+          sudo rm -rf /usr/share/dotnet
+          # Removes the large Android SDK
+          sudo rm -rf /usr/local/lib/android
+          # Clears package manager cache
+          sudo apt-get clean
+          # Clean up any residual docker files from previous jobs
+          docker system prune -a -f || true
+          echo "✅ Estimated 5-8 GB space reclaimed."
+
       # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4

@@ -166,7 +166,7 @@ export function ensureMinimumNextDay(
   // Calculate days difference using the SAME logic as the UI
   // UI uses: Math.floor((date - now) / (1000 * 60 * 60 * 24))
   // We need to ensure this results in at least 1 (to show "Tomorrow" not "Today")
-  
+
   const millisPerDay = 1000 * 60 * 60 * 24;
   const daysDiff = Math.floor(
     (dueDate.getTime() - referenceDate.getTime()) / millisPerDay
