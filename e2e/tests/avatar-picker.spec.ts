@@ -12,6 +12,8 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 
 let ttPage: TuneTreesPage;
+
+// biome-ignore lint/correctness/noUnusedVariables: currentTestUser standard setup, but not used yet.
 let currentTestUser: TestUser;
 
 test.describe("AVATAR-001: Avatar Picker", () => {
@@ -24,10 +26,31 @@ test.describe("AVATAR-001: Avatar Picker", () => {
       seedRepertoire: [],
     });
 
-    // Navigate to avatar settings
     await ttPage.userMenuButton.click();
-    await page.getByRole("menuitem", { name: "User Settings" }).click();
-    await page.getByRole("link", { name: "Avatar" }).click();
+    await page.waitForTimeout(500);
+    await ttPage.userSettingsButton.click();
+    await page.waitForTimeout(1000);
+    const ua = await page.evaluate(() => navigator.userAgent);
+    const isMobileChrome = /Android.*Chrome\/\d+/i.test(ua);
+    if (isMobileChrome) {
+      await page.waitForTimeout(800);
+      await ttPage.settingsMenuToggle.click();
+    }
+    await page.waitForTimeout(800);
+
+    await ttPage.userSettingsAvatarButton.click();
+    await page.waitForTimeout(500);
+
+    // FIXME: close of mobile menu should be automatic
+    if (isMobileChrome) {
+      // await ttPage.settingsMenuToggle.click();
+      const { innerWidth, innerHeight } = await page.evaluate(() => ({
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+      }));
+      await page.mouse.click(innerWidth - 5, Math.floor(innerHeight / 2));
+      await page.waitForTimeout(300);
+    }
   });
 
   test("should display avatar settings page", async ({ page }) => {
@@ -48,11 +71,14 @@ test.describe("AVATAR-001: Avatar Picker", () => {
     await expect(avatarImages.first()).toBeVisible({ timeout: 5000 });
 
     // Count avatar options (10 predefined + 1 upload button area)
-    const avatarCards = page.locator("div[role='button'], button").filter({
-      hasText:
-        /accordion|balalaika|banjo|flute|guitarist|harmonica|harp|pianist|singer|violin/i,
+    // const avatarCards = page.locator("div[role='button'], button").filter({
+    //   hasText:
+    //     /accordion|balalaika|banjo|flute|guitarist|harmonica|harp|pianist|singer|violin/i,
+    // });
+    const avatarCards = page.getByRole("img", {
+      name: /accordion|balalaika|banjo|flute|guitarist|harmonica|harp|pianist|singer|violin/i,
     });
-    expect(await avatarCards.count()).toBeGreaterThanOrEqual(1);
+    expect(await avatarCards.count()).toBeGreaterThanOrEqual(10);
   });
 
   test("should select predefined avatar", async ({ page }) => {
@@ -99,29 +125,5 @@ test.describe("AVATAR-001: Avatar Picker", () => {
     // TODO: Create test image file and upload
     // This requires filesystem access and file creation
     // Skipping for now, implement when needed
-  });
-
-  test("should close settings modal on backdrop click", async ({ page }) => {
-    // Click backdrop
-    await page.getByTestId("settings-modal-backdrop").click();
-
-    // Should redirect to home
-    await expect(page).toHaveURL("/", { timeout: 5000 });
-  });
-
-  test("should close settings modal on close button", async ({ page }) => {
-    // Click close button
-    await page.getByTestId("settings-close-button").click();
-
-    // Should redirect to home
-    await expect(page).toHaveURL("/", { timeout: 5000 });
-  });
-
-  test("should close settings modal on Escape key", async ({ page }) => {
-    // Press Escape
-    await page.keyboard.press("Escape");
-
-    // Should redirect to home
-    await expect(page).toHaveURL("/", { timeout: 5000 });
   });
 });

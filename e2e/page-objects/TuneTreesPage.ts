@@ -75,9 +75,9 @@ export class TuneTreesPage {
   readonly userSettingsButton: Locator;
 
   readonly userSettingsSchedulingOptionsButton: Locator;
-  readonly userSettuserSettingSpacedRepetitionButton: Locator;
-  readonly userSettuserSettingAccountButton: Locator;
-  readonly userSettuserSettingAvatarButton: Locator;
+  readonly userSettingsSpacedRepetitionButton: Locator;
+  readonly userSettingsAccountButton: Locator;
+  readonly userSettingsAvatarButton: Locator;
 
   readonly settingsMenuToggle: Locator;
 
@@ -170,13 +170,13 @@ export class TuneTreesPage {
     this.userSettingsSchedulingOptionsButton = page.getByRole("link", {
       name: "Scheduling Options",
     });
-    this.userSettuserSettingSpacedRepetitionButton = page.getByRole("link", {
+    this.userSettingsSpacedRepetitionButton = page.getByRole("link", {
       name: "Spaced Repetition",
     });
-    this.userSettuserSettingAccountButton = page.getByRole("link", {
+    this.userSettingsAccountButton = page.getByRole("link", {
       name: "Account",
     });
-    this.userSettuserSettingAvatarButton = page.getByRole("link", {
+    this.userSettingsAvatarButton = page.getByRole("link", {
       name: "Avatar",
     });
 
