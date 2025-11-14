@@ -129,6 +129,27 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
           }}
           class="space-y-6"
         >
+          {/* Action Buttons - at top */}
+          <div class="flex justify-start gap-3 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <button
+              type="submit"
+              disabled={isSaving()}
+              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <Show when={isSaving()} fallback={<>Save</>}>
+                <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                Saving...
+              </Show>
+            </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Cancel
+            </button>
+          </div>
+
           {/* Error message */}
           <Show when={errors().submit}>
             <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
@@ -269,27 +290,6 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
               <strong>Note:</strong> Sync metadata (syncVersion, lastModifiedAt,
               deviceId) will be automatically managed when you save.
             </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={handleCancel}
-              class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving()}
-              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <Show when={isSaving()} fallback={<>Save Playlist</>}>
-                <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                Saving...
-              </Show>
-            </button>
           </div>
         </form>
       </div>

@@ -17,9 +17,10 @@
  */
 
 import { X } from "lucide-solid";
-import { useNavigate } from "@solidjs/router";
 import type { Component } from "solid-js";
-import { Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
+import { useAuth } from "../../lib/auth/AuthContext";
+import { PlaylistEditorDialog } from "./PlaylistEditorDialog";
 import { PlaylistList } from "./PlaylistList";
 import type { PlaylistWithSummary } from "../../lib/db/types";
 
@@ -44,29 +45,38 @@ interface PlaylistManagerDialogProps {
 export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
   props
 ) => {
-  const navigate = useNavigate();
+  const { incrementRepertoireListChanged } = useAuth();
+  const [showEditorDialog, setShowEditorDialog] = createSignal(false);
+  const [editingPlaylistId, setEditingPlaylistId] = createSignal<
+    string | undefined
+  >(undefined);
 
   const handlePlaylistSelect = (playlist: PlaylistWithSummary) => {
-    // Close dialog and navigate to edit page
-    props.onClose();
-    navigate(`/playlists/${playlist.playlistId}/edit`);
+    // Open editor dialog instead of navigating
+    setEditingPlaylistId(playlist.playlistId);
+    setShowEditorDialog(true);
   };
 
   const handlePlaylistDeleted = (playlistId: string) => {
     console.log("Playlist deleted:", playlistId);
-    // PlaylistList will automatically refetch, no action needed
+    // Trigger global playlist list refresh
+    incrementRepertoireListChanged();
   };
 
   const handleCreateNew = () => {
-    // Close dialog and navigate to new playlist page
-    props.onClose();
-    navigate("/playlists/new");
+    // Open editor dialog for new playlist
+    setEditingPlaylistId(undefined);
+    setShowEditorDialog(true);
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      props.onClose();
-    }
+  const handleEditorClose = () => {
+    setShowEditorDialog(false);
+    setEditingPlaylistId(undefined);
+  };
+
+  const handleEditorSaved = () => {
+    // Trigger global playlist list refresh
+    incrementRepertoireListChanged();
   };
 
   return (
@@ -76,7 +86,9 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
         type="button"
         class="fixed inset-0 z-40 bg-black/50 dark:bg-black/70 cursor-default"
         onClick={props.onClose}
-        onKeyDown={handleKeyDown}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") props.onClose();
+        }}
         aria-label="Close modal backdrop"
         data-testid="playlist-manager-backdrop"
       />
@@ -149,6 +161,14 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
           />
         </div>
       </div>
+
+      {/* Nested Editor Dialog */}
+      <PlaylistEditorDialog
+        isOpen={showEditorDialog()}
+        onClose={handleEditorClose}
+        playlistId={editingPlaylistId()}
+        onSaved={handleEditorSaved}
+      />
     </Show>
   );
 };
