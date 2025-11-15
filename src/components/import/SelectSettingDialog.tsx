@@ -9,7 +9,7 @@
 
 import abcjs from "abcjs";
 import type { Component } from "solid-js";
-import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, For, onCleanup } from "solid-js";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -184,7 +184,10 @@ export const SelectSettingDialog: Component<SelectSettingDialogProps> = (
           <Button variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
-          <Button onClick={handleSelectSetting} disabled={selectedIndex() === null}>
+          <Button
+            onClick={handleSelectSetting}
+            disabled={selectedIndex() === null}
+          >
             Select Setting
           </Button>
         </AlertDialogFooter>

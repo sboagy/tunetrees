@@ -9,7 +9,7 @@
 
 import { ExternalLink } from "lucide-solid";
 import type { Component } from "solid-js";
-import { For, Show, createSignal } from "solid-js";
+import { createSignal, For } from "solid-js";
 import type { ITheSessionTuneSummary } from "../../lib/import/the-session-schemas";
 import {
   AlertDialog,
@@ -103,10 +103,7 @@ export const SelectTuneDialog: Component<SelectTuneDialogProps> = (props) => {
           <Button variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
-          <Button
-            onClick={handleImport}
-            disabled={!selectedUrl()}
-          >
+          <Button onClick={handleImport} disabled={!selectedUrl()}>
             Import
           </Button>
         </AlertDialogFooter>

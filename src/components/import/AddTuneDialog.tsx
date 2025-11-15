@@ -11,15 +11,19 @@
  */
 
 import { useNavigate } from "@solidjs/router";
+import abcjs from "abcjs";
 import { Import } from "lucide-solid";
 import type { Component } from "solid-js";
-import { Show, createSignal } from "solid-js";
-import { useAuth } from "../../lib/auth/AuthContext";
-import { fetchTheSessionURLsFromTitle, fetchTuneInfoFromTheSessionURL, extractIncipitFromTheSessionJson, getBarsPerSection, normalizeKey, normalizeTuneType } from "../../lib/import/import-utils";
+import { createSignal, Show } from "solid-js";
+import {
+  extractIncipitFromTheSessionJson,
+  fetchTheSessionURLsFromTitle,
+  fetchTuneInfoFromTheSessionURL,
+  getBarsPerSection,
+  normalizeKey,
+  normalizeTuneType,
+} from "../../lib/import/import-utils";
 import type { ITheSessionTuneSummary } from "../../lib/import/the-session-schemas";
-import type { SettingOption } from "./SelectSettingDialog";
-import { SelectSettingDialog } from "./SelectSettingDialog";
-import { SelectTuneDialog } from "./SelectTuneDialog";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -38,7 +42,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import abcjs from "abcjs";
+import type { SettingOption } from "./SelectSettingDialog";
+import { SelectSettingDialog } from "./SelectSettingDialog";
+import { SelectTuneDialog } from "./SelectTuneDialog";
 
 export interface AddTuneDialogProps {
   /** Control dialog open state externally */
@@ -55,8 +61,9 @@ export interface AddTuneDialogProps {
  */
 export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
   const navigate = useNavigate();
-  const auth = useAuth();
-  
+  // NOTE: auth context not currently needed in this dialog (imports are local-only)
+  // const auth = useAuth();
+
   // Main dialog state - use controlled state if provided, otherwise internal state
   const [internalDialogOpen, setInternalDialogOpen] = createSignal(false);
   const mainDialogOpen = () => props.open ?? internalDialogOpen();
@@ -67,26 +74,30 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
       setInternalDialogOpen(open);
     }
   };
-  
+
   const [selectedGenre, setSelectedGenre] = createSignal<string>("ITRAD");
   const [urlOrTitle, setUrlOrTitle] = createSignal<string>("");
-  
+
   // Sub-dialog states
   const [showTuneSelectDialog, setShowTuneSelectDialog] = createSignal(false);
-  const [tuneSearchResults, setTuneSearchResults] = createSignal<ITheSessionTuneSummary[]>([]);
-  const [showSettingSelectDialog, setShowSettingSelectDialog] = createSignal(false);
+  const [tuneSearchResults, setTuneSearchResults] = createSignal<
+    ITheSessionTuneSummary[]
+  >([]);
+  const [showSettingSelectDialog, setShowSettingSelectDialog] =
+    createSignal(false);
   const [settingOptions, setSettingOptions] = createSignal<SettingOption[]>([]);
-  
+
   // Import state
   const [isImporting, setIsImporting] = createSignal(false);
   const [importError, setImportError] = createSignal<string | null>(null);
 
-  // Available genres (simplified - could be fetched from DB)
-  const genres = [
-    { id: "ITRAD", name: "Irish Traditional Music" },
-    { id: "OTIME", name: "Old Time" },
-    { id: "BLUES", name: "Blues" },
-  ];
+  // Available genres (simplified - could be fetched from DB). Use simple string array for Select
+  const genres: string[] = ["ITRAD", "OTIME", "BLUES"];
+  const genreNameMap: Record<string, string> = {
+    ITRAD: "Irish Traditional Music",
+    OTIME: "Old Time",
+    BLUES: "Blues",
+  };
 
   /**
    * Handle "New" button - navigate to tune editor with optional title
@@ -94,7 +105,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
   const handleNew = () => {
     const title = urlOrTitle();
     const isUrl = title.startsWith("http://") || title.startsWith("https://");
-    
+
     if (isUrl) {
       // Clear URL if user wants to create new tune manually
       navigate("/tunes/new");
@@ -103,7 +114,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
       const params = title ? `?title=${encodeURIComponent(title)}` : "";
       navigate(`/tunes/new${params}`);
     }
-    
+
     setMainDialogOpen(false);
   };
 
@@ -144,7 +155,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
    */
   const searchTheSessionByTitle = async (title: string) => {
     const results = await fetchTheSessionURLsFromTitle(title, "");
-    
+
     if (results.total === 0) {
       setImportError(`No tunes found for "${title}"`);
       return;
@@ -175,7 +186,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
       throw new Error("No settings found for this tune");
     }
 
-    let selectedSettingIndex = 0;
+    const selectedSettingIndex = 0;
 
     if (tuneData.settings.length > 1) {
       // Multiple settings - let user choose
@@ -253,7 +264,11 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
   return (
     <>
       <AlertDialog open={mainDialogOpen()} onOpenChange={setMainDialogOpen}>
-        <Show when={props.showButton !== false && !props.open && !props.onOpenChange}>
+        <Show
+          when={
+            props.showButton !== false && !props.open && !props.onOpenChange
+          }
+        >
           <AlertDialogTrigger
             as={Button}
             variant="outline"
@@ -275,27 +290,28 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
 
           {/* Genre Selection */}
           <div class="grid grid-cols-4 items-center gap-4">
-            <label class="text-right font-medium text-sm">Select Genre:</label>
+            <label for="genre-select" class="text-right font-medium text-sm">
+              Select Genre:
+            </label>
             <div class="col-span-3">
               <Select
+                id="genre-select"
                 value={selectedGenre()}
                 onChange={setSelectedGenre}
                 options={genres}
-                optionValue="id"
-                optionTextValue="name"
                 placeholder="Select genre..."
                 itemComponent={(props) => (
                   <SelectItem item={props.item}>
-                    {props.item.rawValue.name}
+                    {genreNameMap[props.item.rawValue] || props.item.rawValue}
                   </SelectItem>
                 )}
               >
                 <SelectTrigger>
                   <SelectValue<string>>
-                    {(state) => {
-                      const genre = genres.find((g) => g.id === state.selectedOption());
-                      return genre?.name || "Select genre...";
-                    }}
+                    {(state) =>
+                      genreNameMap[state.selectedOption() || ""] ||
+                      "Select genre..."
+                    }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent />
@@ -367,8 +383,11 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
 
           {/* URL or Title Input */}
           <div class="grid grid-cols-4 items-center gap-4">
-            <label class="text-right font-medium text-sm">URL or Title:</label>
+            <label for="url-or-title" class="text-right font-medium text-sm">
+              URL or Title:
+            </label>
             <input
+              id="url-or-title"
               type="text"
               value={urlOrTitle()}
               onInput={(e) => setUrlOrTitle(e.currentTarget.value)}
@@ -392,9 +411,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
             <Button
               onClick={handleSearchOrImport}
               disabled={
-                !urlOrTitle() ||
-                selectedGenre() !== "ITRAD" ||
-                isImporting()
+                !urlOrTitle() || selectedGenre() !== "ITRAD" || isImporting()
               }
             >
               {isImporting()

@@ -13,26 +13,33 @@ import { createMemo } from "solid-js";
 import type { TuneEditorData } from "../../components/tunes";
 import { TuneEditor } from "../../components/tunes";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { createTune } from "../../lib/db/queries/tunes";
 import { createReference } from "../../lib/db/queries/references";
+import { createTune } from "../../lib/db/queries/tunes";
 
 /**
  * New Tune Page Component
  */
 const NewTunePage: Component = () => {
   const navigate = useNavigate();
-  const { localDb, userIdInt } = useAuth();
+  const { localDb, userIdInt, user } = useAuth();
   const [searchParams] = useSearchParams();
 
   // Extract imported data from query params
+  // Helper to normalize query param values to string
+  const qp = (key: string): string | undefined => {
+    const v = (searchParams as any)[key];
+    if (Array.isArray(v)) return v[0];
+    return typeof v === "string" && v.length > 0 ? v : undefined;
+  };
+
   const initialData = createMemo(() => ({
-    title: searchParams.title || "",
-    type: searchParams.type || undefined,
-    mode: searchParams.mode || undefined,
-    structure: searchParams.structure || undefined,
-    incipit: searchParams.incipit || undefined,
-    genre: searchParams.genre || undefined,
-    sourceUrl: searchParams.sourceUrl || undefined,
+    title: qp("title") || "",
+    type: qp("type") || undefined,
+    mode: qp("mode") || undefined,
+    structure: qp("structure") || undefined,
+    incipit: qp("incipit") || undefined,
+    genre: qp("genre") || undefined,
+    sourceUrl: qp("sourceUrl") || undefined,
   }));
 
   const handleSave = async (
@@ -60,7 +67,7 @@ const NewTunePage: Component = () => {
       const sourceUrl = initialData().sourceUrl;
       if (sourceUrl && newTune.id) {
         const userId = userIdInt();
-        const supabaseUserId = auth.user()?.id;
+        const supabaseUserId = user()?.id;
         if (userId && supabaseUserId) {
           try {
             const foreignId = sourceUrl.split("/").filter(Boolean).pop();
@@ -70,15 +77,19 @@ const NewTunePage: Component = () => {
                 ? `thesession.org #${foreignId}`
                 : `Source #${foreignId}`;
 
-            await createReference(db, {
-              tuneRef: newTune.id,
-              url: sourceUrl,
-              title: title,
-              refType: "website",
-              favorite: false,
-              public: true,
-              comment: null,
-            }, supabaseUserId);
+            await createReference(
+              db,
+              {
+                tuneRef: newTune.id,
+                url: sourceUrl,
+                title: title,
+                refType: "website",
+                favorite: false,
+                public: true,
+                comment: undefined,
+              },
+              supabaseUserId
+            );
           } catch (refError) {
             console.error("Error creating reference:", refError);
             // Don't fail the whole operation if reference creation fails

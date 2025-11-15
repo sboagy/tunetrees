@@ -53,6 +53,8 @@ export interface TuneEditorData extends Tune {
 interface TuneEditorProps {
   /** Tune to edit (undefined for new tune) */
   tune?: TuneEditorData;
+  /** Initial data for creating a new tune (query imports). Used when tune is undefined */
+  initialData?: Partial<TuneEditorData>;
   /** Callback when save is requested (should return tune ID for new tunes) */
   onSave?: (
     tuneData: Partial<TuneEditorData>
@@ -100,12 +102,20 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   const { user } = useAuth();
 
   // Form state signals
-  const [genre, setGenre] = createSignal(props.tune?.genre || "");
-  const [title, setTitle] = createSignal(props.tune?.title || "");
-  const [type, setType] = createSignal(props.tune?.type || "");
-  const [structure, setStructure] = createSignal(props.tune?.structure || "");
-  const [mode, setMode] = createSignal(props.tune?.mode || "");
-  const [incipit, setIncipit] = createSignal(props.tune?.incipit || "");
+  const init = (field: keyof TuneEditorData): string => {
+    return (
+      (props.tune && (props.tune as any)[field]) ||
+      (props.initialData && (props.initialData as any)[field]) ||
+      ""
+    );
+  };
+
+  const [genre, setGenre] = createSignal(init("genre"));
+  const [title, setTitle] = createSignal(init("title"));
+  const [type, setType] = createSignal(init("type"));
+  const [structure, setStructure] = createSignal(init("structure"));
+  const [mode, setMode] = createSignal(init("mode"));
+  const [incipit, setIncipit] = createSignal(init("incipit"));
   const [selectedTags, setSelectedTags] = createSignal<string[]>([]);
   const [requestPublic, setRequestPublic] = createSignal(
     props.tune?.request_public || false
