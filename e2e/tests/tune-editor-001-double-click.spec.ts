@@ -31,7 +31,11 @@
 
 import { expect } from "@playwright/test";
 import { CATALOG_TUNE_A_FIG_FOR_A_KISS } from "../../src/lib/db/catalog-tune-ids";
-import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
+import {
+  getPrivateTuneIds,
+  TEST_TUNE_MORRISON_ID,
+} from "../../tests/fixtures/test-data";
+import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -42,10 +46,16 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     ttPage = new TuneTreesPage(page);
 
     // Setup: Start on catalog tab with some tunes
-    await setupForCatalogTestsParallel(page, testUser, {
-      emptyRepertoire: false,
-      startTab: "catalog",
+    // await setupForCatalogTestsParallel(page, testUser, {
+    //   emptyRepertoire: false,
+    //   startTab: "catalog",
+    // });
+    const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
+    await setupForRepertoireTestsParallel(page, testUser, {
+      repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID],
+      scheduleTunes: false,
     });
+    await ttPage.navigateToTab("catalog");
   });
 
   test("should open editor in main content area when double-clicking catalog row", async ({
@@ -83,12 +93,8 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await expect(page.getByTestId("show-public-toggle")).toBeVisible();
 
     // Verify Submit and Cancel buttons are visible
-    await expect(
-      page.getByTestId("tune-editor-submit-button")
-    ).toBeVisible();
-    await expect(
-      page.getByTestId("tune-editor-cancel-button")
-    ).toBeVisible();
+    await expect(page.getByTestId("tune-editor-submit-button")).toBeVisible();
+    await expect(page.getByTestId("tune-editor-cancel-button")).toBeVisible();
 
     // Verify tune title is loaded
     await expect(page.getByLabel(/title/i)).toHaveValue(/a fig for a kiss/i);
@@ -106,9 +112,9 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
 
     await tuneRow.dblclick();
 
-    await expect(
-      page.getByTestId("tune-editor-submit-button")
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("tune-editor-submit-button")).toBeVisible({
+      timeout: 10000,
+    });
 
     // ACT: Edit the structure field
     const structureInput = page.getByLabel(/structure/i);
@@ -122,7 +128,7 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await page.getByTestId("tune-editor-submit-button").click();
 
     // ASSERT: Verify navigation back to home
-    await expect(page).toHaveURL("/", { timeout: 10000 });
+    await expect(page).toHaveURL("http://localhost:5173/", { timeout: 10000 });
 
     // Verify we're back on a tab (not in editor)
     await expect(page.getByTestId("tab-practice")).toBeVisible({
@@ -142,9 +148,9 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
 
     await tuneRow.dblclick();
 
-    await expect(
-      page.getByTestId("tune-editor-cancel-button")
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("tune-editor-cancel-button")).toBeVisible({
+      timeout: 10000,
+    });
 
     // ACT: Edit the structure field (but don't save)
     const structureInput = page.getByLabel(/structure/i);
@@ -157,7 +163,7 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await page.getByTestId("tune-editor-cancel-button").click();
 
     // ASSERT: Verify navigation back to home
-    await expect(page).toHaveURL("/", { timeout: 10000 });
+    await expect(page).toHaveURL("http://localhost:5173/", { timeout: 10000 });
 
     // Verify we're back on a tab
     await expect(page.getByTestId("tab-practice")).toBeVisible({
@@ -169,14 +175,11 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     page,
   }) => {
     // ARRANGE: Navigate to repertoire tab
-    await ttPage.repertoireTab.click();
-    await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
-    await page.waitForTimeout(500); // Allow grid to render
+    await ttPage.navigateToTab("repertoire");
 
     // Find a tune row in repertoire
-    const tuneRow = page
-      .locator('[data-testid="tunes-grid-repertoire"] tbody tr')
-      .first();
+    const tuneCell = page.getByRole("cell", { name: "JigD" }).first();
+    const tuneRow = tuneCell.locator("xpath=ancestor::tr[1]");
 
     await expect(tuneRow).toBeVisible({ timeout: 5000 });
 
@@ -184,18 +187,17 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await tuneRow.dblclick();
 
     // ASSERT: Verify navigation to edit page
-    await expect(page).toHaveURL(/\/tunes\/\d+\/edit/, { timeout: 10000 });
+    await expect(page).toHaveURL(
+      /\/tunes\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/edit/i,
+      { timeout: 10000 }
+    );
 
     // Verify Show Public toggle is visible
     await expect(page.getByTestId("show-public-toggle")).toBeVisible();
 
     // Verify Submit and Cancel buttons are visible
-    await expect(
-      page.getByTestId("tune-editor-submit-button")
-    ).toBeVisible();
-    await expect(
-      page.getByTestId("tune-editor-cancel-button")
-    ).toBeVisible();
+    await expect(page.getByTestId("tune-editor-submit-button")).toBeVisible();
+    await expect(page.getByTestId("tune-editor-cancel-button")).toBeVisible();
   });
 
   test("should have scrollable editor content", async ({ page }) => {
@@ -203,20 +205,16 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(500);
 
-    const tuneRow = page
-      .locator('[data-testid="tunes-grid-catalog"] tbody tr')
-      .first();
+    const tuneRow = page.getByRole("cell", { name: "Public" }).first();
 
     await tuneRow.dblclick();
 
-    await expect(
-      page.getByTestId("tune-editor-form")
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("tune-editor-form")).toBeVisible({
+      timeout: 10000,
+    });
 
     // ACT & ASSERT: Verify scrollable container exists
-    const scrollableContainer = page.locator(
-      ".flex-1.overflow-y-auto"
-    );
+    const scrollableContainer = page.locator(".flex-1.overflow-y-auto");
     await expect(scrollableContainer).toBeVisible();
 
     // Verify form is inside scrollable area
@@ -229,9 +227,7 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(500);
 
-    const tuneRow = page
-      .locator('[data-testid="tunes-grid-catalog"] tbody tr')
-      .first();
+    const tuneRow = page.getByRole("cell", { name: "Public" }).first();
 
     await tuneRow.dblclick();
 
