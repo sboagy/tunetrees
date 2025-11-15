@@ -7,7 +7,7 @@
  * @module lib/import/import-utils
  */
 
-import abcjs from "abcjs";
+import type abcjs from "abcjs";
 import type { VoiceItem, VoiceItemBar } from "abcjs";
 import type {
   ITheSessionQueryResults,

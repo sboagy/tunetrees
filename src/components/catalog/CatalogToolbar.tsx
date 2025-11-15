@@ -41,9 +41,9 @@ import {
   TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../grids/types";
+import { AddTuneDialog } from "../import/AddTuneDialog";
 import { ColumnVisibilityMenu } from "./ColumnVisibilityMenu";
 import { FilterPanel } from "./FilterPanel";
-import { AddTuneDialog } from "../import/AddTuneDialog";
 
 export interface CatalogToolbarProps {
   /** Search query */

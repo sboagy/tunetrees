@@ -28,7 +28,6 @@ import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
 import { generateOrGetPracticeQueue } from "../../lib/services/practice-queue";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
-import { AddTuneDialog } from "../import/AddTuneDialog";
 import {
   TOOLBAR_BUTTON_BASE,
   TOOLBAR_BUTTON_DANGER,
@@ -46,6 +45,7 @@ import {
   TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../grids/types";
+import { AddTuneDialog } from "../import/AddTuneDialog";
 
 export interface RepertoireToolbarProps {
   /** Search query */
