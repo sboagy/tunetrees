@@ -18,11 +18,11 @@
 
 import { X } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createSignal, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
+import type { PlaylistWithSummary } from "../../lib/db/types";
 import { PlaylistEditorDialog } from "./PlaylistEditorDialog";
 import { PlaylistList } from "./PlaylistList";
-import type { PlaylistWithSummary } from "../../lib/db/types";
 
 interface PlaylistManagerDialogProps {
   /** Whether the dialog is open */
@@ -50,6 +50,17 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
   const [editingPlaylistId, setEditingPlaylistId] = createSignal<
     string | undefined
   >(undefined);
+
+  // Handle Escape key to close dialog
+  onMount(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && props.isOpen) {
+        props.onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+  });
 
   const handlePlaylistSelect = (playlist: PlaylistWithSummary) => {
     // Open editor dialog instead of navigating

@@ -14,9 +14,15 @@
  * @module components/playlists/PlaylistEditorDialog
  */
 
-import { X } from "lucide-solid";
+import { CircleX, Save } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createResource, Show } from "solid-js";
+import {
+  createResource,
+  createSignal,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import {
   createPlaylist,
@@ -56,45 +62,77 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
   const { user, localDb } = useAuth();
 
   // Fetch playlist data if editing
-  const [playlist] = createResource(
+  const [playlist, { refetch }] = createResource(
     () => {
       const userId = user()?.id;
       const db = localDb();
       const playlistId = props.playlistId;
-      return userId && db && playlistId && props.isOpen
+      const isOpen = props.isOpen; // Track dialog open state
+      return userId && db && playlistId && isOpen
         ? { userId, db, playlistId }
         : null;
     },
     async (params) => {
       if (!params) return null;
-      return await getPlaylistById(params.db, params.playlistId, params.userId);
+      const result = await getPlaylistById(
+        params.db,
+        params.playlistId,
+        params.userId
+      );
+      return result;
     }
   );
 
-  const handleSave = async (playlistData: Partial<Playlist>) => {
+  // Refs to form data and validation functions
+  let getFormData: (() => Partial<Playlist> | null) | undefined;
+  let getIsValid: (() => boolean) | undefined;
+  let setError: ((error: string | null) => void) | undefined;
+
+  const [isSaving, setIsSaving] = createSignal(false);
+
+  // Handle Escape key to close dialog
+  onMount(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && props.isOpen && !isSaving()) {
+        props.onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+  });
+
+  const handleSave = async () => {
     const userId = user()?.id;
     const db = localDb();
 
     if (!userId || !db) {
       console.error("Cannot save playlist: missing user or database");
-      alert("Error: User not authenticated or database not available");
+      setError?.("Error: User not authenticated or database not available");
       return;
     }
+
+    // Get form data from PlaylistEditor
+    const playlistData = getFormData?.();
+    if (!playlistData) {
+      // Validation failed, error already shown in form
+      return;
+    }
+
+    setIsSaving(true);
+    setError?.(null); // Clear any previous errors
 
     try {
       if (props.playlistId) {
         // Update existing playlist
         await updatePlaylist(db, props.playlistId, userId, playlistData);
-        console.log("Playlist updated:", props.playlistId);
       } else {
         // Create new playlist
-        const newPlaylist = await createPlaylist(db, userId, {
+        await createPlaylist(db, userId, {
           name: playlistData.name ?? "Untitled Playlist",
           genreDefault: playlistData.genreDefault ?? null,
           instrumentRef: playlistData.instrumentRef ?? null,
           srAlgType: playlistData.srAlgType ?? "fsrs",
         });
-        console.log("Playlist created:", newPlaylist);
       }
 
       // Notify parent and close dialog
@@ -102,13 +140,9 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
       props.onClose();
     } catch (error) {
       console.error("Failed to save playlist:", error);
-      throw error; // Let PlaylistEditor handle the error display
-    }
-  };
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      props.onClose();
+      setError?.("Failed to save playlist. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -119,7 +153,6 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
         type="button"
         class="fixed inset-0 z-[60] bg-black/50 dark:bg-black/70 cursor-default"
         onClick={props.onClose}
-        onKeyDown={handleKeyDown}
         aria-label="Close modal backdrop"
         data-testid="playlist-editor-backdrop"
       />
@@ -142,15 +175,51 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
           >
             {props.playlistId ? "Edit Playlist" : "Create New Playlist"}
           </h2>
-          <button
-            type="button"
-            onClick={props.onClose}
-            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            aria-label="Close dialog"
-            data-testid="close-playlist-editor"
-          >
-            <X size={24} />
-          </button>
+          <div class="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving()}
+              class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              aria-label="Save playlist"
+              data-testid="save-playlist-button"
+            >
+              <Show
+                when={isSaving()}
+                fallback={
+                  <>
+                    Save <Save size={24} />
+                  </>
+                }
+              >
+                <div class="animate-spin h-4 w-4 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full" />
+                Saving...
+              </Show>
+            </button>
+            <button
+              type="button"
+              onClick={props.onClose}
+              disabled={isSaving()}
+              class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Cancel and close dialog"
+              data-testid="cancel-playlist-button"
+            >
+              <div class="flex items-center gap-2">
+                <span>Cancel</span>
+                <CircleX size={20} />
+              </div>
+            </button>
+            {/* <button
+              type="button"
+              onClick={props.onClose}
+              disabled={isSaving()}
+              class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Close dialog"
+              data-testid="close-playlist-editor"
+            >
+              <X size={24} />
+            </button> */}
+          </div>
         </div>
 
         {/* Content - Scrollable */}
@@ -165,8 +234,15 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
           >
             <PlaylistEditor
               playlist={playlist() ?? undefined}
-              onSave={handleSave}
-              onCancel={props.onClose}
+              onGetFormData={(getter) => {
+                getFormData = getter;
+              }}
+              onGetIsValid={(getter) => {
+                getIsValid = getter;
+              }}
+              onSetError={(setter) => {
+                setError = setter;
+              }}
             />
           </Show>
         </div>

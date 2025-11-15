@@ -21,6 +21,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
 import { queueSync } from "../../sync";
 import type { SqliteDatabase } from "../client-sqlite";
+import { persistDb } from "../client-sqlite";
 import {
   instrument,
   playlist,
@@ -110,6 +111,8 @@ export async function getUserPlaylists(
     .leftJoin(instrument, eq(playlist.instrumentRef, instrument.id))
     .where(and(...conditions))
     .orderBy(playlist.lastModifiedAt);
+
+  // Debug logs removed for cleanliness
 
   return playlists.map((p) => ({
     ...p,
@@ -229,11 +232,7 @@ export async function createPlaylist(
     deviceId: "local", // TODO: Get actual device ID
   };
 
-  console.log("📝 Creating playlist with data:", newPlaylist);
-
   const result = await db.insert(playlist).values(newPlaylist).returning();
-
-  console.log("✅ Playlist created, result:", result[0]);
 
   if (!result || result.length === 0) {
     throw new Error("Failed to create playlist");
@@ -241,8 +240,11 @@ export async function createPlaylist(
 
   const created = result[0];
 
-  // Queue for sync (import queueSync from sync service)
-  // await queueSync(db, 'playlist', created.playlistId!, 'insert');
+  // Queue for sync
+  await queueSync(db, "playlist", "insert", created);
+
+  // Persist to IndexedDB
+  await persistDb();
 
   return created;
 }
@@ -299,7 +301,10 @@ export async function updatePlaylist(
   const updated = result[0];
 
   // Queue for sync
-  // await queueSync(db, 'playlist', playlistId, 'update');
+  await queueSync(db, "playlist", "update", updated);
+
+  // Persist to IndexedDB
+  await persistDb();
 
   return updated;
 }
@@ -355,8 +360,11 @@ export async function deletePlaylist(
     })
     .where(eq(playlistTune.playlistRef, playlistId));
 
-  // Queue for sync
-  // await queueSync(db, 'playlist', playlistId, 'delete');
+  // Queue for sync - pass playlistId for delete
+  await queueSync(db, "playlist", "delete", { playlistId });
+
+  // Persist to IndexedDB
+  await persistDb();
 
   return true;
 }

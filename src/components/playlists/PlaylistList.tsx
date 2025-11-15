@@ -54,8 +54,10 @@ interface PlaylistListProps {
  * ```
  */
 export const PlaylistList: Component<PlaylistListProps> = (props) => {
-  const { user, localDb } = useAuth();
-  const [searchQuery, setSearchQuery] = createSignal("");
+  const { user, localDb, repertoireListChanged } = useAuth();
+
+  // I commented out the search box.  -sb
+  const [searchQuery, _setSearchQuery] = createSignal("");
   const [sorting, setSorting] = createSignal<SortingState>([]);
   const [deletingId, setDeletingId] = createSignal<string | null>(null);
 
@@ -64,7 +66,8 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     () => {
       const userId = user()?.id;
       const db = localDb();
-      return userId && db ? { userId, db } : null;
+      const changeCount = repertoireListChanged(); // Track changes
+      return userId && db ? { userId, db, changeCount } : null;
     },
     async (params) => {
       if (!params) return [];
@@ -292,7 +295,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
       {/* Search Bar */}
       <div class="mb-4 space-y-3">
         {/* Search Input */}
-        <div>
+        {/* <div>
           <label
             for="playlist-search"
             class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
@@ -307,7 +310,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
             placeholder="Search by playlist ID or instrument..."
             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
           />
-        </div>
+        </div> */}
 
         {/* Results Count */}
         <div class="flex items-center justify-between">
