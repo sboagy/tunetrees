@@ -62,7 +62,7 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
   const { user, localDb } = useAuth();
 
   // Fetch playlist data if editing
-  const [playlist, { refetch }] = createResource(
+  const [playlist] = createResource(
     () => {
       const userId = user()?.id;
       const db = localDb();
@@ -85,7 +85,6 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
 
   // Refs to form data and validation functions
   let getFormData: (() => Partial<Playlist> | null) | undefined;
-  let getIsValid: (() => boolean) | undefined;
   let setError: ((error: string | null) => void) | undefined;
 
   const [isSaving, setIsSaving] = createSignal(false);
@@ -236,9 +235,6 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
               playlist={playlist() ?? undefined}
               onGetFormData={(getter) => {
                 getFormData = getter;
-              }}
-              onGetIsValid={(getter) => {
-                getIsValid = getter;
               }}
               onSetError={(setter) => {
                 setError = setter;
