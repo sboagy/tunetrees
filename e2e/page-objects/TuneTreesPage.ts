@@ -72,6 +72,11 @@ export class TuneTreesPage {
 
   readonly topNavManagePlaylistsPanel: Locator;
 
+  // Tune Editor
+  readonly tuneEditorForm: Locator;
+  readonly tuneEditorSubmitButton: Locator;
+  readonly tuneEditorCancelButton: Locator;
+  readonly showPublicToggle: Locator;
   readonly userSettingsButton: Locator;
 
   readonly userSettingsSchedulingOptionsButton: Locator;
@@ -165,6 +170,11 @@ export class TuneTreesPage {
       "top-nav-manage-playlists-panel"
     );
 
+    // Tune Editor
+    this.tuneEditorForm = page.getByTestId("tune-editor-form");
+    this.tuneEditorSubmitButton = page.getByTestId("tune-editor-submit-button");
+    this.tuneEditorCancelButton = page.getByTestId("tune-editor-cancel-button");
+    this.showPublicToggle = page.getByTestId("show-public-toggle");
     this.userSettingsButton = page.getByTestId("user-settings-button");
 
     this.userSettingsSchedulingOptionsButton = page.getByRole("link", {
