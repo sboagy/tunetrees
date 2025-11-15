@@ -12,6 +12,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { toast } from "solid-sonner";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { SyncEngine } from "./engine";
 import type { SyncableTable } from "./queue";
@@ -255,7 +256,15 @@ export class SyncService {
     // Initial syncDown on startup (immediate)
     // This will automatically upload any pending changes first (see syncDown method)
     console.log("[SyncService] Running initial syncDown on startup...");
-    void this.syncDown();
+    void this.syncDown().catch((error) => {
+      console.error("[SyncService] Initial syncDown failed:", error);
+      toast.error(
+        "Failed to sync data from server on startup. You may be seeing outdated data.",
+        {
+          duration: 8000,
+        }
+      );
+    });
 
     // Periodic syncUp (frequent - push local changes to server)
     // Only runs if there are pending changes to avoid unnecessary network calls
@@ -277,19 +286,41 @@ export class SyncService {
           console.log(
             `[SyncService] Running periodic syncUp (${stats.pending} pending changes)...`
           );
-          await this.syncUp();
+          const result = await this.syncUp();
+          if (!result.success && result.itemsFailed > 0) {
+            toast.error(
+              `Failed to upload ${result.itemsFailed} changes to server. Will retry automatically.`,
+              {
+                duration: 5000,
+              }
+            );
+          }
         } else {
           // Silent - no need to log when there's nothing to sync
         }
       } catch (error) {
-        console.error("[SyncService] Error checking sync queue:", error);
+        console.error("[SyncService] Error in periodic syncUp:", error);
+        toast.error(
+          "Background sync error. Your changes may not be uploaded.",
+          {
+            duration: 5000,
+          }
+        );
       }
     }, syncUpIntervalMs);
 
     // Periodic syncDown (infrequent - pull remote changes from server)
     this.syncDownIntervalId = window.setInterval(() => {
       console.log("[SyncService] Running periodic syncDown...");
-      void this.syncDown();
+      void this.syncDown().catch((error) => {
+        console.error("[SyncService] Periodic syncDown failed:", error);
+        toast.error(
+          "Failed to sync data from server. You may be seeing outdated data.",
+          {
+            duration: 5000,
+          }
+        );
+      });
     }, syncDownIntervalMs);
 
     console.log(
