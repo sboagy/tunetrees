@@ -928,40 +928,19 @@ export class SyncEngine {
           console.log(`found problematic table: ${tableName}`);
         }
 
-        try {
-          await this.localDb
-            .insert(localTable)
-            .values(sanitized)
-            .onConflictDoUpdate({
-              target: conflictTarget,
-              set: sanitized,
-            });
-        } catch (error) {
-          log.error(
-            `[SyncEngine] Failed to upsert record (1) in ${tableName}:`,
-            error
-          );
-          console.error("Error type:", typeof error);
-          console.error("Error constructor:", error?.constructor?.name);
-          console.error("Error keys:", error ? Object.keys(error) : "null");
-          console.error(
-            "Error object:",
-            JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
-          );
-          throw error;
-        }
+        await this.localDb
+          .insert(localTable)
+          .values(sanitized)
+          .onConflictDoUpdate({
+            target: conflictTarget,
+            set: sanitized,
+          });
       } catch (error) {
         log.error(
           `[SyncEngine] Failed to upsert record in ${tableName}:`,
           error
         );
         console.error("Error type:", typeof error);
-        console.error("Error constructor:", error?.constructor?.name);
-        console.error("Error keys:", error ? Object.keys(error) : "null");
-        console.error(
-          "Error object:",
-          JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
-        );
         throw error;
       }
     }
