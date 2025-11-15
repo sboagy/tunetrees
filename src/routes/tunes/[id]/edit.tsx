@@ -8,7 +8,7 @@
  */
 
 import { useNavigate, useParams } from "@solidjs/router";
-import { Save, XCircle } from "lucide-solid";
+import { CircleX, Save, XCircle } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createResource, createSignal, Show } from "solid-js";
 import type { TuneEditorData } from "../../../components/tunes";
@@ -18,7 +18,7 @@ import { getTuneById, updateTune } from "../../../lib/db/queries/tunes";
 
 /**
  * Edit Tune Page Component
- * 
+ *
  * Editor with sidebar visible, matching legacy app layout.
  */
 const EditTunePage: Component = () => {
@@ -87,7 +87,10 @@ const EditTunePage: Component = () => {
       <div class="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         {/* Left: Tune ID (small and grayed out) */}
         <div class="flex items-center gap-4">
-          <Show when={tune()} fallback={<span class="text-xs text-gray-400">Loading...</span>}>
+          <Show
+            when={tune()}
+            fallback={<span class="text-xs text-gray-400">Loading...</span>}
+          >
             <span class="text-xs text-gray-500 dark:text-gray-400">
               #{tune()?.id}
             </span>
@@ -104,9 +107,7 @@ const EditTunePage: Component = () => {
               aria-checked={showPublic()}
               onClick={() => setShowPublic(!showPublic())}
               class={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                showPublic()
-                  ? "bg-blue-600"
-                  : "bg-gray-200 dark:bg-gray-700"
+                showPublic() ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
               }`}
               data-testid="show-public-toggle"
             >
@@ -121,7 +122,7 @@ const EditTunePage: Component = () => {
 
         {/* Right: Submit and Cancel buttons */}
         <div class="flex items-center gap-3">
-          <button
+          {/* <button
             type="button"
             onClick={handleCancel}
             class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -129,12 +130,14 @@ const EditTunePage: Component = () => {
           >
             Cancel
             <XCircle class="h-4 w-4" />
-          </button>
-          <button
+          </button> */}
+          {/* <button
             type="button"
             onClick={() => {
               // Trigger form submit in TuneEditor
-              const form = document.querySelector('[data-testid="tune-editor-form"]') as HTMLFormElement;
+              const form = document.querySelector(
+                '[data-testid="tune-editor-form"]'
+              ) as HTMLFormElement;
               if (form) {
                 form.requestSubmit();
               }
@@ -144,6 +147,38 @@ const EditTunePage: Component = () => {
           >
             Submit
             <Save class="h-4 w-4" />
+          </button> */}
+
+          <button
+            type="button"
+            onClick={() => {
+              // Trigger form submit in TuneEditor
+              const form = document.querySelector(
+                '[data-testid="tune-editor-form"]'
+              ) as HTMLFormElement;
+              if (form) {
+                form.requestSubmit();
+              }
+            }}
+            // disabled={isSaving()}
+            class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            aria-label="Save playlist"
+            data-testid="tune-editor-submit-button"
+          >
+            Save <Save size={24} />
+          </button>
+          <button
+            type="button"
+            onClick={handleCancel}
+            // disabled={isSaving()}
+            class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Cancel and close dialog"
+            data-testid="tune-editor-cancel-button"
+          >
+            <div class="flex items-center gap-2">
+              <span>Cancel</span>
+              <CircleX size={20} />
+            </div>
           </button>
         </div>
       </div>

@@ -11,6 +11,7 @@
  */
 
 import abcjs from "abcjs";
+import { CircleX, Save } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -837,7 +838,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
           {/* Action Buttons */}
           <Show when={!props.hideButtons}>
             <div class="flex justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <button
+              {/* <button
                 type="button"
                 onClick={handleCancel}
                 class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -853,6 +854,39 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                   <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
                   Saving...
                 </Show>
+              </button> */}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving()}
+                class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                aria-label="Save playlist"
+                data-testid="save-tune-editor-button"
+              >
+                <Show
+                  when={isSaving()}
+                  fallback={
+                    <>
+                      Save <Save size={24} />
+                    </>
+                  }
+                >
+                  <div class="animate-spin h-4 w-4 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full" />
+                  Saving...
+                </Show>
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={isSaving()}
+                class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Cancel and close dialog"
+                data-testid="cancel-tune-editor-button"
+              >
+                <div class="flex items-center gap-2">
+                  <span>Cancel</span>
+                  <CircleX size={20} />
+                </div>
               </button>
             </div>
           </Show>
