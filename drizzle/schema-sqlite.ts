@@ -156,13 +156,9 @@ export const playlist = sqliteTable(
     syncVersion: integer("sync_version").default(1).notNull(),
     lastModifiedAt: text("last_modified_at").notNull(),
     deviceId: text("device_id"),
-  },
-  (table) => [
-    uniqueIndex("playlist_user_ref_instrument_ref_unique").on(
-      table.userRef,
-      table.instrumentRef
-    ),
-  ]
+  }
+  // Note: Removed unique index on (user_ref, instrument_ref) to allow
+  // multiple playlists per user per instrument (e.g., "Beginner Fiddle", "Advanced Fiddle")
 );
 
 export const playlistTune = sqliteTable(

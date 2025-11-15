@@ -133,9 +133,6 @@ CREATE TABLE
 	);
 
 --> statement-breakpoint
-CREATE UNIQUE INDEX `playlist_user_ref_instrument_ref_unique` ON `playlist` (`user_ref`, `instrument_ref`);
-
---> statement-breakpoint
 CREATE TABLE
 	`playlist_tune` (
 		`playlist_ref` integer NOT NULL,

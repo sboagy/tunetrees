@@ -8,6 +8,8 @@ applyTo: "e2e/tests/**/*.spec.ts"
 
 This document defines the standard structure and expectations for Playwright E2E tests in the TuneTrees SolidJS PWA. All tests must follow these guidelines for consistency, reliability, and maintainability.
 
+Note: Playwright auto-starts the dev server using the `webServer` config in `playwright.config.ts`. You normally do not need to start the dev server manually when running tests via Playwright.
+
 ## Core Testing Philosophy
 
 1. **Single Input State**: Tests must have ONE clear input state. No conditional branches in test code.
@@ -23,6 +25,14 @@ This document defines the standard structure and expectations for Playwright E2E
 - **Storage**: SQLite WASM (browser-based, syncs with Supabase)
 - **CI/CD**: GitHub Actions with automatic database seeding
 - **Test Users**: Parallel-safe dedicated test accounts (alice, bob, charlie)
+
+### Playwright Projects (how tests are organized)
+
+- `setup`: Runs first; authenticates Alice and prepares baseline state (`e2e/setup/auth.setup.ts`).
+- `chromium-auth`: Auth flow tests (unauthenticated start; no setup dependency).
+- `chromium`, `firefox`, `webkit`, `Mobile Chrome`: Authenticated tests; depend on `setup` and use per-worker users from the fixture.
+
+CI specifics (from `playwright.config.ts`): `retries = 4`, `workers = 2`, reporters `["blob", "list"]`.
 
 ## Test File Structure
 
@@ -281,8 +291,8 @@ await ttPage.myNewButton.click();
 # Reset database and regenerate auth (do this first!)
 npm run db:local:reset
 
-# Start dev server (required)
-npm run dev
+# Optional: manually start dev server (Playwright normally auto-starts it)
+# npm run dev
 
 # Run all tests (headless)
 npm run test:e2e
@@ -306,26 +316,25 @@ npm run test:e2e:ui
 npm run test:e2e:report
 ```
 
+Environment variables (local):
+- `ALICE_TEST_PASSWORD` must be set (e.g., in `.env.local`) for the `setup` project to perform login when regenerating auth.
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are passed to the dev server via `webServer.env`.
+
 ### CI/CD (GitHub Actions)
 
 Tests run automatically on:
 - Push to `main` or `feat/pwa1` branches
 - Pull requests targeting `main`
 
-**What CI Does:**
-1. Checks out code
-2. Installs dependencies
-3. Starts Supabase (Docker PostgreSQL)
-4. Resets database with `supabase/seed.sql`
-5. Installs Playwright browsers
-6. Builds application
-7. Starts dev server
-8. Runs all tests in parallel (3 workers)
-9. Uploads artifacts (reports, screenshots, videos)
+**What CI Does (summary):**
+1. Checks out code and installs dependencies
+2. Starts Supabase and seeds the database
+3. Installs Playwright browsers
+4. Starts the dev server via Playwright `webServer`
+5. Runs tests with retries and parallel workers (tuned for CI)
+6. Uploads Playwright reports, screenshots, and videos as artifacts
 
-**Artifacts** (downloadable from GitHub Actions):
-- Playwright HTML Report (30 days retention)
-- Test Screenshots/Videos (7 days retention)
+**Artifacts** (downloadable from GitHub Actions): Playwright HTML report, screenshots, and videos.
 
 ## Debugging
 
@@ -359,7 +368,7 @@ npx playwright show-trace trace.zip
 
 **Flaky test in CI:**
 - Check: Are timeouts long enough? (10s minimum for visibility checks)
-- Fix: Increase timeout or add `waitForLoadState("networkidle")`
+- Fix: Increase timeout or add `waitForLoadState("networkidle")`; prefer page-object locators and avoid brittle text locators for actions.
 
 **Auth expired error:**
 - Check: Are auth files fresh?
@@ -440,6 +449,10 @@ await responsePromise;
 - [ ] Passes locally in headed mode
 - [ ] Passes in CI (PR validation)
 
+Reference examples:
+- `e2e/tests/topnav-001-playlist-dropdown.spec.ts` (canonical structure, selectors, and waits)
+- `e2e/tests/topnav-004-playlist-manager-modal.spec.ts` (modal handling using page object + shared helper)
+
 ### Example New Test
 
 ```typescript
@@ -503,6 +516,8 @@ test.describe("PRACTICE-042: Submit Evaluations", () => {
 - **Practice Helpers**: `e2e/helpers/practice-scenarios.ts`
 - **Test Users**: `e2e/helpers/test-users.ts`
 - **Test Fixture**: `e2e/helpers/test-fixture.ts`
+- **Auth Setup Project**: `e2e/setup/auth.setup.ts`
+- **Additional Notes**: `_notes/testing-infrastructure-complete.md`, `_notes/test-users.md`
 
 ## Summary
 

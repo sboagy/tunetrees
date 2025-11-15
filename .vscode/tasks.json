@@ -36,23 +36,40 @@
             ]
         },
         {
-            "label": "Run Playwright Tests (Headless)",
+            "label": "playwright:headless",
             "type": "shell",
-            "command": "./run-playwright-tests.sh",
+            "command": "npm run test:e2e",
             "options": {
-                "env": {
-                    "cwd": "${workspaceFolder}/frontend",
-                    "PLAYWRIGHT_HEADLESS": "true"
-                }
+                "cwd": "${workspaceFolder}"
             },
+            "problemMatcher": []
         },
         {
-            "label": "Run Playwright Tests (Headed)",
+            "label": "playwright:headed",
             "type": "shell",
-            "command": "./run-playwright-tests.sh",
+            "command": "npm run test:e2e:headed",
             "options": {
-                "cwd": "${workspaceFolder}/frontend"
+                "cwd": "${workspaceFolder}"
             },
+            "problemMatcher": []
+        },
+        {
+            "label": "playwright:debug",
+            "type": "shell",
+            "command": "npm run test:e2e:debug",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "playwright:report",
+            "type": "shell",
+            "command": "npm run test:e2e:report",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
         },
         {
             "label": "git status",
