@@ -22,10 +22,6 @@ interface SidebarNavItem {
 
 const sidebarNavItems: SidebarNavItem[] = [
   {
-    title: "Avatar",
-    href: "/user-settings/avatar",
-  },
-  {
     title: "Scheduling Options",
     href: "/user-settings/scheduling-options",
   },
@@ -36,6 +32,10 @@ const sidebarNavItems: SidebarNavItem[] = [
   {
     title: "Account",
     href: "/user-settings/account",
+  },
+  {
+    title: "Avatar",
+    href: "/user-settings/avatar",
   },
 ];
 

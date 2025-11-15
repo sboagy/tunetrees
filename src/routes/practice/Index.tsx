@@ -7,6 +7,7 @@
  * @module routes/practice/Index
  */
 
+import { useNavigate } from "@solidjs/router";
 import { and, eq, gte, lt, sql } from "drizzle-orm";
 import type { Component } from "solid-js";
 import {
@@ -20,6 +21,7 @@ import {
 import { toast } from "solid-sonner";
 import { TunesGridScheduled } from "../../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
+import type { ITuneOverview } from "../../components/grids/types";
 import {
   DateRolloverBanner,
   type FlashcardFieldVisibilityByFace,
@@ -55,6 +57,7 @@ import {
  * ```
  */
 const PracticeIndex: Component = () => {
+  const navigate = useNavigate();
   const {
     user,
     localDb,
@@ -674,6 +677,11 @@ const PracticeIndex: Component = () => {
     }
   };
 
+  // Handle tune selection (double-click opens editor)
+  const handleTuneSelect = (tune: ITuneOverview) => {
+    navigate(`/tunes/${tune.id}/edit`);
+  };
+
   return (
     <div class="h-full flex flex-col">
       {/* Date Rollover Banner - appears when practice date changes */}
@@ -735,6 +743,7 @@ const PracticeIndex: Component = () => {
               tablePurpose="scheduled"
               onRecallEvalChange={handleRecallEvalChange}
               onGoalChange={handleGoalChange}
+              onTuneSelect={handleTuneSelect}
               evaluations={evaluations()}
               onTableInstanceChange={setTableInstance}
               practiceListData={filteredPracticeList()}

@@ -147,3 +147,6 @@ legacy/frontend/**
 !legacy/frontend/app/**
 !legacy/frontend/auth/**
 !legacy/frontend/components/**
+_notes/OLD_E2E_README.md
+_notes/TEST_GENERATION_SUMMARY.md
+_notes/anon_user_conversion_pattern.md

@@ -38,7 +38,7 @@ test.describe("Checkbox Header Indeterminate State", () => {
     page,
   }) => {
     // Navigate to Catalog tab
-    ttPage.navigateToTab("catalog");
+    await ttPage.navigateToTab("catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -79,7 +79,7 @@ test.describe("Checkbox Header Indeterminate State", () => {
     page,
   }) => {
     // Navigate to Catalog tab
-    ttPage.navigateToTab("catalog");
+    await ttPage.navigateToTab("catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -106,7 +106,7 @@ test.describe("Checkbox Header Indeterminate State", () => {
     page,
   }) => {
     // Navigate to Catalog tab
-    ttPage.navigateToTab("catalog");
+    await ttPage.navigateToTab("catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -139,7 +139,7 @@ test.describe("Checkbox Header Indeterminate State", () => {
     page,
   }) => {
     // Navigate to Repertoire tab
-    ttPage.navigateToTab("repertoire");
+    await ttPage.navigateToTab("repertoire");
     await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
       timeout: 5000,
     });
@@ -180,7 +180,7 @@ test.describe("Checkbox Header Indeterminate State", () => {
     page,
   }) => {
     // Navigate to Repertoire tab
-    ttPage.navigateToTab("repertoire");
+    await ttPage.navigateToTab("repertoire");
     await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
       timeout: 5000,
     });

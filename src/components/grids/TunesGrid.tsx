@@ -51,6 +51,7 @@ export interface ITunesGridProps<T extends { id: string | number }> {
   cellCallbacks?: ICellEditorCallbacks;
   currentRowId?: string | number;
   onRowClick?: (row: T) => void;
+  onRowDoubleClick?: (row: T) => void;
   onSelectionChange?: (count: number) => void;
   columnVisibility?: VisibilityState;
   onColumnVisibilityChange?: (vs: VisibilityState) => void;
@@ -479,6 +480,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                         props.currentRowId === (row.original as any).id,
                     }}
                     onClick={() => props.onRowClick?.(row.original)}
+                    onDblClick={() => props.onRowDoubleClick?.(row.original)}
                     data-index={virtualRow.index}
                   >
                     <For each={row.getVisibleCells()}>

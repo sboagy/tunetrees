@@ -49,6 +49,24 @@ const COMPOSITE_KEY_TABLES: Record<string, string[]> = {
 };
 
 /**
+ * Tables with non-standard primary key column names
+ * Most tables use 'id', but some use table-specific names like 'playlist_id'
+ * Maps table name to its primary key column name (in snake_case for Supabase)
+ */
+const PRIMARY_KEY_COLUMNS: Record<string, string> = {
+  playlist: "playlist_id",
+  // Most other tables use 'id' - add exceptions here as needed
+};
+
+/**
+ * Get the primary key column name for a table (in snake_case)
+ * Returns 'id' by default for tables not in the map
+ */
+function getPrimaryKeyColumn(tableName: string): string {
+  return PRIMARY_KEY_COLUMNS[tableName] || "id";
+}
+
+/**
  * Get composite key/unique constraint fields for a table (in snake_case)
  * Returns null for simple id-only tables
  */
@@ -458,17 +476,18 @@ export class SyncEngine {
             });
           if (error) throw error;
         } else {
-          // Standard id column OR composite key table with id field
-          // Use regular UPDATE by id (allows partial updates)
-          if (!remoteData.id) {
+          // Standard primary key column (may be 'id' or table-specific like 'playlist_id')
+          const pkColumn = getPrimaryKeyColumn(tableName);
+
+          if (!remoteData[pkColumn]) {
             throw new Error(
-              `UPDATE operation requires id in data for table ${tableName}`
+              `UPDATE operation requires ${pkColumn} in data for table ${tableName}`
             );
           }
           const { error } = await this.supabase
             .from(tableName)
             .update(remoteData)
-            .eq("id", String(remoteData.id));
+            .eq(pkColumn, String(remoteData[pkColumn]));
           if (error) throw error;
         }
         break;
@@ -496,16 +515,18 @@ export class SyncEngine {
           const { error } = await query;
           if (error) throw error;
         } else {
-          // Soft delete: set deleted flag
-          if (!remoteData.id) {
+          // Soft delete: set deleted flag using table-specific primary key
+          const pkColumn = getPrimaryKeyColumn(tableName);
+
+          if (!remoteData[pkColumn]) {
             throw new Error(
-              `DELETE operation requires id in data for table ${tableName}`
+              `DELETE operation requires ${pkColumn} in data for table ${tableName}`
             );
           }
           const { error } = await this.supabase
             .from(tableName)
             .update({ deleted: true })
-            .eq("id", String(remoteData.id));
+            .eq(pkColumn, String(remoteData[pkColumn]));
           if (error) throw error;
         }
         break;
@@ -832,18 +853,94 @@ export class SyncEngine {
             break;
         }
 
+        // Check if local record exists and compare timestamps
+        // Skip timestamp check for reference data tables (no sync conflicts expected)
+        const referenceDataTables = [
+          "genre",
+          "tune_type",
+          "genre_tune_type",
+          "instrument",
+        ];
+        const shouldCheckTimestamp =
+          !referenceDataTables.includes(tableName) &&
+          "lastModifiedAt" in transformed;
+
+        if (shouldCheckTimestamp) {
+          // Fetch existing local record to compare timestamps
+          let existingLocal: any = null;
+
+          // Query based on primary key structure
+          if (conflictTarget.length === 1) {
+            // Single primary key
+            const pkField = conflictTarget[0];
+            // pkField.name is snake_case (DB column), but transformed uses camelCase
+            // Convert snake_case to camelCase to look up the value
+            const pkKeyCamel = pkField.name.replace(
+              /_([a-z])/g,
+              (_: string, letter: string) => letter.toUpperCase()
+            );
+            const pkValue = (transformed as any)[pkKeyCamel];
+            existingLocal = await this.localDb
+              .select()
+              .from(localTable)
+              .where(eq(pkField, pkValue))
+              .limit(1);
+          } else {
+            // Composite key - build AND condition
+            const conditions = conflictTarget.map((field: any) => {
+              // Convert snake_case to camelCase
+              const keyCamel = field.name.replace(
+                /_([a-z])/g,
+                (_: string, letter: string) => letter.toUpperCase()
+              );
+              return eq(field, (transformed as any)[keyCamel]);
+            });
+            existingLocal = await this.localDb
+              .select()
+              .from(localTable)
+              .where(and(...conditions))
+              .limit(1);
+          }
+
+          if (existingLocal && existingLocal.length > 0) {
+            const localTimestamp = existingLocal[0].lastModifiedAt;
+            const remoteTimestamp = transformed.lastModifiedAt;
+
+            // Compare timestamps - only update if remote is newer
+            if (
+              localTimestamp &&
+              remoteTimestamp &&
+              localTimestamp >= remoteTimestamp
+            ) {
+              syncLog(
+                `[SyncEngine] Skipping ${tableName} record - local is newer or equal (local: ${localTimestamp}, remote: ${remoteTimestamp})`
+              );
+              continue; // Skip this record
+            }
+          }
+        }
+
+        // Build a schema-aware local row with only valid columns and safe defaults
+        const sanitized = this.prepareLocalRow(tableName, transformed);
+
+        const tableNameString = `${tableName}`;
+        if (tableNameString === "user_profile") {
+          console.log(`found problematic table: ${tableName}`);
+        }
+
         await this.localDb
           .insert(localTable)
-          .values(transformed)
+          .values(sanitized)
           .onConflictDoUpdate({
             target: conflictTarget,
-            set: transformed,
+            set: sanitized,
           });
       } catch (error) {
         log.error(
           `[SyncEngine] Failed to upsert record in ${tableName}:`,
           error
         );
+        console.error("Error type:", typeof error);
         throw error;
       }
     }
@@ -927,6 +1024,120 @@ export class SyncEngine {
     }
 
     return transformed;
+  }
+
+  /**
+   * Return list of column keys for a Drizzle table object.
+   * We detect columns by presence of a string `name` and an object `table`.
+   */
+  private getTableColumnKeys(localTable: any): string[] {
+    return Object.keys(localTable).filter((k) => {
+      const v: any = (localTable as any)[k];
+      return (
+        v &&
+        typeof v === "object" &&
+        typeof v.name === "string" &&
+        // drizzle column objects expose table metadata
+        "table" in v
+      );
+    });
+  }
+
+  /**
+   * Prepare a row for local insertion/update:
+   * - Keep only schema columns
+   * - Fill required defaults per table
+   * - Coerce undefined → null (sql.js binding safe)
+   */
+  private prepareLocalRow(
+    tableName: string,
+    transformed: Record<string, any>
+  ): Record<string, any> {
+    const localTable: any = this.getLocalTable(tableName as SyncableTable);
+    if (!localTable) return {};
+
+    const row: Record<string, any> = {};
+    const colKeys = this.getTableColumnKeys(localTable);
+
+    // Copy only known columns from transformed
+    for (const key of colKeys) {
+      row[key] = transformed[key];
+    }
+
+    // Apply table-agnostic defaults
+    const needsLastModified = [
+      "user_profile",
+      "playlist",
+      "playlist_tune",
+      "note",
+      "reference",
+      "tag",
+      "practice_record",
+      "daily_practice_queue",
+      "tune",
+      "tune_override",
+      "table_state",
+      "table_transient_data",
+      "prefs_scheduling_options",
+      "prefs_spaced_repetition",
+      "instrument",
+    ];
+    if (needsLastModified.includes(tableName)) {
+      if (row.lastModifiedAt === undefined || row.lastModifiedAt === null) {
+        row.lastModifiedAt = new Date().toISOString();
+      }
+    }
+
+    const needsDeleted = [
+      "user_profile",
+      "playlist",
+      "playlist_tune",
+      "note",
+      "reference",
+      "tune",
+      "tune_override",
+      "practice_record",
+      "instrument",
+    ];
+    if (needsDeleted.includes(tableName)) {
+      if (row.deleted === undefined || row.deleted === null) {
+        row.deleted = 0;
+      }
+    }
+    if (row.syncVersion === undefined || row.syncVersion === null) {
+      row.syncVersion = 1;
+    }
+
+    // Table-specific fixes
+    if (tableName === "user_profile") {
+      // Ensure acceptableDelinquencyWindow, avatarUrl exist
+      if (row.acceptableDelinquencyWindow === undefined)
+        row.acceptableDelinquencyWindow = 21;
+      if (row.avatarUrl === undefined) row.avatarUrl = null;
+      // SQLite requires user_profile.id NOT NULL; if absent, mirror supabaseUserId
+      if (row.id === undefined || row.id === null) row.id = row.supabaseUserId;
+    }
+    if (tableName === "playlist") {
+      if (row.name === undefined) row.name = null;
+      if (row.instrumentRef === undefined) row.instrumentRef = null;
+      if (row.genreDefault === undefined) row.genreDefault = null;
+      if (row.srAlgType === undefined) row.srAlgType = null;
+    }
+
+    // Coerce any remaining undefined to null
+    for (const key of colKeys) {
+      if (row[key] === undefined) row[key] = null;
+    }
+
+    if (import.meta.env.VITE_SYNC_DEBUG === "true") {
+      log.debug(`[SyncEngine] Prepared row (${tableName}) keys:`, colKeys);
+      const sample = Object.fromEntries(
+        colKeys.slice(0, 8).map((k) => [k, row[k]])
+      );
+      log.debug(`[SyncEngine] Prepared sample (${tableName}):`, sample);
+    }
+
+    return row;
   }
 
   /**
