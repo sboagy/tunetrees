@@ -8,7 +8,7 @@
  */
 
 import { useNavigate, useParams } from "@solidjs/router";
-import { CircleX, Save, XCircle } from "lucide-solid";
+import { CircleX, Save } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createResource, createSignal, Show } from "solid-js";
 import type { TuneEditorData } from "../../../components/tunes";
