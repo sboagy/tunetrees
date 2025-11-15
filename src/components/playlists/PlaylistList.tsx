@@ -20,6 +20,7 @@ import {
   getSortedRowModel,
   type SortingState,
 } from "@tanstack/solid-table";
+import { Pencil, Trash2 } from "lucide-solid";
 import {
   type Component,
   createMemo,
@@ -53,8 +54,10 @@ interface PlaylistListProps {
  * ```
  */
 export const PlaylistList: Component<PlaylistListProps> = (props) => {
-  const { user, localDb } = useAuth();
-  const [searchQuery, setSearchQuery] = createSignal("");
+  const { user, localDb, repertoireListChanged } = useAuth();
+
+  // I commented out the search box.  -sb
+  const [searchQuery, _setSearchQuery] = createSignal("");
   const [sorting, setSorting] = createSignal<SortingState>([]);
   const [deletingId, setDeletingId] = createSignal<string | null>(null);
 
@@ -63,7 +66,8 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     () => {
       const userId = user()?.id;
       const db = localDb();
-      return userId && db ? { userId, db } : null;
+      const changeCount = repertoireListChanged(); // Track changes
+      return userId && db ? { userId, db, changeCount } : null;
     },
     async (params) => {
       if (!params) return [];
@@ -135,12 +139,20 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     {
       accessorKey: "playlistId",
       header: "ID",
-      size: 60,
-      cell: (info) => (
-        <span class="text-gray-600 dark:text-gray-400">
-          {info.getValue() as number}
-        </span>
-      ),
+      size: 80,
+      cell: (info) => {
+        const fullId = info.getValue() as string;
+        // Show last 8 characters of UUID for readability
+        const shortId = fullId.slice(-8);
+        return (
+          <span
+            class="text-gray-600 dark:text-gray-400 font-mono text-xs"
+            title={fullId}
+          >
+            {shortId}
+          </span>
+        );
+      },
     },
     {
       accessorKey: "name",
@@ -176,15 +188,15 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
       },
     },
     {
-      accessorKey: "instrumentRef",
+      accessorKey: "instrumentName",
       header: "Instrument",
       size: 150,
       cell: (info) => {
-        const value = info.getValue() as number | null;
+        const value = info.getValue() as string | null;
         return (
           <Show when={value} fallback={<span class="text-gray-400">—</span>}>
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
-              Instrument {value}
+              {value}
             </span>
           </Show>
         );
@@ -193,7 +205,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     {
       accessorKey: "srAlgType",
       header: "Algorithm",
-      size: 100,
+      size: 90,
       cell: (info) => {
         const value = (info.getValue() as string | null) || "fsrs";
         return (
@@ -206,44 +218,13 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     {
       accessorKey: "tuneCount",
       header: "Tunes",
-      size: 80,
+      size: 70,
       cell: (info) => {
         const count = info.getValue() as number;
         return (
           <span class="font-semibold text-gray-900 dark:text-white">
             {count}
           </span>
-        );
-      },
-    },
-    {
-      accessorKey: "lastModifiedAt",
-      header: "Last Modified",
-      size: 180,
-      cell: (info) => {
-        const value = info.getValue() as string | null;
-        if (!value) return <span class="text-gray-400">—</span>;
-
-        const date = new Date(value);
-        return (
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {date.toLocaleDateString()}{" "}
-            {date.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
-        );
-      },
-    },
-    {
-      accessorKey: "syncVersion",
-      header: "Version",
-      size: 80,
-      cell: (info) => {
-        const value = info.getValue() as number;
-        return (
-          <span class="text-xs text-gray-500 dark:text-gray-400">v{value}</span>
         );
       },
     },
@@ -256,17 +237,19 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
         const isDeleting = deletingId() === playlist.playlistId;
 
         return (
-          <div class="flex gap-2">
+          <div class="flex gap-2 items-center">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 props.onPlaylistSelect?.(playlist);
               }}
-              class="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+              class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors p-1"
               disabled={isDeleting}
+              title="Edit playlist"
+              aria-label="Edit playlist"
             >
-              Edit
+              <Pencil size={16} />
             </button>
             <button
               type="button"
@@ -274,10 +257,12 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
                 e.stopPropagation();
                 handleDelete(playlist.playlistId);
               }}
-              class="text-red-600 dark:text-red-400 hover:underline text-sm"
+              class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
               disabled={isDeleting}
+              title={isDeleting ? "Deleting..." : "Delete playlist"}
+              aria-label={isDeleting ? "Deleting playlist" : "Delete playlist"}
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              <Trash2 size={16} />
             </button>
           </div>
         );
@@ -310,7 +295,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
       {/* Search Bar */}
       <div class="mb-4 space-y-3">
         {/* Search Input */}
-        <div>
+        {/* <div>
           <label
             for="playlist-search"
             class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
@@ -325,7 +310,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
             placeholder="Search by playlist ID or instrument..."
             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
           />
-        </div>
+        </div> */}
 
         {/* Results Count */}
         <div class="flex items-center justify-between">

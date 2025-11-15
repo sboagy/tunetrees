@@ -12,18 +12,28 @@
  */
 
 import type { Component } from "solid-js";
-import { createResource, createSignal, For, Show } from "solid-js";
-import { genre } from "../../../drizzle/schema-sqlite";
+import {
+  createEffect,
+  createResource,
+  createSignal,
+  For,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
+import { genre, instrument } from "../../../drizzle/schema-sqlite";
 import { useAuth } from "../../lib/auth/AuthContext";
 import type { Playlist } from "../../lib/db/types";
 
 interface PlaylistEditorProps {
   /** Playlist to edit (undefined for new playlist) */
   playlist?: Playlist;
-  /** Callback when save is requested */
-  onSave?: (playlistData: Partial<Playlist>) => void | Promise<void>;
-  /** Callback when cancel is requested */
-  onCancel?: () => void;
+  /** Ref to store function that returns current form data */
+  onGetFormData?: (getter: () => Partial<Playlist> | null) => void;
+  /** Ref to store function that returns validation state */
+  onGetIsValid?: (getter: () => boolean) => void;
+  /** Ref to store function that sets error message */
+  onSetError?: (setter: (error: string | null) => void) => void;
 }
 
 const SR_ALG_TYPES = [
@@ -44,23 +54,48 @@ const SR_ALG_TYPES = [
  * ```
  */
 export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
-  const { localDb } = useAuth();
+  const { localDb, user } = useAuth();
 
-  // Form state signals
-  const [name, setName] = createSignal(props.playlist?.name || "");
-  const [genreDefault, setGenreDefault] = createSignal<string | null>(
-    props.playlist?.genreDefault ?? null
-  );
-  const [instrumentRef, setInstrumentRef] = createSignal<string | null>(
-    props.playlist?.instrumentRef ?? null
-  );
-  const [srAlgType, setSrAlgType] = createSignal(
-    props.playlist?.srAlgType || "fsrs"
-  );
+  // Dev-only mount counter to detect unintended multiple mounts
+  const DEV = import.meta.env.DEV;
+  let mounted = false;
+
+  // Form state signals - initialize with empty/null values
+  const [name, setName] = createSignal("");
+  const [genreDefault, setGenreDefault] = createSignal<string | null>(null);
+  const [instrumentRef, setInstrumentRef] = createSignal<string | null>(null);
+  const [srAlgType, setSrAlgType] = createSignal("fsrs");
+
+  // Dev-only: warn if component mounts more than once per open
+  onMount(() => {
+    if (DEV && mounted) {
+      console.warn("[PlaylistEditor] Mounted more than once for a single open");
+    }
+    mounted = true;
+  });
+  onCleanup(() => {
+    mounted = false;
+  });
+
+  // Update form state when playlist prop changes
+  createEffect(() => {
+    const playlist = props.playlist;
+    if (playlist) {
+      setName(playlist.name || "");
+      setGenreDefault(playlist.genreDefault ?? null);
+      setInstrumentRef(playlist.instrumentRef ?? null);
+      setSrAlgType(playlist.srAlgType || "fsrs");
+    } else {
+      setName("");
+      setGenreDefault(null);
+      setInstrumentRef(null);
+      setSrAlgType("fsrs");
+    }
+  });
 
   // UI state
-  const [isSaving, setIsSaving] = createSignal(false);
   const [errors, setErrors] = createSignal<Record<string, string>>({});
+  const [submitError, setSubmitError] = createSignal<string | null>(null);
 
   // Fetch available genres from database
   const [genres] = createResource(
@@ -71,6 +106,34 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
     }
   );
 
+  // Fetch instruments: public instruments + user's private instruments
+  const [instruments] = createResource(
+    () => {
+      const db = localDb();
+      const userId = user()?.id;
+      return db && userId ? { db, userId } : null;
+    },
+    async (params) => {
+      if (!params) return [];
+      const { or, isNull, eq } = await import("drizzle-orm");
+      const result = await params.db
+        .select()
+        .from(instrument)
+        .where(
+          or(
+            isNull(instrument.privateToUser),
+            eq(instrument.privateToUser, params.userId)
+          )
+        )
+        .orderBy(instrument.instrument)
+        .all();
+      return result;
+    }
+  );
+
+  /**
+   * Validate form data before submission
+   */
   // Validate form
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -83,57 +146,34 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle save
-  const handleSave = async () => {
+  // Get form data
+  const getFormData = (): Partial<Playlist> | null => {
     if (!validate()) {
-      return;
+      return null;
     }
 
-    setIsSaving(true);
-
-    const playlistData: Partial<Playlist> = {
+    return {
       name: name().trim(),
       genreDefault: genreDefault(),
       instrumentRef: instrumentRef(),
       srAlgType: srAlgType() || "fsrs",
     };
-
-    try {
-      await props.onSave?.(playlistData);
-    } catch (error) {
-      console.error("Save error:", error);
-      setErrors({
-        submit: "Failed to save playlist. Please try again.",
-      });
-    } finally {
-      setIsSaving(false);
-    }
   };
 
-  // Handle cancel
-  const handleCancel = () => {
-    props.onCancel?.();
-  };
+  // Expose functions to parent
+  props.onGetFormData?.(getFormData);
+  props.onGetIsValid?.(validate);
+  props.onSetError?.(setSubmitError);
 
   return (
-    <div class="w-full max-w-2xl mx-auto">
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-          {props.playlist ? "Edit Playlist" : "New Playlist"}
-        </h2>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void handleSave();
-          }}
-          class="space-y-6"
-        >
+    <div class="w-full">
+      <div>
+        <div class="space-y-6">
           {/* Error message */}
-          <Show when={errors().submit}>
+          <Show when={submitError()}>
             <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
               <p class="text-sm text-red-600 dark:text-red-400">
-                {errors().submit}
+                {submitError()}
               </p>
             </div>
           </Show>
@@ -186,15 +226,16 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
             </label>
             <select
               id="genre-default"
-              value={genreDefault() ?? ""}
-              onChange={(e) => setGenreDefault(e.currentTarget.value || null)}
+              onInput={(e) => setGenreDefault(e.currentTarget.value || null)}
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
             >
-              <option value="">No default genre</option>
+              <option value="" selected={!genreDefault()}>
+                No default genre
+              </option>
               <Show when={!genres.loading}>
                 <For each={genres()}>
                   {(g) => (
-                    <option value={g.id}>
+                    <option value={g.id} selected={genreDefault() === g.id}>
                       {g.id} - {g.name || "Unnamed Genre"}
                     </option>
                   )}
@@ -213,29 +254,37 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
               for="instrument-ref"
               class="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Instrument Reference{" "}
-              <span class="text-xs text-gray-500">
-                (Optional - for future use)
-              </span>
+              Instrument
             </label>
-            <input
+            <select
               id="instrument-ref"
-              type="number"
-              value={instrumentRef() ?? ""}
-              onInput={(e) => {
-                const value = e.currentTarget.value;
-                setInstrumentRef(value || null);
-              }}
-              placeholder="Leave blank for now"
+              onInput={(e) => setInstrumentRef(e.currentTarget.value || null)}
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
               classList={{ "border-red-500": !!errors().instrumentRef }}
-              disabled
-            />
+            >
+              <option value="" selected={!instrumentRef()}>
+                No instrument selected
+              </option>
+              <Show when={!instruments.loading}>
+                <For each={instruments()}>
+                  {(inst) => (
+                    <option
+                      value={inst.id}
+                      selected={instrumentRef() === inst.id}
+                    >
+                      {inst.instrument || "Unnamed Instrument"}
+                      {inst.description ? ` - ${inst.description}` : ""}
+                    </option>
+                  )}
+                </For>
+              </Show>
+            </select>
             <Show when={errors().instrumentRef}>
               <p class="text-xs text-red-500">{errors().instrumentRef}</p>
             </Show>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              Instrument management will be added in a future update.
+              Select the instrument for this playlist (e.g., Irish Flute,
+              Mandolin).
             </p>
           </div>
 
@@ -270,28 +319,7 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
               deviceId) will be automatically managed when you save.
             </p>
           </div>
-
-          {/* Action Buttons */}
-          <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={handleCancel}
-              class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving()}
-              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <Show when={isSaving()} fallback={<>Save Playlist</>}>
-                <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                Saving...
-              </Show>
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );

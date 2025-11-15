@@ -216,6 +216,14 @@ export async function getPracticeList(
     `[getPracticeList] Matching both formats: ISO='${isoFormat}', Space='${spaceFormat}'`
   );
 
+  // If no active queue windows exist, return empty array
+  if (!isoFormat) {
+    console.log(
+      `[getPracticeList] No active queue windows found, returning empty list`
+    );
+    return [];
+  }
+
   // Select from the MOST RECENT active queue snapshot
   // Match BOTH '2025-11-08T00:00:00' AND '2025-11-08 00:00:00' formats
   // Use GROUP BY to eliminate duplicates (some tunes may exist in both windows)

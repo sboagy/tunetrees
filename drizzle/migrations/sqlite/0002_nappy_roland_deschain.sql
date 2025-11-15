@@ -178,9 +178,6 @@ ALTER TABLE `__new_playlist`
 RENAME TO `playlist`;
 
 --> statement-breakpoint
-CREATE UNIQUE INDEX `playlist_user_ref_instrument_ref_unique` ON `playlist` (`user_ref`, `instrument_ref`);
-
---> statement-breakpoint
 CREATE TABLE
 	`__new_playlist_tune` (
 		`playlist_ref` text NOT NULL,

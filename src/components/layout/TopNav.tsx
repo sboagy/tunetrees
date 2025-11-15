@@ -7,7 +7,6 @@
  * @module components/layout/TopNav
  */
 
-import { useNavigate } from "@solidjs/router";
 import {
   type Component,
   createEffect,
@@ -30,6 +29,7 @@ import {
   setSelectedPlaylistId,
 } from "../../lib/services/playlist-service";
 import { getSyncQueueStats } from "../../lib/sync/queue";
+import { PlaylistManagerDialog } from "../playlists/PlaylistManagerDialog";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
 // Helper function to get display name for a playlist
@@ -61,8 +61,9 @@ const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
  *
  * Dropdown for selecting active playlist with "Manage Playlists..." option
  */
-const PlaylistDropdown: Component = () => {
-  const navigate = useNavigate();
+const PlaylistDropdown: Component<{
+  onOpenPlaylistManager: () => void;
+}> = (props) => {
   const { user, localDb, repertoireListChanged } = useAuth();
   const { currentPlaylistId, setCurrentPlaylistId } = useCurrentPlaylist();
   const [showDropdown, setShowDropdown] = createSignal(false);
@@ -173,7 +174,7 @@ const PlaylistDropdown: Component = () => {
 
   const handleManagePlaylists = () => {
     setShowDropdown(false);
-    navigate("/playlists");
+    props.onOpenPlaylistManager();
   };
 
   const selectedPlaylist = createMemo(() => {
@@ -324,6 +325,7 @@ export const TopNav: Component = () => {
   const [pendingCount, setPendingCount] = createSignal(0);
   const [showUserMenu, setShowUserMenu] = createSignal(false);
   const [showDbMenu, setShowDbMenu] = createSignal(false);
+  const [showPlaylistManager, setShowPlaylistManager] = createSignal(false);
   let userMenuContainerRef: HTMLDivElement | undefined;
   let dbMenuContainerRef: HTMLDivElement | undefined;
 
@@ -438,7 +440,9 @@ export const TopNav: Component = () => {
             </a>
 
             {/* Playlist Selector */}
-            <PlaylistDropdown />
+            <PlaylistDropdown
+              onOpenPlaylistManager={() => setShowPlaylistManager(true)}
+            />
           </div>
 
           {/* User Info + Theme + Logout */}
@@ -877,6 +881,12 @@ export const TopNav: Component = () => {
           </div>
         </div>
       </div>
+
+      {/* Playlist Manager Dialog */}
+      <PlaylistManagerDialog
+        isOpen={showPlaylistManager()}
+        onClose={() => setShowPlaylistManager(false)}
+      />
     </nav>
   );
 };

@@ -21,6 +21,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
 import { queueSync } from "../../sync";
 import type { SqliteDatabase } from "../client-sqlite";
+import { persistDb } from "../client-sqlite";
 import {
   instrument,
   playlist,
@@ -83,6 +84,7 @@ export async function getUserPlaylists(
   }
 
   // Get playlists with tune count and instrument names
+  // Uses logic similar to view_playlist_joined to resolve genre_default from instrument if needed
   const playlists = await db
     .select({
       playlistId: playlist.playlistId,
@@ -90,7 +92,9 @@ export async function getUserPlaylists(
       name: playlist.name,
       instrumentRef: playlist.instrumentRef,
       instrumentName: instrument.instrument,
-      genreDefault: playlist.genreDefault,
+      // Select both genre columns for post-query resolution
+      playlistGenre: playlist.genreDefault,
+      instrumentGenre: instrument.genreDefault,
       srAlgType: playlist.srAlgType,
       deleted: playlist.deleted,
       syncVersion: playlist.syncVersion,
@@ -108,10 +112,17 @@ export async function getUserPlaylists(
     .where(and(...conditions))
     .orderBy(playlist.lastModifiedAt);
 
+  // Debug logs removed for cleanliness
+
   return playlists.map((p) => ({
     ...p,
+    // Resolve genre: use playlist's genreDefault if set, otherwise use instrument's genreDefault
+    genreDefault: p.playlistGenre ?? p.instrumentGenre,
     tuneCount: Number(p.tuneCount) || 0,
     instrumentName: p.instrumentName || undefined, // Convert null to undefined
+    // Remove the temporary fields from the result
+    playlistGenre: undefined,
+    instrumentGenre: undefined,
   }));
 }
 
@@ -221,11 +232,7 @@ export async function createPlaylist(
     deviceId: "local", // TODO: Get actual device ID
   };
 
-  console.log("📝 Creating playlist with data:", newPlaylist);
-
   const result = await db.insert(playlist).values(newPlaylist).returning();
-
-  console.log("✅ Playlist created, result:", result[0]);
 
   if (!result || result.length === 0) {
     throw new Error("Failed to create playlist");
@@ -233,8 +240,11 @@ export async function createPlaylist(
 
   const created = result[0];
 
-  // Queue for sync (import queueSync from sync service)
-  // await queueSync(db, 'playlist', created.playlistId!, 'insert');
+  // Queue for sync
+  await queueSync(db, "playlist", "insert", created);
+
+  // Persist to IndexedDB
+  await persistDb();
 
   return created;
 }
@@ -291,7 +301,10 @@ export async function updatePlaylist(
   const updated = result[0];
 
   // Queue for sync
-  // await queueSync(db, 'playlist', playlistId, 'update');
+  await queueSync(db, "playlist", "update", updated);
+
+  // Persist to IndexedDB
+  await persistDb();
 
   return updated;
 }
@@ -347,8 +360,11 @@ export async function deletePlaylist(
     })
     .where(eq(playlistTune.playlistRef, playlistId));
 
-  // Queue for sync
-  // await queueSync(db, 'playlist', playlistId, 'delete');
+  // Queue for sync - pass playlistId for delete
+  await queueSync(db, "playlist", "delete", { playlistId });
+
+  // Persist to IndexedDB
+  await persistDb();
 
   return true;
 }

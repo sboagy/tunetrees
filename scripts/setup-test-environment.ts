@@ -139,6 +139,15 @@ async function setup() {
     supabase_user_id: user.id, // References auth.users.id
     email: user.email,
     name: user.name,
+    avatar_url: null, // Explicitly set nullable avatar field to avoid undefined
+    sr_alg_type: null, // Scheduling algorithm type (null until user chooses)
+    phone: null,
+    phone_verified: null,
+    acceptable_delinquency_window: 21, // Mirror default explicitly for clarity
+    deleted: false,
+    sync_version: 1,
+    last_modified_at: new Date().toISOString(),
+    device_id: null,
   }));
 
   const { error: profileError } = await supabase
@@ -157,8 +166,14 @@ async function setup() {
   const playlists = TEST_USERS.map((user) => ({
     playlist_id: user.playlistId, // UUID schema uses playlist_id, not id
     user_ref: user.id, // References user_profile.supabase_user_id
+    name: null,
     instrument_ref: CATALOG_INSTRUMENT_IRISH_FLUTE_ID, // Can be set per-user if needed
     genre_default: "ITRAD", // Genre code, not full name
+    sr_alg_type: null,
+    deleted: false,
+    sync_version: 1,
+    last_modified_at: new Date().toISOString(),
+    device_id: null,
   }));
 
   const { error: playlistError } = await supabase
