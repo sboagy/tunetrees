@@ -72,6 +72,20 @@ export class TuneTreesPage {
 
   readonly topNavManagePlaylistsPanel: Locator;
 
+  // Tune Editor
+  readonly tuneEditorForm: Locator;
+  readonly tuneEditorSubmitButton: Locator;
+  readonly tuneEditorCancelButton: Locator;
+  readonly showPublicToggle: Locator;
+  readonly userSettingsButton: Locator;
+
+  readonly userSettingsSchedulingOptionsButton: Locator;
+  readonly userSettingsSpacedRepetitionButton: Locator;
+  readonly userSettingsAccountButton: Locator;
+  readonly userSettingsAvatarButton: Locator;
+
+  readonly settingsMenuToggle: Locator;
+
   constructor(page: Page) {
     this.page = page;
 
@@ -155,6 +169,28 @@ export class TuneTreesPage {
     this.topNavManagePlaylistsPanel = page.getByTestId(
       "top-nav-manage-playlists-panel"
     );
+
+    // Tune Editor
+    this.tuneEditorForm = page.getByTestId("tune-editor-form");
+    this.tuneEditorSubmitButton = page.getByTestId("tune-editor-submit-button");
+    this.tuneEditorCancelButton = page.getByTestId("tune-editor-cancel-button");
+    this.showPublicToggle = page.getByTestId("show-public-toggle");
+    this.userSettingsButton = page.getByTestId("user-settings-button");
+
+    this.userSettingsSchedulingOptionsButton = page.getByRole("link", {
+      name: "Scheduling Options",
+    });
+    this.userSettingsSpacedRepetitionButton = page.getByRole("link", {
+      name: "Spaced Repetition",
+    });
+    this.userSettingsAccountButton = page.getByRole("link", {
+      name: "Account",
+    });
+    this.userSettingsAvatarButton = page.getByRole("link", {
+      name: "Avatar",
+    });
+
+    this.settingsMenuToggle = page.getByTestId("settings-menu-toggle");
   }
 
   /**
@@ -164,6 +200,28 @@ export class TuneTreesPage {
     await this.page.goto(url);
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForTimeout(2000); // Allow sync to start
+  }
+
+  /**
+   * Finds the index of a column in a grid by its header text.
+   * @param gridTestId The data-testid of the grid container.
+   * @param columnHeaderText The text to search for in the header (case-insensitive).
+   * @returns The zero-based index of the column.
+   */
+  async getColumnIndexByHeaderText(
+    gridTestId: string,
+    columnHeaderText: string
+  ) {
+    const headers = this.page.locator(`[data-testid='${gridTestId}'] thead th`);
+    const headerTexts = await headers.allTextContents();
+    const columnIndex = headerTexts.findIndex((text) =>
+      new RegExp(columnHeaderText, "i").test(text)
+    );
+
+    // Ensure the column was found
+    expect(columnIndex).toBeGreaterThan(-1);
+
+    return columnIndex;
   }
 
   /**

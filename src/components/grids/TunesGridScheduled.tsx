@@ -109,6 +109,10 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   // Row click sets current tune and bubbles selection
   const handleRowClick = (row: ReturnType<typeof tunes>[0]) => {
     setCurrentTuneId(row.tune_id);
+  };
+
+  const handleRowDoubleClick = (row: ReturnType<typeof tunes>[0]) => {
+    // Double click: open tune editor via callback
     props.onTuneSelect?.(row as any);
   };
 
@@ -140,6 +144,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           enableColumnReorder={true}
           enableRowSelection={false}
           onRowClick={(row) => handleRowClick(row as any)}
+          onRowDoubleClick={(row) => handleRowDoubleClick(row as any)}
           columnVisibility={columnVisibility()}
           onColumnVisibilityChange={setColumnVisibility}
           cellCallbacks={{

@@ -39,10 +39,12 @@ const DB_KEY = "tunetrees-db";
 const DB_VERSION_KEY = "tunetrees-db-version";
 
 /**
- * Current database schema version
- * Increment this when schema changes to force re-initialization
+ * Current database version
+ * Increment this to force all clients to recreate their local database
+ * Version 3: Added name and genre_default columns
+ * Version 4: Removed playlist.user_ref + instrument_ref unique constraint
  */
-const CURRENT_DB_VERSION = 3; // Incremented to force migration with name and genre_default columns
+const CURRENT_DB_VERSION = 4;
 
 /**
  * Initialize SQLite WASM database
