@@ -307,13 +307,49 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   );
 
   return (
-    <div class="w-full">
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-        <Show when={!props.hideButtons}>
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+    <div class="h-full flex flex-col">
+      {/* Compact Header with Save/Cancel buttons (only when not hidden) */}
+      <Show when={!props.hideButtons}>
+        <div class="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          {/* Left: Title */}
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
             {props.tune ? "Edit Tune" : "New Tune"}
           </h2>
-        </Show>
+
+          {/* Right: Submit and Cancel buttons */}
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={isSaving()}
+              class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Cancel"
+            >
+              <div class="flex items-center gap-2">
+                <span>Cancel</span>
+                <CircleX size={20} />
+              </div>
+            </button>
+            <button
+              type="submit"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleSave();
+              }}
+              disabled={isSaving()}
+              class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              aria-label="Save"
+            >
+              Save <Save size={24} />
+            </button>
+          </div>
+        </div>
+      </Show>
+
+      {/* Scrollable Editor Content */}
+      <div class="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+        <div class="max-w-4xl mx-auto py-6 px-4">
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
 
         <form
           onSubmit={(e) => {
@@ -344,7 +380,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <label
                 for="genre"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
               >
                 Genre:
               </label>
@@ -364,7 +400,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <label
                 for="title"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
               >
                 Title: <span class="text-red-500">*</span>
               </label>
@@ -388,7 +424,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <label
                 for="type"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
               >
                 Type: <span class="text-red-500">*</span>
               </label>
@@ -420,7 +456,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <label
                 for="structure"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
               >
                 Structure:
               </label>
@@ -440,7 +476,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <label
                 for="mode"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
               >
                 Mode:
               </label>
@@ -460,7 +496,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
               <label
                 for="incipit"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300 pt-2"
+                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2"
               >
                 Incipit:
               </label>
@@ -482,7 +518,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
             {/* Tags */}
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300 pt-2">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2">
                 Tags:
               </span>
               <div class="md:col-span-2">
@@ -502,7 +538,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
               <label
                 for="request-public"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
               >
                 Request Public:
               </label>
@@ -534,7 +570,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                 <label
                   for="learned"
-                  class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                 >
                   <em>Learned Date:</em>
                 </label>
@@ -553,7 +589,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                 <label
                   for="practiced"
-                  class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                 >
                   <em>Practiced Date:</em>
                 </label>
@@ -572,7 +608,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                 <label
                   for="quality"
-                  class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                 >
                   <em>Quality:</em>
                 </label>
@@ -622,7 +658,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                       <label
                         for="easiness"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                       >
                         <em>Easiness:</em>
                       </label>
@@ -644,7 +680,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                       <label
                         for="interval"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                       >
                         <em>Interval:</em>
                       </label>
@@ -696,7 +732,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                       <label
                         for="difficulty"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                       >
                         <em>Difficulty:</em>
                       </label>
@@ -718,7 +754,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                       <label
                         for="stability"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                       >
                         <em>Stability:</em>
                       </label>
@@ -740,7 +776,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                       <label
                         for="step"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                       >
                         <em>Step:</em>
                       </label>
@@ -761,7 +797,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                       <label
                         for="state"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                       >
                         <em>State:</em>
                       </label>
@@ -782,7 +818,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                       <label
                         for="repetitions"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                       >
                         <em>Repetitions:</em>
                       </label>
@@ -805,7 +841,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                       <label
                         for="due"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                       >
                         <em>Due:</em>
                       </label>
@@ -827,7 +863,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-4">
                 <label
                   for="notes"
-                  class="text-sm font-medium text-gray-700 dark:text-gray-300 pt-2"
+                  class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2"
                 >
                   Private Notes:
                 </label>
@@ -901,6 +937,8 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
             </div>
           </Show>
         </form>
+          </div>
+        </div>
       </div>
     </div>
   );
