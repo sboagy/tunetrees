@@ -307,49 +307,50 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   );
 
   return (
-    <div class="fixed inset-0 z-40 flex flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Compact Header with Save/Cancel buttons (only when not hidden) */}
-      <Show when={!props.hideButtons}>
-        <div class="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
-          {/* Left: Title */}
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-            {props.tune ? "Edit Tune" : "New Tune"}
-          </h2>
+    <div class="fixed inset-0 z-40 flex flex-col bg-gray-50 dark:bg-gray-900 overflow-y-auto">
+      {/* Scrollable Editor Content with constrained width */}
+      <div class="max-w-4xl mx-auto py-6 px-4 w-full">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+          {/* Header with Save/Cancel buttons inside constrained area (only when not hidden) */}
+          <Show when={!props.hideButtons}>
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              {/* Left: Title */}
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                {props.tune ? "Edit Tune" : "New Tune"}
+              </h2>
 
-          {/* Right: Submit and Cancel buttons */}
-          <div class="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={isSaving()}
-              class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Cancel"
-            >
-              <div class="flex items-center gap-2">
-                <span>Cancel</span>
-                <CircleX size={20} />
+              {/* Right: Cancel and Save buttons */}
+              <div class="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={isSaving()}
+                  class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Cancel"
+                >
+                  <div class="flex items-center gap-2">
+                    <span>Cancel</span>
+                    <CircleX size={20} />
+                  </div>
+                </button>
+                <button
+                  type="submit"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void handleSave();
+                  }}
+                  disabled={isSaving()}
+                  class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  aria-label="Save"
+                >
+                  Save <Save size={24} />
+                </button>
               </div>
-            </button>
-            <button
-              type="submit"
-              onClick={(e) => {
-                e.preventDefault();
-                void handleSave();
-              }}
-              disabled={isSaving()}
-              class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              aria-label="Save"
-            >
-              Save <Save size={24} />
-            </button>
-          </div>
-        </div>
-      </Show>
+            </div>
+          </Show>
 
-      {/* Scrollable Editor Content */}
-      <div class="flex-1 overflow-y-auto">
-        <div class="max-w-4xl mx-auto py-6 px-4">
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          {/* Form Content */}
+          <div class="p-6">
 
         <form
           onSubmit={(e) => {
@@ -878,62 +879,6 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                   />
                 </div>
               </div>
-            </div>
-          </Show>
-
-          {/* Action Buttons */}
-          <Show when={!props.hideButtons}>
-            <div class="flex justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-              {/* <button
-                type="button"
-                onClick={handleCancel}
-                class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSaving()}
-                class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <Show when={isSaving()} fallback={<>Save</>}>
-                  <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                  Saving...
-                </Show>
-              </button> */}
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={isSaving()}
-                class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                aria-label="Save playlist"
-                data-testid="save-tune-editor-button"
-              >
-                <Show
-                  when={isSaving()}
-                  fallback={
-                    <>
-                      Save <Save size={24} />
-                    </>
-                  }
-                >
-                  <div class="animate-spin h-4 w-4 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full" />
-                  Saving...
-                </Show>
-              </button>
-              <button
-                type="button"
-                onClick={handleCancel}
-                disabled={isSaving()}
-                class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Cancel and close dialog"
-                data-testid="cancel-tune-editor-button"
-              >
-                <div class="flex items-center gap-2">
-                  <span>Cancel</span>
-                  <CircleX size={20} />
-                </div>
-              </button>
             </div>
           </Show>
         </form>
