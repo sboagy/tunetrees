@@ -307,10 +307,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   );
 
   return (
-    <div class="h-full flex flex-col">
+    <div class="fixed inset-0 z-40 flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Compact Header with Save/Cancel buttons (only when not hidden) */}
       <Show when={!props.hideButtons}>
-        <div class="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
           {/* Left: Title */}
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
             {props.tune ? "Edit Tune" : "New Tune"}
@@ -347,7 +347,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
       </Show>
 
       {/* Scrollable Editor Content */}
-      <div class="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+      <div class="flex-1 overflow-y-auto">
         <div class="max-w-4xl mx-auto py-6 px-4">
           <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
 

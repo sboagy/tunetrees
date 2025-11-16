@@ -10,7 +10,7 @@
  * @module components/import/AddTuneDialog
  */
 
-import { useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import abcjs from "abcjs";
 import { Import } from "lucide-solid";
 import type { Component } from "solid-js";
@@ -61,6 +61,7 @@ export interface AddTuneDialogProps {
  */
 export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
   const navigate = useNavigate();
+  const location = useLocation();
   // NOTE: auth context not currently needed in this dialog (imports are local-only)
   // const auth = useAuth();
 
@@ -108,11 +109,11 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
 
     if (isUrl) {
       // Clear URL if user wants to create new tune manually
-      navigate("/tunes/new");
+      navigate("/tunes/new", { state: { from: location.pathname } });
     } else {
       // Pass title as query param
       const params = title ? `?title=${encodeURIComponent(title)}` : "";
-      navigate(`/tunes/new${params}`);
+      navigate(`/tunes/new${params}`, { state: { from: location.pathname } });
     }
 
     setMainDialogOpen(false);
@@ -234,7 +235,9 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
         sourceUrl: sourceUrl,
       });
 
-      navigate(`/tunes/new?${params.toString()}`);
+      navigate(`/tunes/new?${params.toString()}`, {
+        state: { from: location.pathname },
+      });
       setMainDialogOpen(false);
     } catch (error) {
       console.error("Error creating tune:", error);

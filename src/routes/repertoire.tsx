@@ -9,7 +9,7 @@
  * @module routes/repertoire
  */
 
-import { useNavigate, useSearchParams } from "@solidjs/router";
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import {
   type Component,
@@ -49,6 +49,7 @@ const arraysEqual = (a: string[], b: string[]) =>
  */
 const RepertoirePage: Component = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, localDb, repertoireListChanged, catalogListChanged } =
     useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
@@ -301,7 +302,7 @@ const RepertoirePage: Component = () => {
 
   // Handle tune selection (double-click opens editor)
   const handleTuneSelect = (tune: ITuneOverview) => {
-    navigate(`/tunes/${tune.id}/edit`);
+    navigate(`/tunes/${tune.id}/edit`, { state: { from: location.pathname } });
   };
 
   const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(

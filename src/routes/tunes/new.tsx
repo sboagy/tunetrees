@@ -3,11 +3,12 @@
  *
  * Protected route for creating a new tune.
  * Accepts query parameters for imported tune data (title, type, mode, structure, incipit, genre, sourceUrl).
+ * Covers the entire viewport including tabs, with sidebar visible.
  *
  * @module routes/tunes/new
  */
 
-import { useNavigate, useSearchParams } from "@solidjs/router";
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import type { Component } from "solid-js";
 import { createMemo } from "solid-js";
 import type { TuneEditorData } from "../../components/tunes";
@@ -21,8 +22,15 @@ import { createTune } from "../../lib/db/queries/tunes";
  */
 const NewTunePage: Component = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { localDb, userIdInt, user } = useAuth();
   const [searchParams] = useSearchParams();
+
+  // Store the location we came from (referrer) for proper back navigation
+  const returnPath = createMemo(() => {
+    const state = location.state as any;
+    return state?.from || "/";
+  });
 
   // Extract imported data from query params
   // Helper to normalize query param values to string
@@ -97,8 +105,8 @@ const NewTunePage: Component = () => {
         }
       }
 
-      // Navigate to the newly created tune's detail page
-      navigate(`/tunes/${newTune.id}`);
+      // Navigate back to where we came from
+      navigate(returnPath());
 
       // Return the new tune ID so TuneEditor can save tags
       return newTune.id;
@@ -109,7 +117,8 @@ const NewTunePage: Component = () => {
   };
 
   const handleCancel = () => {
-    navigate("/");
+    // Navigate back to where we came from
+    navigate(returnPath());
   };
 
   return (
