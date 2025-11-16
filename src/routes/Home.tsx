@@ -22,6 +22,7 @@ import type { TabId } from "../components/layout/TabBar";
 import { OnboardingOverlay } from "../components/onboarding";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useOnboarding } from "../lib/context/OnboardingContext";
+import { getUserPlaylists } from "../lib/db/queries/playlists";
 import AnalysisPage from "./analysis";
 import CatalogPage from "./catalog";
 import PracticeIndex from "./practice/Index";
@@ -44,8 +45,8 @@ import RepertoirePage from "./repertoire";
 const Home: Component = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading, isAnonymous, initialSyncComplete } = useAuth();
-  const { startOnboarding } = useOnboarding();
+  const { user, loading, isAnonymous, initialSyncComplete, localDb } = useAuth();
+  const { startOnboarding, shouldShowOnboarding } = useOnboarding();
   const [activeTab, setActiveTab] = createSignal<TabId>("practice");
   const [hasCheckedOnboarding, setHasCheckedOnboarding] = createSignal(false);
 
@@ -71,7 +72,7 @@ const Home: Component = () => {
     }
   });
 
-  // Check if onboarding is needed for new users
+  // Check if onboarding is needed for users with no playlists
   createEffect(() => {
     // Wait for auth to be loaded and initial sync to complete
     if (
@@ -82,14 +83,27 @@ const Home: Component = () => {
     ) {
       setHasCheckedOnboarding(true);
       
-      // Check if user needs onboarding
-      const onboardingComplete = localStorage.getItem("tunetrees:onboarding:complete");
-      if (onboardingComplete !== "true") {
-        console.log("🎓 New user detected, starting onboarding");
-        // Small delay to let UI settle
-        setTimeout(() => {
-          startOnboarding();
-        }, 500);
+      // Check if user has any playlists
+      const db = localDb();
+      const userId = user()?.id || "anonymous";
+      
+      if (db && userId) {
+        void (async () => {
+          try {
+            const playlists = await getUserPlaylists(db, userId);
+            const hasPlaylists = playlists.length > 0;
+            
+            if (shouldShowOnboarding(hasPlaylists)) {
+              console.log("🎓 No playlists found, starting onboarding");
+              // Small delay to let UI settle
+              setTimeout(() => {
+                startOnboarding();
+              }, 500);
+            }
+          } catch (error) {
+            console.error("Failed to check playlists for onboarding:", error);
+          }
+        })();
       }
     }
   });

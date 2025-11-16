@@ -28,11 +28,11 @@ import { useAuth } from "../../lib/auth/AuthContext";
 export const AnonymousBanner: Component<{
   onConvert: () => void;
 }> = (props) => {
-  const { isAnonymous } = useAuth();
+  const { isAnonymous, user } = useAuth();
   const [dismissed, setDismissed] = createSignal(false);
 
-  // Don't show if not anonymous or dismissed
-  if (!isAnonymous() || dismissed()) {
+  // Show only if anonymous mode AND no signed-in user
+  if (!isAnonymous() || user() || dismissed()) {
     return null;
   }
 

@@ -2,7 +2,7 @@
  * Onboarding Context for TuneTrees
  *
  * Manages the new user onboarding flow for both anonymous and registered users.
- * Tracks onboarding state in localStorage and provides methods to control the flow.
+ * Shows onboarding when no playlists exist (instead of using localStorage).
  *
  * @module lib/context/OnboardingContext
  */
@@ -36,6 +36,9 @@ interface OnboardingState {
   
   /** Skip onboarding */
   skipOnboarding: () => void;
+  
+  /** Check if user should see onboarding (no playlists) */
+  shouldShowOnboarding: (hasPlaylists: boolean) => boolean;
 }
 
 /**
@@ -45,9 +48,6 @@ export type OnboardingStep =
   | "create-playlist"
   | "view-catalog"
   | "complete";
-
-// localStorage key for tracking onboarding completion
-const ONBOARDING_COMPLETE_KEY = "tunetrees:onboarding:complete";
 
 /**
  * Onboarding context (undefined until provider is mounted)
@@ -77,14 +77,10 @@ export const OnboardingProvider: ParentComponent = (props) => {
   const [onboardingStep, setOnboardingStep] = createSignal<OnboardingStep | null>(null);
 
   /**
-   * Check if user has completed onboarding
+   * Check if user should see onboarding based on whether they have playlists
    */
-  const hasCompletedOnboarding = (): boolean => {
-    try {
-      return localStorage.getItem(ONBOARDING_COMPLETE_KEY) === "true";
-    } catch {
-      return false;
-    }
+  const shouldShowOnboarding = (hasPlaylists: boolean): boolean => {
+    return !hasPlaylists;
   };
 
   /**
@@ -116,11 +112,6 @@ export const OnboardingProvider: ParentComponent = (props) => {
    */
   const completeOnboarding = () => {
     console.log("🎓 Completing onboarding");
-    try {
-      localStorage.setItem(ONBOARDING_COMPLETE_KEY, "true");
-    } catch (error) {
-      console.error("Failed to save onboarding completion:", error);
-    }
     setNeedsOnboarding(false);
     setOnboardingStep(null);
   };
@@ -140,6 +131,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
     nextStep,
     completeOnboarding,
     skipOnboarding,
+    shouldShowOnboarding,
   };
 
   return (
@@ -175,15 +167,4 @@ export function useOnboarding(): OnboardingState {
     throw new Error("useOnboarding must be used within OnboardingProvider");
   }
   return context;
-}
-
-/**
- * Check if user needs onboarding (has not completed it)
- */
-export function checkNeedsOnboarding(): boolean {
-  try {
-    return localStorage.getItem(ONBOARDING_COMPLETE_KEY) !== "true";
-  } catch {
-    return false;
-  }
 }
