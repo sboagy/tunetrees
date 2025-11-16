@@ -55,7 +55,7 @@ export const SelectTuneDialog: Component<SelectTuneDialogProps> = (props) => {
 
   return (
     <AlertDialog open={props.open} onOpenChange={props.onOpenChange}>
-      <AlertDialogContent class="max-w-2xl bg-gray-900 dark:bg-gray-900">
+      <AlertDialogContent class="max-w-2xl">
         <AlertDialogCloseButton />
         <AlertDialogHeader>
           <AlertDialogTitle>Select a Tune from thesession.org</AlertDialogTitle>

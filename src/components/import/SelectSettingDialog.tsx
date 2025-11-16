@@ -156,7 +156,7 @@ export const SelectSettingDialog: Component<SelectSettingDialogProps> = (
 
   return (
     <AlertDialog open={props.open} onOpenChange={props.onOpenChange}>
-      <AlertDialogContent class="max-w-3xl bg-gray-900 dark:bg-gray-900">
+      <AlertDialogContent class="max-w-3xl">
         <AlertDialogCloseButton />
         <AlertDialogHeader>
           <AlertDialogTitle>Select a Setting</AlertDialogTitle>
