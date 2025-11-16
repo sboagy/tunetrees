@@ -6,7 +6,8 @@
  * @module components/tunes
  */
 
+export { FilterBar } from "./FilterBar";
+export { PlaylistSelectorModal } from "./PlaylistSelectorModal";
 export { TuneDetail } from "./TuneDetail";
 export type { TuneEditorData } from "./TuneEditor";
 export { TuneEditor } from "./TuneEditor";
-export { TuneList } from "./TuneList";

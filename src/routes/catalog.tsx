@@ -318,7 +318,8 @@ const CatalogPage: Component = () => {
 
   // Handle tune selection (double-click opens editor)
   const handleTuneSelect = (tune: ITuneOverview) => {
-    navigate(`/tunes/${tune.id}/edit`, { state: { from: location.pathname } });
+    const fullPath = location.pathname + location.search;
+    navigate(`/tunes/${tune.id}/edit`, { state: { from: fullPath } });
   };
 
   return (

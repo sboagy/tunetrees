@@ -11,17 +11,23 @@
  */
 
 import abcjs from "abcjs";
-import { CircleX, Save } from "lucide-solid";
+import { CircleX, Pencil, Save } from "lucide-solid";
 import {
   type Component,
   createEffect,
   createMemo,
+  createResource,
   createSignal,
   For,
   Show,
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getDb } from "@/lib/db/client-sqlite";
+import {
+  getAllGenres,
+  getAllTuneTypes,
+  getTuneTypesForGenre,
+} from "@/lib/db/queries/genres";
 import {
   addTagToTune,
   getTuneTags,
@@ -65,26 +71,15 @@ interface TuneEditorProps {
   showAdvancedFields?: boolean;
   /** Hide the built-in action buttons (for external button control) */
   hideButtons?: boolean;
+  /** Read-only mode (disables all form inputs) */
+  readOnly?: boolean;
+  /** Callback when edit is requested (read-only mode only) */
+  onEdit?: () => void;
+  /** Callback when delete is requested (read-only mode only) */
+  onDelete?: () => void;
 }
 
-// Tune types list (from legacy app)
-const TUNE_TYPES = [
-  { id: "Jig", name: "Jig", rhythm: "6/8" },
-  { id: "Reel", name: "Reel", rhythm: "4/4" },
-  { id: "SlipJig", name: "Slip Jig", rhythm: "9/8" },
-  { id: "Hornpipe", name: "Hornpipe", rhythm: "4/4" },
-  { id: "Polka", name: "Polka", rhythm: "2/4" },
-  { id: "Waltz", name: "Waltz", rhythm: "3/4" },
-  { id: "Mazurka", name: "Mazurka", rhythm: "3/4" },
-  { id: "March", name: "March", rhythm: "4/4" },
-  { id: "Strathspey", name: "Strathspey", rhythm: "4/4" },
-  { id: "Barndance", name: "Barndance", rhythm: "4/4" },
-  { id: "Slide", name: "Slide", rhythm: "12/8" },
-  { id: "Fling", name: "Fling", rhythm: "4/4" },
-  { id: "Song", name: "Song", rhythm: "" },
-  { id: "Slow Air", name: "Slow Air", rhythm: "" },
-  { id: "Other", name: "Other", rhythm: "" },
-];
+// Note: Tune types are now loaded from database based on selected genre
 
 /**
  * Tune Editor Component
@@ -158,6 +153,57 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   const [fsrsOpen, setFsrsOpen] = createSignal(false);
   const [isSaving, setIsSaving] = createSignal(false);
   const [errors, setErrors] = createSignal<Record<string, string>>({});
+
+  // Load genres from database
+  const [allGenres] = createResource(async () => {
+    const db = getDb();
+    return await getAllGenres(db);
+  });
+
+  // Load tune types filtered by selected genre
+  const [tuneTypes] = createResource(
+    genre, // Watch genre signal
+    async (genreId) => {
+      const db = getDb();
+      if (!genreId) {
+        return await getAllTuneTypes(db);
+      }
+      return await getTuneTypesForGenre(db, genreId);
+    }
+  );
+
+  // Track if form has been modified (dirty state)
+  const isDirty = createMemo(() => {
+    // Skip dirty check in read-only mode
+    if (props.readOnly) return false;
+
+    // Check core fields
+    if (genre() !== init("genre")) return true;
+    if (title() !== init("title")) return true;
+    if (type() !== init("type")) return true;
+    if (structure() !== init("structure")) return true;
+    if (mode() !== init("mode")) return true;
+    if (incipit() !== init("incipit")) return true;
+    if (requestPublic() !== (props.tune?.request_public || false)) return true;
+
+    // Check user/repertoire fields (only if editing existing tune)
+    if (props.tune) {
+      if (learned() !== (props.tune.learned || "")) return true;
+      if (practiced() !== (props.tune.practiced || "")) return true;
+      if (quality() !== (props.tune.quality || null)) return true;
+      if (notes() !== (props.tune.notes_private || "")) return true;
+      if (difficulty() !== (props.tune.difficulty || null)) return true;
+      if (stability() !== (props.tune.stability || null)) return true;
+      if (step() !== (props.tune.step || null)) return true;
+      if (state() !== (props.tune.state || null)) return true;
+      if (repetitions() !== (props.tune.repetitions || null)) return true;
+      if (due() !== (props.tune.due || "")) return true;
+      if (easiness() !== (props.tune.easiness || null)) return true;
+      if (interval() !== (props.tune.interval || null)) return true;
+    }
+
+    return false;
+  });
 
   // Load existing tags if editing a tune
   createEffect(async () => {
@@ -307,581 +353,661 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   );
 
   return (
-    <div class="fixed inset-0 z-40 flex flex-col bg-gray-50 dark:bg-gray-900 overflow-y-auto">
-      {/* Scrollable Editor Content with constrained width */}
-      <div class="max-w-4xl mx-auto py-6 px-4 w-full">
+    <div class="h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-y-auto">
+      {/* Scrollable Editor Content flush to left */}
+      <div class="max-w-4xl py-1 pl-1 pr-4 w-full">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-          {/* Header with Save/Cancel buttons inside constrained area (only when not hidden) */}
+          {/* Header with buttons inside constrained area (only when not hidden) */}
           <Show when={!props.hideButtons}>
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               {/* Left: Title */}
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                {props.tune ? "Edit Tune" : "New Tune"}
+                {props.readOnly
+                  ? title()
+                  : props.tune
+                    ? "Edit Tune"
+                    : "New Tune"}
               </h2>
 
-              {/* Right: Cancel and Save buttons */}
-              <div class="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  disabled={isSaving()}
-                  class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Cancel"
-                >
-                  <div class="flex items-center gap-2">
-                    <span>Cancel</span>
-                    <CircleX size={20} />
+              {/* Right: Action buttons */}
+              <Show
+                when={props.readOnly}
+                fallback={
+                  <div class="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      disabled={isSaving()}
+                      class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Cancel"
+                    >
+                      <div class="flex items-center gap-2">
+                        <span>Cancel</span>
+                        <CircleX size={20} />
+                      </div>
+                    </button>
+                    <button
+                      type="submit"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void handleSave();
+                      }}
+                      disabled={isSaving() || !isDirty()}
+                      class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      aria-label="Save"
+                    >
+                      Save <Save size={24} />
+                    </button>
                   </div>
-                </button>
-                <button
-                  type="submit"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void handleSave();
-                  }}
-                  disabled={isSaving()}
-                  class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  aria-label="Save"
-                >
-                  Save <Save size={24} />
-                </button>
-              </div>
+                }
+              >
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={props.onCancel}
+                    class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium"
+                    aria-label="Cancel"
+                  >
+                    <div class="flex items-center gap-2">
+                      <span>Cancel</span>
+                      <CircleX size={20} />
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={props.onEdit}
+                    class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium flex items-center gap-2"
+                    aria-label="Edit"
+                  >
+                    Edit <Pencil size={24} />
+                  </button>
+                </div>
+              </Show>
             </div>
           </Show>
 
           {/* Form Content */}
           <div class="p-6">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSave();
+              }}
+              class="space-y-4"
+              data-testid="tune-editor-form"
+            >
+              {/* Error message */}
+              <Show when={errors().submit}>
+                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
+                  <p class="text-sm text-red-600 dark:text-red-400">
+                    {errors().submit}
+                  </p>
+                </div>
+              </Show>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void handleSave();
-          }}
-          class="space-y-4"
-          data-testid="tune-editor-form"
-        >
-          {/* Error message */}
-          <Show when={errors().submit}>
-            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
-              <p class="text-sm text-red-600 dark:text-red-400">
-                {errors().submit}
-              </p>
-            </div>
-          </Show>
+              {/* Core Tune Data Section */}
+              <div class="space-y-4">
+                {/* <div class="border-b border-gray-300 dark:border-gray-600 pb-2 mb-4">
+                  <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                    Core Tune Data
+                  </h3>
+                </div> */}
 
-          {/* Core Tune Data Section */}
-          <div class="space-y-4">
-            <div class="border-b border-gray-300 dark:border-gray-600 pb-2 mb-4">
-              <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                Core Tune Data
-              </h3>
-            </div>
+                {/* Genre */}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                  <label
+                    for="genre"
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                  >
+                    Genre:
+                  </label>
+                  <div class="md:col-span-2">
+                    <select
+                      id="genre"
+                      value={genre()}
+                      onChange={(e) => setGenre(e.currentTarget.value)}
+                      disabled={props.readOnly}
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Select a genre...</option>
+                      <Show when={!allGenres.loading && allGenres()}>
+                        <For each={allGenres()}>
+                          {(g) => (
+                            <option value={g.id} selected={genre() === g.id}>
+                              {g.name}
+                            </option>
+                          )}
+                        </For>
+                      </Show>
+                    </select>
+                  </div>
+                </div>
 
-            {/* Genre */}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-              <label
-                for="genre"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-              >
-                Genre:
-              </label>
-              <div class="md:col-span-2">
-                <input
-                  id="genre"
-                  type="text"
-                  value={genre()}
-                  onInput={(e) => setGenre(e.currentTarget.value)}
-                  placeholder="e.g., ITRAD, SCOT, BLUEGRASS"
-                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                />
-              </div>
-            </div>
+                {/* Title */}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                  <label
+                    for="title"
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                  >
+                    Title:{" "}
+                    <Show when={!props.readOnly}>
+                      <span class="text-red-500">*</span>
+                    </Show>
+                  </label>
+                  <div class="md:col-span-2">
+                    <input
+                      id="title"
+                      type="text"
+                      value={title()}
+                      onInput={(e) => setTitle(e.currentTarget.value)}
+                      placeholder="Tune title"
+                      disabled={props.readOnly}
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                      classList={{ "border-red-500": !!errors().title }}
+                    />
+                    <Show when={errors().title}>
+                      <p class="text-xs text-red-500 mt-1">{errors().title}</p>
+                    </Show>
+                  </div>
+                </div>
 
-            {/* Title */}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-              <label
-                for="title"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-              >
-                Title: <span class="text-red-500">*</span>
-              </label>
-              <div class="md:col-span-2">
-                <input
-                  id="title"
-                  type="text"
-                  value={title()}
-                  onInput={(e) => setTitle(e.currentTarget.value)}
-                  placeholder="Tune title"
-                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                  classList={{ "border-red-500": !!errors().title }}
-                />
-                <Show when={errors().title}>
-                  <p class="text-xs text-red-500 mt-1">{errors().title}</p>
-                </Show>
-              </div>
-            </div>
-
-            {/* Type */}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-              <label
-                for="type"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-              >
-                Type: <span class="text-red-500">*</span>
-              </label>
-              <div class="md:col-span-2">
-                <select
-                  id="type"
-                  value={type()}
-                  onChange={(e) => setType(e.currentTarget.value)}
-                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                  classList={{ "border-red-500": !!errors().type }}
-                >
-                  <option value="">Select type</option>
-                  <For each={TUNE_TYPES}>
-                    {(tuneType) => (
-                      <option value={tuneType.id}>
-                        {tuneType.name}{" "}
-                        {tuneType.rhythm ? `(${tuneType.rhythm})` : ""}
+                {/* Type */}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                  <label
+                    for="type"
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                  >
+                    Type:{" "}
+                    <Show when={!props.readOnly}>
+                      <span class="text-red-500">*</span>
+                    </Show>
+                  </label>
+                  <div class="md:col-span-2">
+                    <select
+                      id="type"
+                      value={type()}
+                      onChange={(e) => setType(e.currentTarget.value)}
+                      disabled={props.readOnly}
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                      classList={{ "border-red-500": !!errors().type }}
+                    >
+                      <option value="">Select type</option>
+                      <Show when={!tuneTypes.loading && tuneTypes()}>
+                        <For each={tuneTypes()}>
+                          {(tt) => (
+                            <option value={tt.id} selected={type() === tt.id}>
+                              {tt.name} {tt.rhythm ? `(${tt.rhythm})` : ""}
+                            </option>
+                          )}
+                        </For>
+                      </Show>
+                      <option value="other" selected={type() === "other"}>
+                        Other...
                       </option>
-                    )}
-                  </For>
-                </select>
-                <Show when={errors().type}>
-                  <p class="text-xs text-red-500 mt-1">{errors().type}</p>
-                </Show>
-              </div>
-            </div>
-
-            {/* Structure */}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-              <label
-                for="structure"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-              >
-                Structure:
-              </label>
-              <div class="md:col-span-2">
-                <input
-                  id="structure"
-                  type="text"
-                  value={structure()}
-                  onInput={(e) => setStructure(e.currentTarget.value)}
-                  placeholder="e.g., AABB, ABC"
-                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Mode */}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-              <label
-                for="mode"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-              >
-                Mode:
-              </label>
-              <div class="md:col-span-2">
-                <input
-                  id="mode"
-                  type="text"
-                  value={mode()}
-                  onInput={(e) => setMode(e.currentTarget.value)}
-                  placeholder="e.g., D Major, A Dorian"
-                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Incipit */}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-              <label
-                for="incipit"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2"
-              >
-                Incipit:
-              </label>
-              <div class="md:col-span-2 space-y-2">
-                <textarea
-                  id="incipit"
-                  value={incipit()}
-                  onInput={(e) => setIncipit(e.currentTarget.value)}
-                  placeholder="ABC notation (e.g., |:DFA dAF|GBE gBE|...)"
-                  rows={3}
-                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm font-mono"
-                />
-                {/* ABC Preview */}
-                <div class="border border-gray-200 dark:border-gray-700 rounded-md p-3 bg-gray-50 dark:bg-gray-900">
-                  <div ref={abcPreviewRef} class="abc-preview" />
+                    </select>
+                    <Show when={errors().type}>
+                      <p class="text-xs text-red-500 mt-1">{errors().type}</p>
+                    </Show>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Tags */}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2">
-                Tags:
-              </span>
-              <div class="md:col-span-2">
-                <TagInput
-                  selectedTags={selectedTags()}
-                  onTagsChange={setSelectedTags}
-                  placeholder="Add tags for organization..."
-                  disabled={isSaving()}
-                />
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Press Enter to add a tag, or select from existing tags
-                </p>
-              </div>
-            </div>
-
-            {/* Request Public */}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-              <label
-                for="request-public"
-                class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-              >
-                Request Public:
-              </label>
-              <div class="md:col-span-2">
-                <input
-                  id="request-public"
-                  type="checkbox"
-                  checked={requestPublic()}
-                  onChange={(e) => setRequestPublic(e.currentTarget.checked)}
-                  class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">
-                  Request to make this tune publicly available
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* User/Repertoire Specific Section - placeholder for next phase */}
-          <Show when={props.tune}>
-            <div class="space-y-4 pt-4">
-              <div class="border-t border-gray-300 dark:border-gray-600 pt-4 mt-4">
-                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                  User/Repertoire Specific Data
-                </h3>
-              </div>
-
-              {/* Learned Date */}
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label
-                  for="learned"
-                  class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                >
-                  <em>Learned Date:</em>
-                </label>
-                <div class="md:col-span-2">
-                  <input
-                    id="learned"
-                    type="datetime-local"
-                    value={learned()}
-                    onInput={(e) => setLearned(e.currentTarget.value)}
-                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Practiced Date */}
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label
-                  for="practiced"
-                  class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                >
-                  <em>Practiced Date:</em>
-                </label>
-                <div class="md:col-span-2">
-                  <input
-                    id="practiced"
-                    type="datetime-local"
-                    value={practiced()}
-                    onInput={(e) => setPracticed(e.currentTarget.value)}
-                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Quality */}
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label
-                  for="quality"
-                  class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                >
-                  <em>Quality:</em>
-                </label>
-                <div class="md:col-span-2">
-                  <input
-                    id="quality"
-                    type="number"
-                    step="0.01"
-                    value={quality() ?? ""}
-                    onInput={(e) =>
-                      setQuality(e.currentTarget.valueAsNumber || null)
-                    }
-                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Collapsible SM2 Fields */}
-              <div class="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSm2Open(!sm2Open())}
-                  class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
-                >
-                  SM2 Fields
-                  <svg
-                    class="w-4 h-4 transition-transform"
-                    style={{ transform: sm2ChevronRotation() }}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
+                {/* Structure */}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                  <label
+                    for="structure"
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                   >
-                    <title>Toggle SM2 fields</title>
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M9 5l7 7-7 7"
+                    Structure:
+                  </label>
+                  <div class="md:col-span-2">
+                    <input
+                      id="structure"
+                      type="text"
+                      value={structure()}
+                      onInput={(e) => setStructure(e.currentTarget.value)}
+                      placeholder="e.g., AABB, ABC"
+                      disabled={props.readOnly}
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
                     />
-                  </svg>
-                </button>
+                  </div>
+                </div>
 
-                <Show when={sm2Open()}>
-                  <div class="mt-4 space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
-                    {/* Easiness */}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      <label
-                        for="easiness"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                      >
-                        <em>Easiness:</em>
-                      </label>
-                      <div class="md:col-span-2">
-                        <input
-                          id="easiness"
-                          type="number"
-                          step="0.01"
-                          value={easiness() ?? ""}
-                          onInput={(e) =>
-                            setEasiness(e.currentTarget.valueAsNumber || null)
-                          }
-                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                        />
-                      </div>
-                    </div>
+                {/* Mode */}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                  <label
+                    for="mode"
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                  >
+                    Mode:
+                  </label>
+                  <div class="md:col-span-2">
+                    <input
+                      id="mode"
+                      type="text"
+                      value={mode()}
+                      onInput={(e) => setMode(e.currentTarget.value)}
+                      placeholder="e.g., D Major, A Dorian"
+                      disabled={props.readOnly}
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                </div>
 
-                    {/* Interval */}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      <label
-                        for="interval"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                      >
-                        <em>Interval:</em>
-                      </label>
-                      <div class="md:col-span-2">
-                        <input
-                          id="interval"
-                          type="number"
-                          value={interval() ?? ""}
-                          onInput={(e) =>
-                            setInterval(e.currentTarget.valueAsNumber || null)
-                          }
-                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                        />
-                      </div>
+                {/* Incipit */}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                  <label
+                    for="incipit"
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2"
+                  >
+                    Incipit:
+                  </label>
+                  <div class="md:col-span-2 space-y-2">
+                    <textarea
+                      id="incipit"
+                      value={incipit()}
+                      onInput={(e) => setIncipit(e.currentTarget.value)}
+                      placeholder="ABC notation (e.g., |:DFA dAF|GBE gBE|...)"
+                      rows={3}
+                      disabled={props.readOnly}
+                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+                    {/* ABC Preview */}
+                    <div class="border border-gray-200 dark:border-gray-700 rounded-md p-3 bg-gray-50 dark:bg-gray-900">
+                      <div ref={abcPreviewRef} class="abc-preview" />
                     </div>
                   </div>
-                </Show>
-              </div>
+                </div>
 
-              {/* Collapsible FSRS Fields */}
-              <div class="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setFsrsOpen(!fsrsOpen())}
-                  class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
-                >
-                  FSRS Fields
-                  <svg
-                    class="w-4 h-4 transition-transform"
-                    style={{ transform: fsrsChevronRotation() }}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <title>Toggle FSRS fields</title>
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M9 5l7 7-7 7"
+                {/* Tags */}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2">
+                    Tags:
+                  </span>
+                  <div class="md:col-span-2">
+                    <TagInput
+                      selectedTags={selectedTags()}
+                      onTagsChange={setSelectedTags}
+                      placeholder="Add tags for organization..."
+                      disabled={isSaving() || props.readOnly}
                     />
-                  </svg>
-                </button>
-
-                <Show when={fsrsOpen()}>
-                  <div class="mt-4 space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
-                    {/* Difficulty */}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      <label
-                        for="difficulty"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                      >
-                        <em>Difficulty:</em>
-                      </label>
-                      <div class="md:col-span-2">
-                        <input
-                          id="difficulty"
-                          type="number"
-                          step="0.01"
-                          value={difficulty() ?? ""}
-                          onInput={(e) =>
-                            setDifficulty(e.currentTarget.valueAsNumber || null)
-                          }
-                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Stability */}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      <label
-                        for="stability"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                      >
-                        <em>Stability:</em>
-                      </label>
-                      <div class="md:col-span-2">
-                        <input
-                          id="stability"
-                          type="number"
-                          step="0.01"
-                          value={stability() ?? ""}
-                          onInput={(e) =>
-                            setStability(e.currentTarget.valueAsNumber || null)
-                          }
-                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Step */}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      <label
-                        for="step"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                      >
-                        <em>Step:</em>
-                      </label>
-                      <div class="md:col-span-2">
-                        <input
-                          id="step"
-                          type="number"
-                          value={step() ?? ""}
-                          onInput={(e) =>
-                            setStep(e.currentTarget.valueAsNumber || null)
-                          }
-                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* State */}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      <label
-                        for="state"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                      >
-                        <em>State:</em>
-                      </label>
-                      <div class="md:col-span-2">
-                        <input
-                          id="state"
-                          type="number"
-                          value={state() ?? ""}
-                          onInput={(e) =>
-                            setState(e.currentTarget.valueAsNumber || null)
-                          }
-                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Repetitions */}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      <label
-                        for="repetitions"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                      >
-                        <em>Repetitions:</em>
-                      </label>
-                      <div class="md:col-span-2">
-                        <input
-                          id="repetitions"
-                          type="number"
-                          value={repetitions() ?? ""}
-                          onInput={(e) =>
-                            setRepetitions(
-                              e.currentTarget.valueAsNumber || null
-                            )
-                          }
-                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Due Date */}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      <label
-                        for="due"
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                      >
-                        <em>Due:</em>
-                      </label>
-                      <div class="md:col-span-2">
-                        <input
-                          id="due"
-                          type="datetime-local"
-                          value={due()}
-                          onInput={(e) => setDue(e.currentTarget.value)}
-                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                        />
-                      </div>
-                    </div>
+                    <Show when={!props.readOnly}>
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Press Enter to add a tag, or select from existing tags
+                      </p>
+                    </Show>
                   </div>
-                </Show>
-              </div>
+                </div>
 
-              {/* Private Notes */}
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-4">
-                <label
-                  for="notes"
-                  class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2"
-                >
-                  Private Notes:
-                </label>
-                <div class="md:col-span-2">
-                  <textarea
-                    id="notes"
-                    value={notes()}
-                    onInput={(e) => setNotes(e.currentTarget.value)}
-                    placeholder="Your private notes about this tune..."
-                    rows={4}
-                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                  />
+                {/* Request Public */}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                  <label
+                    for="request-public"
+                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                  >
+                    Request Public:
+                  </label>
+                  <div class="md:col-span-2">
+                    <input
+                      id="request-public"
+                      type="checkbox"
+                      checked={requestPublic()}
+                      onChange={(e) =>
+                        setRequestPublic(e.currentTarget.checked)
+                      }
+                      disabled={props.readOnly}
+                      class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+                    <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">
+                      Request to make this tune publicly available
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Show>
-        </form>
+
+              {/* User/Repertoire Specific Section - placeholder for next phase */}
+              <Show when={props.tune}>
+                <div class="space-y-4 pt-4">
+                  <div class="border-t border-gray-300 dark:border-gray-600 pt-4 mt-4">
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                      User/Repertoire Specific Data
+                    </h3>
+                  </div>
+
+                  {/* Learned Date */}
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <label
+                      for="learned"
+                      class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                    >
+                      <em>Learned Date:</em>
+                    </label>
+                    <div class="md:col-span-2">
+                      <input
+                        id="learned"
+                        type="datetime-local"
+                        value={learned()}
+                        onInput={(e) => setLearned(e.currentTarget.value)}
+                        disabled={props.readOnly}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Practiced Date */}
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <label
+                      for="practiced"
+                      class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                    >
+                      <em>Practiced Date:</em>
+                    </label>
+                    <div class="md:col-span-2">
+                      <input
+                        id="practiced"
+                        type="datetime-local"
+                        value={practiced()}
+                        onInput={(e) => setPracticed(e.currentTarget.value)}
+                        disabled={props.readOnly}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quality */}
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <label
+                      for="quality"
+                      class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                    >
+                      <em>Quality:</em>
+                    </label>
+                    <div class="md:col-span-2">
+                      <input
+                        id="quality"
+                        type="number"
+                        step="0.01"
+                        value={quality() ?? ""}
+                        onInput={(e) =>
+                          setQuality(e.currentTarget.valueAsNumber || null)
+                        }
+                        disabled={props.readOnly}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Collapsible SM2 Fields */}
+                  <div class="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSm2Open(!sm2Open())}
+                      class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                    >
+                      SM2 Fields
+                      <svg
+                        class="w-4 h-4 transition-transform"
+                        style={{ transform: sm2ChevronRotation() }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <title>Toggle SM2 fields</title>
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+
+                    <Show when={sm2Open()}>
+                      <div class="mt-4 space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                        {/* Easiness */}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                          <label
+                            for="easiness"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                          >
+                            <em>Easiness:</em>
+                          </label>
+                          <div class="md:col-span-2">
+                            <input
+                              id="easiness"
+                              type="number"
+                              step="0.01"
+                              value={easiness() ?? ""}
+                              onInput={(e) =>
+                                setEasiness(
+                                  e.currentTarget.valueAsNumber || null
+                                )
+                              }
+                              disabled={props.readOnly}
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Interval */}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                          <label
+                            for="interval"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                          >
+                            <em>Interval:</em>
+                          </label>
+                          <div class="md:col-span-2">
+                            <input
+                              id="interval"
+                              type="number"
+                              value={interval() ?? ""}
+                              onInput={(e) =>
+                                setInterval(
+                                  e.currentTarget.valueAsNumber || null
+                                )
+                              }
+                              disabled={props.readOnly}
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </Show>
+                  </div>
+
+                  {/* Collapsible FSRS Fields */}
+                  <div class="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setFsrsOpen(!fsrsOpen())}
+                      class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                    >
+                      FSRS Fields
+                      <svg
+                        class="w-4 h-4 transition-transform"
+                        style={{ transform: fsrsChevronRotation() }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <title>Toggle FSRS fields</title>
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+
+                    <Show when={fsrsOpen()}>
+                      <div class="mt-4 space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                        {/* Difficulty */}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                          <label
+                            for="difficulty"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                          >
+                            <em>Difficulty:</em>
+                          </label>
+                          <div class="md:col-span-2">
+                            <input
+                              id="difficulty"
+                              type="number"
+                              step="0.01"
+                              value={difficulty() ?? ""}
+                              onInput={(e) =>
+                                setDifficulty(
+                                  e.currentTarget.valueAsNumber || null
+                                )
+                              }
+                              disabled={props.readOnly}
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Stability */}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                          <label
+                            for="stability"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                          >
+                            <em>Stability:</em>
+                          </label>
+                          <div class="md:col-span-2">
+                            <input
+                              id="stability"
+                              type="number"
+                              step="0.01"
+                              value={stability() ?? ""}
+                              onInput={(e) =>
+                                setStability(
+                                  e.currentTarget.valueAsNumber || null
+                                )
+                              }
+                              disabled={props.readOnly}
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Step */}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                          <label
+                            for="step"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                          >
+                            <em>Step:</em>
+                          </label>
+                          <div class="md:col-span-2">
+                            <input
+                              id="step"
+                              type="number"
+                              value={step() ?? ""}
+                              onInput={(e) =>
+                                setStep(e.currentTarget.valueAsNumber || null)
+                              }
+                              disabled={props.readOnly}
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+
+                        {/* State */}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                          <label
+                            for="state"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                          >
+                            <em>State:</em>
+                          </label>
+                          <div class="md:col-span-2">
+                            <input
+                              id="state"
+                              type="number"
+                              value={state() ?? ""}
+                              onInput={(e) =>
+                                setState(e.currentTarget.valueAsNumber || null)
+                              }
+                              disabled={props.readOnly}
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Repetitions */}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                          <label
+                            for="repetitions"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                          >
+                            <em>Repetitions:</em>
+                          </label>
+                          <div class="md:col-span-2">
+                            <input
+                              id="repetitions"
+                              type="number"
+                              value={repetitions() ?? ""}
+                              onInput={(e) =>
+                                setRepetitions(
+                                  e.currentTarget.valueAsNumber || null
+                                )
+                              }
+                              disabled={props.readOnly}
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Due Date */}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                          <label
+                            for="due"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                          >
+                            <em>Due:</em>
+                          </label>
+                          <div class="md:col-span-2">
+                            <input
+                              id="due"
+                              type="datetime-local"
+                              value={due()}
+                              onInput={(e) => setDue(e.currentTarget.value)}
+                              disabled={props.readOnly}
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </Show>
+                  </div>
+
+                  {/* Private Notes */}
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-4">
+                    <label
+                      for="notes"
+                      class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2"
+                    >
+                      Private Notes:
+                    </label>
+                    <div class="md:col-span-2">
+                      <textarea
+                        id="notes"
+                        value={notes()}
+                        onInput={(e) => setNotes(e.currentTarget.value)}
+                        placeholder="Your private notes about this tune..."
+                        rows={4}
+                        disabled={props.readOnly}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Show>
+            </form>
           </div>
         </div>
       </div>

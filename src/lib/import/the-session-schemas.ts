@@ -1,9 +1,9 @@
 /**
  * TheSession.org API Type Definitions
- * 
+ *
  * TypeScript interfaces for TheSession.org API responses.
  * The schemas are not officially published but inferred from API responses.
- * 
+ *
  * @module lib/import/the-session-schemas
  */
 

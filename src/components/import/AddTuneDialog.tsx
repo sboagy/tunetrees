@@ -106,14 +106,15 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
   const handleNew = () => {
     const title = urlOrTitle();
     const isUrl = title.startsWith("http://") || title.startsWith("https://");
+    const fullPath = location.pathname + location.search;
 
     if (isUrl) {
       // Clear URL if user wants to create new tune manually
-      navigate("/tunes/new", { state: { from: location.pathname } });
+      navigate("/tunes/new", { state: { from: fullPath } });
     } else {
       // Pass title as query param
       const params = title ? `?title=${encodeURIComponent(title)}` : "";
-      navigate(`/tunes/new${params}`, { state: { from: location.pathname } });
+      navigate(`/tunes/new${params}`, { state: { from: fullPath } });
     }
 
     setMainDialogOpen(false);
@@ -235,8 +236,9 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
         sourceUrl: sourceUrl,
       });
 
+      const fullPath = location.pathname + location.search;
       navigate(`/tunes/new?${params.toString()}`, {
-        state: { from: location.pathname },
+        state: { from: fullPath },
       });
       setMainDialogOpen(false);
     } catch (error) {

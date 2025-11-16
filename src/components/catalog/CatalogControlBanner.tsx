@@ -17,7 +17,7 @@
  * @module components/catalog/CatalogToolbar
  */
 
-import { useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import type { Component } from "solid-js";
 import { createEffect, createSignal } from "solid-js";
@@ -77,6 +77,7 @@ export interface CatalogToolbarProps {
 
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const auth = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
@@ -160,7 +161,8 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   };
 
   const handleAddTune = () => {
-    navigate("/tunes/new");
+    const fullPath = location.pathname + location.search;
+    navigate("/tunes/new", { state: { from: fullPath } });
   };
 
   const handleDeleteTunes = () => {
