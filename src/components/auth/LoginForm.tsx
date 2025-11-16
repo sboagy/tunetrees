@@ -342,23 +342,9 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
 
       {/* Main Login Form */}
       <div class="w-full max-w-md mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-        {/* Header */}
-        <div class="mb-6 text-center">
-          <Show
-            when={isConverting()}
-            fallback={
-              <>
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  {isSignUp() ? "Create Account" : "Welcome Back"}
-                </h1>
-                <p class="text-gray-600 dark:text-gray-400">
-                  {isSignUp()
-                    ? "Sign up to start practicing"
-                    : "Sign in to continue practicing"}
-                </p>
-              </>
-            }
-          >
+        {/* Header - Only shown when converting */}
+        <Show when={isConverting()}>
+          <div class="mb-6 text-center">
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Backup Your Data
             </h1>
@@ -371,8 +357,43 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
                 automatically
               </p>
             </div>
-          </Show>
-        </div>
+          </div>
+        </Show>
+
+        {/* Anonymous Sign In Option - at top when not converting */}
+        <Show when={!isConverting()}>
+          <div class="mb-6">
+            <button
+              type="button"
+              onClick={handleAnonymousSignIn}
+              disabled={isSubmitting() || loading()}
+              class="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Show
+                when={!isSubmitting() && !loading()}
+                fallback={<span>Loading...</span>}
+              >
+                Use on this Device Only
+              </Show>
+            </button>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+              Try TuneTrees without an account. Your data will only be stored
+              on this device and won't sync to other devices.
+            </p>
+          </div>
+
+          {/* Divider - "Or sign in" */}
+          <div class="relative mb-6">
+            <div class="absolute inset-0 flex items-center">
+              <div class="w-full border-t border-gray-300 dark:border-gray-600" />
+            </div>
+            <div class="relative flex justify-center text-sm">
+              <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
+                Or sign in
+              </span>
+            </div>
+          </div>
+        </Show>
 
         {/* Error Display */}
         <Show when={error()}>
@@ -546,44 +567,9 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
           </button>
         </div>
 
-        {/* Toggle Sign Up/Sign In */}
-        <div class="text-center space-y-3">
-          {/* Anonymous Sign In Option - hide when converting */}
-          <Show when={!isConverting()}>
-            <div>
-              <button
-                type="button"
-                onClick={handleAnonymousSignIn}
-                disabled={isSubmitting() || loading()}
-                class="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Show
-                  when={!isSubmitting() && !loading()}
-                  fallback={<span>Loading...</span>}
-                >
-                  Use on this Device Only
-                </Show>
-              </button>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                Try TuneTrees without an account. Your data will only be stored
-                on this device and won't sync to other devices.
-              </p>
-            </div>
-
-            {/* Divider */}
-            <div class="relative">
-              <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-gray-300 dark:border-gray-600" />
-              </div>
-              <div class="relative flex justify-center text-sm">
-                <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                  Or
-                </span>
-              </div>
-            </div>
-          </Show>
-
-          <Show when={!isConverting()}>
+        {/* Toggle Sign Up/Sign In - only show when not converting */}
+        <Show when={!isConverting()}>
+          <div class="text-center">
             <button
               type="button"
               onClick={toggleMode}
@@ -600,8 +586,8 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
                 </>
               )}
             </button>
-          </Show>
-        </div>
+          </div>
+        </Show>
       </div>
     </>
   );
