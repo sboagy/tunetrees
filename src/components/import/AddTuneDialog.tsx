@@ -279,7 +279,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
           </AlertDialogTrigger>
         </Show>
 
-        <AlertDialogContent class="max-w-3xl">
+        <AlertDialogContent class="max-w-3xl bg-gray-900 dark:bg-gray-900">
           <AlertDialogCloseButton />
           <AlertDialogHeader>
             <AlertDialogTitle>Add Tune</AlertDialogTitle>
