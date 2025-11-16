@@ -113,13 +113,11 @@ const NewTunePage: Component = () => {
   };
 
   return (
-    <div class="container mx-auto py-8 px-4">
-      <TuneEditor
-        onSave={handleSave}
-        onCancel={handleCancel}
-        initialData={initialData()}
-      />
-    </div>
+    <TuneEditor
+      onSave={handleSave}
+      onCancel={handleCancel}
+      initialData={initialData()}
+    />
   );
 };
 
