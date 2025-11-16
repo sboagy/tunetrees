@@ -19,7 +19,9 @@ import {
 } from "solid-js";
 import { MainLayout } from "../components/layout";
 import type { TabId } from "../components/layout/TabBar";
+import { OnboardingOverlay } from "../components/onboarding";
 import { useAuth } from "../lib/auth/AuthContext";
+import { useOnboarding } from "../lib/context/OnboardingContext";
 import AnalysisPage from "./analysis";
 import CatalogPage from "./catalog";
 import PracticeIndex from "./practice/Index";
@@ -42,8 +44,10 @@ import RepertoirePage from "./repertoire";
 const Home: Component = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading, isAnonymous } = useAuth();
+  const { user, loading, isAnonymous, initialSyncComplete } = useAuth();
+  const { startOnboarding } = useOnboarding();
   const [activeTab, setActiveTab] = createSignal<TabId>("practice");
+  const [hasCheckedOnboarding, setHasCheckedOnboarding] = createSignal(false);
 
   // Initialize active tab from URL parameter
   createEffect(() => {
@@ -64,6 +68,29 @@ const Home: Component = () => {
   createEffect(() => {
     if (!loading() && !user() && !isAnonymous()) {
       navigate("/login", { replace: true });
+    }
+  });
+
+  // Check if onboarding is needed for new users
+  createEffect(() => {
+    // Wait for auth to be loaded and initial sync to complete
+    if (
+      !loading() &&
+      (user() || isAnonymous()) &&
+      initialSyncComplete() &&
+      !hasCheckedOnboarding()
+    ) {
+      setHasCheckedOnboarding(true);
+      
+      // Check if user needs onboarding
+      const onboardingComplete = localStorage.getItem("tunetrees:onboarding:complete");
+      if (onboardingComplete !== "true") {
+        console.log("🎓 New user detected, starting onboarding");
+        // Small delay to let UI settle
+        setTimeout(() => {
+          startOnboarding();
+        }, 500);
+      }
     }
   });
 
@@ -159,6 +186,9 @@ const Home: Component = () => {
       }
     >
       <Show when={user() || isAnonymous()}>
+        {/* Onboarding Overlay */}
+        <OnboardingOverlay />
+        
         <MainLayout activeTab={activeTab()} onTabChange={handleTabChange}>
           <Switch>
             <Match when={activeTab() === "practice"}>
