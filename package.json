@@ -88,7 +88,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^24.6.0",
+    "@types/node": "^24.10.1",
     "@types/sql.js": "^1.4.9",
     "@types/workbox-window": "^4.3.4",
     "@vitest/coverage-v8": "^3.2.4",
