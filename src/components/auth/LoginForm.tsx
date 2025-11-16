@@ -9,9 +9,9 @@
  * @module components/auth/LoginForm
  */
 
+import { useSearchParams } from "@solidjs/router";
 import { Eye, EyeOff } from "lucide-solid";
 import { type Component, createEffect, createSignal, Show } from "solid-js";
-import { useSearchParams } from "@solidjs/router";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { supabase } from "../../lib/supabase/client";
 
@@ -377,20 +377,52 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
               </Show>
             </button>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-              Try TuneTrees without an account. Your data will only be stored
-              on this device and won't sync to other devices.
+              Try TuneTrees without an account. Your data will only be stored on
+              this device and won't sync to other devices.
             </p>
           </div>
 
-          {/* Divider - "Or sign in" */}
-          <div class="relative mb-6">
+          {/* Divider - "Or (sign up)" */}
+          <div class="relative mb-3">
             <div class="absolute inset-0 flex items-center">
               <div class="w-full border-t border-gray-300 dark:border-gray-600" />
             </div>
             <div class="relative flex justify-center text-sm">
               <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                Or sign in
+                Or
               </span>
+            </div>
+          </div>
+          {/* Toggle Sign Up/Sign In - only show when not converting */}
+          <Show when={!isConverting()}>
+            <div class="text-center">
+              <button
+                type="button"
+                onClick={toggleMode}
+                class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+              >
+                {isSignUp() ? (
+                  <>
+                    Already have an account?{" "}
+                    <span class="underline">Sign in</span>
+                  </>
+                ) : (
+                  <>
+                    Don't have an account?{" "}
+                    <span class="underline">Sign up</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </Show>
+
+          {/* Divider - "Or sign in" */}
+          <div class="relative mb-6 mt-6">
+            <div class="absolute inset-0 flex items-center">
+              <div class="w-full border-t border-gray-300 dark:border-gray-600" />
+            </div>
+            <div class="relative flex justify-center text-sm">
+              <span class="px-2 bg-white dark:bg-gray-800 text-gray-500"></span>
             </div>
           </div>
         </Show>
@@ -566,28 +598,6 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
             <span>Continue with GitHub</span>
           </button>
         </div>
-
-        {/* Toggle Sign Up/Sign In - only show when not converting */}
-        <Show when={!isConverting()}>
-          <div class="text-center">
-            <button
-              type="button"
-              onClick={toggleMode}
-              class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-            >
-              {isSignUp() ? (
-                <>
-                  Already have an account?{" "}
-                  <span class="underline">Sign in</span>
-                </>
-              ) : (
-                <>
-                  Don't have an account? <span class="underline">Sign up</span>
-                </>
-              )}
-            </button>
-          </div>
-        </Show>
       </div>
     </>
   );
