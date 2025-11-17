@@ -13,6 +13,10 @@ import { createMemo, createResource, Show } from "solid-js";
 import type { TuneEditorData } from "../../../components/tunes";
 import { TuneEditor } from "../../../components/tunes";
 import { useAuth } from "../../../lib/auth/AuthContext";
+import {
+  getOrCreateTuneOverride,
+  updateTuneOverride,
+} from "../../../lib/db/queries/tune-overrides";
 import { getTuneById, updateTune } from "../../../lib/db/queries/tunes";
 
 /**
@@ -24,7 +28,7 @@ const EditTunePage: Component = () => {
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { localDb } = useAuth();
+  const { localDb, userIdInt } = useAuth();
 
   // Store the location we came from (referrer) for proper back navigation
   const returnPath = createMemo(() => {
@@ -49,9 +53,16 @@ const EditTunePage: Component = () => {
     tuneData: Partial<TuneEditorData>
   ): Promise<string | undefined> => {
     const db = localDb();
+    const userId = userIdInt();
+
     if (!db) {
       console.error("Database not initialized");
       throw new Error("Database not available");
+    }
+
+    if (!userId) {
+      console.error("User not authenticated");
+      throw new Error("User must be authenticated to edit tunes");
     }
 
     const tuneId = params.id;
@@ -60,17 +71,58 @@ const EditTunePage: Component = () => {
       throw new Error("Invalid tune ID");
     }
 
+    const currentTune = tune();
+    if (!currentTune) {
+      throw new Error("Tune not loaded");
+    }
+
     try {
-      // Update tune in local SQLite (automatically queued for Supabase sync)
-      await updateTune(db, tuneId, {
-        title: tuneData.title ?? undefined,
-        type: tuneData.type ?? undefined,
-        mode: tuneData.mode ?? undefined,
-        structure: tuneData.structure ?? undefined,
-        incipit: tuneData.incipit ?? undefined,
-        genre: tuneData.genre ?? undefined,
-        privateFor: tuneData.privateFor ?? undefined,
-      });
+      // Check if this is the user's private tune
+      const isPrivateTune = currentTune.privateFor === userId;
+
+      if (isPrivateTune) {
+        // User owns this tune - update the tune table directly
+        await updateTune(db, tuneId, {
+          title: tuneData.title ?? undefined,
+          type: tuneData.type ?? undefined,
+          mode: tuneData.mode ?? undefined,
+          structure: tuneData.structure ?? undefined,
+          incipit: tuneData.incipit ?? undefined,
+          genre: tuneData.genre ?? undefined,
+          privateFor: tuneData.privateFor ?? undefined,
+        });
+      } else {
+        // Public tune or another user's tune - use tune_override
+        // Build override input with only changed fields
+        const overrideInput: any = {};
+        if (tuneData.title !== currentTune.title)
+          overrideInput.title = tuneData.title;
+        if (tuneData.type !== currentTune.type)
+          overrideInput.type = tuneData.type;
+        if (tuneData.mode !== currentTune.mode)
+          overrideInput.mode = tuneData.mode;
+        if (tuneData.structure !== currentTune.structure)
+          overrideInput.structure = tuneData.structure;
+        if (tuneData.incipit !== currentTune.incipit)
+          overrideInput.incipit = tuneData.incipit;
+        if (tuneData.genre !== currentTune.genre)
+          overrideInput.genre = tuneData.genre;
+
+        // Only proceed if there are actual changes
+        if (Object.keys(overrideInput).length > 0) {
+          const override = await getOrCreateTuneOverride(
+            db,
+            tuneId,
+            userId,
+            overrideInput
+          );
+
+          // If override already existed, update it with the changes
+          if (!override.isNew) {
+            await updateTuneOverride(db, override.id, overrideInput);
+          }
+        }
+      }
 
       // Navigate back to where we came from
       navigate(returnPath());
