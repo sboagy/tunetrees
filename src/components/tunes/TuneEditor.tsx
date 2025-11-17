@@ -177,6 +177,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     // Skip dirty check in read-only mode
     if (props.readOnly) return false;
 
+    // For new tunes, always allow saving
+    if (!props.tune) return true;
+
     // Check core fields
     if (genre() !== init("genre")) return true;
     if (title() !== init("title")) return true;
@@ -187,20 +190,18 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     if (requestPublic() !== (props.tune?.request_public || false)) return true;
 
     // Check user/repertoire fields (only if editing existing tune)
-    if (props.tune) {
-      if (learned() !== (props.tune.learned || "")) return true;
-      if (practiced() !== (props.tune.practiced || "")) return true;
-      if (quality() !== (props.tune.quality || null)) return true;
-      if (notes() !== (props.tune.notes_private || "")) return true;
-      if (difficulty() !== (props.tune.difficulty || null)) return true;
-      if (stability() !== (props.tune.stability || null)) return true;
-      if (step() !== (props.tune.step || null)) return true;
-      if (state() !== (props.tune.state || null)) return true;
-      if (repetitions() !== (props.tune.repetitions || null)) return true;
-      if (due() !== (props.tune.due || "")) return true;
-      if (easiness() !== (props.tune.easiness || null)) return true;
-      if (interval() !== (props.tune.interval || null)) return true;
-    }
+    if (learned() !== (props.tune.learned || "")) return true;
+    if (practiced() !== (props.tune.practiced || "")) return true;
+    if (quality() !== (props.tune.quality || null)) return true;
+    if (notes() !== (props.tune.notes_private || "")) return true;
+    if (difficulty() !== (props.tune.difficulty || null)) return true;
+    if (stability() !== (props.tune.stability || null)) return true;
+    if (step() !== (props.tune.step || null)) return true;
+    if (state() !== (props.tune.state || null)) return true;
+    if (repetitions() !== (props.tune.repetitions || null)) return true;
+    if (due() !== (props.tune.due || "")) return true;
+    if (easiness() !== (props.tune.easiness || null)) return true;
+    if (interval() !== (props.tune.interval || null)) return true;
 
     return false;
   });

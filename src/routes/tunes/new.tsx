@@ -54,13 +54,21 @@ const NewTunePage: Component = () => {
     tuneData: Partial<TuneEditorData>
   ): Promise<string> => {
     const db = localDb();
+    const userId = userIdInt();
+
     if (!db) {
       console.error("Database not initialized");
       throw new Error("Database not available");
     }
 
+    if (!userId) {
+      console.error("User not authenticated");
+      throw new Error("User must be authenticated to create tunes");
+    }
+
     try {
       // Create tune in local SQLite (automatically queued for Supabase sync)
+      // Note: privateFor must be set to user's ID to satisfy RLS policy
       const newTune = await createTune(db, {
         title: tuneData.title || "",
         type: tuneData.type ?? undefined,
@@ -68,7 +76,7 @@ const NewTunePage: Component = () => {
         structure: tuneData.structure ?? undefined,
         incipit: tuneData.incipit ?? undefined,
         genre: tuneData.genre ?? undefined,
-        privateFor: undefined, // TODO: Add privacy controls in UI
+        privateFor: userId, // Required by RLS policy for tune inserts
       });
 
       // If imported from external source, create a reference link
