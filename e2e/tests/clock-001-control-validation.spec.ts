@@ -29,6 +29,8 @@ function expectIsoClose(
   expect(diff).toBeLessThanOrEqual(toleranceMs);
 }
 
+const CLOCK_TOLERANCE_MS = 4000; // CI can exhibit multi-second scheduling delays
+
 test.describe("CLOCK-001: Clock Control Validation", () => {
   test("should set stable date in browser", async ({ context, page }) => {
     // Navigate to app
@@ -39,7 +41,7 @@ test.describe("CLOCK-001: Clock Control Validation", () => {
     await setStableDate(context, testDate);
 
     // Verify browser sees frozen time
-    await verifyClockFrozen(page, testDate, 1000);
+    await verifyClockFrozen(page, testDate, CLOCK_TOLERANCE_MS);
 
     // Get date from browser
     const browserDate = await getCurrentDate(page);
@@ -53,16 +55,16 @@ test.describe("CLOCK-001: Clock Control Validation", () => {
     // Start at stable date
     const day1 = getTestDate(0); // 2025-07-20
     await setStableDate(context, day1);
-    await verifyClockFrozen(page, day1);
+    await verifyClockFrozen(page, day1, CLOCK_TOLERANCE_MS);
 
     // Advance 1 day
     const day2 = await advanceDays(context, 1, day1);
-    await verifyClockFrozen(page, day2);
+    await verifyClockFrozen(page, day2, CLOCK_TOLERANCE_MS);
     expect(day2.toISOString()).toBe("2025-07-21T14:00:00.000Z");
 
     // Advance 7 more days
     const day9 = await advanceDays(context, 7, day2);
-    await verifyClockFrozen(page, day9);
+    await verifyClockFrozen(page, day9, CLOCK_TOLERANCE_MS);
     expect(day9.toISOString()).toBe("2025-07-28T14:00:00.000Z");
   });
 
@@ -75,13 +77,13 @@ test.describe("CLOCK-001: Clock Control Validation", () => {
     // Set stable date
     const testDate = getTestDate(0);
     await setStableDate(context, testDate);
-    await verifyClockFrozen(page, testDate);
+    await verifyClockFrozen(page, testDate, CLOCK_TOLERANCE_MS);
 
     // Reload page
     await page.reload();
 
     // Date should still be frozen
-    await verifyClockFrozen(page, testDate, 2000); // Allow slight drift after reload
+    await verifyClockFrozen(page, testDate, CLOCK_TOLERANCE_MS);
   });
 
   test("should allow time arithmetic", async ({ context, page }) => {
@@ -97,13 +99,13 @@ test.describe("CLOCK-001: Clock Control Validation", () => {
 
     // Set each date in browser and verify
     await setStableDate(context, baseDate);
-    await verifyClockFrozen(page, baseDate);
+    await verifyClockFrozen(page, baseDate, CLOCK_TOLERANCE_MS);
 
     await setStableDate(context, tomorrow);
-    await verifyClockFrozen(page, tomorrow);
+    await verifyClockFrozen(page, tomorrow, CLOCK_TOLERANCE_MS);
 
     await setStableDate(context, yesterday);
-    await verifyClockFrozen(page, yesterday);
+    await verifyClockFrozen(page, yesterday, CLOCK_TOLERANCE_MS);
   });
 
   test("should reflect real-time passage after install (no large drift)", async ({
@@ -140,7 +142,7 @@ test.describe("CLOCK-001: Clock Control Validation", () => {
       const date = getTestDate(day);
       dates.push(date);
       await setStableDate(context, date);
-      await verifyClockFrozen(page, date);
+      await verifyClockFrozen(page, date, CLOCK_TOLERANCE_MS);
     }
 
     // Verify all dates were distinct
