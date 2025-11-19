@@ -7,7 +7,7 @@
  * @module lib/db/queries/tunes
  */
 
-import { and, asc, eq, inArray, isNull, like, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
 import { queueSync } from "../../sync";
 import { generateId } from "../../utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
@@ -85,19 +85,100 @@ export async function getAllTunes(db: SqliteDatabase): Promise<Tune[]> {
 
 /**
  * Get all tunes for a user (includes public and user's private tunes)
- * @param userId - Supabase Auth user UUID (unused in catalog mode)
+ * Merges tune_override data when showPublic is false (default)
+ *
+ * @param db - SQLite database instance
+ * @param userId - Supabase Auth user UUID
+ * @param showPublic - If true, returns public tune data without overrides. If false (default), returns merged tune + override data
+ * @returns Array of tunes with overrides applied (unless showPublic is true)
  */
 export async function getTunesForUser(
   db: SqliteDatabase,
-  _userId: string
+  userId: string,
+  showPublic: boolean = false
 ): Promise<Tune[]> {
-  // For catalog view, return ALL non-deleted tunes regardless of private_for
-  // Catalog should show everything - filtering by user is for other views
-  return await db
-    .select()
-    .from(schema.tune)
-    .where(eq(schema.tune.deleted, 0))
-    .orderBy(asc(schema.tune.title));
+  // Use raw SQL to COALESCE tune and tune_override fields
+  const query = showPublic
+    ? // When showPublic=true, return only tune table data (no overrides)
+      sql`
+      SELECT 
+        t.*
+      FROM tune t
+      WHERE t.deleted = 0
+      ORDER BY t.title
+    `
+    : // When showPublic=false (default), merge tune + tune_override with COALESCE
+      sql`
+      SELECT 
+        t.id,
+        t.id_foreign,
+        t.primary_origin,
+        COALESCE(o.title, t.title) as title,
+        COALESCE(o.type, t.type) as type,
+        COALESCE(o.structure, t.structure) as structure,
+        COALESCE(o.mode, t.mode) as mode,
+        COALESCE(o.incipit, t.incipit) as incipit,
+        COALESCE(o.genre, t.genre) as genre,
+        t.private_for,
+        t.deleted,
+        t.sync_version,
+        t.last_modified_at,
+        t.device_id
+      FROM tune t
+      LEFT JOIN tune_override o 
+        ON t.id = o.tune_ref 
+        AND o.user_ref = ${userId}
+        AND o.deleted = 0
+      WHERE t.deleted = 0
+      ORDER BY COALESCE(o.title, t.title)
+    `;
+
+  return await db.all<Tune>(query);
+}
+
+/**
+ * Get a single tune for a user, merging override values by default
+ */
+export async function getTuneForUserById(
+  db: SqliteDatabase,
+  tuneId: string,
+  userId: string,
+  showPublic: boolean = false
+): Promise<Tune | null> {
+  const query = showPublic
+    ? sql`
+        SELECT t.*
+        FROM tune t
+        WHERE t.deleted = 0 AND t.id = ${tuneId}
+        LIMIT 1
+      `
+    : sql`
+        SELECT 
+          t.id,
+          t.id_foreign,
+          t.primary_origin,
+          COALESCE(o.title, t.title) as title,
+          COALESCE(o.type, t.type) as type,
+          COALESCE(o.structure, t.structure) as structure,
+          COALESCE(o.mode, t.mode) as mode,
+          COALESCE(o.incipit, t.incipit) as incipit,
+          COALESCE(o.genre, t.genre) as genre,
+          t.private_for,
+          t.deleted,
+          t.sync_version,
+          t.last_modified_at,
+          t.device_id
+        FROM tune t
+        LEFT JOIN tune_override o
+          ON t.id = o.tune_ref
+          AND o.user_ref = ${userId}
+          AND o.deleted = 0
+        WHERE t.deleted = 0 AND t.id = ${tuneId}
+        LIMIT 1
+      `;
+
+  const rows = await db.all<Tune>(query);
+  return rows[0] || null;
 }
 /**
  * Create a new tune
@@ -170,6 +251,38 @@ export async function updateTune(
   await queueSync(db, "tune", "update", tune);
 
   return tune;
+}
+
+/**
+ * Update tune only if owned by the specified user.
+ * Returns true if the base tune was updated, false if not allowed.
+ * Never changes ownership (privateFor).
+ */
+export async function updateTuneIfOwned(
+  db: SqliteDatabase,
+  tuneId: string,
+  ownerUserId: string,
+  input: Partial<CreateTuneInput>
+): Promise<boolean> {
+  // Fetch current tune to verify ownership
+  const current = await db
+    .select()
+    .from(schema.tune)
+    .where(eq(schema.tune.id, tuneId))
+    .limit(1);
+
+  if (!current || current.length === 0) return false;
+
+  const record = current[0] as Tune;
+  const isOwned = !!record.privateFor && record.privateFor === ownerUserId;
+  if (!isOwned) return false;
+
+  // Prevent ownership changes at this layer
+  const sanitized: Partial<CreateTuneInput> = { ...input };
+  delete (sanitized as any).privateFor;
+
+  await updateTune(db, tuneId, sanitized);
+  return true;
 }
 
 /**

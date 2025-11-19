@@ -185,6 +185,74 @@ export async function updateTuneOverride(
 }
 
 /**
+ * Clear specific override fields (set to NULL). If resulting record has no override values left
+ * it is soft-deleted for cleanliness.
+ */
+export async function clearTuneOverrideFields(
+  db: SqliteDatabase,
+  overrideId: string,
+  fields: (keyof TuneOverrideInput)[]
+): Promise<void> {
+  if (fields.length === 0) return;
+  const now = new Date().toISOString();
+  const deviceId = getDeviceId();
+
+  const updateData: any = {
+    lastModifiedAt: now,
+    deviceId,
+  };
+  for (const f of fields) {
+    updateData[f] = null;
+  }
+  await db
+    .update(schema.tuneOverride)
+    .set(updateData)
+    .where(eq(schema.tuneOverride.id, overrideId));
+
+  // Fetch current state
+  const current = await db
+    .select()
+    .from(schema.tuneOverride)
+    .where(eq(schema.tuneOverride.id, overrideId))
+    .limit(1);
+  if (current.length === 0) return;
+  const row = current[0];
+
+  const hasAny = [
+    row.title,
+    row.type,
+    row.structure,
+    row.genre,
+    row.mode,
+    row.incipit,
+  ].some((v) => v !== null);
+
+  if (!hasAny) {
+    // Soft delete entire override
+    await deleteTuneOverride(db, overrideId);
+    return;
+  }
+
+  // Queue update sync only with remaining non-null fields
+  const syncData: any = {
+    id: row.id,
+    tuneRef: row.tuneRef,
+    userRef: row.userRef,
+    lastModifiedAt: row.lastModifiedAt,
+    deviceId: row.deviceId,
+    deleted: row.deleted,
+    syncVersion: row.syncVersion,
+  };
+  if (row.title !== null) syncData.title = row.title;
+  if (row.type !== null) syncData.type = row.type;
+  if (row.structure !== null) syncData.structure = row.structure;
+  if (row.genre !== null) syncData.genre = row.genre;
+  if (row.mode !== null) syncData.mode = row.mode;
+  if (row.incipit !== null) syncData.incipit = row.incipit;
+  await queueSync(db, "tune_override", "update", syncData);
+}
+
+/**
  * Get tune override for a specific tune and user
  */
 export async function getTuneOverride(
