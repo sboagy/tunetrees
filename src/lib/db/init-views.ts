@@ -392,6 +392,55 @@ ORDER BY
 `;
 
 /**
+ * View: view_tune_override_readable
+ *
+ * Human-readable inspection view for per-user tune overrides.
+ * Exposes both base tune values and override values side-by-side
+ * with boolean flags indicating which fields are currently overridden.
+ *
+ * This supports debugging the field-level override indicator UI and
+ * provides quick visibility in the /debug/db browser without having to
+ * mentally diff COALESCE results.
+ */
+const VIEW_TUNE_OVERRIDE_READABLE = `
+CREATE VIEW IF NOT EXISTS view_tune_override_readable AS
+SELECT
+  tovr.id AS override_id,
+  COALESCE(up.name, up.email) AS user_name,
+  tovr.user_ref,
+  tovr.tune_ref,
+  t.private_for AS tune_private_for,
+  t.deleted AS tune_deleted,
+  tovr.deleted AS override_deleted,
+  t.last_modified_at AS tune_last_modified_at,
+  tovr.last_modified_at AS override_last_modified_at,
+  t.title AS base_title,
+  tovr.title AS override_title,
+  t.type AS base_type,
+  tovr.type AS override_type,
+  t.structure AS base_structure,
+  tovr.structure AS override_structure,
+  t.mode AS base_mode,
+  tovr.mode AS override_mode,
+  t.incipit AS base_incipit,
+  tovr.incipit AS override_incipit,
+  t.genre AS base_genre,
+  tovr.genre AS override_genre,
+  CASE WHEN tovr.title IS NOT NULL THEN 1 ELSE 0 END AS has_title_override,
+  CASE WHEN tovr.type IS NOT NULL THEN 1 ELSE 0 END AS has_type_override,
+  CASE WHEN tovr.structure IS NOT NULL THEN 1 ELSE 0 END AS has_structure_override,
+  CASE WHEN tovr.mode IS NOT NULL THEN 1 ELSE 0 END AS has_mode_override,
+  CASE WHEN tovr.incipit IS NOT NULL THEN 1 ELSE 0 END AS has_incipit_override,
+  CASE WHEN tovr.genre IS NOT NULL THEN 1 ELSE 0 END AS has_genre_override
+FROM
+  tune_override tovr
+  LEFT JOIN tune t ON t.id = tovr.tune_ref
+  LEFT JOIN user_profile up ON up.id = tovr.user_ref
+ORDER BY
+  tovr.last_modified_at DESC
+`;
+
+/**
  * Initialize database views in SQLite WASM
  *
  * Creates all essential views for the TuneTrees application.
@@ -436,6 +485,10 @@ export async function initializeViews(db: SqliteDatabase): Promise<void> {
     await db.run(VIEW_PRACTICE_RECORD_READABLE);
     console.log("✅ Created view: view_practice_record_readable");
 
+    // Create view_tune_override_readable
+    await db.run(VIEW_TUNE_OVERRIDE_READABLE);
+    console.log("✅ Created view: view_tune_override_readable");
+
     console.log("✅ All database views initialized successfully");
   } catch (error) {
     console.error("❌ Error initializing database views:", error);
@@ -453,6 +506,7 @@ export async function dropViews(db: SqliteDatabase): Promise<void> {
 
   try {
     await db.run("DROP VIEW IF EXISTS view_practice_record_readable");
+    await db.run("DROP VIEW IF EXISTS view_tune_override_readable");
     await db.run("DROP VIEW IF EXISTS view_transient_data_readable");
     await db.run("DROP VIEW IF EXISTS view_daily_practice_queue_readable");
     await db.run("DROP VIEW IF EXISTS practice_list_staged");

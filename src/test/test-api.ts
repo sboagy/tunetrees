@@ -7,6 +7,7 @@
 
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
+  clearDb,
   getDb,
   initializeDb,
   type SqliteDatabase,
@@ -15,6 +16,7 @@ import {
   dailyPracticeQueue,
   playlistTune,
   practiceRecord,
+  tuneOverride,
 } from "@/lib/db/schema";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
@@ -185,6 +187,18 @@ async function getPracticeCount(playlistId: string) {
   return rows[0]?.count ?? 0;
 }
 
+async function getTuneOverrideCountForCurrentUser() {
+  const db = await ensureDb();
+  const userRef = await resolveUserId(db);
+  // Prefer SQL to avoid ORM differences across builds
+  const rows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) as count
+    FROM ${tuneOverride} tovr
+    WHERE tovr.user_ref = ${userRef}
+  `);
+  return rows[0]?.count ?? 0;
+}
+
 // Attach to window
 declare global {
   interface Window {
@@ -195,8 +209,10 @@ declare global {
         userRef: string; // UUID
       }>;
       getPracticeCount: (playlistId: string) => Promise<number>; // UUID
+      getTuneOverrideCountForCurrentUser: () => Promise<number>;
       getSyncVersion: () => number;
       isInitialSyncComplete: () => boolean;
+      dispose: () => Promise<void>;
     };
   }
 }
@@ -207,6 +223,7 @@ if (typeof window !== "undefined") {
     window.__ttTestApi = {
       seedAddToReview,
       getPracticeCount,
+      getTuneOverrideCountForCurrentUser,
       getSyncVersion: () => {
         // Access the sync version from AuthContext
         // The version starts at 0 and increments to 1 after initial sync
@@ -219,6 +236,14 @@ if (typeof window !== "undefined") {
         const el = document.querySelector("[data-auth-initialized]");
         const version = el?.getAttribute("data-sync-version");
         return version ? Number.parseInt(version, 10) >= 1 : false;
+      },
+      dispose: async () => {
+        try {
+          await clearDb();
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn("[TestApi] dispose clearDb error:", e);
+        }
       },
     };
     // eslint-disable-next-line no-console
