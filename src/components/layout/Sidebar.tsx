@@ -18,16 +18,19 @@
  * @module components/layout/Sidebar
  */
 
-import { ChevronLeft, ChevronRight, GripVertical } from "lucide-solid";
+import { useLocation, useNavigate } from "@solidjs/router";
+import { ChevronLeft, ChevronRight, GripVertical, Pencil } from "lucide-solid";
 import {
   type Component,
   createEffect,
   createSignal,
   onCleanup,
+  Show,
 } from "solid-js";
 import { NotesPanel } from "@/components/notes/NotesPanel";
 import { ReferencesPanel } from "@/components/references/ReferencesPanel";
 import { TuneInfoHeader } from "@/components/sidebar";
+import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
 import type { DockPosition } from "./SidebarDockContext";
 import { SidebarDragHandle } from "./SidebarDragHandle";
 
@@ -75,6 +78,9 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   const minWidth = () => props.minWidth ?? 240;
   const maxWidth = () => props.maxWidth ?? 600;
   const [isResizing, setIsResizing] = createSignal(false);
+  const { currentTuneId } = useCurrentTune();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Local width state for smooth dragging without triggering parent updates
   const [localWidth, setLocalWidth] = createSignal(props.width);
@@ -234,6 +240,14 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
   const isHorizontal = () => props.dockPosition === "bottom";
 
+  const handleEdit = () => {
+    const tuneId = currentTuneId();
+    if (tuneId) {
+      const fullPath = location.pathname + location.search;
+      navigate(`/tunes/${tuneId}/edit`, { state: { from: fullPath } });
+    }
+  };
+
   return (
     <aside
       class={`relative bg-gray-50/30 dark:bg-gray-800/30 flex-shrink-0 flex select-none ${
@@ -322,6 +336,30 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         </button>
       </div>
 
+      {/* Edit button - only visible when collapsed and tune is selected - positioned at top (vertical) or far right (horizontal) */}
+      <Show when={props.collapsed && currentTuneId()}>
+        <div
+          class={`absolute z-30 ${
+            isHorizontal()
+              ? "top-0.5 right-3.5 flex items-center"
+              : props.dockPosition === "right"
+                ? "top-3.5 left-1/2 -translate-x-1/2 flex items-center"
+                : "top-3.5 right-1/2 translate-x-1/2 flex items-center"
+          }`}
+        >
+          <button
+            type="button"
+            onClick={handleEdit}
+            class="p-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100/30 dark:hover:bg-blue-900/30 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500"
+            title="Edit tune"
+            aria-label="Edit tune"
+            data-testid="sidebar-edit-tune-button-collapsed"
+          >
+            <Pencil class="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </Show>
+
       {/* Collapse Toggle Button and Drag Handle - positioned based on dock position */}
       <div
         class={`absolute flex items-center justify-center z-30 ${
@@ -356,6 +394,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
             <ChevronLeft class="w-3.5 h-3.5" />
           )}
         </button>
+
         <div class="p-0.5">
           <SidebarDragHandle
             onDragStart={props.onDragStart}

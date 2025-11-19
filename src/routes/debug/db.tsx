@@ -78,6 +78,10 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       sql: "SELECT * FROM view_practice_record_readable LIMIT 50;",
     },
     {
+      name: "Tune Overrides (Readable)",
+      sql: "SELECT * FROM view_tune_override_readable LIMIT 50;",
+    },
+    {
       name: "Sync Queue (All)",
       sql: "SELECT id, table_name, operation, status, attempts, created_at, last_error FROM sync_queue ORDER BY created_at DESC LIMIT 50;",
     },

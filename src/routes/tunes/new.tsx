@@ -2,15 +2,19 @@
  * New Tune Route
  *
  * Protected route for creating a new tune.
+ * Accepts query parameters for imported tune data (title, type, mode, structure, incipit, genre, sourceUrl).
+ * Covers the entire viewport including tabs, with sidebar visible.
  *
  * @module routes/tunes/new
  */
 
-import { useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import type { Component } from "solid-js";
+import { createMemo } from "solid-js";
 import type { TuneEditorData } from "../../components/tunes";
 import { TuneEditor } from "../../components/tunes";
 import { useAuth } from "../../lib/auth/AuthContext";
+import { createReference } from "../../lib/db/queries/references";
 import { createTune } from "../../lib/db/queries/tunes";
 
 /**
@@ -18,19 +22,53 @@ import { createTune } from "../../lib/db/queries/tunes";
  */
 const NewTunePage: Component = () => {
   const navigate = useNavigate();
-  const { localDb } = useAuth();
+  const location = useLocation();
+  const { localDb, userIdInt, user } = useAuth();
+  const [searchParams] = useSearchParams();
+
+  // Store the location we came from (referrer) for proper back navigation
+  const returnPath = createMemo(() => {
+    const state = location.state as any;
+    return state?.from || "/";
+  });
+
+  // Extract imported data from query params
+  // Helper to normalize query param values to string
+  const qp = (key: string): string | undefined => {
+    const v = (searchParams as any)[key];
+    if (Array.isArray(v)) return v[0];
+    return typeof v === "string" && v.length > 0 ? v : undefined;
+  };
+
+  const initialData = createMemo(() => ({
+    title: qp("title") || "",
+    type: qp("type") || undefined,
+    mode: qp("mode") || undefined,
+    structure: qp("structure") || undefined,
+    incipit: qp("incipit") || undefined,
+    genre: qp("genre") || undefined,
+    sourceUrl: qp("sourceUrl") || undefined,
+  }));
 
   const handleSave = async (
     tuneData: Partial<TuneEditorData>
   ): Promise<string> => {
     const db = localDb();
+    const userId = userIdInt();
+
     if (!db) {
       console.error("Database not initialized");
       throw new Error("Database not available");
     }
 
+    if (!userId) {
+      console.error("User not authenticated");
+      throw new Error("User must be authenticated to create tunes");
+    }
+
     try {
       // Create tune in local SQLite (automatically queued for Supabase sync)
+      // Note: privateFor must be set to user's ID to satisfy RLS policy
       const newTune = await createTune(db, {
         title: tuneData.title || "",
         type: tuneData.type ?? undefined,
@@ -38,11 +76,45 @@ const NewTunePage: Component = () => {
         structure: tuneData.structure ?? undefined,
         incipit: tuneData.incipit ?? undefined,
         genre: tuneData.genre ?? undefined,
-        privateFor: undefined, // TODO: Add privacy controls in UI
+        privateFor: userId, // Required by RLS policy for tune inserts
       });
 
-      // Navigate to the newly created tune's detail page
-      navigate(`/tunes/${newTune.id}`);
+      // If imported from external source, create a reference link
+      const sourceUrl = initialData().sourceUrl;
+      if (sourceUrl && newTune.id) {
+        const userId = userIdInt();
+        const supabaseUserId = user()?.id;
+        if (userId && supabaseUserId) {
+          try {
+            const foreignId = sourceUrl.split("/").filter(Boolean).pop();
+            const title = sourceUrl.includes("://www.irishtune.info")
+              ? `irishtune.info #${foreignId}`
+              : sourceUrl.includes("://thesession.org")
+                ? `thesession.org #${foreignId}`
+                : `Source #${foreignId}`;
+
+            await createReference(
+              db,
+              {
+                tuneRef: newTune.id,
+                url: sourceUrl,
+                title: title,
+                refType: "website",
+                favorite: false,
+                public: true,
+                comment: undefined,
+              },
+              supabaseUserId
+            );
+          } catch (refError) {
+            console.error("Error creating reference:", refError);
+            // Don't fail the whole operation if reference creation fails
+          }
+        }
+      }
+
+      // Navigate back to where we came from
+      navigate(returnPath());
 
       // Return the new tune ID so TuneEditor can save tags
       return newTune.id;
@@ -53,13 +125,16 @@ const NewTunePage: Component = () => {
   };
 
   const handleCancel = () => {
-    navigate("/");
+    // Navigate back to where we came from
+    navigate(returnPath());
   };
 
   return (
-    <div class="container mx-auto py-8 px-4">
-      <TuneEditor onSave={handleSave} onCancel={handleCancel} />
-    </div>
+    <TuneEditor
+      onSave={handleSave}
+      onCancel={handleCancel}
+      initialData={initialData()}
+    />
   );
 };
 

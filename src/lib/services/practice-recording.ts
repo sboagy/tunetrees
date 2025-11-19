@@ -392,6 +392,17 @@ export async function commitStagedEvaluations(
       console.log(`Using most recent queue window: ${activeWindowStart}`);
     }
 
+    // Normalize window start to support both ISO "T" and space-separated formats
+    // Stored rows historically use space-separated format; some callers pass ISO with "T".
+    const startSpace = activeWindowStart.includes("T")
+      ? activeWindowStart.replace("T", " ")
+      : activeWindowStart;
+    const startISO = activeWindowStart.includes(" ")
+      ? activeWindowStart.replace(" ", "T")
+      : activeWindowStart;
+    const startA = startSpace; // prefer space form for storage lookup
+    const startB = startISO; // ISO form for callers passing ISO
+
     // DEBUG: Check what's actually in table_transient_data
     const allTransientData = await db.all(sql`
       SELECT user_id, tune_id, playlist_id, practiced, recall_eval
@@ -412,7 +423,7 @@ export async function commitStagedEvaluations(
     // 1. Fetch all staged evaluations from table_transient_data for this playlist
     console.log("Querying table_transient_data...");
     const stagedEvaluations = await db.all<{
-      tune_id: number;
+      tune_id: string;
       quality: number;
       difficulty: number;
       stability: number;
@@ -460,12 +471,12 @@ export async function commitStagedEvaluations(
 
     // 2. Get tune_ids that are in the active practice queue window
     console.log("Querying daily_practice_queue...");
-    const queueTuneIds = await db.all<{ tune_ref: number }>(sql`
+    const queueTuneIds = await db.all<{ tune_ref: string }>(sql`
       SELECT DISTINCT tune_ref
       FROM daily_practice_queue
       WHERE user_ref = ${userId}
         AND playlist_ref = ${playlistId}
-        AND window_start_utc = ${activeWindowStart}
+        AND (window_start_utc = ${startA} OR window_start_utc = ${startB})
     `);
 
     console.log("Queue tune IDs found:", queueTuneIds.length);
@@ -491,7 +502,7 @@ export async function commitStagedEvaluations(
     }
 
     // 4. For each staged evaluation, create practice_record and update related tables
-    const committedTuneIds: number[] = [];
+    const committedTuneIds: string[] = [];
     const now = getPracticeDate().toISOString();
 
     console.log("Starting to commit evaluations...");
@@ -504,7 +515,7 @@ export async function commitStagedEvaluations(
       const maxAttempts = 60; // Prevent infinite loop
 
       while (attempts < maxAttempts) {
-        const existing = await db.all<{ id: number }>(sql`
+        const existing = await db.all<{ id: string }>(sql`
           SELECT id FROM practice_record
           WHERE tune_ref = ${staged.tune_id}
             AND playlist_ref = ${playlistId}
@@ -644,7 +655,7 @@ export async function commitStagedEvaluations(
         WHERE user_ref = ${userId}
           AND playlist_ref = ${playlistId}
           AND tune_ref = ${staged.tune_id}
-          AND window_start_utc = ${activeWindowStart}
+          AND (window_start_utc = ${startA} OR window_start_utc = ${startB})
         LIMIT 1
       `);
 
@@ -654,7 +665,7 @@ export async function commitStagedEvaluations(
         WHERE user_ref = ${userId}
           AND playlist_ref = ${playlistId}
           AND tune_ref = ${staged.tune_id}
-          AND window_start_utc = ${activeWindowStart}
+          AND (window_start_utc = ${startA} OR window_start_utc = ${startB})
       `);
 
       // CRITICAL: Verify the update succeeded
@@ -664,7 +675,7 @@ export async function commitStagedEvaluations(
         WHERE user_ref = ${userId}
           AND playlist_ref = ${playlistId}
           AND tune_ref = ${staged.tune_id}
-          AND window_start_utc = ${activeWindowStart}
+          AND (window_start_utc = ${startA} OR window_start_utc = ${startB})
         LIMIT 1
       `);
 

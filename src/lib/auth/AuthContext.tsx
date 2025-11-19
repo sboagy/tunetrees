@@ -246,7 +246,7 @@ export const AuthProvider: ParentComponent = (props) => {
       // Get user's UUID from user_profile table (user_ref columns now use UUID)
       const { data: userProfile, error } = await supabase
         .from("user_profile")
-        .select("supabase_user_id")
+        .select("id, supabase_user_id")
         .eq("supabase_user_id", userId)
         .single();
 
@@ -255,9 +255,10 @@ export const AuthProvider: ParentComponent = (props) => {
         throw new Error("User profile not found in database");
       }
 
-      const userUuid = userProfile.supabase_user_id;
-      setUserIdInt(userUuid);
-      log.debug("User UUID:", userUuid);
+      const userInternalId = userProfile.id; // Internal UUID (PK in Postgres)
+      const userUuid = userProfile.supabase_user_id; // Auth UUID
+      setUserIdInt(userInternalId); // Use internal ID for FK relationships
+      log.debug("User internal ID:", userInternalId, "Auth UUID:", userUuid);
 
       // Start sync worker (now uses Supabase JS client, browser-compatible)
       // Realtime is disabled by default to reduce console noise during development
