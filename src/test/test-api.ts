@@ -199,6 +199,197 @@ async function getTuneOverrideCountForCurrentUser() {
   return rows[0]?.count ?? 0;
 }
 
+/**
+ * Get practice records for specific tunes
+ */
+async function getPracticeRecords(tuneIds: string[]) {
+  const db = await ensureDb();
+  if (!tuneIds || tuneIds.length === 0) return [];
+
+  const placeholders = tuneIds.map(() => "?").join(",");
+  const rows = await db.all<{
+    id: string;
+    tune_ref: string;
+    playlist_ref: string;
+    practiced: string | null;
+    due: string | null;
+    quality: number | null;
+    interval: number | null;
+    repetitions: number | null;
+    stability: number | null;
+    difficulty: number | null;
+    state: number | null;
+    step: number | null;
+    goal: string | null;
+    technique: string | null;
+    elapsed_days: number | null;
+    lapses: number | null;
+  }>(
+    sql.raw(`
+    SELECT 
+      id, tune_ref, playlist_ref, practiced, due, quality, 
+      interval, repetitions, stability, difficulty, state, step,
+      goal, technique, elapsed_days, lapses
+    FROM practice_record
+    WHERE tune_ref IN (${placeholders})
+    ORDER BY id DESC
+  `),
+    ...tuneIds
+  );
+  return rows;
+}
+
+/**
+ * Get latest practice record for a single tune
+ */
+async function getLatestPracticeRecord(tuneId: string, playlistId: string) {
+  const db = await ensureDb();
+  const rows = await db.all<{
+    id: string;
+    tune_ref: string;
+    playlist_ref: string;
+    practiced: string | null;
+    due: string | null;
+    quality: number | null;
+    interval: number | null;
+    repetitions: number | null;
+    stability: number | null;
+    difficulty: number | null;
+    state: number | null;
+    step: number | null;
+    goal: string | null;
+    technique: string | null;
+    elapsed_days: number | null;
+    lapses: number | null;
+  }>(sql`
+    SELECT 
+      id, tune_ref, playlist_ref, practiced, due, quality,
+      interval, repetitions, stability, difficulty, state, step,
+      goal, technique, elapsed_days, lapses
+    FROM practice_record
+    WHERE tune_ref = ${tuneId}
+      AND playlist_ref = ${playlistId}
+    ORDER BY id DESC
+    LIMIT 1
+  `);
+  return rows.length > 0 ? rows[0] : null;
+}
+
+/**
+ * Get scheduled dates for tunes in a playlist
+ */
+async function getScheduledDates(playlistId: string, tuneIds?: string[]) {
+  const db = await ensureDb();
+  let query = sql`
+    SELECT tune_ref, scheduled, learned, current
+    FROM playlist_tune
+    WHERE playlist_ref = ${playlistId}
+  `;
+
+  if (tuneIds && tuneIds.length > 0) {
+    const placeholders = tuneIds.map(() => "?").join(",");
+    const rows = await db.all<{
+      tune_ref: string;
+      scheduled: string | null;
+      learned: string | null;
+      current: string | null;
+    }>(
+      sql.raw(`
+      SELECT tune_ref, scheduled, learned, current
+      FROM playlist_tune
+      WHERE playlist_ref = ?
+        AND tune_ref IN (${placeholders})
+    `),
+      playlistId,
+      ...tuneIds
+    );
+    const result: Record<
+      string,
+      {
+        tune_ref: string;
+        scheduled: string | null;
+        learned: string | null;
+        current: string | null;
+      }
+    > = {};
+    for (const row of rows) {
+      result[row.tune_ref] = row;
+    }
+    return result;
+  }
+
+  const rows = await db.all<{
+    tune_ref: string;
+    scheduled: string | null;
+    learned: string | null;
+    current: string | null;
+  }>(query);
+
+  const result: Record<
+    string,
+    {
+      tune_ref: string;
+      scheduled: string | null;
+      learned: string | null;
+      current: string | null;
+    }
+  > = {};
+  for (const row of rows) {
+    result[row.tune_ref] = row;
+  }
+  return result;
+}
+
+/**
+ * Get practice queue for a specific window
+ */
+async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
+  const db = await ensureDb();
+  const userRef = await resolveUserId(db);
+
+  let query: any;
+  if (windowStartUtc) {
+    query = sql`
+      SELECT id, tune_ref, bucket, order_index, window_start_utc, 
+             window_end_utc, completed_at, snapshot_coalesced_ts
+      FROM daily_practice_queue
+      WHERE user_ref = ${userRef}
+        AND playlist_ref = ${playlistId}
+        AND window_start_utc = ${windowStartUtc}
+        AND active = 1
+      ORDER BY bucket ASC, order_index ASC
+    `;
+  } else {
+    query = sql`
+      SELECT id, tune_ref, bucket, order_index, window_start_utc,
+             window_end_utc, completed_at, snapshot_coalesced_ts
+      FROM daily_practice_queue
+      WHERE user_ref = ${userRef}
+        AND playlist_ref = ${playlistId}
+        AND active = 1
+        AND window_start_utc = (
+          SELECT MAX(window_start_utc)
+          FROM daily_practice_queue
+          WHERE user_ref = ${userRef} AND playlist_ref = ${playlistId} AND active = 1
+        )
+      ORDER BY bucket ASC, order_index ASC
+    `;
+  }
+
+  const rows = await db.all<{
+    id: string;
+    tune_ref: string;
+    bucket: number;
+    order_index: number;
+    window_start_utc: string;
+    window_end_utc: string;
+    completed_at: string | null;
+    snapshot_coalesced_ts: string | null;
+  }>(query);
+
+  return rows;
+}
+
 // Attach to window
 declare global {
   interface Window {
@@ -213,6 +404,77 @@ declare global {
       getSyncVersion: () => number;
       isInitialSyncComplete: () => boolean;
       dispose: () => Promise<void>;
+      // New query functions for scheduling tests
+      getPracticeRecords: (tuneIds: string[]) => Promise<
+        Array<{
+          id: string;
+          tune_ref: string;
+          playlist_ref: string;
+          practiced: string | null;
+          due: string | null;
+          quality: number | null;
+          interval: number | null;
+          repetitions: number | null;
+          stability: number | null;
+          difficulty: number | null;
+          state: number | null;
+          step: number | null;
+          goal: string | null;
+          technique: string | null;
+          elapsed_days: number | null;
+          lapses: number | null;
+        }>
+      >;
+      getLatestPracticeRecord: (
+        tuneId: string,
+        playlistId: string
+      ) => Promise<{
+        id: string;
+        tune_ref: string;
+        playlist_ref: string;
+        practiced: string | null;
+        due: string | null;
+        quality: number | null;
+        interval: number | null;
+        repetitions: number | null;
+        stability: number | null;
+        difficulty: number | null;
+        state: number | null;
+        step: number | null;
+        goal: string | null;
+        technique: string | null;
+        elapsed_days: number | null;
+        lapses: number | null;
+      } | null>;
+      getScheduledDates: (
+        playlistId: string,
+        tuneIds?: string[]
+      ) => Promise<
+        Record<
+          string,
+          {
+            tune_ref: string;
+            scheduled: string | null;
+            learned: string | null;
+            current: string | null;
+          }
+        >
+      >;
+      getPracticeQueue: (
+        playlistId: string,
+        windowStartUtc?: string
+      ) => Promise<
+        Array<{
+          id: string;
+          tune_ref: string;
+          bucket: number;
+          order_index: number;
+          window_start_utc: string;
+          window_end_utc: string;
+          completed_at: string | null;
+          snapshot_coalesced_ts: string | null;
+        }>
+      >;
     };
   }
 }
@@ -224,6 +486,10 @@ if (typeof window !== "undefined") {
       seedAddToReview,
       getPracticeCount,
       getTuneOverrideCountForCurrentUser,
+      getPracticeRecords,
+      getLatestPracticeRecord,
+      getScheduledDates,
+      getPracticeQueue,
       getSyncVersion: () => {
         // Access the sync version from AuthContext
         // The version starts at 0 and increments to 1 after initial sync
