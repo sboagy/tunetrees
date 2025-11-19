@@ -7,9 +7,9 @@
  * @module components/onboarding/OnboardingOverlay
  */
 
+import { useNavigate } from "@solidjs/router";
 import { Info, X } from "lucide-solid";
 import { type Component, createSignal, Match, Show, Switch } from "solid-js";
-import { useNavigate } from "@solidjs/router";
 import { useOnboarding } from "../../lib/context/OnboardingContext";
 import { PlaylistEditorDialog } from "../playlists/PlaylistEditorDialog";
 
@@ -19,7 +19,8 @@ import { PlaylistEditorDialog } from "../playlists/PlaylistEditorDialog";
  * Shows instructional overlays based on the current onboarding step.
  */
 export const OnboardingOverlay: Component = () => {
-  const { needsOnboarding, onboardingStep, nextStep, skipOnboarding } = useOnboarding();
+  const { needsOnboarding, onboardingStep, nextStep, skipOnboarding } =
+    useOnboarding();
   const navigate = useNavigate();
   const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
 
@@ -76,7 +77,8 @@ export const OnboardingOverlay: Component = () => {
 
                 <div class="space-y-4">
                   <p class="text-gray-600 dark:text-gray-300">
-                    Let's get you started! First, you'll need a playlist to organize your tunes.
+                    Let's get you started! First, you'll need a playlist to
+                    organize your tunes.
                   </p>
 
                   <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
@@ -84,7 +86,9 @@ export const OnboardingOverlay: Component = () => {
                       What's a playlist?
                     </h3>
                     <p class="text-sm text-blue-800 dark:text-blue-200">
-                      A playlist is a collection of tunes you want to practice. You can have different playlists for different instruments, genres, or skill levels.
+                      A playlist is a collection of tunes you want to practice.
+                      You can have different playlists for different
+                      instruments, genres, or skill levels.
                     </p>
                   </div>
 
@@ -134,7 +138,8 @@ export const OnboardingOverlay: Component = () => {
 
                 <div class="space-y-4">
                   <p class="text-gray-600 dark:text-gray-300">
-                    You're now viewing the <strong>Catalog tab</strong>. This is where you'll find all available tunes.
+                    You're now viewing the <strong>Catalog tab</strong>. This is
+                    where you'll find all available tunes.
                   </p>
 
                   <div class="space-y-3">
@@ -143,7 +148,8 @@ export const OnboardingOverlay: Component = () => {
                         📚 Browse the catalog
                       </h3>
                       <p class="text-sm text-green-800 dark:text-green-200">
-                        Use the search and filters to find tunes you want to learn.
+                        Use the search and filters to find tunes you want to
+                        learn.
                       </p>
                     </div>
 
@@ -152,7 +158,9 @@ export const OnboardingOverlay: Component = () => {
                         ➕ Add to Repertoire
                       </h3>
                       <p class="text-sm text-green-800 dark:text-green-200">
-                        Click on a tune and use the <strong>"Add to Repertoire"</strong> button to add it to your playlist.
+                        Click on a tune and use the{" "}
+                        <strong>"Add to Repertoire"</strong> button to add it to
+                        your playlist.
                       </p>
                     </div>
 
@@ -161,7 +169,9 @@ export const OnboardingOverlay: Component = () => {
                         🎯 Practice tab
                       </h3>
                       <p class="text-sm text-green-800 dark:text-green-200">
-                        Once you've added tunes, visit the <strong>Practice tab</strong> to start your practice session!
+                        Once you've added tunes, visit the{" "}
+                        <strong>Practice tab</strong> to start your practice
+                        session!
                       </p>
                     </div>
                   </div>
