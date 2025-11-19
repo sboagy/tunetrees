@@ -3,7 +3,8 @@
 **Issue:** #286 - Scheduling not working properly  
 **Author:** GitHub Copilot  
 **Date:** 2025-11-19  
-**Status:** Draft - Awaiting @sboagy approval
+**Updated:** 2025-11-19 (after @sboagy feedback)
+**Status:** Updated with FSRS implementation details
 
 ## Problem Statement
 
@@ -19,6 +20,18 @@ TuneTrees uses the FSRS (Free Spaced Repetition Scheduler) algorithm via the `ts
 - **Ratings**: Again (1), Hard (2), Good (3), Easy (4)
 - **Metrics**: Stability, Difficulty, Interval (days until next review)
 - **States**: New (0), Learning (1), Review (2), Relearning (3)
+- **Default Weights**: From `generatorParameters().w` (19 values, customizable in user settings)
+- **Minimum Interval**: 1 day (enforced by `ensureMinimumNextDay()`)
+- **Maximum Interval**: 365 days (configurable, default was 36500)
+- **Request Retention**: 0.9 (target retention rate)
+
+**Implementation:**
+- Core FSRS logic: `src/lib/scheduling/fsrs-service.ts` (FSRSService class)
+- Staging preview: `src/lib/services/practice-staging.ts` (`stagePracticeEvaluation()`)
+- Date adjustment: `src/lib/utils/practice-date.ts` (`ensureMinimumNextDay()`)
+- User preferences: `src/routes/user-settings/spaced-repetition.tsx`
+
+**Key Constraint:** Tunes NEVER scheduled for same day - minimum next day enforced to prevent "today" loop bug.
 
 ### Practice Flow (see docs/practice_flow.md)
 1. **Queue Generation**: Daily snapshot of tunes to practice (buckets: Due Today, Lapsed, New, Old Lapsed)
@@ -485,23 +498,113 @@ export const STABLE_TEST_DATE = '2025-07-20T14:00:00.000Z';
 - [ ] FSRS calculation < 100ms per tune
 - [ ] UI refresh < 1 second after submission
 
-## Open Questions for @sboagy
+## Questions Answered by @sboagy
 
-1. **Acceptable Interval Ranges**: What are min/max expected intervals for each rating?
-   - Again: ? days
-   - Hard: ? days
-   - Good: ? days
-   - Easy: ? days
+### 1. FSRS Parameters ✅
+**Answer:** Uses default `generatorParameters().w` from ts-fsrs library, customizable via user settings.
+- Default weights: 19-value array from ts-fsrs
+- Request retention: 0.9 (90% target)
+- Maximum interval: **365 days** (needs update from current 36500)
+- Minimum interval: **1 day** (enforced by `ensureMinimumNextDay()`)
+- Enable fuzzing: true (adds randomness to intervals)
 
-2. **Bucket 4 (Old Lapsed)**: Is this enabled in production? Should tests cover it?
+**Implementation:** See `src/lib/scheduling/fsrs-service.ts` and `src/routes/user-settings/spaced-repetition.tsx`
 
-3. **Timezone Handling**: Should tests validate timezone-aware scheduling?
+### 2. Expected Interval Ranges ✅
+**Answer:** Determined entirely by FSRS algorithm specification (see [Algorithm docs](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm) and [visual guide](https://expertium.github.io/Algorithm.html)).
 
-4. **FSRS Parameters**: Are default FSRS parameters used, or custom ones?
+**Key Constraint:** Minimum interval is **1 day** for all ratings (enforced application-level).
 
-5. **Edge Cases**: Any known production scenarios that need specific test coverage?
+**FSRS Behavior (from ts-fsrs library):**
+- **Again (Rating 1)**: Resets learning, typically 1-2 days
+- **Hard (Rating 2)**: Slightly longer than Again, depends on card state
+- **Good (Rating 3)**: Standard FSRS progression based on stability/difficulty
+- **Easy (Rating 4)**: Accelerated progression, typically 2-4x Good interval
 
-6. **Performance Targets**: What are acceptable performance benchmarks for queue generation?
+**Test Validation:** Tests should verify intervals follow FSRS monotonic progression (Good ≥ Hard ≥ Again, Easy ≥ Good).
+
+### 3. Bucket 4 (Old Lapsed) ✅
+**Answer:** **Yes, enabled in production.**
+
+**Bucket Definitions** (from `src/lib/services/practice-queue.ts`):
+- **Q1 (Due Today)**: Scheduled in [startOfDayUtc, endOfDayUtc)
+- **Q2 (Recently Lapsed)**: Scheduled in [windowFloorUtc, startOfDayUtc) — 0-7 days overdue
+- **Q3 (New/Unscheduled)**: Never scheduled, no practice history
+- **Q4 (Old Lapsed)**: Scheduled < windowFloorUtc — more than 7 days overdue
+
+**Delinquency Window:** 7 days (defines boundary between Q2 and Q4)
+
+**Test Coverage:** Tests should validate all 4 buckets, especially bucket ordering (Q1 → Q2 → Q3 → Q4).
+
+### 4. Timezone Handling ✅
+**Answer:** **Not needed for initial tests.** Assume stable UTC offset.
+
+Timezone offset primarily affects day boundaries. Tests can use consistent UTC timestamps.
+
+**Future Consideration:** Multi-timezone scenarios (user shifts UTC-5 to UTC+1) deferred to future work.
+
+### 5. Performance Targets ✅
+**Answer:** **Focus on correctness first, not performance.**
+
+Performance benchmarks deferred. Primary goal: accurate scheduling without past dates or "today" loops.
+
+### 6. Known Patterns for Past Scheduling ✅
+**Answer:** **Not confirmed yet.**
+
+Need tests to reveal patterns (specific ratings, rapid submissions, clock drift, multi-tab scenarios).
+
+### 7. Multi-Exposure Feature ✅
+**Answer:** **Defer.** Future feature not currently in scope.
+
+### 8. Branch Strategy ✅
+**Answer:** Branch `copilot/fix-scheduling-issues` based on `feat/pwa1`. Merge to `feat/pwa1` when ready.
+
+---
+
+## Updated Test Approach
+
+### Key Implementation Insights
+
+After analyzing the codebase, I found the critical constraint that prevents scheduling bugs:
+
+**Minimum Next-Day Enforcement** (`src/lib/utils/practice-date.ts`):
+```typescript
+export function ensureMinimumNextDay(dueDate: Date, referenceDate: Date): Date {
+  const daysDiff = Math.floor((dueDate.getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysDiff < 1) {
+    // Add 25 hours (24h + 1h buffer) to guarantee at least 1 day gap
+    return new Date(referenceDate.getTime() + (25 * 60 * 60 * 1000));
+  }
+  
+  return dueDate;
+}
+```
+
+This function is called in `stagePracticeEvaluation()` to prevent same-day scheduling:
+```typescript
+// CRITICAL: Ensure tunes are never scheduled for the same day
+// FSRS can schedule very soon (same day) for "Again" ratings, but for
+// tune practice, we enforce a minimum of next day.
+const adjustedDue = ensureMinimumNextDay(nextCard.due, now);
+```
+
+### Validation Strategy
+
+Tests must verify:
+1. **No Same-Day Scheduling**: All `due` dates must be at least 1 full day after `practiced`
+2. **FSRS Progression**: Intervals follow monotonic growth (Easy ≥ Good ≥ Hard ≥ Again)
+3. **Minimum Interval**: All intervals ≥ 1 day (enforced by `ensureMinimumNextDay()`)
+4. **No Past Scheduling**: All `due` dates > current date when evaluation is submitted
+
+### Test Priorities (Updated)
+
+1. **Test 3 (Repeated "Easy")** - HIGHEST PRIORITY - reproduces reported bug
+2. **Test 1 (Basic FSRS)** - Validate core algorithm with single tune
+3. **Test 6 (Past Scheduling)** - Validate no regression to past dates
+4. **Test 2 (Multi-Tune Queue)** - Validate queue regeneration
+5. **Test 5 (Bucket Distribution)** - Validate all 4 buckets (Q1-Q4)
+6. **Test 4 (Mixed Patterns)** - Validate realistic scenarios
 
 ## Timeline
 
