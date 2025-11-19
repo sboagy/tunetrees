@@ -284,7 +284,10 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
           </AlertDialogTrigger>
         </Show>
 
-        <AlertDialogContent class="max-w-3xl bg-gray-900 dark:bg-gray-900">
+        <AlertDialogContent
+          class="max-w-3xl bg-white dark:bg-gray-900"
+          data-testid="add-tune-dialog"
+        >
           <AlertDialogCloseButton />
           <AlertDialogHeader>
             <AlertDialogTitle>Add Tune</AlertDialogTitle>
@@ -295,7 +298,10 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
 
           {/* Genre Selection */}
           <div class="grid grid-cols-4 items-center gap-4">
-            <label for="genre-select" class="text-right font-medium text-sm">
+            <label
+              for="genre-select"
+              class="text-right font-medium text-sm text-gray-900 dark:text-gray-100"
+            >
               Select Genre:
             </label>
             <div class="col-span-3">
@@ -326,7 +332,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
 
           {/* Import Site Information (for ITRAD only) */}
           <Show when={selectedGenre() === "ITRAD"}>
-            <div class="text-sm text-muted-foreground space-y-2">
+            <div class="text-sm text-gray-700 dark:text-gray-300 space-y-2">
               <p>
                 You can import a tune from a URL or search for a tune by title.
                 At this time, only tunes from the following sites can be
@@ -334,16 +340,26 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
               </p>
               <table class="w-full text-sm border-collapse">
                 <thead>
-                  <tr class="border-b">
-                    <th class="text-left p-2">#</th>
-                    <th class="text-left p-2">Site</th>
-                    <th class="text-left p-2">URL</th>
-                    <th class="text-left p-2">Type</th>
-                    <th class="text-left p-2">Genre</th>
+                  <tr class="border-b border-gray-300 dark:border-gray-600">
+                    <th class="text-left p-2 text-gray-900 dark:text-gray-100">
+                      #
+                    </th>
+                    <th class="text-left p-2 text-gray-900 dark:text-gray-100">
+                      Site
+                    </th>
+                    <th class="text-left p-2 text-gray-900 dark:text-gray-100">
+                      URL
+                    </th>
+                    <th class="text-left p-2 text-gray-900 dark:text-gray-100">
+                      Type
+                    </th>
+                    <th class="text-left p-2 text-gray-900 dark:text-gray-100">
+                      Genre
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr class="border-b">
+                <tbody class="text-gray-700 dark:text-gray-300">
+                  <tr class="border-b border-gray-300 dark:border-gray-600">
                     <td class="p-2">1</td>
                     <td class="p-2">irishtune.info</td>
                     <td class="p-2">
@@ -351,7 +367,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
                         href="https://www.irishtune.info/"
                         target="_blank"
                         rel="noreferrer"
-                        class="text-blue-600 hover:underline"
+                        class="text-blue-600 dark:text-blue-400 hover:underline"
                       >
                         https://www.irishtune.info/
                       </a>
@@ -367,7 +383,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
                         href="https://thesession.org/"
                         target="_blank"
                         rel="noreferrer"
-                        class="text-blue-600 hover:underline"
+                        class="text-blue-600 dark:text-blue-400 hover:underline"
                       >
                         https://thesession.org/
                       </a>
@@ -381,14 +397,17 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
           </Show>
 
           <Show when={selectedGenre() !== "ITRAD"}>
-            <p class="text-sm text-muted-foreground">
+            <p class="text-sm text-gray-700 dark:text-gray-300">
               No import sites implemented for this Genre.
             </p>
           </Show>
 
           {/* URL or Title Input */}
           <div class="grid grid-cols-4 items-center gap-4">
-            <label for="url-or-title" class="text-right font-medium text-sm">
+            <label
+              for="url-or-title"
+              class="text-right font-medium text-sm text-gray-900 dark:text-gray-100"
+            >
               URL or Title:
             </label>
             <input
