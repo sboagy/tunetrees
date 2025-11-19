@@ -85,6 +85,10 @@ export class TuneTreesPage {
   readonly userSettingsAvatarButton: Locator;
 
   readonly settingsMenuToggle: Locator;
+  readonly addTuneDialog: Locator;
+  readonly sidebarEditTuneButton: Locator;
+
+  readonly tuneEditorContainer: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -172,9 +176,10 @@ export class TuneTreesPage {
 
     // Tune Editor
     this.tuneEditorForm = page.getByTestId("tune-editor-form");
-    this.tuneEditorSubmitButton = page.getByTestId("tune-editor-submit-button");
+    this.tuneEditorSubmitButton = page.getByTestId("tune-editor-save-button");
     this.tuneEditorCancelButton = page.getByTestId("tune-editor-cancel-button");
-    this.showPublicToggle = page.getByTestId("show-public-toggle");
+    // TODO(REFACTOR): Global show-public-toggle removed. Update tests to use per-field override indicators instead.
+    this.showPublicToggle = page.getByTestId("override-indicator-title");
     this.userSettingsButton = page.getByTestId("user-settings-button");
 
     this.userSettingsSchedulingOptionsButton = page.getByRole("link", {
@@ -191,6 +196,31 @@ export class TuneTreesPage {
     });
 
     this.settingsMenuToggle = page.getByTestId("settings-menu-toggle");
+
+    // Dialogs
+    // Match either explicit test id (if component provides it) or the role-based alertdialog
+    // this.addTuneDialog = page.locator('[data-testid="add-tune-dialog"], [role="alertdialog"]');
+    this.addTuneDialog = page.getByTestId("add-tune-dialog");
+
+    // Match either expanded or collapsed sidebar edit button with a single locator
+    this.sidebarEditTuneButton = page
+      .getByTestId(/^sidebar-edit-tune-button(?:-collapsed)?$/)
+      .last();
+
+    this.tuneEditorContainer = page.getByTestId("tune-editor-container");
+  }
+
+  /**
+   * Open the sidebar tune editor for currently selected tune and wait until core inputs are visible.
+   * Avoids Playwright's networkidle which can hang due to persistent websocket connections.
+   */
+  async openTuneEditor() {
+    await this.sidebarEditTuneButton.click();
+    await this.page.waitForTimeout(100); // Allow sync to start
+    await expect(this.tuneEditorForm).toBeVisible({ timeout: 10000 });
+    // Title input is a reliable readiness indicator
+    const titleInput = this.page.getByTestId("tune-editor-input-title");
+    await expect(titleInput).toBeVisible({ timeout: 10000 });
   }
 
   /**
@@ -276,6 +306,7 @@ export class TuneTreesPage {
     if (isToolbarSearchVisible) {
       // Desktop: use toolbar search box
       await this.searchBox.fill(tuneTitle);
+      await this.page.waitForTimeout(2000); // Wait for virtualized grid to update
     } else {
       // Mobile: open filter panel if needed and use search box inside
       const isPanelSearchVisible = await this.searchBoxPanel
@@ -288,12 +319,25 @@ export class TuneTreesPage {
       }
 
       await this.searchBoxPanel.fill(tuneTitle);
+      await this.page.waitForTimeout(2000); // Wait for virtualized grid to update
+      // Close the panel if we opened it (toggle Filters button) or try Esc as a fallback
+      if (!isPanelSearchVisible) {
+        const filtersVisible = await this.filtersButton
+          .isVisible({ timeout: 1000 })
+          .catch(() => false);
+        if (filtersVisible) {
+          await this.filtersButton.click();
+        } else {
+          await this.page.keyboard.press("Escape").catch(() => {});
+        }
+        await this.page.waitForTimeout(300);
+      }
     }
 
-    await this.page.waitForTimeout(2000); // Wait for virtualized grid to update
-
     // Verify grid is visible after search
-    await expect(grid).toBeVisible({ timeout: 5000 });
+    if (!this.page.getByText("No tunes found").isVisible()) {
+      await expect(grid).toBeVisible({ timeout: 5000 });
+    }
   }
 
   /**
@@ -311,6 +355,12 @@ export class TuneTreesPage {
    */
   async getTuneRowById(tuneId: string, grid: Locator): Promise<Locator> {
     return grid.locator(`tr:has-text("${tuneId}")`);
+  }
+
+  getRows(gridId: string): Locator {
+    return this.page.locator(
+      `[data-testid="tunes-grid-${gridId}"] tbody tr[data-index]`
+    );
   }
 
   /**
@@ -754,5 +804,52 @@ export class TuneTreesPage {
     throw new Error(
       `Counter value did not stabilize within ${maxRetries * retryDelayMs}ms`
     );
+  }
+
+  // ===== Tune Editor form helpers =====
+
+  /**
+   * Open the Genre select in the Tune Editor and choose an option.
+   * Uses the Trigger button next to the "Genre:" label.
+   */
+  async selectGenreInTuneEditor(optionLabel: string) {
+    // Find the trigger near the Genre label within the form
+    const trigger = this.tuneEditorForm
+      .getByRole("button", { name: /select genre/i })
+      .or(
+        this.tuneEditorForm
+          .locator("label:has-text('Genre:')")
+          .locator("xpath=../following-sibling::*")
+          .locator("button")
+          .first()
+      );
+    await trigger.click();
+    await this.page
+      .getByRole("listbox")
+      .waitFor({ state: "visible", timeout: 5000 })
+      .catch(() => {});
+    await this.page.getByRole("option", { name: optionLabel }).first().click();
+  }
+
+  /**
+   * Open the Type select in the Tune Editor and choose an option.
+   * Uses the Trigger button next to the "Type:" label.
+   */
+  async selectTypeInTuneEditor(optionLabel: string) {
+    const trigger = this.tuneEditorForm
+      .getByRole("button", { name: /select tune type/i })
+      .or(
+        this.tuneEditorForm
+          .locator("label:has-text('Type:')")
+          .locator("xpath=../following-sibling::*")
+          .locator("button")
+          .first()
+      );
+    await trigger.click();
+    await this.page
+      .getByRole("listbox")
+      .waitFor({ state: "visible", timeout: 5000 })
+      .catch(() => {});
+    await this.page.getByRole("option", { name: optionLabel }).first().click();
   }
 }

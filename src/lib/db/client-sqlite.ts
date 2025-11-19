@@ -29,6 +29,8 @@ import {
  */
 let sqliteDb: SqlJsDatabase | null = null;
 let drizzleDb: ReturnType<typeof drizzle> | null = null;
+let dbReady = false;
+let isClearing = false;
 
 /**
  * IndexedDB database name for persistence
@@ -68,6 +70,7 @@ const CURRENT_DB_VERSION = 4;
  */
 export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
   if (drizzleDb) {
+    dbReady = true;
     return drizzleDb;
   }
 
@@ -222,6 +225,7 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
 
   // Database is ready - sync will handle populating with real data from Supabase
   console.log("✅ SQLite WASM database ready");
+  dbReady = true;
 
   // Handle schema migration if needed
   if (migrationNeeded) {
@@ -297,8 +301,16 @@ export function getDb(): ReturnType<typeof drizzle> {
  * ```
  */
 export async function persistDb(): Promise<void> {
+  if (isClearing) {
+    console.warn("⏭️  Skipping persist while clearing local DB");
+    return;
+  }
   if (!sqliteDb) {
     throw new Error("SQLite database not initialized");
+  }
+  if (!dbReady) {
+    console.warn("⏭️  Skipping persist until DB initialization completes");
+    return;
   }
 
   const data = sqliteDb.export();
@@ -358,6 +370,7 @@ export async function persistDb(): Promise<void> {
  * Useful for logout or data reset scenarios.
  */
 export async function clearDb(): Promise<void> {
+  isClearing = true;
   if (sqliteDb) {
     sqliteDb.close();
     sqliteDb = null;
@@ -365,6 +378,8 @@ export async function clearDb(): Promise<void> {
   }
 
   await deleteFromIndexedDB(DB_KEY);
+  dbReady = false;
+  isClearing = false;
   console.log("🗑️  Local database cleared");
 }
 
@@ -441,7 +456,7 @@ function ensureColumnExists(
  */
 async function saveToIndexedDB(key: string, data: Uint8Array): Promise<void> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(INDEXEDDB_NAME, 1);
+    const request = indexedDB.open(INDEXEDDB_NAME);
 
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -452,6 +467,37 @@ async function saveToIndexedDB(key: string, data: Uint8Array): Promise<void> {
 
     request.onsuccess = () => {
       const db = request.result;
+
+      // If the store is missing (possible after races with delete), perform an upgrade to create it
+      if (!db.objectStoreNames.contains(INDEXEDDB_STORE)) {
+        const currentVersion = db.version || 1;
+        db.close();
+
+        const upgradeReq = indexedDB.open(INDEXEDDB_NAME, currentVersion + 1);
+        upgradeReq.onupgradeneeded = () => {
+          const udb = upgradeReq.result;
+          if (!udb.objectStoreNames.contains(INDEXEDDB_STORE)) {
+            udb.createObjectStore(INDEXEDDB_STORE);
+          }
+        };
+        upgradeReq.onsuccess = () => {
+          const udb = upgradeReq.result;
+          const tx = udb.transaction(INDEXEDDB_STORE, "readwrite");
+          const store = tx.objectStore(INDEXEDDB_STORE);
+          store.put(data, key);
+          tx.oncomplete = () => {
+            udb.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            udb.close();
+            reject(tx.error);
+          };
+        };
+        upgradeReq.onerror = () => reject(upgradeReq.error);
+        return;
+      }
+
       const tx = db.transaction(INDEXEDDB_STORE, "readwrite");
       const store = tx.objectStore(INDEXEDDB_STORE);
       store.put(data, key);
@@ -475,7 +521,7 @@ async function saveToIndexedDB(key: string, data: Uint8Array): Promise<void> {
  */
 async function loadFromIndexedDB(key: string): Promise<Uint8Array | null> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(INDEXEDDB_NAME, 1);
+    const request = indexedDB.open(INDEXEDDB_NAME);
 
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -517,7 +563,7 @@ async function loadFromIndexedDB(key: string): Promise<Uint8Array | null> {
  */
 async function deleteFromIndexedDB(key: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(INDEXEDDB_NAME, 1);
+    const request = indexedDB.open(INDEXEDDB_NAME);
 
     request.onsuccess = () => {
       const db = request.result;

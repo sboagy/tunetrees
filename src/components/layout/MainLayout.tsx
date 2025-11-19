@@ -13,7 +13,7 @@
  */
 
 import type { ParentComponent } from "solid-js";
-import { createSignal, onMount } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
 import { DropZoneOverlays } from "./DropZoneOverlays";
 import { Sidebar } from "./Sidebar";
 import { useSidebarDock } from "./SidebarDockContext";
@@ -132,8 +132,13 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
 
         {/* Main Content Area */}
         <div class="flex-1 flex flex-col overflow-hidden">
-          {/* Tab Navigation */}
-          <TabBar activeTab={props.activeTab} onTabChange={props.onTabChange} />
+          {/* Tab Navigation - only show if activeTab is provided (Home page) */}
+          <Show when={props.activeTab && props.onTabChange}>
+            <TabBar
+              activeTab={props.activeTab}
+              onTabChange={props.onTabChange!}
+            />
+          </Show>
 
           {/* Tab Content - Remove overflow-auto to let child components handle scrolling */}
           <div class="flex-1 overflow-hidden">{props.children}</div>

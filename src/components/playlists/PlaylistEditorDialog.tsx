@@ -177,6 +177,19 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
           <div class="flex items-center gap-4">
             <button
               type="button"
+              onClick={props.onClose}
+              disabled={isSaving()}
+              class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Cancel and close dialog"
+              data-testid="cancel-playlist-button"
+            >
+              <div class="flex items-center gap-2">
+                <span>Cancel</span>
+                <CircleX size={20} />
+              </div>
+            </button>
+            <button
+              type="button"
               onClick={handleSave}
               disabled={isSaving()}
               class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -195,29 +208,6 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
                 Saving...
               </Show>
             </button>
-            <button
-              type="button"
-              onClick={props.onClose}
-              disabled={isSaving()}
-              class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Cancel and close dialog"
-              data-testid="cancel-playlist-button"
-            >
-              <div class="flex items-center gap-2">
-                <span>Cancel</span>
-                <CircleX size={20} />
-              </div>
-            </button>
-            {/* <button
-              type="button"
-              onClick={props.onClose}
-              disabled={isSaving()}
-              class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Close dialog"
-              data-testid="close-playlist-editor"
-            >
-              <X size={24} />
-            </button> */}
           </div>
         </div>
 

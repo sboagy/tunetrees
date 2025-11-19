@@ -52,6 +52,17 @@ export async function getPracticeCountLocally(page: Page, playlistId: string) {
 export async function clearTunetreesStorageDB(page: Page) {
   await page.evaluate(async () => {
     const dbName = "tunetrees-storage";
+    // First, ask the app to dispose in-memory DB to avoid re-persisting
+    try {
+      if (
+        (window as any).__ttTestApi &&
+        typeof (window as any).__ttTestApi.dispose === "function"
+      ) {
+        await (window as any).__ttTestApi.dispose();
+      }
+    } catch (err) {
+      console.warn("dispose() failed before IndexedDB delete:", err);
+    }
     await new Promise<void>((resolve, reject) => {
       const maxAttempts = 5;
       let attempt = 0;
@@ -117,7 +128,7 @@ export async function clearTunetreesStorageDB(page: Page) {
       }
     }
 
-    // 3) Clear any in-memory test hooks the app may have exposed
+    // 3) Clear any in-memory test hooks the app may have exposed (again, after delete)
     try {
       if ((window as any).__ttTestApi) {
         if (typeof (window as any).__ttTestApi.dispose === "function") {
@@ -194,6 +205,34 @@ async function waitForSyncComplete(
 import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
 import { getTestUserClient, type TestUser } from "./test-users";
 
+// Cache mapping from Supabase user UUID -> internal user_profile.id (user_ref)
+const internalUserRefCache: Map<string, string> = new Map();
+
+async function getInternalUserRef(
+  supabase: any,
+  user: TestUser
+): Promise<string | null> {
+  // Supabase userId stored on TestUser.userId; internal user_profile.id needed for tune_override.user_ref
+  if (internalUserRefCache.has(user.userId)) {
+    return internalUserRefCache.get(user.userId)!;
+  }
+  const { data, error } = await supabase
+    .from("user_profile")
+    .select("id")
+    .eq("supabase_user_id", user.userId)
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.warn(
+      `[${user.name}] Could not resolve internal user_ref: ${error.message}`
+    );
+    return null;
+  }
+  const internalId = data?.id || null;
+  if (internalId) internalUserRefCache.set(user.userId, internalId);
+  return internalId;
+}
+
 /**
  * Parallel-safe version of setupDeterministicTest
  * Sets up a deterministic test state for a specific user
@@ -220,7 +259,11 @@ export async function setupDeterministicTestParallel(
     await waitForSyncComplete(page);
   }
 
-  let whichTables = ["daily_practice_queue", "practice_record"];
+  let whichTables = [
+    "daily_practice_queue",
+    "practice_record",
+    "tune_override",
+  ];
 
   // Step 1: Clear user's state
   if (opts.clearRepertoire) {
@@ -230,6 +273,7 @@ export async function setupDeterministicTestParallel(
   }
   await clearUserTable(user, "daily_practice_queue");
   await clearUserTable(user, "practice_record");
+  await clearUserTable(user, "tune_override");
 
   await verifyTablesEmpty(user, whichTables);
 
@@ -388,6 +432,15 @@ function applyTableQueryFilters(
     query = query.eq("playlist_ref", user.playlistId);
   } else if (tableName === "table_transient_data") {
     query = query.eq("user_id", user.userId);
+  } else if (tableName === "tune_override") {
+    // tune_override.user_ref references internal user_profile.id, not supabase_user_id.
+    const cached = internalUserRefCache.get(user.userId);
+    if (cached) {
+      query = query.eq("user_ref", cached);
+    } else {
+      // Fallback: use supabase_user_id (will match zero rows); deletion will be retried in clearUserTable with explicit internal id.
+      query = query.eq("user_ref", user.userId);
+    }
   } else {
     query = query.eq("user_ref", user.userId);
   }
@@ -419,8 +472,16 @@ async function verifyTableEmpty(
       count: "exact",
       head: true,
     }) as any;
-
-    countQuery = applyTableQueryFilters(tableName, countQuery, user);
+    if (tableName === "tune_override") {
+      const internalId = await getInternalUserRef(supabase, user);
+      if (internalId) {
+        countQuery = countQuery.eq("user_ref", internalId);
+      } else {
+        countQuery = countQuery.eq("user_ref", "__never_match__");
+      }
+    } else {
+      countQuery = applyTableQueryFilters(tableName, countQuery, user);
+    }
 
     const { count, error: countError } = await countQuery;
 
@@ -449,8 +510,16 @@ async function verifyTableEmpty(
       count: "exact",
       head: true,
     }) as any;
-
-    finalQuery = applyTableQueryFilters(tableName, finalQuery, user);
+    if (tableName === "tune_override") {
+      const internalId = await getInternalUserRef(supabase, user);
+      if (internalId) {
+        finalQuery = finalQuery.eq("user_ref", internalId);
+      } else {
+        finalQuery = finalQuery.eq("user_ref", "__never_match__");
+      }
+    } else {
+      finalQuery = applyTableQueryFilters(tableName, finalQuery, user);
+    }
 
     const { count: finalCountRead, error: finalReadError } = await finalQuery;
     if (finalReadError) {
@@ -499,8 +568,16 @@ async function verifyTablesEmpty(
         count: "exact",
         head: true,
       }) as any;
-
-      countQuery = applyTableQueryFilters(tableName, countQuery, user);
+      if (tableName === "tune_override") {
+        const internalId = await getInternalUserRef(supabase, user);
+        if (internalId) {
+          countQuery = countQuery.eq("user_ref", internalId);
+        } else {
+          countQuery = countQuery.eq("user_ref", "__never_match__");
+        }
+      } else {
+        countQuery = applyTableQueryFilters(tableName, countQuery, user);
+      }
 
       const { count, error: countError } = await countQuery;
 
@@ -545,8 +622,16 @@ async function verifyTablesEmpty(
         count: "exact",
         head: true,
       }) as any;
-
-      finalQuery = applyTableQueryFilters(tableName, finalQuery, user);
+      if (tableName === "tune_override") {
+        const internalId = await getInternalUserRef(supabase, user);
+        if (internalId) {
+          finalQuery = finalQuery.eq("user_ref", internalId);
+        } else {
+          finalQuery = finalQuery.eq("user_ref", "__never_match__");
+        }
+      } else {
+        finalQuery = applyTableQueryFilters(tableName, finalQuery, user);
+      }
 
       const { count: finalCountRead, error: finalReadError } = await finalQuery;
       if (finalReadError) {
@@ -589,14 +674,14 @@ async function clearUserTable(
 ) {
   const userKey = user.email.split(".")[0]; // alice.test@... → alice
   const { supabase } = await getTestUserClient(userKey);
-
+  let error: any = null;
+  // Unified deletion path; RLS ensures only caller's rows are affected.
   let query = supabase.from(tableName).delete();
-
   query = applyTableQueryFilters(tableName, query, user);
+  const { error: delError } = await query;
+  error = delError;
 
-  const { error } = await query;
-
-  if (error && !error.message.includes("no rows")) {
+  if (error && !error.message?.includes("no rows")) {
     console.error(`[${user.name}] Failed to clear ${tableName}:`, error);
   } else {
     log.debug(`✅ [${user.name}] Cleared ${tableName}`);

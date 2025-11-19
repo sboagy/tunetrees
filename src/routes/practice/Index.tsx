@@ -7,7 +7,7 @@
  * @module routes/practice/Index
  */
 
-import { useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import { and, eq, gte, lt, sql } from "drizzle-orm";
 import type { Component } from "solid-js";
 import {
@@ -58,6 +58,7 @@ import {
  */
 const PracticeIndex: Component = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     user,
     localDb,
@@ -679,7 +680,8 @@ const PracticeIndex: Component = () => {
 
   // Handle tune selection (double-click opens editor)
   const handleTuneSelect = (tune: ITuneOverview) => {
-    navigate(`/tunes/${tune.id}/edit`);
+    const fullPath = location.pathname + location.search;
+    navigate(`/tunes/${tune.id}/edit`, { state: { from: fullPath } });
   };
 
   return (

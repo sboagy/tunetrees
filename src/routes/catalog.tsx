@@ -13,7 +13,7 @@
  * @module routes/catalog
  */
 
-import { useNavigate, useSearchParams } from "@solidjs/router";
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import {
   type Component,
@@ -45,6 +45,7 @@ import { log } from "../lib/logger";
  */
 const CatalogPage: Component = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, localDb, catalogListChanged } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -317,7 +318,8 @@ const CatalogPage: Component = () => {
 
   // Handle tune selection (double-click opens editor)
   const handleTuneSelect = (tune: ITuneOverview) => {
-    navigate(`/tunes/${tune.id}/edit`);
+    const fullPath = location.pathname + location.search;
+    navigate(`/tunes/${tune.id}/edit`, { state: { from: fullPath } });
   };
 
   return (

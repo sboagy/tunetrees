@@ -2,19 +2,32 @@
  * Edit Tune Route
  *
  * Protected route for editing an existing tune.
- * Uses MainLayout with sidebar visible.
+ * Covers the entire viewport including tabs, with sidebar visible.
  *
  * @module routes/tunes/[id]/edit
  */
 
-import { useNavigate, useParams } from "@solidjs/router";
-import { CircleX, Save } from "lucide-solid";
+import { useLocation, useNavigate, useParams } from "@solidjs/router";
 import type { Component } from "solid-js";
-import { createResource, createSignal, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createResource,
+  onCleanup,
+  Show,
+} from "solid-js";
 import type { TuneEditorData } from "../../../components/tunes";
 import { TuneEditor } from "../../../components/tunes";
 import { useAuth } from "../../../lib/auth/AuthContext";
-import { getTuneById, updateTune } from "../../../lib/db/queries/tunes";
+import { useCurrentTune } from "../../../lib/context/CurrentTuneContext";
+import {
+  getOrCreateTuneOverride,
+  updateTuneOverride,
+} from "../../../lib/db/queries/tune-overrides";
+import {
+  getTuneForUserById,
+  updateTuneIfOwned,
+} from "../../../lib/db/queries/tunes";
 
 /**
  * Edit Tune Page Component
@@ -24,29 +37,65 @@ import { getTuneById, updateTune } from "../../../lib/db/queries/tunes";
 const EditTunePage: Component = () => {
   const params = useParams();
   const navigate = useNavigate();
-  const { localDb } = useAuth();
-  const [showPublic, setShowPublic] = createSignal(false);
+  const location = useLocation();
+  const { localDb, userIdInt } = useAuth();
+  const { currentTuneId, setCurrentTuneId } = useCurrentTune();
+
+  // Store the location we came from (referrer) for proper back navigation
+  const returnPath = createMemo(() => {
+    const state = location.state as any;
+    return state?.from || "/";
+  });
 
   // Fetch tune data
   const [tune] = createResource(
     () => {
       const db = localDb();
       const tuneId = params.id;
-      return db && tuneId ? { db, tuneId } : null;
+      const uid = userIdInt();
+      return db && tuneId && uid
+        ? { db, tuneId, uid }
+        : db && tuneId
+          ? { db, tuneId }
+          : null;
     },
     async (params) => {
       if (!params) return null;
+      if (!params) return null;
+      // Prefer merged override view when user available; fall back to base tune
+      if ("uid" in params && params.uid) {
+        return await getTuneForUserById(params.db, params.tuneId, params.uid);
+      }
+      const { getTuneById } = await import("../../../lib/db/queries/tunes");
       return await getTuneById(params.db, params.tuneId);
     }
   );
+
+  // Ensure the sidebar reflects this tune while editor is active
+  // Set on mount and restore previous value on unmount
+  const prevTuneId = currentTuneId();
+  createEffect(() => {
+    const id = params.id;
+    if (id) setCurrentTuneId(id);
+  });
+  onCleanup(() => {
+    setCurrentTuneId(prevTuneId ?? null);
+  });
 
   const handleSave = async (
     tuneData: Partial<TuneEditorData>
   ): Promise<string | undefined> => {
     const db = localDb();
+    const userId = userIdInt();
+
     if (!db) {
       console.error("Database not initialized");
       throw new Error("Database not available");
+    }
+
+    if (!userId) {
+      console.error("User not authenticated");
+      throw new Error("User must be authenticated to edit tunes");
     }
 
     const tuneId = params.id;
@@ -55,20 +104,64 @@ const EditTunePage: Component = () => {
       throw new Error("Invalid tune ID");
     }
 
-    try {
-      // Update tune in local SQLite (automatically queued for Supabase sync)
-      await updateTune(db, tuneId, {
-        title: tuneData.title ?? undefined,
-        type: tuneData.type ?? undefined,
-        mode: tuneData.mode ?? undefined,
-        structure: tuneData.structure ?? undefined,
-        incipit: tuneData.incipit ?? undefined,
-        genre: tuneData.genre ?? undefined,
-        privateFor: tuneData.privateFor ?? undefined,
-      });
+    const currentTune = tune();
+    if (!currentTune) {
+      throw new Error("Tune not loaded");
+    }
 
-      // Navigate back to home (practice tab)
-      navigate("/");
+    try {
+      // Guard: only allow direct tune updates if tune is explicitly owned by user (privateFor matches userId)
+      // Public tunes (privateFor null) or tunes owned by another user MUST go through tune_override path.
+      const isUserOwnedPrivateTune =
+        !!currentTune.privateFor && currentTune.privateFor === userId;
+
+      if (
+        isUserOwnedPrivateTune &&
+        (await updateTuneIfOwned(db, tuneId, userId, {
+          title: tuneData.title ?? undefined,
+          type: tuneData.type ?? undefined,
+          mode: tuneData.mode ?? undefined,
+          structure: tuneData.structure ?? undefined,
+          incipit: tuneData.incipit ?? undefined,
+          genre: tuneData.genre ?? undefined,
+        }))
+      ) {
+        // Updated base tune (owned by user)
+      } else {
+        // Public tune or another user's tune - use tune_override
+        // Build override input with only changed fields
+        const overrideInput: any = {};
+        if (tuneData.title !== currentTune.title)
+          overrideInput.title = tuneData.title;
+        if (tuneData.type !== currentTune.type)
+          overrideInput.type = tuneData.type;
+        if (tuneData.mode !== currentTune.mode)
+          overrideInput.mode = tuneData.mode;
+        if (tuneData.structure !== currentTune.structure)
+          overrideInput.structure = tuneData.structure;
+        if (tuneData.incipit !== currentTune.incipit)
+          overrideInput.incipit = tuneData.incipit;
+        if (tuneData.genre !== currentTune.genre)
+          overrideInput.genre = tuneData.genre;
+
+        // Only proceed if there are actual changes
+        if (Object.keys(overrideInput).length > 0) {
+          const override = await getOrCreateTuneOverride(
+            db,
+            tuneId,
+            userId,
+            overrideInput
+          );
+
+          // If override already existed, update it with the changes
+          if (!override.isNew) {
+            await updateTuneOverride(db, override.id, overrideInput);
+          }
+        }
+      }
+
+      // Navigate back to where we came from
+      navigate(returnPath());
       return tuneId;
     } catch (error) {
       console.error("Error updating tune:", error);
@@ -77,164 +170,53 @@ const EditTunePage: Component = () => {
   };
 
   const handleCancel = () => {
-    // Navigate back to home (practice tab)
-    navigate("/");
+    // Navigate back to where we came from
+    navigate(returnPath());
   };
 
   return (
-    <div class="h-full flex flex-col">
-      {/* Compact Header with Tune ID, Show Public toggle, and action buttons */}
-      <div class="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        {/* Left: Tune ID (small and grayed out) */}
-        <div class="flex items-center gap-4">
-          <Show
-            when={tune()}
-            fallback={<span class="text-xs text-gray-400">Loading...</span>}
-          >
-            <span class="text-xs text-gray-500 dark:text-gray-400">
-              #{tune()?.id}
-            </span>
-          </Show>
-
-          {/* Show Public Toggle */}
-          <label class="flex items-center gap-2 cursor-pointer">
-            <span class="text-sm text-gray-700 dark:text-gray-300">
-              Show Public
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={showPublic()}
-              onClick={() => setShowPublic(!showPublic())}
-              class={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                showPublic() ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
-              }`}
-              data-testid="show-public-toggle"
-            >
-              <span
-                class={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  showPublic() ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </label>
+    <Show
+      when={!tune.loading}
+      fallback={
+        <div class="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+          <div class="text-center">
+            <div class="animate-spin h-12 w-12 mx-auto border-4 border-blue-600 border-t-transparent rounded-full" />
+            <p class="mt-4 text-gray-600 dark:text-gray-400">Loading tune...</p>
+          </div>
         </div>
-
-        {/* Right: Submit and Cancel buttons */}
-        <div class="flex items-center gap-3">
-          {/* <button
-            type="button"
-            onClick={handleCancel}
-            class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            data-testid="tune-editor-cancel-button"
-          >
-            Cancel
-            <XCircle class="h-4 w-4" />
-          </button> */}
-          {/* <button
-            type="button"
-            onClick={() => {
-              // Trigger form submit in TuneEditor
-              const form = document.querySelector(
-                '[data-testid="tune-editor-form"]'
-              ) as HTMLFormElement;
-              if (form) {
-                form.requestSubmit();
-              }
-            }}
-            class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            data-testid="tune-editor-submit-button"
-          >
-            Submit
-            <Save class="h-4 w-4" />
-          </button> */}
-
-          <button
-            type="button"
-            onClick={() => {
-              // Trigger form submit in TuneEditor
-              const form = document.querySelector(
-                '[data-testid="tune-editor-form"]'
-              ) as HTMLFormElement;
-              if (form) {
-                form.requestSubmit();
-              }
-            }}
-            // disabled={isSaving()}
-            class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            aria-label="Save playlist"
-            data-testid="tune-editor-submit-button"
-          >
-            Save <Save size={24} />
-          </button>
-          <button
-            type="button"
-            onClick={handleCancel}
-            // disabled={isSaving()}
-            class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Cancel and close dialog"
-            data-testid="tune-editor-cancel-button"
-          >
-            <div class="flex items-center gap-2">
-              <span>Cancel</span>
-              <CircleX size={20} />
+      }
+    >
+      <Show
+        when={tune()}
+        fallback={
+          <div class="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+            <div class="text-center">
+              <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+                Tune Not Found
+              </h2>
+              <p class="mt-2 text-gray-600 dark:text-gray-400">
+                The tune you're looking for doesn't exist or has been deleted.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate(returnPath())}
+                class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Go Back
+              </button>
             </div>
-          </button>
-        </div>
-      </div>
-
-      {/* Scrollable Editor Content */}
-      <div class="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
-        <Show
-          when={!tune.loading}
-          fallback={
-            <div class="flex items-center justify-center h-full">
-              <div class="text-center">
-                <div class="animate-spin h-12 w-12 mx-auto border-4 border-blue-600 border-t-transparent rounded-full" />
-                <p class="mt-4 text-gray-600 dark:text-gray-400">
-                  Loading tune...
-                </p>
-              </div>
-            </div>
-          }
-        >
-          <Show
-            when={tune()}
-            fallback={
-              <div class="flex items-center justify-center h-full">
-                <div class="text-center">
-                  <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
-                    Tune Not Found
-                  </h2>
-                  <p class="mt-2 text-gray-600 dark:text-gray-400">
-                    The tune you're looking for doesn't exist or has been
-                    deleted.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/")}
-                    class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    Back to Practice
-                  </button>
-                </div>
-              </div>
-            }
-          >
-            {(tuneData) => (
-              <div class="py-6 px-4">
-                <TuneEditor
-                  tune={tuneData() as TuneEditorData}
-                  onSave={handleSave}
-                  onCancel={handleCancel}
-                  hideButtons={true}
-                />
-              </div>
-            )}
-          </Show>
-        </Show>
-      </div>
-    </div>
+          </div>
+        }
+      >
+        {(tuneData) => (
+          <TuneEditor
+            tune={tuneData() as TuneEditorData}
+            onSave={handleSave}
+            onCancel={handleCancel}
+          />
+        )}
+      </Show>
+    </Show>
   );
 };
 

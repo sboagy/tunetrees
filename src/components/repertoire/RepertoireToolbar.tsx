@@ -8,7 +8,7 @@
  * - Add To Review button with icon (left-most)
  * - Responsive filter textbox (min-width 12ch)
  * - Combined filter dropdown (Type, Mode, Genre - NO Playlist filter)
- * - Add Tune button with + icon
+ * - Add Tune button with + icon (opens AddTuneDialog)
  * - Remove From Repertoire button (enabled when rows selected)
  * - Delete Tunes button with trash icon
  * - Columns dropdown
@@ -18,7 +18,6 @@
  * @module components/repertoire/RepertoireToolbar
  */
 
-import { useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
 import { Columns } from "lucide-solid";
 import type { Component } from "solid-js";
@@ -46,6 +45,7 @@ import {
   TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../grids/types";
+import { AddTuneDialog } from "../import/AddTuneDialog";
 
 export interface RepertoireToolbarProps {
   /** Search query */
@@ -81,10 +81,10 @@ export interface RepertoireToolbarProps {
 }
 
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
-  const navigate = useNavigate();
   const { incrementPracticeListStagedChanged, forceSyncUp, userIdInt } =
     useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
+  const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
 
@@ -171,7 +171,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   };
 
   const handleAddTune = () => {
-    navigate("/tunes/new");
+    setShowAddTuneDialog(true);
   };
 
   const handleRemoveFromRepertoire = () => {
@@ -386,6 +386,12 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           </Show>
         </div>
       </div>
+
+      {/* Add Tune Dialog */}
+      <AddTuneDialog
+        open={showAddTuneDialog()}
+        onOpenChange={setShowAddTuneDialog}
+      />
     </div>
   );
 };
