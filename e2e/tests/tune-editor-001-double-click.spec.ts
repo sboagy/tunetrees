@@ -85,15 +85,14 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     });
 
     // Verify tune ID is displayed (small, grayed out)
-    await expect(page.getByText(new RegExp(`#${tuneId}`))).toBeVisible({
+    await expect(
+      ttPage.tuneEditorContainer.getByText(new RegExp(`${tuneId}`))
+    ).toBeVisible({
       timeout: 5000,
     });
 
-    // Verify Show Public toggle is visible
-    await expect(page.getByTestId("show-public-toggle")).toBeVisible();
-
     // Verify Submit and Cancel buttons are visible
-    await expect(page.getByTestId("tune-editor-submit-button")).toBeVisible();
+    await expect(page.getByTestId("tune-editor-save-button")).toBeVisible();
     await expect(page.getByTestId("tune-editor-cancel-button")).toBeVisible();
 
     // Verify tune title is loaded
@@ -112,7 +111,7 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
 
     await tuneRow.dblclick();
 
-    await expect(page.getByTestId("tune-editor-submit-button")).toBeVisible({
+    await expect(page.getByTestId("tune-editor-save-button")).toBeVisible({
       timeout: 10000,
     });
 
@@ -125,10 +124,12 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await structureInput.fill("AABBCC");
 
     // Submit the form
-    await page.getByTestId("tune-editor-submit-button").click();
+    await page.getByTestId("tune-editor-save-button").click();
 
     // ASSERT: Verify navigation back to home
-    await expect(page).toHaveURL("http://localhost:5173/", { timeout: 10000 });
+    await expect(page).toHaveURL("http://localhost:5173/?tab=catalog", {
+      timeout: 10000,
+    });
 
     // Verify we're back on a tab (not in editor)
     await expect(page.getByTestId("tab-practice")).toBeVisible({
@@ -163,7 +164,9 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await page.getByTestId("tune-editor-cancel-button").click();
 
     // ASSERT: Verify navigation back to home
-    await expect(page).toHaveURL("http://localhost:5173/", { timeout: 10000 });
+    await expect(page).toHaveURL("http://localhost:5173/?tab=catalog", {
+      timeout: 10000,
+    });
 
     // Verify we're back on a tab
     await expect(page.getByTestId("tab-practice")).toBeVisible({
@@ -192,11 +195,8 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
       { timeout: 10000 }
     );
 
-    // Verify Show Public toggle is visible
-    await expect(page.getByTestId("show-public-toggle")).toBeVisible();
-
     // Verify Submit and Cancel buttons are visible
-    await expect(page.getByTestId("tune-editor-submit-button")).toBeVisible();
+    await expect(page.getByTestId("tune-editor-save-button")).toBeVisible();
     await expect(page.getByTestId("tune-editor-cancel-button")).toBeVisible();
   });
 
@@ -214,37 +214,11 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     });
 
     // ACT & ASSERT: Verify scrollable container exists
-    const scrollableContainer = page.locator(".flex-1.overflow-y-auto");
+    const scrollableContainer = page.locator(".flex.overflow-y-auto");
     await expect(scrollableContainer).toBeVisible();
 
     // Verify form is inside scrollable area
     const form = page.getByTestId("tune-editor-form");
     await expect(form).toBeVisible();
-  });
-
-  test("should toggle Show Public switch", async ({ page }) => {
-    // ARRANGE: Open editor
-    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
-    await page.waitForTimeout(500);
-
-    const tuneRow = page.getByRole("cell", { name: "Public" }).first();
-
-    await tuneRow.dblclick();
-
-    const toggle = page.getByTestId("show-public-toggle");
-    await expect(toggle).toBeVisible({ timeout: 10000 });
-
-    // ACT: Toggle the switch
-    const initialState = await toggle.getAttribute("aria-checked");
-    await toggle.click();
-
-    // ASSERT: Verify toggle changed state
-    const newState = await toggle.getAttribute("aria-checked");
-    expect(newState).not.toBe(initialState);
-
-    // Toggle back
-    await toggle.click();
-    const finalState = await toggle.getAttribute("aria-checked");
-    expect(finalState).toBe(initialState);
   });
 });
