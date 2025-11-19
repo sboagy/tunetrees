@@ -9,15 +9,25 @@
 
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
 import type { Component } from "solid-js";
-import { createMemo, createResource, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createResource,
+  onCleanup,
+  Show,
+} from "solid-js";
 import type { TuneEditorData } from "../../../components/tunes";
 import { TuneEditor } from "../../../components/tunes";
 import { useAuth } from "../../../lib/auth/AuthContext";
+import { useCurrentTune } from "../../../lib/context/CurrentTuneContext";
 import {
   getOrCreateTuneOverride,
   updateTuneOverride,
 } from "../../../lib/db/queries/tune-overrides";
-import { getTuneById, updateTune } from "../../../lib/db/queries/tunes";
+import {
+  getTuneForUserById,
+  updateTuneIfOwned,
+} from "../../../lib/db/queries/tunes";
 
 /**
  * Edit Tune Page Component
@@ -29,6 +39,7 @@ const EditTunePage: Component = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { localDb, userIdInt } = useAuth();
+  const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
   // Store the location we came from (referrer) for proper back navigation
   const returnPath = createMemo(() => {
@@ -41,13 +52,35 @@ const EditTunePage: Component = () => {
     () => {
       const db = localDb();
       const tuneId = params.id;
-      return db && tuneId ? { db, tuneId } : null;
+      const uid = userIdInt();
+      return db && tuneId && uid
+        ? { db, tuneId, uid }
+        : db && tuneId
+          ? { db, tuneId }
+          : null;
     },
     async (params) => {
       if (!params) return null;
+      if (!params) return null;
+      // Prefer merged override view when user available; fall back to base tune
+      if ("uid" in params && params.uid) {
+        return await getTuneForUserById(params.db, params.tuneId, params.uid);
+      }
+      const { getTuneById } = await import("../../../lib/db/queries/tunes");
       return await getTuneById(params.db, params.tuneId);
     }
   );
+
+  // Ensure the sidebar reflects this tune while editor is active
+  // Set on mount and restore previous value on unmount
+  const prevTuneId = currentTuneId();
+  createEffect(() => {
+    const id = params.id;
+    if (id) setCurrentTuneId(id);
+  });
+  onCleanup(() => {
+    setCurrentTuneId(prevTuneId ?? null);
+  });
 
   const handleSave = async (
     tuneData: Partial<TuneEditorData>
@@ -77,20 +110,23 @@ const EditTunePage: Component = () => {
     }
 
     try {
-      // Check if this is the user's private tune
-      const isPrivateTune = currentTune.privateFor === userId;
+      // Guard: only allow direct tune updates if tune is explicitly owned by user (privateFor matches userId)
+      // Public tunes (privateFor null) or tunes owned by another user MUST go through tune_override path.
+      const isUserOwnedPrivateTune =
+        !!currentTune.privateFor && currentTune.privateFor === userId;
 
-      if (isPrivateTune) {
-        // User owns this tune - update the tune table directly
-        await updateTune(db, tuneId, {
+      if (
+        isUserOwnedPrivateTune &&
+        (await updateTuneIfOwned(db, tuneId, userId, {
           title: tuneData.title ?? undefined,
           type: tuneData.type ?? undefined,
           mode: tuneData.mode ?? undefined,
           structure: tuneData.structure ?? undefined,
           incipit: tuneData.incipit ?? undefined,
           genre: tuneData.genre ?? undefined,
-          privateFor: tuneData.privateFor ?? undefined,
-        });
+        }))
+      ) {
+        // Updated base tune (owned by user)
       } else {
         // Public tune or another user's tune - use tune_override
         // Build override input with only changed fields

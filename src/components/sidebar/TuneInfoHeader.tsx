@@ -7,11 +7,12 @@
  * @module components/sidebar/TuneInfoHeader
  */
 
-import { Music, Settings2, Tag } from "lucide-solid";
+import { useLocation, useNavigate } from "@solidjs/router";
+import { Music, Pencil, Settings2, Tag } from "lucide-solid";
 import { type Component, createResource, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
-import { getTuneById } from "@/lib/db/queries/tunes";
+import { getTuneForUserById } from "@/lib/db/queries/tunes";
 
 /**
  * TuneInfoHeader - Display current tune information
@@ -24,16 +25,31 @@ import { getTuneById } from "@/lib/db/queries/tunes";
  */
 export const TuneInfoHeader: Component = () => {
   const { currentTuneId } = useCurrentTune();
-  const { localDb } = useAuth();
+  const { localDb, userIdInt } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Load current tune data
   const [tune] = createResource(
-    () => ({ tuneId: currentTuneId(), db: localDb() }),
+    () => ({ tuneId: currentTuneId(), db: localDb(), uid: userIdInt() }),
     async (params) => {
       if (!params.tuneId || !params.db) return null;
+      // Prefer merged override view when user available; fall back to base tune
+      if (params.uid) {
+        return await getTuneForUserById(params.db, params.tuneId, params.uid);
+      }
+      const { getTuneById } = await import("@/lib/db/queries/tunes");
       return await getTuneById(params.db, params.tuneId);
     }
   );
+
+  const handleEdit = () => {
+    const tuneId = currentTuneId();
+    if (tuneId) {
+      const fullPath = location.pathname + location.search;
+      navigate(`/tunes/${tuneId}/edit`, { state: { from: fullPath } });
+    }
+  };
 
   return (
     <div class="tune-info-header border-b border-gray-200/30 dark:border-gray-700/30 pb-2 mb-2">
@@ -59,12 +75,33 @@ export const TuneInfoHeader: Component = () => {
       {/* Tune information */}
       <Show when={tune() && !tune.loading}>
         <div class="space-y-1.5">
-          {/* Title */}
+          {/* Title with Edit Button */}
           <div class="flex items-start gap-1.5">
             <Music class="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white leading-tight break-words">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white leading-tight break-words flex-1">
               {tune()!.title}
             </h3>
+            <button
+              type="button"
+              onClick={handleEdit}
+              class="flex-shrink-0 flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors text-xs font-medium"
+              title="Edit tune"
+              aria-label="Edit tune"
+              data-testid="sidebar-edit-tune-button"
+            >
+              <span class="hidden sm:inline">Edit</span>
+              <Pencil class="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Inline ID directly under the title */}
+          <div class="pl-5">
+            <p
+              class="text-[10px] italic text-gray-500 dark:text-gray-400 select-text"
+              data-testid="tune-id-inline"
+            >
+              ID: {tune()!.id}
+            </p>
           </div>
 
           {/* Type and Mode */}

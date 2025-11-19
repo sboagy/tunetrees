@@ -11,17 +11,18 @@
  */
 
 import abcjs from "abcjs";
-import { CircleX, Pencil, Save } from "lucide-solid";
+import { eq } from "drizzle-orm";
+import { CircleX, Layers, Pencil, Save, Undo2 } from "lucide-solid";
 import {
   type Component,
   createEffect,
   createMemo,
   createResource,
   createSignal,
-  For,
   Show,
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { useCurrentPlaylist } from "@/lib/context/CurrentPlaylistContext";
 import { getDb } from "@/lib/db/client-sqlite";
 import {
   getAllGenres,
@@ -34,6 +35,13 @@ import {
   removeTagFromTune,
 } from "@/lib/db/queries/tags";
 import type { Tune } from "../../lib/db/types";
+import {
+  Select,
+  SelectContent,
+  SelectHiddenSelect,
+  SelectItem,
+  SelectTrigger,
+} from "../ui/select";
 import { TagInput } from "./TagInput";
 
 /**
@@ -56,45 +64,22 @@ export interface TuneEditorData extends Tune {
   interval?: number | null;
 }
 
-interface TuneEditorProps {
-  /** Tune to edit (undefined for new tune) */
+export interface TuneEditorProps {
   tune?: TuneEditorData;
-  /** Initial data for creating a new tune (query imports). Used when tune is undefined */
   initialData?: Partial<TuneEditorData>;
-  /** Callback when save is requested (should return tune ID for new tunes) */
   onSave?: (
     tuneData: Partial<TuneEditorData>
-  ) => Promise<string | undefined> | undefined;
-  /** Callback when cancel is requested */
+  ) => Promise<string | undefined> | string | undefined;
   onCancel?: () => void;
-  /** Show all FSRS/SM2 fields (collapsed by default) */
   showAdvancedFields?: boolean;
-  /** Hide the built-in action buttons (for external button control) */
   hideButtons?: boolean;
-  /** Read-only mode (disables all form inputs) */
   readOnly?: boolean;
-  /** Callback when edit is requested (read-only mode only) */
   onEdit?: () => void;
-  /** Callback when delete is requested (read-only mode only) */
   onDelete?: () => void;
 }
-
-// Note: Tune types are now loaded from database based on selected genre
-
-/**
- * Tune Editor Component
- *
- * @example
- * ```tsx
- * <TuneEditor
- *   tune={existingTune}
- *   onSave={handleSave}
- *   onCancel={() => navigate(-1)}
- * />
- * ```
- */
 export const TuneEditor: Component<TuneEditorProps> = (props) => {
   const { user } = useAuth();
+  const { currentPlaylistId } = useCurrentPlaylist();
 
   // Form state signals
   const init = (field: keyof TuneEditorData): string => {
@@ -153,11 +138,141 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   const [fsrsOpen, setFsrsOpen] = createSignal(false);
   const [isSaving, setIsSaving] = createSignal(false);
   const [errors, setErrors] = createSignal<Record<string, string>>({});
+  // Determine if form should be read-only (global public toggle removed)
+  const isFormReadOnly = createMemo(() => props.readOnly);
+
+  // Base public tune (for comparison with user override values)
+  const [baseTune] = createResource(
+    () => (props.tune?.id ? { tuneId: props.tune.id } : null),
+    async (params) => {
+      if (!params) return null;
+      const db = getDb();
+      const { getTuneById } = await import("../../lib/db/queries/tunes");
+      return await getTuneById(db, params.tuneId);
+    }
+  );
+
+  // Field-level override reveal state
+  const [revealed, setRevealed] = createSignal<Record<string, boolean>>({});
+  const toggleReveal = (field: string) => {
+    setRevealed((r) => ({ ...r, [field]: !r[field] }));
+  };
+
+  // Signals mapping for comparison
+  const fieldGetters: Record<string, () => string> = {
+    title,
+    genre,
+    type,
+    structure,
+    mode,
+    incipit,
+  };
+  const fieldHasOverride = (field: string): boolean => {
+    if (!props.tune || !baseTune()) return false;
+    if (props.tune.privateFor) return false;
+    const currentVal = fieldGetters[field]?.() || "";
+    const publicVal = (baseTune() as any)[field] || "";
+    if (!publicVal) return false;
+    return currentVal !== publicVal;
+  };
+
+  // Load override record for revert actions
+  const [overrideRecord] = createResource(
+    () => (props.tune?.id ? { tuneId: props.tune.id } : null),
+    async (params) => {
+      if (!params) return null;
+      const db = getDb();
+      const { getTuneOverride } = await import(
+        "../../lib/db/queries/tune-overrides"
+      );
+      const currentUser = user();
+      if (!currentUser?.id) return null;
+      return await getTuneOverride(db, params.tuneId, currentUser.id);
+    }
+  );
+
+  const revertField = async (field: keyof TuneEditorData) => {
+    if (!props.tune?.id || !baseTune()) return;
+    const currentUser = user();
+    if (!currentUser?.id) return;
+    const db = getDb();
+    const ov = overrideRecord();
+    if (!ov) return;
+    const { clearTuneOverrideFields } = await import(
+      "../../lib/db/queries/tune-overrides"
+    );
+    await clearTuneOverrideFields(db, ov.id, [field as any]);
+    const publicVal = (baseTune() as any)[field] || "";
+    switch (field) {
+      case "title":
+        setTitle(publicVal);
+        break;
+      case "genre":
+        setGenre(publicVal);
+        break;
+      case "type":
+        setType(publicVal);
+        break;
+      case "structure":
+        setStructure(publicVal);
+        break;
+      case "mode":
+        setMode(publicVal);
+        break;
+      case "incipit":
+        setIncipit(publicVal);
+        break;
+    }
+    setRevealed((r) => ({ ...r, [field]: false }));
+  };
 
   // Load genres from database
   const [allGenres] = createResource(async () => {
     const db = getDb();
     return await getAllGenres(db);
+  });
+
+  // Load current playlist (to derive default genre) when creating a new tune
+  const [currentPlaylist] = createResource(
+    () => {
+      if (!currentPlaylistId() || props.tune) return null; // Only for new tunes
+      const supaUser = user();
+      if (!supaUser?.id) return null;
+      return { playlistId: currentPlaylistId()!, userId: supaUser.id };
+    },
+    async (params) => {
+      if (!params) return null;
+      const db = getDb();
+      const { getPlaylistById } = await import(
+        "../../lib/db/queries/playlists"
+      );
+      const pl = await getPlaylistById(db, params.playlistId, params.userId);
+      if (!pl) return null;
+      // If playlist.genreDefault null, attempt instrument fallback
+      if (!pl.genreDefault && pl.instrumentRef) {
+        const { instrument } = await import("../../lib/db/schema");
+        const inst = await db
+          .select({ genreDefault: instrument.genreDefault })
+          .from(instrument)
+          .where(eq(instrument.id, pl.instrumentRef))
+          .limit(1);
+        const resolved = inst && inst.length > 0 ? inst[0].genreDefault : null;
+        return { ...pl, resolvedGenreDefault: resolved } as any;
+      }
+      return { ...pl, resolvedGenreDefault: pl.genreDefault } as any;
+    }
+  );
+
+  // Apply default genre once when empty
+  createEffect(() => {
+    if (
+      !props.tune && // new tune
+      !genre() && // no existing genre selection
+      currentPlaylist() &&
+      currentPlaylist()!.resolvedGenreDefault
+    ) {
+      setGenre(currentPlaylist()!.resolvedGenreDefault || "");
+    }
   });
 
   // Load tune types filtered by selected genre
@@ -252,6 +367,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
     if (!title().trim()) {
       newErrors.title = "Title is required";
+    }
+
+    if (!genre()) {
+      newErrors.genre = "Genre is required";
     }
 
     if (!type()) {
@@ -354,7 +473,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   );
 
   return (
-    <div class="h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-y-auto">
+    <div
+      class="h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-y-auto"
+      data-testid="tune-editor-container"
+    >
       {/* Scrollable Editor Content flush to left */}
       <div class="max-w-4xl py-1 pl-1 pr-4 w-full">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
@@ -362,13 +484,15 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
           <Show when={!props.hideButtons}>
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               {/* Left: Title */}
-              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                {props.readOnly
-                  ? title()
-                  : props.tune
-                    ? "Edit Tune"
-                    : "New Tune"}
-              </h2>
+              <div class="flex items-center gap-6">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                  {props.readOnly
+                    ? title()
+                    : props.tune
+                      ? "Edit Tune"
+                      : "New Tune"}
+                </h2>
+              </div>
 
               {/* Right: Action buttons */}
               <Show
@@ -381,6 +505,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                       disabled={isSaving()}
                       class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       aria-label="Cancel"
+                      data-testid="tune-editor-cancel-button"
                     >
                       <div class="flex items-center gap-2">
                         <span>Cancel</span>
@@ -394,6 +519,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                         void handleSave();
                       }}
                       disabled={isSaving() || !isDirty()}
+                      data-testid="tune-editor-save-button"
                       class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       aria-label="Save"
                     >
@@ -406,6 +532,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                   <button
                     type="button"
                     onClick={props.onCancel}
+                    data-testid="tune-editor-cancel-button"
                     class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium"
                     aria-label="Cancel"
                   >
@@ -417,6 +544,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                   <button
                     type="button"
                     onClick={props.onEdit}
+                    data-testid="tune-editor-edit-button"
                     class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium flex items-center gap-2"
                     aria-label="Edit"
                   >
@@ -446,6 +574,8 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                 </div>
               </Show>
 
+              {/* Field-level override indicators below */}
+
               {/* Core Tune Data Section */}
               <div class="space-y-4">
                 {/* <div class="border-b border-gray-300 dark:border-gray-600 pb-2 mb-4">
@@ -454,98 +584,289 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                   </h3>
                 </div> */}
 
-                {/* Genre */}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                  <label
-                    for="genre"
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                  >
-                    Genre:
-                  </label>
-                  <div class="md:col-span-2">
-                    <select
-                      id="genre"
-                      value={genre()}
-                      onChange={(e) => setGenre(e.currentTarget.value)}
-                      disabled={props.readOnly}
-                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                <Show when={props.tune?.id}>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <label
+                      for="genre"
+                      class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                     >
-                      <option value="">Select a genre...</option>
-                      <Show when={!allGenres.loading && allGenres()}>
-                        <For each={allGenres()}>
-                          {(g) => (
-                            <option value={g.id} selected={genre() === g.id}>
-                              {g.name}
-                            </option>
-                          )}
-                        </For>
-                      </Show>
-                    </select>
+                      Id:
+                    </label>
+                    <div class="md:col-span-2">
+                      <em class="text-gray-400">{props.tune?.id}</em>
+                    </div>
                   </div>
-                </div>
+                </Show>
 
                 {/* Title */}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
                   <label
                     for="title"
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                    class="h-9 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     Title:{" "}
-                    <Show when={!props.readOnly}>
+                    <Show when={!isFormReadOnly()}>
                       <span class="text-red-500">*</span>
                     </Show>
                   </label>
-                  <div class="md:col-span-2">
-                    <input
-                      id="title"
-                      type="text"
-                      value={title()}
-                      onInput={(e) => setTitle(e.currentTarget.value)}
-                      placeholder="Tune title"
-                      disabled={props.readOnly}
-                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                      classList={{ "border-red-500": !!errors().title }}
-                    />
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <input
+                        id="title"
+                        type="text"
+                        value={title()}
+                        onInput={(e) => setTitle(e.currentTarget.value)}
+                        placeholder="Tune title"
+                        disabled={isFormReadOnly()}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-input-title"
+                        classList={{ "border-red-500": !!errors().title }}
+                      />
+                      <Show when={fieldHasOverride("title")}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReveal("title")}
+                          data-testid="override-indicator-title"
+                          title="Reveal public value / revert"
+                          class="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <Layers class="w-4 h-4 text-gray-400" />
+                        </button>
+                      </Show>
+                    </div>
+                    <Show when={revealed().title && fieldHasOverride("title")}>
+                      <div
+                        class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 space-y-1"
+                        data-testid="override-reveal-title"
+                      >
+                        <div class="flex justify-between items-center">
+                          <span class="font-medium">Public Value:</span>
+                          <button
+                            type="button"
+                            onClick={() => void revertField("title")}
+                            class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            data-testid="override-revert-title"
+                          >
+                            Revert <Undo2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p class="italic break-words">
+                          {baseTune()?.title || ""}
+                        </p>
+                      </div>
+                    </Show>
                     <Show when={errors().title}>
                       <p class="text-xs text-red-500 mt-1">{errors().title}</p>
                     </Show>
                   </div>
                 </div>
 
-                {/* Type */}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                {/* Genre (Required) */}
+                <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
                   <label
-                    for="type"
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                    for="genre"
+                    class="h-9 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
-                    Type:{" "}
-                    <Show when={!props.readOnly}>
+                    Genre:{" "}
+                    <Show when={!isFormReadOnly()}>
                       <span class="text-red-500">*</span>
                     </Show>
                   </label>
-                  <div class="md:col-span-2">
-                    <select
-                      id="type"
-                      value={type()}
-                      onChange={(e) => setType(e.currentTarget.value)}
-                      disabled={props.readOnly}
-                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                      classList={{ "border-red-500": !!errors().type }}
-                    >
-                      <option value="">Select type</option>
-                      <Show when={!tuneTypes.loading && tuneTypes()}>
-                        <For each={tuneTypes()}>
-                          {(tt) => (
-                            <option value={tt.id} selected={type() === tt.id}>
-                              {tt.name} {tt.rhythm ? `(${tt.rhythm})` : ""}
-                            </option>
-                          )}
-                        </For>
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <Select
+                        id="genre"
+                        value={genre()}
+                        onChange={setGenre}
+                        disabled={isFormReadOnly()}
+                        options={(allGenres() ?? []).map((g) => String(g.id))}
+                        class="w-full"
+                        itemComponent={(props) => {
+                          const opts = allGenres() || [];
+                          const raw =
+                            (props.item as any)?.rawValue ?? props.item;
+                          const g = opts.find(
+                            (x) => String(x.id) === String(raw)
+                          );
+                          return (
+                            <SelectItem item={props.item}>
+                              {g ? g.name : String(raw)}
+                            </SelectItem>
+                          );
+                        }}
+                      >
+                        <SelectHiddenSelect name="genre" />
+                        <SelectTrigger
+                          class={`flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-[1.5px] focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 ${errors().genre ? "border-red-500" : ""}`}
+                          data-testid="tune-editor-select-genre"
+                        >
+                          {(() => {
+                            const opts = allGenres() || [];
+                            const g = opts.find(
+                              (x) => String(x.id) === String(genre())
+                            );
+                            return g ? (
+                              <span>{g.name}</span>
+                            ) : (
+                              <span class="text-gray-500 dark:text-gray-400">
+                                Select Genre...
+                              </span>
+                            );
+                          })()}
+                        </SelectTrigger>
+                        <SelectContent />
+                      </Select>
+                      <Show when={fieldHasOverride("genre")}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReveal("genre")}
+                          data-testid="override-indicator-genre"
+                          title="Reveal public value / revert"
+                          class="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <Layers class="w-4 h-4 text-gray-400" />
+                        </button>
                       </Show>
-                      <option value="other" selected={type() === "other"}>
-                        Other...
-                      </option>
-                    </select>
+                    </div>
+                    <Show when={revealed().genre && fieldHasOverride("genre")}>
+                      <div
+                        class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 space-y-1"
+                        data-testid="override-reveal-genre"
+                      >
+                        <div class="flex justify-between items-center">
+                          <span class="font-medium">Public Value:</span>
+                          <button
+                            type="button"
+                            onClick={() => void revertField("genre")}
+                            class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            data-testid="override-revert-genre"
+                          >
+                            Revert <Undo2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p class="italic break-words">
+                          {(() => {
+                            const gId = baseTune()?.genre;
+                            const opts = allGenres() || [];
+                            const g = opts.find(
+                              (x) => String(x.id) === String(gId)
+                            );
+                            return g ? g.name : gId || "";
+                          })()}
+                        </p>
+                      </div>
+                    </Show>
+                    <Show when={errors().genre}>
+                      <p class="text-xs text-red-500 mt-1">{errors().genre}</p>
+                    </Show>
+                  </div>
+                </div>
+
+                {/* Type */}
+                <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+                  <label
+                    for="type"
+                    class="h-9 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
+                  >
+                    Type:{" "}
+                    <Show when={!isFormReadOnly()}>
+                      <span class="text-red-500">*</span>
+                    </Show>
+                  </label>
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <Select
+                        id="type"
+                        value={type()}
+                        onChange={setType}
+                        disabled={isFormReadOnly()}
+                        options={(tuneTypes() ?? [])
+                          .map((tt) => String(tt.id))
+                          .concat(["other"])}
+                        class="w-full"
+                        itemComponent={(props) => {
+                          const opts = tuneTypes() || [];
+                          const raw =
+                            (props.item as any)?.rawValue ?? props.item;
+                          const tt = opts.find(
+                            (x) => String(x.id) === String(raw)
+                          );
+                          return (
+                            <SelectItem item={props.item}>
+                              {tt
+                                ? `${tt.name}${tt.rhythm ? ` (${tt.rhythm})` : ""}`
+                                : String(raw)}
+                            </SelectItem>
+                          );
+                        }}
+                      >
+                        <SelectTrigger
+                          class={`flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-[1.5px] focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 ${
+                            errors().type ? "border-red-500" : ""
+                          }`}
+                          data-testid="tune-editor-select-type"
+                        >
+                          {(() => {
+                            const opts = tuneTypes() || [];
+                            const tt = opts.find(
+                              (x) => String(x.id) === String(type())
+                            );
+                            return tt ? (
+                              <span>
+                                {tt.name}
+                                {tt.rhythm ? ` (${tt.rhythm})` : ""}
+                              </span>
+                            ) : (
+                              <span class="text-gray-500 dark:text-gray-400">
+                                Select Tune Type... (Dependent on Genre)
+                              </span>
+                            );
+                          })()}
+                        </SelectTrigger>
+                        <SelectContent />
+                      </Select>
+                      <Show when={fieldHasOverride("type")}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReveal("type")}
+                          data-testid="override-indicator-type"
+                          title="Reveal public value / revert"
+                          class="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <Layers class="w-4 h-4 text-gray-400" />
+                        </button>
+                      </Show>
+                    </div>
+                    <Show when={revealed().type && fieldHasOverride("type")}>
+                      <div
+                        class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 space-y-1"
+                        data-testid="override-reveal-type"
+                      >
+                        <div class="flex justify-between items-center">
+                          <span class="font-medium">Public Value:</span>
+                          <button
+                            type="button"
+                            onClick={() => void revertField("type")}
+                            class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            data-testid="override-revert-type"
+                          >
+                            Revert <Undo2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p class="italic break-words">
+                          {(() => {
+                            const tId = baseTune()?.type;
+                            const opts = tuneTypes() || [];
+                            const tt = opts.find(
+                              (x) => String(x.id) === String(tId)
+                            );
+                            return tt
+                              ? `${tt.name}${tt.rhythm ? ` (${tt.rhythm})` : ""}`
+                              : tId || "";
+                          })()}
+                        </p>
+                      </div>
+                    </Show>
                     <Show when={errors().type}>
                       <p class="text-xs text-red-500 mt-1">{errors().type}</p>
                     </Show>
@@ -553,65 +874,176 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                 </div>
 
                 {/* Structure */}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
                   <label
                     for="structure"
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                    class="h-9 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     Structure:
                   </label>
-                  <div class="md:col-span-2">
-                    <input
-                      id="structure"
-                      type="text"
-                      value={structure()}
-                      onInput={(e) => setStructure(e.currentTarget.value)}
-                      placeholder="e.g., AABB, ABC"
-                      disabled={props.readOnly}
-                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <input
+                        id="structure"
+                        type="text"
+                        value={structure()}
+                        onInput={(e) => setStructure(e.currentTarget.value)}
+                        placeholder="e.g., AABB, ABC"
+                        disabled={isFormReadOnly()}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-input-structure"
+                      />
+                      <Show when={fieldHasOverride("structure")}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReveal("structure")}
+                          data-testid="override-indicator-structure"
+                          title="Reveal public value / revert"
+                          class="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <Layers class="w-4 h-4 text-gray-400" />
+                        </button>
+                      </Show>
+                    </div>
+                    <Show
+                      when={
+                        revealed().structure && fieldHasOverride("structure")
+                      }
+                    >
+                      <div
+                        class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 space-y-1"
+                        data-testid="override-reveal-structure"
+                      >
+                        <div class="flex justify-between items-center">
+                          <span class="font-medium">Public Value:</span>
+                          <button
+                            type="button"
+                            onClick={() => void revertField("structure")}
+                            class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            data-testid="override-revert-structure"
+                          >
+                            Revert <Undo2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p class="italic break-words">
+                          {baseTune()?.structure || ""}
+                        </p>
+                      </div>
+                    </Show>
                   </div>
                 </div>
 
                 {/* Mode */}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
                   <label
                     for="mode"
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                    class="h-9 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     Mode:
                   </label>
-                  <div class="md:col-span-2">
-                    <input
-                      id="mode"
-                      type="text"
-                      value={mode()}
-                      onInput={(e) => setMode(e.currentTarget.value)}
-                      placeholder="e.g., D Major, A Dorian"
-                      disabled={props.readOnly}
-                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                      <input
+                        id="mode"
+                        type="text"
+                        value={mode()}
+                        onInput={(e) => setMode(e.currentTarget.value)}
+                        placeholder="e.g., D Major, A Dorian"
+                        disabled={isFormReadOnly()}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-input-mode"
+                      />
+                      <Show when={fieldHasOverride("mode")}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReveal("mode")}
+                          data-testid="override-indicator-mode"
+                          title="Reveal public value / revert"
+                          class="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <Layers class="w-4 h-4 text-gray-400" />
+                        </button>
+                      </Show>
+                    </div>
+                    <Show when={revealed().mode && fieldHasOverride("mode")}>
+                      <div
+                        class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 space-y-1"
+                        data-testid="override-reveal-mode"
+                      >
+                        <div class="flex justify-between items-center">
+                          <span class="font-medium">Public Value:</span>
+                          <button
+                            type="button"
+                            onClick={() => void revertField("mode")}
+                            class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            data-testid="override-revert-mode"
+                          >
+                            Revert <Undo2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p class="italic break-words">
+                          {baseTune()?.mode || ""}
+                        </p>
+                      </div>
+                    </Show>
                   </div>
                 </div>
 
                 {/* Incipit */}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                <div class="flex flex-col md:flex-row md:items-start gap-1 md:gap-2">
                   <label
                     for="incipit"
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2"
+                    class="pt-2 flex text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     Incipit:
                   </label>
-                  <div class="md:col-span-2 space-y-2">
-                    <textarea
-                      id="incipit"
-                      value={incipit()}
-                      onInput={(e) => setIncipit(e.currentTarget.value)}
-                      placeholder="ABC notation (e.g., |:DFA dAF|GBE gBE|...)"
-                      rows={3}
-                      disabled={props.readOnly}
-                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
+                  <div class="flex-1 space-y-2">
+                    <div class="flex items-center gap-2">
+                      <textarea
+                        id="incipit"
+                        value={incipit()}
+                        onInput={(e) => setIncipit(e.currentTarget.value)}
+                        placeholder="ABC notation (e.g., |:DFA dAF|GBE gBE|...)"
+                        rows={3}
+                        disabled={isFormReadOnly()}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-textarea-incipit"
+                      />
+                      <Show when={fieldHasOverride("incipit")}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReveal("incipit")}
+                          data-testid="override-indicator-incipit"
+                          title="Reveal public value / revert"
+                          class="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <Layers class="w-4 h-4 text-gray-400" />
+                        </button>
+                      </Show>
+                    </div>
+                    <Show
+                      when={revealed().incipit && fieldHasOverride("incipit")}
+                    >
+                      <div
+                        class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 space-y-1"
+                        data-testid="override-reveal-incipit"
+                      >
+                        <div class="flex justify-between items-center">
+                          <span class="font-medium">Public Value:</span>
+                          <button
+                            type="button"
+                            onClick={() => void revertField("incipit")}
+                            class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            data-testid="override-revert-incipit"
+                          >
+                            Revert <Undo2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p class="italic break-words whitespace-pre-wrap">
+                          {baseTune()?.incipit || ""}
+                        </p>
+                      </div>
+                    </Show>
                     {/* ABC Preview */}
                     <div class="border border-gray-200 dark:border-gray-700 rounded-md p-3 bg-gray-50 dark:bg-gray-900">
                       <div ref={abcPreviewRef} class="abc-preview" />
@@ -629,9 +1061,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                       selectedTags={selectedTags()}
                       onTagsChange={setSelectedTags}
                       placeholder="Add tags for organization..."
-                      disabled={isSaving() || props.readOnly}
+                      disabled={isSaving() || isFormReadOnly()}
                     />
-                    <Show when={!props.readOnly}>
+                    <Show when={!isFormReadOnly()}>
                       <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Press Enter to add a tag, or select from existing tags
                       </p>
@@ -655,8 +1087,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                       onChange={(e) =>
                         setRequestPublic(e.currentTarget.checked)
                       }
-                      disabled={props.readOnly}
+                      disabled={isFormReadOnly()}
                       class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                      data-testid="tune-editor-checkbox-request-public"
                     />
                     <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">
                       Request to make this tune publicly available
@@ -688,8 +1121,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                         type="datetime-local"
                         value={learned()}
                         onInput={(e) => setLearned(e.currentTarget.value)}
-                        disabled={props.readOnly}
+                        disabled={isFormReadOnly()}
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-input-learned"
                       />
                     </div>
                   </div>
@@ -708,8 +1142,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                         type="datetime-local"
                         value={practiced()}
                         onInput={(e) => setPracticed(e.currentTarget.value)}
-                        disabled={props.readOnly}
+                        disabled={isFormReadOnly()}
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-input-practiced"
                       />
                     </div>
                   </div>
@@ -731,8 +1166,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                         onInput={(e) =>
                           setQuality(e.currentTarget.valueAsNumber || null)
                         }
-                        disabled={props.readOnly}
+                        disabled={isFormReadOnly()}
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-input-quality"
                       />
                     </div>
                   </div>
@@ -784,8 +1220,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                                   e.currentTarget.valueAsNumber || null
                                 )
                               }
-                              disabled={props.readOnly}
+                              disabled={isFormReadOnly()}
                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                              data-testid="tune-editor-input-easiness"
                             />
                           </div>
                         </div>
@@ -808,8 +1245,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                                   e.currentTarget.valueAsNumber || null
                                 )
                               }
-                              disabled={props.readOnly}
+                              disabled={isFormReadOnly()}
                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                              data-testid="tune-editor-input-interval"
                             />
                           </div>
                         </div>
@@ -864,8 +1302,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                                   e.currentTarget.valueAsNumber || null
                                 )
                               }
-                              disabled={props.readOnly}
+                              disabled={isFormReadOnly()}
                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                              data-testid="tune-editor-input-difficulty"
                             />
                           </div>
                         </div>
@@ -889,8 +1328,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                                   e.currentTarget.valueAsNumber || null
                                 )
                               }
-                              disabled={props.readOnly}
+                              disabled={isFormReadOnly()}
                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                              data-testid="tune-editor-input-stability"
                             />
                           </div>
                         </div>
@@ -911,8 +1351,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                               onInput={(e) =>
                                 setStep(e.currentTarget.valueAsNumber || null)
                               }
-                              disabled={props.readOnly}
+                              disabled={isFormReadOnly()}
                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                              data-testid="tune-editor-input-step"
                             />
                           </div>
                         </div>
@@ -933,8 +1374,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                               onInput={(e) =>
                                 setState(e.currentTarget.valueAsNumber || null)
                               }
-                              disabled={props.readOnly}
+                              disabled={isFormReadOnly()}
                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                              data-testid="tune-editor-input-state"
                             />
                           </div>
                         </div>
@@ -957,8 +1399,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                                   e.currentTarget.valueAsNumber || null
                                 )
                               }
-                              disabled={props.readOnly}
+                              disabled={isFormReadOnly()}
                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                              data-testid="tune-editor-input-repetitions"
                             />
                           </div>
                         </div>
@@ -977,8 +1420,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                               type="datetime-local"
                               value={due()}
                               onInput={(e) => setDue(e.currentTarget.value)}
-                              disabled={props.readOnly}
+                              disabled={isFormReadOnly()}
                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                              data-testid="tune-editor-input-due"
                             />
                           </div>
                         </div>
@@ -1001,8 +1445,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                         onInput={(e) => setNotes(e.currentTarget.value)}
                         placeholder="Your private notes about this tune..."
                         rows={4}
-                        disabled={props.readOnly}
+                        disabled={isFormReadOnly()}
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-textarea-notes"
                       />
                     </div>
                   </div>
