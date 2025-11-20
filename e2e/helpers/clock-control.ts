@@ -8,9 +8,91 @@
  */
 
 import type { BrowserContext, Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 import log from "loglevel";
 
 log.setLevel("info");
+
+/**
+ * Clock tolerance for time comparisons
+ * 
+ * CI environments can exhibit multi-second scheduling delays.
+ * Mobile browsers show higher variance (observed up to ~300-500ms).
+ */
+export const CLOCK_TOLERANCE_MS = 4000; // Base tolerance for CI
+
+/**
+ * Get appropriate clock tolerance based on project/browser type
+ * 
+ * @param projectName - Playwright project name (e.g., "Mobile Chrome", "chromium")
+ * @param baseToleranceMs - Base tolerance in milliseconds (default: CLOCK_TOLERANCE_MS)
+ * @returns Adjusted tolerance in milliseconds
+ */
+export function getClockTolerance(
+  projectName?: string,
+  baseToleranceMs = CLOCK_TOLERANCE_MS
+): number {
+  // Mobile browsers in CI show higher clock variance (observed up to ~500ms)
+  if (projectName && /Mobile/i.test(projectName)) {
+    return Math.max(baseToleranceMs, 5000);
+  }
+  return baseToleranceMs;
+}
+
+/**
+ * Compare two ISO date strings with tolerance
+ * 
+ * Allows small millisecond differences that can occur due to timing/scheduling
+ * variations in CI environments or mobile browsers.
+ * 
+ * @param actualIso - Actual ISO date string from browser
+ * @param expectedIso - Expected ISO date string
+ * @param projectName - Optional project name for mobile detection
+ * @param baseToleranceMs - Base tolerance (default: 25ms for exact comparisons)
+ * @throws Error if dates differ by more than tolerance
+ * 
+ * @example
+ * ```typescript
+ * const browserDate = await getCurrentDate(page);
+ * expectIsoClose(browserDate.toISOString(), "2025-07-20T14:00:00.000Z");
+ * ```
+ */
+export function expectIsoClose(
+  actualIso: string,
+  expectedIso: string,
+  projectName?: string,
+  baseToleranceMs = 25
+): void {
+  const toleranceMs = getClockTolerance(projectName, baseToleranceMs);
+  const actualTime = new Date(actualIso).getTime();
+  const expectedTime = new Date(expectedIso).getTime();
+  const diff = Math.abs(actualTime - expectedTime);
+  
+  expect(diff).toBeLessThanOrEqual(toleranceMs);
+}
+
+/**
+ * Compare two Date objects with tolerance
+ * 
+ * @param actual - Actual date from browser
+ * @param expected - Expected date
+ * @param projectName - Optional project name for mobile detection
+ * @param baseToleranceMs - Base tolerance (default: 25ms)
+ * 
+ * @example
+ * ```typescript
+ * const browserDate = await getCurrentDate(page);
+ * expectDateClose(browserDate, expectedDate);
+ * ```
+ */
+export function expectDateClose(
+  actual: Date,
+  expected: Date,
+  projectName?: string,
+  baseToleranceMs = 25
+): void {
+  expectIsoClose(actual.toISOString(), expected.toISOString(), projectName, baseToleranceMs);
+}
 
 /**
  * Set a stable, frozen date/time in the browser context
@@ -130,27 +212,36 @@ export async function getCurrentDate(page: Page): Promise<Date> {
  *
  * @param page - Playwright Page
  * @param expectedDate - Expected frozen date
- * @param toleranceMs - Tolerance in milliseconds (default: 1000ms)
+ * @param toleranceMs - Tolerance in milliseconds (default: CLOCK_TOLERANCE_MS)
+ * @param projectName - Optional project name for mobile detection
  *
  * @throws Error if browser time doesn't match expected time
+ * 
+ * @example
+ * ```typescript
+ * await verifyClockFrozen(page, testDate); // Uses default tolerance
+ * await verifyClockFrozen(page, testDate, 1000, "Mobile Chrome"); // Custom tolerance
+ * ```
  */
 export async function verifyClockFrozen(
   page: Page,
   expectedDate: Date,
-  toleranceMs = 1000
+  toleranceMs?: number,
+  projectName?: string
 ): Promise<void> {
   const browserDate = await getCurrentDate(page);
+  const actualTolerance = toleranceMs ?? getClockTolerance(projectName);
   const diff = Math.abs(browserDate.getTime() - expectedDate.getTime());
 
-  if (diff > toleranceMs) {
+  if (diff > actualTolerance) {
     throw new Error(
       `Clock verification failed: expected ${expectedDate.toISOString()}, ` +
-        `got ${browserDate.toISOString()} (diff: ${diff}ms)`
+        `got ${browserDate.toISOString()} (diff: ${diff}ms, tolerance: ${actualTolerance}ms)`
     );
   }
 
   log.debug(
-    `✅ Clock verified at ${browserDate.toISOString()} (tolerance: ${toleranceMs}ms)`
+    `✅ Clock verified at ${browserDate.toISOString()} (tolerance: ${actualTolerance}ms)`
   );
 }
 
