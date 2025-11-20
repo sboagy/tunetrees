@@ -359,7 +359,7 @@ Once you've reviewed the test plan and answered the questions above, please repl
 6. SCHEDULING-013 Sync version & last_modified monotonicity
 7. SCHEDULING-014 playlist_tune vs practice_record consistency
 
-**Status:** Foundational invariants & API in place; proceeding with SCHEDULING-008 implementation.
+**Status:** SCHEDULING-008 skeleton added (`e2e/tests/scheduling-008-interval-ordering.spec.ts`) with structure & placeholder assertions; interval capture & ordering checks pending API tuneId resolution enhancement.
 
 ---
 
