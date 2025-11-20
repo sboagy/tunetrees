@@ -30,7 +30,12 @@ test.describe("CLOCK-001: Clock Control Validation", () => {
     await setStableDate(context, testDate);
 
     // Verify browser sees frozen time
-    await verifyClockFrozen(page, testDate, undefined, test.info().project.name);
+    await verifyClockFrozen(
+      page,
+      testDate,
+      undefined,
+      test.info().project.name
+    );
 
     // Get date from browser - use centralized tolerance helper
     const browserDate = await getCurrentDate(page);
@@ -65,13 +70,23 @@ test.describe("CLOCK-001: Clock Control Validation", () => {
     // Set stable date
     const testDate = getTestDate(0);
     await setStableDate(context, testDate);
-    await verifyClockFrozen(page, testDate, undefined, test.info().project.name);
+    await verifyClockFrozen(
+      page,
+      testDate,
+      undefined,
+      test.info().project.name
+    );
 
     // Reload page
     await page.reload();
 
     // Date should still be frozen
-    await verifyClockFrozen(page, testDate, undefined, test.info().project.name);
+    await verifyClockFrozen(
+      page,
+      testDate,
+      undefined,
+      test.info().project.name
+    );
   });
 
   test("should allow time arithmetic", async ({ context, page }) => {
@@ -87,13 +102,28 @@ test.describe("CLOCK-001: Clock Control Validation", () => {
 
     // Set each date in browser and verify
     await setStableDate(context, baseDate);
-    await verifyClockFrozen(page, baseDate, undefined, test.info().project.name);
+    await verifyClockFrozen(
+      page,
+      baseDate,
+      undefined,
+      test.info().project.name
+    );
 
     await setStableDate(context, tomorrow);
-    await verifyClockFrozen(page, tomorrow, undefined, test.info().project.name);
+    await verifyClockFrozen(
+      page,
+      tomorrow,
+      undefined,
+      test.info().project.name
+    );
 
     await setStableDate(context, yesterday);
-    await verifyClockFrozen(page, yesterday, undefined, test.info().project.name);
+    await verifyClockFrozen(
+      page,
+      yesterday,
+      undefined,
+      test.info().project.name
+    );
   });
 
   test("should reflect real-time passage after install (no large drift)", async ({
@@ -148,12 +178,12 @@ test.describe("CLOCK-001: Clock Control Validation", () => {
     await setStableDate(context, "2025-12-25T12:00:00.000Z");
 
     const browserDate = await getCurrentDate(page);
-        expectIsoClose(
+    expectIsoClose(
       browserDate.toISOString(),
       "2025-12-25T12:00:00.000Z",
       test.info().project.name,
       25
-        );
+    );
   });
 
   test("should work with Date objects (tolerant)", async ({
