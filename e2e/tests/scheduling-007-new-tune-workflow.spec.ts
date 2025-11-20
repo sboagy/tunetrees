@@ -1,8 +1,7 @@
 import { expect } from "@playwright/test";
 import {
-  advanceDays,
-  setStableDate,
   STANDARD_TEST_DATE,
+  setStableDate,
   verifyClockFrozen,
 } from "../helpers/clock-control";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
@@ -55,7 +54,12 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     });
 
     // Verify clock is frozen
-    await verifyClockFrozen(page, currentDate, undefined, test.info().project.name);
+    await verifyClockFrozen(
+      page,
+      currentDate,
+      undefined,
+      test.info().project.name
+    );
 
     // Initialize new tune title with timestamp for uniqueness
     newTuneTitle = `Test Tune SCHED-007 ${Date.now()}`;
@@ -112,12 +116,16 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     console.log("\n=== Step 2: Add to Repertoire ===");
 
     // Select the new tune (checkbox in first column)
-    const firstCheckbox = ttPage.catalogGrid.locator('input[type="checkbox"]').nth(1);
+    const firstCheckbox = ttPage.catalogGrid
+      .locator('input[type="checkbox"]')
+      .nth(1);
     await firstCheckbox.check();
     await page.waitForTimeout(500);
 
     // Verify selection count
-    await expect(page.getByText(/1 tune selected/i)).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText(/1 tune selected/i)).toBeVisible({
+      timeout: 3000,
+    });
 
     // Click "Add to Repertoire"
     await ttPage.catalogAddToRepertoireButton.click();
@@ -182,69 +190,62 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await page.waitForTimeout(2000);
 
     // Query practice record
-    const playlistId = testUser.defaultPlaylistIdInt;
+    const playlistId = testUser.playlistId; // Use playlistId from TestUser
 
     // Get tune ID from scheduled_dates (need to query by title pattern)
     const scheduledDates = await queryScheduledDates(page, playlistId);
-    const tuneEntry = Object.entries(scheduledDates).find(([_, data]) =>
-      // Match by checking if we can find this tune in practice queue with this title
-      true // For now, assume first/only tune in queue
-    );
+    const dateEntries = [...scheduledDates.entries()];
+    const tuneEntry = dateEntries[0]; // Only one tune expected in this isolated test
 
     if (!tuneEntry) {
-      throw new Error(`Could not find scheduled date for new tune ${newTuneTitle}`);
+      throw new Error(
+        `Could not find scheduled date for new tune ${newTuneTitle}`
+      );
     }
 
     newTuneId = tuneEntry[0];
     const record = await queryLatestPracticeRecord(page, newTuneId, playlistId);
+    if (!record)
+      throw new Error("Practice record not found after first evaluation");
 
     console.log(`  Interval: ${record.interval} days`);
     console.log(`  Scheduled: ${record.due}`);
     console.log(`  Stability: ${record.stability}`);
     console.log(`  Difficulty: ${record.difficulty}`);
     console.log(`  State: ${record.state}`);
-    console.log(`  Repetitions: ${record.reps}`);
+    console.log(`  Repetitions: ${record.repetitions}`);
     console.log(`  Lapses: ${record.lapses}`);
 
     // === CRITICAL VALIDATIONS FOR NEW TUNE FIRST EVALUATION ===
 
     // 1. State should be Learning (state=1) after "Good" from NEW
-    expect(record.state).toBe(
-      1,
-      'First "Good" evaluation should transition NEW (0) → Learning (1)'
-    );
+    // First "Good" evaluation transitions NEW (0) → Learning (1)
+    expect(record.state).toBe(1);
 
     // 2. Repetitions should be 1 (first practice)
-    expect(record.reps).toBe(1, "First evaluation should set reps=1");
+    // First evaluation sets repetitions=1
+    expect(record.repetitions).toBe(1);
 
     // 3. Lapses should be 0 (no mistakes yet)
-    expect(record.lapses).toBe(0, "New tune should have lapses=0");
+    // New tune has lapses=0
+    expect(record.lapses).toBe(0);
 
     // 4. Interval >= 1 day (minimum constraint)
-    expect(record.interval).toBeGreaterThanOrEqual(
-      1,
-      `Interval must be >= 1 day (got ${record.interval})`
-    );
+    // Interval must be >= 1 day
+    expect(record.interval).toBeGreaterThanOrEqual(1);
 
     // 5. Scheduled date in future
     const scheduledDate = new Date(record.due);
     const daysDiff = Math.floor(
       (scheduledDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
     );
-    expect(daysDiff).toBeGreaterThanOrEqual(
-      1,
-      `Scheduled date must be >= 1 day in future (got ${daysDiff} days)`
-    );
+    // Scheduled date must be >= 1 day in future
+    expect(daysDiff).toBeGreaterThanOrEqual(1);
 
     // 6. Stability and difficulty initialized
-    expect(record.stability).toBeGreaterThan(
-      0,
-      "FSRS stability should be initialized > 0"
-    );
-    expect(record.difficulty).toBeGreaterThan(
-      0,
-      "FSRS difficulty should be initialized > 0"
-    );
+    // FSRS metrics initialized > 0
+    expect(record.stability).toBeGreaterThan(0);
+    expect(record.difficulty).toBeGreaterThan(0);
 
     console.log("\n✓ All NEW → Learning transition validations passed!");
   });
@@ -268,7 +269,9 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await newButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    const titleField = ttPage.tuneEditorForm.locator('input[name="title"]').first();
+    const titleField = ttPage.tuneEditorForm
+      .locator('input[name="title"]')
+      .first();
     const easyTestTitle = `Easy Skip Learning ${Date.now()}`;
     await titleField.fill(easyTestTitle);
     await ttPage.selectTypeInTuneEditor("Reel (4/4)");
@@ -279,7 +282,9 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
 
     // Add to repertoire
     await ttPage.searchForTune(easyTestTitle, ttPage.catalogGrid);
-    const checkbox = ttPage.catalogGrid.locator('input[type="checkbox"]').nth(1);
+    const checkbox = ttPage.catalogGrid
+      .locator('input[type="checkbox"]')
+      .nth(1);
     await checkbox.check();
     await ttPage.catalogAddToRepertoireButton.click();
     await page.waitForTimeout(2000);
@@ -288,7 +293,9 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await ttPage.repertoireTab.click();
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
     await ttPage.searchForTune(easyTestTitle, ttPage.repertoireGrid);
-    const repCheckbox = ttPage.repertoireGrid.locator('input[type="checkbox"]').nth(1);
+    const repCheckbox = ttPage.repertoireGrid
+      .locator('input[type="checkbox"]')
+      .nth(1);
     await repCheckbox.check();
     await ttPage.repertoireAddToReviewButton.click();
     await page.waitForTimeout(2000);
@@ -308,9 +315,9 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await page.waitForTimeout(2000);
 
     // Query practice record
-    const playlistId = testUser.defaultPlaylistIdInt;
+    const playlistId = testUser.playlistId;
     const scheduledDates = await queryScheduledDates(page, playlistId);
-    const tuneEntry = Object.entries(scheduledDates).find(([_, data]) => true); // First tune
+    const tuneEntry = [...scheduledDates.entries()][0]; // First/only tune expected
 
     if (!tuneEntry) {
       throw new Error("Could not find scheduled date for Easy test tune");
@@ -318,25 +325,25 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
 
     const tuneId = tuneEntry[0];
     const record = await queryLatestPracticeRecord(page, tuneId, playlistId);
+    if (!record)
+      throw new Error("Practice record not found after Easy evaluation");
 
     console.log(`  State: ${record.state}`);
     console.log(`  Interval: ${record.interval} days`);
-    console.log(`  Reps: ${record.reps}, Lapses: ${record.lapses}`);
+    console.log(
+      `  Repetitions: ${record.repetitions}, Lapses: ${record.lapses}`
+    );
 
     // === CRITICAL VALIDATION: Easy skips Learning ===
-    expect(record.state).toBe(
-      2,
-      'First "Easy" evaluation should transition NEW (0) → Review (2), skipping Learning'
-    );
+    // First "Easy" evaluation transitions NEW (0) → Review (2) skipping Learning
+    expect(record.state).toBe(2);
 
-    expect(record.reps).toBe(1, "First evaluation should set reps=1");
-    expect(record.lapses).toBe(0, "New tune should have lapses=0");
+    expect(record.repetitions).toBe(1);
+    expect(record.lapses).toBe(0);
 
     // Interval should be longer than "Good" (Easy gets longer first interval)
-    expect(record.interval).toBeGreaterThan(
-      1,
-      `Easy should produce interval > 1 day (got ${record.interval})`
-    );
+    // Easy should produce interval > 1 day
+    expect(record.interval).toBeGreaterThan(1);
 
     console.log('✓ "Easy" correctly skipped Learning state (NEW → Review)');
   });
@@ -356,7 +363,9 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await newButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    const titleField = ttPage.tuneEditorForm.locator('input[name="title"]').first();
+    const titleField = ttPage.tuneEditorForm
+      .locator('input[name="title"]')
+      .first();
     const againTestTitle = `Again Learning ${Date.now()}`;
     await titleField.fill(againTestTitle);
     await ttPage.selectTypeInTuneEditor("Jig (6/8)");
@@ -373,7 +382,10 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
 
     await ttPage.repertoireTab.click();
     await ttPage.searchForTune(againTestTitle, ttPage.repertoireGrid);
-    await ttPage.repertoireGrid.locator('input[type="checkbox"]').nth(1).check();
+    await ttPage.repertoireGrid
+      .locator('input[type="checkbox"]')
+      .nth(1)
+      .check();
     await ttPage.repertoireAddToReviewButton.click();
     await page.waitForTimeout(2000);
 
@@ -388,27 +400,26 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await page.waitForTimeout(2000);
 
     // Query
-    const playlistId = testUser.defaultPlaylistIdInt;
+    const playlistId = testUser.playlistId;
     const scheduledDates = await queryScheduledDates(page, playlistId);
     const tuneId = Object.keys(scheduledDates)[0];
     const record = await queryLatestPracticeRecord(page, tuneId, playlistId);
+    if (!record)
+      throw new Error("Practice record not found after Again evaluation");
 
     console.log(`  State: ${record.state}`);
     console.log(`  Interval: ${record.interval} days`);
     console.log(`  Lapses: ${record.lapses}`);
 
     // Validation
-    expect(record.state).toBe(1, '"Again" should transition to Learning (1)');
-    expect(record.reps).toBe(1, "First evaluation sets reps=1");
+    expect(record.state).toBe(1); // "Again" transitions to Learning (1)
+    expect(record.repetitions).toBe(1); // First evaluation sets repetitions=1
 
     // "Again" increments lapses immediately
-    expect(record.lapses).toBe(1, '"Again" should increment lapses to 1');
+    expect(record.lapses).toBe(1); // "Again" increments lapses to 1
 
     // Interval should be minimum (1 day) since "Again" is hardest
-    expect(record.interval).toBe(
-      1,
-      '"Again" should produce minimum interval (1 day)'
-    );
+    expect(record.interval).toBe(1); // Minimum interval (1 day)
 
     console.log('✓ "Again" correctly set Learning state with minimum interval');
   });
