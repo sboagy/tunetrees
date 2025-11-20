@@ -501,10 +501,37 @@ Review (2) --[Again]--> Relearning (3)
 
 ## Implementation Details
 
-### Clock Control Helpers
+### Clock Control Helpers (with Tolerance)
 ```typescript
 // e2e/helpers/clock-control.ts
 
+// Centralized clock tolerance constants
+export const CLOCK_TOLERANCE_MS = 4000; // Base tolerance for CI environments
+
+// Adjust tolerance for mobile browsers (higher variance observed)
+export function getClockTolerance(
+  projectName?: string,
+  baseToleranceMs = CLOCK_TOLERANCE_MS
+): number {
+  if (projectName && /Mobile/i.test(projectName)) {
+    return Math.max(baseToleranceMs, 5000);
+  }
+  return baseToleranceMs;
+}
+
+// Compare dates with tolerance (handles CI/mobile timing variance)
+export function expectDateClose(
+  actual: Date,
+  expected: Date,
+  projectName?: string,
+  baseToleranceMs = 25
+): void {
+  const toleranceMs = getClockTolerance(projectName, baseToleranceMs);
+  const diff = Math.abs(actual.getTime() - expected.getTime());
+  expect(diff).toBeLessThanOrEqual(toleranceMs);
+}
+
+// Set stable date in browser
 export async function setStableDate(
   context: BrowserContext,
   date: Date | string
@@ -513,6 +540,7 @@ export async function setStableDate(
   await context.clock.install({ time: timestamp });
 }
 
+// Advance clock by days
 export async function advanceDays(
   context: BrowserContext,
   days: number,
@@ -524,10 +552,32 @@ export async function advanceDays(
   return newDate;
 }
 
-export async function getCurrentDate(page: Page): Promise<Date> {
-  return await page.evaluate(() => new Date());
+// Verify clock is frozen at expected time (with tolerance)
+export async function verifyClockFrozen(
+  page: Page,
+  expectedDate: Date,
+  toleranceMs?: number,
+  projectName?: string
+): Promise<void> {
+  const browserDate = await getCurrentDate(page);
+  const actualTolerance = toleranceMs ?? getClockTolerance(projectName);
+  const diff = Math.abs(browserDate.getTime() - expectedDate.getTime());
+  
+  if (diff > actualTolerance) {
+    throw new Error(
+      `Clock verification failed: expected ${expectedDate.toISOString()}, ` +
+      `got ${browserDate.toISOString()} (diff: ${diff}ms, tolerance: ${actualTolerance}ms)`
+    );
+  }
 }
 ```
+
+**Key Improvements:**
+- `CLOCK_TOLERANCE_MS` (4000ms) centralized in helpers, not individual tests
+- `getClockTolerance()` adjusts for mobile browsers (5000ms)
+- `expectDateClose()` compares dates with automatic tolerance adjustment
+- `verifyClockFrozen()` uses centralized tolerance with mobile detection
+- All clock comparisons use consistent tolerance logic
 
 ### Test Data Queries
 ```typescript
