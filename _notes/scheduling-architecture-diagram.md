@@ -7,19 +7,19 @@
 
 ```mermaid
 graph TB
-    subgraph "User Interface"
-        UI[Practice Page UI<br/>SolidJS Components]
+    subgraph UI["User Interface"]
+        UI_PAGE[Practice Page UI<br/>SolidJS Components]
     end
 
-    subgraph "Core Services (Client-Side)"
-        QG[queue-generator.ts<br/>🎯 QUEUE GENERATION<br/>Creates frozen daily snapshot]
-        PS[practice-staging.ts<br/>🔮 PREVIEW CALCULATIONS<br/>FSRS staging on dropdown]
-        PR[practice-recording.ts<br/>💾 COMMIT EVALUATIONS<br/>Create practice_record]
-        PQ[practice-queue.ts<br/>📋 QUEUE MANAGEMENT<br/>Bucket classification logic]
-        FS[fsrs-service.ts<br/>🧮 FSRS ALGORITHM<br/>Calculates intervals/due dates]
+    subgraph SERVICES["Core Services (Client-Side)"]
+        QG[queue-generator.ts<br/>QUEUE GENERATION<br/>Creates frozen daily snapshot]
+        PS[practice-staging.ts<br/>PREVIEW CALCULATIONS<br/>FSRS staging on dropdown]
+        PR[practice-recording.ts<br/>COMMIT EVALUATIONS<br/>Create practice_record]
+        PQ[practice-queue.ts<br/>QUEUE MANAGEMENT<br/>Bucket classification logic]
+        FS[fsrs-service.ts<br/>FSRS ALGORITHM<br/>Calculates intervals/due dates]
     end
 
-    subgraph "Local Storage (SQLite WASM)"
+    subgraph STORAGE["Local Storage (SQLite WASM)"]
         DB[(SQLite Database<br/>IndexedDB-backed)]
         PT[playlist_tune<br/>next review dates]
         PRE[practice_record<br/>history + FSRS metrics]
@@ -27,19 +27,19 @@ graph TB
         TTD[table_transient_data<br/>staging preview]
     end
 
-    subgraph "Sync Layer"
-        SQ[Sync Queue<br/>queueSync()]
+    subgraph SYNC["Sync Layer"]
+        SQ[Sync Queue<br/>queueSync]
         SE[Sync Engine<br/>Bidirectional sync]
     end
 
-    subgraph "Remote Storage"
+    subgraph REMOTE["Remote Storage"]
         SP[(Supabase PostgreSQL)]
     end
 
     %% User initiates practice
-    UI -->|"1. Load /practice"| QG
-    UI -->|"2. Select evaluation"| PS
-    UI -->|"3. Click Submit"| PR
+    UI_PAGE -->|1. Load /practice| QG
+    UI_PAGE -->|2. Select evaluation| PS
+    UI_PAGE -->|3. Click Submit| PR
 
     %% Queue Generation Flow
     QG -->|Uses| PQ
@@ -54,7 +54,7 @@ graph TB
     FS -->|FSRS algorithm| PS
     PS -->|UPSERT staging| TTD
     TTD -->|Queue sync| SQ
-    UI -->|Read preview| TTD
+    UI_PAGE -->|Read preview| TTD
 
     %% Recording Flow (Commit)
     PR -->|Read staged| TTD
@@ -68,10 +68,11 @@ graph TB
 
     %% Sync Flow
     SQ -->|Background| SE
-    SE <-->|Bidirectional| SP
+    SE -->|Upload| SP
+    SP -->|Download| SE
 
     %% Return to UI
-    DB -->|Reactive queries| UI
+    DB -->|Reactive queries| UI_PAGE
 
     style QG fill:#e1f5ff
     style PS fill:#fff4e1
