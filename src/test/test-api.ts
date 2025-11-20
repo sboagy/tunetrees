@@ -16,7 +16,6 @@ import {
   dailyPracticeQueue,
   playlistTune,
   practiceRecord,
-  tuneOverride,
 } from "@/lib/db/schema";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
@@ -193,7 +192,7 @@ async function getTuneOverrideCountForCurrentUser() {
   // Prefer SQL to avoid ORM differences across builds
   const rows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
-    FROM ${tuneOverride} tovr
+    FROM tune_override tovr
     WHERE tovr.user_ref = ${userRef}
   `);
   return rows[0]?.count ?? 0;
@@ -205,8 +204,8 @@ async function getTuneOverrideCountForCurrentUser() {
 async function getPracticeRecords(tuneIds: string[]) {
   const db = await ensureDb();
   if (!tuneIds || tuneIds.length === 0) return [];
-
-  const placeholders = tuneIds.map(() => "?").join(",");
+  // Build an IN list (UUIDs) for test-only usage. UUIDs contain no quotes.
+  const inList = tuneIds.map((id) => `'${id}'`).join(",");
   const rows = await db.all<{
     id: string;
     tune_ref: string;
@@ -224,18 +223,15 @@ async function getPracticeRecords(tuneIds: string[]) {
     technique: string | null;
     elapsed_days: number | null;
     lapses: number | null;
-  }>(
-    sql.raw(`
+  }>(sql`
     SELECT 
       id, tune_ref, playlist_ref, practiced, due, quality, 
       interval, repetitions, stability, difficulty, state, step,
       goal, technique, elapsed_days, lapses
     FROM practice_record
-    WHERE tune_ref IN (${placeholders})
+    WHERE tune_ref IN (${sql.raw(inList)})
     ORDER BY id DESC
-  `),
-    ...tuneIds
-  );
+  `);
   return rows;
 }
 
@@ -280,29 +276,25 @@ async function getLatestPracticeRecord(tuneId: string, playlistId: string) {
  */
 async function getScheduledDates(playlistId: string, tuneIds?: string[]) {
   const db = await ensureDb();
-  let query = sql`
+  const query = sql`
     SELECT tune_ref, scheduled, learned, current
     FROM playlist_tune
     WHERE playlist_ref = ${playlistId}
   `;
 
   if (tuneIds && tuneIds.length > 0) {
-    const placeholders = tuneIds.map(() => "?").join(",");
+    const inList = tuneIds.map((id) => `'${id}'`).join(",");
     const rows = await db.all<{
       tune_ref: string;
       scheduled: string | null;
       learned: string | null;
       current: string | null;
-    }>(
-      sql.raw(`
+    }>(sql`
       SELECT tune_ref, scheduled, learned, current
       FROM playlist_tune
-      WHERE playlist_ref = ?
-        AND tune_ref IN (${placeholders})
-    `),
-      playlistId,
-      ...tuneIds
-    );
+      WHERE playlist_ref = ${playlistId}
+        AND tune_ref IN (${sql.raw(inList)})
+    `);
     const result: Record<
       string,
       {
