@@ -8,11 +8,11 @@
 
 ```mermaid
 graph LR
-    QG[queue-generator.ts<br/>Generates daily queue]
-    PQ[practice-queue.ts<br/>Bucket classification]
-    PS[practice-staging.ts<br/>FSRS preview]
-    PR[practice-recording.ts<br/>Commit evaluations]
-    FS[fsrs-service.ts<br/>FSRS calculations]
+    QG["<b>queue-generator.ts</b><br/><br/>Generates daily queue"]
+    PQ["<b>practice-queue.ts</b><br/><br/>Bucket classification"]
+    PS["<b>practice-staging.ts</b><br/><br/>FSRS preview"]
+    PR["<b>practice-recording.ts</b><br/><br/>Commit evaluations"]
+    FS["<b>fsrs-service.ts</b><br/><br/>FSRS calculations"]
 
     %% Queue Generation Flow
     QG -->|Uses bucket logic| PQ
@@ -26,11 +26,11 @@ graph LR
     PR -->|Calculate final| FS
     FS -->|Returns metrics| PR
 
-    style QG fill:#e1f5ff
-    style PQ fill:#f3e5f5
-    style PS fill:#fff4e1
-    style PR fill:#e8f5e9
-    style FS fill:#ffe0e0
+    style QG fill:#e1f5ff,stroke:#333,stroke-width:2px,color:#000
+    style PQ fill:#f3e5f5,stroke:#333,stroke-width:2px,color:#000
+    style PS fill:#fff4e1,stroke:#333,stroke-width:2px,color:#000
+    style PR fill:#e8f5e9,stroke:#333,stroke-width:2px,color:#000
+    style FS fill:#ffe0e0,stroke:#333,stroke-width:2px,color:#000
 ```
 
 ## Component Purposes
