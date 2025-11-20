@@ -257,11 +257,13 @@ async function getLatestPracticeRecord(tuneId: string, playlistId: string) {
     technique: string | null;
     elapsed_days: number | null;
     lapses: number | null;
+    sync_version: number;
+    last_modified_at: string;
   }>(sql`
     SELECT 
       id, tune_ref, playlist_ref, practiced, due, quality,
       interval, repetitions, stability, difficulty, state, step,
-      goal, technique, elapsed_days, lapses
+      goal, technique, elapsed_days, lapses, sync_version, last_modified_at
     FROM practice_record
     WHERE tune_ref = ${tuneId}
       AND playlist_ref = ${playlistId}
@@ -382,6 +384,41 @@ async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
   return rows;
 }
 
+/**
+ * Get single playlist_tune row (for consistency checks with practice_record)
+ */
+async function getPlaylistTuneRow(playlistId: string, tuneId: string) {
+  const db = await ensureDb();
+  const rows = await db.all<{
+    playlist_ref: string;
+    tune_ref: string;
+    scheduled: string | null;
+    current: string | null;
+    learned: string | null;
+    sync_version: number;
+    last_modified_at: string;
+  }>(sql`
+    SELECT playlist_ref, tune_ref, scheduled, current, learned, sync_version, last_modified_at
+    FROM playlist_tune
+    WHERE playlist_ref = ${playlistId} AND tune_ref = ${tuneId} AND deleted = 0
+    LIMIT 1
+  `);
+  return rows.length > 0 ? rows[0] : null;
+}
+
+/**
+ * Count distinct practice_record rows per playlist/tune (duplicate guard)
+ */
+async function getDistinctPracticeRecordCount(playlistId: string, tuneId: string) {
+  const db = await ensureDb();
+  const rows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) as count
+    FROM practice_record
+    WHERE playlist_ref = ${playlistId} AND tune_ref = ${tuneId}
+  `);
+  return rows[0]?.count ?? 0;
+}
+
 // Attach to window
 declare global {
   interface Window {
@@ -437,6 +474,8 @@ declare global {
         technique: string | null;
         elapsed_days: number | null;
         lapses: number | null;
+        sync_version: number;
+        last_modified_at: string;
       } | null>;
       getScheduledDates: (
         playlistId: string,
@@ -467,6 +506,22 @@ declare global {
           snapshot_coalesced_ts: string | null;
         }>
       >;
+      getPlaylistTuneRow: (
+        playlistId: string,
+        tuneId: string
+      ) => Promise<{
+        playlist_ref: string;
+        tune_ref: string;
+        scheduled: string | null;
+        current: string | null;
+        learned: string | null;
+        sync_version: number;
+        last_modified_at: string;
+      } | null>;
+      getDistinctPracticeRecordCount: (
+        playlistId: string,
+        tuneId: string
+      ) => Promise<number>;
     };
   }
 }
@@ -482,6 +537,8 @@ if (typeof window !== "undefined") {
       getLatestPracticeRecord,
       getScheduledDates,
       getPracticeQueue,
+      getPlaylistTuneRow,
+      getDistinctPracticeRecordCount,
       getSyncVersion: () => {
         // Access the sync version from AuthContext
         // The version starts at 0 and increments to 1 after initial sync

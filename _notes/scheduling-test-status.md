@@ -100,7 +100,40 @@ validateIncreasingIntervals(intervals, minGrowthFactor);
 - Support ISO strings and Date objects
 - Sequential date changes
 
-## 📋 Open Questions for @sboagy
+### 5. New Tune Workflow Initial Spec (SCHEDULING-007)
+**File:** `e2e/tests/scheduling-007-new-tune-workflow.spec.ts`
+
+Implements creation → repertoire → review → first evaluation for ratings (Good, Easy, Again) with state transitions validated:
+- Good: NEW (0) → Learning (1)
+- Easy: NEW (0) → Review (2) (skip Learning)
+- Again: NEW (0) → Learning (1) with lapses increment
+
+Added guards against null record, normalized field names (`repetitions`), removed deprecated playlistId field usage, ensures minimum interval and positive stability/difficulty.
+
+### 6. Scheduling Invariants Extracted
+Core invariants now codified for upcoming tests:
+1. Future-only due dates (no past scheduling)
+2. First-evaluation interval ordering: Again < Hard ≤ Good < Easy (all ≥ 1 day)
+3. NEW state transitions per rating (Easy skips Learning)
+4. Repetitions start at 1; lapses increment only on Again
+5. Stability & difficulty initialized > 0 and non-null thereafter
+6. Playlist/record consistency: `playlist_tune.scheduled/current` mirrors `practice_record.due`
+7. Interval non-decreasing across successful reviews (Good/Easy)
+8. Bucket classification: initial Q3; never misclassified into Q2/Q4 unless overdue; no same-day due
+9. Sync metadata increments (`sync_version`, `last_modified_at` monotonic)
+10. Uniqueness: single practice_record per tuneRef+playlistRef at any practiced timestamp
+11. Atomic evaluation (one queue removal, one record update)
+12. No backwards interval regression for successful reviews
+
+### 7. Test API Extensions (2025-11-20)
+Updated `src/test/test-api.ts` with:
+- `getPlaylistTuneRow(playlistId, tuneId)` for direct scheduled/current/learned consistency checks
+- `getDistinctPracticeRecordCount(playlistId, tuneId)` for duplicate detection
+- Extended `getLatestPracticeRecord` to surface `sync_version`, `last_modified_at`
+
+These enable invariants 6, 9, 10 verification.
+
+## 📋 Open Questions for @sboagy (Pending / Deferred)
 
 Before implementing the 6 comprehensive test scenarios, please provide guidance on:
 
@@ -309,16 +342,24 @@ Once you've reviewed the test plan and answered the questions above, please repl
    - Describe preferred approach
    - Reasons current plan doesn't fit
 
-## 📊 Current PR State
+## 📊 Current PR State (Updated 2025-11-20)
 
 **Branch:** `copilot/fix-scheduling-issues`  
-**Commits:**
-1. Initial plan
-2. Add comprehensive scheduling test plan document
-3. Add clock control and scheduling query helpers for E2E tests
+**Recent Commits Additions:**
+- Clock control deflake & tolerance centralization
+- SCHEDULING-007 new tune workflow spec (TypeScript fixes applied)
+- Test API extensions (playlist tune row + record count + metadata)
 
-**Files Changed:** 4 new files, 1,242 lines added
-**Status:** Ready for approval to proceed with test implementation
+**Next Planned Tests:**
+1. SCHEDULING-008 Interval Ordering (create 4 tunes; first eval with Again/Hard/Good/Easy; assert ordering & future dates)
+2. SCHEDULING-009 Future-Only Due over multi-day Good/Easy chain
+3. SCHEDULING-010 Interval Growth (Good → Good → Easy progression)
+4. SCHEDULING-011 Stability/Difficulty evolution checks
+5. SCHEDULING-012 Bucket Migration accuracy (Q3 exit, no false Q2)
+6. SCHEDULING-013 Sync version & last_modified monotonicity
+7. SCHEDULING-014 playlist_tune vs practice_record consistency
+
+**Status:** Foundational invariants & API in place; proceeding with SCHEDULING-008 implementation.
 
 ---
 
