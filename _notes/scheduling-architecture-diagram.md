@@ -1,354 +1,112 @@
-# TuneTrees Practice & Scheduling Architecture
+# TuneTrees Scheduling Architecture
 
 **Created:** 2025-11-20  
-**Purpose:** High-level architecture diagram showing core scheduling mechanism components
+**Purpose:** Simplified data flow between core scheduling components  
+**Focus:** Scheduling logic only (storage mechanisms omitted for clarity)
 
-## Architecture Overview
+## Core Components Data Flow
 
 ```mermaid
-graph TB
-    subgraph UI["User Interface"]
-        UI_PAGE[Practice Page UI<br/>SolidJS Components]
-    end
-
-    subgraph SERVICES["Core Services (Client-Side)"]
-        QG[queue-generator.ts<br/>QUEUE GENERATION<br/>Creates frozen daily snapshot]
-        PS[practice-staging.ts<br/>PREVIEW CALCULATIONS<br/>FSRS staging on dropdown]
-        PR[practice-recording.ts<br/>COMMIT EVALUATIONS<br/>Create practice_record]
-        PQ[practice-queue.ts<br/>QUEUE MANAGEMENT<br/>Bucket classification logic]
-        FS[fsrs-service.ts<br/>FSRS ALGORITHM<br/>Calculates intervals/due dates]
-    end
-
-    subgraph STORAGE["Local Storage (SQLite WASM)"]
-        DB[(SQLite Database<br/>IndexedDB-backed)]
-        PT[playlist_tune<br/>next review dates]
-        PRE[practice_record<br/>history + FSRS metrics]
-        DPQ[daily_practice_queue<br/>frozen snapshot]
-        TTD[table_transient_data<br/>staging preview]
-    end
-
-    subgraph SYNC["Sync Layer"]
-        SQ[Sync Queue<br/>queueSync]
-        SE[Sync Engine<br/>Bidirectional sync]
-    end
-
-    subgraph REMOTE["Remote Storage"]
-        SP[(Supabase PostgreSQL)]
-    end
-
-    %% User initiates practice
-    UI_PAGE -->|1. Load /practice| QG
-    UI_PAGE -->|2. Select evaluation| PS
-    UI_PAGE -->|3. Click Submit| PR
+graph LR
+    QG[queue-generator.ts<br/>Generates daily queue]
+    PQ[practice-queue.ts<br/>Bucket classification]
+    PS[practice-staging.ts<br/>FSRS preview]
+    PR[practice-recording.ts<br/>Commit evaluations]
+    FS[fsrs-service.ts<br/>FSRS calculations]
 
     %% Queue Generation Flow
-    QG -->|Uses| PQ
-    PQ -->|Query| DB
-    PQ -->|Classify into buckets| DPQ
-    QG -->|Generate snapshot| DPQ
-    DPQ -->|Queue sync| SQ
+    QG -->|Uses bucket logic| PQ
+    PQ -->|Returns classified queue| QG
 
-    %% Staging Flow (Preview)
-    PS -->|Get latest| PRE
-    PS -->|Calculate| FS
-    FS -->|FSRS algorithm| PS
-    PS -->|UPSERT staging| TTD
-    TTD -->|Queue sync| SQ
-    UI_PAGE -->|Read preview| TTD
+    %% Staging Flow (User selects dropdown)
+    PS -->|Calculate preview| FS
+    FS -->|Returns metrics| PS
 
-    %% Recording Flow (Commit)
-    PR -->|Read staged| TTD
+    %% Recording Flow (User clicks Submit)
     PR -->|Calculate final| FS
-    PR -->|INSERT| PRE
-    PR -->|UPDATE current| PT
-    PR -->|Mark completed| DPQ
-    PR -->|DELETE staging| TTD
-    PRE -->|Queue sync| SQ
-    PT -->|Queue sync| SQ
-
-    %% Sync Flow
-    SQ -->|Background| SE
-    SE -->|Upload| SP
-    SP -->|Download| SE
-
-    %% Return to UI
-    DB -->|Reactive queries| UI_PAGE
+    FS -->|Returns metrics| PR
 
     style QG fill:#e1f5ff
+    style PQ fill:#f3e5f5
     style PS fill:#fff4e1
     style PR fill:#e8f5e9
-    style PQ fill:#f3e5f5
     style FS fill:#ffe0e0
-    style DB fill:#f0f0f0
-    style SP fill:#e3f2fd
 ```
 
-## Component Responsibilities
+## Component Purposes
 
-### 1. **queue-generator.ts** 🎯 Queue Generation
-**Purpose:** Creates frozen daily practice snapshot
+### 1. queue-generator.ts
+Creates frozen daily practice queue snapshot
 
-**Key Functions:**
-- `generateDailyQueue()` - Build queue for today's practice session
-- Bucket classification (1=Due, 2=Lapsed, 3=New, 4=Old Lapsed)
-- Ordering within buckets by due date / priority
-
-**Outputs:**
-- Rows in `daily_practice_queue` table
-- Stable ordering that doesn't change during practice session
-
-**When Called:** 
-- On page load if queue doesn't exist for today
-- On manual regeneration
+**When:** On page load (if queue doesn't exist for today)
 
 ---
 
-### 2. **practice-staging.ts** 🔮 Preview Calculations
-**Purpose:** FSRS preview when user selects evaluation dropdown
+### 2. practice-queue.ts
+Classifies tunes into buckets based on due dates
 
-**Key Functions:**
-- `stagePracticeEvaluation()` - Calculate FSRS metrics for preview
-- Maps evaluation text → FSRS Rating (Again/Hard/Good/Easy)
-- Applies minimum next-day constraint
-
-**Outputs:**
-- UPSERT to `table_transient_data` (temporary staging)
-- Preview metrics shown in grid (stability, due date, interval)
-
-**When Called:**
-- Every time user selects an evaluation dropdown
-- Before submission (shows "what if" preview)
+**Buckets:**
+- Q1: Due Today
+- Q2: Lapsed 0-7 days
+- Q3: New (never scheduled)
+- Q4: Old Lapsed (>7 days)
 
 ---
 
-### 3. **practice-recording.ts** 💾 Commit Evaluations
-**Purpose:** Finalize and persist practice ratings
+### 3. practice-staging.ts
+Calculates FSRS preview when user selects evaluation
 
-**Key Functions:**
-- `commitStagedEvaluations()` - Main commit function
-- `recordPracticeRating()` - Single tune recording
-- Handles duplicate practice timestamps (increments by 1 second)
-
-**Outputs:**
-- INSERT into `practice_record` (permanent history)
-- UPDATE `playlist_tune.current` (next review date)
-- UPDATE `daily_practice_queue.completed_at` (mark done)
-- DELETE from `table_transient_data` (clear staging)
-
-**When Called:**
-- User clicks "Submit" button
-- Processes all staged evaluations in batch
+**When:** User selects dropdown (Again/Hard/Good/Easy)
 
 ---
 
-### 4. **practice-queue.ts** 📋 Queue Management
-**Purpose:** Bucket classification and queue utilities
+### 4. practice-recording.ts
+Commits evaluations and creates practice records
 
-**Key Functions:**
-- `computeSchedulingWindows()` - Calculate day boundaries (UTC)
-- `classifyQueueBucket()` - Determine bucket 1/2/3/4
-- `generateOrGetPracticeQueue()` - Main orchestrator
-
-**Bucket Logic:**
-- **Q1 (Due Today):** scheduled ∈ [startOfDay, endOfDay)
-- **Q2 (Recently Lapsed):** scheduled ∈ [windowFloor, startOfDay) — 0-7 days overdue
-- **Q3 (New/Unscheduled):** never scheduled, no practice history
-- **Q4 (Old Lapsed):** scheduled < windowFloor — >7 days overdue
-
-**When Called:**
-- By `queue-generator.ts` during queue generation
-- Provides reusable bucket classification logic
+**When:** User clicks Submit button
 
 ---
 
-### 5. **fsrs-service.ts** 🧮 FSRS Algorithm
-**Purpose:** Core spaced repetition calculations
+### 5. fsrs-service.ts
+Wraps ts-fsrs library for FSRS calculations
 
-**Key Functions:**
-- `processFirstReview()` - Handle new cards (state=New)
-- `processReview()` - Handle repeat reviews (state=Learning/Review)
-- `createPracticeRecord()` - Build practice_record from FSRS output
-- `getPreviewSchedules()` - Calculate all 4 rating options
+**Calculates:**
+- Next due date
+- Stability (memory strength)
+- Difficulty
+- Interval (days until next review)
 
-**FSRS Outputs:**
-- `nextDue` - Next review date
-- `stability` - Memory strength metric
-- `difficulty` - Card difficulty metric
-- `interval` - Days until next review
-- `state` - Learning state (0=New, 1=Learning, 2=Review, 3=Relearning)
+## Data Flow Sequence
 
-**When Called:**
-- By `practice-staging.ts` for previews
-- By `practice-recording.ts` for final commits
+### Morning: Queue Generation
+1. `queue-generator.ts` → calls → `practice-queue.ts`
+2. `practice-queue.ts` → classifies tunes into Q1/Q2/Q3/Q4
+3. Returns classified queue
 
----
+### During Practice: Preview
+1. User selects "Good" for a tune
+2. `practice-staging.ts` → calls → `fsrs-service.ts`
+3. `fsrs-service.ts` → calculates preview metrics
+4. Returns stability, due date, interval
+5. UI shows preview
 
-## Data Flow Summary
+### End of Practice: Commit
+1. User clicks "Submit"
+2. `practice-recording.ts` → calls → `fsrs-service.ts`
+3. `fsrs-service.ts` → calculates final metrics
+4. Practice records created with next due dates
 
-### 🌅 Morning: Queue Generation
-```
-User opens /practice
-  → queue-generator creates frozen snapshot
-  → Uses practice-queue bucket logic
-  → Queries practice_list_staged VIEW
-  → Inserts daily_practice_queue rows
-  → UI displays ordered grid
-```
+## Key Constraint
 
-### 🎵 During Practice: Staging
-```
-User selects "Good" for Tune A
-  → practice-staging calls fsrs-service
-  → FSRS calculates preview metrics
-  → UPSERT to table_transient_data
-  → UI re-queries and shows preview
-```
-
-### ✅ End of Practice: Commit
-```
-User clicks "Submit"
-  → practice-recording reads table_transient_data
-  → Calls fsrs-service for final calculations
-  → INSERT practice_record
-  → UPDATE playlist_tune.current
-  → UPDATE daily_practice_queue.completed_at
-  → DELETE table_transient_data
-  → Sync queue triggers background upload
-```
-
-### 🔄 Background: Sync
-```
-Sync engine processes queue
-  → Upload changes to Supabase PostgreSQL
-  → Download changes from other devices
-  → Merge with local SQLite
-  → UI reactively updates via signals
-```
-
----
-
-## Key Constraints & Patterns
-
-### Minimum Next-Day Enforcement
-**File:** `src/lib/utils/practice-date.ts` → `ensureMinimumNextDay()`
-
-```typescript
-// Prevents same-day scheduling (causes "today" loop bug)
-if (daysDiff < 1) {
-  return new Date(referenceDate.getTime() + (25 * 60 * 60 * 1000)); // +25 hours
-}
-```
-
-**Why 25 hours?** 24h + 1h buffer to guarantee next day even after render delays.
-
-**Applied in:**
-- `practice-staging.ts` line 167 (preview calculations)
-- Ensures FSRS output never schedules for same day
-
-### Frozen Queue Snapshot
-**Pattern:** Queue generated once per day, remains stable
-
-**Why?** Prevents tunes from appearing/disappearing mid-practice as evaluations change due dates.
-
-**Implementation:**
-- `daily_practice_queue.window_start_utc` groups by day
-- `completed_at` tracks which tunes finished (not deleted)
-- Grid filters to incomplete tunes
-
-### Staging → Commit Flow
-**Pattern:** Two-phase commit (preview, then persist)
-
-**Phase 1 - Staging:**
-- User selects dropdown → UPSERT `table_transient_data`
-- Grid shows preview via COALESCE in `practice_list_staged` VIEW
-- No permanent changes yet
-
-**Phase 2 - Commit:**
-- User clicks Submit → INSERT `practice_record`
-- UPDATE permanent fields (`playlist_tune.current`)
-- DELETE staging data
-- All-or-nothing batch operation
-
----
-
-## File Size & Complexity
-
-| File | Lines | Complexity | Purpose |
-|------|-------|------------|---------|
-| `fsrs-service.ts` | ~330 | Medium | Pure FSRS algorithm wrapper |
-| `practice-queue.ts` | ~820 | High | Bucket classification, windows |
-| `queue-generator.ts` | ~350 | Medium | Queue creation logic |
-| `practice-staging.ts` | ~260 | Low | Simple FSRS preview |
-| `practice-recording.ts` | ~710 | High | Batch commit, duplicate handling |
-
-**Total LOC:** ~2,470 lines of core scheduling logic
-
----
-
-## Common Operations
-
-### "How do I add a tune to today's queue?"
-1. INSERT into `playlist_tune` (via repertoire management)
-2. Set `scheduled = NOW()` to make it "due today"
-3. Regenerate queue OR wait for next day's queue generation
-4. Tune appears in Q1 (Due Today) bucket
-
-### "How does FSRS calculate the next review date?"
-1. Get latest `practice_record` for tune (previous FSRS state)
-2. Reconstruct FSRS `Card` from record (stability, difficulty, state)
-3. Call `fsrs.repeat(card, now)` with user's rating
-4. Extract `nextCard.due` from result
-5. Apply `ensureMinimumNextDay()` constraint
-6. Return adjusted due date (minimum next day)
-
-### "What happens if I practice the same tune twice in one day?"
-**Prevented by queue design:**
-- Queue frozen at start of day
-- Once `completed_at` is set, tune removed from UI
-- Cannot evaluate same tune twice in same queue session
-
-**If forced via API:**
-- `practice_record` has unique constraint on `(tune_ref, playlist_ref, practiced)`
-- `practice-recording.ts` increments `practiced` by 1 second if duplicate detected
-
-### "Why does 'Easy' sometimes not advance the date far enough?"
-**Root Cause (Hypothesis):**
-- Bug may be in FSRS parameter configuration (weights, retention target)
-- Or in how previous practice history is reconstructed into FSRS `Card`
-- Or in `ensureMinimumNextDay()` logic (though this only affects same-day, not multi-day)
-
-**To Debug:**
-1. Check FSRS weights in user preferences
-2. Verify `practice_record` history is correct
-3. Log FSRS `Card` input before calling `fsrs.repeat()`
-4. Log raw FSRS output before `ensureMinimumNextDay()`
-5. Compare to expected FSRS intervals from algorithm spec
-
----
-
-## Testing Strategy
-
-### Unit Tests
-- `fsrs-service.ts`: Mock ts-fsrs library, test quality mapping
-- `practice-queue.ts`: Test bucket classification with known dates
-- `ensureMinimumNextDay()`: Test edge cases (midnight, timezone shifts)
-
-### Integration Tests
-- Staging → Commit flow (full round-trip)
-- Queue generation → practice → submission
-- Duplicate practice timestamp handling
-
-### E2E Tests (This PR)
-- Multi-day scenarios with clock control
-- FSRS interval progression (Again/Hard/Good/Easy)
-- Queue regeneration across day boundaries
-- "Repeated Easy" bug reproduction
-
----
+**Minimum Next-Day Enforcement**
+- File: `src/lib/utils/practice-date.ts`
+- Function: `ensureMinimumNextDay()`
+- Adds 25 hours (24h + 1h buffer) if FSRS schedules same day
+- Prevents "today" loop bug
 
 ## References
 
 - **FSRS Algorithm:** https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm
 - **ts-fsrs Library:** https://github.com/open-spaced-repetition/ts-fsrs
-- **Practice Flow Sequence:** `docs/practice_flow.md` (detailed Mermaid diagram)
+- **Detailed Sequence:** `docs/practice_flow.md`
 - **Test Plan:** `_notes/scheduling-comprehensive-test-plan.md`
