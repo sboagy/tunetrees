@@ -8,11 +8,11 @@
 
 ```mermaid
 graph LR
-    QG["<b>queue-generator.ts</b><br/><br/>Generates daily queue"]
-    PQ["<b>practice-queue.ts</b><br/><br/>Bucket classification"]
-    PS["<b>practice-staging.ts</b><br/><br/>FSRS preview"]
-    PR["<b>practice-recording.ts</b><br/><br/>Commit evaluations"]
-    FS["<b>fsrs-service.ts</b><br/><br/>FSRS calculations"]
+    QG["<b>queue-generator.ts</b> <br/>Generates daily queue"]
+    PQ["<b>practice-queue.ts</b> <br/>Bucket classification"]
+    PS["<b>practice-staging.ts</b> <br/>FSRS preview"]
+    PR["<b>practice-recording.ts</b> <br/>Commit evaluations"]
+    FS["<b>fsrs-service.ts</b><br/>&nbsp;FSRS calculations"]
 
     %% Queue Generation Flow
     QG -->|Uses bucket logic| PQ
