@@ -3,8 +3,8 @@
 **Issue:** #286 - Scheduling not working properly  
 **Author:** GitHub Copilot  
 **Date:** 2025-11-19  
-**Updated:** 2025-11-19 (after @sboagy feedback)
-**Status:** Updated with FSRS implementation details
+**Updated:** 2025-11-20 (added Test 7 for new tune workflow)
+**Status:** Updated with FSRS implementation details and new tune testing
 
 ## Problem Statement
 
@@ -53,7 +53,8 @@ Test comprehensive multi-day practice scenarios with 30 tunes to validate:
 1. FSRS algorithm correctness (dates always advance forward)
 2. Queue regeneration across day boundaries
 3. Evaluation impact on scheduling (Again/Hard/Good/Easy)
-4. Edge cases (new tunes, lapsed tunes, timezone handling)
+4. **New tune workflow and FSRS "New" state transitions**
+5. Edge cases (new tunes, lapsed tunes, timezone handling)
 
 ### Test Duration
 Simulated 10-day practice cycle with controlled time advancement
@@ -364,6 +365,140 @@ expect(scheduledDate).toBeAfter(currentDate);
 
 ---
 
+### Test 7: New Tune Workflow (FSRS "New" State)
+**Purpose**: Validate complete workflow for adding new tunes and FSRS new card handling
+
+**Background:**
+Per ts-fsrs workflow diagram, new cards start in "NEW" state. First evaluation transitions to "Learning" or "Review" state based on rating.
+
+**Setup**:
+- Start with empty repertoire
+- Set stable date: 2025-07-20 14:00:00 UTC
+- Clear all practice history
+
+**Execution**:
+```
+Step 1: Create New Tune in Catalog
+  Navigate to Catalog tab
+  Click "Add Tune" button
+  Select "New" in dialog
+  Fill in tune details:
+    - Title: "Test Tune for New Card Flow"
+    - Type: "Reel"
+    - Mode: "D Major"
+    - ABC notation: (sample ABC)
+  Click "Save"
+  ✓ Verify tune appears in catalog
+
+Step 2: Add to Repertoire
+  Select tune with checkbox
+  Click "Add to Repertoire" button
+  ✓ Verify tune appears in Repertoire tab
+  ✓ Verify tune has NO scheduled date (new, never practiced)
+
+Step 3: Add to Review (Practice Queue)
+  Navigate to Repertoire tab
+  Select tune with checkbox
+  Click "Add to Review" button
+  ✓ Verify tune appears in practice queue
+  ✓ Verify tune is in Bucket Q3 (New/Unscheduled)
+
+Step 4: First Evaluation (NEW → Learning/Review)
+  Navigate to Practice tab
+  ✓ Verify tune appears in queue
+  ✓ Verify FSRS state = 0 (New) - check via staging preview
+  
+  Scenario A: Evaluate as "Again" (Rating 1)
+    ✓ Verify next state = 1 (Learning)
+    ✓ Verify interval ≥ 1 day (enforced minimum)
+    ✓ Verify scheduled date > current date
+  
+  Scenario B: Evaluate as "Hard" (Rating 2)
+    ✓ Verify next state = 1 (Learning)
+    ✓ Verify interval ≥ 1 day
+    ✓ Verify interval_Hard > interval_Again
+  
+  Scenario C: Evaluate as "Good" (Rating 3)
+    ✓ Verify next state transitions correctly per FSRS
+    ✓ Verify interval ≥ 1 day
+    ✓ Verify interval_Good > interval_Hard
+  
+  Scenario D: Evaluate as "Easy" (Rating 4)
+    ✓ Verify next state = 2 (Review) - Easy skips Learning
+    ✓ Verify interval significantly longer (Easy accelerates)
+    ✓ Verify interval_Easy >> interval_Good
+
+Step 5: Second Evaluation (Learning/Review State)
+  Advance clock to scheduled date
+  ✓ Verify tune appears in queue (Bucket Q1: Due Today)
+  Evaluate as "Good"
+  ✓ Verify state progression (Learning → Review if applicable)
+  ✓ Verify interval increases from first evaluation
+  ✓ Verify FSRS stability metric increases
+
+Step 6: Validate New Card FSRS Fields
+  Query practice_record for tune
+  ✓ Verify first record has:
+    - state = 0 (New) initially
+    - stability = initial FSRS value
+    - difficulty = initial FSRS value
+    - repetitions = 0
+    - lapses = 0
+  ✓ Verify second record has:
+    - state = 1 or 2 (Learning/Review)
+    - stability > first record stability
+    - repetitions = 1
+```
+
+**Expected Outcomes**:
+- New tunes start in FSRS state = 0 (New)
+- First evaluation transitions to Learning (state=1) or Review (state=2)
+- "Easy" on first review skips Learning state (goes directly to Review)
+- All scheduled dates respect minimum next-day constraint
+- FSRS metrics (stability, difficulty) initialize correctly
+
+**Validation Points**:
+```typescript
+// After creating and adding to repertoire
+const tuneInRepertoire = await queryRepertoire(tuneId);
+expect(tuneInRepertoire.scheduled).toBeNull(); // Not yet scheduled
+
+// After "Add to Review"
+const queue = await queryPracticeQueue();
+expect(queue.find(q => q.tune_ref === tuneId).bucket).toBe(3); // Q3: New
+
+// After first evaluation with "Good"
+const firstRecord = await getLatestPracticeRecord(tuneId);
+expect(firstRecord.state).toBe(0); // Was NEW before evaluation
+const secondRecord = await submitAndGetRecord(tuneId, 'good');
+expect(secondRecord.state).toBeGreaterThan(0); // Now Learning or Review
+expect(secondRecord.interval).toBeGreaterThanOrEqual(1); // Min 1 day
+expect(secondRecord.stability).toBeGreaterThan(0);
+expect(secondRecord.repetitions).toBe(1);
+
+// After evaluation with "Easy" (should skip to Review)
+const easyRecord = await submitAndGetRecord(newTuneId, 'easy');
+expect(easyRecord.state).toBe(2); // Review state (skipped Learning)
+expect(easyRecord.interval).toBeGreaterThan(secondRecord.interval);
+```
+
+**UI Flow Reference**:
+1. Catalog tab → "Add Tune" → "New" → Fill form → "Save"
+2. Select tune in Catalog → "Add to Repertoire"
+3. Repertoire tab → Select tune → "Add to Review"
+4. Practice tab → Tune appears in queue → Select evaluation → Submit
+
+**FSRS State Transitions (per ts-fsrs workflow)**:
+```
+NEW (0) --[Again/Hard/Good]--> Learning (1)
+NEW (0) --[Easy]--> Review (2)
+Learning (1) --[Good/Easy]--> Review (2)
+Learning (1) --[Again]--> Relearning (3)
+Review (2) --[Again]--> Relearning (3)
+```
+
+---
+
 ## Implementation Details
 
 ### Clock Control Helpers
@@ -486,6 +621,7 @@ export const STABLE_TEST_DATE = '2025-07-20T14:00:00.000Z';
 - [ ] Test 4: Mixed Evaluation Patterns
 - [ ] Test 5: Queue Bucket Distribution
 - [ ] Test 6: Edge Case - Past Scheduling
+- [ ] Test 7: New Tune Workflow (FSRS New State)
 
 ### No Scheduling Bugs
 - [ ] All scheduled dates are in the future
@@ -600,11 +736,12 @@ Tests must verify:
 ### Test Priorities (Updated)
 
 1. **Test 3 (Repeated "Easy")** - HIGHEST PRIORITY - reproduces reported bug
-2. **Test 1 (Basic FSRS)** - Validate core algorithm with single tune
-3. **Test 6 (Past Scheduling)** - Validate no regression to past dates
-4. **Test 2 (Multi-Tune Queue)** - Validate queue regeneration
-5. **Test 5 (Bucket Distribution)** - Validate all 4 buckets (Q1-Q4)
-6. **Test 4 (Mixed Patterns)** - Validate realistic scenarios
+2. **Test 7 (New Tune Workflow)** - HIGH PRIORITY - validates FSRS NEW state handling
+3. **Test 1 (Basic FSRS)** - Validate core algorithm with single tune
+4. **Test 6 (Past Scheduling)** - Validate no regression to past dates
+5. **Test 2 (Multi-Tune Queue)** - Validate queue regeneration
+6. **Test 5 (Bucket Distribution)** - Validate all 4 buckets (Q1-Q4)
+7. **Test 4 (Mixed Patterns)** - Validate realistic scenarios
 
 ## Timeline
 
