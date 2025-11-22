@@ -6,9 +6,9 @@ name: CI - Tests
 
 on:
   push:
-    branches: [main, feat/pwa1]
+    branches: [main, feat/pwa1, copilot/fix-scheduling-issues]
   pull_request:
-    branches: [main, feat/pwa1]
+    branches: [main, feat/pwa1, copilot/fix-scheduling-issues]
 
 # Cancel in-progress runs when new commit pushed
 concurrency:
