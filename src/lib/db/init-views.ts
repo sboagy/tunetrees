@@ -25,7 +25,7 @@ import type { SqliteDatabase } from "./client-sqlite";
  * Joins playlists with their instrument details.
  * Used for playlist selection and display.
  */
-const VIEW_PLAYLIST_JOINED = `
+const VIEW_PLAYLIST_JOINED = /* sql */ `
 CREATE VIEW IF NOT EXISTS view_playlist_joined AS
 SELECT
   p.playlist_id,
@@ -53,7 +53,7 @@ FROM
  * - Uses subquery with MAX(id) instead of DISTINCT ON()
  * - Boolean fields as INTEGER (0/1)
  */
-const PRACTICE_LIST_JOINED = `
+const PRACTICE_LIST_JOINED = /* sql */ `
 CREATE VIEW IF NOT EXISTS practice_list_joined AS
 SELECT
   tune.id AS id,
@@ -138,7 +138,7 @@ FROM
  *
  * Note: Ported from PostgreSQL sql_scripts/view_practice_list_staged.sql
  */
-const PRACTICE_LIST_STAGED = `
+const PRACTICE_LIST_STAGED = /* sql */ `
 CREATE VIEW IF NOT EXISTS practice_list_staged AS
 SELECT
   tune.id,
@@ -255,7 +255,7 @@ WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_r
  * - completed_at: When submitted (NULL if not submitted)
  * - active: Whether queue row is active
  */
-const VIEW_DAILY_PRACTICE_QUEUE_READABLE = `
+const VIEW_DAILY_PRACTICE_QUEUE_READABLE = /* sql */ `
 CREATE VIEW IF NOT EXISTS view_daily_practice_queue_readable AS
 SELECT
   dpq.id AS queue_id,
@@ -290,7 +290,7 @@ ORDER BY
   dpq.order_index ASC
 `;
 
-const VIEW_TRANSIENT_DATA_READABLE = `
+const VIEW_TRANSIENT_DATA_READABLE = /* sql */ `
 CREATE VIEW IF NOT EXISTS view_transient_data_readable AS
 SELECT
   COALESCE(up.name, up.email) AS user_name,
@@ -338,7 +338,7 @@ ORDER BY
  * Shows user names, tune titles, and playlist instruments instead of UUIDs.
  * Useful for debugging and data inspection in SQLite WASM Browser.
  */
-const VIEW_PRACTICE_RECORD_READABLE = `
+const VIEW_PRACTICE_RECORD_READABLE = /* sql */ `
 CREATE VIEW IF NOT EXISTS view_practice_record_readable AS
 SELECT
   COALESCE(up.name, up.email) AS user_name,
@@ -402,7 +402,7 @@ ORDER BY
  * provides quick visibility in the /debug/db browser without having to
  * mentally diff COALESCE results.
  */
-const VIEW_TUNE_OVERRIDE_READABLE = `
+const VIEW_TUNE_OVERRIDE_READABLE = /* sql */ `
 CREATE VIEW IF NOT EXISTS view_tune_override_readable AS
 SELECT
   tovr.id AS override_id,

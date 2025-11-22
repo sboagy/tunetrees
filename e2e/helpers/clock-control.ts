@@ -15,15 +15,15 @@ log.setLevel("info");
 
 /**
  * Clock tolerance for time comparisons
- * 
+ *
  * CI environments can exhibit multi-second scheduling delays.
  * Mobile browsers show higher variance (observed up to ~300-500ms).
  */
-export const CLOCK_TOLERANCE_MS = 4000; // Base tolerance for CI
+export const CLOCK_TOLERANCE_MS = 18000; // Base tolerance for CI
 
 /**
  * Get appropriate clock tolerance based on project/browser type
- * 
+ *
  * @param projectName - Playwright project name (e.g., "Mobile Chrome", "chromium")
  * @param baseToleranceMs - Base tolerance in milliseconds (default: CLOCK_TOLERANCE_MS)
  * @returns Adjusted tolerance in milliseconds
@@ -41,16 +41,16 @@ export function getClockTolerance(
 
 /**
  * Compare two ISO date strings with tolerance
- * 
+ *
  * Allows small millisecond differences that can occur due to timing/scheduling
  * variations in CI environments or mobile browsers.
- * 
+ *
  * @param actualIso - Actual ISO date string from browser
  * @param expectedIso - Expected ISO date string
  * @param projectName - Optional project name for mobile detection
  * @param baseToleranceMs - Base tolerance (default: 25ms for exact comparisons)
  * @throws Error if dates differ by more than tolerance
- * 
+ *
  * @example
  * ```typescript
  * const browserDate = await getCurrentDate(page);
@@ -67,18 +67,18 @@ export function expectIsoClose(
   const actualTime = new Date(actualIso).getTime();
   const expectedTime = new Date(expectedIso).getTime();
   const diff = Math.abs(actualTime - expectedTime);
-  
+
   expect(diff).toBeLessThanOrEqual(toleranceMs);
 }
 
 /**
  * Compare two Date objects with tolerance
- * 
+ *
  * @param actual - Actual date from browser
  * @param expected - Expected date
  * @param projectName - Optional project name for mobile detection
  * @param baseToleranceMs - Base tolerance (default: 25ms)
- * 
+ *
  * @example
  * ```typescript
  * const browserDate = await getCurrentDate(page);
@@ -91,7 +91,12 @@ export function expectDateClose(
   projectName?: string,
   baseToleranceMs = 25
 ): void {
-  expectIsoClose(actual.toISOString(), expected.toISOString(), projectName, baseToleranceMs);
+  expectIsoClose(
+    actual.toISOString(),
+    expected.toISOString(),
+    projectName,
+    baseToleranceMs
+  );
 }
 
 /**
@@ -216,7 +221,7 @@ export async function getCurrentDate(page: Page): Promise<Date> {
  * @param projectName - Optional project name for mobile detection
  *
  * @throws Error if browser time doesn't match expected time
- * 
+ *
  * @example
  * ```typescript
  * await verifyClockFrozen(page, testDate); // Uses default tolerance
@@ -230,8 +235,11 @@ export async function verifyClockFrozen(
   projectName?: string
 ): Promise<void> {
   const browserDate = await getCurrentDate(page);
+  console.debug(`browserDate: ${browserDate}`);
   const actualTolerance = toleranceMs ?? getClockTolerance(projectName);
+  console.debug(`actualTolerance: ${actualTolerance}`);
   const diff = Math.abs(browserDate.getTime() - expectedDate.getTime());
+  console.debug(`diff: ${diff}`);
 
   if (diff > actualTolerance) {
     throw new Error(

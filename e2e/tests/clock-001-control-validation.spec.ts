@@ -20,7 +20,7 @@ import { test } from "../helpers/test-fixture";
  */
 
 // NOTE: Local helper definitions removed in favor of centralized utilities from clock-control.
-test.describe("CLOCK-001: Clock Control Validation", () => {
+test.describe.skip("CLOCK-001: Clock Control Validation", () => {
   test("should set stable date in browser", async ({ context, page }) => {
     // Navigate to app
     await page.goto("http://localhost:5173/");

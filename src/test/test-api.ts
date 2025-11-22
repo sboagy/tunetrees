@@ -239,6 +239,17 @@ async function getPracticeRecords(tuneIds: string[]) {
  * Get latest practice record for a single tune
  */
 async function getLatestPracticeRecord(tuneId: string, playlistId: string) {
+  // Instrumentation to aid Playwright debugging (use console.log for visibility in headless)
+  // eslint-disable-next-line no-console
+  console.log(
+    `[TestApi] getLatestPracticeRecord invoked tuneId=${tuneId} playlistId=${playlistId}`
+  );
+  if (!/^[0-9A-Za-z-]+$/.test(tuneId)) {
+    throw new Error(`Invalid tuneId format: ${tuneId}`);
+  }
+  if (!/^[0-9A-Za-z-]+$/.test(playlistId)) {
+    throw new Error(`Invalid playlistId format: ${playlistId}`);
+  }
   const db = await ensureDb();
   const rows = await db.all<{
     id: string;
@@ -265,11 +276,26 @@ async function getLatestPracticeRecord(tuneId: string, playlistId: string) {
       interval, repetitions, stability, difficulty, state, step,
       goal, technique, elapsed_days, lapses, sync_version, last_modified_at
     FROM practice_record
-    WHERE tune_ref = ${tuneId}
-      AND playlist_ref = ${playlistId}
-    ORDER BY id DESC
+    WHERE tune_ref = ${sql.raw(`'${tuneId}'`)}
+      AND playlist_ref = ${sql.raw(`'${playlistId}'`)}
+    ORDER BY
+      CASE WHEN practiced IS NULL THEN 1 ELSE 0 END ASC,
+      practiced DESC,
+      last_modified_at DESC
     LIMIT 1
   `);
+  // eslint-disable-next-line no-console
+  console.log(`[TestApi] getLatestPracticeRecord committedRows=${rows.length}`);
+  if (rows.length === 0) {
+    // Additional diagnostic: count total rows for tune regardless of playlist to spot mismatch
+    const diagRows = await db.all<{ c: number }>(sql`
+      SELECT COUNT(*) as c FROM practice_record WHERE tune_ref = ${sql.raw(`'${tuneId}'`)}
+    `);
+    // eslint-disable-next-line no-console
+    console.log(
+      `[TestApi] getLatestPracticeRecord DIAG tuneIdRows=${diagRows[0]?.c ?? 0}`
+    );
+  }
   return rows.length > 0 ? rows[0] : null;
 }
 
@@ -409,7 +435,10 @@ async function getPlaylistTuneRow(playlistId: string, tuneId: string) {
 /**
  * Count distinct practice_record rows per playlist/tune (duplicate guard)
  */
-async function getDistinctPracticeRecordCount(playlistId: string, tuneId: string) {
+async function getDistinctPracticeRecordCount(
+  playlistId: string,
+  tuneId: string
+) {
   const db = await ensureDb();
   const rows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count

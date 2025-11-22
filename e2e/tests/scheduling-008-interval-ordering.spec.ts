@@ -4,6 +4,10 @@ import {
   setStableDate,
   verifyClockFrozen,
 } from "../helpers/clock-control";
+import {
+  getTestUserClient,
+  setupDeterministicTestParallel,
+} from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -46,10 +50,26 @@ let ttPage: TuneTreesPage;
 let currentDate: Date;
 
 test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () => {
-  test.beforeEach(async ({ page, context }) => {
+  // Extend timeout for this suite due to multiple tune creations & evaluations
+  test.setTimeout(60000);
+  test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
+
+    // Set stable starting date
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
+
+    // Start with clean repertoire
+    await setupDeterministicTestParallel(page, testUser, {
+      clearRepertoire: true,
+      seedRepertoire: [],
+      purgeTitlePrefixes: [
+        "Test Tune SCHED-007",
+        "Easy Skip Learning",
+        "Again Learning",
+        "SCHED-008",
+      ],
+    });
     await verifyClockFrozen(
       page,
       currentDate,
@@ -60,6 +80,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
 
   test("should produce ordered intervals Again < Hard ≤ Good < Easy (skeleton)", async ({
     page,
+    testUser,
   }) => {
     // Helper to create, configure, and add a tune to review
     async function createAndAddToReview(meta: RatedTuneMeta, tuneType: string) {
@@ -68,9 +89,9 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
       const newButton = page.getByRole("button", { name: /^new$/i });
       await newButton.click();
       await page.waitForLoadState("networkidle", { timeout: 15000 });
-      const titleField = ttPage.tuneEditorForm
-        .locator('input[name="title"]')
-        .first();
+      const titleField = ttPage.tuneEditorForm.getByTestId(
+        "tune-editor-input-title"
+      );
       await titleField.fill(meta.title);
       await ttPage.selectTypeInTuneEditor(tuneType);
       const saveButton = page.getByRole("button", { name: /save/i });
@@ -95,42 +116,111 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
       await page.waitForTimeout(1000);
     }
 
-    // Create all four tunes
-    await createAndAddToReview(RATED_TUNES[0], "Jig (6/8)");
-    await createAndAddToReview(RATED_TUNES[1], "Reel (4/4)");
-    await createAndAddToReview(RATED_TUNES[2], "Hornpipe (4/4)");
-    await createAndAddToReview(RATED_TUNES[3], "Slip Jig (9/8)");
-
-    // Evaluate each tune once with designated rating
-    async function evaluate(meta: RatedTuneMeta) {
-      await ttPage.practiceTab.click();
-      await ttPage.searchForTune(meta.title, ttPage.practiceGrid);
-      const row = ttPage.practiceGrid.getByText(meta.title);
-      await expect(row).toBeVisible({ timeout: 10000 });
-      // Enter flashcard mode (assumes single tune filtered)
-      await ttPage.enableFlashcardMode();
-      await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
-      await ttPage.selectFlashcardEvaluation(meta.rating);
-      await ttPage.submitEvaluationsButton.click();
-      await page.waitForLoadState("networkidle", { timeout: 15000 });
-      await page.waitForTimeout(1500);
-      // Query record
-      // Use scheduled dates mapping to extract tuneId (first matching entry after filtering)
-      // Placeholder for future tuneId resolution via test API extension.
-      // Fallback: fetch via practice queue if scheduledMap ambiguous (skeleton placeholder)
-      // TODO: Replace above with direct tuneId resolution once test API includes title→id map.
-      // For now we will skip tuneId resolution and rely on latest record matching meta.title via separate query helper if available.
+    // Cleanup helper (cascade delete test tunes + dependent rows)
+    async function cleanupRatedTunes() {
+      try {
+        const titles = RATED_TUNES.map((t) => t.title);
+        const userKey = testUser.email.split(".")[0];
+        const { supabase } = await getTestUserClient(userKey);
+        // Resolve tune ids
+        const { data, error } = await supabase
+          .from("tune")
+          .select("id,title")
+          .in("title", titles);
+        if (error) {
+          console.warn(`[SCHED-008 CLEANUP] Query error: ${error.message}`);
+          return;
+        }
+        const tuneIds = (data || []).map((r: any) => r.id).filter(Boolean);
+        if (tuneIds.length === 0) return;
+        const uniqueIds = [...new Set(tuneIds)];
+        const cascade: {
+          table: string;
+          column: string;
+          filterPlaylist?: boolean;
+        }[] = [
+          { table: "playlist_tune", column: "tune_ref", filterPlaylist: true },
+          {
+            table: "practice_record",
+            column: "tune_ref",
+            filterPlaylist: true,
+          },
+          {
+            table: "daily_practice_queue",
+            column: "tune_ref",
+            filterPlaylist: true,
+          },
+          { table: "tune_override", column: "tune_ref" },
+        ];
+        for (const { table, column, filterPlaylist } of cascade) {
+          let del = supabase.from(table).delete().in(column, uniqueIds);
+          if (filterPlaylist) del = del.eq("playlist_ref", testUser.playlistId);
+          const { error: delErr } = await del;
+          if (delErr) {
+            console.warn(
+              `[SCHED-008 CLEANUP] ${table} delete error: ${delErr.message}`
+            );
+          }
+        }
+        const { error: tuneErr } = await supabase
+          .from("tune")
+          .delete()
+          .in("id", uniqueIds);
+        if (tuneErr) {
+          console.warn(
+            `[SCHED-008 CLEANUP] tune delete error: ${tuneErr.message}`
+          );
+        } else {
+          console.log(
+            `[SCHED-008 CLEANUP] Removed tunes: ${uniqueIds.join(", ")}`
+          );
+        }
+      } catch (e: any) {
+        console.warn(`[SCHED-008 CLEANUP] Exception: ${e?.message || e}`);
+      }
     }
 
-    // NOTE: Skeleton will not perform record queries yet – placeholder for future implementation.
-    // Evaluate sequentially (will be expanded to store intervals)
-    for (const meta of RATED_TUNES) {
-      await evaluate(meta);
-    }
+    try {
+      // Create all four tunes
+      await createAndAddToReview(RATED_TUNES[0], "Jig (6/8)");
+      await createAndAddToReview(RATED_TUNES[1], "Reel (4/4)");
+      await createAndAddToReview(RATED_TUNES[2], "Hornpipe (4/4)");
+      await createAndAddToReview(RATED_TUNES[3], "Slip Jig (9/8)");
 
-    // Placeholder assertions (to be replaced once intervals captured)
-    // These prevent false positives but mark test incomplete.
-    expect(true).toBe(true);
+      // Evaluate each tune once with designated rating
+      async function evaluate(meta: RatedTuneMeta) {
+        const toastCloser = page.getByRole("button", { name: "Close toast" });
+        const isCloserVisible = await toastCloser.isVisible();
+        if (isCloserVisible) {
+          toastCloser.click();
+        }
+        await page.waitForTimeout(500);
+        await ttPage.practiceTab.click();
+        const rows = await ttPage.getRows("scheduled");
+
+        // await ttPage.searchForTune(meta.title, ttPage.practiceGrid);
+        const row = rows.getByText(meta.title);
+        await expect(row).toBeVisible({ timeout: 60000 });
+        await ttPage.enableFlashcardMode();
+        await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
+        await ttPage.selectFlashcardEvaluation(meta.rating);
+        await ttPage.submitEvaluationsButton.click();
+        await page.waitForLoadState("networkidle", { timeout: 15000 });
+        await page.waitForTimeout(1500);
+        ttPage.flashcardModeSwitch.isVisible({ timeout: 15000 });
+        await ttPage.disableFlashcardMode();
+        // Interval capture / tuneId resolution will be added later.
+      }
+
+      for (const meta of RATED_TUNES) {
+        await evaluate(meta);
+      }
+
+      // Placeholder assertion (marks skeleton as executed)
+      expect(true).toBe(true);
+    } finally {
+      await cleanupRatedTunes();
+    }
   });
 });
 

@@ -117,7 +117,23 @@ export const TunesGrid = (<T extends { id: string | number }>(
   createEffect(() => {
     const v = props.columnVisibility;
     if (v && Object.keys(v).length > 0) {
-      setColumnVisibility(v);
+      // Treat parent-provided visibility as a PATCH, not a full replacement.
+      // Preserve existing hidden defaults unless parent explicitly overrides.
+      // Use untrack to prevent circular dependency since parent syncs from child changes.
+      setColumnVisibility((prev) => {
+        const merged = { ...prev, ...v };
+        // Only update if actually different to prevent infinite loop
+        const prevKeys = Object.keys(prev).sort();
+        const mergedKeys = Object.keys(merged).sort();
+        if (
+          prevKeys.length !== mergedKeys.length ||
+          prevKeys.some((k, i) => k !== mergedKeys[i]) ||
+          prevKeys.some((k) => prev[k] !== merged[k])
+        ) {
+          return merged;
+        }
+        return prev;
+      });
     }
   });
 

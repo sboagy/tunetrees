@@ -110,6 +110,15 @@ export async function recordPracticeRating(
       ? fsrsService.processReview(input, latestRecord)
       : fsrsService.processFirstReview(input);
 
+    // Lapses business rule override:
+    // Only increment lapses on an "Again" rating when the PRIOR state was Review (state=2).
+    // New (0), Learning (1), Relearning (3) do not increment lapses on failure.
+    const priorState = latestRecord?.state ?? 0;
+    let lapsesValue = latestRecord?.lapses ?? 0;
+    if (input.quality === FSRS_QUALITY_MAP.AGAIN && priorState === 2) {
+      lapsesValue += 1;
+    }
+
     // 5. Create new practice record
     const practicedDateStr = input.practiced.toISOString();
     const dueStr = schedule.nextDue.toISOString();
@@ -128,7 +137,8 @@ export async function recordPracticeRating(
       backupPracticed: null, // For migration compatibility
       stability: schedule.stability,
       elapsedDays: schedule.elapsed_days,
-      lapses: schedule.lapses,
+      // Use overridden lapsesValue instead of FSRS raw schedule.lapses
+      lapses: lapsesValue,
       state: schedule.state,
       difficulty: schedule.difficulty,
       step: null,
@@ -542,6 +552,27 @@ export async function commitStagedEvaluations(
 
       // Insert practice_record
       const recordId = generateId();
+      // Determine prior state & lapses (latest committed record for tune/playlist)
+      const prior = await db.get<{
+        lapses: number | null;
+        state: number | null;
+      }>(sql`
+        SELECT lapses, state
+        FROM practice_record
+        WHERE tune_ref = ${staged.tune_id} AND playlist_ref = ${playlistId}
+        ORDER BY
+          CASE WHEN practiced IS NULL THEN 1 ELSE 0 END ASC,
+          practiced DESC,
+          last_modified_at DESC
+        LIMIT 1
+      `);
+      const priorLapses = prior?.lapses ?? 0;
+      const priorState = prior?.state ?? 0;
+      // Only increment lapses on Again (quality=1) when prior state was Review (2)
+      const lapsesValue =
+        staged.quality === 1 && priorState === 2
+          ? priorLapses + 1
+          : priorLapses;
       await db.run(sql`
         INSERT INTO practice_record (
           id,
@@ -576,7 +607,7 @@ export async function commitStagedEvaluations(
           NULL,
           ${staged.stability},
           ${staged.elapsed_days ?? null},
-          ${staged.lapses ?? 0},
+          ${lapsesValue},
           ${staged.state},
           ${staged.difficulty},
           ${staged.step},
@@ -601,7 +632,7 @@ export async function commitStagedEvaluations(
         backupPracticed: null,
         stability: staged.stability,
         elapsedDays: staged.elapsed_days ?? null,
-        lapses: staged.lapses ?? 0,
+        lapses: lapsesValue,
         state: staged.state,
         difficulty: staged.difficulty,
         step: staged.step,

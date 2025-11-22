@@ -48,6 +48,15 @@ const formatDate = (dateStr: string): string => {
   });
 };
 
+const formatJustDate = (dateStr: string): string => {
+  const date = new Date(dateStr);
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+};
+
 /**
  * Sortable column header component
  */
@@ -275,7 +284,9 @@ export function getCatalogColumns(
     // Status (Public/Private)
     {
       accessorKey: "private_for",
-      header: ({ column }) => <SortableHeader column={column} title="Status" />,
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Ownership" />
+      ),
       cell: (info) => {
         const value = info.getValue() as string | null;
         return value ? (
@@ -308,25 +319,65 @@ export function getRepertoireColumns(
   const practiceColumns: ColumnDef<any>[] = [
     // Learned status
     {
+      accessorKey: "latest_state",
+      header: ({ column }) => <SortableHeader column={column} title="State" />,
+      cell: (info) => {
+        const valueNum = info.getValue() as number | null;
+
+        if (valueNum === null || valueNum === undefined) {
+          return <span class="text-gray-400">—</span>;
+        }
+
+        const statuses: Record<number, { label: string; class: string }> = {
+          0: {
+            label: "New",
+            class:
+              "inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400",
+          },
+          1: {
+            label: "Learning",
+            class:
+              "inline-flex items-center px-2 py-0.5 rounded text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200",
+          },
+          2: {
+            label: "Review",
+            class:
+              "inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200",
+          },
+          3: {
+            label: "Relearning",
+            class:
+              "inline-flex items-center px-2 py-0.5 rounded text-xs bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200",
+          },
+        };
+
+        const status = statuses[valueNum] ?? statuses[0];
+
+        return <span class={status.class}>{status.label}</span>;
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    },
+
+    {
       accessorKey: "learned",
       header: ({ column }) => (
         <SortableHeader column={column} title="Learned" />
       ),
       cell: (info) => {
-        const value = info.getValue() as number | null;
-        return value === 1 ? (
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-            ✓ Learned
+        const value = info.getValue() as string | null;
+        return value !== null ? (
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {formatJustDate(value)}
           </span>
         ) : (
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-            Learning
-          </span>
+          <span class="text-gray-400">—</span>
         );
       },
-      size: 100,
-      minSize: 80,
-      maxSize: 120,
+      size: 80,
+      minSize: 60,
+      maxSize: 100,
     },
 
     // Goal
@@ -360,25 +411,71 @@ export function getRepertoireColumns(
       maxSize: 120,
     },
 
-    // Scheduled
     {
-      accessorKey: "scheduled",
+      id: "scheduled",
+      // accessorFn: (row) => row.scheduled,
+      accessorFn: (row) => row.scheduled || row.latest_due || "",
       header: ({ column }) => (
         <SortableHeader column={column} title="Scheduled" />
       ),
       cell: (info) => {
-        const value = info.getValue() as number | null;
-        return value === 1 ? (
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-            ✓ Yes
+        const value = info.getValue() as string | null;
+        if (!value) return <span class="text-gray-400">—</span>;
+
+        const date = new Date(value);
+        const now = new Date();
+        const diffDays = Math.floor(
+          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        let color = "text-gray-600 dark:text-gray-400";
+        if (diffDays < 0) color = "text-red-600 dark:text-red-400";
+        else if (diffDays === 0) color = "text-orange-600 dark:text-orange-400";
+        else if (diffDays <= 7) color = "text-yellow-600 dark:text-yellow-400";
+        else color = "text-green-600 dark:text-green-400";
+
+        const label =
+          diffDays === 0
+            ? "Today"
+            : diffDays === -1
+              ? "Yesterday"
+              : diffDays < 0
+                ? `${Math.abs(diffDays)}d overdue`
+                : diffDays === 1
+                  ? "Tomorrow"
+                  : `In ${diffDays}d`;
+
+        return (
+          <span
+            class={`text-sm font-medium ${color}`}
+            title={date.toLocaleDateString()}
+          >
+            {label}
           </span>
-        ) : (
-          <span class="text-gray-400">—</span>
         );
       },
-      size: 100,
-      minSize: 80,
-      maxSize: 120,
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+    },
+
+    {
+      id: "latest_due",
+      accessorFn: (row) => row.latest_due,
+      header: ({ column }) => <SortableHeader column={column} title="Due" />,
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        if (!value) return <span class="text-gray-400">—</span>;
+
+        return (
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {formatDate(value)}
+          </span>
+        );
+      },
+      size: 200,
+      minSize: 180,
+      maxSize: 250,
     },
 
     // Latest Practiced
@@ -518,23 +615,23 @@ export function getRepertoireColumns(
     },
 
     // Latest Due
-    {
-      accessorKey: "latest_due",
-      header: ({ column }) => <SortableHeader column={column} title="Due" />,
-      cell: (info) => {
-        const value = info.getValue() as string | null;
-        if (!value) return <span class="text-gray-400">—</span>;
+    // {
+    //   accessorKey: "latest_due",
+    //   header: ({ column }) => <SortableHeader column={column} title="Due" />,
+    //   cell: (info) => {
+    //     const value = info.getValue() as string | null;
+    //     if (!value) return <span class="text-gray-400">—</span>;
 
-        return (
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {formatDate(value)}
-          </span>
-        );
-      },
-      size: 200,
-      minSize: 180,
-      maxSize: 250,
-    },
+    //     return (
+    //       <span class="text-sm text-gray-600 dark:text-gray-400">
+    //         {formatDate(value)}
+    //       </span>
+    //     );
+    //   },
+    //   size: 200,
+    //   minSize: 180,
+    //   maxSize: 250,
+    // },
 
     // Tags
     {
@@ -686,7 +783,8 @@ export function getRepertoireColumns(
 export function getScheduledColumns(
   callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
-  const baseColumns = getCatalogColumns(callbacks);
+  // const baseColumns = getCatalogColumns(callbacks);
+  const baseColumns = getRepertoireColumns(callbacks);
 
   // Practice-specific columns with Evaluation
   const practiceSpecificColumns: ColumnDef<any>[] = [
@@ -830,260 +928,13 @@ export function getScheduledColumns(
       minSize: 120,
       maxSize: 280,
     },
-
-    // Goal
-    {
-      id: "goal",
-      accessorFn: (row) => row.goal || row.latest_goal || "recall",
-      header: ({ column }) => <SortableHeader column={column} title="Goal" />,
-      cell: (info) => {
-        const value = (info.getValue() as string) || "recall";
-        const colors: Record<string, string> = {
-          recall:
-            "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200",
-          notes:
-            "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200",
-          technique:
-            "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200",
-          backup:
-            "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200",
-        };
-        const colorClass = colors[value] || colors.recall;
-        return (
-          <span
-            class={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}
-          >
-            {value}
-          </span>
-        );
-      },
-      size: 100,
-      minSize: 80,
-      maxSize: 120,
-    },
   ];
 
   // Combine: id, practice-specific, then core tune columns (no select checkbox for practice grid)
   return [
     baseColumns[1], // id
     ...practiceSpecificColumns, // Bucket, Evaluation, Goal
-    baseColumns[2], // title
-    baseColumns[3], // type
-    baseColumns[4], // mode
-    baseColumns[5], // structure
-    baseColumns[6], // incipit
-    baseColumns[7], // status (private_for)
-    // Add scheduling columns from repertoire
-    {
-      id: "scheduled",
-      // accessorFn: (row) => row.scheduled,
-      accessorFn: (row) => row.scheduled || row.latest_due || "",
-      header: ({ column }) => (
-        <SortableHeader column={column} title="Scheduled" />
-      ),
-      cell: (info) => {
-        const value = info.getValue() as string | null;
-        if (!value) return <span class="text-gray-400">—</span>;
-
-        const date = new Date(value);
-        const now = new Date();
-        const diffDays = Math.floor(
-          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        let color = "text-gray-600 dark:text-gray-400";
-        if (diffDays < 0) color = "text-red-600 dark:text-red-400";
-        else if (diffDays === 0) color = "text-orange-600 dark:text-orange-400";
-        else if (diffDays <= 7) color = "text-yellow-600 dark:text-yellow-400";
-        else color = "text-green-600 dark:text-green-400";
-
-        const label =
-          diffDays === 0
-            ? "Today"
-            : diffDays === -1
-              ? "Yesterday"
-              : diffDays < 0
-                ? `${Math.abs(diffDays)}d overdue`
-                : diffDays === 1
-                  ? "Tomorrow"
-                  : `In ${diffDays}d`;
-
-        return (
-          <span
-            class={`text-sm font-medium ${color}`}
-            title={date.toLocaleDateString()}
-          >
-            {label}
-          </span>
-        );
-      },
-      size: 120,
-      minSize: 100,
-      maxSize: 150,
-    },
-    {
-      id: "latest_practiced",
-      accessorFn: (row) => row.latest_practiced,
-      header: ({ column }) => (
-        <SortableHeader column={column} title="Last Practiced" />
-      ),
-      cell: (info) => {
-        const value = info.getValue() as string | null;
-        if (!value) return <span class="text-gray-400">Never</span>;
-
-        return (
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {formatDate(value)}
-          </span>
-        );
-      },
-      size: 200,
-      minSize: 180,
-      maxSize: 250,
-    },
-    {
-      id: "latest_goal",
-      accessorFn: (row) => row.latest_goal,
-      header: ({ column }) => (
-        <SortableHeader column={column} title="Latest Goal" />
-      ),
-      cell: (info) => {
-        const value = (info.getValue() as string) || "";
-        if (!value) return <span class="text-gray-400">—</span>;
-        const colors: Record<string, string> = {
-          recall:
-            "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200",
-          notes:
-            "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200",
-          technique:
-            "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200",
-          backup:
-            "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200",
-        };
-        const colorClass = colors[value] || "bg-gray-100 dark:bg-gray-700";
-        return (
-          <span
-            class={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}
-          >
-            {value}
-          </span>
-        );
-      },
-      size: 130,
-      minSize: 110,
-      maxSize: 150,
-    },
-    {
-      id: "latest_technique",
-      accessorFn: (row) => row.latest_technique ?? "sm2",
-      header: ({ column }) => <SortableHeader column={column} title="Alg" />,
-      cell: (info) => {
-        const value = (info.getValue() as string) || "sm2";
-        return (
-          <span class="text-sm font-mono text-gray-600 dark:text-gray-400">
-            {value}
-          </span>
-        );
-      },
-      size: 90,
-      minSize: 80,
-      maxSize: 110,
-    },
-    {
-      id: "latest_quality",
-      accessorFn: (row) => row.latest_quality,
-      header: ({ column }) => <SortableHeader column={column} title="Qual" />,
-      cell: (info) => {
-        const value = info.getValue() as number | null;
-        return value !== null ? (
-          <span class="text-sm text-gray-600 dark:text-gray-400">{value}</span>
-        ) : (
-          <span class="text-gray-400">—</span>
-        );
-      },
-      sortingFn: numericSortingFn,
-      size: 90,
-      minSize: 70,
-      maxSize: 110,
-    },
-    {
-      id: "latest_stability",
-      accessorFn: (row) =>
-        row.latest_stability ?? row.schedulingInfo?.stability ?? null,
-      header: ({ column }) => (
-        <SortableHeader column={column} title="Stability" />
-      ),
-      cell: (info) => {
-        const value = info.getValue() as number | null | undefined;
-        return value !== null && value !== undefined ? (
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {value.toFixed(2)}
-          </span>
-        ) : (
-          <span class="text-gray-400">—</span>
-        );
-      },
-      sortingFn: numericSortingFn,
-      size: 104,
-      minSize: 90,
-      maxSize: 120,
-    },
-    {
-      id: "latest_easiness",
-      accessorFn: (row) => row.latest_difficulty ?? row.latest_easiness ?? null, // FSRS uses difficulty, SM2 uses easiness
-      header: ({ column }) => (
-        <SortableHeader column={column} title="Easiness" />
-      ),
-      cell: (info) => {
-        const value = info.getValue() as number | null | undefined;
-        return value !== null && value !== undefined ? (
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {value.toFixed(2)}
-          </span>
-        ) : (
-          <span class="text-gray-400">—</span>
-        );
-      },
-      sortingFn: numericSortingFn,
-      size: 112,
-      minSize: 90,
-      maxSize: 130,
-    },
-    {
-      id: "latest_repetitions",
-      accessorFn: (row) => row.latest_repetitions,
-      header: ({ column }) => <SortableHeader column={column} title="Reps" />,
-      cell: (info) => {
-        const value = info.getValue() as number | null;
-        return value !== null ? (
-          <span class="text-sm text-gray-600 dark:text-gray-400">{value}</span>
-        ) : (
-          <span class="text-gray-400">—</span>
-        );
-      },
-      sortingFn: numericSortingFn,
-      size: 100,
-      minSize: 80,
-      maxSize: 120,
-    },
-    {
-      id: "latest_due",
-      accessorFn: (row) => row.latest_due,
-      header: ({ column }) => <SortableHeader column={column} title="Due" />,
-      cell: (info) => {
-        const value = info.getValue() as string | null;
-        if (!value) return <span class="text-gray-400">—</span>;
-
-        return (
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {formatDate(value)}
-          </span>
-        );
-      },
-      size: 200,
-      minSize: 180,
-      maxSize: 250,
-    },
+    ...baseColumns.slice(2),
   ];
 }
 

@@ -97,17 +97,43 @@ export async function queryLatestPracticeRecord(
 ): Promise<PracticeRecord | null> {
   log.debug(`📊 Querying latest practice record for tune ${tuneId}`);
 
-  const record = await page.evaluate(
-    async (args) => {
-      const api = (window as any).__ttTestApi;
-      if (!api) {
-        throw new Error("__ttTestApi not available on window");
-      }
-
-      return await api.getLatestPracticeRecord(args.tuneId, args.playlistId);
-    },
-    { tuneId, playlistId }
-  );
+  let record: PracticeRecord | null = null;
+  try {
+    record = await page.evaluate(
+      async (args) => {
+        try {
+          const api = (window as any).__ttTestApi;
+          if (!api) {
+            throw new Error("__ttTestApi not available on window");
+          }
+          // Extra browser-side instrumentation
+          // eslint-disable-next-line no-console
+          console.debug(
+            `[queryLatestPracticeRecord] Evaluating in browser tuneId=${args.tuneId} playlistId=${args.playlistId}`
+          );
+          const res = await api.getLatestPracticeRecord(
+            args.tuneId,
+            args.playlistId
+          );
+          // eslint-disable-next-line no-console
+          console.debug(
+            `[queryLatestPracticeRecord] Browser result null=${res == null}`
+          );
+          return res;
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error(`[queryLatestPracticeRecord] Browser-side error:`, e);
+          throw e;
+        }
+      },
+      { tuneId, playlistId }
+    );
+  } catch (err) {
+    log.error(
+      `❌ queryLatestPracticeRecord evaluate failed: ${(err as Error).message}`
+    );
+    throw err; // Re-throw so tests still fail visibly
+  }
 
   if (record) {
     log.debug(`✅ Found practice record: interval=${record.interval}d`);
@@ -183,7 +209,7 @@ export async function queryPracticeQueue(
   );
 
   log.debug(
-    `✅ Found ${queue.length} item(s) in queue (buckets: ${[...new Set(queue.map((q) => q.bucket))].join(", ")})`
+    `✅ Found ${queue.length} item(s) in queue (buckets: ${[...new Set(queue.map((q: PracticeQueueItem) => q.bucket))].join(", ")})`
   );
 
   return queue;
