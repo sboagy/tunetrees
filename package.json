@@ -35,6 +35,7 @@
     "test:e2e:chromium:mobile": "playwright test --project='Mobile Chrome' --reporter=list",
     "test:e2e:chromium:both": "playwright test --project=chromium-auth --project=chromium --project='Mobile Chrome' --reporter=list",
     "test:e2e:chromium:both:html": "playwright test --project=chromium-auth --project=chromium --project='Mobile Chrome' --reporter=list,html",
+    "test:e2e:chromium:html": "playwright test --project=chromium-auth --project=chromium --reporter=list,html",
     "test:e2e:retest-failed": "playwright test --test-list ./failures.list",
     "test:e2e:retest-failed:1": "playwright test --workers 1 --test-list ./failures.list",
     "test:e2e:retest-failed:repeat-10": "playwright test  --workers 8 --repeat-each 10 --test-list ./failures.list",

@@ -808,3 +808,58 @@ Tests must verify:
 - **ts-fsrs Library**: https://github.com/open-spaced-repetition/ts-fsrs
 - **Practice Flow Docs**: docs/practice_flow.md
 - **Playwright Clock API**: https://playwright.dev/docs/clock
+
+## Potential Refinements
+
+These are deferred improvements (not in current scope) that can enhance reliability, coverage, and semantic clarity of scheduling tests and helpers. Capture here so they are not lost.
+
+### Helper & API Enhancements
+- Introduce a `schedulingMode` enum for setup helpers: `"new" | "override" | "fsrs"`. Each mode drives distinct data seeding (null scheduled vs manual scheduled vs synthetic practice_record rows).
+- Add helper `seedFsrsDueDates(user, [{ tuneId, dueISO }])` to create minimal `practice_record` rows with controlled `due` values (state, interval, difficulty, stability seeded to plausible starting defaults) without needing full evaluation flows.
+- Provide a utility to generate a “synthetic first evaluation” (FSRS-derived intervals) for large tune batches to reduce repetitive E2E evaluation loops.
+
+### Precedence & Semantics Documentation
+- Explicitly codify precedence: if both `playlist_tune.scheduled` (manual override) and latest `practice_record.due` exist, clarify which value queue generation uses. (Likely: use `due` unless `scheduled` is in the past and `due` is null.)
+- Add assertions in test helpers that warn when conflicting signals (override + due in future) are present—helps detect unintended usage.
+
+### Extended Test Coverage
+- Add scenario validating manual override vs FSRS due: ensure that applying an override after FSRS scheduling repositions tune in queue as expected.
+- Timezone drift tests: simulate crossing UTC midnight boundaries (e.g., run same evaluation with different `referenceDate` offset) to verify minimum-next-day logic holds globally.
+- Stress test with rapid consecutive evaluations (simulate user double-submits) ensuring uniqueness of `practice_record.practiced` and monotonically increasing `due`.
+- Regression test for large future intervals (near max cap) to ensure the max interval constraint (365 days) is enforced—create synthetic practice records approaching limit.
+- Multi-user parallel consistency: two users practicing overlapping sets of tunes should not leak practice records or overrides across contexts (RLS & local filtering assertions).
+
+### Test Infrastructure Hardening
+- Deterministic seed for FSRS weights via snapshot file to detect accidental changes in `generatorParameters().w`.
+- Clock fuzz elimination: central wrapper to freeze clock not only via Playwright but also inside exposed test API (`__ttTestApi.setClock`) to avoid drift between runtime layers.
+- Add a `verifyQueueIntegrity()` helper: checks bucket counts, absence of duplicates, ordering invariants, and required fields non-null (e.g., `interval`, `due` for practiced tunes).
+
+### Performance / Diagnostics
+- Add lightweight instrumentation to measure per-tune FSRS evaluation time; expose summary via test API for performance regression detection.
+- Periodic snapshot diff: store serialized practice queue before and after evaluation to ensure only expected fields mutate.
+
+### Resilience & Failure Modes
+- Introduce automatic retry wrapper around Supabase writes in helpers with exponential backoff metrics logging (re-usable across seeding functions) to consolidate current duplicated logic.
+- Add “safety net” cleanup: if a test fails mid-seeding, helper can perform a scoped rollback (delete inserted rows) to keep following tests isolated.
+
+### Data Modeling Improvements (Future)
+- Consider separating override date into `playlist_tune.override_scheduled` and reserving `playlist_tune.scheduled` for algorithm-sourced next review date—would remove current ambiguity and simplify queue logic.
+- Store initial FSRS baseline metrics in a dedicated table for audit; tests could then confirm deltas instead of raw values only.
+
+### Tooling & CI
+- Add a `npm run test:scheduling:quick` subset targeting core invariants (no past scheduling, min-next-day) for fast pre-push feedback.
+- Drift detection between local FSRS implementation and upstream `ts-fsrs` version changes—hash function source or expected sample intervals.
+
+### Documentation
+- Create a concise “Scheduling Glossary” file enumerating: practiced, due, scheduled, override, bucket semantics, state transitions—reference in test assertions.
+- Inline comments in test helpers clarifying why overrides are used instead of synthetic practice_records in certain non-algorithm UI flows.
+
+### Optional Refactors
+- Consolidate repetitive Supabase query filter logic into a single module (`e2e/helpers/supabase-filters.ts`).
+- Replace manual polling loops with a generic `await pollUntil(conditionFn, {timeout, interval})` utility to reduce code footprint and improve readability.
+
+### Decision Tracking
+For each refinement adopted later, record: Rationale, Impact on existing tests, Migration steps, Rollback plan.
+
+---
+Deferred for now; revisit after core scheduling bug fixes verified and baseline suite is green.
