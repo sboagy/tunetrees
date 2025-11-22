@@ -256,8 +256,8 @@ jobs:
     name: Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
     needs: test
-    # Only deploy from feat/pwa1 branch after tests pass
-    if: github.ref == 'refs/heads/feat/pwa1' && github.event_name == 'push'
+    # Deploy when tests pass on feat/pwa1 or copilot/fix-scheduling-issues branches
+    if: (github.ref == 'refs/heads/feat/pwa1' || github.ref == 'refs/heads/copilot/fix-scheduling-issues') && github.event_name == 'push'
     environment: vite_pwa_env
 
     steps:
