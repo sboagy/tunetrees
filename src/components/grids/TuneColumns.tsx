@@ -419,7 +419,22 @@ export function getRepertoireColumns(
         <SortableHeader column={column} title="Scheduled" />
       ),
       cell: (info) => {
-        const value = info.getValue() as string | null;
+        // Scheduling override semantics:
+        // - `playlist_tune.scheduled` is a transient, manual override of the FSRS-derived next due date.
+        // - While an evaluation is STAGED (present in `table_transient_data` / practice_list_staged view),
+        //   we intentionally IGNORE any existing override and display the newly computed `latest_due`.
+        // - Upon COMMIT (see `commitStagedEvaluations` in `practice-recording.ts`), the override column
+        //   is cleared (`scheduled = NULL`) so future renders rely exclusively on FSRS scheduling unless
+        //   a new manual override is set.
+        // - The `completed_at` timestamp originates from `daily_practice_queue.completed_at`,
+        //   and indicates the evaluation for that queue window has been submitted. After completion we
+        //   respect any subsequently set manual override (since staging is no longer active).
+        const completedAt = info.row.getValue("completed_at");
+        const value =
+          info.row.getValue("evaluation") && !completedAt
+            ? (info.row.getValue("latest_due") as string | null)
+            : (info.getValue() as string | null);
+
         if (!value) return <span class="text-gray-400">—</span>;
 
         const date = new Date(value);

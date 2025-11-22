@@ -642,9 +642,13 @@ export async function commitStagedEvaluations(
       });
 
       // Update playlist_tune.current (next review date)
+      // Clear any one-off manual override in playlist_tune.scheduled now that an
+      // evaluation is being committed. The UI expectation (see TuneColumns.tsx) is
+      // that scheduled overrides are transient and removed upon submission.
       await db.run(sql`
         UPDATE playlist_tune
         SET current = ${staged.due},
+            scheduled = NULL,
             last_modified_at = ${now}
         WHERE playlist_ref = ${playlistId}
           AND tune_ref = ${staged.tune_id}
