@@ -429,7 +429,7 @@ export function getRepertoireColumns(
         // - The `completed_at` timestamp originates from `daily_practice_queue.completed_at`,
         //   and indicates the evaluation for that queue window has been submitted. After completion we
         //   respect any subsequently set manual override (since staging is no longer active).
-        const completedAt = info.row.getValue("completed_at");
+        const completedAt = info.cell.row.original.completed_at;
         const value =
           info.row.getValue("evaluation") && !completedAt
             ? (info.row.getValue("latest_due") as string | null)
@@ -472,6 +472,28 @@ export function getRepertoireColumns(
       size: 120,
       minSize: 100,
       maxSize: 150,
+    },
+
+    {
+      id: "scheduled_raw",
+      // accessorKey: "scheduled",
+      accessorFn: (row) => row.scheduled || "",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Sched Override" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        if (!value) return <span class="text-gray-400">—</span>;
+
+        return (
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {formatDate(value)}
+          </span>
+        );
+      },
+      size: 200,
+      minSize: 180,
+      maxSize: 250,
     },
 
     {
