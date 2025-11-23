@@ -462,6 +462,47 @@ declare global {
       getSyncVersion: () => number;
       isInitialSyncComplete: () => boolean;
       dispose: () => Promise<void>;
+      // Staging & committing helpers
+      stageEvaluation: (
+        tuneId: string,
+        playlistId: string,
+        evaluation: string,
+        goal?: string,
+        technique?: string
+      ) => Promise<{
+        quality: number;
+        easiness: number | null;
+        difficulty: number | null;
+        stability: number | null;
+        interval: number;
+        step: number | null;
+        repetitions: number;
+        practiced: string;
+        due: string;
+        state: number;
+        goal: string;
+        technique: string;
+      }>;
+      commitStaged: (
+        playlistId: string,
+        windowStartUtc?: string
+      ) => Promise<{ success: boolean; count: number; error?: string }>;
+      getPracticeListStaged: (
+        playlistId: string,
+        tuneIds?: string[]
+      ) => Promise<
+        Array<{
+          id: string;
+          playlist_ref: string;
+          tune_ref: string;
+          latest_due: string | null;
+          latest_interval: number | null;
+          latest_quality: number | null;
+          latest_state: number | null;
+          has_staged: number; // 1/0
+        }>
+      >;
+      getQueueWindows: (playlistId: string) => Promise<string[]>;
       // New query functions for scheduling tests
       getPracticeRecords: (tuneIds: string[]) => Promise<
         Array<{
@@ -568,6 +609,141 @@ if (typeof window !== "undefined") {
       getPracticeQueue,
       getPlaylistTuneRow,
       getDistinctPracticeRecordCount,
+      stageEvaluation: async (
+        tuneId: string,
+        playlistId: string,
+        evaluation: string,
+        goal?: string,
+        technique?: string
+      ) => {
+        const { stagePracticeEvaluation } = await import(
+          "@/lib/services/practice-staging"
+        );
+        const db = await ensureDb();
+        const userRef = await resolveUserId(db);
+        return await stagePracticeEvaluation(
+          db,
+          userRef,
+          playlistId,
+          tuneId,
+          evaluation,
+          goal,
+          technique
+        );
+      },
+      commitStaged: async (playlistId: string, windowStartUtc?: string) => {
+        const { commitStagedEvaluations } = await import(
+          "@/lib/services/practice-recording"
+        );
+        const db = await ensureDb();
+        const userRef = await resolveUserId(db);
+        return await commitStagedEvaluations(
+          db,
+          userRef,
+          playlistId,
+          windowStartUtc
+        );
+      },
+      getPracticeListStaged: async (playlistId: string, tuneIds?: string[]) => {
+        const db = await ensureDb();
+        const userRef = await resolveUserId(db);
+        let rows: Array<{
+          id: string;
+          playlist_ref: string;
+          tune_ref: string;
+          latest_due: string | null;
+          latest_interval: number | null;
+          latest_quality: number | null;
+          latest_state: number | null;
+          has_staged: number;
+        }>;
+        if (tuneIds && tuneIds.length > 0) {
+          const inList = tuneIds.map((id) => `'${id}'`).join(",");
+          rows = await db.all<{
+            id: string;
+            playlist_ref: string;
+            tune_ref: string;
+            latest_due: string | null;
+            latest_interval: number | null;
+            latest_quality: number | null;
+            latest_state: number | null;
+            has_staged: number;
+          }>(sql`
+            SELECT
+              tune.id as id,
+              playlist.playlist_id as playlist_ref,
+              tune.id as tune_ref,
+              COALESCE(td.due, pr.due) AS latest_due,
+              COALESCE(td.interval, pr.interval) AS latest_interval,
+              COALESCE(td.quality, pr.quality) AS latest_quality,
+              COALESCE(td.state, pr.state) AS latest_state,
+              CASE WHEN td.practiced IS NOT NULL OR td.due IS NOT NULL THEN 1 ELSE 0 END AS has_staged
+            FROM tune
+            LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
+            LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+            LEFT JOIN (
+              SELECT pr.* FROM practice_record pr
+              INNER JOIN (
+                SELECT tune_ref, playlist_ref, MAX(id) as max_id
+                FROM practice_record
+                GROUP BY tune_ref, playlist_ref
+              ) latest ON pr.tune_ref = latest.tune_ref
+                AND pr.playlist_ref = latest.playlist_ref
+                AND pr.id = latest.max_id
+            ) pr ON pr.tune_ref = tune.id AND pr.playlist_ref = playlist_tune.playlist_ref
+            LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.playlist_id = playlist_tune.playlist_ref
+            WHERE playlist.playlist_id = ${playlistId} AND playlist.user_ref = ${userRef} AND tune.id IN (${sql.raw(inList)})
+          `);
+        } else {
+          rows = await db.all<{
+            id: string;
+            playlist_ref: string;
+            tune_ref: string;
+            latest_due: string | null;
+            latest_interval: number | null;
+            latest_quality: number | null;
+            latest_state: number | null;
+            has_staged: number;
+          }>(sql`
+            SELECT
+              tune.id as id,
+              playlist.playlist_id as playlist_ref,
+              tune.id as tune_ref,
+              COALESCE(td.due, pr.due) AS latest_due,
+              COALESCE(td.interval, pr.interval) AS latest_interval,
+              COALESCE(td.quality, pr.quality) AS latest_quality,
+              COALESCE(td.state, pr.state) AS latest_state,
+              CASE WHEN td.practiced IS NOT NULL OR td.due IS NOT NULL THEN 1 ELSE 0 END AS has_staged
+            FROM tune
+            LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
+            LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+            LEFT JOIN (
+              SELECT pr.* FROM practice_record pr
+              INNER JOIN (
+                SELECT tune_ref, playlist_ref, MAX(id) as max_id
+                FROM practice_record
+                GROUP BY tune_ref, playlist_ref
+              ) latest ON pr.tune_ref = latest.tune_ref
+                AND pr.playlist_ref = latest.playlist_ref
+                AND pr.id = latest.max_id
+            ) pr ON pr.tune_ref = tune.id AND pr.playlist_ref = playlist_tune.playlist_ref
+            LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.playlist_id = playlist_tune.playlist_ref
+            WHERE playlist.playlist_id = ${playlistId} AND playlist.user_ref = ${userRef}
+          `);
+        }
+        return rows;
+      },
+      getQueueWindows: async (playlistId: string) => {
+        const db = await ensureDb();
+        const userRef = await resolveUserId(db);
+        const rows = await db.all<{ window_start_utc: string }>(sql`
+          SELECT DISTINCT window_start_utc
+          FROM daily_practice_queue
+          WHERE user_ref = ${userRef} AND playlist_ref = ${playlistId}
+          ORDER BY window_start_utc DESC
+        `);
+        return rows.map((r) => r.window_start_utc);
+      },
       getSyncVersion: () => {
         // Access the sync version from AuthContext
         // The version starts at 0 and increments to 1 after initial sync
