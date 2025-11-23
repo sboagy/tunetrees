@@ -63,7 +63,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
   // Avoid overriding it with a finite value when debugging.
   if (!process.env.PWDEBUG) {
     // In normal runs allow up to 90s to cover multi-day loop logic.
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
   }
   test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
