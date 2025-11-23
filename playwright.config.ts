@@ -32,6 +32,11 @@ export default defineConfig({
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   // reporter: process.env.CI ? [["blob"], ["list"]] : [["html"], ["list"]],
   reporter: process.env.CI ? [["blob"], ["list"]] : [["list"]],
+  // Global expect configuration (assertion polling timeout). Adjust as needed.
+  // Increasing for debug sessions helps when stepping through code.
+  expect: {
+    timeout: process.env.PWDEBUG ? 300_000 : 5_000,
+  },
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
@@ -52,7 +57,9 @@ export default defineConfig({
   // Global timeout for each test (in milliseconds)
   // timeout: 120 * 1000,
 
-  globalTimeout: process.env.CI ? 60 * 60 * 1000 : undefined,
+  // 60 minutes (60 * 60 * 1000 ms = 3,600,000 ms = 1 hour).
+  globalTimeout:
+    process.env.CI || process.env.PWDEBUG ? 60 * 60 * 1000 : undefined,
 
   /* Configure projects for major browsers */
   projects: [
@@ -87,6 +94,33 @@ export default defineConfig({
         launchOptions: {
           args: [
             // "--remote-debugging-port=9222",
+            // Set X (Horizontal) and Y (Vertical) coordinates
+            // Example: X=1950, Y=50 (Pushes the window onto the second monitor)
+            // "--window-position=-1950,50",
+            // OPTIONAL: Also set a specific window size
+            // "--window-size=1280,1024",
+            // "--window-size=1728,1117",
+          ],
+        },
+      },
+      dependencies: ["setup"],
+    },
+
+    {
+      name: "chromium-debug",
+      testDir: "./e2e/tests",
+      testIgnore: /auth-.*\.spec\.ts/, // Exclude auth tests
+      timeout: 0, // Disable overall test timeout for debugging
+      use: {
+        ...devices["Desktop Chrome"],
+        // headless: true,
+        // channel: "chromium",
+        // storageState is set per-worker by test-fixture.ts
+        actionTimeout: 0, // No limit on individual page actions
+        navigationTimeout: 0, // No limit on page.goto / waits
+        launchOptions: {
+          args: [
+            "--remote-debugging-port=9222",
             // Set X (Horizontal) and Y (Vertical) coordinates
             // Example: X=1950, Y=50 (Pushes the window onto the second monitor)
             // "--window-position=-1950,50",

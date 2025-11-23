@@ -581,6 +581,29 @@ export const AuthProvider: ParentComponent = (props) => {
     forceSyncUp,
   };
 
+  // TEST HOOKS: Expose manual sync controls for Playwright to call explicitly
+  if (typeof window !== "undefined") {
+    const w = window as any;
+    if (!w.__forceSyncUpForTest) {
+      w.__forceSyncUpForTest = async () => {
+        try {
+          await forceSyncUp();
+        } catch (e) {
+          console.warn("__forceSyncUpForTest failed", e);
+        }
+      };
+    }
+    if (!w.__forceSyncDownForTest) {
+      w.__forceSyncDownForTest = async () => {
+        try {
+          await forceSyncDown();
+        } catch (e) {
+          console.warn("__forceSyncDownForTest failed", e);
+        }
+      };
+    }
+  }
+
   return (
     <AuthContext.Provider value={authState}>
       <div

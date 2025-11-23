@@ -465,10 +465,10 @@ export class SyncEngine {
 
         // Check if table uses composite keys
         const compositeKeys = getCompositeKeyFields(tableName);
-
-        if (compositeKeys && !remoteData.id) {
-          // Composite key table WITHOUT id field - use UPSERT with onConflict
-          // This happens when we only have composite key fields (no id)
+        if (compositeKeys) {
+          // ALWAYS use UPSERT for composite key tables.
+          // Reason: We frequently queue 'update' after local insert. A pure UPDATE would be a no-op remotely if row doesn't exist yet.
+          // Using UPSERT guarantees creation (insert) or update without duplicate errors.
           const { error } = await this.supabase
             .from(tableName)
             .upsert(remoteData, {
@@ -476,9 +476,8 @@ export class SyncEngine {
             });
           if (error) throw error;
         } else {
-          // Standard primary key column (may be 'id' or table-specific like 'playlist_id')
+          // Standard single PK update path
           const pkColumn = getPrimaryKeyColumn(tableName);
-
           if (!remoteData[pkColumn]) {
             throw new Error(
               `UPDATE operation requires ${pkColumn} in data for table ${tableName}`
@@ -486,8 +485,9 @@ export class SyncEngine {
           }
           const { error } = await this.supabase
             .from(tableName)
-            .update(remoteData)
-            .eq(pkColumn, String(remoteData[pkColumn]));
+            .upsert(remoteData, {
+              onConflict: pkColumn,
+            });
           if (error) throw error;
         }
         break;
@@ -498,26 +498,34 @@ export class SyncEngine {
 
         // Check if table uses composite keys
         const compositeKeys = getCompositeKeyFields(tableName);
-
         if (compositeKeys) {
-          // Composite key table - build DELETE query with all key fields
-          let query = this.supabase.from(tableName).delete();
-
-          for (const keyField of compositeKeys) {
-            if (!remoteData[keyField]) {
-              throw new Error(
-                `DELETE operation requires ${keyField} in data for composite key table ${tableName}`
-              );
-            }
-            query = query.eq(keyField, remoteData[keyField]);
-          }
-
-          const { error } = await query;
-          if (error) throw error;
-        } else {
-          // Soft delete: set deleted flag using table-specific primary key
+          // If composite key fields are present, delete by composite key.
+          // If only an id is provided (legacy queue), fallback to deleting by id.
           const pkColumn = getPrimaryKeyColumn(tableName);
-
+          const hasAllComposite = compositeKeys.every(
+            (k) => remoteData[k] !== undefined && remoteData[k] !== null
+          );
+          if (hasAllComposite) {
+            let query = this.supabase.from(tableName).delete();
+            for (const keyField of compositeKeys) {
+              query = query.eq(keyField, remoteData[keyField]);
+            }
+            const { error } = await query;
+            if (error) throw error;
+          } else if (remoteData[pkColumn]) {
+            const { error } = await this.supabase
+              .from(tableName)
+              .delete()
+              .eq(pkColumn, remoteData[pkColumn]);
+            if (error) throw error;
+          } else {
+            throw new Error(
+              `DELETE operation requires either composite keys (${compositeKeys.join(",")}) or ${pkColumn} for table ${tableName}`
+            );
+          }
+        } else {
+          // Soft delete path replaced with hard delete for simplicity until server implements deleted flag semantics
+          const pkColumn = getPrimaryKeyColumn(tableName);
           if (!remoteData[pkColumn]) {
             throw new Error(
               `DELETE operation requires ${pkColumn} in data for table ${tableName}`
@@ -525,7 +533,7 @@ export class SyncEngine {
           }
           const { error } = await this.supabase
             .from(tableName)
-            .update({ deleted: true })
+            .delete()
             .eq(pkColumn, String(remoteData[pkColumn]));
           if (error) throw error;
         }

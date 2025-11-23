@@ -363,6 +363,19 @@ export async function persistDb(): Promise<void> {
   }
 }
 
+// TEST HOOK: Expose persistDb on window for Playwright to force persistence between reloads
+// This prevents losing in-memory changes (e.g., newly inserted practice_record rows) when
+// the test triggers a full page reload before the auto-persist interval fires.
+if (typeof window !== "undefined" && !(window as any).__persistDbForTest) {
+  (window as any).__persistDbForTest = () => {
+    try {
+      return persistDb();
+    } catch (e) {
+      console.warn("__persistDbForTest failed", e);
+    }
+  };
+}
+
 /**
  * Clear local database
  *

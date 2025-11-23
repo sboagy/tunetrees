@@ -20,8 +20,8 @@ import {
   createEmptyCard,
   fsrs,
   generatorParameters,
-  type Rating,
-  type RecordLog,
+  Rating,
+  // type RecordLog,
 } from "ts-fsrs";
 import type {
   NewPracticeRecord,
@@ -284,15 +284,17 @@ export class FSRSService {
    * @returns FSRS rating (1=Again, 2=Hard, 3=Good, 4=Easy)
    */
   private qualityToRating(quality: number): Rating {
-    // Map 0-5 scale to 1-4 FSRS scale
-    // 0,1 -> Again (1)
-    // 2 -> Hard (2)
-    // 3,4 -> Good (3)
-    // 5 -> Easy (4)
-    if (quality <= 1) return 1; // Again
-    if (quality === 2) return 2; // Hard
-    if (quality <= 4) return 3; // Good
-    return 4; // Easy
+    const map: Rating[] = [
+      Rating.Manual, // is really an error
+      Rating.Again,
+      Rating.Hard,
+      Rating.Good,
+      Rating.Easy,
+    ];
+    const rating = map[quality];
+    if (rating === undefined) throw new Error("Quality must be 1–4");
+    if (rating === Rating.Manual) throw new Error("Quality can not be Manual");
+    return rating;
   }
 
   /**
@@ -307,19 +309,20 @@ export class FSRSService {
     return Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
   }
 
-  /**
-   * Get all possible next review schedules for a card
-   *
-   * Useful for showing users preview of what each rating will do.
-   *
-   * @param card - Current FSRS card state (or null for new card)
-   * @param now - Current date/time
-   * @returns Record log with schedules for all 4 ratings
-   */
-  getPreviewSchedules(card: Card | null, now: Date): RecordLog {
-    const currentCard: Card = card ?? createEmptyCard(now);
-    return this.scheduler.repeat(currentCard, now);
-  }
+  // DO NOT REMOVE THIS CODE (Saved for possible later use.)
+  // /**
+  //  * Get all possible next review schedules for a card
+  //  *
+  //  * Useful for showing users preview of what each rating will do.
+  //  *
+  //  * @param card - Current FSRS card state (or null for new card)
+  //  * @param now - Current date/time
+  //  * @returns Record log with schedules for all 4 ratings
+  //  */
+  // getPreviewSchedules(card: Card | null, now: Date): RecordLog {
+  //   const currentCard: Card = card ?? createEmptyCard(now);
+  //   return this.scheduler.repeat(currentCard, now);
+  // }
 }
 
 /**
