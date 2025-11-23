@@ -70,7 +70,52 @@
                 "reveal": "always",
                 "panel": "shared"
             }
+        },
+        {
+            "name": "Attach Chromium Page 9222",
+            "type": "chrome",
+            "request": "attach",
+            "port": 9222,
+            "webRoot": "${workspaceFolder}",
+            "urlFilter": "http://localhost:5173/*",
+            "targetSelection": "pick",
+            "sourceMapPathOverrides": {
+                "webpack:///src/*": "${webRoot}/src/*",
+                "webpack:///./src/*": "${webRoot}/src/*",
+                "*/src/*": "${webRoot}/src/*"
+            }
+        },
+        {
+            "name": "Debug Playwright Specs (Node)",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/node_modules/@playwright/test/lib/cli.js",
+            "args": ["test", "--project=chromium", "--headed", "--workers=1"],
+            "cwd": "${workspaceFolder}",
+            "env": { "PWDEBUG": "console" },
+            "console": "integratedTerminal",
+            "autoAttachChildProcesses": true
         }
+        // {
+        //     "type": "chrome",
+        //     "request": "attach",
+        //     "name": "Attach Playwright Chromium 9222",
+        //     "port": 9222,
+        //     // "url": "http://localhost:5173/", // Adjust if your Vite app runs on a different port
+        //     "webRoot": "/Users/sboag/gittt/tunetrees", // Adjust if your source code is in a different directory
+        //     "sourceMaps": true
+        // },
+
+        // {
+        //     "name": "Attach Playwright Chromium 9222",
+        //     "type": "chrome",
+        //     "request": "attach",
+        //     "port": 9222,
+        //     "url": "http://localhost:5173/", // Adjust if your Vite app runs on a different port
+        //     "webRoot": "/Users/sboag/gittt/tunetrees", // Adjust if your source code is in a different directory
+        //     "sourceMaps": true
+        // }
+
     ],
     "compounds": [
         {
