@@ -191,11 +191,11 @@ jobs:
           echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:0:20}..."
           echo "ALICE_TEST_PASSWORD is set: $([[ -n "$ALICE_TEST_PASSWORD" ]] && echo 'yes' || echo 'no')"
           echo "TEST_USER_PASSWORD is set: $([[ -n "$TEST_USER_PASSWORD" ]] && echo 'yes' || echo 'no')"
-          echo "🎬 Running single scheduling test on chromium only"
-          # Restricted to single spec & single project (chromium) per request
-          npx playwright test e2e/tests/scheduling-003-repeated-easy.spec.ts --project=chromium
-
-      # npx playwright test --shard=${{ matrix.shard }}/4 --project=chromium-auth --project=chromium --project="Mobile Chrome"
+          # echo "🎬 Running single scheduling test on chromium only"
+          # # Restricted to single spec & single project (chromium) per request
+          # npx playwright test e2e/tests/scheduling-003-repeated-easy.spec.ts --project=chromium
+          echo "🎬 Running full test suite (chromium-auth + chromium + Mobile Chrome)"
+          npx playwright test --shard=${{ matrix.shard }}/4 --project=chromium-auth --project=chromium --project="Mobile Chrome"
 
       # 15. Upload Playwright blob report for merging
       - name: Upload blob report to GitHub Actions Artifacts
