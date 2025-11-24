@@ -75,7 +75,7 @@ export interface TestUserFixture {
  * Each worker gets a dedicated test user to avoid database conflicts
  * Also sets the correct auth state for the assigned user
  */
-export const test = base.extend<TestUserFixture>({
+export const test = base.extend<TestUserFixture & { consoleLogs: string[] }>({
   // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture pattern requires empty object
   testUser: async ({}, use, testInfo) => {
     const user = getTestUserByWorkerIndex(testInfo.parallelIndex);
@@ -112,6 +112,29 @@ export const test = base.extend<TestUserFixture>({
 
     log.debug(`🔐 Worker auth: ${authFile} (fresh)`);
     await use(authFile);
+  },
+  // Capture browser console logs and attach to test report
+  consoleLogs: async ({ page }, use, testInfo) => {
+    const buffer: string[] = [];
+    page.on("console", (msg) => {
+      try {
+        const type = msg.type();
+        const text = msg.text();
+        // Skip extremely noisy low-level logs if desired
+        if (text && !text.startsWith("Downloaded DevTools")) {
+          buffer.push(`[${type}] ${text}`);
+        }
+      } catch {
+        // Ignore extraction errors
+      }
+    });
+    await use(buffer);
+    if (buffer.length) {
+      await testInfo.attach("browser-console", {
+        body: buffer.join("\n"),
+        contentType: "text/plain",
+      });
+    }
   },
 });
 

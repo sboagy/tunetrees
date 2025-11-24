@@ -632,6 +632,8 @@ export const AuthProvider: ParentComponent = (props) => {
           // Prefix makes grepping easy: AUTH DIAG
           // NOTE: Avoid JSON.stringify circular refs by logging plain object.
           console.log("AUTH DIAG", diag);
+          // Store last hasSession for quick page.evaluate access in diagnostics-only spec
+          w.__lastAuthDiagHasSession = diag.hasSession;
           return diag;
         } catch (e) {
           console.warn("AUTH DIAG ERROR", e);
