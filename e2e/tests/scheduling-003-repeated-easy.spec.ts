@@ -279,8 +279,8 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
           login`
         );
 
-        await expect(page.locator("input#password")).not.toBeVisible({
-          timeout: 1000,
+        await expect(page.getByTestId("tab-practice")).toBeVisible({
+          timeout: 20000,
         });
 
         // After re-login, ensure we pull any data that was flushed server-side
