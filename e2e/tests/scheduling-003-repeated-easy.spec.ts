@@ -46,52 +46,42 @@ async function diagAuth(page: import("@playwright/test").Page, label: string) {
   );
 }
 
+// Perform re-login under real time then restore frozen target date (mitigates Supabase token expiry under large time jumps)
 async function ensureLoggedIn(
   page: import("@playwright/test").Page,
-  testUser: { email: string }
+  context: import("@playwright/test").BrowserContext,
+  testUser: { email: string },
+  targetFrozenDate: Date
 ) {
-  // If we're on /login or sign-in form visible, re-authenticate (time travel may expire session)
-  console.log(`ensureLoggedIn: ${page.url()}`);
-  if (
+  const needsLogin =
     page.url().includes("/login") ||
     (await page
       .getByRole("button", { name: "Sign In" })
       .isVisible()
-      .catch(() => false))
-  ) {
-    console.log("Attempting to login");
-    await page.getByLabel("Email").fill(testUser.email);
-    await page.locator("input#password").fill(TEST_PASSWORD);
-    console.log("About to press Sign In click()");
-    const signInLocator = page.getByRole("button", { name: "Sign In" });
-    const maxWaitMs = 15000;
-    const pollIntervalMs = 200;
-    const maxAttempts = Math.ceil(maxWaitMs / pollIntervalMs);
-    let signInEnabled = false;
 
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      signInEnabled = await signInLocator.isEnabled().catch(() => false);
-      if (signInEnabled) break;
-      await page.waitForTimeout(pollIntervalMs);
-    }
+      .catch(() => false));
+  if (!needsLogin) return;
 
-    if (!signInEnabled) {
-      throw new Error("Sign In button did not become enabled within timeout");
-    }
-    await signInLocator.click();
-    console.log("Back from pressing Sign In click()");
-    await page.waitForURL((url) => !url.pathname.includes("/login"), {
-      timeout: 15000,
-    });
-    await page.waitForTimeout(2000); // Allow post-login sync
-  }
+  // Temporarily set clock to real now for auth
+  const realNow = new Date();
+  await context.clock.install({ time: realNow });
+  await page.waitForTimeout(75);
+
+  await page.getByLabel("Email").fill(testUser.email);
+  await page.locator("input#password").fill(TEST_PASSWORD);
+  await page.getByRole("button", { name: "Sign In" }).click();
+  await page.waitForURL((url) => !url.pathname.includes("/login"), {
+    timeout: 30000,
+  });
+  await page.waitForTimeout(500);
+
+  // Restore target frozen date for scheduling logic
+  await context.clock.install({ time: targetFrozenDate });
+  await page.waitForTimeout(100);
 }
 
 test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
-  // NOTE: Per-project timeout for 'chromium-debug' is already 0 (unlimited).
-  // Avoid overriding it with a finite value when debugging.
   if (!process.env.PWDEBUG) {
-    // In normal runs allow up to 90s to cover multi-day loop logic.
     test.setTimeout(120_000);
   }
   test.beforeEach(async ({ page, context, testUser }) => {
@@ -261,8 +251,14 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         await page.waitForTimeout(process.env.CI ? 5000 : 1500);
         await diagAuth(page, `day-${day}-after-reload-pre-login`);
 
-        await ensureLoggedIn(page, testUser);
-        await diagAuth(page, `day-${day}-after-login`);
+        await ensureLoggedIn(page, context, testUser, currentDate);
+        await diagAuth(
+          page,
+          `day-$
+        day;
+        -after -
+          login`
+        );
 
         await expect(page.locator("input#password")).not.toBeVisible({
           timeout: 1000,
@@ -271,7 +267,14 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         // After re-login, ensure we pull any data that was flushed server-side
         await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
         await page.waitForLoadState("networkidle", { timeout: 15000 });
-        await diagAuth(page, `day-${day}-after-syncdown`);
+        await diagAuth(
+          page,
+          `;
+        day - $;
+        day;
+        -after -
+          syncdown`
+        );
 
         // Re-enter flashcard mode for next evaluation
         await ttPage.disableFlashcardMode();
@@ -293,10 +296,16 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     console.log("Difficulties:", difficulties);
 
     // 1. All intervals >= 1 day (minimum constraint)
-    intervals.forEach((interval, idx) => {
+    intervals.forEach((interval, _) => {
       if (interval < 1) {
         throw new Error(
-          `Day ${idx + 1}: Interval must be >= 1 day (got ${interval})`
+          `;
+        Day;
+        $;
+        idx + 1;
+        : Interval must be >= 1 day (got $
+        interval;
+        )`
         );
       }
       expect(interval).toBeGreaterThanOrEqual(1);

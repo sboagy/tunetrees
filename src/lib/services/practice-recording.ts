@@ -733,7 +733,8 @@ export async function commitStagedEvaluations(
           windowEndUtc: queueItem.window_end_utc,
           scheduledSnapshot: queueItem.scheduled_snapshot,
           latestDueSnapshot: queueItem.latest_due_snapshot,
-          acceptableDelinquencyWindowSnapshot: queueItem.acceptable_delinquency_window_snapshot,
+          acceptableDelinquencyWindowSnapshot:
+            queueItem.acceptable_delinquency_window_snapshot,
           tzOffsetMinutesSnapshot: queueItem.tz_offset_minutes_snapshot,
           completedAt: now,
         });
