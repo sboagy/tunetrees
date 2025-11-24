@@ -211,6 +211,9 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
             `Next due (${nextDue.toISOString()}) must be > current date (${currentDate.toISOString()})`
           );
         }
+        // Persist DB snapshot and reload to pick up new frozen time
+        await page.evaluate(() => (window as any).__persistDbForTest?.());
+
         currentDate = nextDue;
         await setStableDate(context, currentDate);
         await verifyClockFrozen(
@@ -220,12 +223,14 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
           test.info().project.name
         );
 
-        // Persist DB snapshot and reload to pick up new frozen time
-        await page.evaluate(() => (window as any).__persistDbForTest?.());
         await page.reload({ waitUntil: "domcontentloaded" });
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(process.env.CI ? 5000 : 1500);
 
         await ensureLoggedIn(page, testUser);
+
+        await expect(page.locator("input#password")).not.toBeVisible({
+          timeout: 1000,
+        });
 
         // After re-login, ensure we pull any data that was flushed server-side
         await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
