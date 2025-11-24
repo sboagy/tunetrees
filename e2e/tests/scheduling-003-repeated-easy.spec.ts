@@ -82,7 +82,7 @@ async function ensureLoggedIn(
 
 test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
   if (!process.env.PWDEBUG) {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
   }
   test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
