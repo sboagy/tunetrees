@@ -62,6 +62,8 @@ async function ensureLoggedIn(
       .catch(() => false));
   if (!needsLogin) return;
 
+  console.log(`ensureLoggedIn (attempting login): ${page.url()}`);
+
   // Temporarily set clock to real now for auth
   const realNow = new Date();
   await context.clock.install({ time: realNow });
@@ -69,7 +71,23 @@ async function ensureLoggedIn(
 
   await page.getByLabel("Email").fill(testUser.email);
   await page.locator("input#password").fill(TEST_PASSWORD);
-  await page.getByRole("button", { name: "Sign In" }).click();
+
+  const signInLocator = await page.getByRole("button", { name: "Sign In" });
+
+  // Poll until the Sign In button becomes enabled (10s timeout)
+  const signInTimeout = 10_000;
+  const pollInterval = 200;
+  const start = Date.now();
+  while (!(await signInLocator.isEnabled())) {
+    if (Date.now() - start > signInTimeout) {
+      throw new Error("Sign In button did not become enabled within timeout");
+    }
+    await page.waitForTimeout(pollInterval);
+  }
+
+  console.log("ensureLoggedIn (about to press sign in button)");
+  await signInLocator.click();
+  console.log("ensureLoggedIn (finished pressing sign in button)");
   await page.waitForURL((url) => !url.pathname.includes("/login"), {
     timeout: 30000,
   });
@@ -77,7 +95,8 @@ async function ensureLoggedIn(
 
   // Restore target frozen date for scheduling logic
   await context.clock.install({ time: targetFrozenDate });
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(500);
+  console.log("ensureLoggedIn (should be signed in now)");
 }
 
 test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
