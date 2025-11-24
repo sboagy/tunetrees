@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 /* Tailwind v4 dark mode variant - makes dark: prefix work properly */
+/* biome-ignore parse: allow Tailwind custom variant until parser option enabled */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {

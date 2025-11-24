@@ -96,11 +96,18 @@ interface AuthState {
   /** Sign out and clear local data */
   signOut: () => Promise<void>;
 
-  /** Force sync down from Supabase (manual sync) */
-  forceSyncDown: () => Promise<void>;
+  /** Force sync down from Supabase (manual sync). Pass { full: true } to force a full (non-incremental) sync. */
+  forceSyncDown: (opts?: { full?: boolean }) => Promise<void>;
 
   /** Force sync up to Supabase (push local changes immediately) */
   forceSyncUp: () => Promise<void>;
+  /** Last successful syncDown ISO timestamp (null if none yet) */
+  lastSyncTimestamp: Accessor<string | null>;
+  /** Mode of last syncDown ('full' | 'incremental' | null if none yet) */
+  lastSyncMode: Accessor<"full" | "incremental" | null>;
+
+  /** Scoped practice sync (playlist_tune, practice_record, daily_practice_queue, table_transient_data) */
+  syncPracticeScope: () => Promise<void>;
 }
 
 /**
@@ -140,6 +147,13 @@ export const AuthProvider: ParentComponent = (props) => {
   const [remoteSyncDownCompletionVersion, setRemoteSyncDownCompletionVersion] =
     createSignal(0);
   const [initialSyncComplete, setInitialSyncComplete] = createSignal(false);
+  // Track last successful syncDown timestamp (used for displaying sync recency)
+  const [lastSyncTimestamp, setLastSyncTimestamp] = createSignal<string | null>(
+    null
+  );
+  const [lastSyncMode, setLastSyncMode] = createSignal<
+    "full" | "incremental" | null
+  >(null);
 
   // View-specific change signals for optimistic updates
   const [practiceListStagedChanged, setPracticeListStagedChanged] =
@@ -204,7 +218,7 @@ export const AuthProvider: ParentComponent = (props) => {
           userId: userUuid,
           realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
           syncIntervalMs: 5000, // Sync every 5 seconds (fast upload of local changes)
-          onSyncComplete: () => {
+          onSyncComplete: (result) => {
             log.debug(
               "Sync completed, incrementing remote sync down completion version"
             );
@@ -218,6 +232,17 @@ export const AuthProvider: ParentComponent = (props) => {
               );
               return newVersion;
             });
+            // Update last syncDown timestamp (only changes when syncDown runs; getter returns last syncDown)
+            if (syncServiceInstance) {
+              const ts = syncServiceInstance.getLastSyncDownTimestamp();
+              if (ts) setLastSyncTimestamp(ts);
+              const mode = syncServiceInstance.getLastSyncMode();
+              if (mode) setLastSyncMode(mode);
+            } else if (result?.timestamp) {
+              // Fallback if service not available yet
+              setLastSyncTimestamp(result.timestamp);
+              // Mode unknown in fallback; leave as null
+            }
             // Mark initial sync as complete on first sync
             if (!initialSyncComplete()) {
               setInitialSyncComplete(true);
@@ -402,7 +427,7 @@ export const AuthProvider: ParentComponent = (props) => {
   /**
    * Force sync down from Supabase (manual sync)
    */
-  const forceSyncDown = async () => {
+  const forceSyncDown = async (opts?: { full?: boolean }) => {
     if (!syncServiceInstance) {
       console.warn("⚠️ [ForceSyncDown] Sync service not available");
       log.warn("Sync service not available");
@@ -412,17 +437,24 @@ export const AuthProvider: ParentComponent = (props) => {
     try {
       console.log("🔄 [ForceSyncDown] Starting sync down from Supabase...");
       log.info("Forcing sync down from Supabase...");
+      const result = opts?.full
+        ? await syncServiceInstance.forceFullSyncDown()
+        : await syncServiceInstance.syncDown();
 
-      const result = await syncServiceInstance.syncDown();
-
-      console.log("✅ [ForceSyncDown] Sync down completed:", {
-        success: result.success,
-        itemsSynced: result.itemsSynced,
-        itemsFailed: result.itemsFailed,
-        conflicts: result.conflicts,
-        errors: result.errors,
-      });
-      log.info("Force sync down completed:", result);
+      console.log(
+        `✅ [ForceSyncDown] ${opts?.full ? "Full" : "Incremental"} sync down completed:`,
+        {
+          success: result.success,
+          itemsSynced: result.itemsSynced,
+          itemsFailed: result.itemsFailed,
+          conflicts: result.conflicts,
+          errors: result.errors,
+        }
+      );
+      log.info(
+        `Force ${opts?.full ? "FULL" : "incremental"} sync down completed:`,
+        result
+      );
 
       // Increment remote sync down completion version to trigger UI updates
       setRemoteSyncDownCompletionVersion((prev) => {
@@ -438,6 +470,11 @@ export const AuthProvider: ParentComponent = (props) => {
         );
         return newVersion;
       });
+      // Update last sync timestamp after manual syncDown
+      const ts = syncServiceInstance.getLastSyncDownTimestamp();
+      if (ts) setLastSyncTimestamp(ts);
+      const mode = syncServiceInstance.getLastSyncMode();
+      if (mode) setLastSyncMode(mode);
     } catch (error) {
       console.error("❌ [ForceSyncDown] Sync down failed:", error);
       log.error("Force sync down failed:", error);
@@ -558,6 +595,37 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
+  /**
+   * Scoped practice-related syncDown (after successful evaluation commit).
+   * Minimizes latency vs full table sweep by restricting to just practice tables.
+   */
+  const syncPracticeScope = async () => {
+    if (!syncServiceInstance) {
+      console.warn("⚠️ [syncPracticeScope] Sync service not available");
+      return;
+    }
+    try {
+      console.log("🔄 [syncPracticeScope] Starting scoped practice syncDown...");
+      const tables = [
+        "playlist_tune",
+        "practice_record",
+        "daily_practice_queue",
+        "table_transient_data",
+      ] as const;
+      const result = await (syncServiceInstance as any).syncDownTables(tables);
+      console.log("✅ [syncPracticeScope] Scoped practice syncDown complete", result);
+      // Update mode & timestamp signals
+      const ts = syncServiceInstance.getLastSyncDownTimestamp();
+      if (ts) setLastSyncTimestamp(ts);
+      const mode = syncServiceInstance.getLastSyncMode();
+      if (mode) setLastSyncMode(mode);
+      // Increment completion version for UI refresh
+      setRemoteSyncDownCompletionVersion((prev) => prev + 1);
+    } catch (e) {
+      console.error("❌ [syncPracticeScope] Scoped practice sync failed", e);
+    }
+  };
+
   const authState: AuthState = {
     user,
     userIdInt,
@@ -579,6 +647,9 @@ export const AuthProvider: ParentComponent = (props) => {
     signOut,
     forceSyncDown,
     forceSyncUp,
+    lastSyncTimestamp,
+    lastSyncMode,
+    syncPracticeScope,
   };
 
   // TEST HOOKS: Expose manual sync controls for Playwright to call explicitly

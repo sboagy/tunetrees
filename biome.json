@@ -37,5 +37,10 @@
       "bracketSpacing": true,
       "quoteProperties": "asNeeded"
     }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
   }
 }
