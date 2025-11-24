@@ -602,6 +602,43 @@ export const AuthProvider: ParentComponent = (props) => {
         }
       };
     }
+    // AUTH DIAGNOSTIC: Capture session state, expiry proximity, and current (possibly time‑traveled) clock.
+    // Label parameter lets tests tag when/where it was invoked.
+    if (!w.__authSessionDiagForTest) {
+      w.__authSessionDiagForTest = async (label?: string) => {
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          const session = data?.session || null;
+          const expEpoch = session?.expires_at
+            ? session.expires_at * 1000
+            : null; // seconds → ms
+          const nowMs = Date.now();
+          const msUntilExpiry = expEpoch !== null ? expEpoch - nowMs : null;
+          const diag = {
+            label: label || "",
+            hasSession: !!session,
+            userId: session?.user?.id || null,
+            error,
+            nowIso: new Date(nowMs).toISOString(),
+            expiresAtEpochSec: session?.expires_at ?? null,
+            msUntilExpiry,
+            timeTravelAheadMs: session?.expires_at
+              ? nowMs - session.expires_at * 1000
+              : null,
+            accessTokenLength: session?.access_token?.length ?? 0,
+            refreshTokenLength: session?.refresh_token?.length ?? 0,
+          };
+          // Use console.log so Playwright captures it in CI run output.
+          // Prefix makes grepping easy: AUTH DIAG
+          // NOTE: Avoid JSON.stringify circular refs by logging plain object.
+          console.log("AUTH DIAG", diag);
+          return diag;
+        } catch (e) {
+          console.warn("AUTH DIAG ERROR", e);
+          return { label, error: String(e) };
+        }
+      };
+    }
   }
 
   return (

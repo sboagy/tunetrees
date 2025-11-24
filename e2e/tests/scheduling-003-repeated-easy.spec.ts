@@ -36,11 +36,20 @@ let currentDate: Date;
 // Test password used for all seeded users (see e2e/helpers/test-users.ts)
 const TEST_PASSWORD = "TestPassword123!";
 
+// Diagnostic helper: invoke auth session diagnostic hook with label if available.
+async function diagAuth(page: import("@playwright/test").Page, label: string) {
+  await page.evaluate(
+    (l) => (window as any).__authSessionDiagForTest?.(l),
+    label
+  );
+}
+
 async function ensureLoggedIn(
   page: import("@playwright/test").Page,
   testUser: { email: string }
 ) {
   // If we're on /login or sign-in form visible, re-authenticate (time travel may expire session)
+  console.log(`ensureLoggedIn: ${page.url()}`);
   if (
     page.url().includes("/login") ||
     (await page
@@ -48,9 +57,12 @@ async function ensureLoggedIn(
       .isVisible()
       .catch(() => false))
   ) {
+    console.log("Attempting to login");
     await page.getByLabel("Email").fill(testUser.email);
     await page.locator("input#password").fill(TEST_PASSWORD);
+    console.log("About to press Sign In click()");
     await page.getByRole("button", { name: "Sign In" }).click();
+    console.log("Back from pressing Sign In click()");
     await page.waitForURL((url) => !url.pathname.includes("/login"), {
       timeout: 15000,
     });
@@ -126,9 +138,13 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
       await page.waitForLoadState("networkidle", { timeout: 15000 });
       await page.waitForTimeout(2000); // Allow sync to complete
 
+      // Diagnostics: session after submission before sync up
+      await diagAuth(page, `day-${day}-post-submit-pre-syncup`);
+
       // CRITICAL: Flush local changes to Supabase before any time travel/reload
       await page.evaluate(() => (window as any).__forceSyncUpForTest?.());
       await page.waitForLoadState("networkidle", { timeout: 15000 });
+      await diagAuth(page, `day-${day}-after-syncup`);
 
       // Query latest practice record to get FSRS metrics
       const playlistId = testUser.playlistId;
@@ -203,6 +219,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
       if (day < 10) {
         // Persist DB before reload so practice_record inserts aren't lost
         await page.evaluate(() => (window as any).__persistDbForTest?.());
+        await diagAuth(page, `day-${day}-before-advance`);
 
         const nextDue = new Date(record.due);
         // Guard: ensure nextDue is in the future relative to currentDate
@@ -225,8 +242,10 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
 
         await page.reload({ waitUntil: "domcontentloaded" });
         await page.waitForTimeout(process.env.CI ? 5000 : 1500);
+        await diagAuth(page, `day-${day}-after-reload-pre-login`);
 
         await ensureLoggedIn(page, testUser);
+        await diagAuth(page, `day-${day}-after-login`);
 
         await expect(page.locator("input#password")).not.toBeVisible({
           timeout: 1000,
@@ -235,6 +254,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         // After re-login, ensure we pull any data that was flushed server-side
         await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
         await page.waitForLoadState("networkidle", { timeout: 15000 });
+        await diagAuth(page, `day-${day}-after-syncdown`);
 
         // Re-enter flashcard mode for next evaluation
         await ttPage.disableFlashcardMode();
