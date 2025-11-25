@@ -125,7 +125,8 @@ jobs:
         run: |
           echo "🔍 Checking Supabase API health at $SUPABASE_URL/rest/v1"
           ATTEMPTS=0
-          until CODE=$(curl -fsS -o /dev/null -w '%{http_code}' "$SUPABASE_URL/rest/v1" || true) && echo "$CODE" | grep -qE '200|401'; do
+          # Accept 200 (OK), 401 (unauthenticated), and 404 (PostgREST available but no route) as healthy
+          until CODE=$(curl -fsS -o /dev/null -w '%{http_code}' "$SUPABASE_URL/rest/v1" || true) && echo "$CODE" | grep -qE '200|401|404'; do
             ATTEMPTS=$((ATTEMPTS+1))
             if [ "$ATTEMPTS" -ge 30 ]; then
               echo "❌ Supabase API not healthy after $ATTEMPTS attempts (last code: $CODE)";
@@ -135,6 +136,20 @@ jobs:
             sleep 2
           done
           echo "✅ Supabase API reachable (HTTP $CODE)"
+
+      # 7c. Additional debug (only on PR events) to aid future failures
+      - name: Supabase Debug Info
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "🔧 Supabase debug info";
+          echo "SUPABASE_URL=$SUPABASE_URL";
+          supabase status --output json || echo "(status failed)";
+          echo "Docker containers:";
+          docker ps -a --format 'table {{.Names}}\t{{.Status}}';
+          echo "Recent logs (rest service):";
+          docker logs supabase_rest_tunetrees --tail=40 || echo "(no rest logs)";
+          echo "Recent logs (auth service):";
+          docker logs supabase_auth_admin_api_tunetrees --tail=20 || echo "(no auth logs)";
 
       # 7a. Save Docker Images to Cache (if cache was missed)
       - name: Save Docker Images to Cache
