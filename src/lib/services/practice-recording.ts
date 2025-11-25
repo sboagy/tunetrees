@@ -23,6 +23,7 @@ import type { SqliteDatabase } from "../db/client-sqlite";
 import {
   getLatestPracticeRecord,
   getUserPreferences,
+  getUserSchedulingOptions,
 } from "../db/queries/practice";
 import { playlistTune, practiceRecord } from "../db/schema";
 import type {
@@ -98,7 +99,8 @@ export async function evaluatePractice(
   if (!prefs) {
     throw new Error("User FSRS preferences not found");
   }
-  const fsrsService = new FSRSService(prefs);
+  const scheduling = await getUserSchedulingOptions(db, userId);
+  const fsrsService = new FSRSService(prefs, scheduling, db, input.playlistRef);
   const latestRecord = await getLatestPracticeRecord(
     db,
     input.tuneRef,

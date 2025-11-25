@@ -285,7 +285,9 @@ export class SyncService {
         );
         try {
           await this.syncEngine.syncUp();
-          console.log("[SyncService] ✅ Pending changes uploaded - scoped syncDown safe");
+          console.log(
+            "[SyncService] ✅ Pending changes uploaded - scoped syncDown safe"
+          );
         } catch (error) {
           console.error(
             "[SyncService] ❌ Failed to upload pending changes before scoped syncDown:",

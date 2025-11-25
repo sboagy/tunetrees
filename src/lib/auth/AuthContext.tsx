@@ -605,7 +605,9 @@ export const AuthProvider: ParentComponent = (props) => {
       return;
     }
     try {
-      console.log("🔄 [syncPracticeScope] Starting scoped practice syncDown...");
+      console.log(
+        "🔄 [syncPracticeScope] Starting scoped practice syncDown..."
+      );
       const tables = [
         "playlist_tune",
         "practice_record",
@@ -613,7 +615,10 @@ export const AuthProvider: ParentComponent = (props) => {
         "table_transient_data",
       ] as const;
       const result = await (syncServiceInstance as any).syncDownTables(tables);
-      console.log("✅ [syncPracticeScope] Scoped practice syncDown complete", result);
+      console.log(
+        "✅ [syncPracticeScope] Scoped practice syncDown complete",
+        result
+      );
       // Update mode & timestamp signals
       const ts = syncServiceInstance.getLastSyncDownTimestamp();
       if (ts) setLastSyncTimestamp(ts);

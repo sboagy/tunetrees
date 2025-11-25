@@ -15,6 +15,7 @@
  *           legacy/tunetrees/app/schedule.py (_process_single_tune_feedback)
  */
 
+import { sql } from "drizzle-orm";
 import {
   type Card,
   createEmptyCard,
@@ -23,7 +24,9 @@ import {
   Rating,
   // type RecordLog,
 } from "ts-fsrs";
+import type { SqliteDatabase } from "../db/client-sqlite";
 import type {
+  IUserSchedulingOptions,
   NewPracticeRecord,
   NextReviewSchedule,
   PracticeRecord,
@@ -74,8 +77,18 @@ const TECHNIQUE_MODIFIERS = {
  */
 export class FSRSService {
   private scheduler: ReturnType<typeof fsrs>;
+  private playlistTuneCount: number | null = null; // populated asynchronously
+  /** Accessor for tune count (may be null if not yet loaded) */
+  getPlaylistTuneCountCached(): number | null {
+    return this.playlistTuneCount;
+  }
 
-  constructor(prefs: PrefsSpacedRepetition) {
+  constructor(
+    prefs: PrefsSpacedRepetition,
+    scheduling: IUserSchedulingOptions,
+    db: SqliteDatabase,
+    playlistRef: string
+  ) {
     // Parse FSRS weights from JSON string (stored in database)
     const weights = prefs.fsrsWeights
       ? (JSON.parse(prefs.fsrsWeights) as number[])
@@ -89,11 +102,36 @@ export class FSRSService {
       ? (JSON.parse(prefs.relearningSteps) as number[]).map((m) => `${m}m`)
       : ["10m"];
 
+    // Determine playlist size (async). Constructor cannot be async, so populate later.
+    void getPlaylistTuneCount(db, playlistRef)
+      .then((cnt) => {
+        this.playlistTuneCount = cnt;
+        console.log(
+          `[FSRSService] Playlist ${playlistRef} tune count loaded: ${cnt}`
+        );
+      })
+      .catch((e) => {
+        console.warn(
+          `[FSRSService] Failed to load playlist tune count for ${playlistRef}:`,
+          e
+        );
+      });
+
+    const maxReviewsPerDay =
+      scheduling.maxReviewsPerDay && scheduling.maxReviewsPerDay > 0
+        ? scheduling.maxReviewsPerDay
+        : 10;
+    const playlistTuneCount: number = this.playlistTuneCount ?? 400;
+    const calculatedMaxInterval = Math.round(
+      3 * (playlistTuneCount / maxReviewsPerDay)
+    );
+
     // Initialize ts-fsrs scheduler with user preferences
     this.scheduler = fsrs({
       w: weights,
-      request_retention: prefs.requestRetention ?? 0.9,
-      maximum_interval: prefs.maximumInterval ?? 36500,
+      // High retention (95%) as default because 'Performance' requires higher recall than 'Facts'
+      request_retention: prefs.requestRetention ?? 0.95,
+      maximum_interval: calculatedMaxInterval, // prefs.maximumInterval ?? calculatedMaxInterval,
       enable_fuzz: prefs.enableFuzzing ? Boolean(prefs.enableFuzzing) : true,
       enable_short_term: true, // Always enable for new cards
       learning_steps: learningSteps as `${number}${"m" | "h" | "d"}`[],
@@ -331,6 +369,36 @@ export class FSRSService {
  * @param prefs - User's spaced repetition preferences
  * @returns Configured FSRS service
  */
-export function createFSRSService(prefs: PrefsSpacedRepetition): FSRSService {
-  return new FSRSService(prefs);
+export function createFSRSService(
+  prefs: PrefsSpacedRepetition,
+  scheduling: IUserSchedulingOptions,
+  db: SqliteDatabase,
+  playlistRef: string
+): FSRSService {
+  return new FSRSService(prefs, scheduling, db, playlistRef);
 }
+
+/**
+ * Get the total number of tunes in all of a user's playlists (repertoire size).
+ * Counts distinct playlist_tune rows for playlists owned by the user.
+ * Excludes deleted playlist or playlist_tune rows.
+ *
+ * @param db Local SQLite database instance
+ * @param userInternalId Internal user_profile.id (NOT supabase_user_id)
+ * @returns Number of tunes in the user's repertoire
+ */
+export async function getPlaylistTuneCount(
+  db: SqliteDatabase,
+  playlistRef: string
+): Promise<number> {
+  const rows = await db.all<{ cnt: number }>(sql`
+    SELECT COUNT(*) AS cnt
+    FROM playlist_tune pt
+    WHERE pt.playlist_ref = ${playlistRef}
+      AND (pt.deleted IS NULL OR pt.deleted = 0)
+  `);
+  return rows[0]?.cnt ?? 0;
+}
+
+// Example usage:
+// const tuneCount = await getPlaylistTuneCount(localDb(), currentPlaylistId()!);

@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
-/* Tailwind v4 dark mode variant - makes dark: prefix work properly */
-/* biome-ignore parse: allow Tailwind custom variant until parser option enabled */
-@custom-variant dark (&:where(.dark, .dark *));
+/* Dark mode is configured via tailwind.config.mjs: darkMode: ["selector", ".dark"].
+  Remove deprecated @custom-variant syntax to satisfy Biome parser which
+  currently flags Tailwind-specific directives. The .dark selector applied to
+  root (or a parent) now activates dark: variant utilities. */
 
 @layer base {
   :root {

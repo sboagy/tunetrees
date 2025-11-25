@@ -26,7 +26,7 @@ const SpacedRepetitionPage: Component = () => {
   const [fsrsWeights, setFsrsWeights] =
     createSignal<string>(DEFAULT_FSRS_WEIGHTS);
   const [requestRetention, setRequestRetention] = createSignal<string>("0.9");
-  const [maximumInterval, setMaximumInterval] = createSignal<string>("365");
+  const [maximumInterval] = createSignal<string>("365");
 
   // UI state
   const [isLoading, setIsLoading] = createSignal(true);
@@ -51,7 +51,7 @@ const SpacedRepetitionPage: Component = () => {
             setAlgType(prefs.algType as "SM2" | "FSRS");
             setFsrsWeights(prefs.fsrsWeights ?? DEFAULT_FSRS_WEIGHTS);
             setRequestRetention(prefs.requestRetention?.toString() ?? "0.9");
-            setMaximumInterval(prefs.maximumInterval?.toString() ?? "365");
+            // setMaximumInterval(prefs.maximumInterval?.toString() ?? "365");
           }
         })
         .catch((error) => {
@@ -203,7 +203,9 @@ const SpacedRepetitionPage: Component = () => {
         >
           <form onSubmit={handleSubmit} class="space-y-6">
             {/* Maximum Interval */}
-            <div class="space-y-1.5">
+            {/* For right now, the max interval is automatically */}
+            {/* calculateded from max_interval = (3 * (TOTAL_TUNES / MAX_DAILY_TUNES)) */}
+            {/* <div class="space-y-1.5">
               <label
                 for="maximum-interval"
                 class="block text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -230,7 +232,7 @@ const SpacedRepetitionPage: Component = () => {
                   {validationErrors().maximumInterval}
                 </p>
               </Show>
-            </div>
+            </div> */}
 
             {/* Algorithm Type */}
             <div class="space-y-1.5">

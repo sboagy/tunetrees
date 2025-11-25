@@ -322,14 +322,14 @@ export class SyncEngine {
     const conflicts = 0; // TODO: Implement conflict detection
 
     // Offline pre-check: if browser reports offline, skip remote fetch attempts entirely.
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      console.warn('[SyncEngine] Skipping syncDown: browser offline');
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      console.warn("[SyncEngine] Skipping syncDown: browser offline");
       return {
         success: true,
         itemsSynced: 0,
         itemsFailed: 0,
         conflicts,
-        errors: ['offline'],
+        errors: ["offline"],
         timestamp: startTime,
       };
     }
@@ -411,7 +411,7 @@ export class SyncEngine {
           // If network-level fetch failure, abort remaining tables to reduce noise.
           if (isNetworkError(error)) {
             console.warn(
-              '[SyncEngine] Network error detected - aborting remaining table syncs'
+              "[SyncEngine] Network error detected - aborting remaining table syncs"
             );
             break;
           }
@@ -480,14 +480,14 @@ export class SyncEngine {
     let synced = 0;
     const conflicts = 0;
 
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      console.warn('[SyncEngine] Skipping scoped syncDown: browser offline');
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      console.warn("[SyncEngine] Skipping scoped syncDown: browser offline");
       return {
         success: true,
         itemsSynced: 0,
         itemsFailed: 0,
         conflicts,
-        errors: ['offline'],
+        errors: ["offline"],
         timestamp: startTime,
       };
     }
@@ -495,15 +495,18 @@ export class SyncEngine {
     try {
       console.log(
         `🔽 [SyncEngine] Scoped syncDown (${tables.length} tables)...` +
-          (previousSyncTimestamp ? ` incremental since ${previousSyncTimestamp}` : ' full (first watermark)')
+          (previousSyncTimestamp
+            ? ` incremental since ${previousSyncTimestamp}`
+            : " full (first watermark)")
       );
 
       for (const tableName of tables) {
         try {
-          const incrementalEligible = !!previousSyncTimestamp && supportsIncrementalTable(tableName);
+          const incrementalEligible =
+            !!previousSyncTimestamp && supportsIncrementalTable(tableName);
           console.log(
             `   📥 Scoped sync table: ${tableName}` +
-              (incrementalEligible ? ` (incremental)` : ' (full)')
+              (incrementalEligible ? ` (incremental)` : " (full)")
           );
           const tableSynced = await this.syncTableDown(
             tableName,
@@ -512,11 +515,14 @@ export class SyncEngine {
           );
           synced += tableSynced;
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
+          const errorMsg =
+            error instanceof Error ? error.message : String(error);
           console.error(`   ✗ ${tableName}: ${errorMsg}`);
           errors.push(`Table ${tableName}: ${errorMsg}`);
           if (isNetworkError(error)) {
-            console.warn('[SyncEngine] Network error detected - aborting remaining scoped tables');
+            console.warn(
+              "[SyncEngine] Network error detected - aborting remaining scoped tables"
+            );
             break;
           }
         }
@@ -540,7 +546,7 @@ export class SyncEngine {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error('❌ [SyncEngine] scoped syncDown failed:', errorMsg);
+      console.error("❌ [SyncEngine] scoped syncDown failed:", errorMsg);
       errors.push(errorMsg);
       return {
         success: false,
