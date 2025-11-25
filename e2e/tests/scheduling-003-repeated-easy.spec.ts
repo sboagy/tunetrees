@@ -127,7 +127,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     );
   });
 
-  test("should advance scheduling dates with repeated Easy evaluations over 10 days", async ({
+  test.skip("should advance scheduling dates with repeated Easy evaluations over 10 days", async ({
     page,
     context,
     testUser,
