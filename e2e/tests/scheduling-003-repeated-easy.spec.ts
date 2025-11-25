@@ -33,8 +33,6 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
 let currentDate: Date;
-// Test password used for all seeded users (see e2e/helpers/test-users.ts)
-const TEST_PASSWORD = "TestPassword123!";
 // CI shortening: set CI_DIAG_FAST=1 to reduce loop days for diagnostics
 const MAX_DAYS = 10;
 
@@ -44,59 +42,6 @@ async function diagAuth(page: import("@playwright/test").Page, label: string) {
     (l) => (window as any).__authSessionDiagForTest?.(l),
     label
   );
-}
-
-// Perform re-login under real time then restore frozen target date (mitigates Supabase token expiry under large time jumps)
-async function ensureLoggedIn(
-  page: import("@playwright/test").Page,
-  context: import("@playwright/test").BrowserContext,
-  testUser: { email: string },
-  targetFrozenDate: Date
-) {
-  const needsLogin =
-    page.url().includes("/login") ||
-    (await page
-      .getByRole("button", { name: "Sign In" })
-      .isVisible()
-
-      .catch(() => false));
-  if (!needsLogin) return;
-
-  console.log(`ensureLoggedIn (attempting login): ${page.url()}`);
-
-  // Temporarily set clock to real now for auth
-  const realNow = new Date();
-  await context.clock.install({ time: realNow });
-  await page.waitForTimeout(75);
-
-  await page.getByLabel("Email").fill(testUser.email);
-  await page.locator("input#password").fill(TEST_PASSWORD);
-
-  const signInLocator = await page.getByRole("button", { name: "Sign In" });
-
-  // Poll until the Sign In button becomes enabled (10s timeout)
-  const signInTimeout = 10_000;
-  const pollInterval = 200;
-  const start = Date.now();
-  while (!(await signInLocator.isEnabled())) {
-    if (Date.now() - start > signInTimeout) {
-      throw new Error("Sign In button did not become enabled within timeout");
-    }
-    await page.waitForTimeout(pollInterval);
-  }
-
-  console.log("ensureLoggedIn (about to press sign in button)");
-  await signInLocator.click();
-  console.log("ensureLoggedIn (finished pressing sign in button)");
-  await page.waitForURL((url) => !url.pathname.includes("/login"), {
-    timeout: 30000,
-  });
-  await page.waitForTimeout(500);
-
-  // Restore target frozen date for scheduling logic
-  await context.clock.install({ time: targetFrozenDate });
-  await page.waitForTimeout(500);
-  console.log("ensureLoggedIn (should be signed in now)");
 }
 
 test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
@@ -109,6 +54,13 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     // Set stable starting date
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
+
+    // Override playlist size for FSRS testing to ensure max_interval is large enough
+    // (Formula: 3 * (playlistSize / maxReviewsPerDay))
+    // With 50000 tunes and 10 reviews/day -> max_interval = 15000 days
+    await page.addInitScript(() => {
+      (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__ = 50000;
+    });
 
     // Set up ONE tune for repeated evaluation
     await setupForPracticeTestsParallel(page, testUser, {
@@ -127,7 +79,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     );
   });
 
-  test.skip("should advance scheduling dates with repeated Easy evaluations over 10 days", async ({
+  test("should advance scheduling dates with repeated Easy evaluations over 10 days", async ({
     page,
     context,
     testUser,
@@ -270,29 +222,25 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         await page.waitForTimeout(process.env.CI ? 5000 : 1500);
         await diagAuth(page, `day-${day}-after-reload-pre-login`);
 
-        await ensureLoggedIn(page, context, testUser, currentDate);
-        await diagAuth(
-          page,
-          `day-$
-        day;
-        -after -
-          login`
-        );
+        // Re-login if session was lost during time travel
+        const loginVisible = await page.getByText("Sign in to continue").isVisible().catch(() => false);
+        if (loginVisible) {
+            console.log("Session lost, re-logging in...");
+            await page.getByLabel("Email").fill(testUser.email);
+            await page.locator('input[type="password"]').fill("TestPassword123!");
+            await page.getByRole("button", { name: "Sign In" }).click();
+        }
 
         await expect(page.getByTestId("tab-practice")).toBeVisible({
           timeout: 20000,
         });
 
-        // After re-login, ensure we pull any data that was flushed server-side
+        // After reload, ensure we pull any data that was flushed server-side
         await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
         await page.waitForLoadState("networkidle", { timeout: 15000 });
         await diagAuth(
           page,
-          `;
-        day - $;
-        day;
-        -after -
-          syncdown`
+          `day-${day}-after-syncdown`
         );
 
         // Re-enter flashcard mode for next evaluation

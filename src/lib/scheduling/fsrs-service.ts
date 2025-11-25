@@ -121,7 +121,15 @@ export class FSRSService {
       scheduling.maxReviewsPerDay && scheduling.maxReviewsPerDay > 0
         ? scheduling.maxReviewsPerDay
         : 10;
-    const playlistTuneCount: number = this.playlistTuneCount ?? 400;
+    
+    // Allow test override via window property
+    const testOverride =
+      typeof window !== "undefined"
+        ? (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__
+        : undefined;
+    const playlistTuneCount: number =
+      testOverride ?? this.playlistTuneCount ?? 400;
+
     const calculatedMaxInterval = Math.round(
       3 * (playlistTuneCount / maxReviewsPerDay)
     );
