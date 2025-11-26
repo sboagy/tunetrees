@@ -32,6 +32,25 @@ import { getSyncQueueStats } from "../../lib/sync/queue";
 import { PlaylistManagerDialog } from "../playlists/PlaylistManagerDialog";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
+// Helper: format relative time (e.g., 2m, 3h, 5d)
+function formatRelativeTime(isoTs: string): string {
+  const then = new Date(isoTs).getTime();
+  const now = Date.now();
+  const diffMs = Math.max(0, now - then);
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}d`;
+  const month = Math.floor(day / 30);
+  if (month < 12) return `${month}mo`;
+  const year = Math.floor(month / 12);
+  return `${year}y`;
+}
+
 // Helper function to get display name for a playlist
 const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
   // If name exists and is not empty, use it
@@ -321,6 +340,8 @@ export const TopNav: Component = () => {
     forceSyncUp,
     remoteSyncDownCompletionVersion,
     isAnonymous,
+    lastSyncTimestamp,
+    lastSyncMode,
   } = useAuth();
   const [isOnline, setIsOnline] = createSignal(navigator.onLine);
   const [pendingCount, setPendingCount] = createSignal(0);
@@ -751,6 +772,14 @@ export const TopNav: Component = () => {
                                 pendingCount() > 0 &&
                                 `${pendingCount()} change${pendingCount() === 1 ? "" : "s"} syncing...`}
                             </div>
+                            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                              <span class="font-medium text-gray-600 dark:text-gray-300">
+                                Last Sync:
+                              </span>{" "}
+                              {lastSyncTimestamp()
+                                ? `${new Date(lastSyncTimestamp()!).toLocaleString()} (${formatRelativeTime(lastSyncTimestamp()!)} ago, ${lastSyncMode() || "n/a"})`
+                                : "Not yet"}
+                            </div>
                           </div>
                         </div>
 
@@ -833,21 +862,21 @@ export const TopNav: Component = () => {
                         type="button"
                         onClick={async () => {
                           console.log(
-                            "🔄 [Force Sync Down] Button clicked - starting sync..."
+                            "🔄 [Force FULL Sync Down] Button clicked - starting FULL sync..."
                           );
                           try {
-                            await forceSyncDown();
+                            await forceSyncDown({ full: true });
                             console.log(
-                              "✅ [Force Sync Down] Sync completed successfully"
+                              "✅ [Force FULL Sync Down] Full sync completed successfully"
                             );
                             toast.success("Remote data downloaded");
                             setShowDbMenu(false); // Close menu after successful sync
                           } catch (error) {
                             console.error(
-                              "❌ [Force Sync Down] Sync failed:",
+                              "❌ [Force FULL Sync Down] Full sync failed:",
                               error
                             );
-                            toast.error("Failed to download data");
+                            toast.error("Failed to perform full download");
                             setShowDbMenu(false); // Close menu even on error
                           }
                         }}
@@ -872,7 +901,7 @@ export const TopNav: Component = () => {
                           <polyline points="7 10 12 15 17 10" />
                           <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
-                        Force Sync Down
+                        Force Full Sync Down
                         {!isOnline() && (
                           <span class="ml-auto text-xs text-gray-500 dark:text-gray-400">
                             (Offline)

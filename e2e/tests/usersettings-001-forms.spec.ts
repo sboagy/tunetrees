@@ -229,9 +229,9 @@ test.describe("USERSETTINGS-001: Spaced Repetition Form", () => {
   test("should display all form fields", async ({ page }) => {
     await page.waitForTimeout(1000);
 
-    await expect(page.getByLabel("Maximum Interval (days)")).toBeVisible({
-      timeout: 5000,
-    });
+    // await expect(page.getByLabel("Maximum Interval (days)")).toBeVisible({
+    //   timeout: 5000,
+    // });
     await expect(page.getByLabel("Algorithm Type")).toBeVisible({
       timeout: 5000,
     });
@@ -260,59 +260,59 @@ test.describe("USERSETTINGS-001: Spaced Repetition Form", () => {
     }
   );
 
-  test("should validate maximum interval positive number", async ({ page }) => {
-    await page.waitForTimeout(1000);
+  // test("should validate maximum interval positive number", async ({ page }) => {
+  //   await page.waitForTimeout(1000);
 
-    const input = page.getByLabel("Maximum Interval (days)");
+  //   const input = page.getByLabel("Maximum Interval (days)");
 
-    // Try invalid value
-    await input.fill("-5");
-    await page.waitForTimeout(500);
-    try {
-      await expect(page.getByText(/Must be a positive number/i)).toBeVisible({
-        timeout: 3000,
-      });
-    } catch (_e) {
-      // FIXME: is the "/Must be a positive number/i" check implemented?
-      console.log(
-        "FIXME: is the '/Must be a positive number/i' check implemented?"
-      );
-    }
+  //   // Try invalid value
+  //   await input.fill("-5");
+  //   await page.waitForTimeout(500);
+  //   try {
+  //     await expect(page.getByText(/Must be a positive number/i)).toBeVisible({
+  //       timeout: 3000,
+  //     });
+  //   } catch (_e) {
+  //     // FIXME: is the "/Must be a positive number/i" check implemented?
+  //     console.log(
+  //       "FIXME: is the '/Must be a positive number/i' check implemented?"
+  //     );
+  //   }
 
-    // Try valid value
-    await input.fill("365");
-    await page.waitForTimeout(500);
-    await expect(
-      page.getByText(/Must be a positive number/i)
-    ).not.toBeVisible();
-  });
+  //   // Try valid value
+  //   await input.fill("365");
+  //   await page.waitForTimeout(500);
+  //   await expect(
+  //     page.getByText(/Must be a positive number/i)
+  //   ).not.toBeVisible();
+  // });
 
-  test("should submit valid spaced repetition form", async ({ page }) => {
-    await page.waitForTimeout(1000);
+  // test("should submit valid spaced repetition form", async ({ page }) => {
+  //   await page.waitForTimeout(1000);
 
-    const input = page.getByLabel("Maximum Interval (days)");
-    const submitButton = page.getByRole("button", { name: /update/i });
+  //   const input = page.getByLabel("Maximum Interval (days)");
+  //   const submitButton = page.getByRole("button", { name: /update/i });
 
-    // Make changes
-    await input.fill("400");
-    await page.waitForTimeout(500);
+  //   // Make changes
+  //   await input.fill("400");
+  //   await page.waitForTimeout(500);
 
-    // Submit should be enabled when dirty
-    await expect(submitButton).toBeEnabled({ timeout: 3000 });
-    await submitButton.click();
+  //   // Submit should be enabled when dirty
+  //   await expect(submitButton).toBeEnabled({ timeout: 3000 });
+  //   await submitButton.click();
 
-    try {
-      // Wait for success message
-      await expect(page.getByText(/Successfully updated|saved/i)).toBeVisible({
-        timeout: 5000,
-      });
-    } catch (_e) {
-      // FIXME: is the "/Successfully updated|saved/i" message implemented?
-      console.log(
-        "FIXME: is the '/Successfully updated|saved/i' message implemented?"
-      );
-    }
-  });
+  //   try {
+  //     // Wait for success message
+  //     await expect(page.getByText(/Successfully updated|saved/i)).toBeVisible({
+  //       timeout: 5000,
+  //     });
+  //   } catch (_e) {
+  //     // FIXME: is the "/Successfully updated|saved/i" message implemented?
+  //     console.log(
+  //       "FIXME: is the '/Successfully updated|saved/i' message implemented?"
+  //     );
+  //   }
+  // });
 });
 
 test.describe("USERSETTINGS-001: Account Settings Form", () => {

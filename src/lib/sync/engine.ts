@@ -132,6 +132,7 @@ export class SyncEngine {
   private userId: string;
   private config: SyncConfig;
   private lastSyncTimestamp: string | null = null;
+  private lastSyncWasIncremental: boolean = false;
 
   constructor(
     localDb: SqliteDatabase,
@@ -310,13 +311,35 @@ export class SyncEngine {
    */
   async syncDown(): Promise<SyncResult> {
     const startTime = new Date().toISOString();
+    // Capture previous successful sync timestamp for incremental filtering.
+    // We only apply incremental filtering for tables supporting 'last_modified_at'
+    // when we have a prior completed sync timestamp.
+    const previousSyncTimestamp = this.lastSyncTimestamp;
+    // Determine overall mode (full vs incremental) for this run
+    this.lastSyncWasIncremental = !!previousSyncTimestamp; // If we had a previous timestamp, attempt incremental
     const errors: string[] = [];
     let synced = 0;
     const conflicts = 0; // TODO: Implement conflict detection
 
+    // Offline pre-check: if browser reports offline, skip remote fetch attempts entirely.
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      console.warn("[SyncEngine] Skipping syncDown: browser offline");
+      return {
+        success: true,
+        itemsSynced: 0,
+        itemsFailed: 0,
+        conflicts,
+        errors: ["offline"],
+        timestamp: startTime,
+      };
+    }
+
     try {
-      // For now, we'll implement a simple full sync for user's data
-      // TODO: Optimize with incremental sync using last_modified_at timestamps
+      // Incremental sync optimization:
+      // If we have a previous sync timestamp, fetch only rows with
+      // last_modified_at >= previousSyncTimestamp for supported tables.
+      // NOTE: Hard deletes cannot be detected without tombstones;
+      // this optimization currently handles inserts/updates only.
 
       console.log(
         "🔽 [SyncEngine] Starting syncDown - pulling changes from Supabase..."
@@ -361,8 +384,19 @@ export class SyncEngine {
 
       for (const tableName of tablesToSync) {
         try {
-          console.log(`   📥 Syncing table: ${tableName}...`);
-          const tableSynced = await this.syncTableDown(tableName);
+          const incrementalEligible =
+            !!previousSyncTimestamp && supportsIncrementalTable(tableName);
+          console.log(
+            `   📥 Syncing table: ${tableName}...` +
+              (incrementalEligible
+                ? ` (incremental since ${previousSyncTimestamp})`
+                : " (full)")
+          );
+          const tableSynced = await this.syncTableDown(
+            tableName,
+            previousSyncTimestamp,
+            incrementalEligible
+          );
           console.log(`   ✓ ${tableName}: ${tableSynced} records`);
           synced += tableSynced;
         } catch (error) {
@@ -374,11 +408,22 @@ export class SyncEngine {
             errorMsg
           );
           errors.push(`Table ${tableName}: ${errorMsg}`);
+          // If network-level fetch failure, abort remaining tables to reduce noise.
+          if (isNetworkError(error)) {
+            console.warn(
+              "[SyncEngine] Network error detected - aborting remaining table syncs"
+            );
+            break;
+          }
         }
       }
 
       // Update last sync timestamp
       this.lastSyncTimestamp = startTime;
+      // If previousSyncTimestamp was null, this run was a full sync (override boolean)
+      if (!previousSyncTimestamp) {
+        this.lastSyncWasIncremental = false;
+      }
 
       console.log(
         `✅ [SyncEngine] SyncDown completed - synced ${synced} records from ${tablesToSync.length} tables`,
@@ -403,6 +448,106 @@ export class SyncEngine {
       log.error("[SyncEngine] syncDown failed:", errorMsg);
       errors.push(errorMsg);
 
+      return {
+        success: false,
+        itemsSynced: synced,
+        itemsFailed: 0,
+        conflicts,
+        errors,
+        timestamp: startTime,
+      };
+    }
+  }
+
+  /**
+   * Pull remote changes for a specific subset of tables.
+   *
+   * Optimization path used after focused local operations (e.g. practice submission)
+   * to avoid looping through every table when we know which ones could have changed.
+   *
+   * Safety considerations:
+   * - Still respects incremental filtering (last_modified_at) when available.
+   * - Still updates the global lastSyncTimestamp so subsequent incremental syncs
+   *   use this watermark (narrow scope acts as a partial incremental sync).
+   * - Does NOT change lastSyncWasIncremental semantic: we mark incremental if a
+   *   previous timestamp existed.
+   */
+  async syncDownTables(tables: SyncableTable[]): Promise<SyncResult> {
+    const startTime = new Date().toISOString();
+    const previousSyncTimestamp = this.lastSyncTimestamp;
+    this.lastSyncWasIncremental = !!previousSyncTimestamp; // treat as incremental if watermark exists
+    const errors: string[] = [];
+    let synced = 0;
+    const conflicts = 0;
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      console.warn("[SyncEngine] Skipping scoped syncDown: browser offline");
+      return {
+        success: true,
+        itemsSynced: 0,
+        itemsFailed: 0,
+        conflicts,
+        errors: ["offline"],
+        timestamp: startTime,
+      };
+    }
+
+    try {
+      console.log(
+        `🔽 [SyncEngine] Scoped syncDown (${tables.length} tables)...` +
+          (previousSyncTimestamp
+            ? ` incremental since ${previousSyncTimestamp}`
+            : " full (first watermark)")
+      );
+
+      for (const tableName of tables) {
+        try {
+          const incrementalEligible =
+            !!previousSyncTimestamp && supportsIncrementalTable(tableName);
+          console.log(
+            `   📥 Scoped sync table: ${tableName}` +
+              (incrementalEligible ? ` (incremental)` : " (full)")
+          );
+          const tableSynced = await this.syncTableDown(
+            tableName,
+            previousSyncTimestamp,
+            incrementalEligible
+          );
+          synced += tableSynced;
+        } catch (error) {
+          const errorMsg =
+            error instanceof Error ? error.message : String(error);
+          console.error(`   ✗ ${tableName}: ${errorMsg}`);
+          errors.push(`Table ${tableName}: ${errorMsg}`);
+          if (isNetworkError(error)) {
+            console.warn(
+              "[SyncEngine] Network error detected - aborting remaining scoped tables"
+            );
+            break;
+          }
+        }
+      }
+
+      this.lastSyncTimestamp = startTime;
+      if (!previousSyncTimestamp) this.lastSyncWasIncremental = false;
+
+      console.log(
+        `✅ [SyncEngine] Scoped syncDown completed - synced ${synced} records from ${tables.length} tables`,
+        { success: errors.length === 0, synced, errors: errors.length }
+      );
+
+      return {
+        success: errors.length === 0,
+        itemsSynced: synced,
+        itemsFailed: 0,
+        conflicts,
+        errors,
+        timestamp: startTime,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("❌ [SyncEngine] scoped syncDown failed:", errorMsg);
+      errors.push(errorMsg);
       return {
         success: false,
         itemsSynced: synced,
@@ -465,10 +610,10 @@ export class SyncEngine {
 
         // Check if table uses composite keys
         const compositeKeys = getCompositeKeyFields(tableName);
-
-        if (compositeKeys && !remoteData.id) {
-          // Composite key table WITHOUT id field - use UPSERT with onConflict
-          // This happens when we only have composite key fields (no id)
+        if (compositeKeys) {
+          // ALWAYS use UPSERT for composite key tables.
+          // Reason: We frequently queue 'update' after local insert. A pure UPDATE would be a no-op remotely if row doesn't exist yet.
+          // Using UPSERT guarantees creation (insert) or update without duplicate errors.
           const { error } = await this.supabase
             .from(tableName)
             .upsert(remoteData, {
@@ -476,9 +621,8 @@ export class SyncEngine {
             });
           if (error) throw error;
         } else {
-          // Standard primary key column (may be 'id' or table-specific like 'playlist_id')
+          // Standard single PK update path
           const pkColumn = getPrimaryKeyColumn(tableName);
-
           if (!remoteData[pkColumn]) {
             throw new Error(
               `UPDATE operation requires ${pkColumn} in data for table ${tableName}`
@@ -486,8 +630,9 @@ export class SyncEngine {
           }
           const { error } = await this.supabase
             .from(tableName)
-            .update(remoteData)
-            .eq(pkColumn, String(remoteData[pkColumn]));
+            .upsert(remoteData, {
+              onConflict: pkColumn,
+            });
           if (error) throw error;
         }
         break;
@@ -498,26 +643,34 @@ export class SyncEngine {
 
         // Check if table uses composite keys
         const compositeKeys = getCompositeKeyFields(tableName);
-
         if (compositeKeys) {
-          // Composite key table - build DELETE query with all key fields
-          let query = this.supabase.from(tableName).delete();
-
-          for (const keyField of compositeKeys) {
-            if (!remoteData[keyField]) {
-              throw new Error(
-                `DELETE operation requires ${keyField} in data for composite key table ${tableName}`
-              );
-            }
-            query = query.eq(keyField, remoteData[keyField]);
-          }
-
-          const { error } = await query;
-          if (error) throw error;
-        } else {
-          // Soft delete: set deleted flag using table-specific primary key
+          // If composite key fields are present, delete by composite key.
+          // If only an id is provided (legacy queue), fallback to deleting by id.
           const pkColumn = getPrimaryKeyColumn(tableName);
-
+          const hasAllComposite = compositeKeys.every(
+            (k) => remoteData[k] !== undefined && remoteData[k] !== null
+          );
+          if (hasAllComposite) {
+            let query = this.supabase.from(tableName).delete();
+            for (const keyField of compositeKeys) {
+              query = query.eq(keyField, remoteData[keyField]);
+            }
+            const { error } = await query;
+            if (error) throw error;
+          } else if (remoteData[pkColumn]) {
+            const { error } = await this.supabase
+              .from(tableName)
+              .delete()
+              .eq(pkColumn, remoteData[pkColumn]);
+            if (error) throw error;
+          } else {
+            throw new Error(
+              `DELETE operation requires either composite keys (${compositeKeys.join(",")}) or ${pkColumn} for table ${tableName}`
+            );
+          }
+        } else {
+          // Soft delete path replaced with hard delete for simplicity until server implements deleted flag semantics
+          const pkColumn = getPrimaryKeyColumn(tableName);
           if (!remoteData[pkColumn]) {
             throw new Error(
               `DELETE operation requires ${pkColumn} in data for table ${tableName}`
@@ -525,7 +678,7 @@ export class SyncEngine {
           }
           const { error } = await this.supabase
             .from(tableName)
-            .update({ deleted: true })
+            .delete()
             .eq(pkColumn, String(remoteData[pkColumn]));
           if (error) throw error;
         }
@@ -543,7 +696,11 @@ export class SyncEngine {
    * @param tableName - Name of table to sync
    * @returns Number of records synced
    */
-  private async syncTableDown(tableName: SyncableTable): Promise<number> {
+  private async syncTableDown(
+    tableName: SyncableTable,
+    previousSyncTimestamp?: string | null,
+    incrementalEligible?: boolean
+  ): Promise<number> {
     syncLog(`[SyncEngine] Syncing table: ${tableName}`);
 
     const localTable = this.getLocalTable(tableName);
@@ -564,6 +721,14 @@ export class SyncEngine {
     // Build query based on table structure
     // NOTE: RLS policies should filter, but we add explicit filters for safety
     let query = this.supabase.from(tableName).select("*");
+
+    const incremental = !!previousSyncTimestamp && !!incrementalEligible;
+    if (incremental) {
+      query = query.gte("last_modified_at", previousSyncTimestamp!);
+      syncLog(
+        `[SyncEngine] Incremental filter applied to ${tableName}: last_modified_at >= ${previousSyncTimestamp}`
+      );
+    }
 
     // Skip user filtering for reference data (shared across all users)
     if (!isReferenceData) {
@@ -1203,6 +1368,50 @@ export class SyncEngine {
   setLastSyncTimestamp(timestamp: string): void {
     this.lastSyncTimestamp = timestamp;
   }
+
+  /**
+   * Clear last sync timestamp to force next syncDown to run in full mode.
+   */
+  clearLastSyncTimestamp(): void {
+    this.lastSyncTimestamp = null;
+  }
+
+  /** Was the most recent syncDown run incremental (true) or full (false)? */
+  wasLastSyncIncremental(): boolean {
+    return this.lastSyncWasIncremental;
+  }
+}
+
+// Tables that include a writable last_modified_at column and are safe for incremental sync.
+// Reference data & tables without modification timestamps are excluded.
+const INCREMENTAL_TABLES: SyncableTable[] = [
+  "playlist",
+  "playlist_tune",
+  "practice_record",
+  "daily_practice_queue",
+  "table_transient_data",
+  "note",
+  "reference",
+  "tag",
+  "tune_override",
+  "tune",
+  "table_state",
+  "tab_group_main_state",
+  "prefs_scheduling_options",
+  "prefs_spaced_repetition",
+  "user_profile", // user can update profile fields
+  // instrument excluded only if considered global reference; include if per-user edits allowed
+];
+
+function supportsIncrementalTable(tableName: SyncableTable): boolean {
+  return INCREMENTAL_TABLES.includes(tableName);
+}
+
+/** Determine if an error is a network-level fetch failure (e.g., offline, DNS, CORS). */
+function isNetworkError(error: unknown): boolean {
+  if (!error) return false;
+  // Supabase client surfaces network failures as TypeError('Failed to fetch')
+  return error instanceof TypeError && /Failed to fetch/i.test(error.message);
 }
 
 /**

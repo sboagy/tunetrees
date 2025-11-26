@@ -83,6 +83,37 @@ export class SyncService {
   }
 
   /**
+   * Get last successful syncDown timestamp from underlying SyncEngine.
+   * Returns null if no syncDown has completed yet.
+   */
+  public getLastSyncDownTimestamp(): string | null {
+    // Access private syncEngine via indexed cast; method is public on engine.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (this.syncEngine as any).getLastSyncTimestamp?.() ?? null;
+  }
+
+  /** Return 'incremental' or 'full' based on last syncDown run */
+  public getLastSyncMode(): "incremental" | "full" | null {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const engine: any = this.syncEngine as any;
+    if (!engine.getLastSyncTimestamp?.()) return null; // no sync yet
+    const inc = engine.wasLastSyncIncremental?.();
+    return inc ? "incremental" : "full";
+  }
+
+  /**
+   * Force a full syncDown by clearing incremental watermark first.
+   * Useful for manual refresh from UI (e.g. DB menu command).
+   */
+  public async forceFullSyncDown(): Promise<SyncResult> {
+    // Clear incremental timestamp so syncDown treats this as cold start.
+    // Access SyncEngine via private field method.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this.syncEngine as any).clearLastSyncTimestamp?.();
+    return await this.syncDown();
+  }
+
+  /**
    * Initialize Supabase Realtime subscriptions
    */
   private initializeRealtime(): void {
@@ -230,6 +261,49 @@ export class SyncService {
       // Notify callback (same as sync() method)
       this.config.onSyncComplete?.(result);
 
+      return result;
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  /**
+   * Scoped syncDown: pull remote changes only for specified tables.
+   * Still uploads pending local changes first to avoid zombie resurrect.
+   */
+  public async syncDownTables(tables: SyncableTable[]): Promise<SyncResult> {
+    if (this.isSyncing) {
+      throw new Error("Sync already in progress");
+    }
+
+    this.isSyncing = true;
+    try {
+      const stats = await this.syncEngine.getSyncQueueStats();
+      if (stats.pending > 0) {
+        console.log(
+          `[SyncService] ⚠️  BLOCKING scoped syncDown: ${stats.pending} pending changes must upload first`
+        );
+        try {
+          await this.syncEngine.syncUp();
+          console.log(
+            "[SyncService] ✅ Pending changes uploaded - scoped syncDown safe"
+          );
+        } catch (error) {
+          console.error(
+            "[SyncService] ❌ Failed to upload pending changes before scoped syncDown:",
+            error
+          );
+          throw new Error(
+            "Cannot run scoped syncDown while pending changes exist - upload failed."
+          );
+        }
+      }
+
+      // Access SyncEngine private method via index cast (method is public we added).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const engine: any = this.syncEngine as any;
+      const result: SyncResult = await engine.syncDownTables(tables);
+      this.config.onSyncComplete?.(result);
       return result;
     } finally {
       this.isSyncing = false;

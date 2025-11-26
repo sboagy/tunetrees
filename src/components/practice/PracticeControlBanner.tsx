@@ -318,6 +318,20 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             <span class="hidden sm:inline">
               {props.flashcardMode ? "Fields" : "Columns"}
             </span>
+            <svg
+              class="w-3.5 h-3.5 hidden lg:inline"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
           </button>
 
           {/* Grid Columns menu */}

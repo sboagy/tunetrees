@@ -26,6 +26,9 @@ export type PracticeRecord = InferSelectModel<typeof schema.practiceRecord>;
 export type PrefsSpacedRepetition = InferSelectModel<
   typeof schema.prefsSpacedRepetition
 >;
+export type PrefsSchedulingOptions = InferSelectModel<
+  typeof schema.prefsSchedulingOptions
+>;
 export type DailyPracticeQueue = InferSelectModel<
   typeof schema.dailyPracticeQueue
 >;
@@ -50,6 +53,9 @@ export type NewPracticeRecord = InferInsertModel<typeof schema.practiceRecord>;
 export type NewPrefsSpacedRepetition = InferInsertModel<
   typeof schema.prefsSpacedRepetition
 >;
+export type NewPrefsSchedulingOptions = InferInsertModel<
+  typeof schema.prefsSchedulingOptions
+>;
 export type NewDailyPracticeQueue = InferInsertModel<
   typeof schema.dailyPracticeQueue
 >;
@@ -61,6 +67,16 @@ export type NewTuneType = InferInsertModel<typeof schema.tuneType>;
 //   typeof schema.userAnnotationSet
 // >;
 export type NewSyncQueueItem = InferInsertModel<typeof schema.syncQueue>;
+// Normalized user scheduling options used across services
+export interface IUserSchedulingOptions {
+  userId: string;
+  acceptableDelinquencyWindow: number;
+  minReviewsPerDay: number;
+  maxReviewsPerDay: number;
+  daysPerWeek: number | null;
+  weeklyRules: string | null;
+  exceptions: string | null;
+}
 
 // ============================================================================
 // View Models & Joined Data

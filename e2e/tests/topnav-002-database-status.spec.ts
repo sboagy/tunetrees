@@ -153,7 +153,7 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
     }
   });
 
-  test("should show 'Force Sync Down' button", async ({ page }) => {
+  test("should show 'Force Full Sync Down' button", async ({ page }) => {
     const dbButton = ttPage.databaseStatusDropdown;
 
     if (await dbButton.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -162,7 +162,7 @@ test.describe("TOPNAV-002: Database Status Dropdown", () => {
 
       // Should have Force Sync button
       const forceSyncButton = page.getByRole("button", {
-        name: /Force Sync Down/i,
+        name: /Force Full Sync Down/i,
       });
       await expect(forceSyncButton).toBeVisible({ timeout: 2000 });
       await expect(forceSyncButton).toBeEnabled();

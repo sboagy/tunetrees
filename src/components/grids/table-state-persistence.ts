@@ -87,12 +87,13 @@ export function getDefaultTableState(
         // Show all practice-relevant columns by default
         bucket: true,
         evaluation: true,
-        goal: true,
+        goal: false,
         type: true,
         mode: true,
-        incipit: true,
-        private_for: true, // Status column
+        incipit: false,
+        private_for: false, // Status column
         scheduled: true,
+        scheduled_raw: true,
         latest_practiced: true,
         latest_goal: true,
         latest_technique: true,
@@ -101,6 +102,7 @@ export function getDefaultTableState(
         latest_easiness: true,
         latest_repetitions: true,
         latest_due: true,
+        learned: false,
         // Hide less important columns
         id: false,
         structure: false,
@@ -112,17 +114,20 @@ export function getDefaultTableState(
       baseState.columnVisibility = {
         id: false,
         incipit: false,
+        scheduled: true,
+        latest_practiced: true,
         latest_quality: false,
         latest_easiness: false,
         latest_stability: false,
         latest_interval: false,
-        latest_due: false,
+        latest_due: true,
         tags: false,
         purpose: false,
         note_private: false,
         note_public: false,
         has_override: false,
         has_staged: false,
+        learned: false,
       };
       baseState.sorting = [{ id: "title", desc: false }]; // Sort by title
       break;
@@ -149,10 +154,18 @@ export function mergeWithDefaults(
 
   if (!loadedState) return defaults;
 
+  // Merge column visibility so defaults for new columns apply when upgrading.
+  // If loaded visibility map is empty, fall back entirely to defaults.
+  const mergedVisibility =
+    loadedState.columnVisibility &&
+    Object.keys(loadedState.columnVisibility).length > 0
+      ? { ...defaults.columnVisibility, ...loadedState.columnVisibility }
+      : defaults.columnVisibility;
+
   return {
     columnSizing: loadedState.columnSizing ?? defaults.columnSizing,
     columnOrder: loadedState.columnOrder ?? defaults.columnOrder,
-    columnVisibility: loadedState.columnVisibility ?? defaults.columnVisibility,
+    columnVisibility: mergedVisibility,
     scrollTop: loadedState.scrollTop ?? defaults.scrollTop,
     sorting: loadedState.sorting ?? defaults.sorting,
     globalFilter: loadedState.globalFilter ?? defaults.globalFilter,
