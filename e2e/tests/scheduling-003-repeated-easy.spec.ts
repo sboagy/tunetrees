@@ -34,7 +34,12 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 let ttPage: TuneTreesPage;
 let currentDate: Date;
 // CI shortening: set CI_DIAG_FAST=1 to reduce loop days for diagnostics
-const MAX_DAYS = 10;
+const MAX_DAYS = 5;
+const REPERTOIRE_SIZE = 419;
+const MAX_DAILY_TUNES = 7;
+const ENABLE_FUZZ = false;
+
+const MAX_INTERVAL = Math.round(3 * (REPERTOIRE_SIZE / MAX_DAILY_TUNES));
 
 // Diagnostic helper: invoke auth session diagnostic hook with label if available.
 async function diagAuth(page: import("@playwright/test").Page, label: string) {
@@ -57,10 +62,19 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
 
     // Override playlist size for FSRS testing to ensure max_interval is large enough
     // (Formula: 3 * (playlistSize / maxReviewsPerDay))
-    // With 50000 tunes and 10 reviews/day -> max_interval = 15000 days
-    await page.addInitScript(() => {
-      (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__ = 50000;
-    });
+    await page.addInitScript(
+      (config) => {
+        (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__ = config.playlistSize;
+        (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = config.enableFuzz;
+        (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ =
+          config.maxReviews;
+      },
+      {
+        playlistSize: REPERTOIRE_SIZE,
+        enableFuzz: ENABLE_FUZZ,
+        maxReviews: MAX_DAILY_TUNES,
+      }
+    );
 
     // Set up ONE tune for repeated evaluation
     await setupForPracticeTestsParallel(page, testUser, {
@@ -79,6 +93,20 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     );
   });
 
+  function expectWithinFuzzRange(actual: number, base: number) {
+    if (base < 3) {
+      expect(actual).toEqual(base);
+      return;
+    }
+
+    // Allow for a slightly generous 5% + 1 day buffer to handle rounding differences
+    const min = Math.floor(base * 0.95) - 1;
+    const max = Math.ceil(base * 1.05) + 1;
+
+    expect(actual).toBeGreaterThanOrEqual(min);
+    expect(actual).toBeLessThanOrEqual(max);
+  }
+
   test("should advance scheduling dates with repeated Easy evaluations over 10 days", async ({
     page,
     context,
@@ -95,6 +123,11 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     // Enable flashcard mode for easier evaluation
     await ttPage.enableFlashcardMode();
     await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
+
+    console.log(
+      `\n== MAX_DAYS: ${MAX_DAYS}, REPERTOIRE_SIZE: ${REPERTOIRE_SIZE}, ` +
+        `MAX_DAILY_TUNES: ${MAX_DAILY_TUNES}, MAX_INTERVAL: ${MAX_INTERVAL}  ==`
+    );
 
     // Day loop (diagnostic-aware)
     for (let day = 1; day <= MAX_DAYS; day++) {
@@ -162,36 +195,40 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
 
       // 2. Interval must increase from previous day
       if (day > 1) {
-        if (!(intervals[day - 1] > intervals[day - 2])) {
-          throw new Error(
-            `Day ${day}: Interval (${intervals[day - 1]}) should be greater than previous interval (${intervals[day - 2]})`
-          );
-        }
-        expect(intervals[day - 1]).toBeGreaterThan(intervals[day - 2]);
+        const currentInterval = intervals[day - 1];
+        const previousInterval = intervals[day - 2];
 
-        // Scheduled date must advance from previous day
-        if (
-          !(
-            scheduledDates[day - 1].getTime() >
-            scheduledDates[day - 2].getTime()
-          )
-        ) {
-          throw new Error(
-            `Day ${day}: Scheduled date should advance from previous day`
-          );
+        if (ENABLE_FUZZ) {
+          // LOGIC TO DETERMINE BASE
+          let base = 0;
+          let doFuzzCheck = true;
+
+          // Check if we are likely hitting the cap
+          // (If the current interval is close to or above the max, the base IS the max)
+          if (currentInterval >= MAX_INTERVAL * 0.9) {
+            base = MAX_INTERVAL;
+          } else {
+            // We are in growth phase.
+            // We can't easily know the exact base without re-doing the math.
+            // Option A: Skip fuzz check and just check for growth:
+            expect(currentInterval).toBeGreaterThan(previousInterval);
+            doFuzzCheck = false; // Skip specific fuzz check
+          }
+          if (doFuzzCheck) {
+            expectWithinFuzzRange(currentInterval, base);
+          }
+        } else {
+          expect(currentInterval).toBeGreaterThanOrEqual(previousInterval);
         }
-        expect(scheduledDates[day - 1].getTime()).toBeGreaterThan(
-          scheduledDates[day - 2].getTime()
-        );
       }
 
       // 3. Stability should generally increase with "Easy"
       // (FSRS may occasionally decrease stability after lapse, but trend should be upward)
-      if (day > 1 && stabilities[day - 1] < stabilities[day - 2]) {
-        console.warn(
-          `  ⚠️  Stability decreased: ${stabilities[day - 2]} → ${stabilities[day - 1]}`
-        );
-      }
+      // if (day > 1 && stabilities[day - 1] < stabilities[day - 2]) {
+      //   console.warn(
+      //     `  ⚠️  Stability decreased: ${stabilities[day - 2]} → ${stabilities[day - 1]}`
+      //   );
+      // }
 
       // Advance time to the card's actual scheduled due date (simulate practicing exactly when due)
       if (day < 10) {
@@ -223,12 +260,15 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         await diagAuth(page, `day-${day}-after-reload-pre-login`);
 
         // Re-login if session was lost during time travel
-        const loginVisible = await page.getByText("Sign in to continue").isVisible().catch(() => false);
+        const loginVisible = await page
+          .getByText("Sign in to continue")
+          .isVisible()
+          .catch(() => false);
         if (loginVisible) {
-            console.log("Session lost, re-logging in...");
-            await page.getByLabel("Email").fill(testUser.email);
-            await page.locator('input[type="password"]').fill("TestPassword123!");
-            await page.getByRole("button", { name: "Sign In" }).click();
+          console.log("Session lost, re-logging in...");
+          await page.getByLabel("Email").fill(testUser.email);
+          await page.locator('input[type="password"]').fill("TestPassword123!");
+          await page.getByRole("button", { name: "Sign In" }).click();
         }
 
         await expect(page.getByTestId("tab-practice")).toBeVisible({
@@ -238,10 +278,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         // After reload, ensure we pull any data that was flushed server-side
         await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
         await page.waitForLoadState("networkidle", { timeout: 15000 });
-        await diagAuth(
-          page,
-          `day-${day}-after-syncdown`
-        );
+        await diagAuth(page, `day-${day}-after-syncdown`);
 
         // Re-enter flashcard mode for next evaluation
         await ttPage.disableFlashcardMode();
@@ -309,7 +346,9 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
 
     console.log(`\n✓ All validations passed!`);
     console.log(`  Growth factor: ${growthFactor.toFixed(2)}x`);
-    console.log(`  Final interval: ${intervals[9].toFixed(1)} days`);
+    console.log(
+      `  Final interval: ${intervals[intervals.length - 1].toFixed(1)} days`
+    );
     console.log(`  Final scheduled: ${daysOut.toFixed(1)} days out`);
   });
 

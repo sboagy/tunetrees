@@ -121,26 +121,55 @@ export class FSRSService {
       scheduling.maxReviewsPerDay && scheduling.maxReviewsPerDay > 0
         ? scheduling.maxReviewsPerDay
         : 10;
-    
+
     // Allow test override via window property
-    const testOverride =
+    const tuneCountOverride =
       typeof window !== "undefined"
         ? (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__
         : undefined;
-    const playlistTuneCount: number =
-      testOverride ?? this.playlistTuneCount ?? 400;
+    const effectivePlaylistTuneCount: number =
+      tuneCountOverride ?? this.playlistTuneCount ?? 400;
+
+    const testMaxReviewsOverride =
+      typeof window !== "undefined"
+        ? (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__
+        : undefined;
+    const effectiveMaxReviews = testMaxReviewsOverride ?? maxReviewsPerDay;
 
     const calculatedMaxInterval = Math.round(
-      3 * (playlistTuneCount / maxReviewsPerDay)
+      3 * (effectivePlaylistTuneCount / effectiveMaxReviews)
     );
+
+    const testRequestRetentionOverride =
+      typeof window !== "undefined"
+        ? (window as any).__TUNETREES_TEST_REQUEST_RETENTION__
+        : undefined;
+
+    const testEnableFuzzOverride =
+      typeof window !== "undefined"
+        ? (window as any).__TUNETREES_TEST_ENABLE_FUZZ__
+        : undefined;
+
+    if (typeof window !== "undefined") {
+      console.log("[FSRSService] Initializing with overrides:", {
+        effectivePlaylistTuneCount,
+        effectiveMaxReviews,
+        calculatedMaxInterval,
+        testRequestRetentionOverride,
+        testEnableFuzzOverride,
+      });
+    }
 
     // Initialize ts-fsrs scheduler with user preferences
     this.scheduler = fsrs({
       w: weights,
       // High retention (95%) as default because 'Performance' requires higher recall than 'Facts'
-      request_retention: prefs.requestRetention ?? 0.95,
+      request_retention:
+        testRequestRetentionOverride ?? prefs.requestRetention ?? 0.95,
       maximum_interval: calculatedMaxInterval, // prefs.maximumInterval ?? calculatedMaxInterval,
-      enable_fuzz: prefs.enableFuzzing ? Boolean(prefs.enableFuzzing) : true,
+      enable_fuzz:
+        testEnableFuzzOverride ??
+        (prefs.enableFuzzing ? Boolean(prefs.enableFuzzing) : true),
       enable_short_term: true, // Always enable for new cards
       learning_steps: learningSteps as `${number}${"m" | "h" | "d"}`[],
       relearning_steps: relearningSteps as `${number}${"m" | "h" | "d"}`[],
