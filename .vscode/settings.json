@@ -96,7 +96,8 @@
                 "copilot/gpt-4.1",
                 "copilot/gpt-5",
                 "copilot/gpt-5-mini",
-                "copilot/gpt-5-codex"
+                "copilot/gpt-5-codex",
+                "copilot/claude-opus-4.5"
             ]
         }
     }
