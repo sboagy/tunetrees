@@ -155,3 +155,6 @@ legacy/frontend/**
 _notes/OLD_E2E_README.md
 _notes/TEST_GENERATION_SUMMARY.md
 _notes/anon_user_conversion_pattern.md
+_notes/plan-sqlViewConsolidation_draft.md
+sql_scripts/_scratch/**
+_notes/_archive/**

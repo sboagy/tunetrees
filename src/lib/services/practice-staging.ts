@@ -14,10 +14,12 @@
  */
 
 import { sql } from "drizzle-orm";
-import { type Card, createEmptyCard, fsrs, Rating } from "ts-fsrs";
+import { Rating } from "ts-fsrs";
 import { persistDb, type SqliteDatabase } from "../db/client-sqlite";
+import type { RecordPracticeInput } from "../db/types";
 import { queueSync } from "../sync/queue";
 import { ensureMinimumNextDay } from "../utils/practice-date";
+import { evaluatePractice } from "./practice-recording";
 
 /**
  * Preview metrics from FSRS calculation
@@ -54,59 +56,7 @@ function mapEvaluationToRating(evaluation: string): Rating {
 /**
  * Get latest practice record for a tune
  */
-async function getLatestPracticeRecord(
-  db: SqliteDatabase,
-  tuneId: string,
-  playlistId: string
-): Promise<Card | null> {
-  const result = await db.all<{
-    stability: number | null;
-    difficulty: number | null;
-    state: number | null;
-    repetitions: number | null;
-    lapses: number | null;
-    due: string | null;
-    elapsed_days: number | null;
-    last_modified_at: string | null;
-  }>(sql`
-    SELECT 
-      stability, 
-      difficulty, 
-      state, 
-      repetitions, 
-      lapses,
-      due, 
-      elapsed_days,
-      last_modified_at
-    FROM practice_record
-    WHERE tune_ref = ${tuneId}
-      AND playlist_ref = ${playlistId}
-    ORDER BY id DESC
-    LIMIT 1
-  `);
-
-  if (!result || result.length === 0) {
-    return null;
-  }
-
-  const record = result[0];
-
-  // Convert to FSRS Card format
-  return {
-    stability: record.stability ?? 0,
-    difficulty: record.difficulty ?? 0,
-    state: record.state ?? 0,
-    reps: record.repetitions ?? 0,
-    lapses: record.lapses ?? 0,
-    due: record.due ? new Date(record.due) : new Date(),
-    elapsed_days: record.elapsed_days ?? 0,
-    scheduled_days: 0,
-    learning_steps: 0, // Managed by FSRS
-    last_review: record.last_modified_at
-      ? new Date(record.last_modified_at)
-      : new Date(),
-  };
-}
+// Removed custom latest record reconstruction; evaluatePractice handles this internally.
 
 /**
  * Stage practice evaluation with FSRS preview
@@ -139,51 +89,37 @@ export async function stagePracticeEvaluation(
   goal: string = "recall",
   technique: string = ""
 ): Promise<FSRSPreviewMetrics> {
-  // Get latest practice state
-  const latestCard = await getLatestPracticeRecord(db, tuneId, playlistId);
-
-  // Initialize FSRS scheduler
-  const f = fsrs();
-
-  // Convert evaluation to FSRS rating
-  const rating = mapEvaluationToRating(evaluation);
-
-  // Calculate next review
   const now = new Date();
-  const card: Card = latestCard ?? createEmptyCard(now);
-  const schedulingCards = f.repeat(card, now);
+  // Build RecordPracticeInput for evaluatePractice
+  const input: RecordPracticeInput = {
+    tuneRef: tuneId,
+    playlistRef: playlistId,
+    practiced: now,
+    // Use FSRS Rating values (Again=1, Hard=2, Good=3, Easy=4) – Manual (0) not used here
+    quality: mapEvaluationToRating(evaluation),
+    goal,
+    technique,
+  };
+  const { schedule } = await evaluatePractice(db, userId, input);
 
-  // Access the specific rating result
-  const ratingKey = rating as
-    | Rating.Again
-    | Rating.Hard
-    | Rating.Good
-    | Rating.Easy;
-  const nextCard = schedulingCards[ratingKey].card;
-
-  // CRITICAL: Ensure tunes are never scheduled for the same day
-  // FSRS can schedule very soon (same day) for "Again" ratings, but for
-  // tune practice, we enforce a minimum of next day.
-  const adjustedDue = ensureMinimumNextDay(nextCard.due, now);
-
-  // Recalculate interval based on adjusted due date
-  const adjustedInterval = Math.max(
+  // Enforce minimum next-day due date (business rule)
+  const adjustedDue = ensureMinimumNextDay(schedule.nextDue, now);
+  const intervalDays = Math.max(
     1,
     Math.round((adjustedDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
   );
 
-  // Extract preview metrics
   const preview: FSRSPreviewMetrics = {
-    quality: rating,
-    easiness: null, // FSRS doesn't use easiness (SM2 concept)
-    difficulty: nextCard.difficulty,
-    stability: nextCard.stability,
-    interval: adjustedInterval, // Use adjusted interval (minimum 1 day)
-    step: nextCard.state,
-    repetitions: nextCard.reps,
+    quality: input.quality,
+    easiness: null,
+    difficulty: schedule.difficulty,
+    stability: schedule.stability,
+    interval: intervalDays,
+    step: schedule.state,
+    repetitions: schedule.reps,
     practiced: now.toISOString(),
-    due: adjustedDue.toISOString(), // Use adjusted due date (minimum next day)
-    state: nextCard.state,
+    due: adjustedDue.toISOString(),
+    state: schedule.state,
     goal,
     technique,
   };

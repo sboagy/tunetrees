@@ -23,11 +23,13 @@ import type { SqliteDatabase } from "../db/client-sqlite";
 import {
   getLatestPracticeRecord,
   getUserPreferences,
+  getUserSchedulingOptions,
 } from "../db/queries/practice";
 import { playlistTune, practiceRecord } from "../db/schema";
 import type {
   NewPracticeRecord,
   NextReviewSchedule,
+  PracticeRecord,
   RecordPracticeInput,
 } from "../db/types";
 import { FSRS_QUALITY_MAP, FSRSService } from "../scheduling/fsrs-service";
@@ -80,104 +82,111 @@ export interface RecordPracticeResult {
  * }
  * ```
  */
+/**
+ * Evaluate a single practice input using FSRS and produce a new practice record (not yet persisted).
+ * Centralizes all FSRS interactions so callers do not touch ts-fsrs directly.
+ */
+export async function evaluatePractice(
+  db: SqliteDatabase,
+  userId: string,
+  input: RecordPracticeInput
+): Promise<{
+  schedule: NextReviewSchedule;
+  record: NewPracticeRecord;
+  prior: PracticeRecord | null;
+}> {
+  const prefs = await getUserPreferences(db, userId);
+  if (!prefs) {
+    throw new Error("User FSRS preferences not found");
+  }
+  const scheduling = await getUserSchedulingOptions(db, userId);
+  const fsrsService = new FSRSService(prefs, scheduling, db, input.playlistRef);
+  const latestRecord = await getLatestPracticeRecord(
+    db,
+    input.tuneRef,
+    input.playlistRef
+  );
+  const schedule = latestRecord
+    ? fsrsService.processReview(input, latestRecord)
+    : fsrsService.processFirstReview(input);
+
+  // Lapses business rule override (Again only increments when prior state was Review=2)
+  const priorState = latestRecord?.state ?? 0;
+  let lapsesValue = latestRecord?.lapses ?? 0;
+  if (input.quality === FSRS_QUALITY_MAP.AGAIN && priorState === 2) {
+    lapsesValue += 1;
+  }
+
+  const record: NewPracticeRecord = {
+    id: generateId(),
+    lastModifiedAt: getPracticeDate().toISOString(),
+    playlistRef: input.playlistRef,
+    tuneRef: input.tuneRef,
+    practiced: input.practiced.toISOString(),
+    quality: input.quality,
+    easiness: null,
+    interval: schedule.interval,
+    repetitions: schedule.reps,
+    due: schedule.nextDue.toISOString(),
+    backupPracticed: null,
+    stability: schedule.stability,
+    elapsedDays: schedule.elapsed_days,
+    lapses: lapsesValue,
+    state: schedule.state,
+    difficulty: schedule.difficulty,
+    step: null,
+    goal: input.goal || "recall",
+    technique: input.technique || null,
+  };
+  return { schedule, record, prior: latestRecord ?? null };
+}
+
+/**
+ * Persist a new practice record and update playlist_tune + sync queue.
+ */
+async function persistPracticeRecord(
+  db: SqliteDatabase,
+  record: NewPracticeRecord
+): Promise<NewPracticeRecord> {
+  const insertResult = await db
+    .insert(practiceRecord)
+    .values(record)
+    .returning();
+  const inserted = insertResult[0];
+  if (!inserted) throw new Error("Failed to insert practice record");
+  await db
+    .update(playlistTune)
+    .set({
+      current: record.due,
+      lastModifiedAt: getPracticeDate().toISOString(),
+    })
+    .where(
+      and(
+        eq(playlistTune.playlistRef, record.playlistRef),
+        eq(playlistTune.tuneRef, record.tuneRef)
+      )
+    );
+  await queueSync(db, "practice_record", "update", inserted);
+  await queueSync(db, "playlist_tune", "update", {
+    playlistRef: record.playlistRef,
+    tuneRef: record.tuneRef,
+  });
+  return inserted;
+}
+
+/**
+ * Unified public API: evaluate + persist in one call (immediate commit path).
+ * Staged flow should call evaluatePractice and persist later via the staging commit.
+ */
 export async function recordPracticeRating(
   db: SqliteDatabase,
   userId: string,
   input: RecordPracticeInput
 ): Promise<RecordPracticeResult> {
   try {
-    // 1. Get user FSRS preferences
-    const prefs = await getUserPreferences(db, userId);
-    if (!prefs) {
-      return {
-        success: false,
-        error: "User FSRS preferences not found",
-      };
-    }
-
-    // 2. Initialize FSRS service with user preferences
-    const fsrsService = new FSRSService(prefs);
-
-    // 3. Get latest practice record for this tune (for FSRS history)
-    const latestRecord = await getLatestPracticeRecord(
-      db,
-      input.tuneRef,
-      input.playlistRef
-    );
-
-    // 4. Calculate next review schedule using FSRS
-    const schedule = latestRecord
-      ? fsrsService.processReview(input, latestRecord)
-      : fsrsService.processFirstReview(input);
-
-    // 5. Create new practice record
-    const practicedDateStr = input.practiced.toISOString();
-    const dueStr = schedule.nextDue.toISOString();
-
-    const newRecord: NewPracticeRecord = {
-      id: generateId(),
-      lastModifiedAt: getPracticeDate().toISOString(),
-      playlistRef: input.playlistRef,
-      tuneRef: input.tuneRef,
-      practiced: practicedDateStr,
-      quality: input.quality,
-      easiness: null, // Legacy SM2 field, not used in FSRS
-      interval: schedule.interval,
-      repetitions: schedule.reps,
-      due: dueStr,
-      backupPracticed: null, // For migration compatibility
-      stability: schedule.stability,
-      elapsedDays: schedule.elapsed_days,
-      lapses: schedule.lapses,
-      state: schedule.state,
-      difficulty: schedule.difficulty,
-      step: null,
-      goal: input.goal || "recall",
-      technique: input.technique || null,
-    };
-
-    // 6. Insert practice record into local SQLite
-    const insertResult = await db
-      .insert(practiceRecord)
-      .values(newRecord)
-      .returning();
-
-    const insertedRecord = insertResult[0];
-
-    if (!insertedRecord) {
-      return {
-        success: false,
-        error: "Failed to insert practice record",
-      };
-    }
-
-    // 7. Update playlist_tune.current field (next review date)
-    await db
-      .update(playlistTune)
-      .set({
-        current: dueStr,
-        lastModifiedAt: getPracticeDate().toISOString(),
-      })
-      .where(
-        and(
-          eq(playlistTune.playlistRef, input.playlistRef),
-          eq(playlistTune.tuneRef, input.tuneRef)
-        )
-      );
-
-    // 8. Queue changes for background sync to Supabase
-    // Use "update" operation so sync engine does UPSERT (handles duplicates gracefully)
-    await queueSync(db, "practice_record", "update", insertedRecord);
-    await queueSync(db, "playlist_tune", "update", {
-      playlistRef: input.playlistRef,
-      tuneRef: input.tuneRef,
-    });
-
-    return {
-      success: true,
-      practiceRecord: insertedRecord,
-      nextReview: schedule,
-    };
+    const { schedule, record } = await evaluatePractice(db, userId, input);
+    const inserted = await persistPracticeRecord(db, record);
+    return { success: true, practiceRecord: inserted, nextReview: schedule };
   } catch (error) {
     console.error("Error recording practice rating:", error);
     return {
@@ -187,48 +196,8 @@ export async function recordPracticeRating(
   }
 }
 
-/**
- * Batch record multiple practice ratings
- *
- * Used when recording a complete practice session with multiple tunes.
- * Processes each rating sequentially to maintain proper FSRS state.
- *
- * @param db - SQLite database instance
- * @param userId - User UUID
- * @param inputs - Array of practice rating inputs
- * @returns Array of results for each rating
- *
- * @example
- * ```typescript
- * const results = await batchRecordPracticeRatings(db, 'user-uuid', [
- *   { tune_ref: 123, playlist_ref: 1, quality: 3, goal: 'recall', practiced: new Date() },
- *   { tune_ref: 456, playlist_ref: 1, quality: 4, goal: 'recall', practiced: new Date() },
- * ]);
- *
- * const successCount = results.filter(r => r.success).length;
- * console.log(`Recorded ${successCount} of ${results.length} ratings`);
- * ```
- */
-export async function batchRecordPracticeRatings(
-  db: SqliteDatabase,
-  userId: string,
-  inputs: RecordPracticeInput[]
-): Promise<RecordPracticeResult[]> {
-  const results: RecordPracticeResult[] = [];
-
-  // Process sequentially to maintain proper FSRS state
-  // (each rating depends on previous practice history)
-  for (const input of inputs) {
-    const result = await recordPracticeRating(db, userId, input);
-    results.push(result);
-
-    // Stop processing on first error if desired
-    // (commented out - currently processes all ratings)
-    // if (!result.success) break;
-  }
-
-  return results;
-}
+// NOTE: Former batchRecordPracticeRatings removed. For batch workflows,
+// stage evaluations by calling evaluatePractice for each, persist later.
 
 /**
  * Get practice statistics for a tune
@@ -542,6 +511,27 @@ export async function commitStagedEvaluations(
 
       // Insert practice_record
       const recordId = generateId();
+      // Determine prior state & lapses (latest committed record for tune/playlist)
+      const prior = await db.get<{
+        lapses: number | null;
+        state: number | null;
+      }>(sql`
+        SELECT lapses, state
+        FROM practice_record
+        WHERE tune_ref = ${staged.tune_id} AND playlist_ref = ${playlistId}
+        ORDER BY
+          CASE WHEN practiced IS NULL THEN 1 ELSE 0 END ASC,
+          practiced DESC,
+          last_modified_at DESC
+        LIMIT 1
+      `);
+      const priorLapses = prior?.lapses ?? 0;
+      const priorState = prior?.state ?? 0;
+      // Only increment lapses on Again (quality=1) when prior state was Review (2)
+      const lapsesValue =
+        staged.quality === 1 && priorState === 2
+          ? priorLapses + 1
+          : priorLapses;
       await db.run(sql`
         INSERT INTO practice_record (
           id,
@@ -576,7 +566,7 @@ export async function commitStagedEvaluations(
           NULL,
           ${staged.stability},
           ${staged.elapsed_days ?? null},
-          ${staged.lapses ?? 0},
+          ${lapsesValue},
           ${staged.state},
           ${staged.difficulty},
           ${staged.step},
@@ -601,7 +591,7 @@ export async function commitStagedEvaluations(
         backupPracticed: null,
         stability: staged.stability,
         elapsedDays: staged.elapsed_days ?? null,
-        lapses: staged.lapses ?? 0,
+        lapses: lapsesValue,
         state: staged.state,
         difficulty: staged.difficulty,
         step: staged.step,
@@ -611,9 +601,13 @@ export async function commitStagedEvaluations(
       });
 
       // Update playlist_tune.current (next review date)
+      // Clear any one-off manual override in playlist_tune.scheduled now that an
+      // evaluation is being committed. The UI expectation (see TuneColumns.tsx) is
+      // that scheduled overrides are transient and removed upon submission.
       await db.run(sql`
         UPDATE playlist_tune
         SET current = ${staged.due},
+            scheduled = NULL,
             last_modified_at = ${now}
         WHERE playlist_ref = ${playlistId}
           AND tune_ref = ${staged.tune_id}
@@ -649,8 +643,33 @@ export async function commitStagedEvaluations(
         id: string;
         window_start_utc: string;
         window_end_utc: string;
+        bucket: number;
+        order_index: number;
+        snapshot_coalesced_ts: string;
+        generated_at: string;
+        active: number;
+        sync_version: number;
+        last_modified_at: string;
+        scheduled_snapshot: string | null;
+        latest_due_snapshot: string | null;
+        acceptable_delinquency_window_snapshot: number | null;
+        tz_offset_minutes_snapshot: number | null;
       }>(sql`
-        SELECT id, window_start_utc, window_end_utc
+        SELECT 
+          id,
+          window_start_utc,
+          window_end_utc,
+          bucket,
+          order_index,
+          snapshot_coalesced_ts,
+          generated_at,
+          active,
+          sync_version,
+          last_modified_at,
+          scheduled_snapshot,
+          latest_due_snapshot,
+          acceptable_delinquency_window_snapshot,
+          tz_offset_minutes_snapshot
         FROM daily_practice_queue
         WHERE user_ref = ${userId}
           AND playlist_ref = ${playlistId}
@@ -702,12 +721,23 @@ export async function commitStagedEvaluations(
 
       if (queueItem) {
         await queueSync(db, "daily_practice_queue", "update", {
-          id: queueItem.id,
           userRef: userId,
           playlistRef: playlistId,
           windowStartUtc: queueItem.window_start_utc,
-          windowEndUtc: queueItem.window_end_utc,
           tuneRef: staged.tune_id,
+          bucket: queueItem.bucket,
+          orderIndex: queueItem.order_index,
+          snapshotCoalescedTs: queueItem.snapshot_coalesced_ts,
+          generatedAt: queueItem.generated_at,
+          active: queueItem.active,
+          syncVersion: queueItem.sync_version,
+          lastModifiedAt: now, // reflect completion modification
+          windowEndUtc: queueItem.window_end_utc,
+          scheduledSnapshot: queueItem.scheduled_snapshot,
+          latestDueSnapshot: queueItem.latest_due_snapshot,
+          acceptableDelinquencyWindowSnapshot:
+            queueItem.acceptable_delinquency_window_snapshot,
+          tzOffsetMinutesSnapshot: queueItem.tz_offset_minutes_snapshot,
           completedAt: now,
         });
       }

@@ -65,6 +65,7 @@ const PracticeIndex: Component = () => {
     incrementPracticeListStagedChanged,
     practiceListStagedChanged,
     initialSyncComplete,
+    syncPracticeScope,
   } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
 
@@ -509,6 +510,10 @@ const PracticeIndex: Component = () => {
         console.log(
           `✅ Submit complete: ${result.count} evaluations committed`
         );
+
+        // Fire a scoped practice sync to pull remote updates for just practice tables
+        // (avoids full-table sweep & reduces perceived latency)
+        void syncPracticeScope();
       } else {
         // Error toast (requires manual dismiss)
         toast.error(

@@ -19,14 +19,14 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.error("   VITE_SUPABASE_URL:", supabaseUrl ? "✓" : "✗");
   console.error(
     "   SUPABASE_SERVICE_ROLE_KEY:",
-    supabaseServiceKey ? "✓" : "✗",
+    supabaseServiceKey ? "✓" : "✗"
   );
   process.exit(1);
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-const VIEW_PLAYLIST_JOINED = `
+const VIEW_PLAYLIST_JOINED = /* sql */ `
 CREATE VIEW view_playlist_joined AS
 SELECT
         p.playlist_id,
@@ -43,7 +43,7 @@ FROM
         JOIN instrument i ON p.instrument_ref = i.id
 `;
 
-const PRACTICE_LIST_JOINED = `
+const PRACTICE_LIST_JOINED = /* sql */ `
 CREATE VIEW practice_list_joined as
 SELECT
     tune.id AS id,
@@ -122,7 +122,7 @@ WHERE
     )
 `;
 
-const PRACTICE_LIST_STAGED = `
+const PRACTICE_LIST_STAGED = /* sql */ `
 CREATE VIEW practice_list_staged AS
 SELECT
         tune.id AS id,
@@ -231,7 +231,7 @@ async function createViews() {
 
   // First, try to create the exec_sql helper function
   console.log("\n📝 Step 1: Creating exec_sql helper function...");
-  const execSqlFunction = `
+  const execSqlFunction = /* sql */ `
 CREATE OR REPLACE FUNCTION exec_sql(sql text)
 RETURNS void
 LANGUAGE plpgsql
@@ -253,7 +253,7 @@ $$;
       // Function doesn't exist, we need to create it via raw SQL
       // We'll use a workaround: create views directly via postgres connection
       console.log(
-        "⚠️  exec_sql function doesn't exist. Creating views via direct SQL...",
+        "⚠️  exec_sql function doesn't exist. Creating views via direct SQL..."
       );
 
       const views = [
@@ -268,7 +268,7 @@ $$;
       for (const view of views) {
         try {
           // Try direct query execution (this works for some Supabase configurations)
-          const dropSql = `DROP VIEW IF EXISTS ${view.name} CASCADE;`;
+          const dropSql = /* sql */ `DROP VIEW IF EXISTS ${view.name} CASCADE;`;
           await fetch(`${supabaseUrl}/rest/v1/rpc/query`, {
             method: "POST",
             headers: {
@@ -291,7 +291,7 @@ $$;
 
           if (!createResult.ok) {
             throw new Error(
-              `HTTP ${createResult.status}: ${await createResult.text()}`,
+              `HTTP ${createResult.status}: ${await createResult.text()}`
             );
           }
 
@@ -300,7 +300,7 @@ $$;
         } catch (error: any) {
           console.error(
             `❌ Error creating view ${view.name}:`,
-            error?.message || error,
+            error?.message || error
           );
           errors++;
         }
@@ -308,12 +308,12 @@ $$;
 
       console.log(`\n${"=".repeat(60)}`);
       console.log(
-        `✅ View creation complete: ${created} created, ${errors} failed`,
+        `✅ View creation complete: ${created} created, ${errors} failed`
       );
 
       if (errors > 0) {
         console.log(
-          "\n⚠️  Manual SQL needed. Copy this to Supabase SQL Editor:",
+          "\n⚠️  Manual SQL needed. Copy this to Supabase SQL Editor:"
         );
         for (const view of views) {
           console.log(`\n-- ${view.name}`);
@@ -343,7 +343,7 @@ $$;
   for (const view of views) {
     try {
       // Drop view if exists
-      const dropSql = `DROP VIEW IF EXISTS ${view.name} CASCADE;`;
+      const dropSql = /* sql */ `DROP VIEW IF EXISTS ${view.name} CASCADE;`;
       const { error: dropError } = await supabase.rpc("exec_sql", {
         sql: dropSql,
       });
@@ -366,7 +366,7 @@ $$;
     } catch (error: any) {
       console.error(
         `❌ Error creating view ${view.name}:`,
-        error?.message || error,
+        error?.message || error
       );
       errors++;
     }
@@ -374,7 +374,7 @@ $$;
 
   console.log(`\n${"=".repeat(60)}`);
   console.log(
-    `✅ View creation complete: ${created} created, ${errors} failed`,
+    `✅ View creation complete: ${created} created, ${errors} failed`
   );
 
   if (errors > 0) {

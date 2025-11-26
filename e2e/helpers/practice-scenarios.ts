@@ -233,6 +233,9 @@ async function getInternalUserRef(
   return internalId;
 }
 
+// Export getTestUserClient so tests can perform direct Supabase cleanup
+export { getTestUserClient };
+
 /**
  * Parallel-safe version of setupDeterministicTest
  * Sets up a deterministic test state for a specific user
@@ -244,6 +247,8 @@ export async function setupDeterministicTestParallel(
     clearRepertoire?: boolean;
     seedRepertoire?: string[];
     scheduleTunes?: { tuneIds: string[]; daysAgo: number };
+    /** Optional list of title prefixes to purge (cascade delete) before setup */
+    purgeTitlePrefixes?: string[];
   } = {}
 ) {
   log.debug(`🔧 [${user.name}] Setting up deterministic test state...`);
@@ -257,6 +262,103 @@ export async function setupDeterministicTestParallel(
   ) {
     await page.goto("http://localhost:5173/");
     await waitForSyncComplete(page);
+  }
+
+  // Optional purge of tunes by title prefix (handles leftover test-created tunes)
+  if (opts.purgeTitlePrefixes && opts.purgeTitlePrefixes.length > 0) {
+    try {
+      const userKey = user.email.split(".")[0];
+      const { supabase } = await getTestUserClient(userKey);
+      const prefixes = opts.purgeTitlePrefixes;
+      const allTuneIds: string[] = [];
+      for (const prefix of prefixes) {
+        // Use ilike with wildcard for prefix matching
+        const { data, error } = await supabase
+          .from("tune")
+          .select("id,title")
+          .ilike("title", `${prefix}%`);
+        if (error) {
+          console.warn(
+            `[${user.name}] Failed to query tunes for purge prefix '${prefix}': ${error.message}`
+          );
+          continue;
+        }
+        if (data) {
+          for (const row of data) {
+            if (row?.id) allTuneIds.push(row.id);
+          }
+        }
+      }
+      const uniqueIds = [...new Set(allTuneIds)];
+      if (uniqueIds.length > 0) {
+        log.debug(
+          `[${user.name}] Purging ${uniqueIds.length} tune(s) matching prefixes: ${prefixes.join(", ")}`
+        );
+        // Cascade delete dependent rows first
+        const tablesToDelete: {
+          table: string;
+          column: string;
+          extraFilters?: (q: any) => any;
+        }[] = [
+          {
+            table: "table_transient_data",
+            column: "tune_id",
+            extraFilters: (q) =>
+              q.eq("user_id", user.userId).eq("playlist_id", user.playlistId),
+          },
+          {
+            table: "daily_practice_queue",
+            column: "tune_ref",
+            extraFilters: (q) => q.eq("playlist_ref", user.playlistId),
+          },
+          {
+            table: "practice_record",
+            column: "tune_ref",
+            extraFilters: (q) => q.eq("playlist_ref", user.playlistId),
+          },
+          {
+            table: "playlist_tune",
+            column: "tune_ref",
+            extraFilters: (q) => q.eq("playlist_ref", user.playlistId),
+          },
+          { table: "tune_override", column: "tune_ref" },
+        ];
+        for (const { table, column, extraFilters } of tablesToDelete) {
+          try {
+            let del = supabase.from(table).delete().in(column, uniqueIds);
+            if (extraFilters) del = extraFilters(del);
+            const { error } = await del;
+            if (error) {
+              console.warn(
+                `[${user.name}] Error deleting from ${table}: ${error.message}`
+              );
+            }
+          } catch (err: any) {
+            console.warn(
+              `[${user.name}] Exception deleting from ${table}: ${err?.message || err}`
+            );
+          }
+        }
+        // Finally delete the tunes themselves
+        const { error: tuneDeleteError } = await supabase
+          .from("tune")
+          .delete()
+          .in("id", uniqueIds);
+        if (tuneDeleteError) {
+          console.warn(
+            `[${user.name}] Error deleting tunes: ${tuneDeleteError.message}`
+          );
+        } else {
+          log.debug(
+            `[${user.name}] ✅ Purged test tunes: ${uniqueIds.join(", ")}`
+          );
+        }
+      }
+    } catch (err: any) {
+      console.warn(
+        `[${user.name}] Failed purgeTitlePrefixes pass: ${err?.message || err}`
+      );
+    }
   }
 
   let whichTables = [
@@ -556,14 +658,11 @@ async function verifyTablesEmpty(
   const timeoutMs = 16000;
   const retryDelayMs = 500;
   const start = Date.now();
-  const tableCounts = new Map<string, number | null>(
-    tableNames.map((t) => [t, null])
-  );
+  const tableCounts = new Map<string, number>(tableNames.map((t) => [t, 0]));
 
-  // Polling loop with parallel queries for all tables
   while (Date.now() - start < timeoutMs) {
-    // Query all tables in parallel
-    const queryPromises = tableNames.map(async (tableName) => {
+    let allEmpty = true;
+    for (const tableName of tableNames) {
       let countQuery = supabase.from(tableName).select("*", {
         count: "exact",
         head: true,
@@ -578,86 +677,36 @@ async function verifyTablesEmpty(
       } else {
         countQuery = applyTableQueryFilters(tableName, countQuery, user);
       }
-
-      const { count, error: countError } = await countQuery;
-
-      if (countError) {
-        console.warn(
-          `[${user.name}] Transient error reading ${tableName} count, retrying:`,
-          countError.message
+      const { count, error } = await countQuery;
+      if (error) {
+        allEmpty = false; // treat error as not-empty, continue polling
+        log.debug(
+          `[${user.name}] Transient count error for ${tableName}, retrying: ${error.message}`
         );
-        return { tableName, count: null, error: countError };
+        continue;
       }
-
-      return { tableName, count: count ?? 0, error: null };
-    });
-
-    const results = await Promise.all(queryPromises);
-
-    // Update counts
-    let allEmpty = true;
-    for (const { tableName, count, error } of results) {
-      if (!error) {
-        tableCounts.set(tableName, count);
-        if (count > 0) {
-          allEmpty = false;
-          log.debug(
-            `[${user.name}] Waiting for ${tableName} to drain: ${count} remaining`
-          );
-        }
+      const c = count ?? 0;
+      tableCounts.set(tableName, c);
+      if (c > 0) {
+        allEmpty = false;
       }
     }
-
-    if (allEmpty && results.every((r) => !r.error)) {
-      break;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    if (allEmpty) break;
+    await new Promise((r) => setTimeout(r, retryDelayMs));
   }
 
-  // Final verification - query any tables that haven't been confirmed as empty
-  for (const tableName of tableNames) {
-    if (tableCounts.get(tableName) === null) {
-      let finalQuery = supabase.from(tableName).select("*", {
-        count: "exact",
-        head: true,
-      }) as any;
-      if (tableName === "tune_override") {
-        const internalId = await getInternalUserRef(supabase, user);
-        if (internalId) {
-          finalQuery = finalQuery.eq("user_ref", internalId);
-        } else {
-          finalQuery = finalQuery.eq("user_ref", "__never_match__");
-        }
-      } else {
-        finalQuery = applyTableQueryFilters(tableName, finalQuery, user);
-      }
-
-      const { count: finalCountRead, error: finalReadError } = await finalQuery;
-      if (finalReadError) {
-        throw new Error(
-          `[${user.name}] Failed to verify ${tableName} deletion after retries: ${finalReadError.message}`
-        );
-      }
-      tableCounts.set(tableName, finalCountRead ?? 0);
-    }
-  }
-
-  // Check all tables are actually empty
-  const failedTables: Array<[string, number]> = [];
+  // Final strict check
+  const failures: string[] = [];
   for (const [tableName, count] of tableCounts.entries()) {
-    if (count == null || count > 0) {
-      failedTables.push([tableName, count ?? 0]);
+    if (count > 0) {
+      failures.push(`${tableName} (${count} rows)`);
     }
   }
-
-  if (failedTables.length > 0) {
-    const details = failedTables
-      .map(([name, count]) => `${name} (${count} rows)`)
-      .join(", ");
-    throw new Error(`[${user.name}] Failed to clear tables: ${details}`);
+  if (failures.length) {
+    throw new Error(
+      `[${user.name}] Failed to clear tables: ${failures.join(", ")}`
+    );
   }
-
   log.debug(
     `✅ [${user.name}] Verified ${tableNames.length} tables are empty: ${tableNames.join(", ")}`
   );
@@ -708,12 +757,19 @@ export async function setupForPracticeTestsParallel(
      * Ensures they appear in today's practice queue so flashcards have items.
      */
     scheduleDaysAgo?: number;
+    /**
+     * Base date (browser-frozen test date) used when computing scheduled dates.
+     * If omitted, falls back to Playwright process current date (legacy behavior).
+     * Accepts Date or ISO string.
+     */
+    scheduleBaseDate?: Date | string;
   }
 ) {
   const {
     repertoireTunes = [],
     startTab = "practice",
     scheduleDaysAgo,
+    scheduleBaseDate,
   } = opts ?? {};
 
   log.debug(`🔧 [${user.name}] setupForPracticeTests Starting...`);
@@ -743,9 +799,11 @@ export async function setupForPracticeTestsParallel(
   if (scheduleDaysAgo !== undefined) {
     const userKey = user.email.split(".")[0];
     const { supabase } = await getTestUserClient(userKey);
-    const date = new Date();
-    date.setDate(date.getDate() - scheduleDaysAgo);
-    const scheduleDateStr = date.toISOString();
+    // Use provided frozen test date base if available; otherwise default to host time.
+    const base = scheduleBaseDate ? new Date(scheduleBaseDate) : new Date();
+    // Subtract daysAgo to get original scheduled date (past due to force inclusion in queue)
+    base.setDate(base.getDate() - scheduleDaysAgo);
+    const scheduleDateStr = base.toISOString();
 
     for (const tuneId of repertoireTunes) {
       const { error } = await supabase
@@ -812,9 +870,19 @@ export async function setupForRepertoireTestsParallel(
     repertoireTunes: string[];
     scheduleTunes?: boolean;
     scheduleDaysAgo?: number;
+    /**
+     * Base date (browser-frozen test date) used when computing scheduled dates.
+     * If omitted, falls back to host time. Accepts Date or ISO string.
+     */
+    scheduleBaseDate?: Date | string;
   }
 ) {
-  const { repertoireTunes, scheduleTunes = false, scheduleDaysAgo = 0 } = opts;
+  const {
+    repertoireTunes,
+    scheduleTunes = false,
+    scheduleDaysAgo = 0,
+    scheduleBaseDate,
+  } = opts;
 
   log.debug(`🔧 [${user.name}] setupForRepertoireTests Starting...`);
 
@@ -841,9 +909,9 @@ export async function setupForRepertoireTestsParallel(
   if (scheduleTunes) {
     const userKey = user.email.split(".")[0]; // alice.test@... → alice
     const { supabase } = await getTestUserClient(userKey);
-    const scheduleDate = new Date();
-    scheduleDate.setDate(scheduleDate.getDate() - scheduleDaysAgo);
-    const scheduleDateStr = scheduleDate.toISOString();
+    const base = scheduleBaseDate ? new Date(scheduleBaseDate) : new Date();
+    base.setDate(base.getDate() - scheduleDaysAgo);
+    const scheduleDateStr = base.toISOString();
 
     for (const tuneId of repertoireTunes) {
       const { error } = await supabase
@@ -903,9 +971,28 @@ export async function setupForCatalogTestsParallel(
   opts?: {
     emptyRepertoire?: boolean;
     startTab?: "practice" | "repertoire" | "catalog";
+    /**
+     * If provided, schedules all repertoire tunes relative to this base date minus scheduleDaysAgo.
+     * Enables deterministic queue states when starting from catalog context.
+     */
+    scheduleBaseDate?: Date | string;
+    /**
+     * Optional: schedule existing repertoire tunes this many days ago (past-due) to force them into queue.
+     */
+    scheduleDaysAgo?: number;
+    /**
+     * Optional: if true and repertoire is not emptied, still apply scheduling logic.
+     */
+    scheduleTunes?: boolean;
   }
 ) {
-  const { emptyRepertoire = true, startTab = "catalog" } = opts ?? {};
+  const {
+    emptyRepertoire = true,
+    startTab = "catalog",
+    scheduleBaseDate,
+    scheduleDaysAgo = 0,
+    scheduleTunes = false,
+  } = opts ?? {};
 
   log.debug(`🔧 [${user.name}] setupForCatalogTests Starting...`);
 
@@ -930,6 +1017,38 @@ export async function setupForCatalogTestsParallel(
   await clearUserTable(user, "tune_override");
 
   await verifyTablesEmpty(user, whichTables);
+
+  // 2b. Optionally schedule tunes if not emptying repertoire and requested
+  if (!emptyRepertoire && scheduleTunes) {
+    const userKey = user.email.split(".")[0];
+    const { supabase } = await getTestUserClient(userKey);
+    const base = scheduleBaseDate ? new Date(scheduleBaseDate) : new Date();
+    base.setDate(base.getDate() - scheduleDaysAgo);
+    const scheduleDateStr = base.toISOString();
+
+    // Fetch repertoire tunes for this playlist
+    const { data: repRows, error: repErr } = await supabase
+      .from("playlist_tune")
+      .select("tune_ref")
+      .eq("playlist_ref", user.playlistId);
+    if (!repErr && repRows) {
+      for (const row of repRows) {
+        const { error } = await supabase
+          .from("playlist_tune")
+          .update({ scheduled: scheduleDateStr })
+          .eq("playlist_ref", user.playlistId)
+          .eq("tune_ref", row.tune_ref);
+        if (error) {
+          console.warn(
+            `[${user.name}] Failed to schedule tune ${row.tune_ref}: ${error.message}`
+          );
+        }
+      }
+      log.debug(
+        `✅ [${user.name}] Scheduled ${repRows.length} repertoire tunes (base: ${scheduleDateStr})`
+      );
+    }
+  }
 
   // 3. Navigate to ensure valid origin
   const currentUrl = page.url();

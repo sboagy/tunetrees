@@ -26,10 +26,13 @@ import {
   playlist,
   playlistTune,
   practiceRecord,
+  prefsSchedulingOptions,
+  prefsSpacedRepetition,
   tune,
 } from "../schema";
 import type {
   DailyPracticeQueue,
+  IUserSchedulingOptions,
   PracticeRecord,
   PracticeRecordWithTune,
   PrefsSpacedRepetition,
@@ -575,34 +578,74 @@ export async function getLatestPracticeRecord(
  * @returns User preferences or null if not set
  */
 export async function getUserPreferences(
-  _db: SqliteDatabase,
-  _userId: string
+  db: SqliteDatabase,
+  userId: string
 ): Promise<PrefsSpacedRepetition | null> {
-  // TODO: Get user_profile.id from Supabase UUID
-  // For now, return default FSRS preferences
+  try {
+    const results = await db
+      .select()
+      .from(prefsSpacedRepetition)
+      .where(eq(prefsSpacedRepetition.userId, userId))
+      .limit(1);
+    if (results[0]) return results[0];
+  } catch (e) {
+    console.warn("getUserPreferences query failed, using fallback", e);
+  }
+  // Fallback defaults (legacy-like) if no row found or query fails
   return {
-    userId: _userId, // Use the UUID directly
+    userId,
     algType: "FSRS",
     fsrsWeights: null,
     requestRetention: 0.9,
     maximumInterval: 36500,
     learningSteps: null,
     relearningSteps: null,
-    enableFuzzing: 1, // SQLite stores as INTEGER
+    enableFuzzing: 1,
     syncVersion: 0,
     lastModifiedAt: new Date().toISOString(),
     deviceId: null,
   };
+}
 
-  /* Original implementation - requires user_profile.id lookup
-  const results = await db
-    .select()
-    .from(prefsSpacedRepetition)
-    .where(eq(prefsSpacedRepetition.userId, userId))
-    .limit(1);
-
-  return results[0] ?? null;
-  */
+/**
+ * Get user's scheduling options preferences.
+ * Falls back to sensible defaults when not found.
+ */
+export async function getUserSchedulingOptions(
+  db: SqliteDatabase,
+  userId: string
+): Promise<IUserSchedulingOptions> {
+  try {
+    const rows = await db
+      .select()
+      .from(prefsSchedulingOptions)
+      .where(eq(prefsSchedulingOptions.userId, userId))
+      .limit(1);
+    if (rows[0]) {
+      const r = rows[0];
+      return {
+        userId,
+        acceptableDelinquencyWindow: r.acceptableDelinquencyWindow ?? 7,
+        minReviewsPerDay: r.minReviewsPerDay ?? 3,
+        maxReviewsPerDay: r.maxReviewsPerDay ?? 10,
+        daysPerWeek: r.daysPerWeek ?? null,
+        weeklyRules: r.weeklyRules ?? null,
+        exceptions: r.exceptions ?? null,
+      };
+    }
+  } catch (e) {
+    console.warn("getUserSchedulingOptions query failed, using fallback", e);
+  }
+  // Fallback defaults mirroring practice-queue service defaults
+  return {
+    userId,
+    acceptableDelinquencyWindow: 7,
+    minReviewsPerDay: 3,
+    maxReviewsPerDay: 10,
+    daysPerWeek: null,
+    weeklyRules: null,
+    exceptions: null,
+  };
 }
 
 /**
