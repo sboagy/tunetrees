@@ -40,6 +40,8 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   const [currentTheme, setCurrentTheme] = createSignal<"light" | "dark">(
     getCurrentTheme()
   );
+  // Track the previous theme to detect actual changes
+  let previousTheme: "light" | "dark" = getCurrentTheme();
 
   // Create the Jodit editor configuration
   const createEditorConfig = (theme: "light" | "dark") => ({
@@ -95,9 +97,10 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   // Initialize editor
   const initEditor = () => {
     if (editorRef) {
-      // Destroy existing instance if any
+      // Destroy existing instance if any and clear reference
       if (joditInstance) {
         joditInstance.destruct();
+        joditInstance = undefined;
       }
 
       // Initialize Jodit editor with current theme
@@ -113,17 +116,11 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     initEditor();
 
     // Set up a MutationObserver to detect theme changes on <html>
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (
-          mutation.type === "attributes" &&
-          mutation.attributeName === "class"
-        ) {
-          const newTheme = getCurrentTheme();
-          if (newTheme !== currentTheme()) {
-            setCurrentTheme(newTheme);
-          }
-        }
+    // Using attributeFilter ensures we only get notified about class changes
+    const observer = new MutationObserver(() => {
+      const newTheme = getCurrentTheme();
+      if (newTheme !== currentTheme()) {
+        setCurrentTheme(newTheme);
       }
     });
 
@@ -137,12 +134,13 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     });
   });
 
-  // Re-initialize editor when theme changes
+  // Re-initialize editor when theme changes (not on initial mount)
   createEffect(() => {
-    // Subscribe to theme changes - currentTheme() must be called to track it
-    if (currentTheme() && joditInstance) {
-      // Only reinitialize if editor already exists (theme changed)
+    const theme = currentTheme();
+    // Only reinitialize if theme actually changed (not on initial mount)
+    if (theme !== previousTheme && joditInstance) {
       const currentContent = joditInstance.value;
+      previousTheme = theme;
       initEditor();
       if (joditInstance) {
         joditInstance.value = currentContent;
