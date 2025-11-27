@@ -208,6 +208,17 @@ export async function clearSyncedItems(db: SqliteDatabase): Promise<void> {
 }
 
 /**
+ * Clear ALL items from sync queue
+ *
+ * Used for anonymous users who don't sync to Supabase.
+ *
+ * @param db - SQLite database instance
+ */
+export async function clearSyncQueue(db: SqliteDatabase): Promise<void> {
+  await db.delete(syncQueue);
+}
+
+/**
  * Get sync queue stats
  *
  * @param db - SQLite database instance

@@ -224,12 +224,30 @@ export const AuthProvider: ParentComponent = (props) => {
    * Creates a user_profile entry in both local SQLite AND Supabase
    */
   async function initializeAnonymousDatabase(anonymousUserId: string) {
-    // Prevent double initialization
-    if (isInitializing || localDb()) {
+    // Prevent double initialization for SAME user
+    if (isInitializing) {
       log.debug(
-        "Skipping anonymous database initialization (already initialized or in progress)"
+        "Skipping anonymous database initialization (already in progress)"
       );
       return;
+    }
+
+    // If DB exists but for a DIFFERENT user, we need to ensure user_profile exists for new user
+    const existingDb = localDb();
+    const currentUserId = userIdInt();
+    
+    if (existingDb && currentUserId === anonymousUserId) {
+      log.debug(
+        "Skipping anonymous database initialization (already initialized for same user)"
+      );
+      return;
+    }
+
+    // If switching to a DIFFERENT user, reset sync state so UI waits for new user's data
+    if (currentUserId && currentUserId !== anonymousUserId) {
+      console.log("🔄 Switching anonymous users - resetting sync state");
+      setInitialSyncComplete(false);
+      setUserIdInt(null);
     }
 
     isInitializing = true;
@@ -239,11 +257,17 @@ export const AuthProvider: ParentComponent = (props) => {
         anonymousUserId
       );
 
-      const db = await initializeSqliteDb();
-      setLocalDb(db);
-
-      // Set up auto-persistence (store cleanup for later)
-      autoPersistCleanup = setupAutoPersist();
+      // Use existing DB if available, otherwise initialize new one
+      let db: SqliteDatabase;
+      if (existingDb) {
+        console.log("📦 Reusing existing SQLite database for new anonymous user");
+        db = existingDb;
+      } else {
+        db = await initializeSqliteDb();
+        setLocalDb(db);
+        // Set up auto-persistence (store cleanup for later)
+        autoPersistCleanup = setupAutoPersist();
+      }
 
       const now = new Date().toISOString();
 
@@ -346,6 +370,16 @@ export const AuthProvider: ParentComponent = (props) => {
       } catch (refError) {
         // Non-fatal - user can still use app, just with empty dropdowns
         log.warn("Failed to sync reference data for anonymous user:", refError);
+      }
+
+      // Clear any pending sync queue items - anonymous users don't sync to Supabase
+      // This prevents the UI from showing "Syncing X" indefinitely
+      try {
+        const { clearSyncQueue } = await import("@/lib/sync/queue");
+        await clearSyncQueue(db);
+        console.log("🗑️ Cleared sync queue for anonymous user");
+      } catch (clearError) {
+        log.warn("Failed to clear sync queue:", clearError);
       }
 
       // Mark sync as complete immediately (no full remote sync for anonymous users)
@@ -460,6 +494,43 @@ export const AuthProvider: ParentComponent = (props) => {
           .onConflictDoNothing();
       }
       console.log(`📥 Synced ${gttMappings.length} genre-tune-type mappings`);
+    }
+
+    // Sync PUBLIC tunes (tunes where private_for IS NULL - meaning they're public, not private to any user)
+    // This gives anonymous users access to the tune catalog
+    const { tune } = await import("@/lib/db/schema");
+    const { data: publicTunes, error: tuneError } = await supabase
+      .from("tune")
+      .select("*")
+      .is("private_for", null)
+      .eq("deleted", false);
+
+    if (tuneError) {
+      log.warn("Failed to fetch public tunes:", tuneError);
+    } else if (publicTunes && publicTunes.length > 0) {
+      const now = new Date().toISOString();
+      for (const t of publicTunes) {
+        await db
+          .insert(tune)
+          .values({
+            id: t.id,
+            idForeign: t.id_foreign,
+            primaryOrigin: t.primary_origin,
+            title: t.title,
+            type: t.type,
+            structure: t.structure,
+            mode: t.mode,
+            incipit: t.incipit,
+            genre: t.genre,
+            privateFor: t.private_for,
+            deleted: t.deleted ? 1 : 0,
+            syncVersion: t.sync_version || 1,
+            lastModifiedAt: t.last_modified_at || now,
+            deviceId: t.device_id,
+          })
+          .onConflictDoNothing();
+      }
+      console.log(`📥 Synced ${publicTunes.length} public tunes`);
     }
   }
 
@@ -803,12 +874,20 @@ export const AuthProvider: ParentComponent = (props) => {
     try {
       // Check if there's a saved anonymous session to restore
       const savedSession = localStorage.getItem(ANONYMOUS_SESSION_KEY);
-      console.log("🔍 Checking for saved anonymous session:", savedSession ? "FOUND" : "NOT FOUND");
+      console.log(
+        "🔍 Checking for saved anonymous session:",
+        savedSession ? "FOUND" : "NOT FOUND"
+      );
       if (savedSession) {
         try {
           const parsed = JSON.parse(savedSession);
           const { refresh_token, user_id } = parsed;
-          console.log("🔍 Parsed saved session - user_id:", user_id, "has refresh_token:", !!refresh_token);
+          console.log(
+            "🔍 Parsed saved session - user_id:",
+            user_id,
+            "has refresh_token:",
+            !!refresh_token
+          );
           if (refresh_token) {
             console.log("🔄 Restoring previous anonymous session...");
             const { data: refreshData, error: refreshError } =
@@ -816,7 +895,12 @@ export const AuthProvider: ParentComponent = (props) => {
                 refresh_token,
               });
 
-            console.log("🔍 Refresh result - error:", refreshError, "has session:", !!refreshData?.session);
+            console.log(
+              "🔍 Refresh result - error:",
+              refreshError,
+              "has session:",
+              !!refreshData?.session
+            );
             if (!refreshError && refreshData.session) {
               // Successfully restored session - clear saved session
               localStorage.removeItem(ANONYMOUS_SESSION_KEY);
@@ -1023,7 +1107,10 @@ export const AuthProvider: ParentComponent = (props) => {
       const currentSession = session();
       console.log("🔍 Sign out (anonymous) - preserving Supabase session");
       if (currentSession?.refresh_token) {
-        console.log("💾 Saving anonymous session for later restoration, user:", currentSession.user?.id);
+        console.log(
+          "💾 Saving anonymous session for later restoration, user:",
+          currentSession.user?.id
+        );
         localStorage.setItem(
           ANONYMOUS_SESSION_KEY,
           JSON.stringify({
@@ -1037,10 +1124,17 @@ export const AuthProvider: ParentComponent = (props) => {
       } else {
         console.warn("⚠️ No refresh token available to save");
       }
-      
-      // Clear local state but DON'T call supabase.auth.signOut()
-      // This keeps the session valid for restoration
-      await clearLocalDatabase();
+
+      // DON'T clear local database for anonymous users!
+      // Their data is local-only and should persist across sign-out/sign-in cycles
+      // We also persist the DB to IndexedDB to ensure it survives page refresh
+      try {
+        const { persistDb } = await import("@/lib/db/client-sqlite");
+        await persistDb();
+        console.log("💾 Persisted anonymous user database to IndexedDB");
+      } catch (persistError) {
+        console.warn("⚠️ Failed to persist anonymous DB:", persistError);
+      }
     } else {
       // For registered users, do a full sign out and clear any saved anonymous session
       console.log("🔍 Sign out - registered user, full sign out");
