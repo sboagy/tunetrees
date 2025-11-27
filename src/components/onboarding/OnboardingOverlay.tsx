@@ -10,6 +10,7 @@
 import { useNavigate } from "@solidjs/router";
 import { Info, X } from "lucide-solid";
 import { type Component, createSignal, Match, Show, Switch } from "solid-js";
+import { useAuth } from "../../lib/auth/AuthContext";
 import { useOnboarding } from "../../lib/context/OnboardingContext";
 import { PlaylistEditorDialog } from "../playlists/PlaylistEditorDialog";
 
@@ -21,11 +22,14 @@ import { PlaylistEditorDialog } from "../playlists/PlaylistEditorDialog";
 export const OnboardingOverlay: Component = () => {
   const { needsOnboarding, onboardingStep, nextStep, skipOnboarding } =
     useOnboarding();
+  const { incrementRepertoireListChanged } = useAuth();
   const navigate = useNavigate();
   const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
 
   const handlePlaylistCreated = () => {
     setShowPlaylistDialog(false);
+    // Trigger global playlist list refresh so TopNav dropdown updates
+    incrementRepertoireListChanged();
     // Move to next step: view catalog
     nextStep();
     navigate("/?tab=catalog");
