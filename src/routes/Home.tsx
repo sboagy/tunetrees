@@ -45,7 +45,7 @@ import RepertoirePage from "./repertoire";
 const Home: Component = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading, isAnonymous, initialSyncComplete, localDb } = useAuth();
+  const { user, loading, isAnonymous, initialSyncComplete, localDb, userIdInt } = useAuth();
   const { startOnboarding, shouldShowOnboarding } = useOnboarding();
   const [activeTab, setActiveTab] = createSignal<TabId>("practice");
   const [hasCheckedOnboarding, setHasCheckedOnboarding] = createSignal(false);
@@ -85,7 +85,8 @@ const Home: Component = () => {
       
       // Check if user has any playlists
       const db = localDb();
-      const userId = user()?.id || "anonymous";
+      // Use userIdInt which is the correct UUID for both regular and anonymous users
+      const userId = userIdInt();
       
       if (db && userId) {
         void (async () => {

@@ -151,15 +151,35 @@ const AuthContext = createContext<AuthState>();
  * }
  * ```
  */
-// Anonymous user storage keys
-const ANONYMOUS_USER_KEY = "tunetrees:anonymous:user";
-const ANONYMOUS_USER_ID_KEY = "tunetrees:anonymous:userId";
+// Legacy anonymous user storage keys (for migration from old local-only approach)
+// These are kept for backwards compatibility to detect and migrate existing anonymous users
+const LEGACY_ANONYMOUS_USER_KEY = "tunetrees:anonymous:user";
+const LEGACY_ANONYMOUS_USER_ID_KEY = "tunetrees:anonymous:userId";
 
 /**
- * Generate a unique anonymous user ID
+ * Check if a Supabase user is anonymous
+ * Supabase anonymous users have:
+ * - app_metadata.is_anonymous === true (newer versions)
+ * - OR: no email AND no identities (fallback for older versions)
  */
-function generateAnonymousUserId(): string {
-  return `anon_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+function isUserAnonymous(user: User | null): boolean {
+  if (!user) return false;
+  
+  // Primary check: app_metadata.is_anonymous (set by Supabase Auth in newer versions)
+  if (user.app_metadata?.is_anonymous === true) {
+    return true;
+  }
+  
+  // Fallback: Check if user has no email and no linked identities
+  // Anonymous users created via signInAnonymously() have:
+  // - No email
+  // - Empty identities array or identities with provider 'anonymous'
+  const hasNoEmail = !user.email;
+  const hasNoIdentities = !user.identities || user.identities.length === 0;
+  const hasOnlyAnonymousIdentity = user.identities?.length === 1 && 
+    user.identities[0]?.provider === 'anonymous';
+  
+  return hasNoEmail && (hasNoIdentities || hasOnlyAnonymousIdentity);
 }
 
 export const AuthProvider: ParentComponent = (props) => {
@@ -195,7 +215,8 @@ export const AuthProvider: ParentComponent = (props) => {
   let isInitializing = false;
 
   /**
-   * Initialize local database for anonymous user (no Supabase sync)
+   * Initialize local database for anonymous user (no Supabase sync initially)
+   * Creates a user_profile entry in both local SQLite AND Supabase
    */
   async function initializeAnonymousDatabase(anonymousUserId: string) {
     // Prevent double initialization
@@ -219,11 +240,92 @@ export const AuthProvider: ParentComponent = (props) => {
       // Set up auto-persistence (store cleanup for later)
       autoPersistCleanup = setupAutoPersist();
 
-      // Set anonymous user ID
+      const now = new Date().toISOString();
+
+      // 1. Create user_profile in LOCAL SQLite database (required for FK relationships)
+      try {
+        // Import schema dynamically to avoid circular deps
+        const { userProfile } = await import("@/lib/db/schema");
+        const { eq } = await import("drizzle-orm");
+
+        // Check if already exists in local DB
+        const existingLocal = await db
+          .select({ id: userProfile.supabaseUserId })
+          .from(userProfile)
+          .where(eq(userProfile.supabaseUserId, anonymousUserId))
+          .limit(1);
+
+        if (!existingLocal || existingLocal.length === 0) {
+          await db.insert(userProfile).values({
+            id: anonymousUserId, // Use Supabase UUID as internal ID
+            supabaseUserId: anonymousUserId,
+            name: "Anonymous User",
+            email: null,
+            srAlgType: "fsrs",
+            deleted: 0,
+            syncVersion: 1,
+            lastModifiedAt: now,
+            deviceId: "local",
+          });
+          console.log("✅ Created local user_profile for anonymous user:", anonymousUserId);
+        }
+      } catch (localError) {
+        log.error("Failed to create local user_profile for anonymous user:", localError);
+        throw localError; // This is critical - we need the local profile
+      }
+
+      // 2. Also create user_profile in Supabase (for future sync when they convert)
+      try {
+        const { data: existingProfile, error: fetchError } = await supabase
+          .from("user_profile")
+          .select("id")
+          .eq("supabase_user_id", anonymousUserId)
+          .maybeSingle();
+
+        if (fetchError) {
+          log.warn("Error checking user_profile for anonymous user:", fetchError);
+        }
+
+        if (!existingProfile) {
+          const { error: insertError } = await supabase
+            .from("user_profile")
+            .insert({
+              id: anonymousUserId,
+              supabase_user_id: anonymousUserId,
+              email: null,
+              name: "Anonymous User",
+              sr_alg_type: "fsrs",
+            });
+
+          if (insertError) {
+            if (!insertError.message?.includes("duplicate key")) {
+              log.warn("Failed to create Supabase user_profile for anonymous user:", insertError);
+            }
+          } else {
+            console.log("✅ Created Supabase user_profile for anonymous user:", anonymousUserId);
+          }
+        }
+      } catch (profileError) {
+        // Non-fatal - Supabase profile can be created later during conversion
+        log.warn("Error managing Supabase user_profile for anonymous user:", profileError);
+      }
+
+      // Set anonymous user ID (this is their Supabase UUID)
       setUserIdInt(anonymousUserId);
       setIsAnonymous(true);
 
-      // Mark sync as complete immediately (no remote sync for anonymous users)
+      // 3. Sync reference data (genres, tune types, instruments) from Supabase
+      // Anonymous users need this data for dropdowns, but not user-specific data
+      try {
+        console.log("📥 Syncing reference data for anonymous user...");
+        await syncReferenceDataForAnonymous(db);
+        console.log("✅ Reference data synced for anonymous user");
+      } catch (refError) {
+        // Non-fatal - user can still use app, just with empty dropdowns
+        log.warn("Failed to sync reference data for anonymous user:", refError);
+      }
+
+      // Mark sync as complete immediately (no full remote sync for anonymous users)
       setInitialSyncComplete(true);
       console.log("✅ [AuthContext] Anonymous mode - local database ready");
 
@@ -232,6 +334,95 @@ export const AuthProvider: ParentComponent = (props) => {
       log.error("Failed to initialize anonymous local database:", error);
     } finally {
       isInitializing = false;
+    }
+  }
+
+  /**
+   * Sync reference data (genres, tune types, instruments) from Supabase
+   * This is needed for anonymous users to have dropdown options
+   */
+  async function syncReferenceDataForAnonymous(db: SqliteDatabase) {
+    const { genre, tuneType, instrument, genreTuneType } = await import("@/lib/db/schema");
+    
+    // Sync genres
+    const { data: genres, error: genreError } = await supabase
+      .from("genre")
+      .select("*");
+    
+    if (genreError) {
+      log.warn("Failed to fetch genres:", genreError);
+    } else if (genres && genres.length > 0) {
+      for (const g of genres) {
+        await db.insert(genre).values({
+          id: g.id,
+          name: g.name,
+          region: g.region,
+          description: g.description,
+        }).onConflictDoNothing();
+      }
+      console.log(`📥 Synced ${genres.length} genres`);
+    }
+    
+    // Sync tune types
+    const { data: tuneTypes, error: tuneTypeError } = await supabase
+      .from("tune_type")
+      .select("*");
+    
+    if (tuneTypeError) {
+      log.warn("Failed to fetch tune types:", tuneTypeError);
+    } else if (tuneTypes && tuneTypes.length > 0) {
+      for (const tt of tuneTypes) {
+        await db.insert(tuneType).values({
+          id: tt.id,
+          name: tt.name,
+          rhythm: tt.rhythm,
+          description: tt.description,
+        }).onConflictDoNothing();
+      }
+      console.log(`📥 Synced ${tuneTypes.length} tune types`);
+    }
+    
+    // Sync instruments (public instruments only - where private_to_user is null)
+    const { data: instruments, error: instrumentError } = await supabase
+      .from("instrument")
+      .select("*")
+      .is("private_to_user", null);
+    
+    if (instrumentError) {
+      log.warn("Failed to fetch instruments:", instrumentError);
+    } else if (instruments && instruments.length > 0) {
+      const now = new Date().toISOString();
+      for (const inst of instruments) {
+        await db.insert(instrument).values({
+          id: inst.id,
+          privateToUser: null,
+          instrument: inst.instrument,
+          description: inst.description,
+          genreDefault: inst.genre_default,
+          deleted: inst.deleted ? 1 : 0,
+          syncVersion: inst.sync_version || 1,
+          lastModifiedAt: inst.last_modified_at || now,
+          deviceId: inst.device_id,
+        }).onConflictDoNothing();
+      }
+      console.log(`📥 Synced ${instruments.length} instruments`);
+    }
+    
+    // Sync genre-tune-type mappings
+    const { data: gttMappings, error: gttError } = await supabase
+      .from("genre_tune_type")
+      .select("*");
+    
+    if (gttError) {
+      log.warn("Failed to fetch genre_tune_type mappings:", gttError);
+    } else if (gttMappings && gttMappings.length > 0) {
+      for (const gtt of gttMappings) {
+        await db.insert(genreTuneType).values({
+          genreId: gtt.genre_id,
+          tuneTypeId: gtt.tune_type_id,
+        }).onConflictDoNothing();
+      }
+      console.log(`📥 Synced ${gttMappings.length} genre-tune-type mappings`);
     }
   }
 
@@ -373,15 +564,37 @@ export const AuthProvider: ParentComponent = (props) => {
     // Wrap async logic inside effect (SolidJS effects can't be async)
     void (async () => {
       try {
-        // Check for anonymous mode first
-        const isAnonymousMode =
-          localStorage.getItem(ANONYMOUS_USER_KEY) === "true";
-        const anonymousUserId = localStorage.getItem(ANONYMOUS_USER_ID_KEY);
+        // Check for legacy anonymous mode (localStorage-based)
+        // and migrate to Supabase native anonymous auth if found
+        const isLegacyAnonymousMode =
+          localStorage.getItem(LEGACY_ANONYMOUS_USER_KEY) === "true";
+        const legacyAnonymousUserId = localStorage.getItem(
+          LEGACY_ANONYMOUS_USER_ID_KEY
+        );
 
-        if (isAnonymousMode && anonymousUserId) {
-          // Restore anonymous session
-          console.log("🔄 Restoring anonymous session:", anonymousUserId);
-          await initializeAnonymousDatabase(anonymousUserId);
+        if (isLegacyAnonymousMode && legacyAnonymousUserId) {
+          // Clear legacy flags and sign in with Supabase anonymous auth
+          console.log(
+            "🔄 Migrating legacy anonymous user to Supabase anonymous auth"
+          );
+          localStorage.removeItem(LEGACY_ANONYMOUS_USER_KEY);
+          localStorage.removeItem(LEGACY_ANONYMOUS_USER_ID_KEY);
+
+          // Sign in anonymously with Supabase (this creates a real auth.users entry)
+          const { data, error } = await supabase.auth.signInAnonymously();
+          if (error) {
+            console.error("❌ Failed to migrate legacy anonymous user:", error);
+            setLoading(false);
+            return;
+          }
+
+          // The onAuthStateChange handler will pick up the new session
+          console.log(
+            "✅ Legacy anonymous user migrated to Supabase:",
+            data.user?.id
+          );
+          // Note: Local data from legacy anonymous mode will be orphaned
+          // because the user_ref was the old anon_* ID
           setLoading(false);
           return;
         }
@@ -395,8 +608,21 @@ export const AuthProvider: ParentComponent = (props) => {
         setUser(existingSession?.user ?? null);
 
         if (existingSession?.user) {
-          // Initialize database in background (don't block loading state)
-          void initializeLocalDatabase(existingSession.user.id);
+          // Check if this is an anonymous user
+          const isAnon = isUserAnonymous(existingSession.user);
+          setIsAnonymous(isAnon);
+
+          if (isAnon) {
+            // Anonymous Supabase user - initialize local database
+            console.log(
+              "🔄 Restoring Supabase anonymous session:",
+              existingSession.user.id
+            );
+            await initializeAnonymousDatabase(existingSession.user.id);
+          } else {
+            // Regular authenticated user - initialize with sync
+            void initializeLocalDatabase(existingSession.user.id);
+          }
         }
       } catch (error) {
         log.error("Error during session initialization:", error);
@@ -420,9 +646,42 @@ export const AuthProvider: ParentComponent = (props) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
+      // Update anonymous state based on Supabase user
+      if (newSession?.user) {
+        const isAnon = isUserAnonymous(newSession.user);
+        setIsAnonymous(isAnon);
+      } else {
+        setIsAnonymous(false);
+      }
+
       // Initialize database on sign in (in background, don't block)
       if (event === "SIGNED_IN" && newSession?.user) {
-        void initializeLocalDatabase(newSession.user.id);
+        const isAnon = isUserAnonymous(newSession.user);
+        console.log("🔍 SIGNED_IN user details:", {
+          email: newSession.user.email,
+          app_metadata: newSession.user.app_metadata,
+          identities: newSession.user.identities,
+          isAnonymous: isAnon
+        });
+        if (isAnon) {
+          // Anonymous user - initialize local-only database
+          void initializeAnonymousDatabase(newSession.user.id);
+        } else {
+          // Registered user - initialize with sync
+          void initializeLocalDatabase(newSession.user.id);
+        }
+      }
+
+      // Handle user update (e.g., anonymous to registered conversion)
+      if (event === "USER_UPDATED" && newSession?.user) {
+        const wasAnonymous = isAnonymous();
+        const isNowAnonymous = isUserAnonymous(newSession.user);
+
+        if (wasAnonymous && !isNowAnonymous) {
+          // User just converted from anonymous to registered
+          console.log("🔄 User converted from anonymous to registered");
+          setIsAnonymous(false);
+        }
       }
 
       // Clear database on sign out
@@ -493,24 +752,44 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   /**
-   * Sign in anonymously (local-only, no account)
+   * Sign in anonymously using Supabase native anonymous auth
+   * Creates a real auth.users entry with is_anonymous = true
+   * UUID is preserved when user later converts to registered account
    */
   const signInAnonymously = async () => {
     setLoading(true);
-    console.log("🔐 Anonymous sign-in attempt");
+    console.log("🔐 Anonymous sign-in attempt (Supabase native)");
 
     try {
-      // Generate anonymous user ID
-      const anonymousUserId = generateAnonymousUserId();
+      // Use Supabase's native anonymous auth
+      // This creates a real user in auth.users with is_anonymous = true
+      const { data, error } = await supabase.auth.signInAnonymously();
 
-      // Store in localStorage
-      localStorage.setItem(ANONYMOUS_USER_KEY, "true");
-      localStorage.setItem(ANONYMOUS_USER_ID_KEY, anonymousUserId);
+      if (error) {
+        console.error("❌ Supabase anonymous sign-in failed:", error);
+        setLoading(false);
+        return { error };
+      }
 
-      // Initialize local database without Supabase
+      const anonymousUserId = data.user?.id;
+      if (!anonymousUserId) {
+        const err = new Error("No user ID returned from anonymous sign-in");
+        console.error("❌ Anonymous sign-in failed:", err);
+        setLoading(false);
+        return { error: err };
+      }
+
+      // The onAuthStateChange handler will fire and set user/session
+      // But we also need to set anonymous mode explicitly
+      setIsAnonymous(true);
+
+      // Initialize local database for anonymous user
       await initializeAnonymousDatabase(anonymousUserId);
 
-      console.log("✅ Anonymous sign-in successful:", anonymousUserId);
+      console.log(
+        "✅ Supabase anonymous sign-in successful:",
+        anonymousUserId
+      );
       setLoading(false);
       return { error: null };
     } catch (error) {
@@ -522,7 +801,8 @@ export const AuthProvider: ParentComponent = (props) => {
 
   /**
    * Convert anonymous user to registered account
-   * Preserves local data and starts syncing
+   * Uses Supabase's updateUser to link email/password while preserving UUID
+   * This ensures all local data with user_ref FK remains valid
    */
   const convertAnonymousToRegistered = async (
     email: string,
@@ -542,33 +822,96 @@ export const AuthProvider: ParentComponent = (props) => {
         throw new Error("No anonymous user ID found");
       }
 
-      // Sign up with Supabase
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
+      // Use updateUser to link email/password to existing anonymous user
+      // This preserves the UUID - the user ID doesn't change!
+      const { data: updateData, error: updateError } =
+        await supabase.auth.updateUser({
+          email,
+          password,
           data: {
             name,
           },
-        },
-      });
+        });
 
-      if (signUpError) {
-        console.error("❌ Sign up failed during conversion:", signUpError);
+      if (updateError) {
+        console.error("❌ Account linking failed:", updateError);
         setLoading(false);
-        return { error: signUpError };
+        return { error: updateError };
       }
 
-      // Clear anonymous mode flags
-      localStorage.removeItem(ANONYMOUS_USER_KEY);
-      localStorage.removeItem(ANONYMOUS_USER_ID_KEY);
+      console.log("✅ Email/password linked to anonymous account");
+      console.log("👤 User ID preserved:", updateData.user?.id);
+
+      // Update user_profile with the new email and name
+      try {
+        const { error: profileUpdateError } = await supabase
+          .from("user_profile")
+          .update({
+            email,
+            name,
+          })
+          .eq("supabase_user_id", anonymousUserId);
+
+        if (profileUpdateError) {
+          log.warn("Failed to update user_profile during conversion:", profileUpdateError);
+        } else {
+          console.log("✅ user_profile updated with email:", email);
+        }
+      } catch (profileError) {
+        // Non-fatal - the account is still converted
+        log.warn("Error updating user_profile during conversion:", profileError);
+      }
+
+      // Clear anonymous mode flag (user is now registered)
       setIsAnonymous(false);
 
-      console.log("✅ Account created, user data will be preserved");
-      console.log("⏳ Starting sync with Supabase...");
+      // Clear any legacy localStorage flags (in case they exist)
+      localStorage.removeItem(LEGACY_ANONYMOUS_USER_KEY);
+      localStorage.removeItem(LEGACY_ANONYMOUS_USER_ID_KEY);
 
-      // The onAuthStateChange handler will trigger and initialize authenticated database
-      // Local data will be preserved because we don't clear the database
+      console.log("✅ Account conversion complete - UUID preserved!");
+      console.log(
+        "🔄 Local data with user_ref FK references remain valid"
+      );
+
+      // Note: is_anonymous in auth.users is automatically set to false by Supabase
+      // when the user is linked to an email identity
+
+      // If sync was not running (anonymous mode), start it now
+      const db = localDb();
+      const currentUser = user();
+      if (db && currentUser && !stopSyncWorker) {
+        console.log("⏳ Starting sync with Supabase for converted user...");
+        const syncWorker = startSyncWorker(db, {
+          supabase,
+          userId: currentUser.id,
+          realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
+          syncIntervalMs: 5000,
+          onSyncComplete: (result) => {
+            log.debug(
+              "Sync completed, incrementing remote sync down completion version"
+            );
+            setRemoteSyncDownCompletionVersion((prev) => prev + 1);
+            if (syncServiceInstance) {
+              const ts = syncServiceInstance.getLastSyncDownTimestamp();
+              if (ts) setLastSyncTimestamp(ts);
+              const mode = syncServiceInstance.getLastSyncMode();
+              if (mode) setLastSyncMode(mode);
+            } else if (result?.timestamp) {
+              setLastSyncTimestamp(result.timestamp);
+            }
+            if (!initialSyncComplete()) {
+              setInitialSyncComplete(true);
+              console.log(
+                "✅ [AuthContext] Initial sync complete after conversion"
+              );
+            }
+          },
+        });
+        stopSyncWorker = syncWorker.stop;
+        syncServiceInstance = syncWorker.service;
+        log.info("Sync worker started after anonymous conversion");
+      }
 
       setLoading(false);
       return { error: null };
@@ -585,23 +928,17 @@ export const AuthProvider: ParentComponent = (props) => {
   const signOut = async () => {
     setLoading(true);
 
-    // If anonymous, just clear local data
-    if (isAnonymous()) {
-      await clearLocalDatabase();
-      localStorage.removeItem(ANONYMOUS_USER_KEY);
-      localStorage.removeItem(ANONYMOUS_USER_ID_KEY);
-      setUserIdInt(null);
-      setIsAnonymous(false);
-      setInitialSyncComplete(false);
-      setLoading(false);
-      return;
-    }
-
-    // Otherwise, sign out from Supabase
+    // Sign out from Supabase (works for both anonymous and registered users)
     await supabase.auth.signOut();
     await clearLocalDatabase();
+
+    // Clear any legacy localStorage flags
+    localStorage.removeItem(LEGACY_ANONYMOUS_USER_KEY);
+    localStorage.removeItem(LEGACY_ANONYMOUS_USER_ID_KEY);
+
     setUserIdInt(null);
-    setInitialSyncComplete(false); // Reset sync status on logout
+    setIsAnonymous(false);
+    setInitialSyncComplete(false);
     setLoading(false);
   };
 

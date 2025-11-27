@@ -2,15 +2,37 @@
 
 ## Overview
 
-Successfully implemented the **Anonymous User Conversion Pattern** (aka "Try Before You Buy" pattern) for TuneTrees, allowing users to:
+Successfully implemented the **Anonymous User Conversion Pattern** (aka "Try Before You Buy" pattern) for TuneTrees using **Supabase Native Anonymous Auth**, allowing users to:
 
 1. ✅ Start using the app immediately without sign-up
-2. ✅ Use all features with local-only storage
-3. ✅ Convert to a registered account later while preserving all data
+2. ✅ Use all features with local SQLite WASM database
+3. ✅ Convert to a registered account later while **preserving their UUID** and all data
 
 ## Implementation Approach
 
-Following the Progressive Reveal model as described in the issue:
+We use **Supabase Native Anonymous Auth** (Option A) which provides:
+- Real `auth.users` entry with `is_anonymous = true`
+- UUID-preserving conversion via `updateUser()`
+- Proper foreign key relationships maintained throughout
+
+### Key Advantage: UUID Preservation
+
+```
+Anonymous Sign-In
+    ↓
+auth.users entry created: { id: 'abc-123', is_anonymous: true }
+user_profile entry created: { id: 'abc-123', supabase_user_id: 'abc-123' }
+    ↓
+User creates local data with user_ref = 'abc-123'
+    ↓
+User converts to registered account
+    ↓
+supabase.auth.updateUser({ email, password })
+    ↓
+auth.users updated: { id: 'abc-123', is_anonymous: false, email: '...' }
+    ↓
+ALL LOCAL DATA STILL VALID - user_ref FK = 'abc-123' unchanged!
+```
 
 ### Pattern Flow
 
@@ -84,56 +106,136 @@ Following the Progressive Reveal model as described in the issue:
 
 ### 1. AuthContext Changes (`src/lib/auth/AuthContext.tsx`)
 
+#### Supabase Config Requirement
+Anonymous sign-ins must be enabled in `supabase/config.toml`:
+```toml
+[auth]
+enable_anonymous_sign_ins = true
+enable_manual_linking = true
+```
+
+#### Anonymous User Detection
+```typescript
+/**
+ * Check if a Supabase user is anonymous based on JWT claims
+ * Supabase sets `is_anonymous: true` in app_metadata for anonymous users
+ */
+function isUserAnonymous(user: User | null): boolean {
+  if (!user) return false;
+  return user.app_metadata?.is_anonymous === true;
+}
+```
+
 #### New State
 ```typescript
 const [isAnonymous, setIsAnonymous] = createSignal(false);
 ```
 
-#### New Methods
+#### signInAnonymously - Uses Supabase Native Auth
 ```typescript
-// Sign in anonymously (no account)
-signInAnonymously: () => Promise<{ error: Error | null }>;
+const signInAnonymously = async () => {
+  // Use Supabase's native anonymous auth
+  // This creates a real user in auth.users with is_anonymous = true
+  const { data, error } = await supabase.auth.signInAnonymously();
 
-// Convert anonymous to registered account
-convertAnonymousToRegistered: (
-  email: string,
-  password: string,
-  name: string
-) => Promise<{ error: AuthError | Error | null }>;
+  if (!error && data.user) {
+    setIsAnonymous(true);
+    await initializeAnonymousDatabase(data.user.id);
+  }
+  return { error };
+};
 ```
 
-#### Anonymous ID Generation
+#### convertAnonymousToRegistered - UUID-Preserving
 ```typescript
-function generateAnonymousUserId(): string {
-  return `anon_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+const convertAnonymousToRegistered = async (email, password, name) => {
+  // Use updateUser to link email/password to existing anonymous user
+  // This preserves the UUID - the user ID doesn't change!
+  const { data, error } = await supabase.auth.updateUser({
+    email,
+    password,
+    data: { name },
+  });
+
+  if (!error) {
+    // Update user_profile with new email
+    await supabase.from("user_profile")
+      .update({ email, name })
+      .eq("supabase_user_id", userIdInt());
+    
+    setIsAnonymous(false);
+    // Start sync worker for converted user
+    startSyncWorker(localDb(), { supabase, userId: data.user.id, ... });
+  }
+  return { error };
+};
+```
+
+#### initializeAnonymousDatabase - Creates user_profile
+```typescript
+async function initializeAnonymousDatabase(anonymousUserId: string) {
+  const db = await initializeSqliteDb();
+  setLocalDb(db);
+
+  // Create user_profile in Supabase for proper FK relationships
+  const { data: existing } = await supabase
+    .from("user_profile")
+    .select("id")
+    .eq("supabase_user_id", anonymousUserId)
+    .maybeSingle();
+
+  if (!existing) {
+    await supabase.from("user_profile").insert({
+      id: anonymousUserId,
+      supabase_user_id: anonymousUserId,
+      email: null, // No email for anonymous users
+      name: "Anonymous User",
+      sr_alg_type: "fsrs",
+    });
+  }
+
+  setUserIdInt(anonymousUserId);
+  setIsAnonymous(true);
+  setInitialSyncComplete(true);
 }
-```
-
-#### localStorage Keys
-```typescript
-const ANONYMOUS_USER_KEY = "tunetrees:anonymous:user";      // "true" when anonymous
-const ANONYMOUS_USER_ID_KEY = "tunetrees:anonymous:userId"; // "anon_xxx"
 ```
 
 #### Session Restoration
 ```typescript
 createEffect(() => {
   void (async () => {
-    // Check for anonymous mode FIRST
-    const isAnonymousMode = localStorage.getItem(ANONYMOUS_USER_KEY) === "true";
-    const anonymousUserId = localStorage.getItem(ANONYMOUS_USER_ID_KEY);
-
-    if (isAnonymousMode && anonymousUserId) {
-      // Restore anonymous session
-      await initializeAnonymousDatabase(anonymousUserId);
-      return;
-    }
-
-    // Otherwise, check for Supabase session
+    // Check for Supabase session
     const { data: { session } } = await supabase.auth.getSession();
-    // ...
+
+    if (session?.user) {
+      const isAnon = isUserAnonymous(session.user);
+      setIsAnonymous(isAnon);
+
+      if (isAnon) {
+        // Anonymous user - initialize local-only database
+        await initializeAnonymousDatabase(session.user.id);
+      } else {
+        // Registered user - initialize with sync
+        void initializeLocalDatabase(session.user.id);
+      }
+    }
   })();
 });
+```
+
+#### Legacy Migration
+```typescript
+// Legacy localStorage keys (for migration from old local-only approach)
+const LEGACY_ANONYMOUS_USER_KEY = "tunetrees:anonymous:user";
+const LEGACY_ANONYMOUS_USER_ID_KEY = "tunetrees:anonymous:userId";
+
+// If old localStorage-based anonymous session exists, migrate to Supabase
+if (localStorage.getItem(LEGACY_ANONYMOUS_USER_KEY) === "true") {
+  localStorage.removeItem(LEGACY_ANONYMOUS_USER_KEY);
+  localStorage.removeItem(LEGACY_ANONYMOUS_USER_ID_KEY);
+  // Sign in with Supabase anonymous auth (creates new UUID)
+  await supabase.auth.signInAnonymously();
+}
 ```
 
 ### 2. LoginForm Changes (`src/components/auth/LoginForm.tsx`)
@@ -249,15 +351,25 @@ createEffect(() => {
 
 ## Data Flow
 
-### Anonymous Mode
+### Anonymous Mode (Supabase Native)
 ```
+supabase.auth.signInAnonymously()
+    ↓
+auth.users entry created: { id: UUID, is_anonymous: true }
+user_profile entry created: { id: UUID, supabase_user_id: UUID }
+    ↓
 User Action → SQLite WASM (local) ❌ No Sync to Supabase
                      ↓
-          localStorage persistence
+          localStorage persistence (IndexedDB for SQLite WASM)
 ```
 
-### After Conversion
+### After Conversion (UUID Preserved!)
 ```
+supabase.auth.updateUser({ email, password })
+    ↓
+auth.users UPDATED (same UUID): { id: UUID, is_anonymous: false, email: '...' }
+user_profile UPDATED: { email: '...', name: '...' }
+    ↓
 User Action → SQLite WASM (local) → Sync Queue → Supabase
                      ↓                              ↓
           localStorage persistence           Cloud backup
@@ -267,42 +379,78 @@ User Action → SQLite WASM (local) → Sync Queue → Supabase
 
 ## Storage Schema
 
-### localStorage (Anonymous Mode)
-```javascript
+### Supabase (Anonymous Mode)
+```sql
+-- auth.users table
+{ 
+  id: 'abc-123-uuid',
+  is_anonymous: true,
+  email: null,
+  app_metadata: { is_anonymous: true }
+}
+
+-- public.user_profile table
 {
-  "tunetrees:anonymous:user": "true",
-  "tunetrees:anonymous:userId": "anon_1701234567890_a1b2c3d4e5",
-  "tunetrees:sqlite-db": "[Binary SQLite database]"
+  id: 'abc-123-uuid',
+  supabase_user_id: 'abc-123-uuid',
+  email: null,
+  name: 'Anonymous User',
+  sr_alg_type: 'fsrs'
 }
 ```
 
-### localStorage (After Conversion)
+### Supabase (After Conversion)
+```sql
+-- auth.users table (SAME ID!)
+{ 
+  id: 'abc-123-uuid',        -- UUID PRESERVED
+  is_anonymous: false,        -- Changed
+  email: 'user@example.com',  -- Added
+  app_metadata: { is_anonymous: false }
+}
+
+-- public.user_profile table (SAME ID!)
+{
+  id: 'abc-123-uuid',          -- UUID PRESERVED
+  supabase_user_id: 'abc-123-uuid',
+  email: 'user@example.com',   -- Updated
+  name: 'John Doe',            -- Updated
+  sr_alg_type: 'fsrs'
+}
+```
+
+### localStorage (Both Modes)
 ```javascript
 {
-  // Anonymous keys removed
-  "tunetrees:sqlite-db": "[Binary SQLite database - PRESERVED]"
   // Supabase auth token stored by Supabase SDK
+  "sb-localhost-auth-token": "...",
+  // SQLite WASM database persisted via IndexedDB
+  "tunetrees:sqlite-db": "[Binary SQLite database]"
 }
 ```
 
 ## Security Considerations
 
 ### Anonymous User Isolation
-- ✅ Each anonymous user has unique ID
-- ✅ Local data only (no server-side storage)
+- ✅ Each anonymous user has unique Supabase UUID
+- ✅ Real auth.users entry (proper authentication)
+- ✅ user_profile entry created immediately
+- ✅ RLS policies apply to anonymous users
 - ✅ No cross-user data leakage
 
 ### Conversion Safety
+- ✅ UUID preserved (no FK orphaning)
 - ✅ Data preserved in local database
-- ✅ Sync starts after account creation
+- ✅ user_profile updated atomically
+- ✅ Sync starts after conversion
 - ✅ No data loss during conversion
-- ✅ Rollback possible (user can sign out and re-enter anonymous mode)
+- ✅ Rollback possible (user can sign out)
 
 ### Data Loss Prevention
-- ⚠️ User warned about local-only storage
+- ⚠️ User warned about local-only storage (banner)
 - ⚠️ Persistent banner reminds to backup
 - ⚠️ Data lost if browser cache cleared (expected behavior)
-- ⚠️ No recovery mechanism for anonymous data
+- ⚠️ Anonymous session controlled by Supabase (JWT expiry applies)
 
 ## User Experience Flow
 
@@ -365,11 +513,12 @@ Consider adding analytics for:
 
 ## Known Limitations
 
-1. **Single Device**: Anonymous mode is device-specific
-2. **No Backup**: Data lost if browser cache cleared
-3. **No Recovery**: Cannot recover anonymous data after clearing
+1. **Single Device**: Anonymous mode is device-specific (until conversion)
+2. **No Backup**: Data lost if browser cache cleared before conversion
+3. **JWT Expiry**: Supabase anonymous sessions subject to JWT expiry (configurable)
 4. **No Cross-Device**: Cannot use anonymous mode on multiple devices
 5. **No Offline Sync**: Conversion requires network connection
+6. **Legacy Migration**: Old localStorage-based anonymous users get new UUID (data orphaned)
 
 ## Future Enhancements
 
@@ -409,15 +558,45 @@ Consider adding analytics for:
 - Data preservation verification
 - Cross-browser testing
 
+## Supabase Configuration
+
+### Enable Anonymous Sign-Ins
+
+In `supabase/config.toml`:
+```toml
+[auth]
+# Allow/disallow anonymous sign-ins to your project.
+enable_anonymous_sign_ins = true
+# Allow/disallow testing manual linking of accounts
+enable_manual_linking = true
+
+[auth.rate_limit]
+# Number of anonymous sign-ins that can be made per hour per IP address
+anonymous_users = 30
+```
+
+This configuration is **required for both local development and CI**. The config.toml file is version-controlled, so the setting persists across `supabase db reset` operations.
+
+### For Production Supabase
+
+In your Supabase Dashboard:
+1. Go to **Authentication** → **Settings**
+2. Under **Anonymous sign-ins**, toggle **Enable anonymous sign-ins** ON
+3. Optionally configure rate limits
+
 ## References
 
+- [Supabase Anonymous Sign-ins Documentation](https://supabase.com/docs/guides/auth/anonymous-sign-ins)
 - Issue: Anonymous User Conversion Pattern 😮
 - Pattern: Progressive Reveal Model
-- Similar implementations: Firebase Anonymous Auth
-- Documentation: ANONYMOUS_USER_TESTING_GUIDE.md
 
 ---
 
 **Status**: ✅ Implementation Complete - Ready for Manual Testing
+
+**Architecture**: Supabase Native Anonymous Auth (Option A)
+- UUID-preserving conversion via `updateUser()`
+- Real `auth.users` entries for anonymous users
+- Proper FK relationships maintained
 
 **Next Action**: User should follow ANONYMOUS_USER_TESTING_GUIDE.md to verify the implementation works as expected.

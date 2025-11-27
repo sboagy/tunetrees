@@ -1,53 +1,66 @@
 # Anonymous User Conversion Pattern - Testing Guide
 
-This document provides step-by-step instructions for testing the newly implemented Anonymous User Conversion pattern.
+This document provides step-by-step instructions for testing the Supabase Native Anonymous Auth implementation.
 
 ## Overview
 
-The Anonymous User Conversion pattern allows users to:
+The Anonymous User Conversion pattern uses **Supabase Native Anonymous Auth** which:
+1. Creates a real `auth.users` entry with `is_anonymous = true`
+2. Preserves the UUID when converting to a registered account
+3. Maintains all FK relationships automatically
+
+Users can:
 1. **Try TuneTrees immediately** without creating an account
-2. **Use the app fully** with all features (data stored locally only)
-3. **Convert to a registered account** later while preserving all their data
+2. **Use the app fully** with all features (data stored locally + user_profile in Supabase)
+3. **Convert to a registered account** later while preserving their UUID and all data
 
 ## Prerequisites
 
-1. Start the development server:
+1. **Enable anonymous sign-ins** in Supabase:
+   - The setting should already be enabled in `supabase/config.toml`
+   - If starting fresh, run `supabase db reset` to apply config
+
+2. Start the development server:
    ```bash
    npm run dev
    ```
 
-2. Open your browser to http://localhost:5173
+3. Open your browser to http://localhost:5173
 
-3. **Important**: Clear localStorage before testing to start fresh:
+4. **Important**: Clear browser data before testing:
+   - Sign out if signed in
    - Open browser DevTools (F12)
    - Go to Application/Storage tab
-   - Clear localStorage items starting with "tunetrees:"
+   - Clear localStorage and IndexedDB
 
 ## Test Scenarios
 
-### Scenario 1: Anonymous Sign-In
+### Scenario 1: Anonymous Sign-In (Supabase Native)
 
-**Goal**: Verify users can start using the app without an account
+**Goal**: Verify users can start using the app without email/password
 
 **Steps**:
 1. Navigate to http://localhost:5173/login
-2. You should see the login form with three options:
+2. You should see the login form with:
+   - **"Use on this Device Only" button** (blue button at top)
    - Email/Password sign-in form
    - OAuth buttons (Google, GitHub)
-   - **New: "Use on this Device Only" button** (gray button)
 3. Click the "Use on this Device Only" button
 4. Expected behavior:
-   - You should be redirected to the main app (Practice tab)
-   - The app should work fully (you can add tunes, practice, etc.)
-   - No Supabase authentication should occur
-   - Data is stored in local SQLite WASM database
+   - Supabase `signInAnonymously()` is called
+   - Real `auth.users` entry created with `is_anonymous = true`
+   - `user_profile` entry created in Supabase
+   - Redirected to the main app (Practice tab)
+   - The app should work fully
 
 **Verification**:
-- Check localStorage in DevTools:
-  - `tunetrees:anonymous:user` should be "true"
-  - `tunetrees:anonymous:userId` should contain an anonymous ID like "anon_1234567890_abc123"
+- Check Supabase Studio (http://localhost:54323):
+  - `auth.users` table should have a new entry with `is_anonymous = true`
+  - `user_profile` table should have a matching entry
 - Check console for:
-  - "✅ Anonymous sign-in successful: anon_..."
+  - "🔐 Anonymous sign-in attempt (Supabase native)"
+  - "✅ Supabase anonymous sign-in successful: [UUID]"
+  - "✅ Created user_profile for anonymous user: [UUID]"
   - "✅ [AuthContext] Anonymous mode - local database ready"
 
 ### Scenario 2: Anonymous User Banner
@@ -72,66 +85,70 @@ The Anonymous User Conversion pattern allows users to:
 
 ### Scenario 3: Creating Test Data as Anonymous User
 
-**Goal**: Add some data to verify preservation during conversion
+**Goal**: Add some data to verify UUID preservation during conversion
 
 **Steps**:
-1. While signed in anonymously, go to Catalog tab
-2. Click "Add Tune" button
-3. Create a test tune:
+1. While signed in anonymously, note your user UUID (check console or Supabase Studio)
+2. Go to Catalog tab
+3. Click "Add Tune" button
+4. Create a test tune:
    - Title: "Test Anonymous Tune"
    - Type: "Jig"
    - Mode: "D Major"
-4. Save the tune
-5. Go to Repertoire tab
-6. Add the tune to a playlist
-7. Go to Practice tab
-8. Stage the tune for practice
+5. Save the tune
+6. Go to Repertoire tab
+7. Add the tune to a playlist
+8. Go to Practice tab
+9. Stage the tune for practice
 
 **Verification**:
 - Tune appears in Catalog
 - Tune appears in Repertoire
 - Tune appears in Practice queue
-- All data is stored locally (no sync occurs)
+- All data stored with `user_ref = [your anonymous UUID]`
+- Data is stored locally (no sync to Supabase yet)
 
-### Scenario 4: Account Conversion Flow
+### Scenario 4: Account Conversion Flow (UUID-Preserving)
 
-**Goal**: Convert anonymous user to registered account while preserving data
+**Goal**: Convert anonymous user to registered account while preserving UUID
 
 **Steps**:
-1. Click "Create Account" button in the blue banner
-2. Expected behavior:
+1. Note your anonymous UUID from earlier
+2. Click "Create Account" button in the blue banner
+3. Expected behavior:
    - Redirected to login page with `?convert=true` parameter
    - Login form shows special conversion UI:
      - Header: "Backup Your Data"
      - Subtext: "Create an account to save and sync your tunes across devices"
      - Blue info box: "✨ Your local data will be preserved and start syncing automatically"
      - Sign-up form (Name, Email, Password fields)
-     - NO "Use on this Device Only" button (hidden during conversion)
-     - NO toggle between sign-in/sign-up (you're in sign-up mode)
-3. Fill in the form:
+4. Fill in the form:
    - Name: "Test User"
-   - Email: "test@example.com" (use a test email)
-   - Password: "password123" (minimum 6 characters)
-4. Click "Create Account" button
-5. Expected behavior:
-   - Account is created in Supabase
-   - Anonymous mode flags are cleared from localStorage
-   - User is signed in with new account
-   - **Local data is preserved** (database is not cleared)
+   - Email: "test@example.com"
+   - Password: "password123"
+5. Click "Create Account" button
+6. Expected behavior:
+   - `supabase.auth.updateUser()` called (NOT `signUp()`)
+   - **UUID PRESERVED** - same ID as anonymous user!
+   - `auth.users` entry updated: `is_anonymous = false`, email added
+   - `user_profile` updated with email and name
    - Sync starts automatically
-   - Banner disappears (no longer anonymous)
+   - Banner disappears
 
 **Verification**:
-- Check localStorage:
-  - `tunetrees:anonymous:user` should be removed
-  - `tunetrees:anonymous:userId` should be removed
+- Check Supabase Studio:
+  - `auth.users`: Same UUID, now `is_anonymous = false`, has email
+  - `user_profile`: Same UUID, now has email and updated name
 - Check console for:
-  - "✅ Account created, user data will be preserved"
-  - "⏳ Starting sync with Supabase..."
+  - "🔄 Converting anonymous user to registered account"
+  - "✅ Email/password linked to anonymous account"
+  - "👤 User ID preserved: [SAME UUID]"
+  - "✅ user_profile updated with email: test@example.com"
+  - "⏳ Starting sync with Supabase for converted user..."
 - Verify data is still there:
-  - Go to Catalog - "Test Anonymous Tune" should still be visible
-  - Go to Repertoire - playlist should still contain the tune
-  - Go to Practice - tune should still be in queue
+  - Go to Catalog - "Test Anonymous Tune" should be visible
+  - Go to Repertoire - playlist should contain the tune
+  - All `user_ref` FKs still reference the SAME UUID
 - Blue banner should be gone
 - TopNav should show user email/name
 
@@ -140,18 +157,18 @@ The Anonymous User Conversion pattern allows users to:
 **Goal**: Verify converted data syncs properly
 
 **Steps**:
-1. After conversion (Scenario 4), note the data you created
+1. After conversion (Scenario 4), note the UUID
 2. Sign out (click user menu → Sign Out)
-3. Sign in again with the same credentials
+3. Sign in again with email/password
 4. Expected behavior:
    - Data should sync down from Supabase
-   - All tunes, playlists, and practice records should be restored
-   - Everything looks identical to before sign-out
+   - All tunes, playlists, and practice records restored
+   - Same UUID used for all data
 
 **Verification**:
 - All data is preserved
+- UUID is the same throughout
 - Sync is working (check console for sync logs)
-- No anonymous mode indicators
 
 ### Scenario 6: Dismissing the Banner
 
@@ -183,7 +200,7 @@ The Anonymous User Conversion pattern allows users to:
 5. Create account
 6. Expected behavior:
    - Normal sign-up flow works
-   - No anonymous mode involved
+   - Creates new Supabase user with `is_anonymous = false`
    - No banner appears (you're a regular user)
    - Starts with empty database (normal flow)
 
@@ -201,70 +218,102 @@ The Anonymous User Conversion pattern allows users to:
 - Should: Do nothing or redirect to home (already anonymous)
 
 ### Edge Case 2: Sign In When Anonymous
-- Signed in anonymously
+- Signed in anonymously (has real Supabase UUID)
 - Go to /login
 - Try to sign in with existing account
-- Should: Sign out of anonymous mode, sign in normally
-- Anonymous data: Should be cleared (or ask user to convert first?)
+- Should: Sign out anonymous user, sign in with existing account
+- Note: Anonymous user's data stays in Supabase under old UUID (orphaned)
 
-### Edge Case 3: Network Failure During Conversion
+### Edge Case 3: Network Failure During Anonymous Sign-In
+- Clear browser state
+- Go to /login
+- Disable network
+- Click "Use on this Device Only"
+- Should: Show error message (Supabase native auth requires network)
+
+### Edge Case 4: Network Failure During Conversion
 - Sign in anonymously
 - Create test data
 - Disable network
 - Try to convert to account
-- Should: Show error message, keep anonymous mode active, data preserved
+- Should: Show error message, keep anonymous mode active, data preserved locally
 
 ## Known Limitations
 
-1. **No multi-device sync for anonymous users**: Data is local-only until conversion
-2. **Data loss on browser cache clear**: Anonymous data is not backed up
-3. **No account recovery**: If user clears localStorage, anonymous data is lost
-4. **Single-device only**: Cannot use anonymous mode on multiple devices simultaneously
+1. **Requires network for anonymous sign-in**: Unlike local-only approach, Supabase native auth needs network for initial sign-in
+2. **Data stored with Supabase UUID from start**: Even for anonymous users
+3. **No multi-device sync for anonymous users**: Local SQLite data is not synced until conversion
+4. **Orphaned data on abandon**: If user never converts or signs in elsewhere, anonymous data remains orphaned
 
 ## Developer Notes
 
-### localStorage Keys
-- `tunetrees:anonymous:user` - "true" if in anonymous mode
-- `tunetrees:anonymous:userId` - Unique anonymous ID (e.g., "anon_1234567890_abc123")
+### Key Supabase Auth Methods
+- `supabase.auth.signInAnonymously()` - Creates `auth.users` with `is_anonymous = true`
+- `supabase.auth.updateUser({ email, password })` - Links credentials, preserves UUID
+- JWT metadata contains `is_anonymous` flag
 
 ### Console Logs to Watch
-- "🔐 Anonymous sign-in attempt"
-- "✅ Anonymous sign-in successful: {id}"
+- "🔐 Anonymous sign-in attempt (Supabase native)"
+- "✅ Supabase anonymous sign-in successful: [UUID]"
+- "✅ Created user_profile for anonymous user: [UUID]"
 - "✅ [AuthContext] Anonymous mode - local database ready"
 - "🔄 Converting anonymous user to registered account"
-- "✅ Account created, user data will be preserved"
+- "✅ Email/password linked to anonymous account"
+- "👤 User ID preserved: [UUID]"
+- "✅ user_profile updated with email: [email]"
+- "⏳ Starting sync with Supabase for converted user..."
 
 ### Key Code Locations
 - Anonymous auth logic: `src/lib/auth/AuthContext.tsx`
 - Login UI: `src/components/auth/LoginForm.tsx`
 - Banner component: `src/components/auth/AnonymousBanner.tsx`
 - Integration: `src/components/layout/MainLayout.tsx`
+- Supabase config: `supabase/config.toml` (enable_anonymous_sign_ins)
+
+### Checking Anonymous Status
+- **In AuthContext**: `isUserAnonymous(user)` helper checks JWT metadata
+- **Supabase Studio**: Check `auth.users` table for `is_anonymous` column
+- **Console**: "Anonymous mode" vs "Registered user" logs
 
 ## Troubleshooting
 
+### "Anonymous Sign-In Failed"
+- Check: Is `enable_anonymous_sign_ins = true` in supabase/config.toml?
+- Check: Run `supabase db reset` to apply config changes
+- Check: Network connectivity (Supabase native auth requires network)
+- Check: Supabase service is running (`supabase status`)
+
 ### Banner Not Appearing
-- Check: Are you actually in anonymous mode? (Check localStorage)
+- Check: Is `isAnonymous()` signal returning true? (Console log)
 - Check: Did you dismiss it? (Refresh page)
-- Check: Is `isAnonymous()` signal working? (Console log)
+- Check: Is the user actually anonymous? (Check Supabase Studio)
 
 ### Conversion Not Working
 - Check: Network connectivity
-- Check: Supabase credentials in .env.local
-- Check: Console errors during sign-up
 - Check: Email format validity
+- Check: Password meets requirements (6+ characters)
+- Check: Console errors during updateUser call
+
+### UUID Changed After Conversion
+- This should NOT happen with Supabase native auth
+- Check: Console logs show "👤 User ID preserved:"
+- Check: updateUser was called, not signUp
 
 ### Data Not Preserved
-- Check: Database was not cleared before conversion
+- Check: Are you looking at the right UUID's data?
 - Check: Sync started after conversion
 - Check: Console logs for errors
+- Check: user_ref FKs in local SQLite match the UUID
 
 ## Success Criteria
 
 ✅ Users can sign in anonymously with one click  
+✅ Anonymous sign-in creates real Supabase user with `is_anonymous = true`  
 ✅ Anonymous users can use all app features  
 ✅ Blue banner appears for anonymous users  
-✅ Conversion flow is clear and seamless  
-✅ All local data is preserved during conversion  
+✅ Conversion uses `updateUser()` to preserve UUID  
+✅ **UUID is preserved** during conversion (critical!)  
+✅ All local data FK references remain valid after conversion  
 ✅ Sync starts automatically after conversion  
 ✅ Regular sign-up flow still works normally  
 ✅ No TypeScript errors  
@@ -273,7 +322,7 @@ The Anonymous User Conversion pattern allows users to:
 ## Next Steps
 
 After manual testing confirms everything works:
-1. Consider adding E2E tests with Playwright
+1. Consider adding E2E tests with Playwright for anonymous flow
 2. Update user documentation
 3. Add analytics tracking for conversion rate
-4. Consider adding "Continue as Guest" instead of "Use on this Device Only" for clarity
+4. Consider periodic cleanup of abandoned anonymous users in Supabase
