@@ -45,7 +45,14 @@ import RepertoirePage from "./repertoire";
 const Home: Component = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading, isAnonymous, initialSyncComplete, localDb, userIdInt } = useAuth();
+  const {
+    user,
+    loading,
+    isAnonymous,
+    initialSyncComplete,
+    localDb,
+    userIdInt,
+  } = useAuth();
   const { startOnboarding, shouldShowOnboarding } = useOnboarding();
   const [activeTab, setActiveTab] = createSignal<TabId>("practice");
   const [hasCheckedOnboarding, setHasCheckedOnboarding] = createSignal(false);
@@ -82,18 +89,18 @@ const Home: Component = () => {
       !hasCheckedOnboarding()
     ) {
       setHasCheckedOnboarding(true);
-      
+
       // Check if user has any playlists
       const db = localDb();
       // Use userIdInt which is the correct UUID for both regular and anonymous users
       const userId = userIdInt();
-      
+
       if (db && userId) {
         void (async () => {
           try {
             const playlists = await getUserPlaylists(db, userId);
             const hasPlaylists = playlists.length > 0;
-            
+
             if (shouldShowOnboarding(hasPlaylists)) {
               console.log("🎓 No playlists found, starting onboarding");
               // Small delay to let UI settle
@@ -203,7 +210,7 @@ const Home: Component = () => {
       <Show when={user() || isAnonymous()}>
         {/* Onboarding Overlay */}
         <OnboardingOverlay />
-        
+
         <MainLayout activeTab={activeTab()} onTabChange={handleTabChange}>
           <Switch>
             <Match when={activeTab() === "practice"}>

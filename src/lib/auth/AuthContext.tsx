@@ -156,6 +156,10 @@ const AuthContext = createContext<AuthState>();
 const LEGACY_ANONYMOUS_USER_KEY = "tunetrees:anonymous:user";
 const LEGACY_ANONYMOUS_USER_ID_KEY = "tunetrees:anonymous:userId";
 
+// Key to persist anonymous session for "Use on this Device Only" feature
+// This allows anonymous users to return to their session after signing out
+const ANONYMOUS_SESSION_KEY = "tunetrees:anonymous:session";
+
 /**
  * Check if a Supabase user is anonymous
  * Supabase anonymous users have:
@@ -164,21 +168,22 @@ const LEGACY_ANONYMOUS_USER_ID_KEY = "tunetrees:anonymous:userId";
  */
 function isUserAnonymous(user: User | null): boolean {
   if (!user) return false;
-  
+
   // Primary check: app_metadata.is_anonymous (set by Supabase Auth in newer versions)
   if (user.app_metadata?.is_anonymous === true) {
     return true;
   }
-  
+
   // Fallback: Check if user has no email and no linked identities
   // Anonymous users created via signInAnonymously() have:
   // - No email
   // - Empty identities array or identities with provider 'anonymous'
   const hasNoEmail = !user.email;
   const hasNoIdentities = !user.identities || user.identities.length === 0;
-  const hasOnlyAnonymousIdentity = user.identities?.length === 1 && 
-    user.identities[0]?.provider === 'anonymous';
-  
+  const hasOnlyAnonymousIdentity =
+    user.identities?.length === 1 &&
+    user.identities[0]?.provider === "anonymous";
+
   return hasNoEmail && (hasNoIdentities || hasOnlyAnonymousIdentity);
 }
 
@@ -267,10 +272,16 @@ export const AuthProvider: ParentComponent = (props) => {
             lastModifiedAt: now,
             deviceId: "local",
           });
-          console.log("✅ Created local user_profile for anonymous user:", anonymousUserId);
+          console.log(
+            "✅ Created local user_profile for anonymous user:",
+            anonymousUserId
+          );
         }
       } catch (localError) {
-        log.error("Failed to create local user_profile for anonymous user:", localError);
+        log.error(
+          "Failed to create local user_profile for anonymous user:",
+          localError
+        );
         throw localError; // This is critical - we need the local profile
       }
 
@@ -283,7 +294,10 @@ export const AuthProvider: ParentComponent = (props) => {
           .maybeSingle();
 
         if (fetchError) {
-          log.warn("Error checking user_profile for anonymous user:", fetchError);
+          log.warn(
+            "Error checking user_profile for anonymous user:",
+            fetchError
+          );
         }
 
         if (!existingProfile) {
@@ -299,15 +313,24 @@ export const AuthProvider: ParentComponent = (props) => {
 
           if (insertError) {
             if (!insertError.message?.includes("duplicate key")) {
-              log.warn("Failed to create Supabase user_profile for anonymous user:", insertError);
+              log.warn(
+                "Failed to create Supabase user_profile for anonymous user:",
+                insertError
+              );
             }
           } else {
-            console.log("✅ Created Supabase user_profile for anonymous user:", anonymousUserId);
+            console.log(
+              "✅ Created Supabase user_profile for anonymous user:",
+              anonymousUserId
+            );
           }
         }
       } catch (profileError) {
         // Non-fatal - Supabase profile can be created later during conversion
-        log.warn("Error managing Supabase user_profile for anonymous user:", profileError);
+        log.warn(
+          "Error managing Supabase user_profile for anonymous user:",
+          profileError
+        );
       }
 
       // Set anonymous user ID (this is their Supabase UUID)
@@ -342,85 +365,99 @@ export const AuthProvider: ParentComponent = (props) => {
    * This is needed for anonymous users to have dropdown options
    */
   async function syncReferenceDataForAnonymous(db: SqliteDatabase) {
-    const { genre, tuneType, instrument, genreTuneType } = await import("@/lib/db/schema");
-    
+    const { genre, tuneType, instrument, genreTuneType } = await import(
+      "@/lib/db/schema"
+    );
+
     // Sync genres
     const { data: genres, error: genreError } = await supabase
       .from("genre")
       .select("*");
-    
+
     if (genreError) {
       log.warn("Failed to fetch genres:", genreError);
     } else if (genres && genres.length > 0) {
       for (const g of genres) {
-        await db.insert(genre).values({
-          id: g.id,
-          name: g.name,
-          region: g.region,
-          description: g.description,
-        }).onConflictDoNothing();
+        await db
+          .insert(genre)
+          .values({
+            id: g.id,
+            name: g.name,
+            region: g.region,
+            description: g.description,
+          })
+          .onConflictDoNothing();
       }
       console.log(`📥 Synced ${genres.length} genres`);
     }
-    
+
     // Sync tune types
     const { data: tuneTypes, error: tuneTypeError } = await supabase
       .from("tune_type")
       .select("*");
-    
+
     if (tuneTypeError) {
       log.warn("Failed to fetch tune types:", tuneTypeError);
     } else if (tuneTypes && tuneTypes.length > 0) {
       for (const tt of tuneTypes) {
-        await db.insert(tuneType).values({
-          id: tt.id,
-          name: tt.name,
-          rhythm: tt.rhythm,
-          description: tt.description,
-        }).onConflictDoNothing();
+        await db
+          .insert(tuneType)
+          .values({
+            id: tt.id,
+            name: tt.name,
+            rhythm: tt.rhythm,
+            description: tt.description,
+          })
+          .onConflictDoNothing();
       }
       console.log(`📥 Synced ${tuneTypes.length} tune types`);
     }
-    
+
     // Sync instruments (public instruments only - where private_to_user is null)
     const { data: instruments, error: instrumentError } = await supabase
       .from("instrument")
       .select("*")
       .is("private_to_user", null);
-    
+
     if (instrumentError) {
       log.warn("Failed to fetch instruments:", instrumentError);
     } else if (instruments && instruments.length > 0) {
       const now = new Date().toISOString();
       for (const inst of instruments) {
-        await db.insert(instrument).values({
-          id: inst.id,
-          privateToUser: null,
-          instrument: inst.instrument,
-          description: inst.description,
-          genreDefault: inst.genre_default,
-          deleted: inst.deleted ? 1 : 0,
-          syncVersion: inst.sync_version || 1,
-          lastModifiedAt: inst.last_modified_at || now,
-          deviceId: inst.device_id,
-        }).onConflictDoNothing();
+        await db
+          .insert(instrument)
+          .values({
+            id: inst.id,
+            privateToUser: null,
+            instrument: inst.instrument,
+            description: inst.description,
+            genreDefault: inst.genre_default,
+            deleted: inst.deleted ? 1 : 0,
+            syncVersion: inst.sync_version || 1,
+            lastModifiedAt: inst.last_modified_at || now,
+            deviceId: inst.device_id,
+          })
+          .onConflictDoNothing();
       }
       console.log(`📥 Synced ${instruments.length} instruments`);
     }
-    
+
     // Sync genre-tune-type mappings
     const { data: gttMappings, error: gttError } = await supabase
       .from("genre_tune_type")
       .select("*");
-    
+
     if (gttError) {
       log.warn("Failed to fetch genre_tune_type mappings:", gttError);
     } else if (gttMappings && gttMappings.length > 0) {
       for (const gtt of gttMappings) {
-        await db.insert(genreTuneType).values({
-          genreId: gtt.genre_id,
-          tuneTypeId: gtt.tune_type_id,
-        }).onConflictDoNothing();
+        await db
+          .insert(genreTuneType)
+          .values({
+            genreId: gtt.genre_id,
+            tuneTypeId: gtt.tune_type_id,
+          })
+          .onConflictDoNothing();
       }
       console.log(`📥 Synced ${gttMappings.length} genre-tune-type mappings`);
     }
@@ -661,7 +698,7 @@ export const AuthProvider: ParentComponent = (props) => {
           email: newSession.user.email,
           app_metadata: newSession.user.app_metadata,
           identities: newSession.user.identities,
-          isAnonymous: isAnon
+          isAnonymous: isAnon,
         });
         if (isAnon) {
           // Anonymous user - initialize local-only database
@@ -755,12 +792,61 @@ export const AuthProvider: ParentComponent = (props) => {
    * Sign in anonymously using Supabase native anonymous auth
    * Creates a real auth.users entry with is_anonymous = true
    * UUID is preserved when user later converts to registered account
+   *
+   * If user previously signed out as anonymous, restores their session
+   * instead of creating a new anonymous user (preserves their data)
    */
   const signInAnonymously = async () => {
     setLoading(true);
     console.log("🔐 Anonymous sign-in attempt (Supabase native)");
 
     try {
+      // Check if there's a saved anonymous session to restore
+      const savedSession = localStorage.getItem(ANONYMOUS_SESSION_KEY);
+      console.log("🔍 Checking for saved anonymous session:", savedSession ? "FOUND" : "NOT FOUND");
+      if (savedSession) {
+        try {
+          const parsed = JSON.parse(savedSession);
+          const { refresh_token, user_id } = parsed;
+          console.log("🔍 Parsed saved session - user_id:", user_id, "has refresh_token:", !!refresh_token);
+          if (refresh_token) {
+            console.log("🔄 Restoring previous anonymous session...");
+            const { data: refreshData, error: refreshError } =
+              await supabase.auth.refreshSession({
+                refresh_token,
+              });
+
+            console.log("🔍 Refresh result - error:", refreshError, "has session:", !!refreshData?.session);
+            if (!refreshError && refreshData.session) {
+              // Successfully restored session - clear saved session
+              localStorage.removeItem(ANONYMOUS_SESSION_KEY);
+              console.log(
+                "✅ Restored anonymous session for user:",
+                refreshData.user?.id
+              );
+
+              // Initialize the database for this restored user
+              await initializeAnonymousDatabase(refreshData.user!.id);
+
+              // The onAuthStateChange handler will handle the rest
+              setIsAnonymous(true);
+              setLoading(false);
+              return { error: null };
+            } else {
+              // Refresh failed - session expired, create new anonymous user
+              console.log(
+                "⚠️ Could not restore anonymous session, creating new one. Error:",
+                refreshError?.message
+              );
+              localStorage.removeItem(ANONYMOUS_SESSION_KEY);
+            }
+          }
+        } catch (parseError) {
+          console.warn("Failed to parse saved anonymous session:", parseError);
+          localStorage.removeItem(ANONYMOUS_SESSION_KEY);
+        }
+      }
+
       // Use Supabase's native anonymous auth
       // This creates a real user in auth.users with is_anonymous = true
       const { data, error } = await supabase.auth.signInAnonymously();
@@ -786,10 +872,7 @@ export const AuthProvider: ParentComponent = (props) => {
       // Initialize local database for anonymous user
       await initializeAnonymousDatabase(anonymousUserId);
 
-      console.log(
-        "✅ Supabase anonymous sign-in successful:",
-        anonymousUserId
-      );
+      console.log("✅ Supabase anonymous sign-in successful:", anonymousUserId);
       setLoading(false);
       return { error: null };
     } catch (error) {
@@ -853,13 +936,19 @@ export const AuthProvider: ParentComponent = (props) => {
           .eq("supabase_user_id", anonymousUserId);
 
         if (profileUpdateError) {
-          log.warn("Failed to update user_profile during conversion:", profileUpdateError);
+          log.warn(
+            "Failed to update user_profile during conversion:",
+            profileUpdateError
+          );
         } else {
           console.log("✅ user_profile updated with email:", email);
         }
       } catch (profileError) {
         // Non-fatal - the account is still converted
-        log.warn("Error updating user_profile during conversion:", profileError);
+        log.warn(
+          "Error updating user_profile during conversion:",
+          profileError
+        );
       }
 
       // Clear anonymous mode flag (user is now registered)
@@ -870,9 +959,7 @@ export const AuthProvider: ParentComponent = (props) => {
       localStorage.removeItem(LEGACY_ANONYMOUS_USER_ID_KEY);
 
       console.log("✅ Account conversion complete - UUID preserved!");
-      console.log(
-        "🔄 Local data with user_ref FK references remain valid"
-      );
+      console.log("🔄 Local data with user_ref FK references remain valid");
 
       // Note: is_anonymous in auth.users is automatically set to false by Supabase
       // when the user is linked to an email identity
@@ -924,18 +1011,50 @@ export const AuthProvider: ParentComponent = (props) => {
 
   /**
    * Sign out and clear local data
+   * For anonymous users, preserves their Supabase session so they can return later
    */
   const signOut = async () => {
     setLoading(true);
 
-    // Sign out from Supabase (works for both anonymous and registered users)
-    await supabase.auth.signOut();
-    await clearLocalDatabase();
+    // For anonymous users, DON'T call supabase.auth.signOut()
+    // This preserves their session so they can return to the same account
+    // Supabase signOut() invalidates the refresh token, making restoration impossible
+    if (isAnonymous()) {
+      const currentSession = session();
+      console.log("🔍 Sign out (anonymous) - preserving Supabase session");
+      if (currentSession?.refresh_token) {
+        console.log("💾 Saving anonymous session for later restoration, user:", currentSession.user?.id);
+        localStorage.setItem(
+          ANONYMOUS_SESSION_KEY,
+          JSON.stringify({
+            refresh_token: currentSession.refresh_token,
+            user_id: currentSession.user?.id,
+          })
+        );
+        // Verify it was saved
+        const saved = localStorage.getItem(ANONYMOUS_SESSION_KEY);
+        console.log("💾 Verified saved session:", saved ? "YES" : "NO");
+      } else {
+        console.warn("⚠️ No refresh token available to save");
+      }
+      
+      // Clear local state but DON'T call supabase.auth.signOut()
+      // This keeps the session valid for restoration
+      await clearLocalDatabase();
+    } else {
+      // For registered users, do a full sign out and clear any saved anonymous session
+      console.log("🔍 Sign out - registered user, full sign out");
+      localStorage.removeItem(ANONYMOUS_SESSION_KEY);
+      await supabase.auth.signOut();
+      await clearLocalDatabase();
+    }
 
     // Clear any legacy localStorage flags
     localStorage.removeItem(LEGACY_ANONYMOUS_USER_KEY);
     localStorage.removeItem(LEGACY_ANONYMOUS_USER_ID_KEY);
 
+    setSession(null);
+    setUser(null);
     setUserIdInt(null);
     setIsAnonymous(false);
     setInitialSyncComplete(false);
