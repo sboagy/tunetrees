@@ -28,15 +28,24 @@ import { useAuth } from "../../lib/auth/AuthContext";
 export const AnonymousBanner: Component<{
   onConvert: () => void;
 }> = (props) => {
-  const { isAnonymous, user } = useAuth();
-  const [dismissed, setDismissed] = createSignal(false);
+  const { isAnonymous } = useAuth();
+  
+  // Persist dismissed state to localStorage so it survives page refreshes
+  const DISMISSED_KEY = "tunetrees:anonymous-banner-dismissed";
+  const [dismissed, setDismissed] = createSignal(
+    localStorage.getItem(DISMISSED_KEY) === "true"
+  );
 
-  // Show only if anonymous mode AND no signed-in user
-  if (!isAnonymous() || user() || dismissed()) {
-    return null;
-  }
+  const handleDismiss = () => {
+    setDismissed(true);
+    localStorage.setItem(DISMISSED_KEY, "true");
+  };
 
+  // Show only if in anonymous mode and not dismissed
+  // Note: Anonymous users DO have a Supabase user() object (with is_anonymous=true),
+  // so we only check isAnonymous() signal, not user()
   return (
+    <Show when={isAnonymous() && !dismissed()}>
     <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div class="flex items-center justify-between flex-wrap gap-2">
@@ -66,7 +75,7 @@ export const AnonymousBanner: Component<{
             </button>
             <button
               type="button"
-              onClick={() => setDismissed(true)}
+              onClick={handleDismiss}
               class="p-1.5 hover:bg-white/10 rounded-md transition-colors"
               aria-label="Dismiss banner"
             >
@@ -76,5 +85,6 @@ export const AnonymousBanner: Component<{
         </div>
       </div>
     </div>
+    </Show>
   );
 };

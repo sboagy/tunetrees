@@ -505,14 +505,20 @@ export const TopNav: Component = () => {
                     {(u) => (
                       <>
                         <span class="hidden sm:inline font-medium">
-                          {u().email}
+                          {isAnonymous() ? "Anonymous" : u().email}
                         </span>
                         {/* User Avatar */}
                         <Show
-                          when={userAvatar()}
+                          when={!isAnonymous() && userAvatar()}
                           fallback={
-                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-                              {u().email?.charAt(0).toUpperCase()}
+                            <div
+                              class={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                                isAnonymous()
+                                  ? "bg-gradient-to-br from-gray-400 to-gray-600"
+                                  : "bg-gradient-to-br from-blue-500 to-purple-600"
+                              }`}
+                            >
+                              {isAnonymous() ? "?" : u().email?.charAt(0).toUpperCase()}
                             </div>
                           }
                         >
@@ -551,53 +557,118 @@ export const TopNav: Component = () => {
                     data-testid="user-menu-panel"
                   >
                     <div class="py-2">
-                      {/* User Information - only for authenticated users */}
-                      <Show when={user()}>
-                        {(u) => (
-                          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                            <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                              User Information
-                            </h3>
-                            <dl class="space-y-1.5 text-sm">
-                              <div class="flex gap-2">
-                                <dt class="font-medium text-gray-600 dark:text-gray-400">
-                                  Email:
-                                </dt>
-                                <dd class="text-gray-900 dark:text-gray-100 break-all">
-                                  {u().email}
-                                </dd>
-                              </div>
-                              <div class="flex gap-2">
-                                <dt class="font-medium text-gray-600 dark:text-gray-400">
-                                  Name:
-                                </dt>
-                                <dd class="text-gray-900 dark:text-gray-100">
-                                  {u().user_metadata?.name || "Not set"}
-                                </dd>
-                              </div>
-                              <div class="flex gap-2">
-                                <dt class="font-medium text-gray-600 dark:text-gray-400">
-                                  User ID:
-                                </dt>
-                                <dd class="text-gray-700 dark:text-gray-300 font-mono text-xs break-all">
-                                  {u().id}
-                                </dd>
-                              </div>
-                            </dl>
-                          </div>
-                        )}
+                      {/* User Information - for authenticated non-anonymous users */}
+                      <Show when={user() && !isAnonymous()}>
+                        {(_) => {
+                          const u = user()!;
+                          return (
+                            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                              <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                                User Information
+                              </h3>
+                              <dl class="space-y-1.5 text-sm">
+                                <div class="flex gap-2">
+                                  <dt class="font-medium text-gray-600 dark:text-gray-400">
+                                    Email:
+                                  </dt>
+                                  <dd class="text-gray-900 dark:text-gray-100 break-all">
+                                    {u.email}
+                                  </dd>
+                                </div>
+                                <div class="flex gap-2">
+                                  <dt class="font-medium text-gray-600 dark:text-gray-400">
+                                    Name:
+                                  </dt>
+                                  <dd class="text-gray-900 dark:text-gray-100">
+                                    {u.user_metadata?.name || "Not set"}
+                                  </dd>
+                                </div>
+                                <div class="flex gap-2">
+                                  <dt class="font-medium text-gray-600 dark:text-gray-400">
+                                    User ID:
+                                  </dt>
+                                  <dd class="text-gray-700 dark:text-gray-300 font-mono text-xs break-all">
+                                    {u.id}
+                                  </dd>
+                                </div>
+                              </dl>
+                            </div>
+                          );
+                        }}
                       </Show>
 
-                      {/* Anonymous User Info */}
-                      <Show when={!user() && isAnonymous()}>
-                        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                          <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                            Device-Only Mode
-                          </h3>
-                          <p class="text-sm text-gray-600 dark:text-gray-400">
-                            Your data is stored locally on this device only.
-                          </p>
-                        </div>
+                      {/* Anonymous User Info - for users in device-only mode */}
+                      <Show when={isAnonymous()}>
+                        {(_) => {
+                          const u = user();
+                          return (
+                            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                              <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                                Device-Only Mode
+                              </h3>
+                              <dl class="space-y-1.5 text-sm">
+                                <div class="flex gap-2">
+                                  <dt class="font-medium text-gray-600 dark:text-gray-400">
+                                    Email:
+                                  </dt>
+                                  <dd class="text-gray-500 dark:text-gray-400 italic">
+                                    Anonymous
+                                  </dd>
+                                </div>
+                                <div class="flex gap-2">
+                                  <dt class="font-medium text-gray-600 dark:text-gray-400">
+                                    Name:
+                                  </dt>
+                                  <dd class="text-gray-500 dark:text-gray-400 italic">
+                                    Anonymous
+                                  </dd>
+                                </div>
+                                <Show when={u}>
+                                  <div class="flex gap-2">
+                                    <dt class="font-medium text-gray-600 dark:text-gray-400">
+                                      User ID:
+                                    </dt>
+                                    <dd class="text-gray-700 dark:text-gray-300 font-mono text-xs break-all">
+                                      {u!.id}
+                                    </dd>
+                                  </div>
+                                </Show>
+                              </dl>
+                              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                Your data is stored locally on this device only.
+                              </p>
+                            </div>
+                          );
+                        }}
+                      </Show>
+
+                      {/* Create Account button for anonymous users */}
+                      <Show when={isAnonymous()}>
+                        <button
+                          type="button"
+                          class="w-full px-4 py-2 text-left text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-2 font-medium"
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            window.location.href = "/login?convert=true";
+                          }}
+                          data-testid="create-account-button"
+                        >
+                          <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                            />
+                          </svg>
+                          Create Account
+                        </button>
                       </Show>
 
                       {/* Menu Items */}
