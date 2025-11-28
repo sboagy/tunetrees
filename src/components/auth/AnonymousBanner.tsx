@@ -8,7 +8,7 @@
  */
 
 import { X } from "lucide-solid";
-import { type Component, createSignal } from "solid-js";
+import { type Component, createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 
 /**

@@ -33,7 +33,8 @@ async function ensureDb(): Promise<SqliteDatabase> {
   try {
     return getDb();
   } catch {
-    return await initializeDb();
+    // Use a test user ID for initialization
+    return await initializeDb("test-user-id");
   }
 }
 
