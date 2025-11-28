@@ -518,7 +518,9 @@ export const TopNav: Component = () => {
                                   : "bg-gradient-to-br from-blue-500 to-purple-600"
                               }`}
                             >
-                              {isAnonymous() ? "?" : u().email?.charAt(0).toUpperCase()}
+                              {isAnonymous()
+                                ? "?"
+                                : u().email?.charAt(0).toUpperCase()}
                             </div>
                           }
                         >
