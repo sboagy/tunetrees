@@ -108,15 +108,72 @@ async function getSqlJs(): Promise<SqlJsStatic> {
  */
 const INDEXEDDB_NAME = "tunetrees-storage";
 const INDEXEDDB_STORE = "databases";
-const DB_KEY = "tunetrees-db";
-const DB_VERSION_KEY = "tunetrees-db-version";
+// Base keys - will be namespaced by user ID
+const DB_KEY_PREFIX = "tunetrees-db";
+const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
 const CURRENT_DB_VERSION = 4;
+
+// Track which user's database is currently loaded
+let currentUserId: string | null = null;
+
+/**
+ * Get the IndexedDB key for a user's database
+ */
+function getDbKey(userId: string): string {
+  return `${DB_KEY_PREFIX}-${userId}`;
+}
+
+/**
+ * Get the IndexedDB key for a user's database version
+ */
+function getDbVersionKey(userId: string): string {
+  return `${DB_VERSION_KEY_PREFIX}-${userId}`;
+}
+
 let initializeDbCalls = 0;
-export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
+
+/**
+ * Initialize SQLite database for a specific user
+ *
+ * Each user gets their own namespaced database in IndexedDB.
+ * If switching users, the previous user's database is persisted and closed,
+ * then the new user's database is loaded (or created fresh).
+ *
+ * @param userId - The user's ID (Supabase auth UUID or anonymous ID)
+ */
+export async function initializeDb(
+  userId: string
+): Promise<ReturnType<typeof drizzle>> {
   initializeDbCalls += 1;
-  console.log("🔁 initializeDb call #", initializeDbCalls);
-  if (drizzleDb) {
+  console.log(
+    `🔁 initializeDb call #${initializeDbCalls} for user: ${userId.substring(0, 8)}...`
+  );
+
+  // If we have an existing DB for a DIFFERENT user, persist and close it
+  if (drizzleDb && currentUserId && currentUserId !== userId) {
+    console.log(
+      `🔄 Switching users: ${currentUserId.substring(0, 8)}... → ${userId.substring(0, 8)}...`
+    );
+    // Persist current user's data before switching
+    try {
+      await persistDb();
+      console.log(`💾 Persisted previous user's database before switching`);
+    } catch (e) {
+      console.warn("⚠️ Failed to persist previous user's DB:", e);
+    }
+    // Close current database
+    if (sqliteDb) {
+      sqliteDb.close();
+      sqliteDb = null;
+    }
+    drizzleDb = null;
+    dbReady = false;
+    initializeDbPromise = null;
+  }
+
+  // If we already have a DB for this same user, return it
+  if (drizzleDb && currentUserId === userId) {
     dbReady = true;
     return drizzleDb;
   }
@@ -163,9 +220,11 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
         }
       }
 
-      // Try to load existing database from IndexedDB
-      const existingData = await loadFromIndexedDB(DB_KEY);
-      const storedVersion = await loadFromIndexedDB(DB_VERSION_KEY);
+      // Try to load existing database from IndexedDB (namespaced by user ID)
+      const dbKey = getDbKey(userId);
+      const dbVersionKey = getDbVersionKey(userId);
+      const existingData = await loadFromIndexedDB(dbKey);
+      const storedVersion = await loadFromIndexedDB(dbVersionKey);
       const storedVersionNum =
         storedVersion && storedVersion.length > 0 ? storedVersion[0] : 0;
 
@@ -183,8 +242,8 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
           console.log(
             `🔄 Database version mismatch (stored: ${storedVersionNum}, current: ${CURRENT_DB_VERSION}). Recreating...`
           );
-          await deleteFromIndexedDB(DB_KEY);
-          await deleteFromIndexedDB(DB_VERSION_KEY);
+          await deleteFromIndexedDB(dbKey);
+          await deleteFromIndexedDB(dbVersionKey);
         }
         sqliteDb = new SQL.Database();
         console.log("📋 Applying SQLite schema migrations...");
@@ -247,7 +306,10 @@ export async function initializeDb(): Promise<ReturnType<typeof drizzle>> {
       } catch (error) {
         console.error("❌ Failed to create sync_queue table:", error);
       }
-      console.log("✅ SQLite WASM database ready");
+      console.log(
+        `✅ SQLite WASM database ready for user: ${userId.substring(0, 8)}...`
+      );
+      currentUserId = userId;
       dbReady = true;
 
       if (migrationNeeded) {
@@ -351,10 +413,15 @@ export async function persistDb(): Promise<void> {
     return;
   }
 
+  if (!currentUserId) {
+    throw new Error("Cannot persist database: no user ID set");
+  }
+  const dbKey = getDbKey(currentUserId);
+  const dbVersionKey = getDbVersionKey(currentUserId);
   const data = sqliteDb.export();
-  await saveToIndexedDB(DB_KEY, data);
+  await saveToIndexedDB(dbKey, data);
   // Save version number
-  await saveToIndexedDB(DB_VERSION_KEY, new Uint8Array([CURRENT_DB_VERSION]));
+  await saveToIndexedDB(dbVersionKey, new Uint8Array([CURRENT_DB_VERSION]));
   console.log("💾 Database persisted to IndexedDB");
 
   // DEV VERIFICATION: load saved blob and verify critical table counts match
@@ -417,6 +484,34 @@ if (typeof window !== "undefined" && !(window as any).__persistDbForTest) {
 }
 
 /**
+ * Close current database without deleting from IndexedDB
+ *
+ * Persists current database and closes it, but keeps it in IndexedDB
+ * for later reloading. Useful for sign-out scenarios where we want to
+ * preserve user data.
+ */
+export async function closeDb(): Promise<void> {
+  if (sqliteDb && dbReady) {
+    try {
+      await persistDb();
+      console.log("💾 Persisted database before closing");
+    } catch (e) {
+      console.warn("⚠️ Failed to persist before close:", e);
+    }
+  }
+
+  if (sqliteDb) {
+    sqliteDb.close();
+    sqliteDb = null;
+  }
+  drizzleDb = null;
+  currentUserId = null;
+  dbReady = false;
+  initializeDbPromise = null;
+  console.log("🔒 Database closed (data preserved in IndexedDB)");
+}
+
+/**
  * Clear local database
  *
  * Removes the database from memory and IndexedDB.
@@ -434,7 +529,11 @@ export async function clearDb(): Promise<void> {
     drizzleDb = null;
   }
 
-  await deleteFromIndexedDB(DB_KEY);
+  if (currentUserId) {
+    await deleteFromIndexedDB(getDbKey(currentUserId));
+    await deleteFromIndexedDB(getDbVersionKey(currentUserId));
+  }
+  currentUserId = null;
   dbReady = false;
   isClearing = false;
   console.log("🗑️  Local database cleared");

@@ -413,10 +413,13 @@ export const TopNav: Component = () => {
     });
   });
 
-  // Poll for pending sync count
+  // Poll for pending sync count (skip for anonymous users - they don't sync)
   createEffect(() => {
     const db = localDb();
-    if (!db) return;
+    if (!db || isAnonymous()) {
+      setPendingCount(0); // Reset count for anonymous users
+      return;
+    }
 
     const updateSyncCount = async () => {
       try {
@@ -433,6 +436,8 @@ export const TopNav: Component = () => {
   });
 
   const statusText = () => {
+    // Anonymous users don't sync - show "Local Only"
+    if (isAnonymous()) return "Local Only";
     if (!isOnline() && pendingCount() > 0) {
       return `Offline - ${pendingCount()} pending`;
     }
@@ -763,12 +768,17 @@ export const TopNav: Component = () => {
                               {statusText()}
                             </div>
                             <div class="text-xs text-gray-500 dark:text-gray-400">
-                              {!isOnline() &&
+                              {isAnonymous() &&
+                                "Data stored on this device only"}
+                              {!isAnonymous() &&
+                                !isOnline() &&
                                 "Changes will sync when reconnected"}
-                              {isOnline() &&
+                              {!isAnonymous() &&
+                                isOnline() &&
                                 pendingCount() === 0 &&
                                 "All changes synced to Supabase"}
-                              {isOnline() &&
+                              {!isAnonymous() &&
+                                isOnline() &&
                                 pendingCount() > 0 &&
                                 `${pendingCount()} change${pendingCount() === 1 ? "" : "s"} syncing...`}
                             </div>

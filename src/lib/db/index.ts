@@ -15,6 +15,7 @@ export type { Schema as SqliteSchema, SqliteDatabase } from "./client-sqlite";
 // SQLite WASM client
 export {
   clearDb as clearSqliteDb,
+  closeDb as closeSqliteDb,
   getDb as getSqliteDb,
   initializeDb as initializeSqliteDb,
   persistDb as persistSqliteDb,

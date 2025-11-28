@@ -19,6 +19,7 @@ import {
 } from "solid-js";
 import {
   clearDb as clearSqliteDb,
+  closeDb as closeSqliteDb,
   initializeDb as initializeSqliteDb,
   type SqliteDatabase,
   setupAutoPersist,
@@ -26,7 +27,7 @@ import {
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
 
-import { type SyncService, startSyncWorker } from "../sync";
+import { clearSyncQueue, type SyncService, startSyncWorker } from "../sync";
 
 /**
  * Authentication state interface
@@ -224,7 +225,7 @@ export const AuthProvider: ParentComponent = (props) => {
    * Creates a user_profile entry in both local SQLite AND Supabase
    */
   async function initializeAnonymousDatabase(anonymousUserId: string) {
-    // Prevent double initialization for SAME user
+    // Check if we're already initializing
     if (isInitializing) {
       log.debug(
         "Skipping anonymous database initialization (already in progress)"
@@ -232,10 +233,9 @@ export const AuthProvider: ParentComponent = (props) => {
       return;
     }
 
-    // If DB exists but for a DIFFERENT user, we need to ensure user_profile exists for new user
+    // Check if DB is already initialized for this SAME user
     const existingDb = localDb();
     const currentUserId = userIdInt();
-    
     if (existingDb && currentUserId === anonymousUserId) {
       log.debug(
         "Skipping anonymous database initialization (already initialized for same user)"
@@ -257,17 +257,11 @@ export const AuthProvider: ParentComponent = (props) => {
         anonymousUserId
       );
 
-      // Use existing DB if available, otherwise initialize new one
-      let db: SqliteDatabase;
-      if (existingDb) {
-        console.log("📦 Reusing existing SQLite database for new anonymous user");
-        db = existingDb;
-      } else {
-        db = await initializeSqliteDb();
-        setLocalDb(db);
-        // Set up auto-persistence (store cleanup for later)
-        autoPersistCleanup = setupAutoPersist();
-      }
+      // Initialize user-namespaced database (handles switching automatically)
+      const db = await initializeSqliteDb(anonymousUserId);
+      setLocalDb(db);
+      // Set up auto-persistence (store cleanup for later)
+      autoPersistCleanup = setupAutoPersist();
 
       const now = new Date().toISOString();
 
@@ -538,10 +532,17 @@ export const AuthProvider: ParentComponent = (props) => {
    * Initialize local database for authenticated user
    */
   async function initializeLocalDatabase(userId: string) {
-    // Prevent double initialization
-    if (isInitializing || localDb()) {
+    // Check if we're already initializing or already initialized FOR THIS SAME USER
+    const currentUserId = userIdInt();
+    if (isInitializing) {
+      log.debug("Skipping database initialization (already in progress)");
+      return;
+    }
+
+    // If we have a database but it's for a DIFFERENT user, we need to switch
+    if (localDb() && currentUserId && currentUserId === userId) {
       log.debug(
-        "Skipping database initialization (already initialized or in progress)"
+        "Skipping database initialization (already initialized for this user)"
       );
       return;
     }
@@ -549,9 +550,36 @@ export const AuthProvider: ParentComponent = (props) => {
     isInitializing = true;
     try {
       log.info("Initializing local database for user", userId);
+      console.log(
+        "🔍 [initializeLocalDatabase] Starting for user:",
+        userId.substring(0, 8)
+      );
+      console.log("🔍 [initializeLocalDatabase] Current state:", {
+        isInitializing,
+        hasLocalDb: !!localDb(),
+        currentUserId,
+        targetUserId: userId,
+        initialSyncComplete: initialSyncComplete(),
+      });
 
-      const db = await initializeSqliteDb();
+      // Reset sync state when switching users - critical for UI to show loading state
+      // until the new user's data is synced
+      setInitialSyncComplete(false);
+      setUserIdInt(null);
+      console.log("🔄 [initializeLocalDatabase] Reset sync state for new user");
+
+      // Initialize user-namespaced database (handles user switching automatically)
+      const db = await initializeSqliteDb(userId);
       setLocalDb(db);
+      console.log(
+        "✅ [initializeLocalDatabase] Database initialized and signal set"
+      );
+
+      // Clear any stale sync queue items from previous sessions
+      // The data will be synced down fresh from Supabase, so stale queue items
+      // would just cause errors when trying to upload
+      console.log("🧹 Clearing sync queue (stale items from previous session)");
+      await clearSyncQueue(db);
 
       // Set up auto-persistence (store cleanup for later)
       autoPersistCleanup = setupAutoPersist();
@@ -614,12 +642,36 @@ export const AuthProvider: ParentComponent = (props) => {
               console.log(
                 "✅ [AuthContext] Initial sync complete, UI can now load data"
               );
+              console.log("🔍 [AuthContext] Sync result:", {
+                success: result?.success,
+                itemsSynced: result?.itemsSynced,
+                errors: result?.errors?.length || 0,
+              });
+
+              // Persist database after initial sync to ensure data is saved
+              import("@/lib/db/client-sqlite").then(({ persistDb }) => {
+                persistDb()
+                  .then(() => {
+                    console.log(
+                      "💾 [AuthContext] Database persisted after initial sync"
+                    );
+                  })
+                  .catch((e) => {
+                    console.warn(
+                      "⚠️ [AuthContext] Failed to persist after sync:",
+                      e
+                    );
+                  });
+              });
             }
           },
         });
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
         log.info("Sync worker started");
+        console.log(
+          "⏳ [AuthContext] Sync worker started, waiting for initial sync..."
+        );
 
         // Note: syncWorker automatically runs initial syncDown on startup
         // We rely on onSyncComplete callback above to mark sync as complete
@@ -639,9 +691,10 @@ export const AuthProvider: ParentComponent = (props) => {
   }
 
   /**
-   * Clear local database on logout
+   * Clear local database - useful for "clear all data" feature
+   * Currently unused but kept for future use
    */
-  async function clearLocalDatabase() {
+  async function _clearLocalDatabase() {
     try {
       // Stop auto-persist
       if (autoPersistCleanup) {
@@ -664,6 +717,8 @@ export const AuthProvider: ParentComponent = (props) => {
       log.error("Failed to clear local database:", error);
     }
   }
+  // Keep reference to avoid unused warning - can be exposed via context later
+  void _clearLocalDatabase;
 
   /**
    * Check for existing session on mount
@@ -792,10 +847,10 @@ export const AuthProvider: ParentComponent = (props) => {
         }
       }
 
-      // Clear database on sign out
-      if (event === "SIGNED_OUT") {
-        await clearLocalDatabase();
-      }
+      // Note: We don't clear database on SIGNED_OUT event anymore
+      // Database lifecycle is managed in signOut() and initializeLocalDatabase()
+      // - signOut() persists to IndexedDB and resets in-memory state
+      // - initializeLocalDatabase() clears if different user signs in
     });
 
     onCleanup(() => {
@@ -1125,22 +1180,55 @@ export const AuthProvider: ParentComponent = (props) => {
         console.warn("⚠️ No refresh token available to save");
       }
 
-      // DON'T clear local database for anonymous users!
-      // Their data is local-only and should persist across sign-out/sign-in cycles
-      // We also persist the DB to IndexedDB to ensure it survives page refresh
+      // Close database properly (persists and resets module state)
+      // This allows the next user to initialize cleanly
       try {
-        const { persistDb } = await import("@/lib/db/client-sqlite");
-        await persistDb();
-        console.log("💾 Persisted anonymous user database to IndexedDB");
-      } catch (persistError) {
-        console.warn("⚠️ Failed to persist anonymous DB:", persistError);
+        await closeSqliteDb();
+      } catch (closeError) {
+        console.warn("⚠️ Failed to close database:", closeError);
       }
+
+      // Stop auto-persist cleanup
+      if (autoPersistCleanup) {
+        autoPersistCleanup();
+        autoPersistCleanup = null;
+      }
+
+      // Reset AuthContext signal
+      setLocalDb(null);
     } else {
-      // For registered users, do a full sign out and clear any saved anonymous session
-      console.log("🔍 Sign out - registered user, full sign out");
-      localStorage.removeItem(ANONYMOUS_SESSION_KEY);
+      // For registered users, do a full sign out
+      // IMPORTANT: Do NOT clear ANONYMOUS_SESSION_KEY - the user may want to return
+      // to their anonymous session after logging out of their registered account
+      console.log(
+        "🔍 Sign out - registered user, full sign out (preserving any saved anonymous session)"
+      );
+
+      // Stop sync worker before closing database
+      if (stopSyncWorker) {
+        stopSyncWorker();
+        stopSyncWorker = null;
+        syncServiceInstance = null;
+        console.log("🛑 Stopped sync worker");
+      }
+
+      // Close database properly (persists and resets module state)
+      try {
+        await closeSqliteDb();
+      } catch (closeError) {
+        console.warn("⚠️ Failed to close database:", closeError);
+      }
+
+      // Stop auto-persist cleanup
+      if (autoPersistCleanup) {
+        autoPersistCleanup();
+        autoPersistCleanup = null;
+      }
+
+      // Reset AuthContext signal
+      setLocalDb(null);
+
       await supabase.auth.signOut();
-      await clearLocalDatabase();
     }
 
     // Clear any legacy localStorage flags
