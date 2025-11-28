@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
-/* Dark mode is configured via tailwind.config.mjs: darkMode: ["selector", ".dark"].
-  Remove deprecated @custom-variant syntax to satisfy Biome parser which
-  currently flags Tailwind-specific directives. The .dark selector applied to
-  root (or a parent) now activates dark: variant utilities. */
+/* Dark mode configuration for Tailwind CSS v4.
+   Uses class-based dark mode via .dark class on <html> element.
+   The ThemeSwitcher component toggles the .dark class. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
@@ -108,7 +108,7 @@
     --radius: 0.5rem;
   }
 
-  [data-kb-theme="dark"] {
+  .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 

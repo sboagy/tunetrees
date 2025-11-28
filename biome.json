@@ -38,5 +38,10 @@
       "quoteProperties": "asNeeded"
     }
   },
-  "css": {}
+  "css": {
+    "parser": {
+      "cssModules": true,
+      "tailwindDirectives": true
+    }
+  }
 }
