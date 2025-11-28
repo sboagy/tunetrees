@@ -362,6 +362,16 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
 
         {/* Anonymous Sign In Option - at top when not converting */}
         <Show when={!isConverting()}>
+          <div class="relative mb-3">
+            <div class="absolute inset-0 flex items-center">
+              <div class="w-full border-t border-gray-300 dark:border-gray-600" />
+            </div>
+            <div class="relative flex justify-center text-sm">
+              <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
+                Run local only, as anonymous
+              </span>
+            </div>
+          </div>{" "}
           <div class="mb-6">
             <button
               type="button"
@@ -381,7 +391,6 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
               this device and won't sync to other devices.
             </p>
           </div>
-
           {/* Divider - "Or (sign up)" */}
           <div class="relative mb-3">
             <div class="absolute inset-0 flex items-center">
@@ -389,7 +398,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
             </div>
             <div class="relative flex justify-center text-sm">
               <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                Or
+                Or sign up
               </span>
             </div>
           </div>
@@ -415,14 +424,15 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
               </button>
             </div>
           </Show>
-
           {/* Divider - "Or sign in" */}
           <div class="relative mb-6 mt-6">
             <div class="absolute inset-0 flex items-center">
               <div class="w-full border-t border-gray-300 dark:border-gray-600" />
             </div>
             <div class="relative flex justify-center text-sm">
-              <span class="px-2 bg-white dark:bg-gray-800 text-gray-500"></span>
+              <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
+                Or sign in with password
+              </span>
             </div>
           </div>
         </Show>
@@ -545,7 +555,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
           </div>
           <div class="relative flex justify-center text-sm">
             <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-              Or continue with
+              Or sign in with social authentication
             </span>
           </div>
         </div>
