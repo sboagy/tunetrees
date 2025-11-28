@@ -144,9 +144,9 @@ test.describe("SCHEDULING-005: Queue Bucket Distribution", () => {
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForTimeout(2000);
 
-    // Re-login if needed
+    // Re-login if needed (session may be lost after IndexedDB clear)
     const loginVisible = await page
-      .getByText("Sign in to continue")
+      .getByRole("button", { name: "Use on this Device Only" })
       .isVisible()
       .catch(() => false);
     if (loginVisible) {
@@ -156,13 +156,14 @@ test.describe("SCHEDULING-005: Queue Bucket Distribution", () => {
     }
 
     await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await page.waitForTimeout(3000);
 
     // CRITICAL: Delete the existing queue so it regenerates with correct scheduled dates
     // The queue was created before we updated scheduled dates in Supabase
     await page.evaluate(async (playlistId: string) => {
       const api = (window as any).__ttTestApi;
       if (!api) return;
+
       // Use seedAddToReview with empty tuneIds to trigger queue regeneration
       // This deletes the current queue and regenerates it
       await api.seedAddToReview({ playlistId, tuneIds: [] });
