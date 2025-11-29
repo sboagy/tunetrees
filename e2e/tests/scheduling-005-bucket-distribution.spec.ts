@@ -338,6 +338,7 @@ test.describe
 
       await page.evaluate(() => (window as any).__forceSyncUpForTest?.());
       await page.waitForLoadState("networkidle", { timeout: 15000 });
+      await page.waitForTimeout(2000);
 
       // Query the queue again - practiced tunes should be marked completed
       // Note: The queue total might stay the same (items marked completed, not deleted)
