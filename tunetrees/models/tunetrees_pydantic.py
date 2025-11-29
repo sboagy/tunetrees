@@ -514,6 +514,7 @@ class NoteModel(BaseModel):
     note_text: Optional[str]
     public: Optional[bool]
     favorite: Optional[int]
+    order_index: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -527,6 +528,7 @@ class NoteModelPartial(BaseModel):
     note_text: Optional[str] = None
     public: Optional[bool] = None
     favorite: Optional[int] = None
+    order_index: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -539,6 +541,7 @@ class NoteModelCreate(BaseModel):
     note_text: Optional[str] = None
     public: Optional[bool] = False
     favorite: Optional[int] = None
+    order_index: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -554,6 +557,7 @@ class ReferenceModel(BaseModel):
     comment: str | None
     title: str | None
     deleted: Optional[bool]
+    order_index: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -569,6 +573,7 @@ class ReferenceModelPartial(BaseModel):
     comment: Optional[str] = None
     title: Optional[str] = None
     deleted: Optional[bool] = None
+    order_index: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -582,6 +587,7 @@ class ReferenceModelCreate(BaseModel):
     favorite: int | None
     comment: str | None
     title: str | None
+    order_index: Optional[int] = 0
 
 
 class PlaylistTuneJoinedModel(BaseModel):

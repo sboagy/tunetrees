@@ -102,6 +102,7 @@ export interface IReferenceData {
   title?: string;
   deleted?: boolean | false;
   isNew?: boolean;
+  order_index?: number;
 }
 
 export interface INote {
@@ -115,6 +116,7 @@ export interface INote {
   favorite: boolean | false;
   deleted?: boolean | false;
   isNew?: boolean;
+  order_index?: number;
 }
 
 export interface ITableStateTable {

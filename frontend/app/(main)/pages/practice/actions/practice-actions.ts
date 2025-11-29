@@ -21,6 +21,8 @@ import {
   deleteNote,
   getNotes,
   updateNote,
+  reorderNotes,
+  reorderReferences,
   createPlaylistTune,
   createPracticeRecord,
   deleteTune,
@@ -154,6 +156,18 @@ export async function updateNoteAction(
   note: Partial<INote>,
 ): ReturnType<typeof updateNote> {
   return updateNote(noteId, note);
+}
+
+export async function reorderNotesAction(
+  noteIds: number[],
+): ReturnType<typeof reorderNotes> {
+  return reorderNotes(noteIds);
+}
+
+export async function reorderReferencesAction(
+  referenceIds: number[],
+): ReturnType<typeof reorderReferences> {
+  return reorderReferences(referenceIds);
 }
 
 export async function createPlaylistTuneAction(

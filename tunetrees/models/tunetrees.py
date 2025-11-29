@@ -443,6 +443,7 @@ class Note(Base):
     public = mapped_column(Boolean, server_default=text("FALSE"))
     favorite = mapped_column(Integer)
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
+    order_index = mapped_column(Integer, server_default=text("0"))
 
     playlist: Mapped[Optional["Playlist"]] = relationship(
         "Playlist", back_populates="note"
@@ -530,6 +531,7 @@ class Reference(Base):
     comment = mapped_column(Text)
     title = mapped_column(Text)
     deleted = mapped_column(Boolean, server_default=text("FALSE"))
+    order_index = mapped_column(Integer, server_default=text("0"))
 
     tune: Mapped["Tune"] = relationship("Tune", back_populates="reference")
 

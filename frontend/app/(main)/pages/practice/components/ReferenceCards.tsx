@@ -5,6 +5,7 @@ import {
   deleteReferenceAction,
   getReferencesAction,
   updateReferenceAction,
+  reorderReferencesAction,
 } from "../actions/practice-actions";
 import AutoResizingRichTextarea from "@/components/AutoResizingRichTextarea";
 import AutoResizingTextarea from "@/components/AutoResizingTextarea";
@@ -20,6 +21,7 @@ import { CollapsibleTrigger } from "@radix-ui/react-collapsible";
 import {
   Check,
   Edit,
+  GripVertical,
   Plus,
   Save,
   SquareChevronDown,
@@ -32,6 +34,23 @@ import { useEffect, useState } from "react";
 import { type IReferenceData, UpdateActionType } from "../types";
 import "./ReferenceCards.css"; // Import the CSS file
 import { logVerbose } from "@/lib/logging";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface IReferenceCardProps {
   reference: IReferenceData;
@@ -39,12 +58,14 @@ interface IReferenceCardProps {
   // onCommentChange: (id: number, comment: string) => void;
   displayPublic: boolean;
   onUpdate: (updatedNote: IReferenceData, action: UpdateActionType) => void;
+  isDragging?: boolean;
 }
 
 function ReferenceCard({
   reference,
   displayPublic,
   onUpdate,
+  isDragging,
 }: IReferenceCardProps) {
   const [isOpen, setIsOpen] = useState(reference.isNew || false);
   const [stagedReference, setStagedReference] = useState<IReferenceData>({
@@ -112,7 +133,10 @@ function ReferenceCard({
   };
 
   return (
-    <Card className="w-full max-w-md mb-4">
+    <Card
+      className={`w-full max-w-md mb-4 ${isDragging ? "opacity-50" : ""}`}
+      data-testid="tt-reference-card"
+    >
       <CardContent className="pt-6">
         <Collapsible open={isOpen}>
           <div className="flex items-right justify-between mb-2">
@@ -353,6 +377,58 @@ function ReferenceCard({
   );
 }
 
+interface ISortableReferenceCardProps {
+  reference: IReferenceData;
+  onToggle: (id: number, field: "public" | "favorite") => void;
+  displayPublic: boolean;
+  onUpdate: (updatedNote: IReferenceData, action: UpdateActionType) => void;
+}
+
+function SortableReferenceCard({
+  reference,
+  onToggle,
+  displayPublic,
+  onUpdate,
+}: ISortableReferenceCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: reference.id ?? 0 });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-start gap-2">
+      <button
+        type="button"
+        className="mt-6 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded touch-none"
+        {...attributes}
+        {...listeners}
+        aria-label="Drag to reorder"
+        data-testid="tt-reference-drag-handle"
+      >
+        <GripVertical className="h-4 w-4 text-gray-400" />
+      </button>
+      <div className="flex-1">
+        <ReferenceCard
+          reference={reference}
+          onToggle={onToggle}
+          displayPublic={displayPublic}
+          onUpdate={onUpdate}
+          isDragging={isDragging}
+        />
+      </div>
+    </div>
+  );
+}
+
 interface IReferenceCardsProps {
   tuneRef: number;
   userRef: number;
@@ -367,6 +443,13 @@ export default function ReferenceCards({
   const [references, setReferences] = useState<IReferenceData[]>([]);
   const [isCollapsibleOpen, setIsCollapsibleOpen] = useState(true);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
   useEffect(() => {
     const fetchReferences = async () => {
       const data = await getReferencesAction(tuneRef, userRef);
@@ -378,6 +461,39 @@ export default function ReferenceCards({
       .then(() => logVerbose("fetched references"))
       .catch((error) => console.error("Error fetching references:", error));
   }, [tuneRef, userRef]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setReferences((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+
+        const newItems = arrayMove(items, oldIndex, newIndex);
+
+        // Persist the new order to the backend
+        const referenceIds = newItems
+          .filter((ref) => ref.id !== undefined && ref.id > 0)
+          .map((ref) => ref.id as number);
+
+        if (referenceIds.length > 0) {
+          reorderReferencesAction(referenceIds)
+            .then(() => {
+              logVerbose("References reordered successfully");
+            })
+            .catch((error) => {
+              console.error("Error reordering references:", error);
+              alert(
+                "An error occurred while reordering the references. Please try again.",
+              );
+            });
+        }
+
+        return newItems;
+      });
+    }
+  };
 
   const handleToggle = (id: number, field: "public" | "favorite") => {
     setReferences((prevReferences) =>
@@ -485,6 +601,7 @@ export default function ReferenceCards({
                 public: 0,
                 comment: "",
                 isNew: true,
+                order_index: 0,
               };
               setReferences((prevReferences) => [
                 newReference,
@@ -506,17 +623,27 @@ export default function ReferenceCards({
           </CollapsibleTrigger>
         </div>
       </div>
-      <CollapsibleContent>
-        {references.map((reference) => (
-          <ReferenceCard
-            key={reference.id}
-            reference={reference}
-            onToggle={handleToggle}
-            // onCommentChange={handleCommentChange}
-            displayPublic={displayPublic}
-            onUpdate={handleUpdateReference}
-          />
-        ))}
+      <CollapsibleContent data-testid="tt-references-content">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={references.map((ref) => ref.id ?? 0)}
+            strategy={verticalListSortingStrategy}
+          >
+            {references.map((reference) => (
+              <SortableReferenceCard
+                key={reference.id}
+                reference={reference}
+                onToggle={handleToggle}
+                displayPublic={displayPublic}
+                onUpdate={handleUpdateReference}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </CollapsibleContent>
     </Collapsible>
   );

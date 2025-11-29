@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import {
   Check,
   Edit,
+  GripVertical,
   Plus,
   Save,
   SquareChevronDown,
@@ -28,15 +29,34 @@ import {
   deleteNoteAction,
   getNotesAction,
   updateNoteAction,
+  reorderNotesAction,
 } from "../actions/practice-actions";
 import { type INote, UpdateActionType } from "../types";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface INoteCardProps {
   note: INote;
   onUpdate: (updatedNote: INote, action: UpdateActionType) => void;
+  isDragging?: boolean;
 }
 
-function NoteCard({ note, onUpdate }: INoteCardProps) {
+function NoteCard({ note, onUpdate, isDragging }: INoteCardProps) {
   const [isOpen, setIsOpen] = useState(note.isNew);
   const [stagedNote, setStagedNote] = useState<INote>({ ...note });
 
@@ -93,7 +113,10 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
   };
 
   return (
-    <Card className="w-full max-w-md mb-4">
+    <Card
+      className={`w-full max-w-md mb-4 ${isDragging ? "opacity-50" : ""}`}
+      data-testid="tt-note-card"
+    >
       <CardContent className="pt-6">
         <Collapsible open={isOpen}>
           <div className="flex items-right justify-between mb-2">
@@ -277,6 +300,45 @@ function NoteCard({ note, onUpdate }: INoteCardProps) {
   );
 }
 
+interface ISortableNoteCardProps {
+  note: INote;
+  onUpdate: (updatedNote: INote, action: UpdateActionType) => void;
+}
+
+function SortableNoteCard({ note, onUpdate }: ISortableNoteCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: note.id ?? 0 });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-start gap-2">
+      <button
+        type="button"
+        className="mt-6 cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded touch-none"
+        {...attributes}
+        {...listeners}
+        aria-label="Drag to reorder"
+        data-testid="tt-note-drag-handle"
+      >
+        <GripVertical className="h-4 w-4 text-gray-400" />
+      </button>
+      <div className="flex-1">
+        <NoteCard note={note} onUpdate={onUpdate} isDragging={isDragging} />
+      </div>
+    </div>
+  );
+}
+
 interface INotesProps {
   tuneRef: number;
   userRef: number;
@@ -290,6 +352,13 @@ export default function NoteCards({
 }: INotesProps) {
   const [notes, setNotes] = useState<INote[]>([]);
   const [isCollapsibleOpen, setIsCollapsibleOpen] = useState(true);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   useEffect(() => {
     const fetchNotes = async () => {
@@ -313,6 +382,39 @@ export default function NoteCards({
       .then(() => logVerbose("fetched notes"))
       .catch((error) => console.error("Error fetching notes:", error));
   }, [tuneRef, userRef, displayPublic]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setNotes((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+
+        const newItems = arrayMove(items, oldIndex, newIndex);
+
+        // Persist the new order to the backend
+        const noteIds = newItems
+          .filter((note) => note.id !== undefined && note.id > 0)
+          .map((note) => note.id as number);
+
+        if (noteIds.length > 0) {
+          reorderNotesAction(noteIds)
+            .then(() => {
+              logVerbose("Notes reordered successfully");
+            })
+            .catch((error) => {
+              console.error("Error reordering notes:", error);
+              alert(
+                "An error occurred while reordering the notes. Please try again.",
+              );
+            });
+        }
+
+        return newItems;
+      });
+    }
+  };
 
   const handleUpdateNote = (updatedNote: INote, action: UpdateActionType) => {
     if (action === UpdateActionType.DELETE) {
@@ -391,6 +493,7 @@ export default function NoteCards({
                 public: false,
                 favorite: false,
                 isNew: true,
+                order_index: 0,
               };
               setNotes((notes) => [newNote, ...notes]);
             }}
@@ -409,16 +512,32 @@ export default function NoteCards({
         </div>
       </div>
       <CollapsibleContent data-testid="tt-notes-content">
-        {notes.map((note) => {
-          const duplicate = notes.filter((n) => n.id === note.id).length > 1;
-          logVerbose(`Checking for duplicate id: ${note.id}`);
-          if (duplicate) {
-            logVerbose(`Duplicate id found: ${note.id}`);
-          }
-          return (
-            <NoteCard key={note.id} note={note} onUpdate={handleUpdateNote} />
-          );
-        })}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={notes.map((note) => note.id ?? 0)}
+            strategy={verticalListSortingStrategy}
+          >
+            {notes.map((note) => {
+              const duplicate =
+                notes.filter((n) => n.id === note.id).length > 1;
+              logVerbose(`Checking for duplicate id: ${note.id}`);
+              if (duplicate) {
+                logVerbose(`Duplicate id found: ${note.id}`);
+              }
+              return (
+                <SortableNoteCard
+                  key={note.id}
+                  note={note}
+                  onUpdate={handleUpdateNote}
+                />
+              );
+            })}
+          </SortableContext>
+        </DndContext>
       </CollapsibleContent>
     </Collapsible>
   );

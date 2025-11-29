@@ -1252,7 +1252,7 @@ def update_playlist_tunes(
     "/references/{user_ref}/{tune_ref}",
     response_model=List[ReferenceModel],
     summary="Get References",
-    description="Get all references for a user and tune or public references.",
+    description="Get all references for a user and tune or public references, ordered by order_index.",
     status_code=200,
 )
 def get_references(
@@ -1266,14 +1266,18 @@ def get_references(
         )
         with SessionLocal() as db:
             stmt = (
-                select(Reference).where(
+                select(Reference)
+                .where(
                     (Reference.tune_ref == tune_ref)
                     & ((Reference.user_ref == user_ref) | (Reference.public == public))
                 )
+                .order_by(Reference.order_index)
                 if public
-                else select(Reference).where(
+                else select(Reference)
+                .where(
                     (Reference.user_ref == user_ref) & (Reference.tune_ref == tune_ref)
                 )
+                .order_by(Reference.order_index)
             )
             logger.debug(f"Generated SQL: {stmt}")
             logger.debug(
@@ -1419,11 +1423,41 @@ def delete_reference(id: int):  # noqa: C901
         raise HTTPException(status_code=500, detail=f"Unable to delete reference: {e}")
 
 
+@router.patch(
+    "/references/reorder",
+    response_model=List[ReferenceModel],
+    summary="Reorder References",
+    description="Update the order of references by providing a list of reference IDs in the new order.",
+    status_code=200,
+)
+def reorder_references(
+    reference_ids: List[int] = Body(..., description="List of reference IDs in the new order"),
+):
+    try:
+        with SessionLocal() as db:
+            for index, ref_id in enumerate(reference_ids):
+                stmt = select(Reference).where(Reference.id == ref_id)
+                result = db.execute(stmt)
+                reference = result.scalars().first()
+                if reference:
+                    reference.order_index = index
+            db.commit()
+
+            # Return updated references in new order
+            stmt = select(Reference).where(Reference.id.in_(reference_ids)).order_by(Reference.order_index)
+            result = db.execute(stmt)
+            references = result.scalars().all()
+            return [ReferenceModel.model_validate(ref) for ref in references]
+    except Exception as e:
+        logger.error(f"Unable to reorder references: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to reorder references: {e}")
+
+
 @router.get(
     "/notes/{user_ref}/{tune_ref}",
     response_model=List[NoteModel],
     summary="Get Notes",
-    description="Retrieve notes based on tune_ref and optional playlist_ref, user_ref, or public.",
+    description="Retrieve notes based on tune_ref and optional playlist_ref, user_ref, or public, ordered by order_index.",
     status_code=200,
 )
 def get_notes(
@@ -1434,11 +1468,15 @@ def get_notes(
 ):
     try:
         with SessionLocal() as db:
-            stmt = select(Note).where(
-                Note.tune_ref == tune_ref,
-                (Note.playlist_ref == playlist_ref)
-                | (Note.user_ref == user_ref)
-                | (Note.public == public),
+            stmt = (
+                select(Note)
+                .where(
+                    Note.tune_ref == tune_ref,
+                    (Note.playlist_ref == playlist_ref)
+                    | (Note.user_ref == user_ref)
+                    | (Note.public == public),
+                )
+                .order_by(Note.order_index)
             )
             result = db.execute(stmt)
             notes = result.scalars().all()
@@ -1527,6 +1565,36 @@ def delete_note(
     except Exception as e:
         logger.error(f"Unable to delete note ({note_id}): {e}")
         raise HTTPException(status_code=500, detail=f"Unable to delete note: {e}")
+
+
+@router.patch(
+    "/notes/reorder",
+    response_model=List[NoteModel],
+    summary="Reorder Notes",
+    description="Update the order of notes by providing a list of note IDs in the new order.",
+    status_code=200,
+)
+def reorder_notes(
+    note_ids: List[int] = Body(..., description="List of note IDs in the new order"),
+):
+    try:
+        with SessionLocal() as db:
+            for index, note_id in enumerate(note_ids):
+                stmt = select(Note).where(Note.id == note_id)
+                result = db.execute(stmt)
+                note = result.scalars().first()
+                if note:
+                    note.order_index = index
+            db.commit()
+
+            # Return updated notes in new order
+            stmt = select(Note).where(Note.id.in_(note_ids)).order_by(Note.order_index)
+            result = db.execute(stmt)
+            notes = result.scalars().all()
+            return [NoteModel.model_validate(n) for n in notes]
+    except Exception as e:
+        logger.error(f"Unable to reorder notes: {e}")
+        raise HTTPException(status_code=500, detail=f"Unable to reorder notes: {e}")
 
 
 @router.get(

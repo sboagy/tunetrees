@@ -1013,6 +1013,43 @@ export async function deleteNote(note_id: number): Promise<ITTResponseInfo> {
 }
 
 /**
+ * Reorder notes by providing a list of note IDs in the new order.
+ *
+ * @param noteIds - Array of note IDs in the desired order.
+ * @returns A promise that resolves to the updated notes in the new order.
+ */
+export async function reorderNotes(noteIds: number[]): Promise<INote[]> {
+  try {
+    const response = await client.patch<INote[]>("/notes/reorder", noteIds);
+    return response.data;
+  } catch (error) {
+    console.error("Error in reorderNotes: ", error);
+    throw error;
+  }
+}
+
+/**
+ * Reorder references by providing a list of reference IDs in the new order.
+ *
+ * @param referenceIds - Array of reference IDs in the desired order.
+ * @returns A promise that resolves to the updated references in the new order.
+ */
+export async function reorderReferences(
+  referenceIds: number[],
+): Promise<IReferenceData[]> {
+  try {
+    const response = await client.patch<IReferenceData[]>(
+      "/references/reorder",
+      referenceIds,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error in reorderReferences: ", error);
+    throw error;
+  }
+}
+
+/**
  * Retrieve a specific tune.
  *
  * @param tuneRef - The reference ID of the tune.
