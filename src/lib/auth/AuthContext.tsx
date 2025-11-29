@@ -1043,7 +1043,9 @@ export const AuthProvider: ParentComponent = (props) => {
       let anonymousUserId: string | null = userIdInt();
       for (let i = 0; !anonymousUserId && i < 10; i += 1) {
         anonymousUserId = userIdInt();
-        await new Promise<void>((res) => setTimeout(res, 100));
+        if (!anonymousUserId) {
+          await new Promise<void>((res) => setTimeout(res, 100));
+        }
       }
       // optional debug
       log.debug("convertAnonymousToRegistered: resolved anonymousUserId:", {
