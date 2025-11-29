@@ -192,6 +192,9 @@ export async function updateReference(
 /**
  * Update display order for multiple references
  * Takes an array of reference IDs in the desired order and updates their display_order
+ *
+ * Note: Uses sequential updates which is acceptable for typical reference counts (1-5 per tune).
+ * For very large lists, consider using a transaction wrapper for better performance.
  */
 export async function updateReferenceOrder(
   db: SqliteDatabase,

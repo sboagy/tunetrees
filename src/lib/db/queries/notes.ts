@@ -144,6 +144,9 @@ export async function updateNote(
 /**
  * Update display order for multiple notes
  * Takes an array of note IDs in the desired order and updates their display_order
+ *
+ * Note: Uses sequential updates which is acceptable for typical note counts (1-5 per tune).
+ * For very large lists, consider using a transaction wrapper for better performance.
  */
 export async function updateNoteOrder(
   db: SqliteDatabase,
