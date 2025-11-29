@@ -1433,21 +1433,35 @@ def delete_reference(id: int):  # noqa: C901
 def reorder_references(
     reference_ids: List[int] = Body(..., description="List of reference IDs in the new order"),
 ):
+    # Input validation
+    if not reference_ids:
+        raise HTTPException(status_code=400, detail="reference_ids list cannot be empty")
+    if len(reference_ids) > 100:
+        raise HTTPException(status_code=400, detail="Too many reference IDs (max 100)")
+    if len(reference_ids) != len(set(reference_ids)):
+        raise HTTPException(status_code=400, detail="Duplicate reference IDs not allowed")
+
     try:
         with SessionLocal() as db:
+            # Fetch all references in one query
+            stmt = select(Reference).where(Reference.id.in_(reference_ids))
+            result = db.execute(stmt)
+            references = {ref.id: ref for ref in result.scalars().all()}
+
+            # Update order_index for each reference
             for index, ref_id in enumerate(reference_ids):
-                stmt = select(Reference).where(Reference.id == ref_id)
-                result = db.execute(stmt)
-                reference = result.scalars().first()
-                if reference:
-                    reference.order_index = index
+                if ref_id in references:
+                    references[ref_id].order_index = index
+
             db.commit()
 
             # Return updated references in new order
             stmt = select(Reference).where(Reference.id.in_(reference_ids)).order_by(Reference.order_index)
             result = db.execute(stmt)
-            references = result.scalars().all()
-            return [ReferenceModel.model_validate(ref) for ref in references]
+            updated_refs = result.scalars().all()
+            return [ReferenceModel.model_validate(ref) for ref in updated_refs]
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unable to reorder references: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to reorder references: {e}")
@@ -1577,21 +1591,35 @@ def delete_note(
 def reorder_notes(
     note_ids: List[int] = Body(..., description="List of note IDs in the new order"),
 ):
+    # Input validation
+    if not note_ids:
+        raise HTTPException(status_code=400, detail="note_ids list cannot be empty")
+    if len(note_ids) > 100:
+        raise HTTPException(status_code=400, detail="Too many note IDs (max 100)")
+    if len(note_ids) != len(set(note_ids)):
+        raise HTTPException(status_code=400, detail="Duplicate note IDs not allowed")
+
     try:
         with SessionLocal() as db:
+            # Fetch all notes in one query
+            stmt = select(Note).where(Note.id.in_(note_ids))
+            result = db.execute(stmt)
+            notes = {note.id: note for note in result.scalars().all()}
+
+            # Update order_index for each note
             for index, note_id in enumerate(note_ids):
-                stmt = select(Note).where(Note.id == note_id)
-                result = db.execute(stmt)
-                note = result.scalars().first()
-                if note:
-                    note.order_index = index
+                if note_id in notes:
+                    notes[note_id].order_index = index
+
             db.commit()
 
             # Return updated notes in new order
             stmt = select(Note).where(Note.id.in_(note_ids)).order_by(Note.order_index)
             result = db.execute(stmt)
-            notes = result.scalars().all()
-            return [NoteModel.model_validate(n) for n in notes]
+            updated_notes = result.scalars().all()
+            return [NoteModel.model_validate(n) for n in updated_notes]
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unable to reorder notes: {e}")
         raise HTTPException(status_code=500, detail=f"Unable to reorder notes: {e}")
