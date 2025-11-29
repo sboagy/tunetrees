@@ -1,5 +1,11 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
+declare global {
+  interface Window {
+    __ttTestUserId?: string;
+  }
+}
+
 /**
  * Page Object Model for TuneTrees SolidJS PWA
  * Based on legacy React implementation with adaptations for new stack
@@ -475,6 +481,83 @@ export class TuneTreesPage {
     await this.signOutButton.click();
     // Wait for redirect to login
     await this.page.waitForURL(/\/login/, { timeout: 10000 });
+  }
+
+  /**
+   * Re-login if session was lost (e.g., after clearing IndexedDB).
+   * Loops until either the practice tab is visible (still logged in) or
+   * login form is detected and credentials are entered.
+   *
+   * @param email - User's email address
+   * @param password - User's password (default: ALICE_TEST_PASSWORD from env)
+   * @param maxAttempts - Maximum retry attempts (default: 10)
+   * @throws Error if unable to log in after max attempts
+   */
+  async ensureLoggedIn(
+    email: string,
+    userId: string,
+    password: string = "",
+    maxAttempts = 10
+  ): Promise<void> {
+    // Doing this unconditionally, early on, seems to avoid what I think
+    // may be a lagging page.evaluate (i.e. it logs out while the evaluate is still running?).
+    await this.page.evaluate((userId) => {
+      window.__ttTestUserId = userId;
+    }, userId);
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const loginVisible = await this.anonymousSignInButton
+        .isVisible()
+        .catch(() => false);
+
+      if (loginVisible) {
+        console.log(`Seem to be logged out, logging back in as ${email}`);
+        if (password === "") {
+          const password = process.env.ALICE_TEST_PASSWORD;
+          if (!password) {
+            throw Error("ALICE_TEST_PASSWORD must be set in the environment");
+          }
+        }
+        await this.emailInput.fill(email);
+        await this.page.locator('input[type="password"]').fill(password);
+        await this.signInButton.click();
+
+        // Wait for practice tab to appear after login
+        for (let attempt2 = 0; attempt2 < maxAttempts; attempt2++) {
+          const practiceTabVisible = await this.practiceTab
+            .isVisible()
+            .catch(() => false);
+          if (practiceTabVisible) {
+            console.log(
+              `Practice tab visible after login, logged in as ${email}`
+            );
+            return;
+          }
+          await this.page.waitForTimeout(1000);
+        }
+
+        // Failed to see practice tab after login - attach diagnostics
+        await this.page.screenshot(); // Captured for debugging
+        console.log("Login failure - screenshot captured");
+        console.log(
+          "Login failure - page content available via page.content()"
+        );
+
+        throw new Error(
+          `Unable to log in as ${email} after multiple attempts. Check console for diagnostics.`
+        );
+      }
+
+      // Check if already logged in (practice tab visible)
+      const practiceTabVisible = await this.practiceTab
+        .isVisible()
+        .catch(() => false);
+      if (practiceTabVisible) {
+        console.log(`Practice tab visible, still logged in as ${email}`);
+        return;
+      }
+
+      await this.page.waitForTimeout(1000);
+    }
   }
 
   /**
