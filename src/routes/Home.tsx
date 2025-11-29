@@ -53,9 +53,13 @@ const Home: Component = () => {
     localDb,
     userIdInt,
   } = useAuth();
-  const { startOnboarding, shouldShowOnboarding } = useOnboarding();
+  const {
+    startOnboarding,
+    shouldShowOnboarding,
+    hasCheckedOnboarding,
+    setHasCheckedOnboarding,
+  } = useOnboarding();
   const [activeTab, setActiveTab] = createSignal<TabId>("practice");
-  const [hasCheckedOnboarding, setHasCheckedOnboarding] = createSignal(false);
 
   // Initialize active tab from URL parameter
   createEffect(() => {

@@ -21,22 +21,28 @@ import {
 interface OnboardingState {
   /** Whether onboarding is needed */
   needsOnboarding: Accessor<boolean>;
-  
+
   /** Current step in onboarding flow */
   onboardingStep: Accessor<OnboardingStep | null>;
-  
+
+  /** Whether onboarding has been checked this session */
+  hasCheckedOnboarding: Accessor<boolean>;
+
+  /** Mark onboarding as checked */
+  setHasCheckedOnboarding: (value: boolean) => void;
+
   /** Start onboarding flow */
   startOnboarding: () => void;
-  
+
   /** Move to next onboarding step */
   nextStep: () => void;
-  
+
   /** Complete onboarding */
   completeOnboarding: () => void;
-  
+
   /** Skip onboarding */
   skipOnboarding: () => void;
-  
+
   /** Check if user should see onboarding (no playlists) */
   shouldShowOnboarding: (hasPlaylists: boolean) => boolean;
 }
@@ -44,10 +50,7 @@ interface OnboardingState {
 /**
  * Onboarding steps
  */
-export type OnboardingStep = 
-  | "create-playlist"
-  | "view-catalog"
-  | "complete";
+export type OnboardingStep = "create-playlist" | "view-catalog" | "complete";
 
 /**
  * Onboarding context (undefined until provider is mounted)
@@ -74,7 +77,17 @@ const OnboardingContext = createContext<OnboardingState>();
  */
 export const OnboardingProvider: ParentComponent = (props) => {
   const [needsOnboarding, setNeedsOnboarding] = createSignal(false);
-  const [onboardingStep, setOnboardingStep] = createSignal<OnboardingStep | null>(null);
+  const [onboardingStep, setOnboardingStep] =
+    createSignal<OnboardingStep | null>(null);
+  const [hasCheckedOnboarding, setHasCheckedOnboarding] = createSignal(false);
+
+  // Track if user has already skipped/completed onboarding
+  // Persist to localStorage so it survives page refreshes
+  const SKIPPED_KEY = "tunetrees:onboarding-skipped";
+  const [wasSkippedOrCompleted, setWasSkippedOrCompleted] = createSignal(
+    typeof localStorage !== "undefined" &&
+      localStorage.getItem(SKIPPED_KEY) === "true"
+  );
 
   /**
    * Check if user should see onboarding based on whether they have playlists
@@ -85,8 +98,14 @@ export const OnboardingProvider: ParentComponent = (props) => {
 
   /**
    * Start onboarding flow
+   * Will not re-start if user has already skipped or completed onboarding this session
    */
   const startOnboarding = () => {
+    // Don't restart if already skipped or completed
+    if (wasSkippedOrCompleted()) {
+      console.log("🎓 Onboarding already skipped/completed, not restarting");
+      return;
+    }
     console.log("🎓 Starting onboarding flow");
     setNeedsOnboarding(true);
     setOnboardingStep("create-playlist");
@@ -98,7 +117,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
   const nextStep = () => {
     const current = onboardingStep();
     console.log("🎓 Onboarding next step from:", current);
-    
+
     if (current === "create-playlist") {
       setOnboardingStep("view-catalog");
     } else if (current === "view-catalog") {
@@ -114,6 +133,10 @@ export const OnboardingProvider: ParentComponent = (props) => {
     console.log("🎓 Completing onboarding");
     setNeedsOnboarding(false);
     setOnboardingStep(null);
+    setWasSkippedOrCompleted(true);
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(SKIPPED_KEY, "true");
+    }
   };
 
   /**
@@ -124,9 +147,23 @@ export const OnboardingProvider: ParentComponent = (props) => {
     completeOnboarding();
   };
 
+  /**
+   * Reset onboarding state (useful for testing or after user creates a playlist)
+   */
+
+  // const resetOnboarding = () => {
+  //   setWasSkippedOrCompleted(false);
+  //   setHasCheckedOnboarding(false);
+  //   if (typeof localStorage !== "undefined") {
+  //     localStorage.removeItem(SKIPPED_KEY);
+  //   }
+  // };
+
   const onboardingState: OnboardingState = {
     needsOnboarding,
     onboardingStep,
+    hasCheckedOnboarding,
+    setHasCheckedOnboarding,
     startOnboarding,
     nextStep,
     completeOnboarding,

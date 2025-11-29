@@ -68,7 +68,7 @@ export const AnonymousBanner: Component<{
             <div class="flex items-center gap-2">
               <button
                 type="button"
-                onClick={props.onConvert}
+                onClick={() => props.onConvert()}
                 class="px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 font-medium rounded-md shadow-sm transition-colors text-sm"
               >
                 Create Account

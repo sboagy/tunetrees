@@ -112,13 +112,13 @@ test.describe("AUTH-001: User Authentication", () => {
       sessionStorage.clear();
     });
 
-    // Hard reload with networkidle to ensure login page is fully loaded
-    await page.reload({ waitUntil: "networkidle" });
+    // Reload and wait for login form to be visible (no networkidle)
+    await page.reload();
 
     // Wait for URL to be /login
     await expect(page).toHaveURL(/.*\/login/, { timeout: 5000 });
 
-    // Wait for login form to be visible
+    // Wait for login form to be visible - this is the reliable signal
     await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10000 });
 
     // Fill in email and wrong password

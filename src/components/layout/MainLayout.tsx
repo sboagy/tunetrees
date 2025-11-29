@@ -12,7 +12,6 @@
  * @module components/layout/MainLayout
  */
 
-import { useNavigate } from "@solidjs/router";
 import type { ParentComponent } from "solid-js";
 import { createSignal, onMount, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
@@ -43,7 +42,6 @@ interface MainLayoutProps {
 export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
   const { position: dockPosition } = useSidebarDock();
   const { isAnonymous } = useAuth();
-  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false);
   const [sidebarWidth, setSidebarWidth] = createSignal(320); // Default 320px
   const [isDragging, setIsDragging] = createSignal(false);
@@ -111,7 +109,13 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
 
       {/* Anonymous User Banner */}
       <Show when={isAnonymous()}>
-        <AnonymousBanner onConvert={() => navigate("/login?convert=true")} />
+        <AnonymousBanner
+          onConvert={() => {
+            // Use window.location instead of navigate() due to SolidJS router issues
+            // when called from within nested component callbacks
+            window.location.href = "/login?convert=true";
+          }}
+        />
       </Show>
 
       <div

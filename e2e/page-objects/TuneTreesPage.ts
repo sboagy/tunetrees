@@ -90,6 +90,30 @@ export class TuneTreesPage {
 
   readonly tuneEditorContainer: Locator;
 
+  // Login/Auth Elements
+  readonly anonymousSignInButton: Locator;
+  readonly emailInput: Locator;
+  readonly passwordInput: Locator;
+  readonly nameInput: Locator;
+  readonly signInButton: Locator;
+  readonly signUpButton: Locator;
+  readonly signUpToggleLink: Locator;
+  readonly signOutButton: Locator;
+  readonly googleOAuthButton: Locator;
+  readonly githubOAuthButton: Locator;
+
+  // Anonymous Banner Elements
+  readonly anonymousBanner: Locator;
+  readonly anonymousBannerCreateAccountButton: Locator;
+  readonly anonymousBannerDismissButton: Locator;
+
+  // Conversion UI Elements
+  readonly conversionHeader: Locator;
+  readonly conversionInfoBox: Locator;
+
+  // Error Display
+  readonly authErrorMessage: Locator;
+
   constructor(page: Page) {
     this.page = page;
 
@@ -208,6 +232,289 @@ export class TuneTreesPage {
       .last();
 
     this.tuneEditorContainer = page.getByTestId("tune-editor-container");
+
+    // Login/Auth Elements
+    this.anonymousSignInButton = page.getByRole("button", {
+      name: /Use on this Device Only/i,
+    });
+    this.emailInput = page.getByLabel("Email");
+    this.passwordInput = page.getByRole("textbox", { name: "Password" });
+    this.nameInput = page.getByLabel("Name");
+    this.signInButton = page.getByRole("button", { name: /^Sign In$/i });
+    this.signUpButton = page.getByRole("button", { name: /Create Account/i });
+    this.signUpToggleLink = page.getByRole("button", {
+      name: /Sign up|Don't have an account/i,
+    });
+    this.signOutButton = page.getByRole("button", { name: /Sign Out/i });
+    this.googleOAuthButton = page.getByRole("button", {
+      name: /Continue with Google/i,
+    });
+    this.githubOAuthButton = page.getByRole("button", {
+      name: /Continue with GitHub/i,
+    });
+
+    // Anonymous Banner Elements
+    this.anonymousBanner = page.locator(
+      ".bg-gradient-to-r.from-blue-500.to-blue-600"
+    );
+    this.anonymousBannerCreateAccountButton = this.anonymousBanner.getByRole(
+      "button",
+      { name: /Create Account/i }
+    );
+    this.anonymousBannerDismissButton = this.anonymousBanner.getByRole(
+      "button",
+      { name: /Dismiss/i }
+    );
+
+    // Conversion UI Elements
+    this.conversionHeader = page.getByRole("heading", {
+      name: /Backup Your Data/i,
+    });
+    this.conversionInfoBox = page.locator(
+      "text=Your local data will be preserved"
+    );
+
+    // Error Display
+    this.authErrorMessage = page.locator(".bg-red-50, .bg-red-900\\/20");
+  }
+
+  // ===== Authentication Helper Methods =====
+
+  /**
+   * Navigate to login page and clear any existing auth state
+   */
+  async gotoLogin() {
+    // Clear cookies first (this works without a page)
+    await this.page.context().clearCookies();
+
+    // Navigate to login page first (required before accessing localStorage)
+    await this.page.goto("http://localhost:5173/login");
+    await this.page.waitForLoadState("domcontentloaded");
+
+    // Now clear localStorage and IndexedDB (page must be loaded first)
+    await this.page.evaluate(async () => {
+      localStorage.clear();
+      // Clear IndexedDB
+      const dbs = await indexedDB.databases();
+      for (const db of dbs) {
+        if (db.name) indexedDB.deleteDatabase(db.name);
+      }
+    });
+
+    // Reload the page to apply cleared state
+    await this.page.reload();
+    await this.page.waitForLoadState("domcontentloaded");
+  }
+
+  /**
+   * Sign in anonymously and wait for app to load
+   * Automatically dismisses onboarding overlay if shown
+   */
+  async signInAnonymously() {
+    await this.anonymousSignInButton.click();
+    // Wait for redirect to home and app to load
+    await this.page.waitForURL(/\/$|\/\?/, { timeout: 15000 });
+
+    // Wait longer for database initialization and onboarding check
+    // The app has a 500ms delay before showing onboarding, so we need to wait
+    await this.page.waitForTimeout(1500);
+
+    // Dismiss onboarding overlay if it appears (for new users)
+    await this.dismissOnboardingIfPresent();
+  }
+
+  /**
+   * Sign in anonymously and complete onboarding by creating a playlist.
+   * Use this when tests need to interact with repertoire functionality.
+   *
+   * @param playlistName - Name for the new playlist (default: "Test Playlist")
+   */
+  async signInAnonymouslyWithPlaylist(playlistName = "Test Playlist") {
+    await this.anonymousSignInButton.click();
+    // Wait for redirect to home and app to load
+    await this.page.waitForURL(/\/$|\/\?/, { timeout: 15000 });
+
+    // Wait longer for database initialization and onboarding check
+    // The app has a 500ms delay before showing onboarding, so we need to wait
+    await this.page.waitForTimeout(1500);
+
+    // Complete onboarding by creating a playlist (instead of skipping)
+    await this.completeOnboardingWithPlaylist(playlistName);
+  }
+
+  /**
+   * Dismiss onboarding overlay if it is visible.
+   * The app has a bug where onboarding can appear with a 500ms+ delay,
+   * so we need to wait long enough and be aggressive about dismissing.
+   */
+  async dismissOnboardingIfPresent() {
+    const welcomeHeading = this.page.getByRole("heading", {
+      name: /Welcome to TuneTrees/i,
+    });
+    const skipTourButton = this.page
+      .locator('button:has-text("Skip Tour")')
+      .last();
+
+    // Wait for the app to potentially show onboarding (600ms delay + buffer)
+    await this.page.waitForTimeout(1000);
+
+    // Try up to 5 times to ensure onboarding is dismissed
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const isVisible = await welcomeHeading.isVisible().catch(() => false);
+
+      if (isVisible) {
+        try {
+          await skipTourButton.click({ timeout: 2000 });
+          // Wait for it to disappear
+          await welcomeHeading.waitFor({ state: "hidden", timeout: 3000 });
+        } catch {
+          // Click might have failed, wait and retry
+          await this.page.waitForTimeout(500);
+          continue;
+        }
+      }
+
+      // Wait to see if it re-appears
+      await this.page.waitForTimeout(800);
+
+      const stillVisible = await welcomeHeading.isVisible().catch(() => false);
+      if (!stillVisible) {
+        // It's gone and stayed gone - success!
+        return;
+      }
+    }
+  }
+
+  /**
+   * Complete onboarding by creating a playlist (instead of skipping).
+   * This is required for tests that need to use repertoire functionality.
+   *
+   * @param playlistName - Name for the new playlist (default: "Test Playlist")
+   */
+  async completeOnboardingWithPlaylist(playlistName = "Test Playlist") {
+    const welcomeHeading = this.page.getByRole("heading", {
+      name: /Welcome to TuneTrees/i,
+    });
+    const createPlaylistButton = this.page.locator(
+      'button:has-text("Create Playlist")'
+    );
+
+    // Wait for the app to potentially show onboarding (600ms delay + buffer)
+    await this.page.waitForTimeout(1000);
+
+    // Check if onboarding is visible
+    const isVisible = await welcomeHeading.isVisible().catch(() => false);
+
+    if (isVisible) {
+      // Click "Create Playlist" button to open the playlist editor dialog
+      await createPlaylistButton.click({ timeout: 3000 });
+
+      // Wait for playlist editor dialog to appear
+      const playlistDialog = this.page.getByRole("dialog");
+      await playlistDialog.waitFor({ state: "visible", timeout: 5000 });
+
+      // Fill in the playlist name
+      const nameInput = playlistDialog.getByLabel(/Playlist Name|Name/i);
+      await nameInput.fill(playlistName);
+
+      // Click "Create" or "Save" button
+      const saveButton = playlistDialog.getByRole("button", {
+        name: /Create|Save/i,
+      });
+      await saveButton.click({ timeout: 3000 });
+
+      // Wait for dialog to close
+      await playlistDialog.waitFor({ state: "hidden", timeout: 5000 });
+
+      // Now we should be on step 2 (view-catalog) - skip that
+      await this.page.waitForTimeout(500);
+      const step2Heading = this.page.getByRole("heading", {
+        name: /add some tunes/i,
+      });
+      const step2Visible = await step2Heading.isVisible().catch(() => false);
+      if (step2Visible) {
+        const skipButton = this.page
+          .locator('button:has-text("Skip Tour")')
+          .last();
+        await skipButton.click({ timeout: 2000 });
+        await step2Heading.waitFor({ state: "hidden", timeout: 3000 });
+      }
+    }
+  }
+
+  /**
+   * Sign up with email/password
+   */
+  async signUp(email: string, password: string, name: string) {
+    await this.signUpToggleLink.click();
+    await this.nameInput.fill(name);
+    await this.emailInput.fill(email);
+    await this.passwordInput.fill(password);
+    await this.signUpButton.click();
+  }
+
+  /**
+   * Convert anonymous user to registered account
+   * Assumes already on login page with ?convert=true
+   */
+  async convertAnonymousAccount(email: string, password: string, name: string) {
+    await this.nameInput.fill(name);
+    await this.emailInput.fill(email);
+    await this.passwordInput.fill(password);
+    await this.signUpButton.click();
+    // Wait for conversion to complete and redirect
+    await this.page.waitForURL(/\/$|\/\?/, { timeout: 25000 });
+    await this.page.waitForTimeout(2000); // Allow sync to start
+  }
+
+  /**
+   * Sign out via user menu
+   */
+  async signOut() {
+    await this.userMenuButton.click();
+    await this.signOutButton.click();
+    // Wait for redirect to login
+    await this.page.waitForURL(/\/login/, { timeout: 10000 });
+  }
+
+  /**
+   * Check if anonymous banner is visible
+   */
+  async isAnonymousBannerVisible(): Promise<boolean> {
+    try {
+      await this.anonymousBanner.waitFor({ state: "visible", timeout: 2000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Dismiss the anonymous banner
+   */
+  async dismissAnonymousBanner() {
+    await this.anonymousBannerDismissButton.click();
+    await this.anonymousBanner.waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Click "Create Account" on the anonymous banner
+   */
+  async clickCreateAccountOnBanner() {
+    // Ensure onboarding overlay is dismissed first (may block banner button)
+    await this.dismissOnboardingIfPresent();
+
+    // Ensure the button is visible and ready
+    await this.anonymousBannerCreateAccountButton.waitFor({
+      state: "visible",
+      timeout: 5000,
+    });
+
+    // Click and immediately check if navigation starts
+    await this.anonymousBannerCreateAccountButton.click();
+
+    // Wait for navigation to login page with convert parameter
+    await this.page.waitForURL(/\/login\?convert=true/, { timeout: 10000 });
   }
 
   /**
