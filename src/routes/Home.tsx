@@ -19,7 +19,10 @@ import {
 } from "solid-js";
 import { MainLayout } from "../components/layout";
 import type { TabId } from "../components/layout/TabBar";
+import { OnboardingOverlay } from "../components/onboarding";
 import { useAuth } from "../lib/auth/AuthContext";
+import { useOnboarding } from "../lib/context/OnboardingContext";
+import { getUserPlaylists } from "../lib/db/queries/playlists";
 import AnalysisPage from "./analysis";
 import CatalogPage from "./catalog";
 import PracticeIndex from "./practice/Index";
@@ -42,7 +45,20 @@ import RepertoirePage from "./repertoire";
 const Home: Component = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading } = useAuth();
+  const {
+    user,
+    loading,
+    isAnonymous,
+    initialSyncComplete,
+    localDb,
+    userIdInt,
+  } = useAuth();
+  const {
+    startOnboarding,
+    shouldShowOnboarding,
+    hasCheckedOnboarding,
+    setHasCheckedOnboarding,
+  } = useOnboarding();
   const [activeTab, setActiveTab] = createSignal<TabId>("practice");
 
   // Initialize active tab from URL parameter
@@ -60,10 +76,47 @@ const Home: Component = () => {
     }
   });
 
-  // Redirect unauthenticated users to login
+  // Redirect unauthenticated users to login (but allow anonymous users)
   createEffect(() => {
-    if (!loading() && !user()) {
+    if (!loading() && !user() && !isAnonymous()) {
       navigate("/login", { replace: true });
+    }
+  });
+
+  // Check if onboarding is needed for users with no playlists
+  createEffect(() => {
+    // Wait for auth to be loaded and initial sync to complete
+    if (
+      !loading() &&
+      (user() || isAnonymous()) &&
+      initialSyncComplete() &&
+      !hasCheckedOnboarding()
+    ) {
+      setHasCheckedOnboarding(true);
+
+      // Check if user has any playlists
+      const db = localDb();
+      // Use userIdInt which is the correct UUID for both regular and anonymous users
+      const userId = userIdInt();
+
+      if (db && userId) {
+        void (async () => {
+          try {
+            const playlists = await getUserPlaylists(db, userId);
+            const hasPlaylists = playlists.length > 0;
+
+            if (shouldShowOnboarding(hasPlaylists)) {
+              console.log("🎓 No playlists found, starting onboarding");
+              // Small delay to let UI settle
+              setTimeout(() => {
+                startOnboarding();
+              }, 500);
+            }
+          } catch (error) {
+            console.error("Failed to check playlists for onboarding:", error);
+          }
+        })();
+      }
     }
   });
 
@@ -158,7 +211,10 @@ const Home: Component = () => {
         </div>
       }
     >
-      <Show when={user()}>
+      <Show when={user() || isAnonymous()}>
+        {/* Onboarding Overlay */}
+        <OnboardingOverlay />
+
         <MainLayout activeTab={activeTab()} onTabChange={handleTabChange}>
           <Switch>
             <Match when={activeTab() === "practice"}>

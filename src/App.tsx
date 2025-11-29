@@ -15,6 +15,7 @@ import { SidebarDockProvider } from "./components/layout/SidebarDockContext";
 import { AuthProvider } from "./lib/auth/AuthContext";
 import { CurrentPlaylistProvider } from "./lib/context/CurrentPlaylistContext";
 import { CurrentTuneProvider } from "./lib/context/CurrentTuneContext";
+import { OnboardingProvider } from "./lib/context/OnboardingContext";
 import DatabaseBrowser from "./routes/debug/db";
 import Home from "./routes/Home";
 import Login from "./routes/Login";
@@ -65,13 +66,14 @@ const ResetPassword = lazy(() => import("./routes/reset-password"));
 function App() {
   return (
     <AuthProvider>
-      <CurrentPlaylistProvider>
-        <CurrentTuneProvider>
-          <SidebarDockProvider>
-            {/* Toast notification provider */}
-            <Toaster position="top-right" richColors closeButton />
-            {/* <ThemeDebugger /> */}
-            <Router>
+      <OnboardingProvider>
+        <CurrentPlaylistProvider>
+          <CurrentTuneProvider>
+            <SidebarDockProvider>
+              {/* Toast notification provider */}
+              <Toaster position="top-right" richColors closeButton />
+              {/* <ThemeDebugger /> */}
+              <Router>
               {/* Public Routes */}
               <Route path="/login" component={Login} />
               <Route path="/auth/callback" component={AuthCallback} />
@@ -183,6 +185,7 @@ function App() {
           </SidebarDockProvider>
         </CurrentTuneProvider>
       </CurrentPlaylistProvider>
+      </OnboardingProvider>
     </AuthProvider>
   );
 }

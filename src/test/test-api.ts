@@ -29,16 +29,35 @@ type SeedAddToReviewInput = {
   userId?: string;
 };
 
+/**
+ * Injected test user ID - set via window.__ttTestUserId to bypass Supabase auth lookup.
+ * This allows tests to run without requiring a valid Supabase session.
+ */
+declare global {
+  interface Window {
+    __ttTestUserId?: string;
+  }
+}
+
 async function ensureDb(): Promise<SqliteDatabase> {
   try {
     return getDb();
   } catch {
-    return await initializeDb();
+    // Use a test user ID for initialization
+    return await initializeDb("test-user-id");
   }
 }
 
 async function resolveUserId(db: SqliteDatabase): Promise<string> {
-  // Try to fetch current auth user from Supabase and map to user_profile.id
+  // First check for injected test user ID (bypasses Supabase entirely)
+  if (typeof window !== "undefined" && window.__ttTestUserId) {
+    console.log(
+      `[TestApi] Using injected test user ID: ${window.__ttTestUserId}`
+    );
+    return window.__ttTestUserId;
+  }
+
+  // Fall back to Supabase auth lookup
   const { data } = await supabase.auth.getUser();
   const userId = data.user?.id;
   if (!userId) throw new Error("No authenticated user in test session");
@@ -452,6 +471,10 @@ async function getDistinctPracticeRecordCount(
 declare global {
   interface Window {
     __ttTestApi?: {
+      // User ID injection for bypassing Supabase auth
+      setTestUserId: (userId: string) => void;
+      getTestUserId: () => string | undefined;
+      clearTestUserId: () => void;
       seedAddToReview: (input: SeedAddToReviewInput) => Promise<{
         updated: number;
         queueCount: number;
@@ -600,6 +623,16 @@ if (typeof window !== "undefined") {
   // Idempotent attach
   if (!window.__ttTestApi) {
     window.__ttTestApi = {
+      // User ID injection methods
+      setTestUserId: (userId: string) => {
+        window.__ttTestUserId = userId;
+        console.log(`[TestApi] Test user ID set to: ${userId}`);
+      },
+      getTestUserId: () => window.__ttTestUserId,
+      clearTestUserId: () => {
+        delete window.__ttTestUserId;
+        console.log("[TestApi] Test user ID cleared");
+      },
       seedAddToReview,
       getPracticeCount,
       getTuneOverrideCountForCurrentUser,

@@ -8,6 +8,7 @@
 
 export {
   clearSyncedItems,
+  clearSyncQueue,
   getFailedSyncItems,
   getPendingSyncItems,
   getSyncQueueStats,

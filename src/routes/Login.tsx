@@ -27,10 +27,10 @@ import { useAuth } from "../lib/auth/AuthContext";
  */
 const Login: Component = () => {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, isAnonymous } = useAuth();
 
-  // Redirect to practice if already logged in (only after auth is loaded)
-  if (!loading() && user()) {
+  // Redirect to practice if already logged in or anonymous (only after auth is loaded)
+  if (!loading() && (user() || isAnonymous())) {
     navigate("/", { replace: true });
   }
 

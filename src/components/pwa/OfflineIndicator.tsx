@@ -22,7 +22,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { getSyncQueueStats } from "@/lib/sync/queue";
 
 export const OfflineIndicator: Component = () => {
-  const { localDb } = useAuth();
+  const { localDb, isAnonymous } = useAuth();
   const [isOnline, setIsOnline] = createSignal(navigator.onLine);
   const [pendingCount, setPendingCount] = createSignal(0);
   const [isDismissed, setIsDismissed] = createSignal(false);
@@ -44,10 +44,13 @@ export const OfflineIndicator: Component = () => {
     });
   });
 
-  // Poll for pending sync count
+  // Poll for pending sync count (skip for anonymous users - they don't sync)
   createEffect(() => {
     const db = localDb();
-    if (!db) return;
+    if (!db || isAnonymous()) {
+      setPendingCount(0); // Reset count for anonymous users
+      return;
+    }
 
     const updateSyncCount = async () => {
       try {
@@ -67,12 +70,15 @@ export const OfflineIndicator: Component = () => {
     onCleanup(() => clearInterval(interval));
   });
 
-  // Determine banner state
+  // Determine banner state (anonymous users: only show offline, not syncing)
   const shouldShowBanner = () => {
     if (isDismissed()) return false;
 
     const online = isOnline();
     const pending = pendingCount();
+
+    // Anonymous users: only show if offline
+    if (isAnonymous()) return !online;
 
     // Show if offline OR if online with pending changes
     return !online || pending > 0;
