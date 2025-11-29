@@ -1039,7 +1039,16 @@ export const AuthProvider: ParentComponent = (props) => {
         throw new Error("User is not in anonymous mode");
       }
 
-      const anonymousUserId = userIdInt();
+      // Wait briefly for userIdInt signal to populate (handle race during conversion)
+      let anonymousUserId: string | null = userIdInt();
+      for (let i = 0; !anonymousUserId && i < 10; i += 1) {
+        anonymousUserId = userIdInt();
+        await new Promise<void>((res) => setTimeout(res, 100));
+      }
+      // optional debug
+      log.debug("convertAnonymousToRegistered: resolved anonymousUserId:", {
+        anonymousUserId,
+      });
       if (!anonymousUserId) {
         throw new Error("No anonymous user ID found");
       }
