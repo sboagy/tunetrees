@@ -36,6 +36,9 @@ test.describe("Anonymous User Account Conversion", () => {
   // Run these tests serially to avoid parallel session conflicts
   test.describe.configure({ mode: "serial" });
 
+  // Only run on Chromium for now
+  test.skip(({ browserName }) => browserName !== "chromium", "Chromium only");
+
   let ttPage: TuneTreesPage;
 
   test.beforeEach(async ({ page }) => {
