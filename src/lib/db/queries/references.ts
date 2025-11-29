@@ -7,7 +7,7 @@
  * @module lib/db/queries/references
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
@@ -38,11 +38,12 @@ export interface UpdateReferenceData {
   comment?: string;
   public?: boolean;
   favorite?: boolean;
+  displayOrder?: number;
 }
 
 /**
  * Get all references for a specific tune
- * Returns only non-deleted references
+ * Returns only non-deleted references, ordered by display order
  *
  * @param db - Database instance
  * @param tuneId - Tune UUID
@@ -68,7 +69,7 @@ export async function getReferencesByTune(
     .select()
     .from(schema.reference)
     .where(and(...conditions))
-    .orderBy(desc(schema.reference.id)) // Newest first
+    .orderBy(asc(schema.reference.displayOrder), desc(schema.reference.id))
     .all();
 }
 
@@ -174,6 +175,10 @@ export async function updateReference(
     updateData.favorite = data.favorite ? 1 : 0;
   }
 
+  if (data.displayOrder !== undefined) {
+    updateData.displayOrder = data.displayOrder;
+  }
+
   const result = await db
     .update(schema.reference)
     .set(updateData)
@@ -182,6 +187,29 @@ export async function updateReference(
     .get();
 
   return result as Reference | undefined;
+}
+
+/**
+ * Update display order for multiple references
+ * Takes an array of reference IDs in the desired order and updates their display_order
+ */
+export async function updateReferenceOrder(
+  db: SqliteDatabase,
+  referenceIds: string[] // UUIDs in desired order
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  // Update each reference's display_order based on its index in the array
+  for (let i = 0; i < referenceIds.length; i++) {
+    await db
+      .update(schema.reference)
+      .set({
+        displayOrder: i,
+        lastModifiedAt: now,
+      })
+      .where(eq(schema.reference.id, referenceIds[i]))
+      .run();
+  }
 }
 
 /**

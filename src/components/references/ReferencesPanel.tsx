@@ -3,6 +3,7 @@
  *
  * Sidebar panel for managing tune references.
  * Displays references for the current tune, allows add/edit/delete operations.
+ * Supports drag-and-drop reordering.
  *
  * @module components/references/ReferencesPanel
  */
@@ -19,6 +20,7 @@ import {
   getReferencesByTune,
   type Reference,
   updateReference,
+  updateReferenceOrder,
 } from "@/lib/db/queries/references";
 import { ReferenceForm, type ReferenceFormData } from "./ReferenceForm";
 import { ReferenceList } from "./ReferenceList";
@@ -115,6 +117,20 @@ export const ReferencesPanel: Component = () => {
     }
   };
 
+  // Handle reordering references
+  const handleReorderReferences = async (referenceIds: string[]) => {
+    try {
+      const db = getDb();
+      await updateReferenceOrder(db, referenceIds);
+
+      // Reload references
+      refetch();
+    } catch (error) {
+      console.error("Failed to reorder references:", error);
+      // TODO: Show error toast
+    }
+  };
+
   // Handle edit button click
   const handleEditClick = (reference: Reference) => {
     setEditingReference(reference);
@@ -200,6 +216,7 @@ export const ReferencesPanel: Component = () => {
           references={references() || []}
           onEdit={handleEditClick}
           onDelete={handleDeleteReference}
+          onReorder={handleReorderReferences}
           showActions={true}
           groupByType={false}
         />

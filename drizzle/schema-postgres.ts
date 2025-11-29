@@ -377,6 +377,7 @@ export const note = pgTable(
     noteText: text("note_text"),
     public: boolean("public").default(false).notNull(),
     favorite: boolean("favorite"),
+    displayOrder: integer("display_order").default(0).notNull(), // For drag ordering
     deleted: boolean("deleted").default(false).notNull(),
 
     // Sync columns
@@ -417,6 +418,7 @@ export const reference = pgTable(
     title: text("title"),
     public: boolean("public"),
     favorite: boolean("favorite"),
+    displayOrder: integer("display_order").default(0).notNull(), // For drag ordering
     deleted: boolean("deleted").default(false).notNull(),
 
     // Sync columns

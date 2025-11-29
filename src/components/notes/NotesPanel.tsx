@@ -1,4 +1,4 @@
-import { Edit, Plus, StickyNote, Trash2 } from "lucide-solid";
+import { Edit, GripVertical, Plus, StickyNote, Trash2 } from "lucide-solid";
 import {
   type Component,
   createResource,
@@ -14,6 +14,7 @@ import {
   deleteNote,
   getNotesByTune,
   updateNote,
+  updateNoteOrder,
 } from "@/lib/db/queries/notes";
 import { NotesEditor } from "./NotesEditor";
 
@@ -26,6 +27,7 @@ import { NotesEditor } from "./NotesEditor";
  * - Edit existing notes
  * - Delete notes
  * - Auto-save with debounce
+ * - Drag-and-drop reordering
  *
  * Note: Uses CurrentTuneContext to track which tune's notes to display
  */
@@ -36,6 +38,10 @@ export const NotesPanel: Component = () => {
   const [isAdding, setIsAdding] = createSignal(false);
   const [editingNoteId, setEditingNoteId] = createSignal<string | null>(null); // UUID
   const [newNoteContent, setNewNoteContent] = createSignal("");
+
+  // Drag-and-drop state
+  const [draggedNoteId, setDraggedNoteId] = createSignal<string | null>(null);
+  const [dragOverNoteId, setDragOverNoteId] = createSignal<string | null>(null);
 
   // Load notes for current tune
   const [notes, { refetch }] = createResource(currentTuneId, async (tuneId) => {
@@ -114,6 +120,78 @@ export const NotesPanel: Component = () => {
     }
   };
 
+  // Drag-and-drop handlers
+  const handleDragStart = (e: DragEvent, noteId: string) => {
+    setDraggedNoteId(noteId);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", noteId);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedNoteId(null);
+    setDragOverNoteId(null);
+  };
+
+  const handleDragOver = (e: DragEvent, noteId: string) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
+    if (draggedNoteId() !== noteId) {
+      setDragOverNoteId(noteId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverNoteId(null);
+  };
+
+  const handleDrop = async (e: DragEvent, targetNoteId: string) => {
+    e.preventDefault();
+    const sourceNoteId = draggedNoteId();
+
+    if (!sourceNoteId || sourceNoteId === targetNoteId) {
+      setDraggedNoteId(null);
+      setDragOverNoteId(null);
+      return;
+    }
+
+    const currentNotes = notes();
+    if (!currentNotes) return;
+
+    // Calculate new order
+    const sourceIndex = currentNotes.findIndex((n) => n.id === sourceNoteId);
+    const targetIndex = currentNotes.findIndex((n) => n.id === targetNoteId);
+
+    if (sourceIndex === -1 || targetIndex === -1) {
+      setDraggedNoteId(null);
+      setDragOverNoteId(null);
+      return;
+    }
+
+    // Create new order array
+    const newOrder = [...currentNotes];
+    const [movedNote] = newOrder.splice(sourceIndex, 1);
+    newOrder.splice(targetIndex, 0, movedNote);
+
+    // Update order in database
+    try {
+      const db = getDb();
+      await updateNoteOrder(
+        db,
+        newOrder.map((n) => n.id)
+      );
+      refetch();
+    } catch (error) {
+      console.error("Failed to update note order:", error);
+    }
+
+    setDraggedNoteId(null);
+    setDragOverNoteId(null);
+  };
+
   return (
     <div class="notes-panel">
       {/* Header with icon and Add Note button */}
@@ -188,16 +266,45 @@ export const NotesPanel: Component = () => {
         </p>
       </Show>
 
-      {/* Notes list */}
-      <div class="space-y-2">
+      {/* Notes list with drag-and-drop */}
+      <ul class="space-y-2 list-none">
         <For each={notes()}>
           {(note) => (
-            <div class="p-2 bg-white/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30">
+            <li
+              class={`p-2 bg-white/50 dark:bg-gray-800/50 rounded border transition-all ${
+                draggedNoteId() === note.id
+                  ? "opacity-50 border-gray-400/50 dark:border-gray-500/50"
+                  : dragOverNoteId() === note.id
+                    ? "border-blue-400 dark:border-blue-500 bg-blue-50/30 dark:bg-blue-900/20"
+                    : "border-gray-200/30 dark:border-gray-700/30"
+              }`}
+              onDragOver={(e) =>
+                handleDragOver(e as unknown as DragEvent, note.id)
+              }
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e as unknown as DragEvent, note.id)}
+            >
               {/* Note metadata */}
               <div class="flex items-center justify-between mb-1.5">
-                <span class="text-[10px] text-gray-500 dark:text-gray-400">
-                  {formatDate(note.createdDate)}
-                </span>
+                <div class="flex items-center gap-1">
+                  {/* Drag handle */}
+                  <button
+                    type="button"
+                    draggable={true}
+                    onDragStart={(e) =>
+                      handleDragStart(e as unknown as DragEvent, note.id)
+                    }
+                    onDragEnd={handleDragEnd}
+                    class="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    title="Drag to reorder"
+                    aria-label="Drag to reorder note"
+                  >
+                    <GripVertical class="w-3 h-3" />
+                  </button>
+                  <span class="text-[10px] text-gray-500 dark:text-gray-400">
+                    {formatDate(note.createdDate)}
+                  </span>
+                </div>
                 <div class="flex gap-0.5">
                   <button
                     type="button"
@@ -244,10 +351,10 @@ export const NotesPanel: Component = () => {
                   placeholder="Edit your note..."
                 />
               </Show>
-            </div>
+            </li>
           )}
         </For>
-      </div>
+      </ul>
     </div>
   );
 };

@@ -2,18 +2,20 @@
  * ReferenceList Component
  *
  * Display references as clickable links with icons based on type.
- * Includes edit/delete actions.
+ * Includes edit/delete actions and drag-and-drop reordering.
  *
  * @module components/references/ReferenceList
  */
 
-import { type Component, For, Show } from "solid-js";
+import { GripVertical } from "lucide-solid";
+import { type Component, createSignal, For, Show } from "solid-js";
 import type { Reference } from "@/lib/db/queries/references";
 
 interface ReferenceListProps {
   references: Reference[];
   onEdit?: (reference: Reference) => void;
   onDelete?: (referenceId: string) => void;
+  onReorder?: (referenceIds: string[]) => void;
   showActions?: boolean;
   groupByType?: boolean;
 }
@@ -76,14 +78,112 @@ function groupReferencesByType(
 export const ReferenceList: Component<ReferenceListProps> = (props) => {
   const showActions = () => props.showActions ?? true;
 
+  // Drag-and-drop state
+  const [draggedRefId, setDraggedRefId] = createSignal<string | null>(null);
+  const [dragOverRefId, setDragOverRefId] = createSignal<string | null>(null);
+
   // Handle opening link in new tab
   const handleOpenLink = (url: string) => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  // Drag-and-drop handlers
+  const handleDragStart = (e: DragEvent, refId: string) => {
+    setDraggedRefId(refId);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", refId);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedRefId(null);
+    setDragOverRefId(null);
+  };
+
+  const handleDragOver = (e: DragEvent, refId: string) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
+    if (draggedRefId() !== refId) {
+      setDragOverRefId(refId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverRefId(null);
+  };
+
+  const handleDrop = (e: DragEvent, targetRefId: string) => {
+    e.preventDefault();
+    const sourceRefId = draggedRefId();
+
+    if (!sourceRefId || sourceRefId === targetRefId || !props.onReorder) {
+      setDraggedRefId(null);
+      setDragOverRefId(null);
+      return;
+    }
+
+    const currentRefs = props.references;
+
+    // Calculate new order
+    const sourceIndex = currentRefs.findIndex((r) => r.id === sourceRefId);
+    const targetIndex = currentRefs.findIndex((r) => r.id === targetRefId);
+
+    if (sourceIndex === -1 || targetIndex === -1) {
+      setDraggedRefId(null);
+      setDragOverRefId(null);
+      return;
+    }
+
+    // Create new order array
+    const newOrder = [...currentRefs];
+    const [movedRef] = newOrder.splice(sourceIndex, 1);
+    newOrder.splice(targetIndex, 0, movedRef);
+
+    // Call the reorder callback
+    props.onReorder(newOrder.map((r) => r.id));
+
+    setDraggedRefId(null);
+    setDragOverRefId(null);
+  };
+
   // Render a single reference item
   const ReferenceItem: Component<{ reference: Reference }> = (itemProps) => (
-    <div class="flex items-start gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-colors group">
+    <li
+      class={`list-none flex items-start gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border transition-all group ${
+        draggedRefId() === itemProps.reference.id
+          ? "opacity-50 border-gray-400/50 dark:border-gray-500/50"
+          : dragOverRefId() === itemProps.reference.id
+            ? "border-blue-400 dark:border-blue-500 bg-blue-50/30 dark:bg-blue-900/20"
+            : "border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600"
+      }`}
+      onDragOver={(e) =>
+        handleDragOver(e as unknown as DragEvent, itemProps.reference.id)
+      }
+      onDragLeave={handleDragLeave}
+      onDrop={(e) =>
+        handleDrop(e as unknown as DragEvent, itemProps.reference.id)
+      }
+    >
+      {/* Drag handle */}
+      <Show when={props.onReorder}>
+        <button
+          type="button"
+          draggable={true}
+          onDragStart={(e) =>
+            handleDragStart(e as unknown as DragEvent, itemProps.reference.id)
+          }
+          onDragEnd={handleDragEnd}
+          class="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0 mt-0.5"
+          title="Drag to reorder"
+          aria-label="Drag to reorder reference"
+        >
+          <GripVertical class="w-4 h-4" />
+        </button>
+      </Show>
+
       {/* Icon */}
       <div class="text-2xl flex-shrink-0 mt-0.5">
         {getTypeIcon(itemProps.reference.refType)}
@@ -183,11 +283,11 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
           </Show>
         </div>
       </Show>
-    </div>
+    </li>
   );
 
   return (
-    <div class="space-y-3">
+    <ul class="space-y-3 list-none">
       {/* Empty state */}
       <Show when={props.references.length === 0}>
         <div class="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -228,6 +328,6 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
           {(ref) => <ReferenceItem reference={ref} />}
         </For>
       </Show>
-    </div>
+    </ul>
   );
 };
