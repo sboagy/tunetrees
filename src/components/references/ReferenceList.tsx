@@ -159,6 +159,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
             ? "border-blue-400 dark:border-blue-500 bg-blue-50/30 dark:bg-blue-900/20"
             : "border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600"
       }`}
+      data-testid={`reference-item-${itemProps.reference.id}`}
       onDragOver={(e) =>
         handleDragOver(e as unknown as DragEvent, itemProps.reference.id)
       }
@@ -179,6 +180,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
           class="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0 mt-0.5"
           title="Drag to reorder"
           aria-label="Drag to reorder reference"
+          data-testid={`reference-drag-handle-${itemProps.reference.id}`}
         >
           <GripVertical class="w-4 h-4" />
         </button>
@@ -197,6 +199,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
           onClick={() => handleOpenLink(itemProps.reference.url)}
           class="text-left w-full text-blue-600 dark:text-blue-400 hover:underline font-medium break-words"
           title="Open in new tab"
+          data-testid={`reference-link-${itemProps.reference.id}`}
         >
           {itemProps.reference.title || itemProps.reference.url}
         </button>
@@ -240,6 +243,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
               onClick={() => props.onEdit!(itemProps.reference)}
               class="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 rounded transition-colors"
               title="Edit reference"
+              data-testid={`reference-edit-button-${itemProps.reference.id}`}
             >
               <svg
                 class="w-4 h-4"
@@ -264,6 +268,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
               onClick={() => props.onDelete!(itemProps.reference.id)}
               class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900 rounded transition-colors"
               title="Delete reference"
+              data-testid={`reference-delete-button-${itemProps.reference.id}`}
             >
               <svg
                 class="w-4 h-4"
@@ -287,7 +292,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
   );
 
   return (
-    <ul class="space-y-3 list-none">
+    <ul class="space-y-3 list-none" data-testid="references-list">
       {/* Empty state */}
       <Show when={props.references.length === 0}>
         <div class="text-center py-8 text-gray-500 dark:text-gray-400">

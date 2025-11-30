@@ -194,11 +194,13 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
       // Evaluate each tune once with designated rating
       async function evaluate(meta: RatedTuneMeta) {
         const toastCloser = page.getByRole("button", { name: "Close toast" });
-        const isCloserVisible = await toastCloser.isVisible();
-        if (isCloserVisible) {
-          toastCloser.click();
-        }
-        await page.waitForTimeout(500);
+        try {
+          const isCloserVisible = await toastCloser.isVisible();
+          if (isCloserVisible) {
+            toastCloser.click();
+          }
+          await page.waitForTimeout(500);
+        } catch (_e) {}
         await ttPage.practiceTab.click();
         const rows = await ttPage.getRows("scheduled");
 
