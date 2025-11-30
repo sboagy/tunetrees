@@ -318,6 +318,48 @@ export const syncQueue = sqliteTable("sync_queue", {
   lastError: text("last_error"),
 });
 
+/**
+ * Sync Outbox Table - Populated by SQL triggers
+ *
+ * This table is the new "Local Outbox Pattern" replacement for sync_queue.
+ * SQL triggers automatically insert rows here on INSERT/UPDATE/DELETE,
+ * and the sync worker processes them to push changes to Supabase.
+ *
+ * Key differences from sync_queue:
+ * - Populated by triggers (not manual queueSync calls)
+ * - rowId is a JSON string for composite PKs
+ * - Uses changedAt for ordering (not UUID-based ordering)
+ */
+export const syncOutbox = sqliteTable(
+  "sync_outbox",
+  {
+    // Random hex ID for outbox entry (triggers use: lower(hex(randomblob(16))))
+    id: text().primaryKey().notNull(),
+    // Table being synced (snake_case to match trigger column names)
+    tableName: text("table_name").notNull(),
+    // Row ID: simple string for single PK, JSON string for composite PK
+    // e.g., "abc-123" or '{"user_id":"x","tune_id":"y"}'
+    rowId: text("row_id").notNull(),
+    // INSERT, UPDATE, or DELETE
+    operation: text().notNull(),
+    // pending | in_progress | completed | failed
+    status: text().default("pending").notNull(),
+    // When the trigger fired (ISO 8601)
+    changedAt: text("changed_at").notNull(),
+    // When sync worker processed (ISO 8601)
+    syncedAt: text("synced_at"),
+    // Retry tracking
+    attempts: integer().default(0).notNull(),
+    lastError: text("last_error"),
+  },
+  (table) => [
+    // Index for sync worker to fetch pending items in order
+    index("idx_outbox_status_changed").on(table.status, table.changedAt),
+    // Index for deduplication within same table/row
+    index("idx_outbox_table_row").on(table.tableName, table.rowId),
+  ]
+);
+
 export const tabGroupMainState = sqliteTable("tab_group_main_state", {
   id: text().primaryKey().notNull(), // UUID
   userId: text("user_id")
