@@ -31,6 +31,8 @@ export function applyMigrations(db: BetterSQLite3Database): void {
     "0001_thin_chronomancer.sql",
     "0002_nappy_roland_deschain.sql",
     "0003_friendly_cerebro.sql",
+    "0004_true_union_jack.sql",
+    "0005_add_display_order.sql",
   ];
 
   for (const migrationFile of migrations) {
@@ -53,6 +55,17 @@ export function applyMigrations(db: BetterSQLite3Database): void {
           continue;
         }
 
+        // Skip specific ALTER TABLE ADD statements that cause "duplicate column" errors
+        // when the column already exists in the base schema (migration 0004)
+        if (
+          statement.includes("ALTER TABLE") &&
+          statement.includes("ADD") &&
+          statement.includes("avatar_url")
+        ) {
+          // Skip avatar_url ADD statement (already in base schema)
+          continue;
+        }
+
         db.run(statement as any);
       } catch (error) {
         console.error(`Failed to execute statement from ${migrationFile}:`);
@@ -61,6 +74,30 @@ export function applyMigrations(db: BetterSQLite3Database): void {
       }
     }
   }
+
+  // Create sync_outbox table (not yet in migrations, added for trigger-based sync)
+  // This table is populated by triggers on syncable tables
+  db.run(
+    `
+    CREATE TABLE IF NOT EXISTS sync_outbox (
+      id TEXT PRIMARY KEY NOT NULL,
+      table_name TEXT NOT NULL,
+      row_id TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      status TEXT DEFAULT 'pending' NOT NULL,
+      changed_at TEXT NOT NULL,
+      synced_at TEXT,
+      attempts INTEGER DEFAULT 0 NOT NULL,
+      last_error TEXT
+    )
+  ` as any
+  );
+  db.run(
+    `CREATE INDEX IF NOT EXISTS idx_outbox_status_changed ON sync_outbox(status, changed_at)` as any
+  );
+  db.run(
+    `CREATE INDEX IF NOT EXISTS idx_outbox_table_row ON sync_outbox(table_name, row_id)` as any
+  );
 }
 
 /**

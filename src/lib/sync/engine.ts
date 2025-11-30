@@ -18,6 +18,14 @@ import type { SyncQueueItem } from "../db/types";
 import { log } from "../logger";
 import { getAdapter, type SyncableTableName } from "./adapters";
 import {
+  fetchLocalRowByPrimaryKey,
+  getPendingOutboxItems,
+  markOutboxCompleted,
+  markOutboxFailed,
+  markOutboxPermanentlyFailed,
+  type OutboxItem,
+} from "./outbox";
+import {
   getPendingSyncItems,
   getSyncQueueStats,
   markSynced,
@@ -250,6 +258,234 @@ export class SyncEngine {
         errors,
         timestamp: startTime,
       };
+    }
+  }
+
+  /**
+   * Push local changes to Supabase using trigger-populated outbox.
+   *
+   * This is the new sync method that reads from sync_outbox (populated by triggers)
+   * instead of the manual sync_queue. For INSERT/UPDATE operations, fetches the
+   * current local row data before sending to remote.
+   *
+   * @returns Sync result
+   */
+  async syncUpFromOutbox(): Promise<SyncResult> {
+    const startTime = new Date().toISOString();
+    const errors: string[] = [];
+    let synced = 0;
+    let failed = 0;
+
+    try {
+      // Get pending outbox items
+      const pendingItems = await getPendingOutboxItems(
+        this.localDb,
+        this.config.batchSize
+      );
+
+      if (pendingItems.length === 0) {
+        syncLog("[SyncEngine] No pending outbox items to sync");
+        return {
+          success: true,
+          itemsSynced: 0,
+          itemsFailed: 0,
+          conflicts: 0,
+          errors: [],
+          timestamp: startTime,
+        };
+      }
+
+      log.info(
+        `[SyncEngine] Processing ${pendingItems.length} pending outbox items`
+      );
+
+      // Process each outbox item
+      for (const item of pendingItems) {
+        try {
+          await this.processOutboxItem(item);
+          await markOutboxCompleted(this.localDb, item.id);
+          synced++;
+        } catch (error) {
+          // Properly extract error message from Supabase errors
+          let errorMsg: string;
+          if (error instanceof Error) {
+            errorMsg = error.message;
+          } else if (error && typeof error === "object" && "message" in error) {
+            errorMsg = String(error.message);
+          } else {
+            errorMsg = JSON.stringify(error);
+          }
+
+          log.error(
+            `[SyncEngine] Failed to sync outbox item ${item.id} (${item.tableName} ${item.operation}):`,
+            errorMsg
+          );
+
+          // Update item status based on retry count
+          if (item.attempts >= this.config.maxRetries) {
+            await markOutboxPermanentlyFailed(this.localDb, item.id, errorMsg);
+            failed++;
+            errors.push(`Item ${item.id} (${item.tableName}): ${errorMsg}`);
+
+            // Show persistent toast for permanently failed items
+            toast.error(
+              `Sync failed permanently: ${item.tableName} (${item.operation})\n${errorMsg}`,
+              {
+                duration: Number.POSITIVE_INFINITY,
+              }
+            );
+          } else {
+            // Mark for retry
+            await markOutboxFailed(
+              this.localDb,
+              item.id,
+              errorMsg,
+              item.attempts
+            );
+          }
+        }
+      }
+
+      return {
+        success: failed === 0,
+        itemsSynced: synced,
+        itemsFailed: failed,
+        conflicts: 0,
+        errors,
+        timestamp: startTime,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      log.error("[SyncEngine] syncUpFromOutbox failed:", errorMsg);
+      errors.push(errorMsg);
+
+      return {
+        success: false,
+        itemsSynced: synced,
+        itemsFailed: failed,
+        conflicts: 0,
+        errors,
+        timestamp: startTime,
+      };
+    }
+  }
+
+  /**
+   * Process a single outbox item (INSERT, UPDATE, or DELETE)
+   *
+   * For INSERT/UPDATE: Fetches current local row data using rowId before sending.
+   * For DELETE: Uses rowId keys directly.
+   *
+   * @param item - Outbox item to process
+   */
+  private async processOutboxItem(item: OutboxItem): Promise<void> {
+    const { tableName, rowId, operation } = item;
+
+    log.info(
+      `[SyncEngine] Processing outbox ${operation} on ${tableName} (rowId: ${rowId})`
+    );
+
+    // Get adapter for this table - provides transform and conflict key info
+    const adapter = getAdapter(tableName as SyncableTableName);
+    const compositeKeys = adapter.conflictKeys;
+    const pkColumn = Array.isArray(adapter.primaryKey)
+      ? adapter.primaryKey[0]
+      : adapter.primaryKey;
+
+    switch (operation.toLowerCase()) {
+      case "insert":
+      case "update": {
+        // Fetch current local row data
+        const localRow = await fetchLocalRowByPrimaryKey(
+          this.localDb,
+          tableName as SyncableTableName,
+          rowId
+        );
+
+        if (!localRow) {
+          // Row was deleted locally before we could sync it
+          // For INSERT: This shouldn't happen normally, skip with warning
+          // For UPDATE: The row was deleted, skip the update
+          log.warn(
+            `[SyncEngine] Local row not found for ${operation} on ${tableName} (rowId: ${rowId}). Skipping.`
+          );
+          return;
+        }
+
+        // Transform camelCase (local) → snake_case (Supabase)
+        const remoteData = adapter.toRemote(localRow);
+
+        if (compositeKeys) {
+          // Table has unique constraints - use UPSERT to avoid duplicate key errors
+          const { error } = await this.supabase
+            .from(tableName)
+            .upsert(remoteData, {
+              onConflict: compositeKeys.join(","),
+            });
+          if (error) throw error;
+        } else {
+          // Standard upsert for tables without unique constraints
+          const { error } = await this.supabase
+            .from(tableName)
+            .upsert(remoteData, {
+              onConflict: pkColumn,
+            });
+          if (error) throw error;
+        }
+        break;
+      }
+
+      case "delete": {
+        // For DELETE, we need to reconstruct the key data from rowId
+        // The trigger stores rowId as simple string or JSON composite
+        const parsedRowId = rowId.startsWith("{")
+          ? JSON.parse(rowId)
+          : { [pkColumn]: rowId };
+
+        // Transform to snake_case for remote
+        const remoteKeys = adapter.toRemote(parsedRowId);
+
+        if (compositeKeys) {
+          // Check if we have all composite keys
+          const hasAllComposite = compositeKeys.every(
+            (k) => remoteKeys[k] !== undefined && remoteKeys[k] !== null
+          );
+          if (hasAllComposite) {
+            let query = this.supabase.from(tableName).delete();
+            for (const keyField of compositeKeys) {
+              query = query.eq(keyField, remoteKeys[keyField]);
+            }
+            const { error } = await query;
+            if (error) throw error;
+          } else if (remoteKeys[pkColumn]) {
+            const { error } = await this.supabase
+              .from(tableName)
+              .delete()
+              .eq(pkColumn, remoteKeys[pkColumn]);
+            if (error) throw error;
+          } else {
+            throw new Error(
+              `DELETE operation requires either composite keys (${compositeKeys.join(",")}) or ${pkColumn} for table ${tableName}`
+            );
+          }
+        } else {
+          // Simple primary key delete
+          if (!remoteKeys[pkColumn]) {
+            throw new Error(
+              `DELETE operation requires ${pkColumn} in rowId for table ${tableName}`
+            );
+          }
+          const { error } = await this.supabase
+            .from(tableName)
+            .delete()
+            .eq(pkColumn, String(remoteKeys[pkColumn]));
+          if (error) throw error;
+        }
+        break;
+      }
+
+      default:
+        throw new Error(`Unknown operation: ${operation}`);
     }
   }
 
