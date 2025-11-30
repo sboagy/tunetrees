@@ -9,6 +9,7 @@
 
 import { and, asc, desc, eq } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
+import { queueSync } from "../../sync";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
 import type { Reference } from "../types";
@@ -129,6 +130,9 @@ export async function createReference(
     .returning()
     .get();
 
+  // Queue for sync to Supabase
+  await queueSync(db, "reference", "insert", result);
+
   return result as Reference;
 }
 
@@ -186,6 +190,11 @@ export async function updateReference(
     .returning()
     .get();
 
+  // Queue for sync to Supabase
+  if (result) {
+    await queueSync(db, "reference", "update", result);
+  }
+
   return result as Reference | undefined;
 }
 
@@ -204,14 +213,20 @@ export async function updateReferenceOrder(
 
   // Update each reference's display_order based on its index in the array
   for (let i = 0; i < referenceIds.length; i++) {
-    await db
+    const result = await db
       .update(schema.reference)
       .set({
         displayOrder: i,
         lastModifiedAt: now,
       })
       .where(eq(schema.reference.id, referenceIds[i]))
-      .run();
+      .returning()
+      .get();
+
+    // Queue each update for sync to Supabase
+    if (result) {
+      await queueSync(db, "reference", "update", result);
+    }
   }
 }
 
@@ -238,6 +253,11 @@ export async function deleteReference(
     .where(eq(schema.reference.id, referenceId))
     .returning()
     .get();
+
+  // Queue soft delete for sync to Supabase
+  if (result) {
+    await queueSync(db, "reference", "update", result);
+  }
 
   return result !== undefined;
 }
