@@ -6,7 +6,7 @@
 
 ---
 
-## Current Phase: Phase 2 - Table Adapters
+## Current Phase: Phase 3 - Integrate Adapters into SyncEngine
 
 ### Phase 0.1: Casing Utilities ✅
 - [x] Create `src/lib/sync/casing.ts`
@@ -30,10 +30,10 @@
 
 ---
 
-## Phase 2: Table Adapters
-- [ ] Create `src/lib/sync/adapters.ts`
-- [ ] Create `tests/lib/sync/adapters.test.ts`
-- [ ] Tests passing
+## Phase 2: Table Adapters ✅
+- [x] Create `src/lib/sync/adapters.ts`
+- [x] Create `tests/lib/sync/adapters.test.ts`
+- [x] Tests passing (49 tests)
 
 ---
 
@@ -79,5 +79,6 @@
 - Phase 1.1: Added `syncOutbox` table to `drizzle/schema-sqlite.ts`
 - Phase 1.2: Created `sql_scripts/sync_triggers.sql` (trigger SQL for all 19 tables)
 - Phase 1.3: Created `src/lib/db/install-triggers.ts` with tests (20 tests passing)
-- **Total tests: 88 passing**
+- Phase 2: Created `src/lib/sync/adapters.ts` with tests (49 tests passing)
+- **Total tests: 137 passing** (27 + 41 + 20 + 49)
 
