@@ -191,7 +191,7 @@ export class SyncService {
   }
 
   /**
-   * Push local changes to Supabase only
+   * Push local changes to Supabase only (using trigger-based outbox)
    */
   public async syncUp(): Promise<SyncResult> {
     if (this.isSyncing) {
@@ -201,7 +201,7 @@ export class SyncService {
     this.isSyncing = true;
 
     try {
-      const result = await this.syncEngine.syncUp();
+      const result = await this.syncEngine.syncUpFromOutbox();
 
       // Notify callback (same as sync() method)
       this.config.onSyncComplete?.(result);
@@ -233,13 +233,13 @@ export class SyncService {
       // 2. DELETE is queued but not yet sent to Supabase
       // 3. syncDown runs and re-downloads the "deleted" row from Supabase
       // 4. Row reappears in local DB (zombie record)
-      const stats = await this.syncEngine.getSyncQueueStats();
-      if (stats.pending > 0) {
+      const stats = await this.syncEngine.getOutboxStats();
+      if (stats.pending > 0 || stats.inProgress > 0) {
         console.log(
           `[SyncService] ⚠️  BLOCKING syncDown: ${stats.pending} pending changes must upload first`
         );
         try {
-          await this.syncEngine.syncUp();
+          await this.syncEngine.syncUpFromOutbox();
           console.log(
             "[SyncService] ✅ Pending changes uploaded - safe to syncDown"
           );
@@ -278,13 +278,13 @@ export class SyncService {
 
     this.isSyncing = true;
     try {
-      const stats = await this.syncEngine.getSyncQueueStats();
-      if (stats.pending > 0) {
+      const stats = await this.syncEngine.getOutboxStats();
+      if (stats.pending > 0 || stats.inProgress > 0) {
         console.log(
           `[SyncService] ⚠️  BLOCKING scoped syncDown: ${stats.pending} pending changes must upload first`
         );
         try {
-          await this.syncEngine.syncUp();
+          await this.syncEngine.syncUpFromOutbox();
           console.log(
             "[SyncService] ✅ Pending changes uploaded - scoped syncDown safe"
           );
@@ -352,9 +352,9 @@ export class SyncService {
           return;
         }
 
-        // Check if there are pending changes before syncing
-        const stats = await this.syncEngine.getSyncQueueStats();
-        const hasPendingChanges = stats.pending > 0 || stats.syncing > 0;
+        // Check if there are pending changes before syncing (using outbox)
+        const stats = await this.syncEngine.getOutboxStats();
+        const hasPendingChanges = stats.pending > 0 || stats.inProgress > 0;
 
         if (hasPendingChanges) {
           console.log(

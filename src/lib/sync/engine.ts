@@ -19,6 +19,7 @@ import { log } from "../logger";
 import { getAdapter, type SyncableTableName } from "./adapters";
 import {
   fetchLocalRowByPrimaryKey,
+  getOutboxStats,
   getPendingOutboxItems,
   markOutboxCompleted,
   markOutboxFailed,
@@ -108,7 +109,7 @@ export class SyncEngine {
   /**
    * Perform full bidirectional sync
    *
-   * 1. Push local changes to Supabase (syncUp)
+   * 1. Push local changes to Supabase (syncUpFromOutbox)
    * 2. Pull remote changes to local (syncDown)
    *
    * @returns Combined sync result
@@ -121,9 +122,9 @@ export class SyncEngine {
     let totalConflicts = 0;
 
     try {
-      // Step 1: Push local changes to Supabase
-      syncLog("[SyncEngine] Starting syncUp...");
-      const upResult = await this.syncUp();
+      // Step 1: Push local changes to Supabase (using trigger-based outbox)
+      syncLog("[SyncEngine] Starting syncUpFromOutbox...");
+      const upResult = await this.syncUpFromOutbox();
       totalSynced += upResult.itemsSynced;
       totalFailed += upResult.itemsFailed;
       errors.push(...upResult.errors);
@@ -1473,6 +1474,24 @@ export class SyncEngine {
       return { pending: 0, syncing: 0, failed: 0, total: 0 };
     }
     return await getSyncQueueStats(this.localDb);
+  }
+
+  /**
+   * Get outbox statistics (trigger-populated sync_outbox table)
+   *
+   * @returns Promise with pending, inProgress, failed, and total counts
+   */
+  async getOutboxStats(): Promise<{
+    pending: number;
+    inProgress: number;
+    failed: number;
+    total: number;
+  }> {
+    if (!this.localDb) {
+      // Return empty stats if db not initialized
+      return { pending: 0, inProgress: 0, failed: 0, total: 0 };
+    }
+    return await getOutboxStats(this.localDb);
   }
 
   /**
