@@ -103,7 +103,11 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} class="space-y-4">
+    <form
+      onSubmit={handleSubmit}
+      class="space-y-4"
+      data-testid="reference-form"
+    >
       {/* URL Input */}
       <div>
         <label
@@ -124,6 +128,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
               : "border-gray-300 dark:border-gray-600 focus:ring-blue-500"
           } bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2`}
           required
+          data-testid="reference-url-input"
         />
         {urlError() && (
           <p class="text-sm text-red-600 dark:text-red-400 mt-1">
@@ -147,6 +152,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
           onInput={(e) => setTitle(e.currentTarget.value)}
           placeholder="Auto-detected from URL"
           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          data-testid="reference-title-input"
         />
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
           Optional - auto-filled from URL if left blank
@@ -166,6 +172,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
           value={refType()}
           onChange={(e) => setRefType(e.currentTarget.value)}
           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          data-testid="reference-type-select"
         >
           {REFERENCE_TYPES.map((type) => (
             <option value={type.value}>{type.label}</option>
@@ -191,6 +198,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
           placeholder="Add notes about this reference..."
           rows={3}
           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          data-testid="reference-comment-input"
         />
       </div>
 
@@ -202,6 +210,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
           checked={favorite()}
           onChange={(e) => setFavorite(e.currentTarget.checked)}
           class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          data-testid="reference-favorite-checkbox"
         />
         <label
           for="ref-favorite"
@@ -216,6 +225,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
         <button
           type="submit"
           class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          data-testid="reference-submit-button"
         >
           {props.reference ? "Update Reference" : "Add Reference"}
         </button>
@@ -223,6 +233,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
           type="button"
           onClick={props.onCancel}
           class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+          data-testid="reference-cancel-button"
         >
           Cancel
         </button>

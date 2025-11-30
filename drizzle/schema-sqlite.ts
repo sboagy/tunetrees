@@ -122,6 +122,7 @@ export const note = sqliteTable(
     noteText: text("note_text"),
     public: integer().default(0).notNull(),
     favorite: integer(),
+    displayOrder: integer("display_order").default(0).notNull(), // For drag ordering
     deleted: integer().default(0).notNull(),
     syncVersion: integer("sync_version").default(1).notNull(),
     lastModifiedAt: text("last_modified_at").notNull(),
@@ -287,6 +288,7 @@ export const reference = sqliteTable(
     title: text(),
     public: integer(),
     favorite: integer(),
+    displayOrder: integer("display_order").default(0).notNull(), // For drag ordering
     deleted: integer().default(0).notNull(),
     syncVersion: integer("sync_version").default(1).notNull(),
     lastModifiedAt: text("last_modified_at").notNull(),

@@ -93,8 +93,42 @@ export class TuneTreesPage {
   readonly settingsMenuToggle: Locator;
   readonly addTuneDialog: Locator;
   readonly sidebarEditTuneButton: Locator;
+  readonly sidebarExpandButton: Locator;
+  readonly sidebarCollapseButton: Locator;
 
   readonly tuneEditorContainer: Locator;
+
+  // Notes Panel
+  readonly notesPanel: Locator;
+  readonly notesCount: Locator;
+  readonly notesAddButton: Locator;
+  readonly notesSaveButton: Locator;
+  readonly notesCancelButton: Locator;
+  readonly notesNewEditor: Locator;
+  readonly notesList: Locator;
+  readonly notesEmptyMessage: Locator;
+  readonly notesNoTuneMessage: Locator;
+  readonly notesLoading: Locator;
+
+  // References Panel
+  readonly referencesPanel: Locator;
+  readonly referencesCount: Locator;
+  readonly referencesAddButton: Locator;
+  readonly referencesAddForm: Locator;
+  readonly referencesEditForm: Locator;
+  readonly referencesList: Locator;
+  readonly referencesNoTuneMessage: Locator;
+  readonly referencesLoading: Locator;
+
+  // Reference Form
+  readonly referenceForm: Locator;
+  readonly referenceUrlInput: Locator;
+  readonly referenceTitleInput: Locator;
+  readonly referenceTypeSelect: Locator;
+  readonly referenceCommentInput: Locator;
+  readonly referenceFavoriteCheckbox: Locator;
+  readonly referenceSubmitButton: Locator;
+  readonly referenceCancelButton: Locator;
 
   // Login/Auth Elements
   readonly anonymousSignInButton: Locator;
@@ -237,7 +271,51 @@ export class TuneTreesPage {
       .getByTestId(/^sidebar-edit-tune-button(?:-collapsed)?$/)
       .last();
 
+    // Sidebar expand/collapse buttons (for mobile responsive layout)
+    this.sidebarExpandButton = page.getByRole("button", {
+      name: "Expand sidebar",
+    });
+    this.sidebarCollapseButton = page.getByRole("button", {
+      name: "Collapse sidebar",
+    });
+
     this.tuneEditorContainer = page.getByTestId("tune-editor-container");
+
+    // Notes Panel
+    this.notesPanel = page.getByTestId("notes-panel");
+    this.notesCount = page.getByTestId("notes-count");
+    this.notesAddButton = page.getByTestId("notes-add-button");
+    this.notesSaveButton = page.getByTestId("notes-save-button");
+    this.notesCancelButton = page.getByTestId("notes-cancel-button");
+    this.notesNewEditor = page.getByTestId("notes-new-editor");
+    this.notesList = page.getByTestId("notes-list");
+    this.notesEmptyMessage = page.getByTestId("notes-empty-message");
+    this.notesNoTuneMessage = page.getByTestId("notes-no-tune-message");
+    this.notesLoading = page.getByTestId("notes-loading");
+
+    // References Panel
+    this.referencesPanel = page.getByTestId("references-panel");
+    this.referencesCount = page.getByTestId("references-count");
+    this.referencesAddButton = page.getByTestId("references-add-button");
+    this.referencesAddForm = page.getByTestId("references-add-form");
+    this.referencesEditForm = page.getByTestId("references-edit-form");
+    this.referencesList = page.getByTestId("references-list");
+    this.referencesNoTuneMessage = page.getByTestId(
+      "references-no-tune-message"
+    );
+    this.referencesLoading = page.getByTestId("references-loading");
+
+    // Reference Form
+    this.referenceForm = page.getByTestId("reference-form");
+    this.referenceUrlInput = page.getByTestId("reference-url-input");
+    this.referenceTitleInput = page.getByTestId("reference-title-input");
+    this.referenceTypeSelect = page.getByTestId("reference-type-select");
+    this.referenceCommentInput = page.getByTestId("reference-comment-input");
+    this.referenceFavoriteCheckbox = page.getByTestId(
+      "reference-favorite-checkbox"
+    );
+    this.referenceSubmitButton = page.getByTestId("reference-submit-button");
+    this.referenceCancelButton = page.getByTestId("reference-cancel-button");
 
     // Login/Auth Elements
     this.anonymousSignInButton = page.getByRole("button", {
@@ -611,6 +689,23 @@ export class TuneTreesPage {
     // Title input is a reliable readiness indicator
     const titleInput = this.page.getByTestId("tune-editor-input-title");
     await expect(titleInput).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Expand the sidebar if it's collapsed (mobile responsive layout).
+   * On desktop, the sidebar is always expanded, so this is a no-op.
+   * On mobile, after clicking a row the sidebar is collapsed and needs to be expanded.
+   */
+  async ensureSidebarExpanded() {
+    const isExpandVisible = await this.sidebarExpandButton
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
+
+    if (isExpandVisible) {
+      await this.sidebarExpandButton.click();
+      // Wait for sidebar to expand and content to be visible
+      await this.page.waitForTimeout(500);
+    }
   }
 
   /**
@@ -1241,5 +1336,215 @@ export class TuneTreesPage {
       .waitFor({ state: "visible", timeout: 5000 })
       .catch(() => {});
     await this.page.getByRole("option", { name: optionLabel }).first().click();
+  }
+
+  // ===== Notes Panel helpers =====
+
+  /**
+   * Get a note item by its ID
+   */
+  getNoteItem(noteId: string): Locator {
+    return this.page.getByTestId(`note-item-${noteId}`);
+  }
+
+  /**
+   * Get the drag handle for a specific note
+   */
+  getNoteDragHandle(noteId: string): Locator {
+    return this.page.getByTestId(`note-drag-handle-${noteId}`);
+  }
+
+  /**
+   * Get the edit button for a specific note
+   */
+  getNoteEditButton(noteId: string): Locator {
+    return this.page.getByTestId(`note-edit-button-${noteId}`);
+  }
+
+  /**
+   * Get the delete button for a specific note
+   */
+  getNoteDeleteButton(noteId: string): Locator {
+    return this.page.getByTestId(`note-delete-button-${noteId}`);
+  }
+
+  /**
+   * Get the content display for a specific note (read mode)
+   */
+  getNoteContent(noteId: string): Locator {
+    return this.page.getByTestId(`note-content-${noteId}`);
+  }
+
+  /**
+   * Get the editor container for a specific note (edit mode)
+   */
+  getNoteEditor(noteId: string): Locator {
+    return this.page.getByTestId(`note-editor-${noteId}`);
+  }
+
+  /**
+   * Get all note items in the list
+   */
+  getAllNoteItems(): Locator {
+    return this.page.locator('[data-testid^="note-item-"]');
+  }
+
+  /**
+   * Add a new note with the given content
+   */
+  async addNote(content: string) {
+    await this.notesAddButton.click();
+    await expect(this.notesNewEditor).toBeVisible({ timeout: 10000 });
+    // Type into Jodit editor
+    const joditEditor = this.notesNewEditor.locator(".jodit-wysiwyg");
+    await joditEditor.click();
+    await joditEditor.fill(content);
+    await this.notesSaveButton.click();
+    await this.page.waitForLoadState("networkidle", { timeout: 15000 });
+  }
+
+  // ===== References Panel helpers =====
+
+  /**
+   * Get a reference item by its ID
+   */
+  getReferenceItem(referenceId: string): Locator {
+    return this.page.getByTestId(`reference-item-${referenceId}`);
+  }
+
+  /**
+   * Get the drag handle for a specific reference
+   */
+  getReferenceDragHandle(referenceId: string): Locator {
+    return this.page.getByTestId(`reference-drag-handle-${referenceId}`);
+  }
+
+  /**
+   * Get the edit button for a specific reference
+   */
+  getReferenceEditButton(referenceId: string): Locator {
+    return this.page.getByTestId(`reference-edit-button-${referenceId}`);
+  }
+
+  /**
+   * Get the delete button for a specific reference
+   */
+  getReferenceDeleteButton(referenceId: string): Locator {
+    return this.page.getByTestId(`reference-delete-button-${referenceId}`);
+  }
+
+  /**
+   * Get the link button for a specific reference
+   */
+  getReferenceLink(referenceId: string): Locator {
+    return this.page.getByTestId(`reference-link-${referenceId}`);
+  }
+
+  /**
+   * Get all reference items in the list
+   */
+  getAllReferenceItems(): Locator {
+    return this.page.locator('[data-testid^="reference-item-"]');
+  }
+
+  /**
+   * Add a new reference with the given URL
+   */
+  async addReference(
+    url: string,
+    options?: {
+      title?: string;
+      type?: string;
+      comment?: string;
+      favorite?: boolean;
+    }
+  ) {
+    await this.referencesAddButton.click();
+    await expect(this.referenceForm).toBeVisible({ timeout: 10000 });
+    await this.referenceUrlInput.fill(url);
+    if (options?.title) {
+      await this.referenceTitleInput.fill(options.title);
+    }
+    if (options?.type) {
+      await this.referenceTypeSelect.selectOption(options.type);
+    }
+    if (options?.comment) {
+      await this.referenceCommentInput.fill(options.comment);
+    }
+    if (options?.favorite) {
+      await this.referenceFavoriteCheckbox.check();
+    }
+    await this.referenceSubmitButton.click();
+    await this.page.waitForLoadState("networkidle", { timeout: 15000 });
+  }
+
+  /**
+   * Delete all notes from the currently selected tune.
+   * Useful for test cleanup to ensure a clean state.
+   */
+  async deleteAllNotes() {
+    // Wait for notes panel to be visible
+    const notesPanel = this.page.getByTestId("notes-panel");
+    await notesPanel.waitFor({ state: "visible", timeout: 5000 }).catch(() => {
+      // Panel not visible - may be a different layout, skip
+    });
+
+    // Keep deleting notes until there are none left
+    let maxIterations = 20; // Safety limit
+    while (maxIterations > 0) {
+      maxIterations--;
+
+      // Find all delete buttons in notes panel
+      const deleteButtons = notesPanel.getByRole("button", { name: "Delete" });
+      const count = await deleteButtons.count();
+
+      if (count === 0) {
+        break; // No more notes to delete
+      }
+
+      // Set up dialog handler BEFORE clicking delete
+      this.page.once("dialog", (dialog) => dialog.accept());
+
+      // Click the first delete button
+      await deleteButtons.first().click();
+
+      // Wait for deletion to complete (UI update)
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  /**
+   * Delete all references from the currently selected tune.
+   * Useful for test cleanup to ensure a clean state.
+   */
+  async deleteAllReferences() {
+    // Wait for references panel to be visible
+    const refsPanel = this.page.getByTestId("references-panel");
+    await refsPanel.waitFor({ state: "visible", timeout: 5000 }).catch(() => {
+      // Panel not visible - may be a different layout, skip
+    });
+
+    // Keep deleting references until there are none left
+    let maxIterations = 20; // Safety limit
+    while (maxIterations > 0) {
+      maxIterations--;
+
+      // Find all delete buttons in references panel
+      const deleteButtons = refsPanel.getByRole("button", { name: "Delete" });
+      const count = await deleteButtons.count();
+
+      if (count === 0) {
+        break; // No more references to delete
+      }
+
+      // Set up dialog handler BEFORE clicking delete
+      this.page.once("dialog", (dialog) => dialog.accept());
+
+      // Click the first delete button
+      await deleteButtons.first().click();
+
+      // Wait for deletion to complete (UI update)
+      await this.page.waitForTimeout(500);
+    }
   }
 }

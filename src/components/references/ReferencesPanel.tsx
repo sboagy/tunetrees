@@ -3,6 +3,7 @@
  *
  * Sidebar panel for managing tune references.
  * Displays references for the current tune, allows add/edit/delete operations.
+ * Supports drag-and-drop reordering.
  *
  * @module components/references/ReferencesPanel
  */
@@ -19,6 +20,7 @@ import {
   getReferencesByTune,
   type Reference,
   updateReference,
+  updateReferenceOrder,
 } from "@/lib/db/queries/references";
 import { ReferenceForm, type ReferenceFormData } from "./ReferenceForm";
 import { ReferenceList } from "./ReferenceList";
@@ -115,6 +117,20 @@ export const ReferencesPanel: Component = () => {
     }
   };
 
+  // Handle reordering references
+  const handleReorderReferences = async (referenceIds: string[]) => {
+    try {
+      const db = getDb();
+      await updateReferenceOrder(db, referenceIds);
+
+      // Reload references
+      refetch();
+    } catch (error) {
+      console.error("Failed to reorder references:", error);
+      // TODO: Show error toast
+    }
+  };
+
   // Handle edit button click
   const handleEditClick = (reference: Reference) => {
     setEditingReference(reference);
@@ -128,12 +144,15 @@ export const ReferencesPanel: Component = () => {
   };
 
   return (
-    <div class="references-panel">
+    <div class="references-panel" data-testid="references-panel">
       {/* Header with icon and Add Reference button */}
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-1.5">
           <Link class="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-          <h4 class="text-xs font-medium text-gray-700 dark:text-gray-300">
+          <h4
+            class="text-xs font-medium text-gray-700 dark:text-gray-300"
+            data-testid="references-count"
+          >
             {references()?.length || 0}{" "}
             {references()?.length === 1 ? "reference" : "references"}
           </h4>
@@ -144,6 +163,7 @@ export const ReferencesPanel: Component = () => {
             onClick={() => setIsAdding(true)}
             class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50"
             title="Add new reference"
+            data-testid="references-add-button"
           >
             <Plus class="w-2.5 h-2.5" />
             Add
@@ -153,7 +173,10 @@ export const ReferencesPanel: Component = () => {
 
       {/* Add reference form */}
       <Show when={isAdding()}>
-        <div class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30">
+        <div
+          class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
+          data-testid="references-add-form"
+        >
           <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
             Add New Reference
           </h5>
@@ -167,7 +190,10 @@ export const ReferencesPanel: Component = () => {
       {/* Edit reference form */}
       <Show when={editingReference()}>
         {(ref) => (
-          <div class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30">
+          <div
+            class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
+            data-testid="references-edit-form"
+          >
             <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Edit Reference
             </h5>
@@ -182,14 +208,20 @@ export const ReferencesPanel: Component = () => {
 
       {/* No tune selected */}
       <Show when={!currentTuneId()}>
-        <p class="text-xs italic text-gray-500 dark:text-gray-400">
+        <p
+          class="text-xs italic text-gray-500 dark:text-gray-400"
+          data-testid="references-no-tune-message"
+        >
           Select a tune to view references
         </p>
       </Show>
 
       {/* Loading state */}
       <Show when={references.loading}>
-        <p class="text-xs text-gray-500 dark:text-gray-400">
+        <p
+          class="text-xs text-gray-500 dark:text-gray-400"
+          data-testid="references-loading"
+        >
           Loading references...
         </p>
       </Show>
@@ -200,6 +232,7 @@ export const ReferencesPanel: Component = () => {
           references={references() || []}
           onEdit={handleEditClick}
           onDelete={handleDeleteReference}
+          onReorder={handleReorderReferences}
           showActions={true}
           groupByType={false}
         />
