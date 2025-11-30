@@ -28,7 +28,6 @@ import type { SqliteDatabase } from "../db/client-sqlite";
 import { getDueTunesLegacy } from "../db/queries/practice";
 import { dailyPracticeQueue, playlistTune, userProfile } from "../db/schema";
 import type { DailyPracticeQueue, NewDailyPracticeQueue } from "../db/types";
-import { queueSync } from "../sync/queue";
 import { generateId } from "../utils/uuid";
 
 /**
@@ -347,10 +346,7 @@ export async function generateDailyPracticeQueue(
     `✅ Generated daily practice queue with ${inserted.length} tunes`
   );
 
-  // Queue for background sync
-  for (const entry of inserted) {
-    await queueSync(db, "daily_practice_queue", "insert", entry);
-  }
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   return inserted;
 }
@@ -470,15 +466,13 @@ export async function refillPracticeQueue(
     active: 1,
   }));
 
-  // Insert and sync
+  // Insert
   const inserted = await db
     .insert(dailyPracticeQueue)
     .values(newEntries)
     .returning();
 
-  for (const entry of inserted) {
-    await queueSync(db, "daily_practice_queue", "insert", entry);
-  }
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   console.log(`✅ Refilled queue with ${inserted.length} backfill tunes`);
   return inserted;

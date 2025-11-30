@@ -1,6 +1,5 @@
 import { and, asc, desc, eq } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
-import { queueSync } from "../../sync";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
 import type { Note } from "../types";
@@ -98,8 +97,7 @@ export async function createNote(
     .returning()
     .get();
 
-  // Queue for sync to Supabase
-  await queueSync(db, "note", "insert", result);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   return result as Note;
 }
@@ -142,10 +140,7 @@ export async function updateNote(
     .returning()
     .get();
 
-  // Queue for sync to Supabase
-  if (result) {
-    await queueSync(db, "note", "update", result);
-  }
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   return result as Note | undefined;
 }
@@ -164,21 +159,15 @@ export async function updateNoteOrder(
   const now = new Date().toISOString();
 
   // Update each note's display_order based on its index in the array
+  // Sync is handled automatically by SQL triggers populating sync_outbox
   for (let i = 0; i < noteIds.length; i++) {
-    const result = await db
+    await db
       .update(schema.note)
       .set({
         displayOrder: i,
         lastModifiedAt: now,
       })
-      .where(eq(schema.note.id, noteIds[i]))
-      .returning()
-      .get();
-
-    // Queue each update for sync to Supabase
-    if (result) {
-      await queueSync(db, "note", "update", result);
-    }
+      .where(eq(schema.note.id, noteIds[i]));
   }
 }
 
@@ -202,10 +191,7 @@ export async function deleteNote(
     .returning()
     .get();
 
-  // Queue soft delete for sync to Supabase
-  if (result) {
-    await queueSync(db, "note", "update", result);
-  }
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   return result !== undefined;
 }

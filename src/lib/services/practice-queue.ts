@@ -401,32 +401,14 @@ async function persistQueueRows(
   windows: SchedulingWindows
 ): Promise<DailyPracticeQueueRow[]> {
   try {
-    // Insert all rows and queue for sync
+    // Insert all rows - sync is handled automatically by SQL triggers
     for (const row of rows) {
       const id = generateId();
       const fullRow = { id, ...row };
 
       // Insert into local database
+      // Sync is handled automatically by SQL triggers populating sync_outbox
       await db.insert(dailyPracticeQueue).values(fullRow).run();
-
-      // Transform to snake_case for Supabase (match Drizzle's internal transformation)
-      const snakeCaseRow: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(fullRow)) {
-        const snakeKey = key.replace(
-          /[A-Z]/g,
-          (letter) => `_${letter.toLowerCase()}`
-        );
-        snakeCaseRow[snakeKey] = value;
-      }
-
-      // Queue for sync to Supabase with snake_case column names
-      const { queueSync } = await import("../sync/queue");
-      await queueSync(
-        db as SqliteDatabase,
-        "daily_practice_queue",
-        "insert",
-        snakeCaseRow
-      );
     }
 
     // Fetch back the inserted rows

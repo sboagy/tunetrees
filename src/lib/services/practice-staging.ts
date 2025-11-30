@@ -17,7 +17,6 @@ import { sql } from "drizzle-orm";
 import { Rating } from "ts-fsrs";
 import { persistDb, type SqliteDatabase } from "../db/client-sqlite";
 import type { RecordPracticeInput } from "../db/types";
-import { queueSync } from "../sync/queue";
 import { ensureMinimumNextDay } from "../utils/practice-date";
 import { evaluatePractice } from "./practice-recording";
 
@@ -181,21 +180,7 @@ export async function stagePracticeEvaluation(
       last_modified_at = excluded.last_modified_at
   `);
 
-  // Queue for sync to Supabase (so staging appears on other devices)
-  await queueSync(
-    db,
-    "table_transient_data",
-    "update", // Always update (UPSERT behavior)
-    {
-      userId,
-      tuneId,
-      playlistId,
-      ...preview,
-      recallEval: evaluation,
-      syncVersion: 1,
-      lastModifiedAt,
-    }
-  );
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   // Persist database to IndexedDB immediately so page refresh shows staged data
   await persistDb();
@@ -233,12 +218,7 @@ export async function clearStagedEvaluation(
       AND playlist_id = ${playlistId}
   `);
 
-  // Queue deletion for sync to Supabase
-  await queueSync(db, "table_transient_data", "delete", {
-    userId,
-    tuneId,
-    playlistId,
-  });
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   // Persist database to IndexedDB immediately
   await persistDb();

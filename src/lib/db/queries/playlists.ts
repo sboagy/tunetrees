@@ -19,7 +19,6 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
-import { queueSync } from "../../sync";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
 import {
@@ -240,8 +239,7 @@ export async function createPlaylist(
 
   const created = result[0];
 
-  // Queue for sync
-  await queueSync(db, "playlist", "insert", created);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   // Persist to IndexedDB
   await persistDb();
@@ -300,8 +298,7 @@ export async function updatePlaylist(
 
   const updated = result[0];
 
-  // Queue for sync
-  await queueSync(db, "playlist", "update", updated);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   // Persist to IndexedDB
   await persistDb();
@@ -360,8 +357,7 @@ export async function deletePlaylist(
     })
     .where(eq(playlistTune.playlistRef, playlistId));
 
-  // Queue for sync - pass playlistId for delete
-  await queueSync(db, "playlist", "delete", { playlistId });
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   // Persist to IndexedDB
   await persistDb();
@@ -461,8 +457,7 @@ export async function addTuneToPlaylist(
     throw new Error("Failed to add tune to playlist");
   }
 
-  // Queue for sync with the full row data
-  await queueSync(db, "playlist_tune", "insert", result[0]);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   return result[0];
 }

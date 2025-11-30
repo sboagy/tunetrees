@@ -18,7 +18,6 @@
 
 import { and, desc, eq, sql } from "drizzle-orm";
 import { computeSchedulingWindows } from "../../services/practice-queue";
-import { queueSync } from "../../sync";
 import { generateId } from "../../utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import {
@@ -798,8 +797,7 @@ export async function addTunesToPracticeQueue(
         added++;
         addedTuneIds.push(tuneId);
 
-        // Queue playlist_tune update for sync
-        await queueSync(db, "playlist_tune", "update", result[0]);
+        // Sync is handled automatically by SQL triggers populating sync_outbox
 
         // Check if practice record exists
         const existing = await db
@@ -815,7 +813,7 @@ export async function addTunesToPracticeQueue(
 
         // If no practice record exists, create an initial one (state=0, New)
         if (!existing || existing.length === 0) {
-          const newRecord = await db
+          await db
             .insert(practiceRecord)
             .values({
               id: generateId(),
@@ -839,13 +837,9 @@ export async function addTunesToPracticeQueue(
               syncVersion: 1,
               lastModifiedAt: now,
               deviceId: "local",
-            })
-            .returning();
+            });
 
-          // Queue practice_record insert for sync
-          if (newRecord && newRecord.length > 0) {
-            await queueSync(db, "practice_record", "insert", newRecord[0]);
-          }
+          // Sync is handled automatically by SQL triggers populating sync_outbox
         }
       } else {
         skipped++;
