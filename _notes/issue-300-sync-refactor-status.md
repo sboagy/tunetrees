@@ -6,7 +6,7 @@
 
 ---
 
-## Current Phase: Phase 3 - Integrate Adapters into SyncEngine
+## Current Phase: Phase 4 - Migrate to Trigger-Based Queue
 
 ### Phase 0.1: Casing Utilities ✅
 - [x] Create `src/lib/sync/casing.ts`
@@ -37,11 +37,17 @@
 
 ---
 
-## Phase 3: Integrate Adapters into SyncEngine
-- [ ] Update `processQueueItem` to use adapters
-- [ ] Update `syncTableDown` to use adapters
-- [ ] Remove duplicate methods from engine.ts
-- [ ] All E2E tests passing
+## Phase 3: Integrate Adapters into SyncEngine ✅
+- [x] Update `processQueueItem` to use adapters
+- [x] Update `syncTableDown` to use adapters  
+- [x] Remove duplicate methods from engine.ts
+  - Removed `COMPOSITE_KEY_TABLES` constant
+  - Removed `PRIMARY_KEY_COLUMNS` constant
+  - Removed `getPrimaryKeyColumn()` function
+  - Removed `getCompositeKeyFields()` function
+  - Removed `transformRemoteToLocal()` method
+  - Removed `transformLocalToRemote()` method
+- [x] All unit tests passing (188 tests)
 
 ---
 
@@ -80,5 +86,9 @@
 - Phase 1.2: Created `sql_scripts/sync_triggers.sql` (trigger SQL for all 19 tables)
 - Phase 1.3: Created `src/lib/db/install-triggers.ts` with tests (20 tests passing)
 - Phase 2: Created `src/lib/sync/adapters.ts` with tests (49 tests passing)
-- **Total tests: 137 passing** (27 + 41 + 20 + 49)
+- Phase 3: Integrated adapters into SyncEngine
+  - Updated `processQueueItem` to use `getAdapter().toRemote()`
+  - Updated `syncTableDown` to use `getAdapter().toLocal()`
+  - Removed ~100 lines of duplicate transform code
+  - All 188 unit tests passing
 

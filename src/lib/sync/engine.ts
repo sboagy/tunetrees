@@ -16,6 +16,7 @@ import * as localSchema from "../../../drizzle/schema-sqlite";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type { SyncQueueItem } from "../db/types";
 import { log } from "../logger";
+import { getAdapter, type SyncableTableName } from "./adapters";
 import {
   getPendingSyncItems,
   getSyncQueueStats,
@@ -23,56 +24,6 @@ import {
   type SyncableTable,
   updateSyncStatus,
 } from "./queue";
-
-/**
- * Configuration for tables with composite primary keys OR unique constraints
- * For UPSERT operations, we need to specify which fields to match on conflict.
- *
- * Maps table name to array of key field names (in snake_case for Supabase)
- */
-const COMPOSITE_KEY_TABLES: Record<string, string[]> = {
-  // Composite primary keys
-  table_transient_data: ["user_id", "tune_id", "playlist_id"],
-  playlist_tune: ["playlist_ref", "tune_ref"],
-  genre_tune_type: ["genre_id", "tune_type_id"],
-  prefs_spaced_repetition: ["user_id", "alg_type"],
-  table_state: ["user_id", "screen_size", "purpose", "playlist_id"],
-
-  // Tables with id PK but composite UNIQUE constraints (natural business keys)
-  daily_practice_queue: [
-    "user_ref",
-    "playlist_ref",
-    "window_start_utc",
-    "tune_ref",
-  ],
-  practice_record: ["tune_ref", "playlist_ref", "practiced"],
-};
-
-/**
- * Tables with non-standard primary key column names
- * Most tables use 'id', but some use table-specific names like 'playlist_id'
- * Maps table name to its primary key column name (in snake_case for Supabase)
- */
-const PRIMARY_KEY_COLUMNS: Record<string, string> = {
-  playlist: "playlist_id",
-  // Most other tables use 'id' - add exceptions here as needed
-};
-
-/**
- * Get the primary key column name for a table (in snake_case)
- * Returns 'id' by default for tables not in the map
- */
-function getPrimaryKeyColumn(tableName: string): string {
-  return PRIMARY_KEY_COLUMNS[tableName] || "id";
-}
-
-/**
- * Get composite key/unique constraint fields for a table (in snake_case)
- * Returns null for simple id-only tables
- */
-function getCompositeKeyFields(tableName: string): string[] | null {
-  return COMPOSITE_KEY_TABLES[tableName] || null;
-}
 
 // Debug flag for sync logging (set VITE_SYNC_DEBUG=true in .env to enable)
 const SYNC_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
@@ -575,16 +526,20 @@ export class SyncEngine {
     }
     const recordData = JSON.parse(data);
 
+    // Get adapter for this table - provides transform and conflict key info
+    const adapter = getAdapter(tableName as SyncableTableName);
+    const compositeKeys = adapter.conflictKeys;
+    const pkColumn = Array.isArray(adapter.primaryKey)
+      ? adapter.primaryKey[0] // For composite PKs, use first key for error messages
+      : adapter.primaryKey;
+
     switch (operation) {
       case "insert": {
         if (!recordData) {
           throw new Error("INSERT operation requires data");
         }
         // Transform camelCase (local) → snake_case (Supabase)
-        const remoteData = this.transformLocalToRemote(recordData);
-
-        // Check if table has unique constraints (use UPSERT to handle duplicates)
-        const compositeKeys = getCompositeKeyFields(tableName);
+        const remoteData = adapter.toRemote(recordData);
 
         if (compositeKeys) {
           // Table has unique constraints - use UPSERT to avoid duplicate key errors
@@ -606,10 +561,8 @@ export class SyncEngine {
 
       case "update": {
         // Transform camelCase (local) → snake_case (Supabase)
-        const remoteData = this.transformLocalToRemote(recordData);
+        const remoteData = adapter.toRemote(recordData);
 
-        // Check if table uses composite keys
-        const compositeKeys = getCompositeKeyFields(tableName);
         if (compositeKeys) {
           // ALWAYS use UPSERT for composite key tables.
           // Reason: We frequently queue 'update' after local insert. A pure UPDATE would be a no-op remotely if row doesn't exist yet.
@@ -622,7 +575,6 @@ export class SyncEngine {
           if (error) throw error;
         } else {
           // Standard single PK update path
-          const pkColumn = getPrimaryKeyColumn(tableName);
           if (!remoteData[pkColumn]) {
             throw new Error(
               `UPDATE operation requires ${pkColumn} in data for table ${tableName}`
@@ -639,14 +591,11 @@ export class SyncEngine {
       }
 
       case "delete": {
-        const remoteData = this.transformLocalToRemote(recordData);
+        const remoteData = adapter.toRemote(recordData);
 
-        // Check if table uses composite keys
-        const compositeKeys = getCompositeKeyFields(tableName);
         if (compositeKeys) {
           // If composite key fields are present, delete by composite key.
           // If only an id is provided (legacy queue), fallback to deleting by id.
-          const pkColumn = getPrimaryKeyColumn(tableName);
           const hasAllComposite = compositeKeys.every(
             (k) => remoteData[k] !== undefined && remoteData[k] !== null
           );
@@ -670,7 +619,6 @@ export class SyncEngine {
           }
         } else {
           // Soft delete path replaced with hard delete for simplicity until server implements deleted flag semantics
-          const pkColumn = getPrimaryKeyColumn(tableName);
           if (!remoteData[pkColumn]) {
             throw new Error(
               `DELETE operation requires ${pkColumn} in data for table ${tableName}`
@@ -836,11 +784,15 @@ export class SyncEngine {
       return 0;
     }
 
+    // Get adapter for this table - provides transform logic
+    const adapter = getAdapter(tableName as SyncableTableName);
+
     // Upsert into local database
     // SQLite upsert: INSERT OR REPLACE
     for (const record of filteredRecords) {
       try {
-        const transformed = this.transformRemoteToLocal(record);
+        // Cast to any to maintain compatibility with existing code that uses loose typing
+        const transformed: any = adapter.toLocal(record);
 
         // Debug: Log first record of each table to verify transformation
         if (filteredRecords.indexOf(record) === 0) {
@@ -1156,42 +1108,6 @@ export class SyncEngine {
   }
 
   /**
-   * Transform remote (PostgreSQL) record to local (SQLite) format
-   *
-   * Handles:
-   * 1. Field name conversion: snake_case (Supabase API) → camelCase (Drizzle)
-   * 2. Type conversions:
-   *    - timestamp (PostgreSQL) → text (SQLite ISO 8601)
-   *    - boolean (PostgreSQL) → integer (SQLite 0/1)
-   *    - uuid (PostgreSQL) → text (SQLite)
-   *
-   * @param record - Remote record from Supabase (snake_case keys)
-   * @returns Transformed record for local DB (camelCase keys)
-   */
-  private transformRemoteToLocal(record: any): any {
-    const transformed: any = {};
-
-    // Convert snake_case to camelCase and apply type conversions
-    for (const [key, value] of Object.entries(record)) {
-      // Convert snake_case to camelCase
-      const camelKey = key.replace(/_([a-z])/g, (_, letter) =>
-        letter.toUpperCase()
-      );
-
-      // Apply type conversions
-      if (value instanceof Date) {
-        transformed[camelKey] = value.toISOString();
-      } else if (typeof value === "boolean") {
-        transformed[camelKey] = value ? 1 : 0;
-      } else {
-        transformed[camelKey] = value;
-      }
-    }
-
-    return transformed;
-  }
-
-  /**
    * Return list of column keys for a Drizzle table object.
    * We detect columns by presence of a string `name` and an object `table`.
    */
@@ -1303,38 +1219,6 @@ export class SyncEngine {
     }
 
     return row;
-  }
-
-  /**
-   * Transform local (SQLite) record to remote (PostgreSQL) format
-   *
-   * Handles:
-   * 1. Field name conversion: camelCase (Drizzle) → snake_case (Supabase API)
-   * 2. Type conversions:
-   *    - integer 0/1 (SQLite boolean) → boolean (PostgreSQL)
-   *
-   * @param record - Local record from SQLite (camelCase keys)
-   * @returns Transformed record for Supabase (snake_case keys)
-   */
-  private transformLocalToRemote(record: any): any {
-    const transformed: any = {};
-
-    // Convert camelCase to snake_case
-    for (const [key, value] of Object.entries(record)) {
-      // Convert camelCase to snake_case
-      const snakeKey = key.replace(
-        /[A-Z]/g,
-        (letter) => `_${letter.toLowerCase()}`
-      );
-
-      // Note: We don't convert booleans back here because:
-      // 1. SQLite stores booleans as integers (0/1)
-      // 2. Supabase/PostgreSQL accepts integers for boolean columns
-      // 3. The conversion happens automatically on the PostgreSQL side
-      transformed[snakeKey] = value;
-    }
-
-    return transformed;
   }
 
   /**

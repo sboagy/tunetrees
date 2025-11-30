@@ -23,6 +23,9 @@ import {
   TABLE_REGISTRY,
 } from "./table-meta";
 
+// Re-export for convenience
+export type { SyncableTableName };
+
 /**
  * Adapter interface for table-specific sync transformations.
  */
