@@ -52,6 +52,7 @@
 ---
 
 ## Phase 4: Migrate to Trigger-Based Queue
+- [x] Install triggers during database initialization (Phase 4.1)
 - [ ] Update `syncUp` to read from `sync_outbox`
 - [ ] Remove manual `queueSync` calls
 - [ ] Deprecate old `sync_queue` table
@@ -90,5 +91,8 @@
   - Updated `processQueueItem` to use `getAdapter().toRemote()`
   - Updated `syncTableDown` to use `getAdapter().toLocal()`
   - Removed ~100 lines of duplicate transform code
+  - All 188 unit tests passing
+- Phase 4.1: Install triggers during database initialization
+  - Modified `src/lib/db/client-sqlite.ts` to call `createSyncOutboxTable()` and `installSyncTriggers()` on init
   - All 188 unit tests passing
 

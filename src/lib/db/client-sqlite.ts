@@ -19,6 +19,7 @@ import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import * as relations from "../../../drizzle/relations";
 import * as schema from "../../../drizzle/schema-sqlite";
 import { initializeViews, recreateViews } from "./init-views";
+import { createSyncOutboxTable, installSyncTriggers } from "./install-triggers";
 import {
   clearLocalDatabaseForMigration,
   clearMigrationParams,
@@ -308,6 +309,16 @@ export async function initializeDb(
       } catch (error) {
         console.error("❌ Failed to create sync_queue table:", error);
       }
+
+      // Install sync outbox and triggers for automatic change tracking
+      // The sync_outbox table and triggers are used for the new trigger-based sync architecture
+      try {
+        createSyncOutboxTable(sqliteDb);
+        installSyncTriggers(sqliteDb);
+      } catch (error) {
+        console.error("❌ Failed to install sync triggers:", error);
+      }
+
       console.log(
         `✅ SQLite WASM database ready for user: ${userId.substring(0, 8)}...`
       );
