@@ -4,10 +4,35 @@
  * This module handles the installation of SQL triggers that automatically
  * populate the sync_outbox table whenever data changes occur.
  *
+ * The triggers include a suppression mechanism:
+ * - A `sync_trigger_control` table with a single row controls whether triggers are active
+ * - During syncDown (pulling data from Supabase), triggers are suppressed to avoid
+ *   creating outbox entries for data that already exists remotely
+ * - User-initiated changes trigger outbox entries normally
+ *
  * @module install-triggers
  */
 
 import type { Database as SqlJsDatabase } from "sql.js";
+
+/**
+ * Create the sync trigger control table.
+ * This table has exactly one row with a 'disabled' flag.
+ * When disabled = 1, triggers will NOT add entries to sync_outbox.
+ */
+export function createSyncTriggerControlTable(db: SqlJsDatabase): void {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sync_trigger_control (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      disabled INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  // Ensure exactly one row exists
+  db.run(`
+    INSERT OR IGNORE INTO sync_trigger_control (id, disabled) VALUES (1, 0)
+  `);
+  console.log("✅ Created sync_trigger_control table");
+}
 
 /**
  * Create the sync_outbox table if it doesn't exist
@@ -59,7 +84,7 @@ const TRIGGER_CONFIGS: TableTriggerConfig[] = [
     primaryKey: ["user_id", "playlist_id"],
   },
   { tableName: "reference", primaryKey: "id" },
-  { tableName: "repertoire", primaryKey: "id" },
+  // Note: "repertoire" table was removed from schema, so no trigger needed
   { tableName: "tab_group_main_state", primaryKey: "id" },
   {
     tableName: "table_state",
@@ -71,8 +96,9 @@ const TRIGGER_CONFIGS: TableTriggerConfig[] = [
   },
   { tableName: "tag", primaryKey: "id" },
   { tableName: "tune", primaryKey: "id" },
+  { tableName: "tune_override", primaryKey: "id" },
   { tableName: "tune_type", primaryKey: "id" },
-  { tableName: "user_annotation", primaryKey: "id" },
+  // Note: "user_annotation" table was removed from SQLite schema, so no trigger needed
   { tableName: "user_profile", primaryKey: "supabase_user_id" },
 ];
 
@@ -100,6 +126,10 @@ function generateRowIdExpression(
 /**
  * Execute triggers for a single table.
  * Executes each statement directly instead of building multi-statement SQL.
+ *
+ * The triggers include a check against sync_trigger_control.disabled:
+ * - When disabled = 0 (default): triggers add entries to sync_outbox
+ * - When disabled = 1: triggers are suppressed (no outbox entries)
  */
 function createTriggersForTable(
   db: SqlJsDatabase,
@@ -114,10 +144,11 @@ function createTriggersForTable(
   db.run(`DROP TRIGGER IF EXISTS trg_${tableName}_update`);
   db.run(`DROP TRIGGER IF EXISTS trg_${tableName}_delete`);
 
-  // Create INSERT trigger
+  // Create INSERT trigger with suppression check
   db.run(`
     CREATE TRIGGER trg_${tableName}_insert
     AFTER INSERT ON ${tableName}
+    WHEN (SELECT disabled FROM sync_trigger_control WHERE id = 1) = 0
     BEGIN
       INSERT INTO sync_outbox (id, table_name, row_id, operation, changed_at)
       VALUES (
@@ -130,10 +161,11 @@ function createTriggersForTable(
     END
   `);
 
-  // Create UPDATE trigger
+  // Create UPDATE trigger with suppression check
   db.run(`
     CREATE TRIGGER trg_${tableName}_update
     AFTER UPDATE ON ${tableName}
+    WHEN (SELECT disabled FROM sync_trigger_control WHERE id = 1) = 0
     BEGIN
       INSERT INTO sync_outbox (id, table_name, row_id, operation, changed_at)
       VALUES (
@@ -146,10 +178,11 @@ function createTriggersForTable(
     END
   `);
 
-  // Create DELETE trigger
+  // Create DELETE trigger with suppression check
   db.run(`
     CREATE TRIGGER trg_${tableName}_delete
     AFTER DELETE ON ${tableName}
+    WHEN (SELECT disabled FROM sync_trigger_control WHERE id = 1) = 0
     BEGIN
       INSERT INTO sync_outbox (id, table_name, row_id, operation, changed_at)
       VALUES (
@@ -167,16 +200,20 @@ function createTriggersForTable(
  * Install all sync outbox triggers on the database.
  *
  * This function:
- * 1. Creates the sync_outbox table if it doesn't exist
- * 2. Drops any existing triggers (idempotent)
- * 3. Creates INSERT/UPDATE/DELETE triggers for all syncable tables
+ * 1. Creates the sync_trigger_control table for trigger suppression
+ * 2. Creates the sync_outbox table if it doesn't exist
+ * 3. Drops any existing triggers (idempotent)
+ * 4. Creates INSERT/UPDATE/DELETE triggers for all syncable tables
  *
  * @param db - The sql.js Database instance
  */
 export function installSyncTriggers(db: SqlJsDatabase): void {
   console.log("🔧 Installing sync outbox triggers...");
 
-  // First ensure the sync_outbox table exists
+  // First ensure the control table exists (for trigger suppression)
+  createSyncTriggerControlTable(db);
+
+  // Then ensure the sync_outbox table exists
   createSyncOutboxTable(db);
 
   // Generate and execute triggers for each table
@@ -197,6 +234,43 @@ export function installSyncTriggers(db: SqlJsDatabase): void {
   console.log(
     `✅ Installed ${triggerCount} sync triggers for ${TRIGGER_CONFIGS.length} tables`
   );
+}
+
+/**
+ * Suppress sync triggers (disable outbox population).
+ * Call this before syncDown operations to prevent creating outbox entries
+ * for data that already exists on the server.
+ *
+ * @param db - The sql.js Database instance
+ */
+export function suppressSyncTriggers(db: SqlJsDatabase): void {
+  db.run(`UPDATE sync_trigger_control SET disabled = 1 WHERE id = 1`);
+}
+
+/**
+ * Enable sync triggers (resume outbox population).
+ * Call this after syncDown operations to resume normal trigger behavior.
+ *
+ * @param db - The sql.js Database instance
+ */
+export function enableSyncTriggers(db: SqlJsDatabase): void {
+  db.run(`UPDATE sync_trigger_control SET disabled = 0 WHERE id = 1`);
+}
+
+/**
+ * Check if sync triggers are currently suppressed.
+ *
+ * @param db - The sql.js Database instance
+ * @returns true if triggers are suppressed, false otherwise
+ */
+export function areSyncTriggersSuppressed(db: SqlJsDatabase): boolean {
+  const result = db.exec(
+    `SELECT disabled FROM sync_trigger_control WHERE id = 1`
+  );
+  if (result.length === 0 || result[0].values.length === 0) {
+    return false;
+  }
+  return result[0].values[0][0] === 1;
 }
 
 /**

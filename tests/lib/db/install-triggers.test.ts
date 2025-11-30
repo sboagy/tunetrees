@@ -8,9 +8,12 @@ import initSqlJs, { type Database } from "sql.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   areSyncTriggersInstalled,
+  areSyncTriggersSuppressed,
   createSyncOutboxTable,
+  enableSyncTriggers,
   getSyncTriggerCount,
   installSyncTriggers,
+  suppressSyncTriggers,
   verifySyncTriggers,
 } from "../../../src/lib/db/install-triggers";
 
@@ -103,13 +106,7 @@ beforeEach(async () => {
     )
   `);
 
-  db.run(`
-    CREATE TABLE user_annotation (
-      id TEXT PRIMARY KEY NOT NULL,
-      user_ref TEXT,
-      tune_ref TEXT
-    )
-  `);
+  // Note: user_annotation table removed from SQLite schema (Supabase-only)
 
   db.run(`
     CREATE TABLE user_profile (
@@ -178,6 +175,15 @@ beforeEach(async () => {
       PRIMARY KEY (user_id, playlist_id)
     )
   `);
+
+  db.run(`
+    CREATE TABLE tune_override (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT,
+      tune_id TEXT,
+      settings TEXT
+    )
+  `);
 });
 
 afterEach(() => {
@@ -242,7 +248,8 @@ describe("installSyncTriggers", () => {
     expect(verification.missingTables).toHaveLength(0);
   });
 
-  it("creates 57 triggers (19 tables × 3 operations)", () => {
+  // 18 tables × 3 operations = 54 triggers (user_annotation removed)
+  it("creates 54 triggers (18 tables × 3 operations)", () => {
     installSyncTriggers(db);
 
     const result = db.exec(`
@@ -250,7 +257,7 @@ describe("installSyncTriggers", () => {
       WHERE type = 'trigger' AND name LIKE 'trg_%'
     `);
     const count = Number(result[0]?.values[0]?.[0] || 0);
-    expect(count).toBe(57);
+    expect(count).toBe(54);
   });
 
   it("is idempotent", () => {
@@ -436,7 +443,8 @@ describe("verifySyncTriggers", () => {
     const verification = verifySyncTriggers(db);
 
     expect(verification.installed).toBe(false);
-    expect(verification.missingTables.length).toBe(19);
+    // 18 tables: user_annotation removed from SQLite schema
+    expect(verification.missingTables.length).toBe(18);
     expect(verification.missingTables).toContain("tune");
     expect(verification.missingTables).toContain("playlist");
     expect(verification.missingTables).toContain("genre_tune_type");
@@ -448,5 +456,105 @@ describe("verifySyncTriggers", () => {
 
     expect(verification.installed).toBe(true);
     expect(verification.missingTables).toHaveLength(0);
+  });
+});
+
+describe("trigger suppression", () => {
+  beforeEach(() => {
+    installSyncTriggers(db);
+  });
+
+  it("triggers are enabled by default", () => {
+    expect(areSyncTriggersSuppressed(db)).toBe(false);
+  });
+
+  it("suppressSyncTriggers disables triggers", () => {
+    suppressSyncTriggers(db);
+    expect(areSyncTriggersSuppressed(db)).toBe(true);
+  });
+
+  it("enableSyncTriggers re-enables triggers", () => {
+    suppressSyncTriggers(db);
+    expect(areSyncTriggersSuppressed(db)).toBe(true);
+
+    enableSyncTriggers(db);
+    expect(areSyncTriggersSuppressed(db)).toBe(false);
+  });
+
+  it("suppressed triggers do not create outbox entries", () => {
+    // Clear any existing outbox entries
+    db.run("DELETE FROM sync_outbox");
+
+    // Suppress triggers
+    suppressSyncTriggers(db);
+
+    // Insert data - should NOT create outbox entry
+    db.run(
+      "INSERT INTO tune (id, title) VALUES ('t-suppressed', 'Suppressed')"
+    );
+
+    // Verify no outbox entry was created
+    const outbox = db.exec("SELECT * FROM sync_outbox");
+    expect(outbox.length === 0 || outbox[0]?.values.length === 0).toBe(true);
+  });
+
+  it("enabled triggers create outbox entries normally", () => {
+    // Clear any existing outbox entries
+    db.run("DELETE FROM sync_outbox");
+
+    // Ensure triggers are enabled
+    enableSyncTriggers(db);
+
+    // Insert data - SHOULD create outbox entry
+    db.run("INSERT INTO tune (id, title) VALUES ('t-enabled', 'Enabled')");
+
+    // Verify outbox entry was created
+    const outbox = db.exec(
+      "SELECT table_name, operation FROM sync_outbox WHERE row_id = 't-enabled'"
+    );
+    expect(outbox.length).toBe(1);
+    expect(outbox[0]?.values.length).toBe(1);
+    expect(outbox[0]?.values[0]?.[0]).toBe("tune");
+    expect(outbox[0]?.values[0]?.[1]).toBe("INSERT");
+  });
+
+  it("suppression survives multiple operations", () => {
+    // Clear any existing outbox entries
+    db.run("DELETE FROM sync_outbox");
+
+    // Suppress triggers
+    suppressSyncTriggers(db);
+
+    // Do multiple operations - none should create outbox entries
+    db.run("INSERT INTO tune (id, title) VALUES ('t1', 'Tune 1')");
+    db.run("UPDATE tune SET title = 'Tune 1 Updated' WHERE id = 't1'");
+    db.run("DELETE FROM tune WHERE id = 't1'");
+
+    // Verify no outbox entries were created
+    const outbox = db.exec("SELECT * FROM sync_outbox");
+    expect(outbox.length === 0 || outbox[0]?.values.length === 0).toBe(true);
+  });
+
+  it("re-enabling triggers works for subsequent operations", () => {
+    // Clear any existing outbox entries
+    db.run("DELETE FROM sync_outbox");
+
+    // Suppress, do operation, re-enable
+    suppressSyncTriggers(db);
+    db.run(
+      "INSERT INTO tune (id, title) VALUES ('t-suppressed', 'Suppressed')"
+    );
+    enableSyncTriggers(db);
+
+    // Do another operation - SHOULD create outbox entry
+    db.run(
+      "INSERT INTO tune (id, title) VALUES ('t-after', 'After Re-enable')"
+    );
+
+    // Verify only the second insert created an outbox entry
+    const outbox = db.exec("SELECT row_id FROM sync_outbox");
+    expect(outbox.length).toBe(1);
+    expect(outbox[0]?.values.length).toBe(1);
+    expect(outbox[0]?.values[0]?.[0]).toBe("t-after");
   });
 });

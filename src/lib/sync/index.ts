@@ -6,6 +6,7 @@
  * @module lib/sync
  */
 
+export { clearSyncOutbox } from "./outbox";
 export {
   clearSyncedItems,
   clearSyncQueue,

@@ -813,31 +813,29 @@ export async function addTunesToPracticeQueue(
 
         // If no practice record exists, create an initial one (state=0, New)
         if (!existing || existing.length === 0) {
-          await db
-            .insert(practiceRecord)
-            .values({
-              id: generateId(),
-              playlistRef: playlistId,
-              tuneRef: tuneId,
-              practiced: null,
-              quality: null,
-              easiness: null,
-              difficulty: 0,
-              stability: null,
-              interval: null,
-              step: null,
-              repetitions: 0,
-              lapses: 0,
-              elapsedDays: 0,
-              state: 0, // State 0 = New
-              due: null,
-              backupPracticed: null,
-              goal: "recall",
-              technique: null,
-              syncVersion: 1,
-              lastModifiedAt: now,
-              deviceId: "local",
-            });
+          await db.insert(practiceRecord).values({
+            id: generateId(),
+            playlistRef: playlistId,
+            tuneRef: tuneId,
+            practiced: null,
+            quality: null,
+            easiness: null,
+            difficulty: 0,
+            stability: null,
+            interval: null,
+            step: null,
+            repetitions: 0,
+            lapses: 0,
+            elapsedDays: 0,
+            state: 0, // State 0 = New
+            due: null,
+            backupPracticed: null,
+            goal: "recall",
+            technique: null,
+            syncVersion: 1,
+            lastModifiedAt: now,
+            deviceId: "local",
+          });
 
           // Sync is handled automatically by SQL triggers populating sync_outbox
         }

@@ -223,6 +223,19 @@ export async function clearOldOutboxItems(
   }
 }
 
+/**
+ * Clear ALL items from sync outbox
+ *
+ * Used at login to clear stale outbox items from previous sessions.
+ * The data will be synced down fresh from Supabase, so stale outbox items
+ * would cause errors when trying to upload outdated data.
+ *
+ * @param db - SQLite database instance
+ */
+export async function clearSyncOutbox(db: SqliteDatabase): Promise<void> {
+  await db.delete(syncOutbox);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDrizzleTable = SQLiteTableWithColumns<any>;
 
@@ -242,6 +255,9 @@ const TABLE_MAP: Record<string, AnyDrizzleTable> = {
   prefs_scheduling_options: localSchema.prefsSchedulingOptions,
   prefs_spaced_repetition: localSchema.prefsSpacedRepetition,
   reference: localSchema.reference,
+  tab_group_main_state: localSchema.tabGroupMainState,
+  table_state: localSchema.tableState,
+  table_transient_data: localSchema.tableTransientData,
   tag: localSchema.tag,
   tune: localSchema.tune,
   tune_override: localSchema.tuneOverride,

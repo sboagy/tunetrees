@@ -27,7 +27,12 @@ import {
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
 
-import { clearSyncQueue, type SyncService, startSyncWorker } from "../sync";
+import {
+  clearSyncOutbox,
+  clearSyncQueue,
+  type SyncService,
+  startSyncWorker,
+} from "../sync";
 
 /**
  * Authentication state interface
@@ -366,14 +371,17 @@ export const AuthProvider: ParentComponent = (props) => {
         log.warn("Failed to sync reference data for anonymous user:", refError);
       }
 
-      // Clear any pending sync queue items - anonymous users don't sync to Supabase
+      // Clear any pending sync queue/outbox items - anonymous users don't sync to Supabase
       // This prevents the UI from showing "Syncing X" indefinitely
       try {
-        const { clearSyncQueue } = await import("@/lib/sync/queue");
+        const { clearSyncQueue, clearSyncOutbox } = await import(
+          "@/lib/sync/index"
+        );
         await clearSyncQueue(db);
-        console.log("🗑️ Cleared sync queue for anonymous user");
+        await clearSyncOutbox(db);
+        console.log("🗑️ Cleared sync queue and outbox for anonymous user");
       } catch (clearError) {
-        log.warn("Failed to clear sync queue:", clearError);
+        log.warn("Failed to clear sync queue/outbox:", clearError);
       }
 
       // Mark sync as complete immediately (no full remote sync for anonymous users)
@@ -575,11 +583,14 @@ export const AuthProvider: ParentComponent = (props) => {
         "✅ [initializeLocalDatabase] Database initialized and signal set"
       );
 
-      // Clear any stale sync queue items from previous sessions
-      // The data will be synced down fresh from Supabase, so stale queue items
-      // would just cause errors when trying to upload
-      console.log("🧹 Clearing sync queue (stale items from previous session)");
+      // Clear any stale sync queue/outbox items from previous sessions
+      // The data will be synced down fresh from Supabase, so stale items
+      // would just cause errors when trying to upload outdated data
+      console.log(
+        "🧹 Clearing sync queue and outbox (stale items from previous session)"
+      );
       await clearSyncQueue(db);
+      await clearSyncOutbox(db);
 
       // Set up auto-persistence (store cleanup for later)
       autoPersistCleanup = setupAutoPersist();

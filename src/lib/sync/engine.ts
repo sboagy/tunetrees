@@ -13,7 +13,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
 import { toast } from "solid-sonner";
 import * as localSchema from "../../../drizzle/schema-sqlite";
-import type { SqliteDatabase } from "../db/client-sqlite";
+import { getSqliteInstance, type SqliteDatabase } from "../db/client-sqlite";
+import {
+  enableSyncTriggers,
+  suppressSyncTriggers,
+} from "../db/install-triggers";
 import type { SyncQueueItem } from "../db/types";
 import { log } from "../logger";
 import { getAdapter, type SyncableTableName } from "./adapters";
@@ -65,6 +69,90 @@ const DEFAULT_CONFIG: SyncConfig = {
   maxRetries: 3,
   timeoutMs: 30000, // 30 seconds
 };
+
+/**
+ * Table dependency order for sync operations.
+ * Parent tables (lower numbers) must be synced before child tables (higher numbers)
+ * to avoid foreign key constraint violations.
+ *
+ * Order rationale:
+ * - Reference data tables (genre, tune_type) come first (no dependencies)
+ * - User profile comes next (referenced by many tables)
+ * - Tunes before playlist_tune (FK: tune_ref)
+ * - Playlists before playlist_tune, practice_record (FK: playlist_ref)
+ * - playlist_tune before practice_record (implicit practice dependency)
+ */
+const TABLE_SYNC_ORDER: Record<string, number> = {
+  // Reference data (no dependencies)
+  genre: 1,
+  tune_type: 2,
+  genre_tune_type: 3,
+  instrument: 4,
+
+  // User data (base tables)
+  user_profile: 10,
+  prefs_scheduling_options: 11,
+  prefs_spaced_repetition: 12,
+  tab_group_main_state: 13,
+  table_state: 14,
+
+  // Core data
+  tune: 20,
+  playlist: 21,
+  tag: 22,
+  note: 23,
+  reference: 24,
+  user_annotation: 25,
+  tune_override: 26,
+
+  // Junction/dependent tables (must come after their referenced tables)
+  playlist_tune: 30,
+  repertoire: 31,
+  table_transient_data: 32,
+
+  // Practice data (depends on tune, playlist, playlist_tune)
+  daily_practice_queue: 40,
+  practice_record: 41,
+};
+
+/**
+ * Sort outbox items by table dependency order.
+ * This ensures parent tables are synced before child tables to avoid FK violations.
+ *
+ * For INSERT operations: parent tables first (ascending order)
+ * For DELETE operations: child tables first (descending order)
+ *
+ * @param items - Array of outbox items to sort
+ * @returns Sorted array of outbox items
+ */
+function sortOutboxItemsByDependency(items: OutboxItem[]): OutboxItem[] {
+  return [...items].sort((a, b) => {
+    const orderA = TABLE_SYNC_ORDER[a.tableName] ?? 100;
+    const orderB = TABLE_SYNC_ORDER[b.tableName] ?? 100;
+
+    // For DELETE operations, reverse the order (children first)
+    if (
+      a.operation.toLowerCase() === "delete" &&
+      b.operation.toLowerCase() === "delete"
+    ) {
+      return orderB - orderA;
+    }
+
+    // For INSERT/UPDATE, parent tables first
+    if (
+      a.operation.toLowerCase() !== "delete" &&
+      b.operation.toLowerCase() !== "delete"
+    ) {
+      return orderA - orderB;
+    }
+
+    // Mixed operations: INSERT/UPDATE before DELETE
+    if (a.operation.toLowerCase() === "delete") return 1;
+    if (b.operation.toLowerCase() === "delete") return -1;
+
+    return orderA - orderB;
+  });
+}
 
 /**
  * Sync Engine Class
@@ -296,15 +384,31 @@ export class SyncEngine {
         };
       }
 
+      // Sort outbox items by table dependency order to avoid FK violations
+      // Parent tables must be synced before child tables that reference them
+      const sortedItems = sortOutboxItemsByDependency(pendingItems);
+
       log.info(
-        `[SyncEngine] Processing ${pendingItems.length} pending outbox items`
+        `[SyncEngine] Processing ${sortedItems.length} pending outbox items`
+      );
+
+      // Log the sorted items for debugging
+      console.log(
+        "📤 [SyncEngine] Outbox items to sync (sorted by dependency):",
+        sortedItems.map((item) => `${item.tableName}:${item.operation}`)
       );
 
       // Process each outbox item
-      for (const item of pendingItems) {
+      for (const item of sortedItems) {
         try {
+          console.log(
+            `📤 [SyncEngine] Syncing ${item.tableName} (${item.operation}) rowId: ${item.rowId}`
+          );
           await this.processOutboxItem(item);
           await markOutboxCompleted(this.localDb, item.id);
+          console.log(
+            `✅ [SyncEngine] Successfully synced ${item.tableName} (${item.operation})`
+          );
           synced++;
         } catch (error) {
           // Properly extract error message from Supabase errors
@@ -317,13 +421,30 @@ export class SyncEngine {
             errorMsg = JSON.stringify(error);
           }
 
+          // Log detailed error for debugging
+          console.error(
+            `❌ [SyncEngine] Failed to sync ${item.tableName} (${item.operation}):`,
+            errorMsg
+          );
+
           log.error(
             `[SyncEngine] Failed to sync outbox item ${item.id} (${item.tableName} ${item.operation}):`,
             errorMsg
           );
 
+          // Check if this is a FK constraint violation - these are retriable
+          // because the parent row might be synced in a subsequent batch
+          const isFkViolation = errorMsg.includes(
+            "violates foreign key constraint"
+          );
+
+          // FK violations get extended retries since parent might sync later
+          const effectiveMaxRetries = isFkViolation
+            ? this.config.maxRetries * 3
+            : this.config.maxRetries;
+
           // Update item status based on retry count
-          if (item.attempts >= this.config.maxRetries) {
+          if (item.attempts >= effectiveMaxRetries) {
             await markOutboxPermanentlyFailed(this.localDb, item.id, errorMsg);
             failed++;
             errors.push(`Item ${item.id} (${item.tableName}): ${errorMsg}`);
@@ -336,13 +457,18 @@ export class SyncEngine {
               }
             );
           } else {
-            // Mark for retry
+            // Mark for retry - FK violations will get more attempts
             await markOutboxFailed(
               this.localDb,
               item.id,
               errorMsg,
               item.attempts
             );
+            if (isFkViolation) {
+              syncLog(
+                `[SyncEngine] FK violation for ${item.tableName} - will retry (attempt ${item.attempts + 1}/${effectiveMaxRetries})`
+              );
+            }
           }
         }
       }
@@ -534,6 +660,14 @@ export class SyncEngine {
       );
       syncLog("[SyncEngine] Pulling changes from Supabase...");
 
+      // Suppress sync triggers during syncDown to prevent outbox entries
+      // for data that already exists on the server
+      const sqliteInstance = await getSqliteInstance();
+      if (sqliteInstance) {
+        suppressSyncTriggers(sqliteInstance);
+        syncLog("[SyncEngine] Sync triggers suppressed for syncDown");
+      }
+
       // Sync each table (in dependency order to avoid FK violations)
       const tablesToSync: SyncableTable[] = [
         // Reference data first (no dependencies, shared across users)
@@ -613,6 +747,12 @@ export class SyncEngine {
         this.lastSyncWasIncremental = false;
       }
 
+      // Re-enable sync triggers after syncDown completes
+      if (sqliteInstance) {
+        enableSyncTriggers(sqliteInstance);
+        syncLog("[SyncEngine] Sync triggers re-enabled after syncDown");
+      }
+
       console.log(
         `✅ [SyncEngine] SyncDown completed - synced ${synced} records from ${tablesToSync.length} tables`,
         {
@@ -631,6 +771,13 @@ export class SyncEngine {
         timestamp: startTime,
       };
     } catch (error) {
+      // Re-enable sync triggers even on error to maintain consistent state
+      const sqliteInstance = await getSqliteInstance();
+      if (sqliteInstance) {
+        enableSyncTriggers(sqliteInstance);
+        syncLog("[SyncEngine] Sync triggers re-enabled after syncDown error");
+      }
+
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error("❌ [SyncEngine] syncDown failed:", errorMsg);
       log.error("[SyncEngine] syncDown failed:", errorMsg);
@@ -688,6 +835,14 @@ export class SyncEngine {
             : " full (first watermark)")
       );
 
+      // Suppress sync triggers during syncDown to prevent outbox entries
+      // for data that already exists on the server
+      const sqliteInstance = await getSqliteInstance();
+      if (sqliteInstance) {
+        suppressSyncTriggers(sqliteInstance);
+        syncLog("[SyncEngine] Sync triggers suppressed for scoped syncDown");
+      }
+
       for (const tableName of tables) {
         try {
           const incrementalEligible =
@@ -719,6 +874,12 @@ export class SyncEngine {
       this.lastSyncTimestamp = startTime;
       if (!previousSyncTimestamp) this.lastSyncWasIncremental = false;
 
+      // Re-enable sync triggers after syncDown completes
+      if (sqliteInstance) {
+        enableSyncTriggers(sqliteInstance);
+        syncLog("[SyncEngine] Sync triggers re-enabled after scoped syncDown");
+      }
+
       console.log(
         `✅ [SyncEngine] Scoped syncDown completed - synced ${synced} records from ${tables.length} tables`,
         { success: errors.length === 0, synced, errors: errors.length }
@@ -733,6 +894,15 @@ export class SyncEngine {
         timestamp: startTime,
       };
     } catch (error) {
+      // Re-enable sync triggers even on error to maintain consistent state
+      const sqliteInstance = await getSqliteInstance();
+      if (sqliteInstance) {
+        enableSyncTriggers(sqliteInstance);
+        syncLog(
+          "[SyncEngine] Sync triggers re-enabled after scoped syncDown error"
+        );
+      }
+
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error("❌ [SyncEngine] scoped syncDown failed:", errorMsg);
       errors.push(errorMsg);
