@@ -51,12 +51,19 @@
 
 ---
 
-## Phase 4: Migrate to Trigger-Based Queue
+## Phase 4: Migrate to Trigger-Based Queue ✅
 - [x] Install triggers during database initialization (Phase 4.1)
-- [ ] Update `syncUp` to read from `sync_outbox`
-- [ ] Remove manual `queueSync` calls
-- [ ] Deprecate old `sync_queue` table
-- [ ] All E2E tests passing
+- [x] Create `syncUpFromOutbox()` method (Phase 4.2)
+- [x] Wire `syncUpFromOutbox` into sync coordinator (Phase 4.3)
+  - Updated `SyncEngine.sync()` to use `syncUpFromOutbox()`
+  - Updated `SyncService.syncUp()` to use `syncUpFromOutbox()`
+  - Updated `SyncService.syncDown()` to check outbox stats
+  - Added `getOutboxStats()` method
+- [x] Remove manual `queueSync` calls (Phase 4.4)
+  - Removed from all query files (notes, tunes, references, playlists, tune-overrides, practice)
+  - Removed from all service files (practice-queue, queue-generator, practice-recording, practice-staging)
+  - 247 lines of code removed
+- [x] All unit tests passing (208 tests)
 
 ---
 
