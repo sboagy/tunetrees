@@ -161,6 +161,13 @@ beforeEach(async () => {
   `);
 
   db.run(`
+    CREATE TABLE instrument (
+      id TEXT PRIMARY KEY NOT NULL,
+      instrument TEXT
+    )
+  `);
+
+  db.run(`
     CREATE TABLE prefs_scheduling_options (
       user_id TEXT PRIMARY KEY NOT NULL,
       settings TEXT
@@ -170,9 +177,9 @@ beforeEach(async () => {
   db.run(`
     CREATE TABLE prefs_spaced_repetition (
       user_id TEXT NOT NULL,
-      playlist_id TEXT NOT NULL,
+      alg_type TEXT NOT NULL,
       settings TEXT,
-      PRIMARY KEY (user_id, playlist_id)
+      PRIMARY KEY (user_id, alg_type)
     )
   `);
 
@@ -248,8 +255,8 @@ describe("installSyncTriggers", () => {
     expect(verification.missingTables).toHaveLength(0);
   });
 
-  // 18 tables × 3 operations = 54 triggers (user_annotation removed)
-  it("creates 54 triggers (18 tables × 3 operations)", () => {
+  // 19 tables × 3 operations = 57 triggers
+  it("creates 57 triggers (19 tables × 3 operations)", () => {
     installSyncTriggers(db);
 
     const result = db.exec(`
@@ -257,7 +264,7 @@ describe("installSyncTriggers", () => {
       WHERE type = 'trigger' AND name LIKE 'trg_%'
     `);
     const count = Number(result[0]?.values[0]?.[0] || 0);
-    expect(count).toBe(54);
+    expect(count).toBe(57);
   });
 
   it("is idempotent", () => {
@@ -443,8 +450,8 @@ describe("verifySyncTriggers", () => {
     const verification = verifySyncTriggers(db);
 
     expect(verification.installed).toBe(false);
-    // 18 tables: user_annotation removed from SQLite schema
-    expect(verification.missingTables.length).toBe(18);
+    // 19 tables
+    expect(verification.missingTables.length).toBe(19);
     expect(verification.missingTables).toContain("tune");
     expect(verification.missingTables).toContain("playlist");
     expect(verification.missingTables).toContain("genre_tune_type");

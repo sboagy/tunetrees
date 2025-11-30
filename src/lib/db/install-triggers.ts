@@ -14,6 +14,7 @@
  */
 
 import type { Database as SqlJsDatabase } from "sql.js";
+import { TABLE_REGISTRY } from "../sync/table-meta";
 
 /**
  * Create the sync trigger control table.
@@ -70,37 +71,12 @@ interface TableTriggerConfig {
   primaryKey: string | string[];
 }
 
-const TRIGGER_CONFIGS: TableTriggerConfig[] = [
-  { tableName: "daily_practice_queue", primaryKey: "id" },
-  { tableName: "genre", primaryKey: "id" },
-  { tableName: "genre_tune_type", primaryKey: ["genre_id", "tune_type_id"] },
-  { tableName: "note", primaryKey: "id" },
-  { tableName: "playlist", primaryKey: "playlist_id" },
-  { tableName: "playlist_tune", primaryKey: ["playlist_ref", "tune_ref"] },
-  { tableName: "practice_record", primaryKey: "id" },
-  { tableName: "prefs_scheduling_options", primaryKey: "user_id" },
-  {
-    tableName: "prefs_spaced_repetition",
-    primaryKey: ["user_id", "playlist_id"],
-  },
-  { tableName: "reference", primaryKey: "id" },
-  // Note: "repertoire" table was removed from schema, so no trigger needed
-  { tableName: "tab_group_main_state", primaryKey: "id" },
-  {
-    tableName: "table_state",
-    primaryKey: ["user_id", "screen_size", "purpose", "playlist_id"],
-  },
-  {
-    tableName: "table_transient_data",
-    primaryKey: ["user_id", "tune_id", "playlist_id"],
-  },
-  { tableName: "tag", primaryKey: "id" },
-  { tableName: "tune", primaryKey: "id" },
-  { tableName: "tune_override", primaryKey: "id" },
-  { tableName: "tune_type", primaryKey: "id" },
-  // Note: "user_annotation" table was removed from SQLite schema, so no trigger needed
-  { tableName: "user_profile", primaryKey: "supabase_user_id" },
-];
+const TRIGGER_CONFIGS: TableTriggerConfig[] = Object.entries(
+  TABLE_REGISTRY
+).map(([tableName, meta]) => ({
+  tableName,
+  primaryKey: meta.primaryKey,
+}));
 
 /**
  * Generate the row_id expression for a trigger.
