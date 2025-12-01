@@ -1,15 +1,15 @@
 import {
   index,
   integer,
+  pgTable,
   primaryKey,
   real,
-  sqliteTable,
   text,
   uniqueIndex,
-} from "drizzle-orm/sqlite-core";
-import { COL, TBL } from "../shared/db-constants";
+} from "drizzle-orm/pg-core";
+import { COL, TBL } from "../../shared/db-constants";
 
-export const dailyPracticeQueue = sqliteTable(
+export const dailyPracticeQueue = pgTable(
   TBL.DAILY_PRACTICE_QUEUE,
   {
     id: text(COL.ID).primaryKey().notNull(), // UUID
@@ -64,14 +64,14 @@ export const dailyPracticeQueue = sqliteTable(
   ]
 );
 
-export const genre = sqliteTable(TBL.GENRE, {
+export const genre = pgTable(TBL.GENRE, {
   id: text(COL.ID).primaryKey().notNull(), // UUID (was TEXT semantic ID)
   name: text(COL.NAME),
   region: text(COL.REGION),
   description: text(COL.DESCRIPTION),
 });
 
-export const genreTuneType = sqliteTable(
+export const genreTuneType = pgTable(
   TBL.GENRE_TUNE_TYPE,
   {
     genreId: text(COL.GENRE_ID)
@@ -89,7 +89,7 @@ export const genreTuneType = sqliteTable(
   ]
 );
 
-export const instrument = sqliteTable(
+export const instrument = pgTable(
   TBL.INSTRUMENT,
   {
     id: text(COL.ID).primaryKey().notNull(), // UUID
@@ -112,7 +112,7 @@ export const instrument = sqliteTable(
   ]
 );
 
-export const note = sqliteTable(
+export const note = pgTable(
   TBL.NOTE,
   {
     id: text(COL.ID).primaryKey().notNull(), // UUID
@@ -143,7 +143,7 @@ export const note = sqliteTable(
   ]
 );
 
-export const playlist = sqliteTable(
+export const playlist = pgTable(
   TBL.PLAYLIST,
   {
     playlistId: text(COL.PLAYLIST_ID).primaryKey().notNull(), // UUID
@@ -163,7 +163,7 @@ export const playlist = sqliteTable(
   // multiple playlists per user per instrument (e.g., "Beginner Fiddle", "Advanced Fiddle")
 );
 
-export const playlistTune = sqliteTable(
+export const playlistTune = pgTable(
   TBL.PLAYLIST_TUNE,
   {
     playlistRef: text(COL.PLAYLIST_REF)
@@ -189,7 +189,7 @@ export const playlistTune = sqliteTable(
   ]
 );
 
-export const practiceRecord = sqliteTable(
+export const practiceRecord = pgTable(
   TBL.PRACTICE_RECORD,
   {
     id: text(COL.ID).primaryKey().notNull(), // UUID
@@ -234,28 +234,25 @@ export const practiceRecord = sqliteTable(
   ]
 );
 
-export const prefsSchedulingOptions = sqliteTable(
-  TBL.PREFS_SCHEDULING_OPTIONS,
-  {
-    userId: text(COL.USER_ID)
-      .primaryKey()
-      .notNull()
-      .references(() => userProfile.id), // UUID FK to internal ID
-    acceptableDelinquencyWindow: integer(COL.ACCEPTABLE_DELINQUENCY_WINDOW)
-      .default(21)
-      .notNull(),
-    minReviewsPerDay: integer(COL.MIN_REVIEWS_PER_DAY),
-    maxReviewsPerDay: integer(COL.MAX_REVIEWS_PER_DAY),
-    daysPerWeek: integer(COL.DAYS_PER_WEEK),
-    weeklyRules: text(COL.WEEKLY_RULES),
-    exceptions: text(COL.EXCEPTIONS),
-    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
-    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
-    deviceId: text(COL.DEVICE_ID),
-  }
-);
+export const prefsSchedulingOptions = pgTable(TBL.PREFS_SCHEDULING_OPTIONS, {
+  userId: text(COL.USER_ID)
+    .primaryKey()
+    .notNull()
+    .references(() => userProfile.id), // UUID FK to internal ID
+  acceptableDelinquencyWindow: integer(COL.ACCEPTABLE_DELINQUENCY_WINDOW)
+    .default(21)
+    .notNull(),
+  minReviewsPerDay: integer(COL.MIN_REVIEWS_PER_DAY),
+  maxReviewsPerDay: integer(COL.MAX_REVIEWS_PER_DAY),
+  daysPerWeek: integer(COL.DAYS_PER_WEEK),
+  weeklyRules: text(COL.WEEKLY_RULES),
+  exceptions: text(COL.EXCEPTIONS),
+  syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+  lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+  deviceId: text(COL.DEVICE_ID),
+});
 
-export const prefsSpacedRepetition = sqliteTable(
+export const prefsSpacedRepetition = pgTable(
   TBL.PREFS_SPACED_REPETITION,
   {
     userId: text(COL.USER_ID)
@@ -280,7 +277,7 @@ export const prefsSpacedRepetition = sqliteTable(
   ]
 );
 
-export const reference = sqliteTable(
+export const reference = pgTable(
   TBL.REFERENCE,
   {
     id: text(COL.ID).primaryKey().notNull(), // UUID
@@ -311,7 +308,7 @@ export const reference = sqliteTable(
   ]
 );
 
-export const syncQueue = sqliteTable(TBL.SYNC_QUEUE, {
+export const syncQueue = pgTable(TBL.SYNC_QUEUE, {
   id: text(COL.ID).primaryKey().notNull(), // UUID
   tableName: text(COL.TABLE_NAME).notNull(),
   recordId: text(COL.RECORD_ID), // DEPRECATED - kept for backwards compatibility only. Use data field.
@@ -336,7 +333,7 @@ export const syncQueue = sqliteTable(TBL.SYNC_QUEUE, {
  * - rowId is a JSON string for composite PKs
  * - Uses changedAt for ordering (not UUID-based ordering)
  */
-export const syncOutbox = sqliteTable(
+export const syncOutbox = pgTable(
   TBL.SYNC_OUTBOX,
   {
     // Random hex ID for outbox entry (triggers use: lower(hex(randomblob(16))))
@@ -366,7 +363,7 @@ export const syncOutbox = sqliteTable(
   ]
 );
 
-export const tabGroupMainState = sqliteTable(TBL.TAB_GROUP_MAIN_STATE, {
+export const tabGroupMainState = pgTable(TBL.TAB_GROUP_MAIN_STATE, {
   id: text(COL.ID).primaryKey().notNull(), // UUID
   userId: text(COL.USER_ID)
     .notNull()
@@ -382,7 +379,7 @@ export const tabGroupMainState = sqliteTable(TBL.TAB_GROUP_MAIN_STATE, {
   deviceId: text(COL.DEVICE_ID),
 });
 
-export const tableState = sqliteTable(
+export const tableState = pgTable(
   TBL.TABLE_STATE,
   {
     userId: text(COL.USER_ID)
@@ -412,7 +409,7 @@ export const tableState = sqliteTable(
   ]
 );
 
-export const tableTransientData = sqliteTable(
+export const tableTransientData = pgTable(
   TBL.TABLE_TRANSIENT_DATA,
   {
     userId: text(COL.USER_ID)
@@ -453,7 +450,7 @@ export const tableTransientData = sqliteTable(
   ]
 );
 
-export const tag = sqliteTable(
+export const tag = pgTable(
   TBL.TAG,
   {
     id: text(COL.ID).primaryKey().notNull(), // UUID (renamed from tagId)
@@ -479,7 +476,7 @@ export const tag = sqliteTable(
   ]
 );
 
-export const tune = sqliteTable(TBL.TUNE, {
+export const tune = pgTable(TBL.TUNE, {
   id: text(COL.ID).primaryKey().notNull(), // UUID
   idForeign: integer(COL.ID_FOREIGN), // Legacy integer ID for provenance tracking (nullable, non-unique)
   primaryOrigin: text(COL.PRIMARY_ORIGIN).default("irishtune.info"), // Source: 'irishtune.info', 'user_created', etc.
@@ -496,7 +493,7 @@ export const tune = sqliteTable(TBL.TUNE, {
   deviceId: text(COL.DEVICE_ID),
 });
 
-export const tuneOverride = sqliteTable(TBL.TUNE_OVERRIDE, {
+export const tuneOverride = pgTable(TBL.TUNE_OVERRIDE, {
   id: text(COL.ID).primaryKey().notNull(), // UUID
   tuneRef: text(COL.TUNE_REF)
     .notNull()
@@ -516,14 +513,14 @@ export const tuneOverride = sqliteTable(TBL.TUNE_OVERRIDE, {
   deviceId: text(COL.DEVICE_ID),
 });
 
-export const tuneType = sqliteTable(TBL.TUNE_TYPE, {
+export const tuneType = pgTable(TBL.TUNE_TYPE, {
   id: text(COL.ID).primaryKey().notNull(), // UUID (was TEXT semantic ID)
   name: text(COL.NAME),
   rhythm: text(COL.RHYTHM),
   description: text(COL.DESCRIPTION),
 });
 
-export const userProfile = sqliteTable(
+export const userProfile = pgTable(
   TBL.USER_PROFILE,
   {
     id: text(COL.ID).notNull(), // UUID (matches PostgreSQL, but not used as PK in SQLite)

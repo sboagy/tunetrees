@@ -45,25 +45,25 @@ tunetrees/
 
 ## 3. Implementation Phases
 
-### Phase 1: Shared Infrastructure (The "Drift Prevention" Layer)
+### Phase 1: Shared Infrastructure (The "Drift Prevention" Layer) (Completed)
 
 **Goal:** Decouple schema definitions from string literals to ensure SQLite and Postgres schemas remain compatible.
 
-1.  **Create `shared/db-constants.ts`:**
+1.  **Create `shared/db-constants.ts`:** (Done)
     *   Define enums/constants for all table names.
     *   Define constants for column names.
     *   *Example:* `export const TBL = { TUNE: 'tune', ... }; export const COL = { ID: 'id', ... };`
 
-2.  **Refactor `drizzle/schema-sqlite.ts`:**
+2.  **Refactor `drizzle/schema-sqlite.ts`:** (Done)
     *   Update existing schema to use constants.
     *   *Check:* `npm run typecheck` must pass.
 
-3.  **Create `worker/src/schema-postgres.ts`:**
+3.  **Create `worker/src/schema-postgres.ts`:** (Done)
     *   Define the PostgreSQL equivalent of the schema.
     *   Use the same constants from `shared/db-constants.ts`.
     *   Map types: `text` -> `text`, `integer` (boolean) -> `boolean`, `integer` (timestamp) -> `timestamp`.
 
-### Phase 2: Worker Setup
+### Phase 2: Worker Setup (Next)
 
 **Goal:** Initialize the serverless environment.
 
