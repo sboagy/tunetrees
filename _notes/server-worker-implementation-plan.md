@@ -63,19 +63,19 @@ tunetrees/
     *   Use the same constants from `shared/db-constants.ts`.
     *   Map types: `text` -> `text`, `integer` (boolean) -> `boolean`, `integer` (timestamp) -> `timestamp`.
 
-### Phase 2: Worker Setup (Next)
+### Phase 2: Worker Setup (Completed)
 
 **Goal:** Initialize the serverless environment.
 
-1.  **Initialize Worker:**
+1.  **Initialize Worker:** (Done)
     *   Create `worker/` directory.
     *   Configure `wrangler.toml` with **Hyperdrive** binding (`HYPERDRIVE`) and Supabase secrets (`SUPABASE_URL`, `SUPABASE_JWT_SECRET`).
-2.  **Dependencies:**
-    *   Install `drizzle-orm`, `postgres`, `@supabase/supabase-js` (or `jsonwebtoken` for lighter auth).
-3.  **Database Connection:**
-    *   Setup Drizzle with `postgres` driver using the Hyperdrive connection string.
+2.  **Dependencies:** (Done)
+    *   Install `drizzle-orm`, `postgres`, `@supabase/supabase-js`.
+3.  **Database Connection:** (Done)
+    *   Setup Drizzle with `postgres` driver using the Hyperdrive connection string in `worker/src/index.ts`.
 
-### Phase 3: The Sync Endpoint (`POST /api/sync`)
+### Phase 3: The Sync Endpoint (`POST /api/sync`) (Next)
 
 **Goal:** Implement the transactional sync logic.
 

@@ -54,6 +54,7 @@ export class RealtimeManager {
   private syncService: SyncService;
   private config: RealtimeConfig;
   private state: RealtimeState;
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(syncService: SyncService, config: RealtimeConfig) {
     this.syncService = syncService;
@@ -167,59 +168,50 @@ export class RealtimeManager {
 
   /**
    * Handle a single Realtime change event
+   *
+   * SIGNAL-TO-SYNC PATTERN:
+   * We ignore the payload content and simply treat this as a "wake up" signal.
+   * We debounce the signal to avoid hammering the worker if many changes come in at once.
    */
   private handleChange(
     tableName: string,
     payload: RealtimePostgresChangesPayload<Record<string, unknown>>
   ): void {
-    const { eventType, new: newRecord, old: oldRecord } = payload;
+    const { eventType } = payload;
 
-    console.log(`[Realtime] ${eventType} on ${tableName}:`, {
-      new: newRecord,
-      old: oldRecord,
-    });
+    console.log(`[Realtime] Signal received: ${eventType} on ${tableName}`);
 
-    // Debounce: Skip if we just synced this table recently (< 1 second ago)
-    const lastSync = this.state.lastSync.get(tableName);
-    if (lastSync && Date.now() - lastSync.getTime() < 1000) {
-      console.log(`[Realtime] Skipping ${tableName} - recently synced`);
-      return;
+    // Clear existing timer
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
     }
 
-    // Trigger sync for this table
-    this.syncTableDown(tableName);
+    // Set new timer (2 seconds debounce)
+    this.debounceTimer = setTimeout(() => {
+      void this.triggerSync();
+    }, 2000);
   }
 
   /**
-   * Sync a specific table from remote to local
+   * Trigger the global sync via SyncService
    */
-  private async syncTableDown(tableName: string): Promise<void> {
+  private async triggerSync(): Promise<void> {
+    if (this.syncService.syncing) {
+      console.log(
+        "[Realtime] Sync already in progress, skipping signal trigger"
+      );
+      return;
+    }
+
     try {
-      console.log(`[Realtime] Syncing ${tableName} down from Supabase...`);
-
-      // CRITICAL: Use SyncService.syncDown() instead of SyncEngine.syncDown()
-      // SyncService ensures pending local changes are uploaded BEFORE downloading
-      // This prevents race conditions where:
-      // 1. User deletes a row locally
-      // 2. Realtime triggers syncDown before DELETE is uploaded
-      // 3. Deleted row gets re-downloaded (zombie record)
-      //
-      // TODO: Add syncTableDown method to SyncEngine class for per-table syncing
-      // For now, do a full syncDown through SyncService (has queue protection)
-      await this.syncService.syncDown();
-
-      // Update last sync timestamp
-      this.state.lastSync.set(tableName, new Date());
-
-      // Notify callback
-      this.config.onSync?.(tableName);
-
-      console.log(`[Realtime] ✓ ${tableName} synced successfully`);
+      console.log("[Realtime] Debounce complete - triggering worker sync...");
+      await this.syncService.sync();
+      console.log("[Realtime] Worker sync completed successfully");
     } catch (error) {
-      console.error(`[Realtime] Failed to sync ${tableName}:`, error);
-      const err = error instanceof Error ? error : new Error(String(error));
-      this.state.errors.push(err);
-      this.config.onError?.(err);
+      console.error("[Realtime] Failed to trigger worker sync:", error);
+      this.config.onError?.(
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }
 
