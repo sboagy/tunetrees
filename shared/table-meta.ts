@@ -53,8 +53,23 @@ function normalizeDatetimeFields(
 ): Record<string, unknown> {
   const normalized = { ...row };
   for (const field of fields) {
-    if (typeof normalized[field] === "string") {
-      normalized[field] = (normalized[field] as string).replace(" ", "T");
+    const value = normalized[field];
+    if (typeof value === "string") {
+      // Replace single space between date and time with T, if present
+      let result = value.includes(" ") ? value.replace(" ", "T") : value;
+
+      // If there is already an explicit timezone (Z or offset), leave as-is
+      if (/Z$/i.test(result) || /[+-]\d{2}:?\d{2}$/.test(result)) {
+        normalized[field] = result;
+        continue;
+      }
+
+      // Otherwise, treat as UTC and append Z
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(result)) {
+        result = `${result}Z`;
+      }
+
+      normalized[field] = result;
     }
   }
   return normalized;
@@ -73,6 +88,15 @@ function normalizeDailyPracticeQueue(
     "completed_at",
     "snapshot_coalesced_ts",
   ]);
+}
+
+/**
+ * Normalize practice_record datetime formats
+ */
+function normalizePracticeRecord(
+  row: Record<string, unknown>
+): Record<string, unknown> {
+  return normalizeDatetimeFields(row, ["practiced", "backup_practiced", "due"]);
 }
 
 /**
@@ -227,6 +251,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: [],
     supportsIncremental: true,
     hasDeletedFlag: false,
+    normalize: normalizePracticeRecord,
     changeCategory: "practice",
   },
 

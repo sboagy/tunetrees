@@ -47,6 +47,10 @@ const RATING_SEQUENCE: Array<"good" | "easy" | "hard"> = [
   "good",
 ];
 
+const REPERTOIRE_SIZE = 419;
+const MAX_DAILY_TUNES = 7;
+const ENABLE_FUZZ = false;
+
 test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
   // test.setTimeout(120000);
 
@@ -58,6 +62,20 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
     // Freeze clock
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
+
+    await page.addInitScript(
+      (config) => {
+        (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__ = config.playlistSize;
+        (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = config.enableFuzz;
+        (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ =
+          config.maxReviews;
+      },
+      {
+        playlistSize: REPERTOIRE_SIZE,
+        enableFuzz: ENABLE_FUZZ,
+        maxReviews: MAX_DAILY_TUNES,
+      }
+    );
 
     // Instantiate page object
     ttPage = new TuneTreesPage(page);
@@ -155,7 +173,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
         // Advance days difference between today and due (minimum 1)
         const diffDays = Math.max(
           1,
-          Math.round(
+          Math.ceil(
             (dueDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
           )
         );
@@ -193,7 +211,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
             );
 
             // Get ALL queue windows in DB (using new helper)
-            const allQueues = await api.getAllQueueWindows(args.playlistId);
+            // const allQueues = await api.getAllQueueWindows(args.playlistId);
 
             // Get current queue (MAX window)
             const queue = await api.getPracticeQueue(args.playlistId);
@@ -216,7 +234,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
                     state: pr.state,
                   }
                 : null,
-              allQueues,
+              // allQueues,
               queueLength: queue.length,
               queueItems: queue.slice(0, 5).map((q: any) => ({
                 tuneRef: q.tune_ref,

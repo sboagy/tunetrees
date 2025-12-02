@@ -22,7 +22,7 @@ import type {
   SyncRequest,
   SyncResponse,
 } from "../../shared/sync-types";
-import { hasDeletedFlag } from "../../shared/table-meta";
+import { getNormalizer, hasDeletedFlag } from "../../shared/table-meta";
 import * as schema from "./schema-postgres";
 
 export interface Env {
@@ -374,7 +374,7 @@ export default {
               }
 
               for (const row of rows) {
-                const r = row as any;
+                let r = row as any;
 
                 if (
                   tableName === TBL.TUNE &&
@@ -395,6 +395,12 @@ export default {
                     pkValues[pk.prop] = r[pk.prop];
                   });
                   rowId = JSON.stringify(pkValues);
+                }
+
+                // Apply per-table normalization (e.g., datetime, booleans)
+                const normalizer = getNormalizer(tableName);
+                if (normalizer) {
+                  r = normalizer(r);
                 }
 
                 responseChanges.push({
