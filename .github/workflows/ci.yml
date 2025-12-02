@@ -206,6 +206,23 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
+      # 12b. Start Cloudflare Worker (Local)
+      - name: Start Cloudflare Worker (Local)
+        run: |
+          echo "👷 Starting Cloudflare Worker..."
+          cd worker
+          npm ci
+          # Create .dev.vars for local testing
+          echo "SUPABASE_URL=${{ env.SUPABASE_URL }}" > .dev.vars
+          echo "SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long" >> .dev.vars
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
+
+          # Start worker in background
+          npx wrangler dev --port 8787 --ip 127.0.0.1 &
+          echo "Worker started in background"
+          sleep 10
+          curl -v http://127.0.0.1:8787/health || echo "Worker health check failed"
+
       # 13. Generate Auth States (requires dev server + Playwright browsers)
       - name: Generate Auth States
         run: |
@@ -350,3 +367,30 @@ jobs:
         run: |
           echo "🚀 Deployment complete!"
           echo "Deployment URL will be available in Cloudflare Pages dashboard"
+
+  deploy-worker:
+    name: Deploy Cloudflare Worker
+    runs-on: ubuntu-latest
+    needs: test
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/feat/pwa1') || (github.event_name == 'pull_request' && github.head_ref == 'copilot/fix-scheduling-issues')
+    environment: vite_pwa_env
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: "worker"
+          command: deploy
+          secrets: |
+            SUPABASE_URL
+            SUPABASE_JWT_SECRET
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}

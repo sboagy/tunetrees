@@ -21,7 +21,7 @@ import {
   SYNCABLE_TABLES,
   supportsIncremental,
   TABLE_REGISTRY,
-} from "../../../src/lib/sync/table-meta";
+} from "../../../shared/table-meta";
 
 describe("TABLE_REGISTRY completeness", () => {
   it("has entries for all SYNCABLE_TABLES", () => {

@@ -310,6 +310,10 @@ const RepertoirePage: Component = () => {
     null
   );
 
+  createEffect(() => {
+    console.log("[RepertoirePage] tableInstance updated:", !!tableInstance());
+  });
+
   const handleRemoveFromRepertoire = async () => {
     // TODO: Implement removal logic
     alert("Remove From Repertoire - Not yet implemented");

@@ -12,6 +12,16 @@
  */
 
 /**
+ * Category of change for UI signaling
+ */
+export type ChangeCategory =
+  | "repertoire"
+  | "practice"
+  | "catalog"
+  | "user"
+  | null;
+
+/**
  * Metadata for a syncable table
  */
 export interface TableMeta {
@@ -27,6 +37,8 @@ export interface TableMeta {
   supportsIncremental: boolean;
   /** Whether this table has a deleted flag for soft deletes */
   hasDeletedFlag: boolean;
+  /** Category of change for UI signaling */
+  changeCategory: ChangeCategory;
   /** Optional per-table normalization (e.g., datetime format) */
   normalize?: (row: Record<string, unknown>) => Record<string, unknown>;
 }
@@ -79,6 +91,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: [],
     supportsIncremental: false,
     hasDeletedFlag: false,
+    changeCategory: "catalog",
   },
 
   tune_type: {
@@ -88,6 +101,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: [],
     supportsIncremental: false,
     hasDeletedFlag: false,
+    changeCategory: "catalog",
   },
 
   genre_tune_type: {
@@ -97,6 +111,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: [],
     supportsIncremental: false,
     hasDeletedFlag: false,
+    changeCategory: "catalog",
   },
 
   // ===== User Profile =====
@@ -108,6 +123,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: ["deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
+    changeCategory: "user",
   },
 
   // ===== Instrument =====
@@ -119,6 +135,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: ["deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
+    changeCategory: "catalog",
   },
 
   // ===== User Preferences =====
@@ -130,6 +147,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: [],
     supportsIncremental: true,
     hasDeletedFlag: false,
+    changeCategory: "user",
   },
 
   prefs_spaced_repetition: {
@@ -139,6 +157,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: ["enable_fuzzing"],
     supportsIncremental: true,
     hasDeletedFlag: false,
+    changeCategory: "user",
   },
 
   // ===== Playlist =====
@@ -150,6 +169,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: ["deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
+    changeCategory: "repertoire",
   },
 
   // ===== Table State =====
@@ -161,6 +181,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: [],
     supportsIncremental: true,
     hasDeletedFlag: false,
+    changeCategory: null,
   },
 
   tab_group_main_state: {
@@ -170,6 +191,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: ["practice_show_submitted", "practice_mode_flashcard"],
     supportsIncremental: true,
     hasDeletedFlag: false,
+    changeCategory: null,
   },
 
   // ===== Tune =====
@@ -181,6 +203,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: ["deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
+    changeCategory: "catalog",
   },
 
   // ===== Playlist-Tune Association =====
@@ -192,6 +215,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: ["deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
+    changeCategory: "repertoire",
   },
 
   // ===== Practice Record =====
@@ -203,6 +227,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: [],
     supportsIncremental: true,
     hasDeletedFlag: false,
+    changeCategory: "practice",
   },
 
   // ===== Daily Practice Queue =====
@@ -222,6 +247,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     supportsIncremental: true,
     hasDeletedFlag: false,
     normalize: normalizeDailyPracticeQueue,
+    changeCategory: "practice",
   },
 
   // ===== Table Transient Data (Practice Staging) =====
@@ -233,6 +259,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: [],
     supportsIncremental: true,
     hasDeletedFlag: false,
+    changeCategory: "practice",
   },
 
   // ===== Note =====
@@ -244,6 +271,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: ["public", "favorite", "deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
+    changeCategory: "repertoire",
   },
 
   // ===== Reference =====
@@ -255,6 +283,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: ["public", "favorite", "deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
+    changeCategory: "repertoire",
   },
 
   // ===== Tag =====
@@ -266,6 +295,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: [],
     supportsIncremental: true,
     hasDeletedFlag: false,
+    changeCategory: "repertoire",
   },
 
   // ===== Tune Override =====
@@ -277,6 +307,7 @@ export const TABLE_REGISTRY: Record<string, TableMeta> = {
     booleanColumns: ["deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
+    changeCategory: "repertoire",
   },
 };
 
@@ -473,3 +504,69 @@ export function parseOutboxRowId(
   // Simple key - return as-is
   return rowId;
 }
+
+/**
+ * Sync order for tables to respect foreign key dependencies
+ */
+export const TABLE_SYNC_ORDER: Record<string, number> = {
+  // Reference data (no dependencies)
+  genre: 1,
+  tune_type: 2,
+  genre_tune_type: 3,
+  instrument: 4,
+
+  // User data (base tables)
+  user_profile: 10,
+  prefs_scheduling_options: 11,
+  prefs_spaced_repetition: 12,
+  tab_group_main_state: 13,
+  table_state: 14,
+
+  // Core data
+  tune: 20,
+  playlist: 21,
+  tag: 22,
+  note: 23,
+  reference: 24,
+  user_annotation: 25,
+  tune_override: 26,
+
+  // Junction/dependent tables (must come after their referenced tables)
+  playlist_tune: 30,
+  repertoire: 31,
+  table_transient_data: 32,
+
+  // Practice data (depends on tune, playlist, playlist_tune)
+  daily_practice_queue: 40,
+  practice_record: 41,
+};
+
+/**
+ * Mapping from table name to schema key (camelCase)
+ */
+export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
+  daily_practice_queue: "dailyPracticeQueue",
+  genre: "genre",
+  genre_tune_type: "genreTuneType",
+  instrument: "instrument",
+  note: "note",
+  playlist: "playlist",
+  playlist_tune: "playlistTune",
+  practice_record: "practiceRecord",
+  prefs_scheduling_options: "prefsSchedulingOptions",
+  prefs_spaced_repetition: "prefsSpacedRepetition",
+  reference: "reference",
+  sync_queue: "syncQueue",
+  sync_outbox: "syncOutbox",
+  tab_group_main_state: "tabGroupMainState",
+  table_state: "tableState",
+  tune: "tune",
+  tune_attribute: "tuneAttribute",
+  tune_type: "tuneType",
+  user_profile: "userProfile",
+  tag: "tag",
+  repertoire: "repertoire",
+  table_transient_data: "tableTransientData",
+  user_annotation: "userAnnotation",
+  tune_override: "tuneOverride",
+};

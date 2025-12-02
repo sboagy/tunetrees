@@ -36,6 +36,9 @@ export const dailyPracticeQueue = sqliteTable(
     exposuresRequired: integer(COL.EXPOSURES_REQUIRED),
     exposuresCompleted: integer(COL.EXPOSURES_COMPLETED).default(0),
     outcome: text(COL.OUTCOME),
+    // NOTE: Postgres uses a boolean type for `active`.
+    // We keep SQLite as integer 0/1 but conceptually this is boolean;
+    // downstream code and sync logic treat non-zero as true.
     active: integer(COL.ACTIVE).default(1).notNull(),
     syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
     lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),

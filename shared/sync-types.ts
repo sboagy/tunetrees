@@ -27,4 +27,5 @@ export interface SyncResponse {
   changes: SyncChange[];
   syncedAt: string; // ISO timestamp of this sync
   error?: string;
+  debug?: string[];
 }

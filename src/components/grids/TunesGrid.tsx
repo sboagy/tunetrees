@@ -192,6 +192,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
   // Notify parent of table instance
   createEffect(() => {
+    console.log("[TunesGrid] onTableReady called with table instance");
     props.onTableReady?.(table);
   });
 

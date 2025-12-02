@@ -22,6 +22,7 @@ import {
 import type { SyncQueueItem } from "../db/types";
 import { log } from "../logger";
 import { getAdapter, type SyncableTableName } from "./adapters";
+import { toCamelCase } from "./casing";
 import {
   fetchLocalRowByPrimaryKey,
   getOutboxStats,
@@ -53,6 +54,7 @@ export interface SyncResult {
   conflicts: number;
   errors: string[];
   timestamp: string;
+  affectedTables: string[];
 }
 
 /**
@@ -82,38 +84,10 @@ const DEFAULT_CONFIG: SyncConfig = {
  * - Playlists before playlist_tune, practice_record (FK: playlist_ref)
  * - playlist_tune before practice_record (implicit practice dependency)
  */
-const TABLE_SYNC_ORDER: Record<string, number> = {
-  // Reference data (no dependencies)
-  genre: 1,
-  tune_type: 2,
-  genre_tune_type: 3,
-  instrument: 4,
-
-  // User data (base tables)
-  user_profile: 10,
-  prefs_scheduling_options: 11,
-  prefs_spaced_repetition: 12,
-  tab_group_main_state: 13,
-  table_state: 14,
-
-  // Core data
-  tune: 20,
-  playlist: 21,
-  tag: 22,
-  note: 23,
-  reference: 24,
-  user_annotation: 25,
-  tune_override: 26,
-
-  // Junction/dependent tables (must come after their referenced tables)
-  playlist_tune: 30,
-  repertoire: 31,
-  table_transient_data: 32,
-
-  // Practice data (depends on tune, playlist, playlist_tune)
-  daily_practice_queue: 40,
-  practice_record: 41,
-};
+import {
+  TABLE_SYNC_ORDER,
+  TABLE_TO_SCHEMA_KEY,
+} from "../../../shared/table-meta";
 
 /**
  * Sort outbox items by table dependency order.
@@ -152,6 +126,17 @@ function sortOutboxItemsByDependency(items: OutboxItem[]): OutboxItem[] {
 
     return orderA - orderB;
   });
+}
+
+function sanitizeData(data: any) {
+  const sanitized = { ...data };
+  // Convert boolean to integer for SQLite
+  for (const key in sanitized) {
+    if (typeof sanitized[key] === "boolean") {
+      sanitized[key] = sanitized[key] ? 1 : 0;
+    }
+  }
+  return sanitized;
 }
 
 /**
@@ -218,6 +203,7 @@ export class SyncEngine {
         conflicts: 0,
         errors: [errorMsg],
         timestamp: startTime,
+        affectedTables: [],
       };
     }
   }
@@ -229,6 +215,7 @@ export class SyncEngine {
     const startTime = new Date().toISOString();
     const errors: string[] = [];
     let synced = 0;
+    const affectedTablesSet = new Set<string>();
 
     try {
       // 1. Get Auth Token
@@ -310,16 +297,78 @@ export class SyncEngine {
         this.lastSyncTimestamp || undefined
       );
 
-      // 4. Apply Remote Changes (Pull)
+      // Debug logging
+      if (response.debug) {
+        console.log(
+          "[SyncEngine] Worker Debug Logs:",
+          JSON.stringify(response.debug)
+        );
+      }
+      const tableCounts: Record<string, number> = {};
+      for (const change of response.changes) {
+        tableCounts[change.table] = (tableCounts[change.table] || 0) + 1;
+      }
+      console.log("[SyncEngine] Received changes:", tableCounts);
+      console.log("[SyncEngine] Total change count:", response.changes.length);
+
+      // Explicit tune check
+      const tuneChanges = response.changes.filter((c) => c.table === "tune");
+      console.log("[SyncEngine] Tune changes count:", tuneChanges.length);
+      if (tuneChanges.length > 0) {
+        console.log(
+          "[SyncEngine] First tune:",
+          JSON.stringify(tuneChanges[0]).substring(0, 200)
+        );
+      }
+
+      // 4. Apply Remote Changes
       if (response.changes.length > 0) {
         const sqliteInstance = await getSqliteInstance();
         if (sqliteInstance) {
           suppressSyncTriggers(sqliteInstance);
 
-          for (const change of response.changes) {
+          // Sort changes by dependency to avoid FK violations
+          const sortedChanges = [...response.changes].sort((a, b) => {
+            const orderA = TABLE_SYNC_ORDER[a.table] ?? 100;
+            const orderB = TABLE_SYNC_ORDER[b.table] ?? 100;
+            return orderA - orderB;
+          });
+
+          // DEBUG: Log the order of tables after sorting
+          const tableOrder = Array.from(
+            new Set(sortedChanges.map((c) => c.table))
+          );
+          console.log("[SyncEngine] Sorted table order:", tableOrder);
+
+          // Track inserts per table
+          const insertCounts: Record<string, number> = {};
+          let currentTable = "";
+
+          for (const change of sortedChanges) {
+            // Log when switching tables
+            if (change.table !== currentTable) {
+              if (currentTable) {
+                console.log(
+                  `[SyncEngine] Completed ${currentTable}: ${insertCounts[currentTable] || 0} inserts`
+                );
+              }
+              currentTable = change.table;
+              insertCounts[currentTable] = 0;
+            }
+
+            affectedTablesSet.add(change.table);
             const adapter = getAdapter(change.table as SyncableTableName);
+
+            const schemaKey = TABLE_TO_SCHEMA_KEY[change.table] || change.table;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const table = (localSchema as any)[change.table];
+            const table = (localSchema as any)[schemaKey];
+
+            if (!table) {
+              log.warn(
+                `[SyncEngine] Table not found in local schema: ${change.table} (key: ${schemaKey})`
+              );
+              continue;
+            }
 
             if (change.deleted) {
               // Delete local
@@ -337,16 +386,61 @@ export class SyncEngine {
               }
             } else {
               // Upsert local
-              await this.localDb
-                .insert(table)
-                .values(change.data)
-                .onConflictDoUpdate({
-                  target: Array.isArray(adapter.primaryKey)
-                    ? adapter.primaryKey.map((k) => (table as any)[k])
-                    : (table as any)[adapter.primaryKey],
-                  set: change.data,
-                });
+              const sanitizedData = sanitizeData(change.data);
+
+              // DEBUG: Log daily_practice_queue upserts to trace active field issue
+              if (change.table === "daily_practice_queue") {
+                console.log(
+                  `[SyncEngine] 🔍 Upserting daily_practice_queue:`,
+                  JSON.stringify(
+                    {
+                      rawData: change.data,
+                      sanitizedData,
+                      windowStartUtc:
+                        (change.data as any)?.window_start_utc ??
+                        (change.data as any)?.windowStartUtc,
+                      activeRaw: (change.data as any)?.active,
+                      activeSanitized: (sanitizedData as any)?.active,
+                      lastModifiedAt:
+                        (change.data as any)?.last_modified_at ??
+                        (change.data as any)?.lastModifiedAt,
+                    },
+                    null,
+                    2
+                  )
+                );
+              }
+
+              try {
+                await this.localDb
+                  .insert(table)
+                  .values(sanitizedData)
+                  .onConflictDoUpdate({
+                    target: Array.isArray(adapter.primaryKey)
+                      ? adapter.primaryKey.map(
+                          (k) => (table as any)[toCamelCase(k)]
+                        )
+                      : (table as any)[
+                          toCamelCase(adapter.primaryKey as string)
+                        ],
+                    set: sanitizedData,
+                  });
+              } catch (e) {
+                log.error(
+                  `[SyncEngine] Failed to insert into ${change.table}:`,
+                  e
+                );
+                // Log the failing data for debugging
+                if (change.table === "playlist_tune") {
+                  console.log(
+                    `[SyncEngine] Failed playlist_tune data:`,
+                    JSON.stringify(change.data)
+                  );
+                }
+                throw e;
+              }
             }
+            insertCounts[change.table] = (insertCounts[change.table] || 0) + 1;
             synced++;
           }
 
@@ -371,6 +465,7 @@ export class SyncEngine {
         conflicts: 0,
         errors,
         timestamp: startTime,
+        affectedTables: Array.from(affectedTablesSet),
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -383,6 +478,7 @@ export class SyncEngine {
         conflicts: 0,
         errors,
         timestamp: startTime,
+        affectedTables: Array.from(affectedTablesSet),
       };
     }
   }
@@ -416,6 +512,7 @@ export class SyncEngine {
           conflicts: 0,
           errors: [],
           timestamp: startTime,
+          affectedTables: [],
         };
       }
 
@@ -472,6 +569,7 @@ export class SyncEngine {
         conflicts: 0,
         errors,
         timestamp: startTime,
+        affectedTables: [],
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -485,6 +583,7 @@ export class SyncEngine {
         conflicts: 0,
         errors,
         timestamp: startTime,
+        affectedTables: [],
       };
     }
   }

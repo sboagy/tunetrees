@@ -12,7 +12,7 @@
 -- 3. Timestamp: ISO 8601 format using strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 -- 4. All tables get triggers (including reference data like genre, tune_type)
 --
--- Generated from: src/lib/sync/table-meta.ts SYNCABLE_TABLES
+-- Generated from: shared/table-meta.ts SYNCABLE_TABLES
 -- ============================================================================
 -- ============================================================================
 -- DROP EXISTING TRIGGERS (if reinstalling)

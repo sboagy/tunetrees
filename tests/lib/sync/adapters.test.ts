@@ -5,6 +5,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
+import { SYNCABLE_TABLES } from "../../../shared/table-meta";
 import {
   batchToLocal,
   batchToRemote,
@@ -14,7 +15,6 @@ import {
   getRegisteredTables,
   hasAdapter,
 } from "../../../src/lib/sync/adapters";
-import { SYNCABLE_TABLES } from "../../../src/lib/sync/table-meta";
 
 beforeEach(() => {
   clearAdapterCache();

@@ -28,6 +28,7 @@ export interface SyncResult {
   conflicts: number;
   errors: string[];
   timestamp: string;
+  affectedTables: string[];
 }
 
 /**
@@ -183,6 +184,7 @@ export class SyncService {
         conflicts: 0,
         errors: [error instanceof Error ? error.message : "Unknown sync error"],
         timestamp: new Date().toISOString(),
+        affectedTables: [],
       };
       return errorResult;
     } finally {

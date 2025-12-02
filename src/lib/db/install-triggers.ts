@@ -14,7 +14,7 @@
  */
 
 import type { Database as SqlJsDatabase } from "sql.js";
-import { TABLE_REGISTRY } from "../sync/table-meta";
+import { TABLE_REGISTRY } from "../../../shared/table-meta";
 
 /**
  * Create the sync trigger control table.
@@ -63,7 +63,7 @@ export function createSyncOutboxTable(db: SqlJsDatabase): void {
 
 /**
  * List of all syncable tables with their primary key configurations.
- * Matches the TABLE_REGISTRY in src/lib/sync/table-meta.ts
+ * Matches the TABLE_REGISTRY in shared/table-meta.ts
  */
 interface TableTriggerConfig {
   tableName: string;

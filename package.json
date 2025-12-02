@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:worker": "cd worker && npm run dev",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:worker\"",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "migrate:production": "tsx scripts/migrate-production-to-supabase.ts",
@@ -94,6 +96,7 @@
     "@vitest/coverage-v8": "^4.0.13",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.4.6",
+    "concurrently": "^9.2.1",
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.18.1",
     "jsdom": "^27.2.0",

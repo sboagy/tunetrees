@@ -11,6 +11,7 @@
  * - Maps composite primary keys and indexes appropriate for Postgres.
  */
 import {
+  boolean,
   index,
   integer,
   pgTable,
@@ -46,7 +47,11 @@ export const dailyPracticeQueue = pgTable(
     exposuresRequired: integer(COL.EXPOSURES_REQUIRED),
     exposuresCompleted: integer(COL.EXPOSURES_COMPLETED).default(0),
     outcome: text(COL.OUTCOME),
-    active: integer(COL.ACTIVE).default(1).notNull(),
+    // NOTE: PostgreSQL column `active` is a boolean. The worker must
+    // reflect that to avoid type mismatches and silent coercion that can
+    // flip new windows to inactive. SQLite continues to use 0/1 ints,
+    // with the sync engine converting booleans to integers on pull.
+    active: boolean(COL.ACTIVE).default(true).notNull(),
     syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
     lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
     deviceId: text(COL.DEVICE_ID),
@@ -444,7 +449,7 @@ export const tableTransientData = pgTable(
 export const tag = pgTable(
   TBL.TAG,
   {
-    id: text(COL.ID).primaryKey().notNull(),
+    id: text("tag_id").primaryKey().notNull(),
     userRef: text(COL.USER_REF)
       .notNull()
       .references(() => userProfile.id),

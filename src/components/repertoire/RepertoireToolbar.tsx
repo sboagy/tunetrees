@@ -202,6 +202,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             title="Add selected tunes to practice review queue"
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_PRIMARY}`}
             data-testid="add-to-review-button"
+            disabled={!props.table}
           >
             <svg
               class={TOOLBAR_ICON_SIZE}

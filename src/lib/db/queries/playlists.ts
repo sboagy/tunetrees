@@ -75,6 +75,9 @@ export async function getUserPlaylists(
   }
 
   const userRef = userRecord[0].id;
+  console.error(
+    `[getUserPlaylists] Found userRef: ${userRef} for userId: ${userId}`
+  );
 
   // Build query conditions
   const conditions = [eq(playlist.userRef, userRef)];
@@ -110,6 +113,13 @@ export async function getUserPlaylists(
     .leftJoin(instrument, eq(playlist.instrumentRef, instrument.id))
     .where(and(...conditions))
     .orderBy(playlist.lastModifiedAt);
+
+  console.error(`[getUserPlaylists] Found ${playlists.length} playlists`);
+  if (playlists.length > 0) {
+    console.error(
+      `[getUserPlaylists] First playlist: ${JSON.stringify(playlists[0])}`
+    );
+  }
 
   // Debug logs removed for cleanliness
 
@@ -636,6 +646,9 @@ export async function getPlaylistTunesStaged(
   }
 
   const userRef = userRecord[0].id;
+  console.log(
+    `[getPlaylistTunesStaged] Resolved userRef: ${userRef} for userId: ${userId}`
+  );
 
   // Query the practice_list_staged view directly
   const result = await db.all<any>(sql`
@@ -646,6 +659,9 @@ export async function getPlaylistTunesStaged(
       AND playlist_deleted = 0
     ORDER BY title
   `);
+  console.log(
+    `[getPlaylistTunesStaged] Found ${result.length} tunes for playlist ${playlistId}`
+  );
 
   return result;
 }

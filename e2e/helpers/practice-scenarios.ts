@@ -930,6 +930,14 @@ export async function setupForRepertoireTestsParallel(
   }
 
   // 4. Navigate if needed
+  page.on("console", (msg) => {
+    if (msg.type() === "error") {
+      console.error(`[Browser Error] ${msg.text()}`);
+    } else {
+      console.log(`[Browser] ${msg.text()}`);
+    }
+  });
+
   const currentUrl = page.url();
   if (
     !currentUrl ||

@@ -13,7 +13,6 @@
  * @module lib/sync/adapters
  */
 
-import { camelizeKeys, snakifyKeys } from "./casing";
 import {
   getBooleanColumns,
   getNormalizer,
@@ -21,7 +20,8 @@ import {
   getUniqueKeys,
   type SyncableTableName,
   TABLE_REGISTRY,
-} from "./table-meta";
+} from "../../../shared/table-meta";
+import { camelizeKeys, snakifyKeys } from "./casing";
 
 // Re-export for convenience
 export type { SyncableTableName };

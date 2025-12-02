@@ -128,9 +128,29 @@ tunetrees/
 
 ### Phase 5: Deployment & Cutover
 
+**Goal:** Deploy the Worker and configure the environment for production and CI/CD.
+
+1.  **Local Development Setup:**
+    *   **Secrets:** Create `worker/.dev.vars` for local secrets (Supabase URL/Key). Ensure it is git-ignored.
+    *   **Scripts:** Add `npm run dev:worker` and `npm run dev:all` (concurrently run frontend + worker) to root `package.json`.
+    *   **Proxy/CORS:** Ensure the frontend (Vite) can communicate with the local Worker (usually port 8787).
+
+2.  **CI/CD Configuration (`.github/workflows/ci.yml`):**
+    *   **Setup:** Add steps to install worker dependencies.
+    *   **Testing:** Configure integration tests to run against the local worker (using `wrangler dev`).
+    *   **Deployment:** Add a `deploy-worker` job that runs `npx wrangler deploy` on push to `main`.
+    *   **Secrets:** Configure GitHub Secrets (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`) for the action.
+
+3.  **Production Deployment:**
+    *   **Deploy:** Run `npx wrangler deploy` from `worker/`.
+    *   **Verify:** Check Cloudflare Dashboard for successful deployment.
+    *   **Environment Variables:** Set production secrets via `wrangler secret put`.
+
+4.  **Cutover:**
+    *   **Monitoring:** Watch logs for sync errors or auth failures.
+
 1.  **Deploy Worker:** `npx wrangler deploy`.
-2.  **Feature Flag:** Add `useWorkerSync` flag in Client.
-3.  **Testing:**
+2.  **Testing:**
     *   **Data Integrity:** Verify `shared/db-constants.ts` prevents schema mismatch.
     *   **Conflict:** Test "Last Write Wins" scenarios.
     *   **Realtime:** Verify that a change on Device A triggers a "Signal" on Device B, which then pulls data via Worker.

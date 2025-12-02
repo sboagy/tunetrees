@@ -37,6 +37,15 @@ export class WorkerClient {
       throw new Error(`Sync failed: ${response.status} ${text}`);
     }
 
-    return await response.json();
+    const json = await response.json();
+
+    // DEBUG: Check tune count in raw response
+    const tuneChanges =
+      json.changes?.filter((c: SyncChange) => c.table === "tune") || [];
+    console.log(
+      `[WorkerClient] Raw response tune count: ${tuneChanges.length}, total changes: ${json.changes?.length || 0}`
+    );
+
+    return json;
   }
 }

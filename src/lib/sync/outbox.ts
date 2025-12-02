@@ -10,9 +10,12 @@
 import { asc, eq } from "drizzle-orm";
 import type { SQLiteTableWithColumns } from "drizzle-orm/sqlite-core";
 import * as localSchema from "../../../drizzle/schema-sqlite";
+import {
+  getPrimaryKey,
+  type SyncableTableName,
+} from "../../../shared/table-meta";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { toCamelCase } from "./casing";
-import { getPrimaryKey, type SyncableTableName } from "./table-meta";
 
 const { syncOutbox } = localSchema;
 

@@ -467,6 +467,27 @@ async function getDistinctPracticeRecordCount(
   return rows[0]?.count ?? 0;
 }
 
+/**
+ * Get all queue window dates for debugging (returns ALL windows for a playlist)
+ */
+async function getAllQueueWindows(playlistId: string) {
+  const db = await ensureDb();
+  const userRef = await resolveUserId(db);
+  const rows = await db.all<{
+    window_start_utc: string;
+    count: number;
+    active: number;
+  }>(sql`
+    SELECT window_start_utc, COUNT(*) as count, active
+    FROM daily_practice_queue
+    WHERE user_ref = ${userRef} AND playlist_ref = ${playlistId}
+    GROUP BY window_start_utc, active
+    ORDER BY window_start_utc DESC
+    LIMIT 20
+  `);
+  return rows;
+}
+
 // Attach to window
 declare global {
   interface Window {
@@ -615,6 +636,13 @@ declare global {
         playlistId: string,
         tuneId: string
       ) => Promise<number>;
+      getAllQueueWindows: (playlistId: string) => Promise<
+        Array<{
+          window_start_utc: string;
+          count: number;
+          active: number;
+        }>
+      >;
     };
   }
 }
@@ -642,6 +670,7 @@ if (typeof window !== "undefined") {
       getPracticeQueue,
       getPlaylistTuneRow,
       getDistinctPracticeRecordCount,
+      getAllQueueWindows,
       stageEvaluation: async (
         tuneId: string,
         playlistId: string,

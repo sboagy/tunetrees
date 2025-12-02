@@ -17,6 +17,7 @@ import {
   type ParentComponent,
   useContext,
 } from "solid-js";
+import { TABLE_REGISTRY } from "../../../shared/table-meta";
 import {
   clearDb as clearSqliteDb,
   closeDb as closeSqliteDb,
@@ -26,7 +27,6 @@ import {
 } from "../db/client-sqlite";
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
-
 import {
   clearSyncOutbox,
   clearSyncQueue,
@@ -623,9 +623,11 @@ export const AuthProvider: ParentComponent = (props) => {
           realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
           syncIntervalMs: 5000, // Sync every 5 seconds (fast upload of local changes)
           onSyncComplete: (result) => {
+            console.log("[AuthContext] onSyncComplete called", result);
             log.debug(
               "Sync completed, incrementing remote sync down completion version"
             );
+
             setRemoteSyncDownCompletionVersion((prev) => {
               const newVersion = prev + 1;
               log.debug(
@@ -636,6 +638,7 @@ export const AuthProvider: ParentComponent = (props) => {
               );
               return newVersion;
             });
+
             // Update last syncDown timestamp (only changes when syncDown runs; getter returns last syncDown)
             if (syncServiceInstance) {
               const ts = syncServiceInstance.getLastSyncDownTimestamp();
@@ -647,6 +650,7 @@ export const AuthProvider: ParentComponent = (props) => {
               setLastSyncTimestamp(result.timestamp);
               // Mode unknown in fallback; leave as null
             }
+
             // Mark initial sync as complete on first sync
             if (!initialSyncComplete()) {
               setInitialSyncComplete(true);
@@ -674,6 +678,35 @@ export const AuthProvider: ParentComponent = (props) => {
                     );
                   });
               });
+            }
+
+            // Granular Signaling: Trigger specific view refreshes based on affected tables
+            try {
+              if (result.affectedTables && result.affectedTables.length > 0) {
+                const categories = new Set<string>();
+                for (const table of result.affectedTables) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const meta = (TABLE_REGISTRY as any)[table];
+                  if (meta?.changeCategory) {
+                    categories.add(meta.changeCategory);
+                  }
+                }
+
+                if (categories.has("repertoire")) {
+                  log.debug("[AuthContext] Triggering repertoire list refresh");
+                  incrementRepertoireListChanged();
+                }
+                if (categories.has("practice")) {
+                  log.debug("[AuthContext] Triggering practice list refresh");
+                  incrementPracticeListStagedChanged();
+                }
+                if (categories.has("catalog")) {
+                  log.debug("[AuthContext] Triggering catalog list refresh");
+                  incrementCatalogListChanged();
+                }
+              }
+            } catch (e) {
+              log.error("[AuthContext] Error in granular signaling:", e);
             }
           },
         });
