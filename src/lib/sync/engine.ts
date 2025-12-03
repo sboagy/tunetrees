@@ -2,8 +2,8 @@
  * Sync Engine - Bidirectional Sync Between Local SQLite and Supabase
  *
  * Implements offline-first sync architecture:
- * 1. Local changes → Sync Queue → Supabase (syncUp)
- * 2. Supabase changes → Local SQLite (syncDown)
+ * 1. Local changes → Sync Outbox → Worker → Supabase (push)
+ * 2. Supabase changes → Worker → Local SQLite (pull)
  * 3. Conflict detection and resolution (last-write-wins)
  *
  * @module lib/sync/engine
@@ -11,7 +11,6 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
-import { toast } from "solid-sonner";
 import * as localSchema from "../../../drizzle/schema-sqlite";
 import type { SyncChange } from "../../../shared/sync-types";
 import { getSqliteInstance, type SqliteDatabase } from "../db/client-sqlite";
@@ -19,7 +18,6 @@ import {
   enableSyncTriggers,
   suppressSyncTriggers,
 } from "../db/install-triggers";
-import type { SyncQueueItem } from "../db/types";
 import { log } from "../logger";
 import { getAdapter, type SyncableTableName } from "./adapters";
 import { toCamelCase } from "./casing";
@@ -30,13 +28,6 @@ import {
   markOutboxCompleted,
   type OutboxItem,
 } from "./outbox";
-import {
-  getPendingSyncItems,
-  getSyncQueueStats,
-  markSynced,
-  type SyncableTable,
-  updateSyncStatus,
-} from "./queue";
 import { WorkerClient } from "./worker-client";
 
 // Debug flag for sync logging (set VITE_SYNC_DEBUG=true in .env to enable)
@@ -142,19 +133,14 @@ function sanitizeData(data: any) {
 /**
  * Sync Engine Class
  *
- * Manages bidirectional sync between local SQLite and Supabase PostgreSQL.
+ * Manages bidirectional sync between local SQLite and Supabase PostgreSQL
+ * via Cloudflare Worker endpoint.
  *
  * @example
  * ```typescript
- * const engine = new SyncEngine(localDb, userId);
+ * const engine = new SyncEngine(localDb, supabase, userId);
  *
- * // Push local changes to Supabase
- * const upResult = await engine.syncUp();
- *
- * // Pull remote changes to local
- * const downResult = await engine.syncDown();
- *
- * // Full bidirectional sync
+ * // Bidirectional sync (push + pull)
  * const result = await engine.sync();
  * ```
  */
@@ -163,7 +149,6 @@ export class SyncEngine {
   private supabase: SupabaseClient;
   private config: SyncConfig;
   private lastSyncTimestamp: string | null = null;
-  private lastSyncWasIncremental: boolean = false;
 
   constructor(
     localDb: SqliteDatabase,
@@ -297,28 +282,17 @@ export class SyncEngine {
         this.lastSyncTimestamp || undefined
       );
 
-      // Debug logging
-      if (response.debug) {
-        console.log(
-          "[SyncEngine] Worker Debug Logs:",
-          JSON.stringify(response.debug)
-        );
+      // Debug logging (only when VITE_SYNC_DEBUG=true)
+      if (SYNC_DEBUG && response.debug) {
+        syncLog("Worker Debug Logs:", JSON.stringify(response.debug));
       }
-      const tableCounts: Record<string, number> = {};
-      for (const change of response.changes) {
-        tableCounts[change.table] = (tableCounts[change.table] || 0) + 1;
-      }
-      console.log("[SyncEngine] Received changes:", tableCounts);
-      console.log("[SyncEngine] Total change count:", response.changes.length);
-
-      // Explicit tune check
-      const tuneChanges = response.changes.filter((c) => c.table === "tune");
-      console.log("[SyncEngine] Tune changes count:", tuneChanges.length);
-      if (tuneChanges.length > 0) {
-        console.log(
-          "[SyncEngine] First tune:",
-          JSON.stringify(tuneChanges[0]).substring(0, 200)
-        );
+      if (SYNC_DEBUG) {
+        const tableCounts: Record<string, number> = {};
+        for (const change of response.changes) {
+          tableCounts[change.table] = (tableCounts[change.table] || 0) + 1;
+        }
+        syncLog("Received changes:", tableCounts);
+        syncLog("Total change count:", response.changes.length);
       }
 
       // 4. Apply Remote Changes
@@ -334,28 +308,7 @@ export class SyncEngine {
             return orderA - orderB;
           });
 
-          // DEBUG: Log the order of tables after sorting
-          const tableOrder = Array.from(
-            new Set(sortedChanges.map((c) => c.table))
-          );
-          console.log("[SyncEngine] Sorted table order:", tableOrder);
-
-          // Track inserts per table
-          const insertCounts: Record<string, number> = {};
-          let currentTable = "";
-
           for (const change of sortedChanges) {
-            // Log when switching tables
-            if (change.table !== currentTable) {
-              if (currentTable) {
-                console.log(
-                  `[SyncEngine] Completed ${currentTable}: ${insertCounts[currentTable] || 0} inserts`
-                );
-              }
-              currentTable = change.table;
-              insertCounts[currentTable] = 0;
-            }
-
             affectedTablesSet.add(change.table);
             const adapter = getAdapter(change.table as SyncableTableName);
 
@@ -388,29 +341,6 @@ export class SyncEngine {
               // Upsert local
               const sanitizedData = sanitizeData(change.data);
 
-              // DEBUG: Log daily_practice_queue upserts to trace active field issue
-              if (change.table === "daily_practice_queue") {
-                console.log(
-                  `[SyncEngine] 🔍 Upserting daily_practice_queue:`,
-                  JSON.stringify(
-                    {
-                      rawData: change.data,
-                      sanitizedData,
-                      windowStartUtc:
-                        (change.data as any)?.window_start_utc ??
-                        (change.data as any)?.windowStartUtc,
-                      activeRaw: (change.data as any)?.active,
-                      activeSanitized: (sanitizedData as any)?.active,
-                      lastModifiedAt:
-                        (change.data as any)?.last_modified_at ??
-                        (change.data as any)?.lastModifiedAt,
-                    },
-                    null,
-                    2
-                  )
-                );
-              }
-
               try {
                 await this.localDb
                   .insert(table)
@@ -430,17 +360,9 @@ export class SyncEngine {
                   `[SyncEngine] Failed to insert into ${change.table}:`,
                   e
                 );
-                // Log the failing data for debugging
-                if (change.table === "playlist_tune") {
-                  console.log(
-                    `[SyncEngine] Failed playlist_tune data:`,
-                    JSON.stringify(change.data)
-                  );
-                }
                 throw e;
               }
             }
-            insertCounts[change.table] = (insertCounts[change.table] || 0) + 1;
             synced++;
           }
 
@@ -484,294 +406,24 @@ export class SyncEngine {
   }
 
   /**
-   * Push local changes to Supabase (Upload)
-   *
-   * Processes sync queue and uploads pending changes to remote database.
-   *
-   * @returns Sync result
-   */
-  async syncUp(): Promise<SyncResult> {
-    const startTime = new Date().toISOString();
-    const errors: string[] = [];
-    let synced = 0;
-    let failed = 0;
-
-    try {
-      // Get pending sync items in batches
-      const pendingItems = await getPendingSyncItems(
-        this.localDb,
-        this.config.batchSize
-      );
-
-      if (pendingItems.length === 0) {
-        syncLog("[SyncEngine] No pending items to sync");
-        return {
-          success: true,
-          itemsSynced: 0,
-          itemsFailed: 0,
-          conflicts: 0,
-          errors: [],
-          timestamp: startTime,
-          affectedTables: [],
-        };
-      }
-
-      log.info(`[SyncEngine] Processing ${pendingItems.length} pending items`);
-
-      // Process each item
-      for (const item of pendingItems) {
-        try {
-          await this.processQueueItem(item);
-          await markSynced(this.localDb, item.id!);
-          synced++;
-        } catch (error) {
-          // Properly extract error message from Supabase errors
-          let errorMsg: string;
-          if (error instanceof Error) {
-            errorMsg = error.message;
-          } else if (error && typeof error === "object" && "message" in error) {
-            errorMsg = String(error.message);
-          } else {
-            errorMsg = JSON.stringify(error);
-          }
-
-          log.error(
-            `[SyncEngine] Failed to sync item ${item.id} (${item.tableName} ${item.operation}):`,
-            errorMsg,
-            "\nItem data:",
-            item.data
-          );
-
-          // Update item status based on retry count
-          if (item.attempts >= this.config.maxRetries) {
-            await updateSyncStatus(this.localDb, item.id!, "failed", errorMsg);
-            failed++;
-            errors.push(`Item ${item.id} (${item.tableName}): ${errorMsg}`);
-
-            // Show persistent toast for permanently failed items
-            toast.error(
-              `Sync failed permanently: ${item.tableName} (${item.operation})\n${errorMsg}`,
-              {
-                duration: Number.POSITIVE_INFINITY,
-              }
-            );
-          } else {
-            // Mark for retry
-            await updateSyncStatus(this.localDb, item.id!, "pending", errorMsg);
-          }
-        }
-      }
-
-      return {
-        success: failed === 0,
-        itemsSynced: synced,
-        itemsFailed: failed,
-        conflicts: 0,
-        errors,
-        timestamp: startTime,
-        affectedTables: [],
-      };
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      log.error("[SyncEngine] syncUp failed:", errorMsg);
-      errors.push(errorMsg);
-
-      return {
-        success: false,
-        itemsSynced: synced,
-        itemsFailed: failed,
-        conflicts: 0,
-        errors,
-        timestamp: startTime,
-        affectedTables: [],
-      };
-    }
-  }
-
-  /**
-   * Push local changes to Supabase (Upload)
-   *
-   * DEPRECATED: Use sync() instead.
-   * This method now delegates to syncWithWorker() which performs a full bidirectional sync.
+   * Alias for sync() - kept for API compatibility with SyncService.
    */
   async syncUpFromOutbox(): Promise<SyncResult> {
     return this.syncWithWorker();
   }
 
   /**
-   * Pull remote changes from Supabase (Download)
-   *
-   * DEPRECATED: Use sync() instead.
-   * This method now delegates to syncWithWorker() which performs a full bidirectional sync.
+   * Alias for sync() - kept for API compatibility with SyncService.
    */
   async syncDown(): Promise<SyncResult> {
     return this.syncWithWorker();
   }
 
   /**
-   * Pull remote changes for a specific subset of tables.
-   *
-   * DEPRECATED: Use sync() instead.
-   * The worker endpoint does not support partial syncs yet.
-   * This method now delegates to syncWithWorker() which performs a full bidirectional sync.
+   * Alias for sync() - partial table sync not supported, performs full sync.
    */
-  async syncDownTables(_tables: SyncableTable[]): Promise<SyncResult> {
-    console.warn(
-      "[SyncEngine] syncDownTables is deprecated. Performing full sync."
-    );
+  async syncDownTables(_tables: string[]): Promise<SyncResult> {
     return this.syncWithWorker();
-  }
-
-  /**
-   * Process a single queue item (INSERT, UPDATE, or DELETE)
-   *
-   * @param item - Sync queue item to process
-   */
-  private async processQueueItem(item: SyncQueueItem): Promise<void> {
-    const { tableName, operation, data } = item;
-
-    log.info(`[SyncEngine] Processing ${operation} on ${tableName}`);
-
-    // Parse data (required for all operations now)
-    if (!data) {
-      throw new Error(`${operation} operation requires data field`);
-    }
-    const recordData = JSON.parse(data);
-
-    // Get adapter for this table - provides transform and conflict key info
-    const adapter = getAdapter(tableName as SyncableTableName);
-    const compositeKeys = adapter.conflictKeys;
-    const pkColumn = Array.isArray(adapter.primaryKey)
-      ? adapter.primaryKey[0] // For composite PKs, use first key for error messages
-      : adapter.primaryKey;
-
-    switch (operation) {
-      case "insert": {
-        if (!recordData) {
-          throw new Error("INSERT operation requires data");
-        }
-        // Transform camelCase (local) → snake_case (Supabase)
-        const remoteData = adapter.toRemote(recordData);
-
-        if (compositeKeys) {
-          // Table has unique constraints - use UPSERT to avoid duplicate key errors
-          const { error } = await this.supabase
-            .from(tableName)
-            .upsert(remoteData, {
-              onConflict: compositeKeys.join(","),
-            });
-          if (error) throw error;
-        } else {
-          // Standard insert for tables without unique constraints
-          const { error } = await this.supabase
-            .from(tableName)
-            .insert(remoteData);
-          if (error) throw error;
-        }
-        break;
-      }
-
-      case "update": {
-        // Transform camelCase (local) → snake_case (Supabase)
-        const remoteData = adapter.toRemote(recordData);
-
-        if (compositeKeys) {
-          // ALWAYS use UPSERT for composite key tables.
-          // Reason: We frequently queue 'update' after local insert. A pure UPDATE would be a no-op remotely if row doesn't exist yet.
-          // Using UPSERT guarantees creation (insert) or update without duplicate errors.
-          const { error } = await this.supabase
-            .from(tableName)
-            .upsert(remoteData, {
-              onConflict: compositeKeys.join(","),
-            });
-          if (error) throw error;
-        } else {
-          // Standard single PK update path
-          if (!remoteData[pkColumn]) {
-            throw new Error(
-              `UPDATE operation requires ${pkColumn} in data for table ${tableName}`
-            );
-          }
-          const { error } = await this.supabase
-            .from(tableName)
-            .upsert(remoteData, {
-              onConflict: pkColumn,
-            });
-          if (error) throw error;
-        }
-        break;
-      }
-
-      case "delete": {
-        const remoteData = adapter.toRemote(recordData);
-
-        if (compositeKeys) {
-          // If composite key fields are present, delete by composite key.
-          // If only an id is provided (legacy queue), fallback to deleting by id.
-          const hasAllComposite = compositeKeys.every(
-            (k) => remoteData[k] !== undefined && remoteData[k] !== null
-          );
-          if (hasAllComposite) {
-            let query = this.supabase.from(tableName).delete();
-            for (const keyField of compositeKeys) {
-              query = query.eq(keyField, remoteData[keyField]);
-            }
-            const { error } = await query;
-            if (error) throw error;
-          } else if (remoteData[pkColumn]) {
-            const { error } = await this.supabase
-              .from(tableName)
-              .delete()
-              .eq(pkColumn, remoteData[pkColumn]);
-            if (error) throw error;
-          } else {
-            throw new Error(
-              `DELETE operation requires either composite keys (${compositeKeys.join(",")}) or ${pkColumn} for table ${tableName}`
-            );
-          }
-        } else {
-          // Soft delete path replaced with hard delete for simplicity until server implements deleted flag semantics
-          if (!remoteData[pkColumn]) {
-            throw new Error(
-              `DELETE operation requires ${pkColumn} in data for table ${tableName}`
-            );
-          }
-          const { error } = await this.supabase
-            .from(tableName)
-            .delete()
-            .eq(pkColumn, String(remoteData[pkColumn]));
-          if (error) throw error;
-        }
-        break;
-      }
-
-      default:
-        throw new Error(`Unknown operation: ${operation}`);
-    }
-  }
-
-  /**
-   * Sync a single table from Supabase to local
-   *
-   * @param tableName - Name of table to sync
-   * @returns Number of records synced
-   */
-  /**
-   * Get sync queue statistics
-   *
-   * @returns Promise with pending, syncing, failed, and total counts
-   */
-  async getSyncQueueStats(): Promise<{
-    pending: number;
-    syncing: number;
-    failed: number;
-    total: number;
-  }> {
-    if (!this.localDb) {
-      // Return empty stats if db not initialized
-      return { pending: 0, syncing: 0, failed: 0, total: 0 };
-    }
-    return await getSyncQueueStats(this.localDb);
   }
 
   /**
@@ -807,15 +459,17 @@ export class SyncEngine {
   }
 
   /**
-   * Clear last sync timestamp to force next syncDown to run in full mode.
+   * Clear last sync timestamp to force next sync to run in full mode.
    */
   clearLastSyncTimestamp(): void {
     this.lastSyncTimestamp = null;
   }
 
-  /** Was the most recent syncDown run incremental (true) or full (false)? */
+  /**
+   * Check if last sync was incremental (had a timestamp) or full (no timestamp).
+   */
   wasLastSyncIncremental(): boolean {
-    return this.lastSyncWasIncremental;
+    return this.lastSyncTimestamp !== null;
   }
 }
 
