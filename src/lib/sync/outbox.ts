@@ -137,6 +137,47 @@ export async function markOutboxPermanentlyFailed(
 }
 
 /**
+ * Get failed outbox items
+ *
+ * @param db - SQLite database instance
+ * @param limit - Maximum number of items to return
+ * @returns Array of failed outbox items ordered by changedAt desc
+ */
+export async function getFailedOutboxItems(
+  db: SqliteDatabase,
+  limit = 100
+): Promise<OutboxItem[]> {
+  const { desc } = await import("drizzle-orm");
+  const items = await db
+    .select()
+    .from(syncOutbox)
+    .where(eq(syncOutbox.status, "failed"))
+    .orderBy(desc(syncOutbox.changedAt))
+    .limit(limit);
+
+  return items;
+}
+
+/**
+ * Reset a failed outbox item for retry
+ *
+ * @param db - SQLite database instance
+ * @param id - Outbox item ID
+ */
+export async function retryOutboxItem(
+  db: SqliteDatabase,
+  id: string
+): Promise<void> {
+  await db
+    .update(syncOutbox)
+    .set({
+      status: "pending",
+      lastError: null,
+    })
+    .where(eq(syncOutbox.id, id));
+}
+
+/**
  * Get outbox statistics
  *
  * @param db - SQLite database instance

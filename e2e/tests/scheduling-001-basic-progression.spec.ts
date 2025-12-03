@@ -246,6 +246,8 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
           },
           { tuneId: TEST_TUNE_BANISH_ID, playlistId: testUser.playlistId }
         );
+        await page.evaluate(() => (window as any).__persistDbForTest?.());
+
         console.log(
           `[DAY ${day + 1}] DEBUG after time advance:`,
           JSON.stringify(debugInfo, null, 2)

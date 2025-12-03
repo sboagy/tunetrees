@@ -131,6 +131,14 @@ export function computeSchedulingWindows(
     -acceptableDelinquencyWindow
   );
 
+  // // Format as ISO 8601 UTC up to seconds: YYYY-MM-DDTHH:MM:SSZ
+  // // We keep this "obviously UTC" form to avoid local/UTC ambiguity.
+  // const formatTs = (dt: Date): string => {
+  //   const iso = dt.toISOString();
+  //   // iso is always in UTC, e.g. 2026-05-01T00:00:00.000Z
+  //   return `${iso.substring(0, 19)}Z`;
+  // };
+
   // Format as YYYY-MM-DD HH:MM:SS (legacy format for lexicographic comparison)
   const formatTs = (dt: Date): string => {
     return dt.toISOString().replace("T", " ").substring(0, 19);
@@ -409,6 +417,13 @@ async function persistQueueRows(
       // Insert into local database
       // Sync is handled automatically by SQL triggers populating sync_outbox
       await db.insert(dailyPracticeQueue).values(fullRow).run();
+
+      const debugRow = await db
+        .select()
+        .from(dailyPracticeQueue)
+        .where(eq(dailyPracticeQueue.id, id))
+        .all();
+      console.log(`debugRow: ${debugRow}`);
     }
 
     // Fetch back the inserted rows

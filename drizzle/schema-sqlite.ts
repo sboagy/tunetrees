@@ -314,19 +314,6 @@ export const reference = sqliteTable(
   ]
 );
 
-export const syncQueue = sqliteTable(TBL.SYNC_QUEUE, {
-  id: text(COL.ID).primaryKey().notNull(), // UUID
-  tableName: text(COL.TABLE_NAME).notNull(),
-  recordId: text(COL.RECORD_ID), // DEPRECATED - kept for backwards compatibility only. Use data field.
-  operation: text(COL.OPERATION).notNull(),
-  data: text(COL.DATA).notNull(), // JSON with all record data including id/composite keys
-  status: text(COL.STATUS).default("pending").notNull(),
-  createdAt: text(COL.CREATED_AT).notNull(),
-  syncedAt: text(COL.SYNCED_AT),
-  attempts: integer(COL.ATTEMPTS).default(0).notNull(),
-  lastError: text(COL.LAST_ERROR),
-});
-
 /**
  * Sync Outbox Table - Populated by SQL triggers
  *

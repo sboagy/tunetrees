@@ -28,7 +28,7 @@ import {
   getSelectedPlaylistId,
   setSelectedPlaylistId,
 } from "../../lib/services/playlist-service";
-import { getSyncQueueStats } from "../../lib/sync/queue";
+import { getOutboxStats } from "../../lib/sync/outbox";
 import { PlaylistManagerDialog } from "../playlists/PlaylistManagerDialog";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
@@ -423,10 +423,10 @@ export const TopNav: Component = () => {
 
     const updateSyncCount = async () => {
       try {
-        const stats = await getSyncQueueStats(db);
-        setPendingCount(stats.pending + stats.syncing);
+        const stats = await getOutboxStats(db);
+        setPendingCount(stats.pending + stats.inProgress);
       } catch (error) {
-        log.error("Failed to get sync queue stats:", error);
+        log.error("Failed to get sync outbox stats:", error);
       }
     };
 

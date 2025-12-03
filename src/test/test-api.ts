@@ -399,6 +399,8 @@ async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
       ORDER BY bucket ASC, order_index ASC
     `;
   } else {
+    // When no explicit windowStartUtc is provided, select the latest
+    // queue window using the UUIDv7 id ordering (monotonic by time).
     query = sql`
       SELECT id, tune_ref, bucket, order_index, window_start_utc,
              window_end_utc, completed_at, snapshot_coalesced_ts
@@ -407,9 +409,13 @@ async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
         AND playlist_ref = ${playlistId}
         AND active = 1
         AND window_start_utc = (
-          SELECT MAX(window_start_utc)
+          SELECT window_start_utc
           FROM daily_practice_queue
-          WHERE user_ref = ${userRef} AND playlist_ref = ${playlistId} AND active = 1
+          WHERE user_ref = ${userRef}
+            AND playlist_ref = ${playlistId}
+            AND active = 1
+          ORDER BY id DESC
+          LIMIT 1
         )
       ORDER BY bucket ASC, order_index ASC
     `;

@@ -316,8 +316,10 @@ export class SyncService {
    * Start automatic background sync
    *
    * Strategy:
-   * - syncDown: Once on startup, then every 20 minutes (pull remote changes - rare)
-   * - syncUp: Every 5 minutes (push local changes - frequent, only if changes pending)
+   * - syncDown: Once on startup, then every 2 minutes (pull remote changes - outbox-driven, cheap)
+   * - syncUp: Every 30 seconds (push local changes - only if pending, so free when idle)
+   *
+   * Cost when idle: 1 Postgres query of sync_outbox every 2 minutes
    */
   public startAutoSync(): void {
     if (this.syncIntervalId) {
@@ -325,9 +327,11 @@ export class SyncService {
       return;
     }
 
-    // Sync intervals
-    const syncUpIntervalMs = this.config.syncIntervalMs ?? 300000; // 5 minutes (push local changes)
-    const syncDownIntervalMs = 20 * 60 * 1000; // 20 minutes (pull remote changes)
+    // Sync intervals - cheap due to outbox-driven architecture:
+    // - syncUp only makes network call if local outbox has pending items
+    // - syncDown queries server sync_outbox (1 query) and only fetches changed rows
+    const syncUpIntervalMs = this.config.syncIntervalMs ?? 30_000; // 30 seconds
+    const syncDownIntervalMs = 2 * 60 * 1000; // 2 minutes
 
     // Initial syncDown on startup (immediate)
     // This will automatically upload any pending changes first (see syncDown method)

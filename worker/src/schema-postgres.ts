@@ -324,19 +324,6 @@ export const reference = pgTable(
   })
 );
 
-export const syncQueue = pgTable(TBL.SYNC_QUEUE, {
-  id: text(COL.ID).primaryKey().notNull(),
-  tableName: text(COL.TABLE_NAME).notNull(),
-  recordId: text(COL.RECORD_ID),
-  operation: text(COL.OPERATION).notNull(),
-  data: text(COL.DATA).notNull(),
-  status: text(COL.STATUS).default("pending").notNull(),
-  createdAt: text(COL.CREATED_AT).notNull(),
-  syncedAt: text(COL.SYNCED_AT),
-  attempts: integer(COL.ATTEMPTS).default(0).notNull(),
-  lastError: text(COL.LAST_ERROR),
-});
-
 export const syncOutbox = pgTable(
   TBL.SYNC_OUTBOX,
   {
@@ -561,7 +548,6 @@ export const tables = {
   [TBL.PREFS_SCHEDULING_OPTIONS]: prefsSchedulingOptions,
   [TBL.PREFS_SPACED_REPETITION]: prefsSpacedRepetition,
   [TBL.REFERENCE]: reference,
-  [TBL.SYNC_QUEUE]: syncQueue,
   [TBL.SYNC_OUTBOX]: syncOutbox,
   [TBL.TAB_GROUP_MAIN_STATE]: tabGroupMainState,
   [TBL.TABLE_STATE]: tableState,

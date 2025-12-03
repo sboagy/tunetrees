@@ -288,30 +288,9 @@ export async function initializeDb(
       } catch (err) {
         console.warn("⚠️ Column ensure check failed:", err);
       }
-      try {
-        sqliteDb.run(`
-      CREATE TABLE IF NOT EXISTS sync_queue (
-        id TEXT PRIMARY KEY NOT NULL,
-        table_name TEXT NOT NULL,
-        operation TEXT NOT NULL,
-        data TEXT NOT NULL,
-        status TEXT DEFAULT 'pending' NOT NULL,
-        created_at TEXT NOT NULL,
-        synced_at TEXT,
-        attempts INTEGER DEFAULT 0 NOT NULL,
-        last_error TEXT
-      )
-    `);
-        sqliteDb.run(`
-      CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status)
-    `);
-        console.log("✅ Ensured sync_queue table exists");
-      } catch (error) {
-        console.error("❌ Failed to create sync_queue table:", error);
-      }
 
       // Install sync outbox and triggers for automatic change tracking
-      // The sync_outbox table and triggers are used for the new trigger-based sync architecture
+      // The sync_outbox table and triggers are used for the trigger-based sync architecture
       try {
         createSyncOutboxTable(sqliteDb);
         installSyncTriggers(sqliteDb);

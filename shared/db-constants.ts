@@ -17,7 +17,6 @@ export const TBL = {
   PREFS_SCHEDULING_OPTIONS: "prefs_scheduling_options",
   PREFS_SPACED_REPETITION: "prefs_spaced_repetition",
   REFERENCE: "reference",
-  SYNC_QUEUE: "sync_queue",
   SYNC_OUTBOX: "sync_outbox",
   TAB_GROUP_MAIN_STATE: "tab_group_main_state",
   TABLE_STATE: "table_state",
@@ -130,7 +129,7 @@ export const COL = {
   COMMENT: "comment",
   TITLE: "title",
 
-  // sync_queue
+  // sync_outbox
   TABLE_NAME: "table_name",
   RECORD_ID: "record_id",
   OPERATION: "operation",
@@ -140,8 +139,6 @@ export const COL = {
   SYNCED_AT: "synced_at",
   ATTEMPTS: "attempts",
   LAST_ERROR: "last_error",
-
-  // sync_outbox
   ROW_ID: "row_id",
   CHANGED_AT: "changed_at",
 

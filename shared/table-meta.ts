@@ -581,7 +581,6 @@ export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
   prefs_scheduling_options: "prefsSchedulingOptions",
   prefs_spaced_repetition: "prefsSpacedRepetition",
   reference: "reference",
-  sync_queue: "syncQueue",
   sync_outbox: "syncOutbox",
   tab_group_main_state: "tabGroupMainState",
   table_state: "tableState",
