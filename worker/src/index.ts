@@ -7,7 +7,7 @@
  *
  * @module worker/index
  */
-import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, count, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { jwtVerify } from "jose";
@@ -55,6 +55,13 @@ type DrizzleTable = any;
 type DrizzleColumn = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Transaction = PgTransaction<any, any, any>;
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+/** Maximum total records in sync_change_log before triggering GC */
+const GC_THRESHOLD = 500;
 
 // ============================================================================
 // UTILITY: Case Conversion
@@ -589,6 +596,48 @@ async function processIncrementalSync(
 }
 
 // ============================================================================
+// GARBAGE COLLECTION: Dedupe sync_change_log
+// ============================================================================
+
+/**
+ * Remove duplicate entries from sync_change_log.
+ * For each (table_name, row_id), keep only the most recent changed_at.
+ * This is called after sync when the table exceeds GC_THRESHOLD.
+ */
+async function garbageCollectChangeLog(tx: Transaction): Promise<number> {
+  // Count total records
+  const countResult = await tx
+    .select({ count: count() })
+    .from(schema.syncChangeLog);
+
+  const totalRecords = countResult[0]?.count ?? 0;
+  if (totalRecords <= GC_THRESHOLD) {
+    return 0;
+  }
+
+  // Delete duplicates: keep only the row with max(changed_at) per (table_name, row_id)
+  // Using a subquery to find IDs to delete
+  const deleteResult = await tx.execute(sql`
+    DELETE FROM sync_change_log
+    WHERE id NOT IN (
+      SELECT DISTINCT ON (table_name, row_id) id
+      FROM sync_change_log
+      ORDER BY table_name, row_id, changed_at DESC
+    )
+  `);
+
+  const deletedCount =
+    typeof deleteResult === "object" && deleteResult !== null
+      ? ((deleteResult as { rowCount?: number }).rowCount ?? 0)
+      : 0;
+
+  console.log(
+    `GC: Removed ${deletedCount} duplicate entries from sync_change_log`
+  );
+  return deletedCount;
+}
+
+// ============================================================================
 // MAIN SYNC HANDLER
 // ============================================================================
 
@@ -626,6 +675,9 @@ async function handleSync(
     } else {
       responseChanges = await processInitialSync(tx, ctx);
     }
+
+    // CLEANUP: Remove duplicate change log entries
+    await garbageCollectChangeLog(tx);
   });
 
   return {
