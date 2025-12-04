@@ -49,7 +49,7 @@ function insertOutboxItem(
   lastError: string | null = null
 ): void {
   db.run(sql`
-    INSERT INTO sync_outbox (id, table_name, row_id, operation, status, changed_at, attempts, last_error)
+    INSERT INTO sync_push_queue (id, table_name, row_id, operation, status, changed_at, attempts, last_error)
     VALUES (${id}, ${tableName}, ${rowId}, ${operation}, ${status}, ${changedAt}, ${attempts}, ${lastError})
   `);
 }

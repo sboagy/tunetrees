@@ -82,16 +82,16 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       sql: "SELECT * FROM view_tune_override_readable LIMIT 50;",
     },
     {
-      name: "Sync Outbox (All)",
-      sql: "SELECT id, table_name, row_id, operation, status, attempts, changed_at, last_error FROM sync_outbox ORDER BY changed_at DESC LIMIT 50;",
+      name: "Sync Push Queue (All)",
+      sql: "SELECT id, table_name, row_id, operation, status, attempts, changed_at, last_error FROM sync_push_queue ORDER BY changed_at DESC LIMIT 50;",
     },
     {
-      name: "Sync Outbox (Pending)",
-      sql: "SELECT id, table_name, row_id, operation, status, attempts, changed_at FROM sync_outbox WHERE status = 'pending' ORDER BY changed_at;",
+      name: "Sync Push Queue (Pending)",
+      sql: "SELECT id, table_name, row_id, operation, status, attempts, changed_at FROM sync_push_queue WHERE status = 'pending' ORDER BY changed_at;",
     },
     {
-      name: "Sync Outbox (Failed)",
-      sql: "SELECT id, table_name, row_id, operation, status, attempts, last_error, changed_at FROM sync_outbox WHERE status = 'failed' ORDER BY changed_at DESC;",
+      name: "Sync Push Queue (Failed)",
+      sql: "SELECT id, table_name, row_id, operation, status, attempts, last_error, changed_at FROM sync_push_queue WHERE status = 'failed' ORDER BY changed_at DESC;",
     },
   ];
 
@@ -178,8 +178,8 @@ export default function DatabaseBrowser(): ReturnType<Component> {
         });
       }
 
-      // Refresh the results if showing sync_outbox
-      if (query().toLowerCase().includes("sync_outbox")) {
+      // Refresh the results if showing sync_push_queue
+      if (query().toLowerCase().includes("sync_push_queue")) {
         executeQuery();
       }
     } catch (error) {

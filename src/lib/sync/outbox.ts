@@ -1,8 +1,9 @@
 /**
- * Sync Outbox Operations
+ * Sync Push Queue Operations
  *
- * Handles reading and updating the trigger-populated sync_outbox table.
- * This replaces manual queueSync calls - triggers auto-populate this table.
+ * Handles reading and updating the trigger-populated sync_push_queue table.
+ * This is the client-side queue of changes to push to the server.
+ * Note: Different from the server's sync_change_log which is stateless.
  *
  * @module lib/sync/outbox
  */
@@ -17,7 +18,7 @@ import {
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { toCamelCase } from "./casing";
 
-const { syncOutbox } = localSchema;
+const { syncPushQueue } = localSchema;
 
 /**
  * Outbox item status
@@ -25,7 +26,7 @@ const { syncOutbox } = localSchema;
 export type OutboxStatus = "pending" | "in_progress" | "completed" | "failed";
 
 /**
- * Outbox item from the sync_outbox table
+ * Outbox item from the sync_push_queue table
  */
 export interface OutboxItem {
   id: string;
@@ -52,9 +53,9 @@ export async function getPendingOutboxItems(
 ): Promise<OutboxItem[]> {
   const items = await db
     .select()
-    .from(syncOutbox)
-    .where(eq(syncOutbox.status, "pending"))
-    .orderBy(asc(syncOutbox.changedAt))
+    .from(syncPushQueue)
+    .where(eq(syncPushQueue.status, "pending"))
+    .orderBy(asc(syncPushQueue.changedAt))
     .limit(limit);
 
   return items;
@@ -71,9 +72,9 @@ export async function markOutboxInProgress(
   id: string
 ): Promise<void> {
   await db
-    .update(syncOutbox)
+    .update(syncPushQueue)
     .set({ status: "in_progress" })
-    .where(eq(syncOutbox.id, id));
+    .where(eq(syncPushQueue.id, id));
 }
 
 /**
@@ -87,7 +88,7 @@ export async function markOutboxCompleted(
   db: SqliteDatabase,
   id: string
 ): Promise<void> {
-  await db.delete(syncOutbox).where(eq(syncOutbox.id, id));
+  await db.delete(syncPushQueue).where(eq(syncPushQueue.id, id));
 }
 
 /**
@@ -105,13 +106,13 @@ export async function markOutboxFailed(
   currentAttempts: number
 ): Promise<void> {
   await db
-    .update(syncOutbox)
+    .update(syncPushQueue)
     .set({
       status: "pending", // Back to pending for retry
       attempts: currentAttempts + 1,
       lastError: errorMessage,
     })
-    .where(eq(syncOutbox.id, id));
+    .where(eq(syncPushQueue.id, id));
 }
 
 /**
@@ -127,13 +128,13 @@ export async function markOutboxPermanentlyFailed(
   errorMessage: string
 ): Promise<void> {
   await db
-    .update(syncOutbox)
+    .update(syncPushQueue)
     .set({
       status: "failed",
       lastError: errorMessage,
       syncedAt: new Date().toISOString(),
     })
-    .where(eq(syncOutbox.id, id));
+    .where(eq(syncPushQueue.id, id));
 }
 
 /**
@@ -150,9 +151,9 @@ export async function getFailedOutboxItems(
   const { desc } = await import("drizzle-orm");
   const items = await db
     .select()
-    .from(syncOutbox)
-    .where(eq(syncOutbox.status, "failed"))
-    .orderBy(desc(syncOutbox.changedAt))
+    .from(syncPushQueue)
+    .where(eq(syncPushQueue.status, "failed"))
+    .orderBy(desc(syncPushQueue.changedAt))
     .limit(limit);
 
   return items;
@@ -169,12 +170,12 @@ export async function retryOutboxItem(
   id: string
 ): Promise<void> {
   await db
-    .update(syncOutbox)
+    .update(syncPushQueue)
     .set({
       status: "pending",
       lastError: null,
     })
-    .where(eq(syncOutbox.id, id));
+    .where(eq(syncPushQueue.id, id));
 }
 
 /**
@@ -190,7 +191,9 @@ export async function getOutboxStats(db: SqliteDatabase): Promise<{
   total: number;
 }> {
   // Get all items and count in memory (simpler than group by)
-  const items = await db.select({ status: syncOutbox.status }).from(syncOutbox);
+  const items = await db
+    .select({ status: syncPushQueue.status })
+    .from(syncPushQueue);
 
   const stats = {
     pending: 0,
@@ -250,34 +253,34 @@ export async function clearOldOutboxItems(
 
   // Get failed items older than cutoff and delete them
   const failedItems = await db
-    .select({ id: syncOutbox.id })
-    .from(syncOutbox)
-    .where(eq(syncOutbox.status, "failed"));
+    .select({ id: syncPushQueue.id })
+    .from(syncPushQueue)
+    .where(eq(syncPushQueue.status, "failed"));
 
   for (const item of failedItems) {
     // Check timestamp manually since Drizzle lt() can be tricky with strings
     const fullItem = await db
       .select()
-      .from(syncOutbox)
-      .where(eq(syncOutbox.id, item.id))
+      .from(syncPushQueue)
+      .where(eq(syncPushQueue.id, item.id))
       .limit(1);
     if (fullItem[0] && fullItem[0].changedAt < cutoff) {
-      await db.delete(syncOutbox).where(eq(syncOutbox.id, item.id));
+      await db.delete(syncPushQueue).where(eq(syncPushQueue.id, item.id));
     }
   }
 }
 
 /**
- * Clear ALL items from sync outbox
+ * Clear ALL items from sync push queue
  *
- * Used at login to clear stale outbox items from previous sessions.
- * The data will be synced down fresh from Supabase, so stale outbox items
+ * Used at login to clear stale queue items from previous sessions.
+ * The data will be synced down fresh from Supabase, so stale queue items
  * would cause errors when trying to upload outdated data.
  *
  * @param db - SQLite database instance
  */
 export async function clearSyncOutbox(db: SqliteDatabase): Promise<void> {
-  await db.delete(syncOutbox);
+  await db.delete(syncPushQueue);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -285,7 +288,7 @@ type AnyDrizzleTable = SQLiteTableWithColumns<any>;
 
 /**
  * Map from snake_case table name to Drizzle table object.
- * Only includes syncable tables (not sync_queue, sync_outbox, or local-only tables).
+ * Only includes syncable tables (not sync_queue, sync_push_queue, or local-only tables).
  */
 const TABLE_MAP: Record<string, AnyDrizzleTable> = {
   daily_practice_queue: localSchema.dailyPracticeQueue,

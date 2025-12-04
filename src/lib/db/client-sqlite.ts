@@ -19,7 +19,10 @@ import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import * as relations from "../../../drizzle/relations";
 import * as schema from "../../../drizzle/schema-sqlite";
 import { initializeViews, recreateViews } from "./init-views";
-import { createSyncOutboxTable, installSyncTriggers } from "./install-triggers";
+import {
+  createSyncPushQueueTable,
+  installSyncTriggers,
+} from "./install-triggers";
 import {
   clearLocalDatabaseForMigration,
   clearMigrationParams,
@@ -289,10 +292,10 @@ export async function initializeDb(
         console.warn("⚠️ Column ensure check failed:", err);
       }
 
-      // Install sync outbox and triggers for automatic change tracking
-      // The sync_outbox table and triggers are used for the trigger-based sync architecture
+      // Install sync push queue and triggers for automatic change tracking
+      // The sync_push_queue table and triggers are used for the trigger-based sync architecture
       try {
-        createSyncOutboxTable(sqliteDb);
+        createSyncPushQueueTable(sqliteDb);
         installSyncTriggers(sqliteDb);
       } catch (error) {
         console.error("❌ Failed to install sync triggers:", error);

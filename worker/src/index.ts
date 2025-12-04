@@ -1,16 +1,14 @@
 /**
- * Cloudflare Worker Sync Endpoint - Outbox-Driven Implementation
+ * Cloudflare Worker Sync Endpoint
  *
  * Architecture:
- * - PUSH: Apply client changes to Postgres (triggers populate sync_outbox)
- * - PULL: Query sync_outbox for changes since lastSyncAt, fetch only affected rows
+ * - PUSH: Client sends changes → Worker applies to Postgres
+ * - PULL: Worker queries sync_change_log → returns changed rows to client
  *
- * Data-driven using TABLE_REGISTRY from table-meta.ts:
- * - No hardcoded table names or switch statements
- * - Boolean conversion between SQLite (0/1) and Postgres (true/false)
- * - Composite key handling via getConflictTarget()
+ * @module worker/index
  */
 import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
@@ -33,6 +31,10 @@ import {
 } from "../../shared/table-meta";
 import * as schema from "./schema-postgres";
 
+// ============================================================================
+// TYPES
+// ============================================================================
+
 export interface Env {
   HYPERDRIVE?: Hyperdrive;
   DATABASE_URL?: string;
@@ -40,39 +42,108 @@ export interface Env {
   SUPABASE_JWT_SECRET: string;
 }
 
+/** Context passed through sync operations */
+interface SyncContext {
+  userId: string;
+  userPlaylistIds: Set<string>;
+  now: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DrizzleTable = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DrizzleColumn = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Transaction = PgTransaction<any, any, any>;
+
 // ============================================================================
-// UTILITY FUNCTIONS - All data-driven from TABLE_REGISTRY
+// UTILITY: Case Conversion
 // ============================================================================
 
-/** Convert snake_case to camelCase */
 function snakeToCamel(s: string): string {
   return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 }
 
+// ============================================================================
+// UTILITY: Primary Key Helpers
+// ============================================================================
+
 /**
- * Get Drizzle column references for conflict target.
- * Uses getConflictTarget() from TABLE_REGISTRY.
+ * Get column definitions for a table's primary/conflict key.
  */
-function getConflictColumns(
+function getPkColumns(
   tableName: string,
-  table: Record<string, unknown>
-): { col: unknown; prop: string }[] {
+  table: DrizzleTable
+): { col: DrizzleColumn; prop: string }[] {
   const snakeKeys = getConflictTarget(tableName);
   return snakeKeys.map((snakeKey) => {
     const camelKey = snakeToCamel(snakeKey);
     const col = table[camelKey];
     if (!col) {
-      throw new Error(
-        `Column '${camelKey}' not found in '${tableName}' (from '${snakeKey}')`
-      );
+      throw new Error(`Column '${camelKey}' not found in '${tableName}'`);
     }
     return { col, prop: camelKey };
   });
 }
 
 /**
+ * Build a WHERE clause to find a row by its primary key.
+ */
+function buildPkWhere(
+  tableName: string,
+  rowId: string,
+  table: DrizzleTable
+): unknown {
+  const pkCols = getPkColumns(tableName, table);
+
+  // Simple primary key (e.g., "abc-123")
+  if (pkCols.length === 1) {
+    return eq(pkCols[0].col, rowId);
+  }
+
+  // Composite key (e.g., '{"user_id":"x","tune_id":"y"}')
+  const parsedKey = parseOutboxRowId(tableName, rowId);
+  if (typeof parsedKey === "string") {
+    return eq(pkCols[0].col, parsedKey);
+  }
+
+  const conditions = pkCols.map((pk) => {
+    const snakeKey = pk.prop.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+    const value = parsedKey[snakeKey] ?? parsedKey[pk.prop];
+    return eq(pk.col, value);
+  });
+
+  return and(...conditions);
+}
+
+/**
+ * Extract rowId string from a row object.
+ */
+function extractRowId(
+  tableName: string,
+  row: Record<string, unknown>,
+  table: DrizzleTable
+): string {
+  // Most tables have 'id' as primary key
+  if (row.id != null) {
+    return String(row.id);
+  }
+
+  // Composite key - serialize to JSON
+  const pkCols = getPkColumns(tableName, table);
+  const pkValues: Record<string, unknown> = {};
+  for (const pk of pkCols) {
+    pkValues[pk.prop] = row[pk.prop];
+  }
+  return JSON.stringify(pkValues);
+}
+
+// ============================================================================
+// UTILITY: Boolean Conversion (SQLite ↔ Postgres)
+// ============================================================================
+
+/**
  * Convert SQLite integers (0/1) to Postgres booleans.
- * Uses getBooleanColumns() from TABLE_REGISTRY.
  */
 function sqliteToPostgres(
   tableName: string,
@@ -93,7 +164,6 @@ function sqliteToPostgres(
 
 /**
  * Convert Postgres booleans to SQLite integers (0/1).
- * Uses getBooleanColumns() from TABLE_REGISTRY.
  */
 function postgresToSqlite(
   tableName: string,
@@ -112,84 +182,55 @@ function postgresToSqlite(
   return result;
 }
 
-/**
- * Build WHERE condition for fetching a specific row by its primary key.
- * Handles both simple (id) and composite keys.
- */
-function buildPkCondition(
-  tableName: string,
-  rowId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  table: any
-): unknown {
-  const pkDefs = getConflictColumns(tableName, table);
-
-  if (pkDefs.length === 1) {
-    // Simple primary key
-    return eq(pkDefs[0].col as any, rowId);
-  }
-
-  // Composite key - rowId is JSON
-  const parsedKey = parseOutboxRowId(tableName, rowId);
-  if (typeof parsedKey === "string") {
-    // Shouldn't happen for composite keys, but handle gracefully
-    return eq(pkDefs[0].col as any, parsedKey);
-  }
-
-  // Build AND condition for each key column
-  const conditions = pkDefs.map((pk) => {
-    const camelKey = pk.prop;
-    const snakeKey = camelKey.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
-    const value = parsedKey[snakeKey] ?? parsedKey[camelKey];
-    return eq(pk.col as any, value);
-  });
-
-  return and(...conditions);
-}
+// ============================================================================
+// UTILITY: Access Control
+// ============================================================================
 
 /**
- * Check if user has access to a row based on table ownership rules.
+ * Check if user can access a row based on ownership rules.
  */
-function userCanAccessRow(
+function canUserAccessRow(
   tableName: string,
   row: Record<string, unknown>,
-  userId: string,
-  userPlaylistIds: Set<string>
+  ctx: SyncContext
 ): boolean {
-  // Tables with direct user ownership
-  if ("userId" in row) return row.userId === userId;
-  if ("userRef" in row) return row.userRef === userId;
+  // Direct user ownership
+  if ("userId" in row) return row.userId === ctx.userId;
+  if ("userRef" in row) return row.userRef === ctx.userId;
 
-  // Tables with public/private pattern
+  // Public/private pattern
   if ("privateFor" in row) {
-    return row.privateFor === null || row.privateFor === userId;
+    return row.privateFor === null || row.privateFor === ctx.userId;
   }
   if ("privateToUser" in row) {
-    return row.privateToUser === null || row.privateToUser === userId;
+    return row.privateToUser === null || row.privateToUser === ctx.userId;
   }
 
-  // Junction tables that reference playlist
+  // Playlist-based ownership
   if ("playlistRef" in row) {
-    return userPlaylistIds.has(row.playlistRef as string);
+    return ctx.userPlaylistIds.has(row.playlistRef as string);
   }
 
-  // Static reference tables (genre, tune_type) - everyone can access
-  const meta = TABLE_REGISTRY[tableName];
-  if (meta && !supportsIncremental(tableName)) {
-    return true; // Static reference data
+  // Static reference tables - everyone can access
+  if (!supportsIncremental(tableName)) {
+    return true;
   }
 
-  // Default: allow (for tables without ownership)
+  // Default: allow
   return true;
 }
 
-/** JWT verification */
-async function verifyAuth(
+// ============================================================================
+// UTILITY: Authentication
+// ============================================================================
+
+async function verifyJwt(
   request: Request,
   secret: string
 ): Promise<string | null> {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
+
   const token = authHeader.split(" ")[1];
   try {
     const { payload } = await jwtVerify(
@@ -198,368 +239,464 @@ async function verifyAuth(
     );
     return payload.sub ?? null;
   } catch (e) {
-    console.error("JWT Verification failed:", e);
+    console.error("JWT verification failed:", e);
     return null;
   }
 }
 
 // ============================================================================
-// MAIN WORKER
+// PUSH: Apply Client Changes to Postgres
 // ============================================================================
+
+/**
+ * Apply a single change (insert/update/delete) to Postgres.
+ */
+async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
+  // Skip sync infrastructure tables
+  if (
+    change.table === "sync_push_queue" ||
+    change.table === "sync_change_log"
+  ) {
+    return;
+  }
+
+  const table = schema.tables[change.table as keyof typeof schema.tables];
+  if (!table) return;
+
+  const t = table as DrizzleTable;
+  if (!t.lastModifiedAt) return;
+
+  const pkCols = getPkColumns(change.table, t);
+  const data = sqliteToPostgres(
+    change.table,
+    change.data as Record<string, unknown>
+  );
+
+  if (change.deleted) {
+    await applyDelete(tx, change.table, table, pkCols, change);
+  } else {
+    await applyUpsert(tx, table, pkCols, data);
+  }
+}
+
+async function applyDelete(
+  tx: Transaction,
+  tableName: string,
+  table: DrizzleTable,
+  pkCols: { col: unknown; prop: string }[],
+  change: SyncChange
+): Promise<void> {
+  const whereConditions = pkCols.map((pk) =>
+    eq(pk.col as any, (change.data as Record<string, unknown>)[pk.prop])
+  );
+
+  if (hasDeletedFlag(tableName)) {
+    // Soft delete: set deleted = true
+    await tx
+      .update(table)
+      .set({
+        [COL.DELETED]: true,
+        [COL.LAST_MODIFIED_AT]: change.lastModifiedAt,
+      })
+      .where(and(...whereConditions));
+  } else {
+    // Hard delete
+    await tx.delete(table).where(and(...whereConditions));
+  }
+}
+
+async function applyUpsert(
+  tx: Transaction,
+  table: DrizzleTable,
+  pkCols: { col: unknown; prop: string }[],
+  data: Record<string, unknown>
+): Promise<void> {
+  const targetCols = pkCols.map((pk) => pk.col);
+  await tx
+    .insert(table)
+    .values(data)
+    .onConflictDoUpdate({
+      target: targetCols as any,
+      set: data,
+    });
+}
+
+/**
+ * Process all PUSH changes from the client.
+ */
+async function processPushChanges(
+  tx: Transaction,
+  changes: SyncChange[]
+): Promise<void> {
+  for (const change of changes) {
+    await applyChange(tx, change);
+  }
+}
+
+// ============================================================================
+// PULL: Gather Changes for Client
+// ============================================================================
+
+/**
+ * Convert a Postgres row to a SyncChange for the client.
+ */
+function rowToSyncChange(
+  tableName: string,
+  rowId: string,
+  row: Record<string, unknown>
+): SyncChange {
+  // Apply any table-specific normalization
+  const normalizer = getNormalizer(tableName);
+  let data = normalizer ? normalizer(row) : row;
+
+  // Convert booleans for SQLite
+  data = postgresToSqlite(tableName, data);
+
+  return {
+    table: tableName as SyncableTableName,
+    rowId,
+    data,
+    deleted: !!data.deleted,
+    lastModifiedAt:
+      (data.lastModifiedAt as string) || new Date(0).toISOString(),
+  };
+}
+
+/**
+ * Create a delete marker for a row that no longer exists.
+ */
+function createDeleteMarker(
+  tableName: string,
+  rowId: string,
+  table: DrizzleTable,
+  now: string
+): SyncChange {
+  const pkCols = getPkColumns(tableName, table);
+
+  let data: Record<string, unknown>;
+  if (pkCols.length === 1) {
+    data = { [pkCols[0].prop]: rowId };
+  } else {
+    const parsed = parseOutboxRowId(tableName, rowId);
+    data = typeof parsed === "string" ? { [pkCols[0].prop]: parsed } : parsed;
+  }
+
+  return {
+    table: tableName as SyncableTableName,
+    rowId,
+    data,
+    deleted: true,
+    lastModifiedAt: now,
+  };
+}
+
+// ============================================================================
+// PULL: Initial Sync (Full Table Scan)
+// ============================================================================
+
+/**
+ * Build WHERE conditions for user-filtered table access.
+ * Returns null if the table should be skipped entirely.
+ */
+function buildUserFilter(
+  table: DrizzleTable,
+  ctx: SyncContext
+): unknown[] | null {
+  const conditions: unknown[] = [];
+
+  if (table.userId) {
+    conditions.push(eq(table.userId, ctx.userId));
+  } else if (table.userRef) {
+    conditions.push(eq(table.userRef, ctx.userId));
+  } else if (table.privateFor) {
+    conditions.push(
+      or(isNull(table.privateFor), eq(table.privateFor, ctx.userId))
+    );
+  } else if (table.privateToUser) {
+    conditions.push(
+      or(isNull(table.privateToUser), eq(table.privateToUser, ctx.userId))
+    );
+  } else if (table.playlistRef) {
+    const playlistIds = Array.from(ctx.userPlaylistIds);
+    if (playlistIds.length === 0) {
+      return null; // No playlists = skip this table
+    }
+    conditions.push(inArray(table.playlistRef, playlistIds));
+  }
+  // Static tables (genre, tune_type) have no conditions
+
+  return conditions;
+}
+
+/**
+ * Fetch all rows from a single table for initial sync.
+ */
+async function fetchTableForInitialSync(
+  tx: Transaction,
+  tableName: SyncableTableName,
+  ctx: SyncContext
+): Promise<SyncChange[]> {
+  const table = schema.tables[tableName];
+  if (!table) return [];
+
+  const t = table as DrizzleTable;
+  const meta = TABLE_REGISTRY[tableName];
+  if (!meta) return [];
+
+  // Build user filter
+  const conditions = buildUserFilter(t, ctx);
+  if (conditions === null) return []; // Skip table (e.g., no playlists)
+
+  // Query
+  let query = tx.select().from(table);
+  if (conditions.length > 0) {
+    // @ts-expect-error - dynamic where
+    query = query.where(and(...conditions));
+  }
+
+  const rows = await query;
+
+  // Convert rows to SyncChanges
+  const changes: SyncChange[] = [];
+  for (const row of rows) {
+    const r = row as Record<string, unknown>;
+    const rowId = extractRowId(tableName, r, t);
+    changes.push(rowToSyncChange(tableName, rowId, r));
+  }
+
+  return changes;
+}
+
+/**
+ * Initial sync: fetch all user-accessible rows from all tables.
+ */
+async function processInitialSync(
+  tx: Transaction,
+  ctx: SyncContext
+): Promise<SyncChange[]> {
+  const allChanges: SyncChange[] = [];
+
+  for (const tableName of SYNCABLE_TABLES) {
+    const tableChanges = await fetchTableForInitialSync(tx, tableName, ctx);
+    allChanges.push(...tableChanges);
+  }
+
+  return allChanges;
+}
+
+// ============================================================================
+// PULL: Incremental Sync (Change Log Driven)
+// ============================================================================
+
+/**
+ * Fetch changes from sync_change_log since lastSyncAt.
+ * Groups by table and dedupes row IDs.
+ */
+async function fetchChangeLogEntries(
+  tx: Transaction,
+  lastSyncAt: string
+): Promise<Map<string, Set<string>>> {
+  const entries = await tx
+    .select()
+    .from(schema.syncChangeLog)
+    .where(gt(schema.syncChangeLog.changedAt, lastSyncAt));
+
+  // Group by table, dedupe row IDs
+  const changesByTable = new Map<string, Set<string>>();
+  for (const entry of entries) {
+    if (!changesByTable.has(entry.tableName)) {
+      changesByTable.set(entry.tableName, new Set());
+    }
+    changesByTable.get(entry.tableName)!.add(entry.rowId);
+  }
+
+  return changesByTable;
+}
+
+/**
+ * Fetch a single row by its primary key.
+ * Returns null if the row doesn't exist (was hard-deleted).
+ */
+async function fetchRowByPk(
+  tx: Transaction,
+  tableName: string,
+  rowId: string,
+  table: DrizzleTable
+): Promise<Record<string, unknown> | null> {
+  const whereClause = buildPkWhere(tableName, rowId, table);
+
+  const rows = await tx
+    .select()
+    .from(table)
+    // @ts-expect-error - dynamic where
+    .where(whereClause);
+
+  return rows.length > 0 ? (rows[0] as Record<string, unknown>) : null;
+}
+
+/**
+ * Process all changed rows for a single table.
+ */
+async function processTableChanges(
+  tx: Transaction,
+  tableName: string,
+  rowIds: Set<string>,
+  ctx: SyncContext
+): Promise<SyncChange[]> {
+  const table = schema.tables[tableName as keyof typeof schema.tables];
+  if (!table) return [];
+
+  const t = table as DrizzleTable;
+  const changes: SyncChange[] = [];
+
+  for (const rowId of rowIds) {
+    const row = await fetchRowByPk(tx, tableName, rowId, t);
+
+    if (row === null) {
+      // Row was hard-deleted
+      changes.push(createDeleteMarker(tableName, rowId, t, ctx.now));
+      continue;
+    }
+
+    // Check access
+    if (!canUserAccessRow(tableName, row, ctx)) {
+      continue;
+    }
+
+    changes.push(rowToSyncChange(tableName, rowId, row));
+  }
+
+  return changes;
+}
+
+/**
+ * Incremental sync: fetch only rows that changed since lastSyncAt.
+ */
+async function processIncrementalSync(
+  tx: Transaction,
+  lastSyncAt: string,
+  ctx: SyncContext
+): Promise<SyncChange[]> {
+  const changesByTable = await fetchChangeLogEntries(tx, lastSyncAt);
+
+  const allChanges: SyncChange[] = [];
+  for (const [tableName, rowIds] of changesByTable) {
+    const tableChanges = await processTableChanges(tx, tableName, rowIds, ctx);
+    allChanges.push(...tableChanges);
+  }
+
+  return allChanges;
+}
+
+// ============================================================================
+// MAIN SYNC HANDLER
+// ============================================================================
+
+async function handleSync(
+  db: ReturnType<typeof drizzle>,
+  payload: SyncRequest,
+  userId: string
+): Promise<SyncResponse> {
+  const now = new Date().toISOString();
+  let responseChanges: SyncChange[] = [];
+
+  await db.transaction(async (tx) => {
+    // Get user's playlist IDs for ownership filtering
+    const userPlaylists = await tx
+      .select({ id: schema.playlist.playlistId })
+      .from(schema.playlist)
+      .where(eq(schema.playlist.userRef, userId));
+
+    const ctx: SyncContext = {
+      userId,
+      userPlaylistIds: new Set(userPlaylists.map((p) => p.id)),
+      now,
+    };
+
+    // PUSH: Apply client changes
+    await processPushChanges(tx, payload.changes);
+
+    // PULL: Gather changes for client
+    if (payload.lastSyncAt) {
+      responseChanges = await processIncrementalSync(
+        tx,
+        payload.lastSyncAt,
+        ctx
+      );
+    } else {
+      responseChanges = await processInitialSync(tx, ctx);
+    }
+  });
+
+  return {
+    changes: responseChanges,
+    syncedAt: now,
+  };
+}
+
+// ============================================================================
+// HTTP HANDLER
+// ============================================================================
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
+function errorResponse(message: string, status = 500): Response {
+  return jsonResponse({ error: message }, status);
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    };
 
+    // CORS preflight
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, { headers: CORS_HEADERS });
     }
 
+    // Health check
     if (request.method === "GET" && url.pathname === "/health") {
-      return new Response("OK", { status: 200, headers: corsHeaders });
+      return new Response("OK", { status: 200, headers: CORS_HEADERS });
     }
 
+    // Sync endpoint
     if (request.method === "POST" && url.pathname === "/api/sync") {
-      const userId = await verifyAuth(request, env.SUPABASE_JWT_SECRET);
+      // Authenticate
+      const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
       if (!userId) {
-        return new Response("Unauthorized", {
-          status: 401,
-          headers: corsHeaders,
-        });
+        return errorResponse("Unauthorized", 401);
+      }
+
+      // Connect to database
+      const connectionString =
+        env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
+      if (!connectionString) {
+        return errorResponse("Database configuration error", 500);
       }
 
       try {
-        const connectionString =
-          env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
-        if (!connectionString) {
-          return new Response("Database configuration error", {
-            status: 500,
-            headers: corsHeaders,
-          });
-        }
-
         const client = postgres(connectionString);
         const db = drizzle(client, { schema });
         const payload = (await request.json()) as SyncRequest;
-        const responseChanges: SyncChange[] = [];
-        const now = new Date().toISOString();
 
-        await db.transaction(async (tx) => {
-          // ==============================================================
-          // PUSH: Apply client changes to Postgres
-          // Postgres triggers will populate sync_outbox automatically
-          // ==============================================================
-          for (const change of payload.changes) {
-            const table = schema.tables[change.table];
-            if (!table) continue;
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const t = table as any;
-            if (!t.lastModifiedAt) continue;
-
-            // Get conflict target from TABLE_REGISTRY
-            const pkDefs = getConflictColumns(change.table, t);
-
-            // Convert SQLite booleans to Postgres
-            const dataForDb = sqliteToPostgres(
-              change.table,
-              change.data as Record<string, unknown>
-            );
-
-            if (change.deleted) {
-              // Build WHERE from primary key
-              const whereConditions = pkDefs.map((pk) =>
-                eq(
-                  pk.col as any,
-                  (change.data as Record<string, unknown>)[pk.prop]
-                )
-              );
-
-              if (hasDeletedFlag(change.table)) {
-                // Soft delete
-                await tx
-                  .update(table)
-                  .set({
-                    [COL.DELETED]: true,
-                    [COL.LAST_MODIFIED_AT]: change.lastModifiedAt,
-                  })
-                  .where(and(...whereConditions));
-              } else {
-                // Hard delete
-                await tx.delete(table).where(and(...whereConditions));
-              }
-            } else {
-              // Upsert
-              const targetCols = pkDefs.map((pk) => pk.col);
-              await tx
-                .insert(table)
-                .values(dataForDb)
-                .onConflictDoUpdate({
-                  target: targetCols as any,
-                  set: dataForDb,
-                });
-            }
-          }
-
-          // ==============================================================
-          // PULL: Outbox-driven - query sync_outbox for changed rows
-          // ==============================================================
-
-          // Get user's playlist IDs for ownership filtering
-          const userPlaylists = await tx
-            .select({ id: schema.playlist.playlistId })
-            .from(schema.playlist)
-            .where(eq(schema.playlist.userRef, userId));
-          const userPlaylistIds = new Set(userPlaylists.map((p) => p.id));
-
-          // Determine if this is initial sync or incremental
-          const isInitialSync = !payload.lastSyncAt;
-
-          if (isInitialSync) {
-            // ==============================================================
-            // INITIAL SYNC: Full table scan (no outbox yet)
-            // ==============================================================
-            for (const tableName of SYNCABLE_TABLES) {
-              const table = schema.tables[tableName];
-              if (!table) continue;
-
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const t = table as any;
-              const meta = TABLE_REGISTRY[tableName];
-              if (!meta) continue;
-
-              // Build user filter conditions
-              const conditions: unknown[] = [];
-
-              if (t.userId) {
-                conditions.push(eq(t.userId, userId));
-              } else if (t.userRef) {
-                conditions.push(eq(t.userRef, userId));
-              } else if (t.privateFor) {
-                conditions.push(
-                  or(isNull(t.privateFor), eq(t.privateFor, userId))
-                );
-              } else if (t.privateToUser) {
-                conditions.push(
-                  or(isNull(t.privateToUser), eq(t.privateToUser, userId))
-                );
-              } else if (t.playlistRef) {
-                const playlistIdList = Array.from(userPlaylistIds);
-                if (playlistIdList.length > 0) {
-                  conditions.push(inArray(t.playlistRef, playlistIdList));
-                } else {
-                  // User has no playlists, skip tables that require playlist ownership
-                  continue;
-                }
-              }
-              // Static tables (genre, tune_type) have no conditions
-
-              // Execute query
-              let query = tx.select().from(table);
-              if (conditions.length > 0) {
-                // @ts-expect-error - dynamic where
-                query = query.where(and(...conditions));
-              }
-
-              const rows = await query;
-
-              // Process each row
-              for (const row of rows) {
-                let r = row as Record<string, unknown>;
-
-                // Get row ID
-                let rowId: string;
-                if (r.id != null) {
-                  rowId = String(r.id);
-                } else {
-                  const pkDefs = getConflictColumns(tableName, t);
-                  const pkValues: Record<string, unknown> = {};
-                  for (const pk of pkDefs) {
-                    pkValues[pk.prop] = r[pk.prop];
-                  }
-                  rowId = JSON.stringify(pkValues);
-                }
-
-                // Apply normalization
-                const normalizer = getNormalizer(tableName);
-                if (normalizer) {
-                  r = normalizer(r);
-                }
-
-                // Convert Postgres booleans to SQLite integers
-                r = postgresToSqlite(tableName, r);
-
-                responseChanges.push({
-                  table: tableName as SyncableTableName,
-                  rowId,
-                  data: r,
-                  deleted: !!r.deleted,
-                  lastModifiedAt:
-                    (r.lastModifiedAt as string) || new Date(0).toISOString(),
-                });
-              }
-            }
-          } else {
-            // ==============================================================
-            // INCREMENTAL SYNC: Query sync_outbox for changes
-            // ==============================================================
-            const outboxChanges = await tx
-              .select()
-              .from(schema.syncOutbox)
-              .where(gt(schema.syncOutbox.changedAt, payload.lastSyncAt!));
-
-            // Group changes by table for efficient batch fetching
-            const changesByTable = new Map<
-              string,
-              Array<{ rowId: string; operation: string }>
-            >();
-
-            for (const entry of outboxChanges) {
-              const tableName = entry.tableName;
-              if (!changesByTable.has(tableName)) {
-                changesByTable.set(tableName, []);
-              }
-              changesByTable.get(tableName)!.push({
-                rowId: entry.rowId,
-                operation: entry.operation,
-              });
-            }
-
-            // Fetch actual rows for each changed table
-            for (const [tableName, changes] of changesByTable) {
-              const table =
-                schema.tables[tableName as keyof typeof schema.tables];
-              if (!table) continue;
-
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const t = table as any;
-
-              for (const change of changes) {
-                if (change.operation === "DELETE") {
-                  // For hard deletes, we need to send a deleted marker
-                  // Parse the rowId to get key values
-                  const pkDefs = getConflictColumns(tableName, t);
-                  let data: Record<string, unknown>;
-
-                  if (pkDefs.length === 1) {
-                    data = { [pkDefs[0].prop]: change.rowId };
-                  } else {
-                    const parsed = parseOutboxRowId(tableName, change.rowId);
-                    data =
-                      typeof parsed === "string"
-                        ? { [pkDefs[0].prop]: parsed }
-                        : (parsed as Record<string, unknown>);
-                  }
-
-                  responseChanges.push({
-                    table: tableName as SyncableTableName,
-                    rowId: change.rowId,
-                    data,
-                    deleted: true,
-                    lastModifiedAt: now,
-                  });
-                } else {
-                  // INSERT or UPDATE - fetch the actual row
-                  const pkCondition = buildPkCondition(
-                    tableName,
-                    change.rowId,
-                    t
-                  );
-
-                  const rows = await tx
-                    .select()
-                    .from(table)
-                    // @ts-expect-error - dynamic where
-                    .where(pkCondition);
-
-                  if (rows.length === 0) {
-                    // Row was deleted after outbox entry - treat as delete
-                    const pkDefs = getConflictColumns(tableName, t);
-                    let data: Record<string, unknown>;
-
-                    if (pkDefs.length === 1) {
-                      data = { [pkDefs[0].prop]: change.rowId };
-                    } else {
-                      const parsed = parseOutboxRowId(tableName, change.rowId);
-                      data =
-                        typeof parsed === "string"
-                          ? { [pkDefs[0].prop]: parsed }
-                          : (parsed as Record<string, unknown>);
-                    }
-
-                    responseChanges.push({
-                      table: tableName as SyncableTableName,
-                      rowId: change.rowId,
-                      data,
-                      deleted: true,
-                      lastModifiedAt: now,
-                    });
-                    continue;
-                  }
-
-                  let r = rows[0] as Record<string, unknown>;
-
-                  // Check user access
-                  if (
-                    !userCanAccessRow(tableName, r, userId, userPlaylistIds)
-                  ) {
-                    continue; // Skip rows user doesn't have access to
-                  }
-
-                  // Apply normalization
-                  const normalizer = getNormalizer(tableName);
-                  if (normalizer) {
-                    r = normalizer(r);
-                  }
-
-                  // Convert Postgres booleans to SQLite integers
-                  r = postgresToSqlite(tableName, r);
-
-                  responseChanges.push({
-                    table: tableName as SyncableTableName,
-                    rowId: change.rowId,
-                    data: r,
-                    deleted: !!r.deleted,
-                    lastModifiedAt:
-                      (r.lastModifiedAt as string) || new Date(0).toISOString(),
-                  });
-                }
-              }
-            }
-
-            // Mark processed outbox entries as synced
-            if (outboxChanges.length > 0) {
-              const outboxIds = outboxChanges.map((e) => e.id);
-              await tx
-                .update(schema.syncOutbox)
-                .set({ status: "synced", syncedAt: now })
-                .where(inArray(schema.syncOutbox.id, outboxIds));
-            }
-          }
-        });
-
-        const response: SyncResponse = {
-          changes: responseChanges,
-          syncedAt: now,
-        };
-
-        return new Response(JSON.stringify(response), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const response = await handleSync(db, payload, userId);
+        return jsonResponse(response);
       } catch (error) {
-        console.error(error);
-        return new Response(JSON.stringify({ error: String(error) }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        console.error("Sync error:", error);
+        return errorResponse(String(error), 500);
       }
     }
 
-    return new Response("Not Found", { status: 404, headers: corsHeaders });
+    return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
   },
 };

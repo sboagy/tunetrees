@@ -324,24 +324,19 @@ export const reference = pgTable(
   })
 );
 
-export const syncOutbox = pgTable(
-  TBL.SYNC_OUTBOX,
+// Stateless sync_change_log - tracks what changed and when on the server.
+// Each client maintains its own lastSyncAt; no per-client status stored here.
+// Different from client's sync_push_queue which has status/operation/attempts.
+export const syncChangeLog = pgTable(
+  TBL.SYNC_CHANGE_LOG,
   {
     id: text(COL.ID).primaryKey().notNull(),
     tableName: text(COL.TABLE_NAME).notNull(),
     rowId: text(COL.ROW_ID).notNull(),
-    operation: text(COL.OPERATION).notNull(),
-    status: text(COL.STATUS).default("pending").notNull(),
     changedAt: text(COL.CHANGED_AT).notNull(),
-    syncedAt: text(COL.SYNCED_AT),
-    attempts: integer(COL.ATTEMPTS).default(0).notNull(),
-    lastError: text(COL.LAST_ERROR),
   },
   (table) => ({
-    idxStatusChanged: index("idx_outbox_status_changed").on(
-      table.status,
-      table.changedAt
-    ),
+    idxChangedAt: index("idx_outbox_changed_at").on(table.changedAt),
     idxTableRow: index("idx_outbox_table_row").on(table.tableName, table.rowId),
   })
 );
@@ -548,7 +543,7 @@ export const tables = {
   [TBL.PREFS_SCHEDULING_OPTIONS]: prefsSchedulingOptions,
   [TBL.PREFS_SPACED_REPETITION]: prefsSpacedRepetition,
   [TBL.REFERENCE]: reference,
-  [TBL.SYNC_OUTBOX]: syncOutbox,
+  [TBL.SYNC_CHANGE_LOG]: syncChangeLog,
   [TBL.TAB_GROUP_MAIN_STATE]: tabGroupMainState,
   [TBL.TABLE_STATE]: tableState,
   [TBL.TABLE_TRANSIENT_DATA]: tableTransientData,

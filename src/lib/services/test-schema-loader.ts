@@ -75,11 +75,11 @@ export function applyMigrations(db: BetterSQLite3Database): void {
     }
   }
 
-  // Create sync_outbox table (not yet in migrations, added for trigger-based sync)
+  // Create sync_push_queue table (not yet in migrations, added for trigger-based sync)
   // This table is populated by triggers on syncable tables
   db.run(
     `
-    CREATE TABLE IF NOT EXISTS sync_outbox (
+    CREATE TABLE IF NOT EXISTS sync_push_queue (
       id TEXT PRIMARY KEY NOT NULL,
       table_name TEXT NOT NULL,
       row_id TEXT NOT NULL,
@@ -93,10 +93,10 @@ export function applyMigrations(db: BetterSQLite3Database): void {
   ` as any
   );
   db.run(
-    `CREATE INDEX IF NOT EXISTS idx_outbox_status_changed ON sync_outbox(status, changed_at)` as any
+    `CREATE INDEX IF NOT EXISTS idx_push_queue_status_changed ON sync_push_queue(status, changed_at)` as any
   );
   db.run(
-    `CREATE INDEX IF NOT EXISTS idx_outbox_table_row ON sync_outbox(table_name, row_id)` as any
+    `CREATE INDEX IF NOT EXISTS idx_push_queue_table_row ON sync_push_queue(table_name, row_id)` as any
   );
 }
 

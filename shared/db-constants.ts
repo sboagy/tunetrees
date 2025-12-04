@@ -17,7 +17,10 @@ export const TBL = {
   PREFS_SCHEDULING_OPTIONS: "prefs_scheduling_options",
   PREFS_SPACED_REPETITION: "prefs_spaced_repetition",
   REFERENCE: "reference",
-  SYNC_OUTBOX: "sync_outbox",
+  // Client SQLite: queue of changes to push to server (has status, operation, attempts)
+  SYNC_PUSH_QUEUE: "sync_push_queue",
+  // Server Postgres: log of changes for clients to pull (stateless: just table/row/timestamp)
+  SYNC_CHANGE_LOG: "sync_change_log",
   TAB_GROUP_MAIN_STATE: "tab_group_main_state",
   TABLE_STATE: "table_state",
   TABLE_TRANSIENT_DATA: "table_transient_data",
@@ -129,16 +132,16 @@ export const COL = {
   COMMENT: "comment",
   TITLE: "title",
 
-  // sync_outbox
+  // sync_push_queue (SQLite client) and sync_change_log (Postgres server)
   TABLE_NAME: "table_name",
   RECORD_ID: "record_id",
-  OPERATION: "operation",
+  OPERATION: "operation", // SQLite only
   DATA: "data",
-  STATUS: "status",
+  STATUS: "status", // SQLite only
   CREATED_AT: "created_at",
-  SYNCED_AT: "synced_at",
-  ATTEMPTS: "attempts",
-  LAST_ERROR: "last_error",
+  SYNCED_AT: "synced_at", // SQLite only
+  ATTEMPTS: "attempts", // SQLite only
+  LAST_ERROR: "last_error", // SQLite only
   ROW_ID: "row_id",
   CHANGED_AT: "changed_at",
 

@@ -1,14 +1,17 @@
 /**
- * Sync Outbox Trigger Installation
+ * Sync Push Queue Trigger Installation
  *
  * This module handles the installation of SQL triggers that automatically
- * populate the sync_outbox table whenever data changes occur.
+ * populate the sync_push_queue table whenever data changes occur.
+ *
+ * sync_push_queue is the client-side queue of changes to push to the server.
+ * Note: Different from the server's sync_change_log which is stateless.
  *
  * The triggers include a suppression mechanism:
  * - A `sync_trigger_control` table with a single row controls whether triggers are active
  * - During syncDown (pulling data from Supabase), triggers are suppressed to avoid
- *   creating outbox entries for data that already exists remotely
- * - User-initiated changes trigger outbox entries normally
+ *   creating queue entries for data that already exists remotely
+ * - User-initiated changes trigger queue entries normally
  *
  * @module install-triggers
  */
@@ -19,7 +22,7 @@ import { TABLE_REGISTRY } from "../../../shared/table-meta";
 /**
  * Create the sync trigger control table.
  * This table has exactly one row with a 'disabled' flag.
- * When disabled = 1, triggers will NOT add entries to sync_outbox.
+ * When disabled = 1, triggers will NOT add entries to sync_push_queue.
  */
 export function createSyncTriggerControlTable(db: SqlJsDatabase): void {
   db.run(`
@@ -36,11 +39,11 @@ export function createSyncTriggerControlTable(db: SqlJsDatabase): void {
 }
 
 /**
- * Create the sync_outbox table if it doesn't exist
+ * Create the sync_push_queue table if it doesn't exist
  */
-export function createSyncOutboxTable(db: SqlJsDatabase): void {
+export function createSyncPushQueueTable(db: SqlJsDatabase): void {
   db.run(`
-    CREATE TABLE IF NOT EXISTS sync_outbox (
+    CREATE TABLE IF NOT EXISTS sync_push_queue (
       id TEXT PRIMARY KEY NOT NULL,
       table_name TEXT NOT NULL,
       row_id TEXT NOT NULL,
@@ -53,12 +56,12 @@ export function createSyncOutboxTable(db: SqlJsDatabase): void {
     )
   `);
   db.run(
-    `CREATE INDEX IF NOT EXISTS idx_outbox_status_changed ON sync_outbox(status, changed_at)`
+    `CREATE INDEX IF NOT EXISTS idx_push_queue_status_changed ON sync_push_queue(status, changed_at)`
   );
   db.run(
-    `CREATE INDEX IF NOT EXISTS idx_outbox_table_row ON sync_outbox(table_name, row_id)`
+    `CREATE INDEX IF NOT EXISTS idx_push_queue_table_row ON sync_push_queue(table_name, row_id)`
   );
-  console.log("✅ Created sync_outbox table and indexes");
+  console.log("✅ Created sync_push_queue table and indexes");
 }
 
 /**
@@ -104,8 +107,8 @@ function generateRowIdExpression(
  * Executes each statement directly instead of building multi-statement SQL.
  *
  * The triggers include a check against sync_trigger_control.disabled:
- * - When disabled = 0 (default): triggers add entries to sync_outbox
- * - When disabled = 1: triggers are suppressed (no outbox entries)
+ * - When disabled = 0 (default): triggers add entries to sync_push_queue
+ * - When disabled = 1: triggers are suppressed (no queue entries)
  */
 function createTriggersForTable(
   db: SqlJsDatabase,
@@ -126,7 +129,7 @@ function createTriggersForTable(
     AFTER INSERT ON ${tableName}
     WHEN (SELECT disabled FROM sync_trigger_control WHERE id = 1) = 0
     BEGIN
-      INSERT INTO sync_outbox (id, table_name, row_id, operation, changed_at)
+      INSERT INTO sync_push_queue (id, table_name, row_id, operation, changed_at)
       VALUES (
         lower(hex(randomblob(16))),
         '${tableName}',
@@ -143,7 +146,7 @@ function createTriggersForTable(
     AFTER UPDATE ON ${tableName}
     WHEN (SELECT disabled FROM sync_trigger_control WHERE id = 1) = 0
     BEGIN
-      INSERT INTO sync_outbox (id, table_name, row_id, operation, changed_at)
+      INSERT INTO sync_push_queue (id, table_name, row_id, operation, changed_at)
       VALUES (
         lower(hex(randomblob(16))),
         '${tableName}',
@@ -160,7 +163,7 @@ function createTriggersForTable(
     AFTER DELETE ON ${tableName}
     WHEN (SELECT disabled FROM sync_trigger_control WHERE id = 1) = 0
     BEGIN
-      INSERT INTO sync_outbox (id, table_name, row_id, operation, changed_at)
+      INSERT INTO sync_push_queue (id, table_name, row_id, operation, changed_at)
       VALUES (
         lower(hex(randomblob(16))),
         '${tableName}',
@@ -173,24 +176,24 @@ function createTriggersForTable(
 }
 
 /**
- * Install all sync outbox triggers on the database.
+ * Install all sync push queue triggers on the database.
  *
  * This function:
  * 1. Creates the sync_trigger_control table for trigger suppression
- * 2. Creates the sync_outbox table if it doesn't exist
+ * 2. Creates the sync_push_queue table if it doesn't exist
  * 3. Drops any existing triggers (idempotent)
  * 4. Creates INSERT/UPDATE/DELETE triggers for all syncable tables
  *
  * @param db - The sql.js Database instance
  */
 export function installSyncTriggers(db: SqlJsDatabase): void {
-  console.log("🔧 Installing sync outbox triggers...");
+  console.log("🔧 Installing sync push queue triggers...");
 
   // First ensure the control table exists (for trigger suppression)
   createSyncTriggerControlTable(db);
 
-  // Then ensure the sync_outbox table exists
-  createSyncOutboxTable(db);
+  // Then ensure the sync_push_queue table exists
+  createSyncPushQueueTable(db);
 
   // Generate and execute triggers for each table
   let triggerCount = 0;
@@ -213,8 +216,8 @@ export function installSyncTriggers(db: SqlJsDatabase): void {
 }
 
 /**
- * Suppress sync triggers (disable outbox population).
- * Call this before syncDown operations to prevent creating outbox entries
+ * Suppress sync triggers (disable push queue population).
+ * Call this before syncDown operations to prevent creating queue entries
  * for data that already exists on the server.
  *
  * @param db - The sql.js Database instance
@@ -224,7 +227,7 @@ export function suppressSyncTriggers(db: SqlJsDatabase): void {
 }
 
 /**
- * Enable sync triggers (resume outbox population).
+ * Enable sync triggers (resume push queue population).
  * Call this after syncDown operations to resume normal trigger behavior.
  *
  * @param db - The sql.js Database instance

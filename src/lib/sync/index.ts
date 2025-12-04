@@ -2,7 +2,7 @@
  * Sync Module
  *
  * Exports sync-related functions and types.
- * NOTE: sync_queue is deprecated. Use sync_outbox (trigger-based) instead.
+ * NOTE: sync_queue is deprecated. Use sync_push_queue (trigger-based) instead.
  *
  * @module lib/sync
  */

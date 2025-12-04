@@ -315,19 +315,16 @@ export const reference = sqliteTable(
 );
 
 /**
- * Sync Outbox Table - Populated by SQL triggers
+ * sync_push_queue: Client-side queue of changes to push to server.
  *
- * This table is the new "Local Outbox Pattern" replacement for sync_queue.
  * SQL triggers automatically insert rows here on INSERT/UPDATE/DELETE,
- * and the sync worker processes them to push changes to Supabase.
+ * and the sync engine processes them to push changes to Supabase via the Worker.
  *
- * Key differences from sync_queue:
- * - Populated by triggers (not manual queueSync calls)
- * - rowId is a JSON string for composite PKs
- * - Uses changedAt for ordering (not UUID-based ordering)
+ * Note: This is different from the server's sync_change_log table which is stateless.
+ * This client table has status/operation/attempts for tracking push progress.
  */
-export const syncOutbox = sqliteTable(
-  TBL.SYNC_OUTBOX,
+export const syncPushQueue = sqliteTable(
+  TBL.SYNC_PUSH_QUEUE,
   {
     // Random hex ID for outbox entry (triggers use: lower(hex(randomblob(16))))
     id: text(COL.ID).primaryKey().notNull(),
