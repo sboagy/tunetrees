@@ -19,7 +19,6 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
-import { queueSync } from "../../sync";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
 import {
@@ -76,6 +75,9 @@ export async function getUserPlaylists(
   }
 
   const userRef = userRecord[0].id;
+  console.error(
+    `[getUserPlaylists] Found userRef: ${userRef} for userId: ${userId}`
+  );
 
   // Build query conditions
   const conditions = [eq(playlist.userRef, userRef)];
@@ -111,6 +113,13 @@ export async function getUserPlaylists(
     .leftJoin(instrument, eq(playlist.instrumentRef, instrument.id))
     .where(and(...conditions))
     .orderBy(playlist.lastModifiedAt);
+
+  console.error(`[getUserPlaylists] Found ${playlists.length} playlists`);
+  if (playlists.length > 0) {
+    console.error(
+      `[getUserPlaylists] First playlist: ${JSON.stringify(playlists[0])}`
+    );
+  }
 
   // Debug logs removed for cleanliness
 
@@ -240,8 +249,7 @@ export async function createPlaylist(
 
   const created = result[0];
 
-  // Queue for sync
-  await queueSync(db, "playlist", "insert", created);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   // Persist to IndexedDB
   await persistDb();
@@ -300,8 +308,7 @@ export async function updatePlaylist(
 
   const updated = result[0];
 
-  // Queue for sync
-  await queueSync(db, "playlist", "update", updated);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   // Persist to IndexedDB
   await persistDb();
@@ -360,8 +367,7 @@ export async function deletePlaylist(
     })
     .where(eq(playlistTune.playlistRef, playlistId));
 
-  // Queue for sync - pass playlistId for delete
-  await queueSync(db, "playlist", "delete", { playlistId });
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   // Persist to IndexedDB
   await persistDb();
@@ -461,8 +467,7 @@ export async function addTuneToPlaylist(
     throw new Error("Failed to add tune to playlist");
   }
 
-  // Queue for sync with the full row data
-  await queueSync(db, "playlist_tune", "insert", result[0]);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   return result[0];
 }
@@ -641,6 +646,9 @@ export async function getPlaylistTunesStaged(
   }
 
   const userRef = userRecord[0].id;
+  console.log(
+    `[getPlaylistTunesStaged] Resolved userRef: ${userRef} for userId: ${userId}`
+  );
 
   // Query the practice_list_staged view directly
   const result = await db.all<any>(sql`
@@ -651,6 +659,9 @@ export async function getPlaylistTunesStaged(
       AND playlist_deleted = 0
     ORDER BY title
   `);
+  console.log(
+    `[getPlaylistTunesStaged] Found ${result.length} tunes for playlist ${playlistId}`
+  );
 
   return result;
 }

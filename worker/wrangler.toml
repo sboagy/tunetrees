@@ -1,0 +1,18 @@
+name = "tunetrees-sync-worker"
+main = "src/index.ts"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Hyperdrive Binding (PostgreSQL Connection Pooling)
+# Run `npx wrangler hyperdrive create tunetrees-hyperdrive --connection-string="postgres://user:password@host:port/db"` to generate ID
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "INSERT_HYPERDRIVE_ID_HERE"
+# localConnectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+[vars]
+SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co"
+# SUPABASE_JWT_SECRET should be set via `wrangler secret put SUPABASE_JWT_SECRET`
+
+[observability]
+enabled = true

@@ -12,7 +12,7 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getSqliteInstance } from "@/lib/db/client-sqlite";
-import { getFailedSyncItems, retrySyncItem } from "@/lib/sync/queue";
+import { getFailedOutboxItems, retryOutboxItem } from "@/lib/sync/outbox";
 
 interface QueryResult {
   columns: string[];
@@ -82,16 +82,16 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       sql: "SELECT * FROM view_tune_override_readable LIMIT 50;",
     },
     {
-      name: "Sync Queue (All)",
-      sql: "SELECT id, table_name, operation, status, attempts, created_at, last_error FROM sync_queue ORDER BY created_at DESC LIMIT 50;",
+      name: "Sync Push Queue (All)",
+      sql: "SELECT id, table_name, row_id, operation, status, attempts, changed_at, last_error FROM sync_push_queue ORDER BY changed_at DESC LIMIT 50;",
     },
     {
-      name: "Sync Queue (Pending)",
-      sql: "SELECT id, table_name, operation, status, attempts, created_at FROM sync_queue WHERE status = 'pending' ORDER BY created_at;",
+      name: "Sync Push Queue (Pending)",
+      sql: "SELECT id, table_name, row_id, operation, status, attempts, changed_at FROM sync_push_queue WHERE status = 'pending' ORDER BY changed_at;",
     },
     {
-      name: "Sync Queue (Failed)",
-      sql: "SELECT id, table_name, operation, status, attempts, last_error, created_at FROM sync_queue WHERE status = 'failed' ORDER BY created_at DESC;",
+      name: "Sync Push Queue (Failed)",
+      sql: "SELECT id, table_name, row_id, operation, status, attempts, last_error, changed_at FROM sync_push_queue WHERE status = 'failed' ORDER BY changed_at DESC;",
     },
   ];
 
@@ -150,7 +150,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
     }
 
     try {
-      const failedItems = await getFailedSyncItems(localDb()!);
+      const failedItems = await getFailedOutboxItems(localDb()!);
 
       if (failedItems.length === 0) {
         toast.info("No failed sync items to retry");
@@ -162,7 +162,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
 
       for (const item of failedItems) {
         try {
-          await retrySyncItem(localDb()!, item.id!);
+          await retryOutboxItem(localDb()!, item.id);
           successCount++;
         } catch (error) {
           errorCount++;
@@ -178,8 +178,8 @@ export default function DatabaseBrowser(): ReturnType<Component> {
         });
       }
 
-      // Refresh the results if showing sync_queue
-      if (query().toLowerCase().includes("sync_queue")) {
+      // Refresh the results if showing sync_push_queue
+      if (query().toLowerCase().includes("sync_push_queue")) {
         executeQuery();
       }
     } catch (error) {

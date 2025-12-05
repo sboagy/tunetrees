@@ -8,7 +8,6 @@
  */
 
 import { and, asc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
-import { queueSync } from "../../sync";
 import { generateId } from "../../utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
@@ -208,8 +207,7 @@ export async function createTune(
     })
     .returning();
 
-  // Queue for sync to Supabase
-  await queueSync(db, "tune", "insert", tune);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   return tune;
 }
@@ -247,8 +245,7 @@ export async function updateTune(
     .where(eq(schema.tune.id, tuneId))
     .returning();
 
-  // Queue for sync to Supabase
-  await queueSync(db, "tune", "update", tune);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   return tune;
 }
@@ -304,8 +301,7 @@ export async function deleteTune(
     })
     .where(eq(schema.tune.id, tuneId));
 
-  // Queue for sync to Supabase
-  await queueSync(db, "tune", "delete", { id: tuneId });
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 }
 
 /**

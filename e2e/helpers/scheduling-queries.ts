@@ -83,6 +83,32 @@ export async function queryPracticeRecords(
 }
 
 /**
+ * Get tunes by their titles from the local database
+ *
+ * @param page - Playwright Page
+ * @param titles - Array of tune titles to query
+ * @returns Array of { id, title } objects
+ */
+export async function queryTunesByTitles(
+  page: Page,
+  titles: string[]
+): Promise<Array<{ id: string; title: string }>> {
+  log.debug(`📊 Querying tunes by ${titles.length} title(s)`);
+
+  const tunes = await page.evaluate(async (titlesArg) => {
+    const api = (window as any).__ttTestApi;
+    if (!api) {
+      throw new Error("__ttTestApi not available on window");
+    }
+
+    return await api.getTunesByTitles(titlesArg);
+  }, titles);
+
+  log.debug(`✅ Found ${tunes.length} tune(s) by title`);
+  return tunes;
+}
+
+/**
  * Get the latest practice record for a single tune
  *
  * @param page - Playwright Page

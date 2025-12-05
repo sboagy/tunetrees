@@ -57,7 +57,7 @@ export const TOOLBAR_BUTTON_BASE =
  * Ghost/outline style - transparent background with border
  */
 export const TOOLBAR_BUTTON_PRIMARY =
-  "text-gray-700 dark:text-gray-300 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-300 dark:border-gray-600";
+  "text-gray-700 dark:text-gray-300 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-300 dark:border-gray-600 disabled:text-gray-400 disabled:border-gray-200 dark:disabled:text-gray-600 dark:disabled:border-gray-700 disabled:cursor-not-allowed";
 
 /**
  * Success/Add button (e.g., Add Tune)

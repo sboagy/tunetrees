@@ -19,7 +19,7 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getSyncQueueStats } from "@/lib/sync/queue";
+import { getOutboxStats } from "@/lib/sync/outbox";
 
 export const OfflineIndicator: Component = () => {
   const { localDb, isAnonymous } = useAuth();
@@ -54,10 +54,10 @@ export const OfflineIndicator: Component = () => {
 
     const updateSyncCount = async () => {
       try {
-        const stats = await getSyncQueueStats(db);
-        setPendingCount(stats.pending + stats.syncing);
+        const stats = await getOutboxStats(db);
+        setPendingCount(stats.pending + stats.inProgress);
       } catch (error) {
-        console.error("Failed to get sync queue stats:", error);
+        console.error("Failed to get sync outbox stats:", error);
       }
     };
 

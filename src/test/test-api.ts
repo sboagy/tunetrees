@@ -380,6 +380,44 @@ async function getScheduledDates(playlistId: string, tuneIds?: string[]) {
 }
 
 /**
+ * Update scheduled dates for tunes in a playlist (local SQLite only)
+ * Used by tests to set up specific bucket distributions without going through Supabase sync.
+ *
+ * @param playlistId - The playlist ID
+ * @param updates - Array of { tuneId, scheduled } where scheduled is ISO string or null
+ */
+async function updateScheduledDates(
+  playlistId: string,
+  updates: Array<{ tuneId: string; scheduled: string | null }>
+): Promise<{ updated: number }> {
+  const db = await ensureDb();
+  let updated = 0;
+
+  for (const { tuneId, scheduled } of updates) {
+    const result = await db
+      .update(playlistTune)
+      .set({
+        scheduled: scheduled,
+        syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
+        lastModifiedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(playlistTune.playlistRef, playlistId),
+          eq(playlistTune.tuneRef, tuneId)
+        )
+      )
+      .returning();
+
+    if (result && result.length > 0) {
+      updated++;
+    }
+  }
+
+  return { updated };
+}
+
+/**
  * Get practice queue for a specific window
  */
 async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
@@ -399,6 +437,8 @@ async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
       ORDER BY bucket ASC, order_index ASC
     `;
   } else {
+    // When no explicit windowStartUtc is provided, select the latest
+    // queue window using the UUIDv7 id ordering (monotonic by time).
     query = sql`
       SELECT id, tune_ref, bucket, order_index, window_start_utc,
              window_end_utc, completed_at, snapshot_coalesced_ts
@@ -407,9 +447,13 @@ async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
         AND playlist_ref = ${playlistId}
         AND active = 1
         AND window_start_utc = (
-          SELECT MAX(window_start_utc)
+          SELECT window_start_utc
           FROM daily_practice_queue
-          WHERE user_ref = ${userRef} AND playlist_ref = ${playlistId} AND active = 1
+          WHERE user_ref = ${userRef}
+            AND playlist_ref = ${playlistId}
+            AND active = 1
+          ORDER BY id DESC
+          LIMIT 1
         )
       ORDER BY bucket ASC, order_index ASC
     `;
@@ -465,6 +509,42 @@ async function getDistinctPracticeRecordCount(
     WHERE playlist_ref = ${playlistId} AND tune_ref = ${tuneId}
   `);
   return rows[0]?.count ?? 0;
+}
+
+/**
+ * Get all queue window dates for debugging (returns ALL windows for a playlist)
+ */
+async function getAllQueueWindows(playlistId: string) {
+  const db = await ensureDb();
+  const userRef = await resolveUserId(db);
+  const rows = await db.all<{
+    window_start_utc: string;
+    count: number;
+    active: number;
+  }>(sql`
+    SELECT window_start_utc, COUNT(*) as count, active
+    FROM daily_practice_queue
+    WHERE user_ref = ${userRef} AND playlist_ref = ${playlistId}
+    GROUP BY window_start_utc, active
+    ORDER BY window_start_utc DESC
+    LIMIT 20
+  `);
+  return rows;
+}
+
+/**
+ * Get tunes by their titles from the local database.
+ * Returns an array of { id, title } objects.
+ */
+async function getTunesByTitles(titles: string[]) {
+  const db = await ensureDb();
+  if (!titles || titles.length === 0) return [];
+  // Escape single quotes in titles for safety
+  const inList = titles.map((t) => `'${t.replace(/'/g, "''")}'`).join(",");
+  const rows = await db.all<{ id: string; title: string }>(sql`
+    SELECT id, title FROM tune WHERE title IN (${sql.raw(inList)})
+  `);
+  return rows;
 }
 
 // Attach to window
@@ -584,6 +664,10 @@ declare global {
           }
         >
       >;
+      updateScheduledDates: (
+        playlistId: string,
+        updates: Array<{ tuneId: string; scheduled: string | null }>
+      ) => Promise<{ updated: number }>;
       getPracticeQueue: (
         playlistId: string,
         windowStartUtc?: string
@@ -615,6 +699,16 @@ declare global {
         playlistId: string,
         tuneId: string
       ) => Promise<number>;
+      getAllQueueWindows: (playlistId: string) => Promise<
+        Array<{
+          window_start_utc: string;
+          count: number;
+          active: number;
+        }>
+      >;
+      getTunesByTitles: (
+        titles: string[]
+      ) => Promise<Array<{ id: string; title: string }>>;
     };
   }
 }
@@ -639,9 +733,12 @@ if (typeof window !== "undefined") {
       getPracticeRecords,
       getLatestPracticeRecord,
       getScheduledDates,
+      updateScheduledDates,
       getPracticeQueue,
       getPlaylistTuneRow,
       getDistinctPracticeRecordCount,
+      getAllQueueWindows,
+      getTunesByTitles,
       stageEvaluation: async (
         tuneId: string,
         playlistId: string,

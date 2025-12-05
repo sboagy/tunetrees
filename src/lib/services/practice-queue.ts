@@ -131,6 +131,14 @@ export function computeSchedulingWindows(
     -acceptableDelinquencyWindow
   );
 
+  // // Format as ISO 8601 UTC up to seconds: YYYY-MM-DDTHH:MM:SSZ
+  // // We keep this "obviously UTC" form to avoid local/UTC ambiguity.
+  // const formatTs = (dt: Date): string => {
+  //   const iso = dt.toISOString();
+  //   // iso is always in UTC, e.g. 2026-05-01T00:00:00.000Z
+  //   return `${iso.substring(0, 19)}Z`;
+  // };
+
   // Format as YYYY-MM-DD HH:MM:SS (legacy format for lexicographic comparison)
   const formatTs = (dt: Date): string => {
     return dt.toISOString().replace("T", " ").substring(0, 19);
@@ -401,32 +409,21 @@ async function persistQueueRows(
   windows: SchedulingWindows
 ): Promise<DailyPracticeQueueRow[]> {
   try {
-    // Insert all rows and queue for sync
+    // Insert all rows - sync is handled automatically by SQL triggers
     for (const row of rows) {
       const id = generateId();
       const fullRow = { id, ...row };
 
       // Insert into local database
+      // Sync is handled automatically by SQL triggers populating sync_outbox
       await db.insert(dailyPracticeQueue).values(fullRow).run();
 
-      // Transform to snake_case for Supabase (match Drizzle's internal transformation)
-      const snakeCaseRow: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(fullRow)) {
-        const snakeKey = key.replace(
-          /[A-Z]/g,
-          (letter) => `_${letter.toLowerCase()}`
-        );
-        snakeCaseRow[snakeKey] = value;
-      }
-
-      // Queue for sync to Supabase with snake_case column names
-      const { queueSync } = await import("../sync/queue");
-      await queueSync(
-        db as SqliteDatabase,
-        "daily_practice_queue",
-        "insert",
-        snakeCaseRow
-      );
+      const debugRow = await db
+        .select()
+        .from(dailyPracticeQueue)
+        .where(eq(dailyPracticeQueue.id, id))
+        .all();
+      console.log(`debugRow: ${debugRow}`);
     }
 
     // Fetch back the inserted rows

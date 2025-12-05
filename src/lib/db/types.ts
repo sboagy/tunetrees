@@ -39,7 +39,6 @@ export type TuneType = InferSelectModel<typeof schema.tuneType>;
 // export type UserAnnotationSet = InferSelectModel<
 //   typeof schema.userAnnotationSet
 // >;
-export type SyncQueueItem = InferSelectModel<typeof schema.syncQueue>;
 
 // Insert types (creating new records)
 export type NewUser = InferInsertModel<typeof schema.userProfile>;
@@ -66,7 +65,6 @@ export type NewTuneType = InferInsertModel<typeof schema.tuneType>;
 // export type NewUserAnnotationSet = InferInsertModel<
 //   typeof schema.userAnnotationSet
 // >;
-export type NewSyncQueueItem = InferInsertModel<typeof schema.syncQueue>;
 // Normalized user scheduling options used across services
 export interface IUserSchedulingOptions {
   userId: string;

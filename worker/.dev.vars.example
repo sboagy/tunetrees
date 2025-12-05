@@ -1,0 +1,4 @@
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_JWT_SECRET=your_supabase_jwt_secret
+# Hyperdrive connection string (if testing locally with Hyperdrive shim, otherwise use direct connection string)
+HYPERDRIVE=postgres://user:password@host:port/database

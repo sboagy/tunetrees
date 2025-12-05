@@ -9,7 +9,6 @@
  */
 
 import { and, eq } from "drizzle-orm";
-import { queueSync } from "../../sync";
 import { generateId } from "../../utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
@@ -92,27 +91,7 @@ export async function getOrCreateTuneOverride(
 
   await db.insert(schema.tuneOverride).values(insertValues);
 
-  // Queue for sync to Supabase - include only non-NULL override fields
-  const syncData: any = {
-    id: overrideId,
-    tuneRef: tuneId,
-    userRef: userId,
-    deleted: 0,
-    syncVersion: 0,
-    lastModifiedAt: now,
-    deviceId: deviceId,
-  };
-
-  // Only include non-NULL override fields in sync data
-  if (insertValues.title !== null) syncData.title = insertValues.title;
-  if (insertValues.type !== null) syncData.type = insertValues.type;
-  if (insertValues.structure !== null)
-    syncData.structure = insertValues.structure;
-  if (insertValues.genre !== null) syncData.genre = insertValues.genre;
-  if (insertValues.mode !== null) syncData.mode = insertValues.mode;
-  if (insertValues.incipit !== null) syncData.incipit = insertValues.incipit;
-
-  await queueSync(db, "tune_override", "insert", syncData);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
   return { id: overrideId, isNew: true };
 }
@@ -159,29 +138,7 @@ export async function updateTuneOverride(
     throw new Error(`tune_override ${overrideId} not found after update`);
   }
 
-  // Queue for sync to Supabase - only include fields that are NOT NULL
-  // This prevents overwriting existing overrides with NULL values
-  const syncData: any = {
-    id: overrideId,
-    tuneRef: currentRecord[0].tuneRef,
-    userRef: currentRecord[0].userRef,
-    lastModifiedAt: currentRecord[0].lastModifiedAt,
-    deviceId: currentRecord[0].deviceId,
-    deleted: currentRecord[0].deleted,
-    syncVersion: currentRecord[0].syncVersion,
-  };
-
-  // Only include override fields that are NOT NULL
-  if (currentRecord[0].title !== null) syncData.title = currentRecord[0].title;
-  if (currentRecord[0].type !== null) syncData.type = currentRecord[0].type;
-  if (currentRecord[0].structure !== null)
-    syncData.structure = currentRecord[0].structure;
-  if (currentRecord[0].genre !== null) syncData.genre = currentRecord[0].genre;
-  if (currentRecord[0].mode !== null) syncData.mode = currentRecord[0].mode;
-  if (currentRecord[0].incipit !== null)
-    syncData.incipit = currentRecord[0].incipit;
-
-  await queueSync(db, "tune_override", "update", syncData);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 }
 
 /**
@@ -233,23 +190,7 @@ export async function clearTuneOverrideFields(
     return;
   }
 
-  // Queue update sync only with remaining non-null fields
-  const syncData: any = {
-    id: row.id,
-    tuneRef: row.tuneRef,
-    userRef: row.userRef,
-    lastModifiedAt: row.lastModifiedAt,
-    deviceId: row.deviceId,
-    deleted: row.deleted,
-    syncVersion: row.syncVersion,
-  };
-  if (row.title !== null) syncData.title = row.title;
-  if (row.type !== null) syncData.type = row.type;
-  if (row.structure !== null) syncData.structure = row.structure;
-  if (row.genre !== null) syncData.genre = row.genre;
-  if (row.mode !== null) syncData.mode = row.mode;
-  if (row.incipit !== null) syncData.incipit = row.incipit;
-  await queueSync(db, "tune_override", "update", syncData);
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 }
 
 /**
@@ -294,6 +235,5 @@ export async function deleteTuneOverride(
     })
     .where(eq(schema.tuneOverride.id, overrideId));
 
-  // Queue for sync to Supabase
-  await queueSync(db, "tune_override", "delete", { id: overrideId });
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 }

@@ -20,6 +20,10 @@ import * as relations from "../../../drizzle/relations";
 import * as schema from "../../../drizzle/schema-sqlite";
 import { initializeViews, recreateViews } from "./init-views";
 import {
+  createSyncPushQueueTable,
+  installSyncTriggers,
+} from "./install-triggers";
+import {
   clearLocalDatabaseForMigration,
   clearMigrationParams,
   getCurrentSchemaVersion,
@@ -287,27 +291,16 @@ export async function initializeDb(
       } catch (err) {
         console.warn("⚠️ Column ensure check failed:", err);
       }
+
+      // Install sync push queue and triggers for automatic change tracking
+      // The sync_push_queue table and triggers are used for the trigger-based sync architecture
       try {
-        sqliteDb.run(`
-      CREATE TABLE IF NOT EXISTS sync_queue (
-        id TEXT PRIMARY KEY NOT NULL,
-        table_name TEXT NOT NULL,
-        operation TEXT NOT NULL,
-        data TEXT NOT NULL,
-        status TEXT DEFAULT 'pending' NOT NULL,
-        created_at TEXT NOT NULL,
-        synced_at TEXT,
-        attempts INTEGER DEFAULT 0 NOT NULL,
-        last_error TEXT
-      )
-    `);
-        sqliteDb.run(`
-      CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status)
-    `);
-        console.log("✅ Ensured sync_queue table exists");
+        createSyncPushQueueTable(sqliteDb);
+        installSyncTriggers(sqliteDb);
       } catch (error) {
-        console.error("❌ Failed to create sync_queue table:", error);
+        console.error("❌ Failed to install sync triggers:", error);
       }
+
       console.log(
         `✅ SQLite WASM database ready for user: ${userId.substring(0, 8)}...`
       );

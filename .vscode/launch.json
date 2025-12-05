@@ -55,6 +55,29 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Debug Worker (Wrangler dev)",
+            "cwd": "/Users/sboag/gittt/tunetrees/worker",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": [
+                "wrangler",
+                "dev",
+                "--inspect",        // enable Node inspector
+                "--local"           // if you’re using the local Node runtime
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "NODE_ENV": "development"
+            },
+            "autoAttachChildProcesses": true,
+            "sourceMapPathOverrides": {
+                "webpack:///src/*": "${workspaceFolder}/worker/src/*",
+                "*/worker/src/*": "${workspaceFolder}/worker/src/*",
+                "*/shared/*": "${workspaceFolder}/shared/*"
+            }
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Run npm migrate:production",
             "cwd": "/Users/sboag/gittt/tunetrees",
             "runtimeExecutable": "npm",

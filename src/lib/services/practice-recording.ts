@@ -33,7 +33,6 @@ import type {
   RecordPracticeInput,
 } from "../db/types";
 import { FSRS_QUALITY_MAP, FSRSService } from "../scheduling/fsrs-service";
-import { queueSync } from "../sync/queue";
 import { getPracticeDate } from "../utils/practice-date";
 import { generateId } from "../utils/uuid";
 
@@ -166,11 +165,7 @@ async function persistPracticeRecord(
         eq(playlistTune.tuneRef, record.tuneRef)
       )
     );
-  await queueSync(db, "practice_record", "update", inserted);
-  await queueSync(db, "playlist_tune", "update", {
-    playlistRef: record.playlistRef,
-    tuneRef: record.tuneRef,
-  });
+  // Sync is handled automatically by SQL triggers populating sync_outbox
   return inserted;
 }
 
@@ -576,29 +571,7 @@ export async function commitStagedEvaluations(
         )
       `);
 
-      // Queue sync for the newly inserted record
-      // Use "update" operation so sync engine does UPSERT (handles duplicates gracefully)
-      await queueSync(db, "practice_record", "update", {
-        id: recordId,
-        playlistRef: playlistId,
-        tuneRef: staged.tune_id,
-        practiced: practicedTimestamp,
-        quality: staged.quality,
-        easiness: null,
-        interval: staged.interval,
-        repetitions: staged.repetitions,
-        due: staged.due,
-        backupPracticed: null,
-        stability: staged.stability,
-        elapsedDays: staged.elapsed_days ?? null,
-        lapses: lapsesValue,
-        state: staged.state,
-        difficulty: staged.difficulty,
-        step: staged.step,
-        goal: staged.goal,
-        technique: staged.technique,
-        lastModifiedAt: now,
-      });
+      // Sync is handled automatically by SQL triggers populating sync_outbox
 
       // Update playlist_tune.current (next review date)
       // Clear any one-off manual override in playlist_tune.scheduled now that an
@@ -613,10 +586,7 @@ export async function commitStagedEvaluations(
           AND tune_ref = ${staged.tune_id}
       `);
 
-      await queueSync(db, "playlist_tune", "update", {
-        playlistRef: playlistId,
-        tuneRef: staged.tune_id,
-      });
+      // Sync is handled automatically by SQL triggers populating sync_outbox
 
       // Delete from table_transient_data
       console.log(`Deleting staged evaluation for tune ${staged.tune_id}...`);
@@ -627,56 +597,12 @@ export async function commitStagedEvaluations(
           AND playlist_id = ${playlistId}
       `);
 
-      await queueSync(db, "table_transient_data", "delete", {
-        userId,
-        tuneId: staged.tune_id,
-        playlistId,
-      });
+      // Sync is handled automatically by SQL triggers populating sync_outbox
 
       // Mark queue item as completed
       console.log(
         `Marking queue item as completed for tune ${staged.tune_id}...`
       );
-
-      // Get the complete queue item for sync (need id, window_start_utc, and window_end_utc)
-      const queueItem = await db.get<{
-        id: string;
-        window_start_utc: string;
-        window_end_utc: string;
-        bucket: number;
-        order_index: number;
-        snapshot_coalesced_ts: string;
-        generated_at: string;
-        active: number;
-        sync_version: number;
-        last_modified_at: string;
-        scheduled_snapshot: string | null;
-        latest_due_snapshot: string | null;
-        acceptable_delinquency_window_snapshot: number | null;
-        tz_offset_minutes_snapshot: number | null;
-      }>(sql`
-        SELECT 
-          id,
-          window_start_utc,
-          window_end_utc,
-          bucket,
-          order_index,
-          snapshot_coalesced_ts,
-          generated_at,
-          active,
-          sync_version,
-          last_modified_at,
-          scheduled_snapshot,
-          latest_due_snapshot,
-          acceptable_delinquency_window_snapshot,
-          tz_offset_minutes_snapshot
-        FROM daily_practice_queue
-        WHERE user_ref = ${userId}
-          AND playlist_ref = ${playlistId}
-          AND tune_ref = ${staged.tune_id}
-          AND (window_start_utc = ${startA} OR window_start_utc = ${startB})
-        LIMIT 1
-      `);
 
       await db.run(sql`
         UPDATE daily_practice_queue
@@ -719,28 +645,7 @@ export async function commitStagedEvaluations(
         verifyQueue.completed_at
       );
 
-      if (queueItem) {
-        await queueSync(db, "daily_practice_queue", "update", {
-          userRef: userId,
-          playlistRef: playlistId,
-          windowStartUtc: queueItem.window_start_utc,
-          tuneRef: staged.tune_id,
-          bucket: queueItem.bucket,
-          orderIndex: queueItem.order_index,
-          snapshotCoalescedTs: queueItem.snapshot_coalesced_ts,
-          generatedAt: queueItem.generated_at,
-          active: queueItem.active,
-          syncVersion: queueItem.sync_version,
-          lastModifiedAt: now, // reflect completion modification
-          windowEndUtc: queueItem.window_end_utc,
-          scheduledSnapshot: queueItem.scheduled_snapshot,
-          latestDueSnapshot: queueItem.latest_due_snapshot,
-          acceptableDelinquencyWindowSnapshot:
-            queueItem.acceptable_delinquency_window_snapshot,
-          tzOffsetMinutesSnapshot: queueItem.tz_offset_minutes_snapshot,
-          completedAt: now,
-        });
-      }
+      // Sync is handled automatically by SQL triggers populating sync_outbox
 
       committedTuneIds.push(staged.tune_id);
       console.log(`✓ Completed processing tune ${staged.tune_id}`);
@@ -835,12 +740,7 @@ export async function undoLastPracticeRating(
         )
       );
 
-    // Queue sync operations
-    await queueSync(db, "practice_record", "delete", { id: lastRecord.id! });
-    await queueSync(db, "playlist_tune", "update", {
-      playlistRef: playlistId,
-      tuneRef: tuneId,
-    });
+    // Sync is handled automatically by SQL triggers populating sync_outbox
 
     return true;
   } catch (error) {

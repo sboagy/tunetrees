@@ -17,6 +17,7 @@ import {
   type ParentComponent,
   useContext,
 } from "solid-js";
+import { TABLE_REGISTRY } from "../../../shared/table-meta";
 import {
   clearDb as clearSqliteDb,
   closeDb as closeSqliteDb,
@@ -26,8 +27,7 @@ import {
 } from "../db/client-sqlite";
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
-
-import { clearSyncQueue, type SyncService, startSyncWorker } from "../sync";
+import { clearSyncOutbox, type SyncService, startSyncWorker } from "../sync";
 
 /**
  * Authentication state interface
@@ -221,8 +221,160 @@ export const AuthProvider: ParentComponent = (props) => {
   let isInitializing = false;
 
   /**
-   * Initialize local database for anonymous user (no Supabase sync initially)
-   * Creates a user_profile entry in both local SQLite AND Supabase
+   * Query local SQLite for user's internal ID from user_profile.
+   * Used after initial sync to get the internal ID for FK relationships.
+   */
+  async function getUserInternalIdFromLocalDb(
+    db: SqliteDatabase,
+    authUserId: string
+  ): Promise<string | null> {
+    try {
+      const { userProfile } = await import("@/lib/db/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const result = await db
+        .select({ id: userProfile.id })
+        .from(userProfile)
+        .where(eq(userProfile.supabaseUserId, authUserId))
+        .limit(1);
+
+      if (result && result.length > 0) {
+        return result[0].id;
+      }
+      return null;
+    } catch (error) {
+      log.error("Failed to get user internal ID from local DB:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Start the sync worker with common configuration.
+   * Returns the sync worker stop function and service instance.
+   */
+  async function startSyncWorkerForUser(
+    db: SqliteDatabase,
+    authUserId: string,
+    isAnonymousUser: boolean
+  ): Promise<{ stop: () => void; service: SyncService }> {
+    const syncWorker = startSyncWorker(db, {
+      supabase,
+      userId: authUserId,
+      realtimeEnabled:
+        !isAnonymousUser && import.meta.env.VITE_REALTIME_ENABLED === "true",
+      syncIntervalMs: isAnonymousUser ? 30000 : 5000, // Anonymous: less frequent sync
+      onSyncComplete: async (result) => {
+        console.log("[AuthContext] onSyncComplete called", result);
+        log.debug(
+          "Sync completed, incrementing remote sync down completion version"
+        );
+
+        setRemoteSyncDownCompletionVersion((prev) => {
+          const newVersion = prev + 1;
+          log.debug(
+            "Remote sync down completion version changed:",
+            prev,
+            "->",
+            newVersion
+          );
+          return newVersion;
+        });
+
+        // Update last syncDown timestamp
+        if (syncServiceInstance) {
+          const ts = syncServiceInstance.getLastSyncDownTimestamp();
+          if (ts) setLastSyncTimestamp(ts);
+          const mode = syncServiceInstance.getLastSyncMode();
+          if (mode) setLastSyncMode(mode);
+        } else if (result?.timestamp) {
+          setLastSyncTimestamp(result.timestamp);
+        }
+
+        // On first sync, set userIdInt from local SQLite and mark sync complete
+        if (!initialSyncComplete()) {
+          // Get user's internal ID from local SQLite (now available after sync)
+          const internalId = await getUserInternalIdFromLocalDb(db, authUserId);
+          if (internalId) {
+            setUserIdInt(internalId);
+            console.log(
+              `✅ [AuthContext] User internal ID set from local DB: ${internalId}`
+            );
+          } else if (isAnonymousUser) {
+            // For anonymous users, internal ID equals auth ID (we set it that way)
+            setUserIdInt(authUserId);
+            console.log(
+              `✅ [AuthContext] Anonymous user - using auth ID as internal ID`
+            );
+          } else {
+            log.warn(
+              "User profile not found in local DB after initial sync - this may cause issues"
+            );
+          }
+
+          setInitialSyncComplete(true);
+          console.log(
+            "✅ [AuthContext] Initial sync complete, UI can now load data"
+          );
+          console.log("🔍 [AuthContext] Sync result:", {
+            success: result?.success,
+            itemsSynced: result?.itemsSynced,
+            errors: result?.errors?.length || 0,
+          });
+
+          // Persist database after initial sync
+          import("@/lib/db/client-sqlite").then(({ persistDb }) => {
+            persistDb()
+              .then(() => {
+                console.log(
+                  "💾 [AuthContext] Database persisted after initial sync"
+                );
+              })
+              .catch((e) => {
+                console.warn(
+                  "⚠️ [AuthContext] Failed to persist after sync:",
+                  e
+                );
+              });
+          });
+        }
+
+        // Granular Signaling: Trigger specific view refreshes
+        try {
+          if (result.affectedTables && result.affectedTables.length > 0) {
+            const categories = new Set<string>();
+            for (const table of result.affectedTables) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const meta = (TABLE_REGISTRY as any)[table];
+              if (meta?.changeCategory) {
+                categories.add(meta.changeCategory);
+              }
+            }
+
+            if (categories.has("repertoire")) {
+              log.debug("[AuthContext] Triggering repertoire list refresh");
+              incrementRepertoireListChanged();
+            }
+            if (categories.has("practice")) {
+              log.debug("[AuthContext] Triggering practice list refresh");
+              incrementPracticeListStagedChanged();
+            }
+            if (categories.has("catalog")) {
+              log.debug("[AuthContext] Triggering catalog list refresh");
+              incrementCatalogListChanged();
+            }
+          }
+        } catch (e) {
+          log.error("[AuthContext] Error in granular signaling:", e);
+        }
+      },
+    });
+
+    return syncWorker;
+  }
+
+  /**
+   * Initialize local database for anonymous user.
+   * Creates a user_profile in local SQLite and starts sync worker to get reference data.
    */
   async function initializeAnonymousDatabase(anonymousUserId: string) {
     // Check if we're already initializing
@@ -303,228 +455,41 @@ export const AuthProvider: ParentComponent = (props) => {
         throw localError; // This is critical - we need the local profile
       }
 
-      // 2. Also create user_profile in Supabase (for future sync when they convert)
-      try {
-        const { data: existingProfile, error: fetchError } = await supabase
-          .from("user_profile")
-          .select("id")
-          .eq("supabase_user_id", anonymousUserId)
-          .maybeSingle();
+      // Set anonymous flag early (before sync)
+      setIsAnonymous(true);
 
-        if (fetchError) {
-          log.warn(
-            "Error checking user_profile for anonymous user:",
-            fetchError
-          );
-        }
-
-        if (!existingProfile) {
-          const { error: insertError } = await supabase
-            .from("user_profile")
-            .insert({
-              id: anonymousUserId,
-              supabase_user_id: anonymousUserId,
-              email: null,
-              name: "Anonymous User",
-              sr_alg_type: "fsrs",
-            });
-
-          if (insertError) {
-            if (!insertError.message?.includes("duplicate key")) {
-              log.warn(
-                "Failed to create Supabase user_profile for anonymous user:",
-                insertError
-              );
-            }
-          } else {
-            console.log(
-              "✅ Created Supabase user_profile for anonymous user:",
-              anonymousUserId
-            );
-          }
-        }
-      } catch (profileError) {
-        // Non-fatal - Supabase profile can be created later during conversion
-        log.warn(
-          "Error managing Supabase user_profile for anonymous user:",
-          profileError
+      // 2. Start sync worker to fetch reference data (genres, tune_types, instruments, tunes)
+      // The sync worker will pull all public reference data from the Worker endpoint
+      // This replaces the old direct Supabase queries for reference data
+      if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
+        console.log("📥 Starting sync worker for anonymous user...");
+        const syncWorker = await startSyncWorkerForUser(
+          db,
+          anonymousUserId,
+          true // isAnonymous
+        );
+        stopSyncWorker = syncWorker.stop;
+        syncServiceInstance = syncWorker.service;
+        log.info("Sync worker started for anonymous user");
+        console.log(
+          "⏳ [AuthContext] Anonymous sync worker started, waiting for initial sync..."
+        );
+        // Note: userIdInt will be set in onSyncComplete callback
+      } else {
+        log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
+        // When sync is disabled, set userIdInt immediately and mark sync as complete
+        setUserIdInt(anonymousUserId);
+        setInitialSyncComplete(true);
+        console.log(
+          "✅ [AuthContext] Anonymous mode - sync disabled, using local data only"
         );
       }
 
-      // Set anonymous user ID (this is their Supabase UUID)
-      setUserIdInt(anonymousUserId);
-      setIsAnonymous(true);
-
-      // 3. Sync reference data (genres, tune types, instruments) from Supabase
-      // Anonymous users need this data for dropdowns, but not user-specific data
-      try {
-        console.log("📥 Syncing reference data for anonymous user...");
-        await syncReferenceDataForAnonymous(db);
-        console.log("✅ Reference data synced for anonymous user");
-      } catch (refError) {
-        // Non-fatal - user can still use app, just with empty dropdowns
-        log.warn("Failed to sync reference data for anonymous user:", refError);
-      }
-
-      // Clear any pending sync queue items - anonymous users don't sync to Supabase
-      // This prevents the UI from showing "Syncing X" indefinitely
-      try {
-        const { clearSyncQueue } = await import("@/lib/sync/queue");
-        await clearSyncQueue(db);
-        console.log("🗑️ Cleared sync queue for anonymous user");
-      } catch (clearError) {
-        log.warn("Failed to clear sync queue:", clearError);
-      }
-
-      // Mark sync as complete immediately (no full remote sync for anonymous users)
-      setInitialSyncComplete(true);
-      console.log("✅ [AuthContext] Anonymous mode - local database ready");
-
-      log.info("Anonymous local database ready");
+      log.info("Anonymous local database initialization complete");
     } catch (error) {
       log.error("Failed to initialize anonymous local database:", error);
     } finally {
       isInitializing = false;
-    }
-  }
-
-  /**
-   * Sync reference data (genres, tune types, instruments) from Supabase
-   * This is needed for anonymous users to have dropdown options
-   */
-  async function syncReferenceDataForAnonymous(db: SqliteDatabase) {
-    const { genre, tuneType, instrument, genreTuneType } = await import(
-      "@/lib/db/schema"
-    );
-
-    // Sync genres
-    const { data: genres, error: genreError } = await supabase
-      .from("genre")
-      .select("*");
-
-    if (genreError) {
-      log.warn("Failed to fetch genres:", genreError);
-    } else if (genres && genres.length > 0) {
-      for (const g of genres) {
-        await db
-          .insert(genre)
-          .values({
-            id: g.id,
-            name: g.name,
-            region: g.region,
-            description: g.description,
-          })
-          .onConflictDoNothing();
-      }
-      console.log(`📥 Synced ${genres.length} genres`);
-    }
-
-    // Sync tune types
-    const { data: tuneTypes, error: tuneTypeError } = await supabase
-      .from("tune_type")
-      .select("*");
-
-    if (tuneTypeError) {
-      log.warn("Failed to fetch tune types:", tuneTypeError);
-    } else if (tuneTypes && tuneTypes.length > 0) {
-      for (const tt of tuneTypes) {
-        await db
-          .insert(tuneType)
-          .values({
-            id: tt.id,
-            name: tt.name,
-            rhythm: tt.rhythm,
-            description: tt.description,
-          })
-          .onConflictDoNothing();
-      }
-      console.log(`📥 Synced ${tuneTypes.length} tune types`);
-    }
-
-    // Sync instruments (public instruments only - where private_to_user is null)
-    const { data: instruments, error: instrumentError } = await supabase
-      .from("instrument")
-      .select("*")
-      .is("private_to_user", null);
-
-    if (instrumentError) {
-      log.warn("Failed to fetch instruments:", instrumentError);
-    } else if (instruments && instruments.length > 0) {
-      const now = new Date().toISOString();
-      for (const inst of instruments) {
-        await db
-          .insert(instrument)
-          .values({
-            id: inst.id,
-            privateToUser: null,
-            instrument: inst.instrument,
-            description: inst.description,
-            genreDefault: inst.genre_default,
-            deleted: inst.deleted ? 1 : 0,
-            syncVersion: inst.sync_version || 1,
-            lastModifiedAt: inst.last_modified_at || now,
-            deviceId: inst.device_id,
-          })
-          .onConflictDoNothing();
-      }
-      console.log(`📥 Synced ${instruments.length} instruments`);
-    }
-
-    // Sync genre-tune-type mappings
-    const { data: gttMappings, error: gttError } = await supabase
-      .from("genre_tune_type")
-      .select("*");
-
-    if (gttError) {
-      log.warn("Failed to fetch genre_tune_type mappings:", gttError);
-    } else if (gttMappings && gttMappings.length > 0) {
-      for (const gtt of gttMappings) {
-        await db
-          .insert(genreTuneType)
-          .values({
-            genreId: gtt.genre_id,
-            tuneTypeId: gtt.tune_type_id,
-          })
-          .onConflictDoNothing();
-      }
-      console.log(`📥 Synced ${gttMappings.length} genre-tune-type mappings`);
-    }
-
-    // Sync PUBLIC tunes (tunes where private_for IS NULL - meaning they're public, not private to any user)
-    // This gives anonymous users access to the tune catalog
-    const { tune } = await import("@/lib/db/schema");
-    const { data: publicTunes, error: tuneError } = await supabase
-      .from("tune")
-      .select("*")
-      .is("private_for", null)
-      .eq("deleted", false);
-
-    if (tuneError) {
-      log.warn("Failed to fetch public tunes:", tuneError);
-    } else if (publicTunes && publicTunes.length > 0) {
-      const now = new Date().toISOString();
-      for (const t of publicTunes) {
-        await db
-          .insert(tune)
-          .values({
-            id: t.id,
-            idForeign: t.id_foreign,
-            primaryOrigin: t.primary_origin,
-            title: t.title,
-            type: t.type,
-            structure: t.structure,
-            mode: t.mode,
-            incipit: t.incipit,
-            genre: t.genre,
-            privateFor: t.private_for,
-            deleted: t.deleted ? 1 : 0,
-            syncVersion: t.sync_version || 1,
-            lastModifiedAt: t.last_modified_at || now,
-            deviceId: t.device_id,
-          })
-          .onConflictDoNothing();
-      }
-      console.log(`📥 Synced ${publicTunes.length} public tunes`);
     }
   }
 
@@ -575,114 +540,51 @@ export const AuthProvider: ParentComponent = (props) => {
         "✅ [initializeLocalDatabase] Database initialized and signal set"
       );
 
-      // Clear any stale sync queue items from previous sessions
-      // The data will be synced down fresh from Supabase, so stale queue items
-      // would just cause errors when trying to upload
-      console.log("🧹 Clearing sync queue (stale items from previous session)");
-      await clearSyncQueue(db);
+      // Clear any stale sync outbox items from previous sessions
+      // The data will be synced down fresh from Supabase, so stale items
+      // would just cause errors when trying to upload outdated data
+      console.log(
+        "🧹 Clearing sync outbox (stale items from previous session)"
+      );
+      await clearSyncOutbox(db);
 
       // Set up auto-persistence (store cleanup for later)
       autoPersistCleanup = setupAutoPersist();
 
-      // Get user's UUID from user_profile table (user_ref columns now use UUID)
-      const { data: userProfile, error } = await supabase
-        .from("user_profile")
-        .select("id, supabase_user_id")
-        .eq("supabase_user_id", userId)
-        .single();
-
-      if (error || !userProfile) {
-        log.error("Failed to get user profile:", error);
-        throw new Error("User profile not found in database");
-      }
-
-      const userInternalId = userProfile.id; // Internal UUID (PK in Postgres)
-      const userUuid = userProfile.supabase_user_id; // Auth UUID
-      setUserIdInt(userInternalId); // Use internal ID for FK relationships
-      log.debug("User internal ID:", userInternalId, "Auth UUID:", userUuid);
-
       // Start sync worker (now uses Supabase JS client, browser-compatible)
-      // Realtime is disabled by default to reduce console noise during development
-      // Set VITE_REALTIME_ENABLED=true in .env.local to enable live sync
-      // Set VITE_DISABLE_SYNC=true to completely disable sync (useful for testing seed data)
+      // The user's internal ID will be set in onSyncComplete callback after initial sync
+      // This avoids querying Supabase directly for user_profile
       if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
-        const syncWorker = startSyncWorker(db, {
-          supabase,
-          userId: userUuid,
-          realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
-          syncIntervalMs: 5000, // Sync every 5 seconds (fast upload of local changes)
-          onSyncComplete: (result) => {
-            log.debug(
-              "Sync completed, incrementing remote sync down completion version"
-            );
-            setRemoteSyncDownCompletionVersion((prev) => {
-              const newVersion = prev + 1;
-              log.debug(
-                "Remote sync down completion version changed:",
-                prev,
-                "->",
-                newVersion
-              );
-              return newVersion;
-            });
-            // Update last syncDown timestamp (only changes when syncDown runs; getter returns last syncDown)
-            if (syncServiceInstance) {
-              const ts = syncServiceInstance.getLastSyncDownTimestamp();
-              if (ts) setLastSyncTimestamp(ts);
-              const mode = syncServiceInstance.getLastSyncMode();
-              if (mode) setLastSyncMode(mode);
-            } else if (result?.timestamp) {
-              // Fallback if service not available yet
-              setLastSyncTimestamp(result.timestamp);
-              // Mode unknown in fallback; leave as null
-            }
-            // Mark initial sync as complete on first sync
-            if (!initialSyncComplete()) {
-              setInitialSyncComplete(true);
-              console.log(
-                "✅ [AuthContext] Initial sync complete, UI can now load data"
-              );
-              console.log("🔍 [AuthContext] Sync result:", {
-                success: result?.success,
-                itemsSynced: result?.itemsSynced,
-                errors: result?.errors?.length || 0,
-              });
-
-              // Persist database after initial sync to ensure data is saved
-              import("@/lib/db/client-sqlite").then(({ persistDb }) => {
-                persistDb()
-                  .then(() => {
-                    console.log(
-                      "💾 [AuthContext] Database persisted after initial sync"
-                    );
-                  })
-                  .catch((e) => {
-                    console.warn(
-                      "⚠️ [AuthContext] Failed to persist after sync:",
-                      e
-                    );
-                  });
-              });
-            }
-          },
-        });
+        console.log("📥 Starting sync worker for authenticated user...");
+        const syncWorker = await startSyncWorkerForUser(
+          db,
+          userId,
+          false // not anonymous
+        );
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
         log.info("Sync worker started");
         console.log(
           "⏳ [AuthContext] Sync worker started, waiting for initial sync..."
         );
-
-        // Note: syncWorker automatically runs initial syncDown on startup
-        // We rely on onSyncComplete callback above to mark sync as complete
-        console.log("⏳ [AuthContext] Waiting for initial sync to complete...");
+        // Note: userIdInt will be set in onSyncComplete callback after initial sync
       } else {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
-        // When sync is disabled, mark as complete immediately
+        // When sync is disabled, try to get userIdInt from local DB if available
+        const internalId = await getUserInternalIdFromLocalDb(db, userId);
+        if (internalId) {
+          setUserIdInt(internalId);
+        } else {
+          // Fallback: use auth UUID directly (may cause issues with FKs if mismatch)
+          log.warn(
+            "No user profile in local DB - using auth UUID as internal ID"
+          );
+          setUserIdInt(userId);
+        }
         setInitialSyncComplete(true);
       }
 
-      log.info("Local database ready");
+      log.info("Local database initialization complete");
     } catch (error) {
       log.error("Failed to initialize local database:", error);
     } finally {
@@ -1075,28 +977,30 @@ export const AuthProvider: ParentComponent = (props) => {
       console.log("✅ Email/password linked to anonymous account");
       console.log("👤 User ID preserved:", updateData.user?.id);
 
-      // Update user_profile with the new email and name
+      // Update user_profile in LOCAL SQLite - sync will push it to Supabase
+      // This avoids direct Supabase queries which can race with sync
       try {
-        const { error: profileUpdateError } = await supabase
-          .from("user_profile")
-          .update({
-            email,
-            name,
-          })
-          .eq("supabase_user_id", anonymousUserId);
+        const db = localDb();
+        if (db) {
+          const { userProfile } = await import("@/lib/db/schema");
+          const { eq } = await import("drizzle-orm");
 
-        if (profileUpdateError) {
-          log.warn(
-            "Failed to update user_profile during conversion:",
-            profileUpdateError
-          );
-        } else {
-          console.log("✅ user_profile updated with email:", email);
+          await db
+            .update(userProfile)
+            .set({
+              email,
+              name,
+              lastModifiedAt: new Date().toISOString(),
+              syncVersion: 2, // Increment to trigger sync
+            })
+            .where(eq(userProfile.supabaseUserId, anonymousUserId));
+
+          console.log("✅ Local user_profile updated with email:", email);
         }
       } catch (profileError) {
-        // Non-fatal - the account is still converted
+        // Non-fatal - the account is still converted, sync will eventually catch up
         log.warn(
-          "Error updating user_profile during conversion:",
+          "Error updating local user_profile during conversion:",
           profileError
         );
       }
@@ -1114,40 +1018,25 @@ export const AuthProvider: ParentComponent = (props) => {
       // Note: is_anonymous in auth.users is automatically set to false by Supabase
       // when the user is linked to an email identity
 
-      // If sync was not running (anonymous mode), start it now
+      // Sync worker should already be running (anonymous users now use sync too)
+      // It will push the updated user_profile automatically
+      // If for some reason it's not running, start it now
       const db = localDb();
       const currentUser = user();
       if (db && currentUser && !stopSyncWorker) {
         console.log("⏳ Starting sync with Supabase for converted user...");
-        const syncWorker = startSyncWorker(db, {
-          supabase,
-          userId: currentUser.id,
-          realtimeEnabled: import.meta.env.VITE_REALTIME_ENABLED === "true",
-          syncIntervalMs: 5000,
-          onSyncComplete: (result) => {
-            log.debug(
-              "Sync completed, incrementing remote sync down completion version"
-            );
-            setRemoteSyncDownCompletionVersion((prev) => prev + 1);
-            if (syncServiceInstance) {
-              const ts = syncServiceInstance.getLastSyncDownTimestamp();
-              if (ts) setLastSyncTimestamp(ts);
-              const mode = syncServiceInstance.getLastSyncMode();
-              if (mode) setLastSyncMode(mode);
-            } else if (result?.timestamp) {
-              setLastSyncTimestamp(result.timestamp);
-            }
-            if (!initialSyncComplete()) {
-              setInitialSyncComplete(true);
-              console.log(
-                "✅ [AuthContext] Initial sync complete after conversion"
-              );
-            }
-          },
-        });
+        const syncWorker = await startSyncWorkerForUser(
+          db,
+          currentUser.id,
+          false // no longer anonymous
+        );
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
         log.info("Sync worker started after anonymous conversion");
+      } else if (stopSyncWorker) {
+        console.log(
+          "✅ Sync worker already running - will push updated user_profile"
+        );
       }
 
       setLoading(false);

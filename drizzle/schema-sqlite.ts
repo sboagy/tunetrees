@@ -7,36 +7,42 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { COL, TBL } from "../shared/db-constants";
 
 export const dailyPracticeQueue = sqliteTable(
-  "daily_practice_queue",
+  TBL.DAILY_PRACTICE_QUEUE,
   {
-    id: text().primaryKey().notNull(), // UUID
-    userRef: text("user_ref").notNull(), // UUID FK
-    playlistRef: text("playlist_ref").notNull(), // UUID FK
-    mode: text(),
-    queueDate: text("queue_date"),
-    windowStartUtc: text("window_start_utc").notNull(),
-    windowEndUtc: text("window_end_utc").notNull(),
-    tuneRef: text("tune_ref").notNull(), // UUID FK
-    bucket: integer().notNull(),
-    orderIndex: integer("order_index").notNull(),
-    snapshotCoalescedTs: text("snapshot_coalesced_ts").notNull(),
-    scheduledSnapshot: text("scheduled_snapshot"),
-    latestDueSnapshot: text("latest_due_snapshot"),
+    id: text(COL.ID).primaryKey().notNull(), // UUID
+    userRef: text(COL.USER_REF).notNull(), // UUID FK
+    playlistRef: text(COL.PLAYLIST_REF).notNull(), // UUID FK
+    mode: text(COL.MODE), // Note: MODE is in COL but was missing in previous schema? No, it was text() without name. Wait.
+    // In original schema: mode: text(), which means column name is "mode".
+    // In COL: MODE: "mode". So text(COL.MODE) is correct.
+    queueDate: text(COL.QUEUE_DATE),
+    windowStartUtc: text(COL.WINDOW_START_UTC).notNull(),
+    windowEndUtc: text(COL.WINDOW_END_UTC).notNull(),
+    tuneRef: text(COL.TUNE_REF).notNull(), // UUID FK
+    bucket: integer(COL.BUCKET).notNull(),
+    orderIndex: integer(COL.ORDER_INDEX).notNull(),
+    snapshotCoalescedTs: text(COL.SNAPSHOT_COALESCED_TS).notNull(),
+    scheduledSnapshot: text(COL.SCHEDULED_SNAPSHOT),
+    latestDueSnapshot: text(COL.LATEST_DUE_SNAPSHOT),
     acceptableDelinquencyWindowSnapshot: integer(
-      "acceptable_delinquency_window_snapshot"
+      COL.ACCEPTABLE_DELINQUENCY_WINDOW_SNAPSHOT
     ),
-    tzOffsetMinutesSnapshot: integer("tz_offset_minutes_snapshot"),
-    generatedAt: text("generated_at").notNull(),
-    completedAt: text("completed_at"),
-    exposuresRequired: integer("exposures_required"),
-    exposuresCompleted: integer("exposures_completed").default(0),
-    outcome: text(),
-    active: integer().default(1).notNull(),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    tzOffsetMinutesSnapshot: integer(COL.TZ_OFFSET_MINUTES_SNAPSHOT),
+    generatedAt: text(COL.GENERATED_AT).notNull(),
+    completedAt: text(COL.COMPLETED_AT),
+    exposuresRequired: integer(COL.EXPOSURES_REQUIRED),
+    exposuresCompleted: integer(COL.EXPOSURES_COMPLETED).default(0),
+    outcome: text(COL.OUTCOME),
+    // NOTE: Postgres uses a boolean type for `active`.
+    // We keep SQLite as integer 0/1 but conceptually this is boolean;
+    // downstream code and sync logic treat non-zero as true.
+    active: integer(COL.ACTIVE).default(1).notNull(),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     uniqueIndex(
@@ -61,20 +67,20 @@ export const dailyPracticeQueue = sqliteTable(
   ]
 );
 
-export const genre = sqliteTable("genre", {
-  id: text().primaryKey().notNull(), // UUID (was TEXT semantic ID)
-  name: text(),
-  region: text(),
-  description: text(),
+export const genre = sqliteTable(TBL.GENRE, {
+  id: text(COL.ID).primaryKey().notNull(), // UUID (was TEXT semantic ID)
+  name: text(COL.NAME),
+  region: text(COL.REGION),
+  description: text(COL.DESCRIPTION),
 });
 
 export const genreTuneType = sqliteTable(
-  "genre_tune_type",
+  TBL.GENRE_TUNE_TYPE,
   {
-    genreId: text("genre_id")
+    genreId: text(COL.GENRE_ID)
       .notNull()
       .references(() => genre.id), // UUID FK
-    tuneTypeId: text("tune_type_id")
+    tuneTypeId: text(COL.TUNE_TYPE_ID)
       .notNull()
       .references(() => tuneType.id), // UUID FK
   },
@@ -87,17 +93,17 @@ export const genreTuneType = sqliteTable(
 );
 
 export const instrument = sqliteTable(
-  "instrument",
+  TBL.INSTRUMENT,
   {
-    id: text().primaryKey().notNull(), // UUID
-    privateToUser: text("private_to_user").references(() => userProfile.id), // UUID FK to internal ID
-    instrument: text(),
-    description: text(),
-    genreDefault: text("genre_default"), // UUID FK to genre
-    deleted: integer().default(0).notNull(),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    id: text(COL.ID).primaryKey().notNull(), // UUID
+    privateToUser: text(COL.PRIVATE_TO_USER).references(() => userProfile.id), // UUID FK to internal ID
+    instrument: text(COL.INSTRUMENT),
+    description: text(COL.DESCRIPTION),
+    genreDefault: text(COL.GENRE_DEFAULT), // UUID FK to genre
+    deleted: integer(COL.DELETED).default(0).notNull(),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     uniqueIndex("instrument_private_to_user_instrument_unique").on(
@@ -110,23 +116,23 @@ export const instrument = sqliteTable(
 );
 
 export const note = sqliteTable(
-  "note",
+  TBL.NOTE,
   {
-    id: text().primaryKey().notNull(), // UUID
-    userRef: text("user_ref").references(() => userProfile.id), // UUID FK to internal ID
-    tuneRef: text("tune_ref")
+    id: text(COL.ID).primaryKey().notNull(), // UUID
+    userRef: text(COL.USER_REF).references(() => userProfile.id), // UUID FK to internal ID
+    tuneRef: text(COL.TUNE_REF)
       .notNull()
       .references(() => tune.id), // UUID FK
-    playlistRef: text("playlist_ref").references(() => playlist.playlistId), // UUID FK
-    createdDate: text("created_date"),
-    noteText: text("note_text"),
-    public: integer().default(0).notNull(),
-    favorite: integer(),
-    displayOrder: integer("display_order").default(0).notNull(), // For drag ordering
-    deleted: integer().default(0).notNull(),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    playlistRef: text(COL.PLAYLIST_REF).references(() => playlist.playlistId), // UUID FK
+    createdDate: text(COL.CREATED_DATE),
+    noteText: text(COL.NOTE_TEXT),
+    public: integer(COL.PUBLIC).default(0).notNull(),
+    favorite: integer(COL.FAVORITE),
+    displayOrder: integer(COL.DISPLAY_ORDER).default(0).notNull(), // For drag ordering
+    deleted: integer(COL.DELETED).default(0).notNull(),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     index("idx_note_tune_user").on(table.tuneRef, table.userRef),
@@ -141,42 +147,42 @@ export const note = sqliteTable(
 );
 
 export const playlist = sqliteTable(
-  "playlist",
+  TBL.PLAYLIST,
   {
-    playlistId: text("playlist_id").primaryKey().notNull(), // UUID
-    userRef: text("user_ref")
+    playlistId: text(COL.PLAYLIST_ID).primaryKey().notNull(), // UUID
+    userRef: text(COL.USER_REF)
       .notNull()
       .references(() => userProfile.id), // UUID FK to internal ID
-    name: text(),
-    instrumentRef: text("instrument_ref"), // UUID FK
-    genreDefault: text("genre_default").references(() => genre.id), // UUID FK
-    srAlgType: text("sr_alg_type"),
-    deleted: integer().default(0).notNull(),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    name: text(COL.NAME),
+    instrumentRef: text(COL.INSTRUMENT_REF), // UUID FK
+    genreDefault: text(COL.GENRE_DEFAULT).references(() => genre.id), // UUID FK
+    srAlgType: text(COL.SR_ALG_TYPE),
+    deleted: integer(COL.DELETED).default(0).notNull(),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   }
   // Note: Removed unique index on (user_ref, instrument_ref) to allow
   // multiple playlists per user per instrument (e.g., "Beginner Fiddle", "Advanced Fiddle")
 );
 
 export const playlistTune = sqliteTable(
-  "playlist_tune",
+  TBL.PLAYLIST_TUNE,
   {
-    playlistRef: text("playlist_ref")
+    playlistRef: text(COL.PLAYLIST_REF)
       .notNull()
       .references(() => playlist.playlistId), // UUID FK
-    tuneRef: text("tune_ref")
+    tuneRef: text(COL.TUNE_REF)
       .notNull()
       .references(() => tune.id), // UUID FK
-    current: text(),
-    learned: text(),
-    scheduled: text(),
-    goal: text().default("recall"),
-    deleted: integer().default(0).notNull(),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    current: text(COL.CURRENT),
+    learned: text(COL.LEARNED),
+    scheduled: text(COL.SCHEDULED),
+    goal: text(COL.GOAL).default("recall"),
+    deleted: integer(COL.DELETED).default(0).notNull(),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     primaryKey({
@@ -187,33 +193,33 @@ export const playlistTune = sqliteTable(
 );
 
 export const practiceRecord = sqliteTable(
-  "practice_record",
+  TBL.PRACTICE_RECORD,
   {
-    id: text().primaryKey().notNull(), // UUID
-    playlistRef: text("playlist_ref")
+    id: text(COL.ID).primaryKey().notNull(), // UUID
+    playlistRef: text(COL.PLAYLIST_REF)
       .notNull()
       .references(() => playlist.playlistId), // UUID FK
-    tuneRef: text("tune_ref")
+    tuneRef: text(COL.TUNE_REF)
       .notNull()
       .references(() => tune.id), // UUID FK
-    practiced: text(),
-    quality: integer(),
-    easiness: real(),
-    difficulty: real(),
-    stability: real(),
-    interval: integer(),
-    step: integer(),
-    repetitions: integer(),
-    lapses: integer(),
-    elapsedDays: integer("elapsed_days"),
-    state: integer(),
-    due: text(),
-    backupPracticed: text("backup_practiced"),
-    goal: text().default("recall"),
-    technique: text(),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    practiced: text(COL.PRACTICED),
+    quality: integer(COL.QUALITY),
+    easiness: real(COL.EASINESS),
+    difficulty: real(COL.DIFFICULTY),
+    stability: real(COL.STABILITY),
+    interval: integer(COL.INTERVAL),
+    step: integer(COL.STEP),
+    repetitions: integer(COL.REPETITIONS),
+    lapses: integer(COL.LAPSES),
+    elapsedDays: integer(COL.ELAPSED_DAYS),
+    state: integer(COL.STATE),
+    due: text(COL.DUE),
+    backupPracticed: text(COL.BACKUP_PRACTICED),
+    goal: text(COL.GOAL).default("recall"),
+    technique: text(COL.TECHNIQUE),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     uniqueIndex("practice_record_tune_ref_playlist_ref_practiced_unique").on(
@@ -231,40 +237,43 @@ export const practiceRecord = sqliteTable(
   ]
 );
 
-export const prefsSchedulingOptions = sqliteTable("prefs_scheduling_options", {
-  userId: text("user_id")
-    .primaryKey()
-    .notNull()
-    .references(() => userProfile.id), // UUID FK to internal ID
-  acceptableDelinquencyWindow: integer("acceptable_delinquency_window")
-    .default(21)
-    .notNull(),
-  minReviewsPerDay: integer("min_reviews_per_day"),
-  maxReviewsPerDay: integer("max_reviews_per_day"),
-  daysPerWeek: integer("days_per_week"),
-  weeklyRules: text("weekly_rules"),
-  exceptions: text(),
-  syncVersion: integer("sync_version").default(1).notNull(),
-  lastModifiedAt: text("last_modified_at").notNull(),
-  deviceId: text("device_id"),
-});
-
-export const prefsSpacedRepetition = sqliteTable(
-  "prefs_spaced_repetition",
+export const prefsSchedulingOptions = sqliteTable(
+  TBL.PREFS_SCHEDULING_OPTIONS,
   {
-    userId: text("user_id")
+    userId: text(COL.USER_ID)
+      .primaryKey()
       .notNull()
       .references(() => userProfile.id), // UUID FK to internal ID
-    algType: text("alg_type").notNull(),
-    fsrsWeights: text("fsrs_weights"),
-    requestRetention: real("request_retention"),
-    maximumInterval: integer("maximum_interval"),
-    learningSteps: text("learning_steps"),
-    relearningSteps: text("relearning_steps"),
-    enableFuzzing: integer("enable_fuzzing"),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    acceptableDelinquencyWindow: integer(COL.ACCEPTABLE_DELINQUENCY_WINDOW)
+      .default(21)
+      .notNull(),
+    minReviewsPerDay: integer(COL.MIN_REVIEWS_PER_DAY),
+    maxReviewsPerDay: integer(COL.MAX_REVIEWS_PER_DAY),
+    daysPerWeek: integer(COL.DAYS_PER_WEEK),
+    weeklyRules: text(COL.WEEKLY_RULES),
+    exceptions: text(COL.EXCEPTIONS),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
+  }
+);
+
+export const prefsSpacedRepetition = sqliteTable(
+  TBL.PREFS_SPACED_REPETITION,
+  {
+    userId: text(COL.USER_ID)
+      .notNull()
+      .references(() => userProfile.id), // UUID FK to internal ID
+    algType: text(COL.ALG_TYPE).notNull(),
+    fsrsWeights: text(COL.FSRS_WEIGHTS),
+    requestRetention: real(COL.REQUEST_RETENTION),
+    maximumInterval: integer(COL.MAXIMUM_INTERVAL),
+    learningSteps: text(COL.LEARNING_STEPS),
+    relearningSteps: text(COL.RELEARNING_STEPS),
+    enableFuzzing: integer(COL.ENABLE_FUZZING),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     primaryKey({
@@ -275,24 +284,24 @@ export const prefsSpacedRepetition = sqliteTable(
 );
 
 export const reference = sqliteTable(
-  "reference",
+  TBL.REFERENCE,
   {
-    id: text().primaryKey().notNull(), // UUID
-    url: text().notNull(),
-    refType: text("ref_type"),
-    tuneRef: text("tune_ref")
+    id: text(COL.ID).primaryKey().notNull(), // UUID
+    url: text(COL.URL).notNull(),
+    refType: text(COL.REF_TYPE),
+    tuneRef: text(COL.TUNE_REF)
       .notNull()
       .references(() => tune.id), // UUID FK
-    userRef: text("user_ref").references(() => userProfile.id), // UUID FK to internal ID
-    comment: text(),
-    title: text(),
-    public: integer(),
-    favorite: integer(),
-    displayOrder: integer("display_order").default(0).notNull(), // For drag ordering
-    deleted: integer().default(0).notNull(),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    userRef: text(COL.USER_REF).references(() => userProfile.id), // UUID FK to internal ID
+    comment: text(COL.COMMENT),
+    title: text(COL.TITLE),
+    public: integer(COL.PUBLIC),
+    favorite: integer(COL.FAVORITE),
+    displayOrder: integer(COL.DISPLAY_ORDER).default(0).notNull(), // For drag ordering
+    deleted: integer(COL.DELETED).default(0).notNull(),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     index("idx_reference_user_tune_public").on(
@@ -305,51 +314,77 @@ export const reference = sqliteTable(
   ]
 );
 
-export const syncQueue = sqliteTable("sync_queue", {
-  id: text().primaryKey().notNull(), // UUID
-  tableName: text("table_name").notNull(),
-  recordId: text("record_id"), // DEPRECATED - kept for backwards compatibility only. Use data field.
-  operation: text().notNull(),
-  data: text().notNull(), // JSON with all record data including id/composite keys
-  status: text().default("pending").notNull(),
-  createdAt: text("created_at").notNull(),
-  syncedAt: text("synced_at"),
-  attempts: integer().default(0).notNull(),
-  lastError: text("last_error"),
-});
+/**
+ * sync_push_queue: Client-side queue of changes to push to server.
+ *
+ * SQL triggers automatically insert rows here on INSERT/UPDATE/DELETE,
+ * and the sync engine processes them to push changes to Supabase via the Worker.
+ *
+ * Note: This is different from the server's sync_change_log table which is stateless.
+ * This client table has status/operation/attempts for tracking push progress.
+ */
+export const syncPushQueue = sqliteTable(
+  TBL.SYNC_PUSH_QUEUE,
+  {
+    // Random hex ID for outbox entry (triggers use: lower(hex(randomblob(16))))
+    id: text(COL.ID).primaryKey().notNull(),
+    // Table being synced (snake_case to match trigger column names)
+    tableName: text(COL.TABLE_NAME).notNull(),
+    // Row ID: simple string for single PK, JSON string for composite PK
+    // e.g., "abc-123" or '{"user_id":"x","tune_id":"y"}'
+    rowId: text(COL.ROW_ID).notNull(),
+    // INSERT, UPDATE, or DELETE
+    operation: text(COL.OPERATION).notNull(),
+    // pending | in_progress | completed | failed
+    status: text(COL.STATUS).default("pending").notNull(),
+    // When the trigger fired (ISO 8601)
+    changedAt: text(COL.CHANGED_AT).notNull(),
+    // When sync worker processed (ISO 8601)
+    syncedAt: text(COL.SYNCED_AT),
+    // Retry tracking
+    attempts: integer(COL.ATTEMPTS).default(0).notNull(),
+    lastError: text(COL.LAST_ERROR),
+  },
+  (table) => [
+    // Index for sync worker to fetch pending items in order
+    index("idx_outbox_status_changed").on(table.status, table.changedAt),
+    // Index for deduplication within same table/row
+    index("idx_outbox_table_row").on(table.tableName, table.rowId),
+  ]
+);
 
-export const tabGroupMainState = sqliteTable("tab_group_main_state", {
-  id: text().primaryKey().notNull(), // UUID
-  userId: text("user_id")
+export const tabGroupMainState = sqliteTable(TBL.TAB_GROUP_MAIN_STATE, {
+  id: text(COL.ID).primaryKey().notNull(), // UUID
+  userId: text(COL.USER_ID)
     .notNull()
     .references(() => userProfile.id), // UUID FK to internal ID
-  whichTab: text("which_tab").default("practice"),
-  playlistId: text("playlist_id"), // UUID FK
-  tabSpec: text("tab_spec"),
-  practiceShowSubmitted: integer("practice_show_submitted").default(0),
-  practiceModeFlashcard: integer("practice_mode_flashcard").default(0),
-  sidebarDockPosition: text("sidebar_dock_position").default("left"),
-  syncVersion: integer("sync_version").default(1).notNull(),
-  lastModifiedAt: text("last_modified_at").notNull(),
-  deviceId: text("device_id"),
+  whichTab: text(COL.WHICH_TAB).default("practice"),
+  playlistId: text(COL.PLAYLIST_ID_FK), // UUID FK
+  tabSpec: text(COL.TAB_SPEC),
+  practiceShowSubmitted: integer(COL.PRACTICE_SHOW_SUBMITTED).default(0),
+  practiceModeFlashcard: integer(COL.PRACTICE_MODE_FLASHCARD).default(0),
+  sidebarDockPosition: text(COL.SIDEBAR_DOCK_POSITION).default("left"),
+  syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+  lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+  deviceId: text(COL.DEVICE_ID),
 });
 
 export const tableState = sqliteTable(
-  "table_state",
+  TBL.TABLE_STATE,
   {
-    userId: text("user_id")
+    userId: text(COL.USER_ID)
       .notNull()
       .references(() => userProfile.id), // UUID FK to internal ID
-    screenSize: text("screen_size").notNull(),
-    purpose: text().notNull(),
-    playlistId: text("playlist_id")
+    screenSize: text(COL.SCREEN_SIZE).notNull(),
+    purpose: text(COL.PURPOSE).notNull(),
+    playlistId: text(COL.PLAYLIST_ID_FK)
       .notNull()
       .references(() => playlist.playlistId), // UUID FK
-    settings: text(),
-    currentTune: text("current_tune"), // UUID
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    settings: text(COL.SETTINGS),
+    currentTune: text(COL.CURRENT_TUNE), // UUID
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     primaryKey({
@@ -365,37 +400,37 @@ export const tableState = sqliteTable(
 );
 
 export const tableTransientData = sqliteTable(
-  "table_transient_data",
+  TBL.TABLE_TRANSIENT_DATA,
   {
-    userId: text("user_id")
+    userId: text(COL.USER_ID)
       .notNull()
       .references(() => userProfile.id), // UUID FK to internal ID
-    tuneId: text("tune_id")
+    tuneId: text(COL.TUNE_ID)
       .notNull()
       .references(() => tune.id), // UUID FK
-    playlistId: text("playlist_id")
+    playlistId: text(COL.PLAYLIST_ID_FK)
       .notNull()
       .references(() => playlist.playlistId), // UUID FK
-    purpose: text(),
-    notePrivate: text("note_private"),
-    notePublic: text("note_public"),
-    recallEval: text("recall_eval"),
-    practiced: text(),
-    quality: integer(),
-    easiness: real(),
-    difficulty: real(),
-    interval: integer(),
-    step: integer(),
-    repetitions: integer(),
-    due: text(),
-    backupPracticed: text("backup_practiced"),
-    goal: text(),
-    technique: text(),
-    stability: real(),
-    state: integer().default(2),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    purpose: text(COL.PURPOSE),
+    notePrivate: text(COL.NOTE_PRIVATE),
+    notePublic: text(COL.NOTE_PUBLIC),
+    recallEval: text(COL.RECALL_EVAL),
+    practiced: text(COL.PRACTICED),
+    quality: integer(COL.QUALITY),
+    easiness: real(COL.EASINESS),
+    difficulty: real(COL.DIFFICULTY),
+    interval: integer(COL.INTERVAL),
+    step: integer(COL.STEP),
+    repetitions: integer(COL.REPETITIONS),
+    due: text(COL.DUE),
+    backupPracticed: text(COL.BACKUP_PRACTICED),
+    goal: text(COL.GOAL),
+    technique: text(COL.TECHNIQUE),
+    stability: real(COL.STABILITY),
+    state: integer(COL.STATE).default(2),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     primaryKey({
@@ -406,19 +441,19 @@ export const tableTransientData = sqliteTable(
 );
 
 export const tag = sqliteTable(
-  "tag",
+  TBL.TAG,
   {
-    id: text().primaryKey().notNull(), // UUID (renamed from tagId)
-    userRef: text("user_ref")
+    id: text(COL.ID).primaryKey().notNull(), // UUID (renamed from tagId)
+    userRef: text(COL.USER_REF)
       .notNull()
       .references(() => userProfile.id), // UUID FK to internal ID
-    tuneRef: text("tune_ref")
+    tuneRef: text(COL.TUNE_REF)
       .notNull()
       .references(() => tune.id), // UUID FK
-    tagText: text("tag_text").notNull(),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    tagText: text(COL.TAG_TEXT).notNull(),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     uniqueIndex("tag_user_ref_tune_ref_tag_text_unique").on(
@@ -431,68 +466,68 @@ export const tag = sqliteTable(
   ]
 );
 
-export const tune = sqliteTable("tune", {
-  id: text().primaryKey().notNull(), // UUID
-  idForeign: integer("id_foreign"), // Legacy integer ID for provenance tracking (nullable, non-unique)
-  primaryOrigin: text("primary_origin").default("irishtune.info"), // Source: 'irishtune.info', 'user_created', etc.
-  title: text(),
-  type: text(),
-  structure: text(),
-  mode: text(),
-  incipit: text(),
-  genre: text().references(() => genre.id), // UUID FK
-  privateFor: text("private_for").references(() => userProfile.id), // UUID FK to internal ID
-  deleted: integer().default(0).notNull(),
-  syncVersion: integer("sync_version").default(1).notNull(),
-  lastModifiedAt: text("last_modified_at").notNull(),
-  deviceId: text("device_id"),
+export const tune = sqliteTable(TBL.TUNE, {
+  id: text(COL.ID).primaryKey().notNull(), // UUID
+  idForeign: integer(COL.ID_FOREIGN), // Legacy integer ID for provenance tracking (nullable, non-unique)
+  primaryOrigin: text(COL.PRIMARY_ORIGIN).default("irishtune.info"), // Source: 'irishtune.info', 'user_created', etc.
+  title: text(COL.TITLE),
+  type: text(COL.TYPE),
+  structure: text(COL.STRUCTURE),
+  mode: text(COL.MODE),
+  incipit: text(COL.INCIPIT),
+  genre: text(COL.GENRE).references(() => genre.id), // UUID FK
+  privateFor: text(COL.PRIVATE_FOR).references(() => userProfile.id), // UUID FK to internal ID
+  deleted: integer(COL.DELETED).default(0).notNull(),
+  syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+  lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+  deviceId: text(COL.DEVICE_ID),
 });
 
-export const tuneOverride = sqliteTable("tune_override", {
-  id: text().primaryKey().notNull(), // UUID
-  tuneRef: text("tune_ref")
+export const tuneOverride = sqliteTable(TBL.TUNE_OVERRIDE, {
+  id: text(COL.ID).primaryKey().notNull(), // UUID
+  tuneRef: text(COL.TUNE_REF)
     .notNull()
     .references(() => tune.id), // UUID FK
-  userRef: text("user_ref")
+  userRef: text(COL.USER_REF)
     .notNull()
     .references(() => userProfile.id), // UUID FK to internal ID
-  title: text(),
-  type: text(),
-  structure: text(),
-  genre: text().references(() => genre.id), // UUID FK
-  mode: text(),
-  incipit: text(),
-  deleted: integer().default(0).notNull(),
-  syncVersion: integer("sync_version").default(1).notNull(),
-  lastModifiedAt: text("last_modified_at").notNull(),
-  deviceId: text("device_id"),
+  title: text(COL.TITLE),
+  type: text(COL.TYPE),
+  structure: text(COL.STRUCTURE),
+  genre: text(COL.GENRE).references(() => genre.id), // UUID FK
+  mode: text(COL.MODE),
+  incipit: text(COL.INCIPIT),
+  deleted: integer(COL.DELETED).default(0).notNull(),
+  syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+  lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+  deviceId: text(COL.DEVICE_ID),
 });
 
-export const tuneType = sqliteTable("tune_type", {
-  id: text().primaryKey().notNull(), // UUID (was TEXT semantic ID)
-  name: text(),
-  rhythm: text(),
-  description: text(),
+export const tuneType = sqliteTable(TBL.TUNE_TYPE, {
+  id: text(COL.ID).primaryKey().notNull(), // UUID (was TEXT semantic ID)
+  name: text(COL.NAME),
+  rhythm: text(COL.RHYTHM),
+  description: text(COL.DESCRIPTION),
 });
 
 export const userProfile = sqliteTable(
-  "user_profile",
+  TBL.USER_PROFILE,
   {
-    id: text().notNull(), // UUID (matches PostgreSQL, but not used as PK in SQLite)
-    supabaseUserId: text("supabase_user_id").primaryKey().notNull(), // UUID PK
-    name: text(),
-    email: text(),
-    avatarUrl: text("avatar_url"), // User avatar image URL (predefined or custom upload)
-    srAlgType: text("sr_alg_type"),
-    phone: text(),
-    phoneVerified: text("phone_verified"),
+    id: text(COL.ID).notNull(), // UUID (matches PostgreSQL, but not used as PK in SQLite)
+    supabaseUserId: text(COL.SUPABASE_USER_ID).primaryKey().notNull(), // UUID PK
+    name: text(COL.NAME),
+    email: text(COL.EMAIL),
+    avatarUrl: text(COL.AVATAR_URL), // User avatar image URL (predefined or custom upload)
+    srAlgType: text(COL.SR_ALG_TYPE),
+    phone: text(COL.PHONE),
+    phoneVerified: text(COL.PHONE_VERIFIED),
     acceptableDelinquencyWindow: integer(
-      "acceptable_delinquency_window"
+      COL.ACCEPTABLE_DELINQUENCY_WINDOW
     ).default(21),
-    deleted: integer().default(0).notNull(),
-    syncVersion: integer("sync_version").default(1).notNull(),
-    lastModifiedAt: text("last_modified_at").notNull(),
-    deviceId: text("device_id"),
+    deleted: integer(COL.DELETED).default(0).notNull(),
+    syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
+    lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
+    deviceId: text(COL.DEVICE_ID),
   },
   (table) => [
     uniqueIndex("user_profile_id_unique").on(table.id),

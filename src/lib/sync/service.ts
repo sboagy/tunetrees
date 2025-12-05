@@ -28,6 +28,7 @@ export interface SyncResult {
   conflicts: number;
   errors: string[];
   timestamp: string;
+  affectedTables: string[];
 }
 
 /**
@@ -183,6 +184,7 @@ export class SyncService {
         conflicts: 0,
         errors: [error instanceof Error ? error.message : "Unknown sync error"],
         timestamp: new Date().toISOString(),
+        affectedTables: [],
       };
       return errorResult;
     } finally {
@@ -191,7 +193,7 @@ export class SyncService {
   }
 
   /**
-   * Push local changes to Supabase only
+   * Push local changes to Supabase only (using trigger-based outbox)
    */
   public async syncUp(): Promise<SyncResult> {
     if (this.isSyncing) {
@@ -201,7 +203,7 @@ export class SyncService {
     this.isSyncing = true;
 
     try {
-      const result = await this.syncEngine.syncUp();
+      const result = await this.syncEngine.syncUpFromOutbox();
 
       // Notify callback (same as sync() method)
       this.config.onSyncComplete?.(result);
@@ -233,13 +235,13 @@ export class SyncService {
       // 2. DELETE is queued but not yet sent to Supabase
       // 3. syncDown runs and re-downloads the "deleted" row from Supabase
       // 4. Row reappears in local DB (zombie record)
-      const stats = await this.syncEngine.getSyncQueueStats();
-      if (stats.pending > 0) {
+      const stats = await this.syncEngine.getOutboxStats();
+      if (stats.pending > 0 || stats.inProgress > 0) {
         console.log(
           `[SyncService] ⚠️  BLOCKING syncDown: ${stats.pending} pending changes must upload first`
         );
         try {
-          await this.syncEngine.syncUp();
+          await this.syncEngine.syncUpFromOutbox();
           console.log(
             "[SyncService] ✅ Pending changes uploaded - safe to syncDown"
           );
@@ -278,13 +280,13 @@ export class SyncService {
 
     this.isSyncing = true;
     try {
-      const stats = await this.syncEngine.getSyncQueueStats();
-      if (stats.pending > 0) {
+      const stats = await this.syncEngine.getOutboxStats();
+      if (stats.pending > 0 || stats.inProgress > 0) {
         console.log(
           `[SyncService] ⚠️  BLOCKING scoped syncDown: ${stats.pending} pending changes must upload first`
         );
         try {
-          await this.syncEngine.syncUp();
+          await this.syncEngine.syncUpFromOutbox();
           console.log(
             "[SyncService] ✅ Pending changes uploaded - scoped syncDown safe"
           );
@@ -314,8 +316,10 @@ export class SyncService {
    * Start automatic background sync
    *
    * Strategy:
-   * - syncDown: Once on startup, then every 20 minutes (pull remote changes - rare)
-   * - syncUp: Every 5 minutes (push local changes - frequent, only if changes pending)
+   * - syncDown: Once on startup, then every 2 minutes (pull remote changes - outbox-driven, cheap)
+   * - syncUp: Every 30 seconds (push local changes - only if pending, so free when idle)
+   *
+   * Cost when idle: 1 Postgres query of sync_outbox every 2 minutes
    */
   public startAutoSync(): void {
     if (this.syncIntervalId) {
@@ -323,9 +327,11 @@ export class SyncService {
       return;
     }
 
-    // Sync intervals
-    const syncUpIntervalMs = this.config.syncIntervalMs ?? 300000; // 5 minutes (push local changes)
-    const syncDownIntervalMs = 20 * 60 * 1000; // 20 minutes (pull remote changes)
+    // Sync intervals - cheap due to outbox-driven architecture:
+    // - syncUp only makes network call if local outbox has pending items
+    // - syncDown queries server sync_outbox (1 query) and only fetches changed rows
+    const syncUpIntervalMs = this.config.syncIntervalMs ?? 30_000; // 30 seconds
+    const syncDownIntervalMs = 2 * 60 * 1000; // 2 minutes
 
     // Initial syncDown on startup (immediate)
     // This will automatically upload any pending changes first (see syncDown method)
@@ -352,9 +358,9 @@ export class SyncService {
           return;
         }
 
-        // Check if there are pending changes before syncing
-        const stats = await this.syncEngine.getSyncQueueStats();
-        const hasPendingChanges = stats.pending > 0 || stats.syncing > 0;
+        // Check if there are pending changes before syncing (using outbox)
+        const stats = await this.syncEngine.getOutboxStats();
+        const hasPendingChanges = stats.pending > 0 || stats.inProgress > 0;
 
         if (hasPendingChanges) {
           console.log(
