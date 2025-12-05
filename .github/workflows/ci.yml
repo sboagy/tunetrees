@@ -345,6 +345,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_WORKER_URL: ${{ secrets.VITE_WORKER_URL }}
 
       # 5. Deploy to Cloudflare Pages
       - name: Deploy to Cloudflare Pages
