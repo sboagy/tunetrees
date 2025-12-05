@@ -35,6 +35,9 @@ const SYNC_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
 const syncLog = (...args: any[]) =>
   SYNC_DEBUG && log.debug("[SyncEngine]", ...args);
 
+/** LocalStorage key prefix for persisting last sync timestamp across app restarts */
+const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
+
 /**
  * Sync result for tracking what happened during sync
  */
@@ -149,16 +152,31 @@ export class SyncEngine {
   private supabase: SupabaseClient;
   private config: SyncConfig;
   private lastSyncTimestamp: string | null = null;
+  private userId: string;
+
+  /** Get the user-specific localStorage key for sync timestamp */
+  private get syncTimestampKey(): string {
+    return `${LAST_SYNC_TIMESTAMP_KEY_PREFIX}_${this.userId}`;
+  }
 
   constructor(
     localDb: SqliteDatabase,
     supabase: SupabaseClient,
-    _userId: string,
+    userId: string,
     config: Partial<SyncConfig> = {}
   ) {
     this.localDb = localDb;
     this.supabase = supabase;
+    this.userId = userId;
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Load persisted timestamp from localStorage (enables incremental sync after app restart)
+    this.lastSyncTimestamp = localStorage.getItem(this.syncTimestampKey);
+    if (this.lastSyncTimestamp) {
+      log.info(
+        `[SyncEngine] Loaded persisted lastSyncTimestamp for user ${userId}: ${this.lastSyncTimestamp}`
+      );
+    }
   }
 
   /**
@@ -375,9 +393,9 @@ export class SyncEngine {
         await markOutboxCompleted(this.localDb, item.id);
       }
 
-      // 6. Update Timestamp
+      // 6. Update Timestamp (persists to localStorage for incremental sync after restart)
       if (response.syncedAt) {
-        this.lastSyncTimestamp = response.syncedAt;
+        this.setLastSyncTimestamp(response.syncedAt);
       }
 
       return {
@@ -453,16 +471,20 @@ export class SyncEngine {
 
   /**
    * Set last sync timestamp (used when resuming sync after restart)
+   * Persists to localStorage for incremental sync after app restart.
    */
   setLastSyncTimestamp(timestamp: string): void {
     this.lastSyncTimestamp = timestamp;
+    localStorage.setItem(this.syncTimestampKey, timestamp);
   }
 
   /**
    * Clear last sync timestamp to force next sync to run in full mode.
+   * Also clears persisted value from localStorage.
    */
   clearLastSyncTimestamp(): void {
     this.lastSyncTimestamp = null;
+    localStorage.removeItem(this.syncTimestampKey);
   }
 
   /**

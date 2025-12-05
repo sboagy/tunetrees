@@ -117,6 +117,28 @@ export async function clearTunetreesStorageDB(page: Page) {
       console.warn("Failed to clear sessionStorage:", err);
     }
 
+    // 1b) Clear sync timestamp keys from localStorage (forces full initial sync)
+    // These are user-namespaced: TT_LAST_SYNC_TIMESTAMP_<userId>
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith("TT_LAST_SYNC_TIMESTAMP")) {
+          keysToRemove.push(key);
+        }
+      }
+      for (const key of keysToRemove) {
+        localStorage.removeItem(key);
+      }
+      if (keysToRemove.length > 0) {
+        log.debug(
+          `✅ Cleared ${keysToRemove.length} sync timestamp key(s) from localStorage`
+        );
+      }
+    } catch (err) {
+      console.warn("Failed to clear sync timestamp keys:", err);
+    }
+
     // 2) Clear CacheStorage (service-worker / workbox caches for app code)
     if (typeof caches !== "undefined") {
       try {

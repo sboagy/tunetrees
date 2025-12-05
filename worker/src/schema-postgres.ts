@@ -324,20 +324,17 @@ export const reference = pgTable(
   })
 );
 
-// Stateless sync_change_log - tracks what changed and when on the server.
+// Stateless sync_change_log - tracks LAST CHANGE TIME per TABLE.
+// One row per table, not per row! Simple and efficient.
 // Each client maintains its own lastSyncAt; no per-client status stored here.
-// Different from client's sync_push_queue which has status/operation/attempts.
 export const syncChangeLog = pgTable(
   TBL.SYNC_CHANGE_LOG,
   {
-    id: text(COL.ID).primaryKey().notNull(),
-    tableName: text(COL.TABLE_NAME).notNull(),
-    rowId: text(COL.ROW_ID).notNull(),
+    tableName: text(COL.TABLE_NAME).primaryKey().notNull(),
     changedAt: text(COL.CHANGED_AT).notNull(),
   },
   (table) => ({
-    idxChangedAt: index("idx_outbox_changed_at").on(table.changedAt),
-    idxTableRow: index("idx_outbox_table_row").on(table.tableName, table.rowId),
+    idxChangedAt: index("idx_sync_change_log_changed_at").on(table.changedAt),
   })
 );
 

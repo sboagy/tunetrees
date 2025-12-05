@@ -52,7 +52,7 @@ const MAX_DAILY_TUNES = 7;
 const ENABLE_FUZZ = false;
 
 test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
-  // test.setTimeout(120000);
+  test.setTimeout(120000);
 
   let currentDate: Date;
   let ttPage: TuneTreesPage;

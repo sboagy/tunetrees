@@ -138,7 +138,8 @@ test.describe
       await app.displaySubmittedSwitch.click();
       await page.waitForTimeout(500);
 
-      await page.getByRole("cell", { name: "recall" }).first().click();
+      await page.getByRole("cell", { name: "JigD" }).first().click();
+      // await page.getByRole("cell", { name: "recall" }).first().click();
 
       // Open flashcard (will show first tune, which may be submitted)
       await app.enableFlashcardMode();

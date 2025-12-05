@@ -10,6 +10,7 @@ import {
 } from "../helpers/practice-scenarios";
 import {
   queryPracticeRecords,
+  queryTunesByTitles,
   validateScheduledDatesInFuture,
 } from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
@@ -222,22 +223,20 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
         await evaluate(meta);
       }
 
-      // Resolve tune IDs and query practice records
+      // Resolve tune IDs from LOCAL database and query practice records
       const titles = RATED_TUNES.map((t) => t.title);
-      const userKey = testUser.email.split(".")[0];
-      const { supabase } = await getTestUserClient(userKey);
-      const { data: tuneData } = await supabase
-        .from("tune")
-        .select("id,title")
-        .in("title", titles);
+
+      // Query tunes from local SQLite instead of Supabase to avoid sync timing issues
+      const tuneData = await queryTunesByTitles(page, titles);
 
       const tuneIdMap = new Map<string, string>();
-      tuneData?.forEach((t: any) => {
+      tuneData.forEach((t: { id: string; title: string }) => {
         tuneIdMap.set(t.title, t.id);
       });
 
       const tuneIds = Array.from(tuneIdMap.values());
       const allRecords = await queryPracticeRecords(page, tuneIds);
+
       // Filter out initial seed records (quality is null) and ensure we have the evaluation records
       const records = allRecords.filter((r) => r.quality !== null);
 
@@ -255,10 +254,10 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
       console.log("Captured intervals:", intervals);
 
       // Assertions
-      const again = intervals["again"];
-      const hard = intervals["hard"];
-      const good = intervals["good"];
-      const easy = intervals["easy"];
+      const again = intervals.again;
+      const hard = intervals.hard;
+      const good = intervals.good;
+      const easy = intervals.easy;
 
       expect(again).toBeDefined();
       expect(hard).toBeDefined();

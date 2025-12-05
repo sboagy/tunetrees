@@ -5,10 +5,7 @@ import {
   setStableDate,
   verifyClockFrozen,
 } from "../helpers/clock-control";
-import {
-  getTestUserClient,
-  setupForPracticeTestsParallel,
-} from "../helpers/practice-scenarios";
+import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import {
   getQueueBucketDistribution,
   queryPracticeQueue,
@@ -77,88 +74,67 @@ test.describe
       currentDate = new Date(STANDARD_TEST_DATE);
       await setStableDate(context, currentDate);
 
-      // First, set up all tunes in repertoire (no scheduling yet)
+      // Set up all tunes in repertoire (no scheduling yet)
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: ALL_TUNES,
         startTab: "practice",
       });
 
-      // Now manually configure scheduled dates for bucket distribution
-      const userKey = testUser.email.split(".")[0];
-      const { supabase } = await getTestUserClient(userKey);
-
-      // Q1: Due Today (scheduled for today)
+      // Now configure scheduled dates LOCALLY (no Supabase round-trip needed)
+      // This is purely testing local bucket assignment logic
       const todayStr = currentDate.toISOString();
-      const nowStr = new Date().toISOString(); // For last_modified_at to trigger sync
-      for (const tuneId of TUNES_DUE_TODAY) {
-        await supabase
-          .from("playlist_tune")
-          .update({ scheduled: todayStr, last_modified_at: nowStr })
-          .eq("playlist_ref", testUser.playlistId)
-          .eq("tune_ref", tuneId);
-      }
 
       // Q2: Recently Lapsed (3 days overdue - within 7-day window)
       const recentlyLapsedDate = new Date(currentDate);
       recentlyLapsedDate.setDate(recentlyLapsedDate.getDate() - 3);
       const recentlyLapsedStr = recentlyLapsedDate.toISOString();
-      for (const tuneId of TUNES_RECENTLY_LAPSED) {
-        await supabase
-          .from("playlist_tune")
-          .update({ scheduled: recentlyLapsedStr, last_modified_at: nowStr })
-          .eq("playlist_ref", testUser.playlistId)
-          .eq("tune_ref", tuneId);
-      }
-
-      // Q3: New (no scheduled date - leave as null)
-      for (const tuneId of TUNES_NEW) {
-        await supabase
-          .from("playlist_tune")
-          .update({ scheduled: null, last_modified_at: nowStr })
-          .eq("playlist_ref", testUser.playlistId)
-          .eq("tune_ref", tuneId);
-      }
 
       // Q4: Old Lapsed (14 days overdue - beyond 7-day window)
       const oldLapsedDate = new Date(currentDate);
       oldLapsedDate.setDate(oldLapsedDate.getDate() - 14);
       const oldLapsedStr = oldLapsedDate.toISOString();
-      for (const tuneId of TUNES_OLD_LAPSED) {
-        await supabase
-          .from("playlist_tune")
-          .update({ scheduled: oldLapsedStr, last_modified_at: nowStr })
-          .eq("playlist_ref", testUser.playlistId)
-          .eq("tune_ref", tuneId);
-      }
 
-      // Clear local cache and reload to pick up scheduled dates
-      await page.evaluate(async () => {
-        const dbName = "tunetrees-storage";
-        await new Promise<void>((resolve) => {
-          const req = indexedDB.deleteDatabase(dbName);
-          req.onsuccess = () => resolve();
-          req.onerror = () => resolve();
-          req.onblocked = () => resolve();
-        });
-      });
+      // Build updates array for all tunes
+      const updates: Array<{ tuneId: string; scheduled: string | null }> = [
+        // Q1: Due Today
+        ...TUNES_DUE_TODAY.map((tuneId) => ({ tuneId, scheduled: todayStr })),
+        // Q2: Recently Lapsed
+        ...TUNES_RECENTLY_LAPSED.map((tuneId) => ({
+          tuneId,
+          scheduled: recentlyLapsedStr,
+        })),
+        // Q3: New (null scheduled)
+        ...TUNES_NEW.map((tuneId) => ({ tuneId, scheduled: null })),
+        // Q4: Old Lapsed
+        ...TUNES_OLD_LAPSED.map((tuneId) => ({
+          tuneId,
+          scheduled: oldLapsedStr,
+        })),
+      ];
 
-      await page.reload({ waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(2000);
+      // Update scheduled dates in local SQLite
+      const updateResult = await page.evaluate(
+        async ({ playlistId, updates }) => {
+          const api = (window as any).__ttTestApi;
+          if (!api?.updateScheduledDates) {
+            throw new Error(
+              "updateScheduledDates not available on __ttTestApi"
+            );
+          }
+          return await api.updateScheduledDates(playlistId, updates);
+        },
+        { playlistId: testUser.playlistId, updates }
+      );
+      console.log(`  Updated ${updateResult.updated} tune scheduled dates`);
 
-      // Re-login if needed (session may be lost after IndexedDB clear)
       await ttPage.ensureLoggedIn(testUser.email, testUser.userId);
 
-      await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
-      await page.waitForTimeout(3000);
-
-      // CRITICAL: Delete the existing queue so it regenerates with correct scheduled dates
-      // The queue was created before we updated scheduled dates in Supabase
+      // Regenerate the queue with correct scheduled dates
       await page.evaluate(async (playlistId: string) => {
         const api = (window as any).__ttTestApi;
         if (!api) return;
 
         // Use seedAddToReview with empty tuneIds to trigger queue regeneration
-        // This deletes the current queue and regenerates it
         await api.seedAddToReview({ playlistId, tuneIds: [] });
       }, testUser.playlistId);
 

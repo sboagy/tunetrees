@@ -183,6 +183,26 @@ setup("authenticate as Alice", async ({ page }) => {
     timeout: 5000,
   });
 
+  // Clear sync timestamps from localStorage before saving auth state
+  // This ensures tests start fresh and do an initial sync (not incremental)
+  await page.evaluate(() => {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("TT_LAST_SYNC_TIMESTAMP")) {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
+    }
+    if (keysToRemove.length > 0) {
+      console.log(
+        `Cleared ${keysToRemove.length} sync timestamp(s) before saving auth state`
+      );
+    }
+  });
+
   // Save authentication state
   console.log("⏳ Saving authentication state...");
   await page.context().storageState({ path: authFile });

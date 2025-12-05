@@ -380,6 +380,44 @@ async function getScheduledDates(playlistId: string, tuneIds?: string[]) {
 }
 
 /**
+ * Update scheduled dates for tunes in a playlist (local SQLite only)
+ * Used by tests to set up specific bucket distributions without going through Supabase sync.
+ *
+ * @param playlistId - The playlist ID
+ * @param updates - Array of { tuneId, scheduled } where scheduled is ISO string or null
+ */
+async function updateScheduledDates(
+  playlistId: string,
+  updates: Array<{ tuneId: string; scheduled: string | null }>
+): Promise<{ updated: number }> {
+  const db = await ensureDb();
+  let updated = 0;
+
+  for (const { tuneId, scheduled } of updates) {
+    const result = await db
+      .update(playlistTune)
+      .set({
+        scheduled: scheduled,
+        syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
+        lastModifiedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(playlistTune.playlistRef, playlistId),
+          eq(playlistTune.tuneRef, tuneId)
+        )
+      )
+      .returning();
+
+    if (result && result.length > 0) {
+      updated++;
+    }
+  }
+
+  return { updated };
+}
+
+/**
  * Get practice queue for a specific window
  */
 async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
@@ -490,6 +528,21 @@ async function getAllQueueWindows(playlistId: string) {
     GROUP BY window_start_utc, active
     ORDER BY window_start_utc DESC
     LIMIT 20
+  `);
+  return rows;
+}
+
+/**
+ * Get tunes by their titles from the local database.
+ * Returns an array of { id, title } objects.
+ */
+async function getTunesByTitles(titles: string[]) {
+  const db = await ensureDb();
+  if (!titles || titles.length === 0) return [];
+  // Escape single quotes in titles for safety
+  const inList = titles.map((t) => `'${t.replace(/'/g, "''")}'`).join(",");
+  const rows = await db.all<{ id: string; title: string }>(sql`
+    SELECT id, title FROM tune WHERE title IN (${sql.raw(inList)})
   `);
   return rows;
 }
@@ -611,6 +664,10 @@ declare global {
           }
         >
       >;
+      updateScheduledDates: (
+        playlistId: string,
+        updates: Array<{ tuneId: string; scheduled: string | null }>
+      ) => Promise<{ updated: number }>;
       getPracticeQueue: (
         playlistId: string,
         windowStartUtc?: string
@@ -649,6 +706,9 @@ declare global {
           active: number;
         }>
       >;
+      getTunesByTitles: (
+        titles: string[]
+      ) => Promise<Array<{ id: string; title: string }>>;
     };
   }
 }
@@ -673,10 +733,12 @@ if (typeof window !== "undefined") {
       getPracticeRecords,
       getLatestPracticeRecord,
       getScheduledDates,
+      updateScheduledDates,
       getPracticeQueue,
       getPlaylistTuneRow,
       getDistinctPracticeRecordCount,
       getAllQueueWindows,
+      getTunesByTitles,
       stageEvaluation: async (
         tuneId: string,
         playlistId: string,

@@ -7,7 +7,7 @@
  *
  * @module worker/index
  */
-import { and, count, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { jwtVerify } from "jose";
@@ -23,10 +23,8 @@ import {
   getConflictTarget,
   getNormalizer,
   hasDeletedFlag,
-  parseOutboxRowId,
   SYNCABLE_TABLES,
   type SyncableTableName,
-  supportsIncremental,
   TABLE_REGISTRY,
 } from "../../shared/table-meta";
 import * as schema from "./schema-postgres";
@@ -57,13 +55,6 @@ type DrizzleColumn = any;
 type Transaction = PgTransaction<any, any, any>;
 
 // ============================================================================
-// CONFIGURATION
-// ============================================================================
-
-/** Maximum total records in sync_change_log before triggering GC */
-const GC_THRESHOLD = 500;
-
-// ============================================================================
 // UTILITY: Case Conversion
 // ============================================================================
 
@@ -91,36 +82,6 @@ function getPkColumns(
     }
     return { col, prop: camelKey };
   });
-}
-
-/**
- * Build a WHERE clause to find a row by its primary key.
- */
-function buildPkWhere(
-  tableName: string,
-  rowId: string,
-  table: DrizzleTable
-): unknown {
-  const pkCols = getPkColumns(tableName, table);
-
-  // Simple primary key (e.g., "abc-123")
-  if (pkCols.length === 1) {
-    return eq(pkCols[0].col, rowId);
-  }
-
-  // Composite key (e.g., '{"user_id":"x","tune_id":"y"}')
-  const parsedKey = parseOutboxRowId(tableName, rowId);
-  if (typeof parsedKey === "string") {
-    return eq(pkCols[0].col, parsedKey);
-  }
-
-  const conditions = pkCols.map((pk) => {
-    const snakeKey = pk.prop.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
-    const value = parsedKey[snakeKey] ?? parsedKey[pk.prop];
-    return eq(pk.col, value);
-  });
-
-  return and(...conditions);
 }
 
 /**
@@ -190,44 +151,6 @@ function postgresToSqlite(
 }
 
 // ============================================================================
-// UTILITY: Access Control
-// ============================================================================
-
-/**
- * Check if user can access a row based on ownership rules.
- */
-function canUserAccessRow(
-  tableName: string,
-  row: Record<string, unknown>,
-  ctx: SyncContext
-): boolean {
-  // Direct user ownership
-  if ("userId" in row) return row.userId === ctx.userId;
-  if ("userRef" in row) return row.userRef === ctx.userId;
-
-  // Public/private pattern
-  if ("privateFor" in row) {
-    return row.privateFor === null || row.privateFor === ctx.userId;
-  }
-  if ("privateToUser" in row) {
-    return row.privateToUser === null || row.privateToUser === ctx.userId;
-  }
-
-  // Playlist-based ownership
-  if ("playlistRef" in row) {
-    return ctx.userPlaylistIds.has(row.playlistRef as string);
-  }
-
-  // Static reference tables - everyone can access
-  if (!supportsIncremental(tableName)) {
-    return true;
-  }
-
-  // Default: allow
-  return true;
-}
-
-// ============================================================================
 // UTILITY: Authentication
 // ============================================================================
 
@@ -236,7 +159,10 @@ async function verifyJwt(
   secret: string
 ): Promise<string | null> {
   const authHeader = request.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
+  if (!authHeader?.startsWith("Bearer ")) {
+    console.log("[AUTH] No Bearer token in Authorization header");
+    return null;
+  }
 
   const token = authHeader.split(" ")[1];
   try {
@@ -244,9 +170,10 @@ async function verifyJwt(
       token,
       new TextEncoder().encode(secret)
     );
+    console.log("[AUTH] JWT verified successfully, user:", payload.sub);
     return payload.sub ?? null;
   } catch (e) {
-    console.error("JWT verification failed:", e);
+    console.error("[AUTH] JWT verification failed:", e);
     return null;
   }
 }
@@ -264,19 +191,32 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
     change.table === "sync_push_queue" ||
     change.table === "sync_change_log"
   ) {
+    console.log(`[PUSH] Skipping sync infrastructure table: ${change.table}`);
     return;
   }
 
   const table = schema.tables[change.table as keyof typeof schema.tables];
-  if (!table) return;
+  if (!table) {
+    console.log(`[PUSH] Unknown table: ${change.table}`);
+    return;
+  }
 
   const t = table as DrizzleTable;
-  if (!t.lastModifiedAt) return;
+  if (!t.lastModifiedAt) {
+    console.log(
+      `[PUSH] Table ${change.table} has no lastModifiedAt column, skipping`
+    );
+    return;
+  }
 
   const pkCols = getPkColumns(change.table, t);
   const data = sqliteToPostgres(
     change.table,
     change.data as Record<string, unknown>
+  );
+
+  console.log(
+    `[PUSH] Applying ${change.deleted ? "DELETE" : "UPSERT"} to ${change.table}, rowId: ${change.rowId}`
   );
 
   if (change.deleted) {
@@ -335,9 +275,11 @@ async function processPushChanges(
   tx: Transaction,
   changes: SyncChange[]
 ): Promise<void> {
+  console.log(`[PUSH] Processing ${changes.length} changes from client`);
   for (const change of changes) {
     await applyChange(tx, change);
   }
+  console.log(`[PUSH] Completed processing ${changes.length} changes`);
 }
 
 // ============================================================================
@@ -366,34 +308,6 @@ function rowToSyncChange(
     deleted: !!data.deleted,
     lastModifiedAt:
       (data.lastModifiedAt as string) || new Date(0).toISOString(),
-  };
-}
-
-/**
- * Create a delete marker for a row that no longer exists.
- */
-function createDeleteMarker(
-  tableName: string,
-  rowId: string,
-  table: DrizzleTable,
-  now: string
-): SyncChange {
-  const pkCols = getPkColumns(tableName, table);
-
-  let data: Record<string, unknown>;
-  if (pkCols.length === 1) {
-    data = { [pkCols[0].prop]: rowId };
-  } else {
-    const parsed = parseOutboxRowId(tableName, rowId);
-    data = typeof parsed === "string" ? { [pkCols[0].prop]: parsed } : parsed;
-  }
-
-  return {
-    table: tableName as SyncableTableName,
-    rowId,
-    data,
-    deleted: true,
-    lastModifiedAt: now,
   };
 }
 
@@ -452,7 +366,10 @@ async function fetchTableForInitialSync(
 
   // Build user filter
   const conditions = buildUserFilter(t, ctx);
-  if (conditions === null) return []; // Skip table (e.g., no playlists)
+  if (conditions === null) {
+    console.log(`[PULL:INITIAL] Skipping ${tableName} (no playlists for user)`);
+    return []; // Skip table (e.g., no playlists)
+  }
 
   // Query
   let query = tx.select().from(table);
@@ -462,6 +379,7 @@ async function fetchTableForInitialSync(
   }
 
   const rows = await query;
+  console.log(`[PULL:INITIAL] ${tableName}: fetched ${rows.length} rows`);
 
   // Convert rows to SyncChanges
   const changes: SyncChange[] = [];
@@ -481,6 +399,9 @@ async function processInitialSync(
   tx: Transaction,
   ctx: SyncContext
 ): Promise<SyncChange[]> {
+  console.log(
+    `[PULL:INITIAL] Starting initial sync for user ${ctx.userId}, playlists: [${Array.from(ctx.userPlaylistIds).join(", ")}]`
+  );
   const allChanges: SyncChange[] = [];
 
   for (const tableName of SYNCABLE_TABLES) {
@@ -488,89 +409,80 @@ async function processInitialSync(
     allChanges.push(...tableChanges);
   }
 
+  console.log(
+    `[PULL:INITIAL] Completed initial sync: ${allChanges.length} total changes across ${SYNCABLE_TABLES.length} tables`
+  );
   return allChanges;
 }
 
 // ============================================================================
-// PULL: Incremental Sync (Change Log Driven)
+// PULL: Incremental Sync (Table-Level Change Log)
 // ============================================================================
 
 /**
- * Fetch changes from sync_change_log since lastSyncAt.
- * Groups by table and dedupes row IDs.
+ * Get list of tables that have changed since lastSyncAt.
+ * sync_change_log now has ONE ROW PER TABLE (table_name is the primary key).
  */
-async function fetchChangeLogEntries(
+async function getChangedTables(
   tx: Transaction,
   lastSyncAt: string
-): Promise<Map<string, Set<string>>> {
+): Promise<string[]> {
   const entries = await tx
-    .select()
+    .select({ tableName: schema.syncChangeLog.tableName })
     .from(schema.syncChangeLog)
     .where(gt(schema.syncChangeLog.changedAt, lastSyncAt));
 
-  // Group by table, dedupe row IDs
-  const changesByTable = new Map<string, Set<string>>();
-  for (const entry of entries) {
-    if (!changesByTable.has(entry.tableName)) {
-      changesByTable.set(entry.tableName, new Set());
-    }
-    changesByTable.get(entry.tableName)!.add(entry.rowId);
-  }
-
-  return changesByTable;
+  const tables = entries.map((e) => e.tableName);
+  console.log(
+    `[PULL:INCR] Tables changed since ${lastSyncAt}: [${tables.join(", ")}]`
+  );
+  return tables;
 }
 
 /**
- * Fetch a single row by its primary key.
- * Returns null if the row doesn't exist (was hard-deleted).
+ * Fetch all rows from a table that have changed since lastSyncAt.
+ * Uses the table's last_modified_at column.
  */
-async function fetchRowByPk(
+async function fetchChangedRowsFromTable(
   tx: Transaction,
-  tableName: string,
-  rowId: string,
-  table: DrizzleTable
-): Promise<Record<string, unknown> | null> {
-  const whereClause = buildPkWhere(tableName, rowId, table);
-
-  const rows = await tx
-    .select()
-    .from(table)
-    // @ts-expect-error - dynamic where
-    .where(whereClause);
-
-  return rows.length > 0 ? (rows[0] as Record<string, unknown>) : null;
-}
-
-/**
- * Process all changed rows for a single table.
- */
-async function processTableChanges(
-  tx: Transaction,
-  tableName: string,
-  rowIds: Set<string>,
+  tableName: SyncableTableName,
+  lastSyncAt: string,
   ctx: SyncContext
 ): Promise<SyncChange[]> {
-  const table = schema.tables[tableName as keyof typeof schema.tables];
+  const table = schema.tables[tableName];
   if (!table) return [];
 
   const t = table as DrizzleTable;
+  if (!t.lastModifiedAt) {
+    console.log(`[PULL:INCR] ${tableName} has no lastModifiedAt, skipping`);
+    return []; // Table doesn't support incremental sync
+  }
+
+  // Build conditions: last_modified_at > lastSyncAt AND user_filter
+  const userConditions = buildUserFilter(t, ctx);
+  if (userConditions === null) {
+    console.log(`[PULL:INCR] Skipping ${tableName} (no playlists for user)`);
+    return []; // Skip table (e.g., no playlists)
+  }
+
+  const timeCondition = gt(t.lastModifiedAt, lastSyncAt);
+  const allConditions =
+    userConditions.length > 0
+      ? // @ts-expect-error - dynamic where conditions with unknown types
+        and(timeCondition, ...(userConditions as unknown[]))
+      : timeCondition;
+
+  const rows = await tx.select().from(table).where(allConditions);
+  console.log(
+    `[PULL:INCR] ${tableName}: fetched ${rows.length} changed rows since ${lastSyncAt}`
+  );
+
+  // Convert rows to SyncChanges
   const changes: SyncChange[] = [];
-
-  for (const rowId of rowIds) {
-    const row = await fetchRowByPk(tx, tableName, rowId, t);
-
-    if (row === null) {
-      // Row was hard-deleted
-      changes.push(createDeleteMarker(tableName, rowId, t, ctx.now));
-      continue;
-    }
-
-    // Check access
-    if (!canUserAccessRow(tableName, row, ctx)) {
-      continue;
-    }
-
-    changes.push(rowToSyncChange(tableName, rowId, row));
+  for (const row of rows) {
+    const r = row as Record<string, unknown>;
+    const rowId = extractRowId(tableName, r, t);
+    changes.push(rowToSyncChange(tableName, rowId, r));
   }
 
   return changes;
@@ -578,63 +490,44 @@ async function processTableChanges(
 
 /**
  * Incremental sync: fetch only rows that changed since lastSyncAt.
+ * 1. Query sync_change_log for tables with changed_at > lastSyncAt
+ * 2. For each changed table, query rows with last_modified_at > lastSyncAt
  */
 async function processIncrementalSync(
   tx: Transaction,
   lastSyncAt: string,
   ctx: SyncContext
 ): Promise<SyncChange[]> {
-  const changesByTable = await fetchChangeLogEntries(tx, lastSyncAt);
+  console.log(
+    `[PULL:INCR] Starting incremental sync for user ${ctx.userId} since ${lastSyncAt}`
+  );
+  const changedTables = await getChangedTables(tx, lastSyncAt);
+
+  if (changedTables.length === 0) {
+    console.log(`[PULL:INCR] No tables changed since ${lastSyncAt}`);
+    return [];
+  }
 
   const allChanges: SyncChange[] = [];
-  for (const [tableName, rowIds] of changesByTable) {
-    const tableChanges = await processTableChanges(tx, tableName, rowIds, ctx);
+  for (const tableName of changedTables) {
+    // Only process tables we know about
+    if (!SYNCABLE_TABLES.includes(tableName as SyncableTableName)) {
+      console.log(`[PULL:INCR] Skipping unknown table: ${tableName}`);
+      continue;
+    }
+    const tableChanges = await fetchChangedRowsFromTable(
+      tx,
+      tableName as SyncableTableName,
+      lastSyncAt,
+      ctx
+    );
     allChanges.push(...tableChanges);
   }
 
-  return allChanges;
-}
-
-// ============================================================================
-// GARBAGE COLLECTION: Dedupe sync_change_log
-// ============================================================================
-
-/**
- * Remove duplicate entries from sync_change_log.
- * For each (table_name, row_id), keep only the most recent changed_at.
- * This is called after sync when the table exceeds GC_THRESHOLD.
- */
-async function garbageCollectChangeLog(tx: Transaction): Promise<number> {
-  // Count total records
-  const countResult = await tx
-    .select({ count: count() })
-    .from(schema.syncChangeLog);
-
-  const totalRecords = countResult[0]?.count ?? 0;
-  if (totalRecords <= GC_THRESHOLD) {
-    return 0;
-  }
-
-  // Delete duplicates: keep only the row with max(changed_at) per (table_name, row_id)
-  // Using a subquery to find IDs to delete
-  const deleteResult = await tx.execute(sql`
-    DELETE FROM sync_change_log
-    WHERE id NOT IN (
-      SELECT DISTINCT ON (table_name, row_id) id
-      FROM sync_change_log
-      ORDER BY table_name, row_id, changed_at DESC
-    )
-  `);
-
-  const deletedCount =
-    typeof deleteResult === "object" && deleteResult !== null
-      ? ((deleteResult as { rowCount?: number }).rowCount ?? 0)
-      : 0;
-
   console.log(
-    `GC: Removed ${deletedCount} duplicate entries from sync_change_log`
+    `[PULL:INCR] Completed incremental sync: ${allChanges.length} total changes`
   );
-  return deletedCount;
+  return allChanges;
 }
 
 // ============================================================================
@@ -648,6 +541,12 @@ async function handleSync(
 ): Promise<SyncResponse> {
   const now = new Date().toISOString();
   let responseChanges: SyncChange[] = [];
+  const syncType = payload.lastSyncAt ? "INCREMENTAL" : "INITIAL";
+
+  console.log(`[SYNC] === Starting ${syncType} sync for user ${userId} ===`);
+  console.log(
+    `[SYNC] Request: lastSyncAt=${payload.lastSyncAt ?? "null"}, changes=${payload.changes.length}`
+  );
 
   await db.transaction(async (tx) => {
     // Get user's playlist IDs for ownership filtering
@@ -655,6 +554,8 @@ async function handleSync(
       .select({ id: schema.playlist.playlistId })
       .from(schema.playlist)
       .where(eq(schema.playlist.userRef, userId));
+
+    console.log(`[SYNC] User has ${userPlaylists.length} playlists`);
 
     const ctx: SyncContext = {
       userId,
@@ -676,9 +577,13 @@ async function handleSync(
       responseChanges = await processInitialSync(tx, ctx);
     }
 
-    // CLEANUP: Remove duplicate change log entries
-    await garbageCollectChangeLog(tx);
+    // NO GARBAGE COLLECTION NEEDED!
+    // sync_change_log now has at most ~20 rows (one per table)
   });
+
+  console.log(
+    `[SYNC] === Completed ${syncType} sync: returning ${responseChanges.length} changes, syncedAt=${now} ===`
+  );
 
   return {
     changes: responseChanges,
@@ -723,9 +628,12 @@ export default {
 
     // Sync endpoint
     if (request.method === "POST" && url.pathname === "/api/sync") {
+      console.log(`[HTTP] POST /api/sync received`);
+
       // Authenticate
       const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
       if (!userId) {
+        console.log(`[HTTP] Unauthorized - JWT verification failed`);
         return errorResponse("Unauthorized", 401);
       }
 
@@ -733,6 +641,9 @@ export default {
       const connectionString =
         env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
       if (!connectionString) {
+        console.error(
+          `[HTTP] Database configuration error - no connection string`
+        );
         return errorResponse("Database configuration error", 500);
       }
 
@@ -741,10 +652,12 @@ export default {
         const db = drizzle(client, { schema });
         const payload = (await request.json()) as SyncRequest;
 
+        console.log(`[HTTP] Sync request parsed, calling handleSync`);
         const response = await handleSync(db, payload, userId);
+        console.log(`[HTTP] Sync completed successfully`);
         return jsonResponse(response);
       } catch (error) {
-        console.error("Sync error:", error);
+        console.error("[HTTP] Sync error:", error);
         return errorResponse(String(error), 500);
       }
     }
