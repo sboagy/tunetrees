@@ -319,8 +319,8 @@ jobs:
     needs: test
     # Deploy when tests pass:
     # - on pushes to feat/pwa1
-    # - on PR updates from branch copilot/fix-scheduling-issues
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/feat/pwa1') || (github.event_name == 'pull_request' && github.head_ref == 'copilot/fix-scheduling-issues')
+    # - on PR updates from branch fix/sync
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/feat/pwa1') || (github.event_name == 'pull_request' && github.head_ref == 'fix/sync')
     environment: vite_pwa_env
 
     steps:
@@ -367,7 +367,7 @@ jobs:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
     needs: test
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/feat/pwa1') || (github.event_name == 'pull_request' && github.head_ref == 'copilot/fix-scheduling-issues')
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/feat/pwa1') || (github.event_name == 'pull_request' && github.head_ref == 'fix/sync')
     environment: vite_pwa_env
     steps:
       - uses: actions/checkout@v4
