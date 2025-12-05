@@ -206,22 +206,17 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      # 12b. Start Cloudflare Worker (Local)
-      - name: Start Cloudflare Worker (Local)
+      # 12b. Setup Cloudflare Worker (don't start - Playwright webServer handles that)
+      - name: Setup Cloudflare Worker
         run: |
-          echo "👷 Starting Cloudflare Worker..."
+          echo "👷 Setting up Cloudflare Worker..."
           cd worker
           npm ci
-          # Create .dev.vars for local testing
+          # Create .dev.vars for local testing (Playwright will start the worker)
           echo "SUPABASE_URL=${{ env.SUPABASE_URL }}" > .dev.vars
           echo "SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long" >> .dev.vars
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
-
-          # Start worker in background
-          npx wrangler dev --port 8787 --ip 127.0.0.1 &
-          echo "Worker started in background"
-          sleep 10
-          curl -v http://127.0.0.1:8787/health || echo "Worker health check failed"
+          echo "✅ Worker dependencies installed and .dev.vars created"
 
       # 13. Generate Auth States (requires dev server + Playwright browsers)
       - name: Generate Auth States
