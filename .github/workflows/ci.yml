@@ -387,8 +387,6 @@ jobs:
           workingDirectory: "worker"
           command: deploy
           secrets: |
-            SUPABASE_URL
             SUPABASE_JWT_SECRET
         env:
-          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
