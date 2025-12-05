@@ -376,6 +376,8 @@ jobs:
           node-version: "20"
           cache: "npm"
       - run: npm ci
+      - name: Install Worker Dependencies
+        run: cd worker && npm ci
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
