@@ -55,7 +55,7 @@ const Login: Component = () => {
               TuneTrees
             </span>
             <p class="m-2 text-2xl text-gray-600 dark:text-gray-400">
-              Practice smarter, not harder
+              Practice manager
             </p>
           </div>
         </div>
