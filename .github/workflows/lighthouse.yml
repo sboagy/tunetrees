@@ -1,0 +1,101 @@
+# Lighthouse CI - Performance Monitoring
+# Runs Lighthouse audits on every push to feat/pwa1 branch
+# Fails build if performance metrics fall below thresholds
+
+name: Lighthouse CI
+
+on:
+  push:
+    branches: [feat/pwa1]
+  pull_request:
+    branches: [main, feat/pwa1]
+
+# Cancel in-progress runs when new commit pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    name: Lighthouse Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Build production bundle
+      - name: Build Application
+        run: npm run build
+        env:
+          # Use placeholder values for build (not accessing real Supabase)
+          VITE_SUPABASE_URL: https://placeholder.supabase.co
+          VITE_SUPABASE_ANON_KEY: placeholder-key-for-build-only
+
+      # 5. Run Lighthouse CI
+      - name: Run Lighthouse CI
+        run: |
+          npm install -g @lhci/cli@0.13.x
+          lhci autorun
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      # 6. Upload Lighthouse reports
+      - name: Upload Lighthouse Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci/
+          retention-days: 30
+
+      # 7. Comment PR with results (if PR context)
+      - name: Comment PR with Lighthouse Results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = '.lighthouseci/manifest.json';
+            
+            if (!fs.existsSync(reportPath)) {
+              console.log('No Lighthouse manifest found');
+              return;
+            }
+            
+            const manifest = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+            const reports = manifest.map(report => report.url);
+            
+            const comment = `## 🔦 Lighthouse CI Results
+            
+            Lighthouse audits have been completed. View reports:
+            ${reports.map((url, i) => `- [Report ${i + 1}](${url})`).join('\n')}
+            
+            **Performance Targets:**
+            - ✅ FCP < 1.5s
+            - ✅ LCP < 2.5s
+            - ✅ TTI < 3.0s
+            - ✅ TBT < 300ms
+            - ✅ CLS < 0.1
+            
+            See workflow artifacts for detailed reports.
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

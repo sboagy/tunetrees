@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/tt.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#1e3a8a" />
+    <meta name="description" content="Spaced repetition practice system for musicians. Learn tunes faster with intelligent scheduling." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icon-192x192.png" />
+    
+    <!-- Preconnect to Supabase for faster API calls -->
+    <link rel="preconnect" href="https://nbowmctaebpfxqpzxfkb.supabase.co" crossorigin />
+    
+    <!-- Preload critical WASM file for offline SQLite -->
+    <link rel="preload" href="/sql-wasm/sql-wasm.wasm" as="fetch" crossorigin />
+    
+    <title>TuneTrees - Music Practice Manager</title>
+    
+    <script>
+      // Apply theme mode: light, dark, or system (follows OS preference)
+      const themeMode = localStorage.getItem('themeMode') || 'system';
+      
+      let effectiveTheme;
+      if (themeMode === 'system') {
+        effectiveTheme = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
+      } else {
+        effectiveTheme = themeMode;
+      }
+      
+      if (effectiveTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-kb-theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.setAttribute('data-kb-theme', 'light');
+      }
+    </script>
+  </head>
+  <body>
+    <main id="root"></main>
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+</html>

@@ -1,18 +1,23 @@
 {
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "browser": {
     "browserName": "chromium",
     "contextOptions": {
       "viewport": {
         "width": 1280,
         "height": 720
-      }
+      },
+      "colorScheme": "dark"
     }
   },
   "server": {
     "port": 3001,
     "host": "localhost"
   },
-  "capabilities": ["core", "vision"],
+  "capabilities": [
+    "core",
+    "vision"
+  ],
   "saveTrace": false,
   "outputDir": "./playwright-output"
 }

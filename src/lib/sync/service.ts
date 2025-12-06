@@ -1,0 +1,485 @@
+/**
+ * Sync Service
+ *
+ * Handles background synchronization between local SQLite and Supabase.
+ * Implements:
+ * - Push: Upload local changes to Supabase (via SyncEngine)
+ * - Pull: Download remote changes from Supabase (via SyncEngine)
+ * - Realtime: Live sync via Supabase Realtime subscriptions
+ * - Conflict resolution: Last-write-wins with user override option
+ *
+ * @module lib/sync/service
+ */
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { toast } from "solid-sonner";
+import type { SqliteDatabase } from "../db/client-sqlite";
+import { SyncEngine } from "./engine";
+import type { SyncableTable } from "./queue";
+import { type RealtimeConfig, RealtimeManager } from "./realtime";
+
+/**
+ * Sync result (compatible with SyncEngine)
+ */
+export interface SyncResult {
+  success: boolean;
+  itemsSynced: number;
+  itemsFailed: number;
+  conflicts: number;
+  errors: string[];
+  timestamp: string;
+  affectedTables: string[];
+}
+
+/**
+ * Sync Service Configuration
+ */
+export interface SyncServiceConfig {
+  supabase: SupabaseClient;
+  // Supabase Auth user id (UUID string)
+  userId: string | null;
+  realtimeEnabled?: boolean;
+  syncIntervalMs?: number;
+  onSyncComplete?: (result: SyncResult) => void;
+  onRealtimeConnected?: () => void;
+  onRealtimeDisconnected?: () => void;
+  onRealtimeError?: (error: Error) => void;
+}
+
+/**
+ * Sync Service
+ *
+ * Manages bidirectional sync between local SQLite and Supabase.
+ * Uses SyncEngine for push/pull and RealtimeManager for live updates.
+ */
+export class SyncService {
+  private db: SqliteDatabase;
+  private syncEngine: SyncEngine;
+  private realtimeManager: RealtimeManager | null = null;
+  private config: SyncServiceConfig;
+  private isSyncing = false;
+  private syncIntervalId: number | null = null; // For syncUp interval
+  private syncDownIntervalId: number | null = null; // For syncDown interval
+
+  constructor(db: SqliteDatabase, config: SyncServiceConfig) {
+    this.db = db;
+    this.config = config;
+
+    // Initialize sync engine
+    this.syncEngine = new SyncEngine(
+      this.db,
+      config.supabase,
+      config.userId ?? "",
+      {
+        batchSize: 100,
+        maxRetries: 3,
+        timeoutMs: 30000,
+      }
+    );
+
+    // Initialize Realtime if enabled
+    if (config.realtimeEnabled && config.userId) {
+      this.initializeRealtime();
+    }
+  }
+
+  /**
+   * Get last successful syncDown timestamp from underlying SyncEngine.
+   * Returns null if no syncDown has completed yet.
+   */
+  public getLastSyncDownTimestamp(): string | null {
+    // Access private syncEngine via indexed cast; method is public on engine.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (this.syncEngine as any).getLastSyncTimestamp?.() ?? null;
+  }
+
+  /** Return 'incremental' or 'full' based on last syncDown run */
+  public getLastSyncMode(): "incremental" | "full" | null {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const engine: any = this.syncEngine as any;
+    if (!engine.getLastSyncTimestamp?.()) return null; // no sync yet
+    const inc = engine.wasLastSyncIncremental?.();
+    return inc ? "incremental" : "full";
+  }
+
+  /**
+   * Force a full syncDown by clearing incremental watermark first.
+   * Useful for manual refresh from UI (e.g. DB menu command).
+   */
+  public async forceFullSyncDown(): Promise<SyncResult> {
+    // Clear incremental timestamp so syncDown treats this as cold start.
+    // Access SyncEngine via private field method.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this.syncEngine as any).clearLastSyncTimestamp?.();
+    return await this.syncDown();
+  }
+
+  /**
+   * Initialize Supabase Realtime subscriptions
+   */
+  private initializeRealtime(): void {
+    const tables: SyncableTable[] = [
+      "tune",
+      "playlist",
+      "playlist_tune",
+      "note",
+      "reference",
+      "tag",
+      "practice_record",
+      "daily_practice_queue",
+      "tune_override",
+    ];
+
+    const realtimeConfig: RealtimeConfig = {
+      enabled: true,
+      tables,
+      userId: this.config.userId,
+      onConnected: this.config.onRealtimeConnected,
+      onDisconnected: this.config.onRealtimeDisconnected,
+      onError: this.config.onRealtimeError,
+      onSync: (tableName) => {
+        console.log(`[SyncService] Realtime sync completed for ${tableName}`);
+      },
+    };
+
+    // Pass 'this' (SyncService) instead of syncEngine so Realtime can use
+    // the protected syncDown() that blocks when pending changes exist
+    this.realtimeManager = new RealtimeManager(this, realtimeConfig);
+    void this.realtimeManager.start();
+  }
+
+  /**
+   * Check if sync is currently in progress
+   */
+  public get syncing(): boolean {
+    return this.isSyncing;
+  }
+
+  /**
+   * Perform full sync (push then pull)
+   *
+   * @returns Sync result statistics
+   */
+  public async sync(): Promise<SyncResult> {
+    if (this.isSyncing) {
+      throw new Error("Sync already in progress");
+    }
+
+    this.isSyncing = true;
+
+    try {
+      // Use SyncEngine's bidirectional sync
+      const result = await this.syncEngine.sync();
+
+      // Notify callback
+      this.config.onSyncComplete?.(result);
+
+      return result;
+    } catch (error) {
+      console.error("Sync error:", error);
+      const errorResult: SyncResult = {
+        success: false,
+        itemsSynced: 0,
+        itemsFailed: 0,
+        conflicts: 0,
+        errors: [error instanceof Error ? error.message : "Unknown sync error"],
+        timestamp: new Date().toISOString(),
+        affectedTables: [],
+      };
+      return errorResult;
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  /**
+   * Push local changes to Supabase only (using trigger-based outbox)
+   */
+  public async syncUp(): Promise<SyncResult> {
+    if (this.isSyncing) {
+      throw new Error("Sync already in progress");
+    }
+
+    this.isSyncing = true;
+
+    try {
+      const result = await this.syncEngine.syncUpFromOutbox();
+
+      // Notify callback (same as sync() method)
+      this.config.onSyncComplete?.(result);
+
+      return result;
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  /**
+   * Pull remote changes from Supabase only
+   *
+   * CRITICAL: Before pulling remote changes, we must upload any pending local changes
+   * to avoid losing user data. If syncUp fails, we still proceed with syncDown to ensure
+   * the user gets the latest remote data.
+   */
+  public async syncDown(): Promise<SyncResult> {
+    if (this.isSyncing) {
+      throw new Error("Sync already in progress");
+    }
+
+    this.isSyncing = true;
+
+    try {
+      // CRITICAL: Upload pending changes BEFORE downloading remote changes
+      // This prevents race conditions where:
+      // 1. User deletes a row locally
+      // 2. DELETE is queued but not yet sent to Supabase
+      // 3. syncDown runs and re-downloads the "deleted" row from Supabase
+      // 4. Row reappears in local DB (zombie record)
+      const stats = await this.syncEngine.getOutboxStats();
+      if (stats.pending > 0 || stats.inProgress > 0) {
+        console.log(
+          `[SyncService] ⚠️  BLOCKING syncDown: ${stats.pending} pending changes must upload first`
+        );
+        try {
+          await this.syncEngine.syncUpFromOutbox();
+          console.log(
+            "[SyncService] ✅ Pending changes uploaded - safe to syncDown"
+          );
+        } catch (error) {
+          console.error(
+            "[SyncService] ❌ Failed to upload pending changes:",
+            error
+          );
+          // CRITICAL: DO NOT proceed with syncDown if upload failed
+          // This would cause zombie records (deleted items reappearing)
+          throw new Error(
+            "Cannot syncDown while pending changes exist - upload failed. Local data preserved."
+          );
+        }
+      }
+
+      const result = await this.syncEngine.syncDown();
+
+      // Notify callback (same as sync() method)
+      this.config.onSyncComplete?.(result);
+
+      return result;
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  /**
+   * Scoped syncDown: pull remote changes only for specified tables.
+   * Still uploads pending local changes first to avoid zombie resurrect.
+   */
+  public async syncDownTables(tables: SyncableTable[]): Promise<SyncResult> {
+    if (this.isSyncing) {
+      throw new Error("Sync already in progress");
+    }
+
+    this.isSyncing = true;
+    try {
+      const stats = await this.syncEngine.getOutboxStats();
+      if (stats.pending > 0 || stats.inProgress > 0) {
+        console.log(
+          `[SyncService] ⚠️  BLOCKING scoped syncDown: ${stats.pending} pending changes must upload first`
+        );
+        try {
+          await this.syncEngine.syncUpFromOutbox();
+          console.log(
+            "[SyncService] ✅ Pending changes uploaded - scoped syncDown safe"
+          );
+        } catch (error) {
+          console.error(
+            "[SyncService] ❌ Failed to upload pending changes before scoped syncDown:",
+            error
+          );
+          throw new Error(
+            "Cannot run scoped syncDown while pending changes exist - upload failed."
+          );
+        }
+      }
+
+      // Access SyncEngine private method via index cast (method is public we added).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const engine: any = this.syncEngine as any;
+      const result: SyncResult = await engine.syncDownTables(tables);
+      this.config.onSyncComplete?.(result);
+      return result;
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  /**
+   * Start automatic background sync
+   *
+   * Strategy:
+   * - syncDown: Once on startup, then every 2 minutes (pull remote changes - outbox-driven, cheap)
+   * - syncUp: Every 30 seconds (push local changes - only if pending, so free when idle)
+   *
+   * Cost when idle: 1 Postgres query of sync_outbox every 2 minutes
+   */
+  public startAutoSync(): void {
+    if (this.syncIntervalId) {
+      console.warn("[SyncService] Auto sync already running");
+      return;
+    }
+
+    // Sync intervals - cheap due to outbox-driven architecture:
+    // - syncUp only makes network call if local outbox has pending items
+    // - syncDown queries server sync_outbox (1 query) and only fetches changed rows
+    const syncUpIntervalMs = this.config.syncIntervalMs ?? 30_000; // 30 seconds
+    const syncDownIntervalMs = 2 * 60 * 1000; // 2 minutes
+
+    // Initial syncDown on startup (immediate)
+    // This will automatically upload any pending changes first (see syncDown method)
+    console.log("[SyncService] Running initial syncDown on startup...");
+    void this.syncDown().catch((error) => {
+      console.error("[SyncService] Initial syncDown failed:", error);
+      toast.error(
+        "Failed to sync data from server on startup. You may be seeing outdated data.",
+        {
+          duration: 8000,
+        }
+      );
+    });
+
+    // Periodic syncUp (frequent - push local changes to server)
+    // Only runs if there are pending changes to avoid unnecessary network calls
+    this.syncIntervalId = window.setInterval(async () => {
+      try {
+        // Safety check: ensure database is initialized
+        if (!this.db) {
+          console.warn(
+            "[SyncService] Database not initialized yet, skipping syncUp check"
+          );
+          return;
+        }
+
+        // Check if there are pending changes before syncing (using outbox)
+        const stats = await this.syncEngine.getOutboxStats();
+        const hasPendingChanges = stats.pending > 0 || stats.inProgress > 0;
+
+        if (hasPendingChanges) {
+          console.log(
+            `[SyncService] Running periodic syncUp (${stats.pending} pending changes)...`
+          );
+          const result = await this.syncUp();
+          if (!result.success && result.itemsFailed > 0) {
+            toast.error(
+              `Failed to upload ${result.itemsFailed} changes to server. Will retry automatically.`,
+              {
+                duration: 5000,
+              }
+            );
+          }
+        } else {
+          // Silent - no need to log when there's nothing to sync
+        }
+      } catch (error) {
+        console.error("[SyncService] Error in periodic syncUp:", error);
+        toast.error(
+          "Background sync error. Your changes may not be uploaded.",
+          {
+            duration: 5000,
+          }
+        );
+      }
+    }, syncUpIntervalMs);
+
+    // Periodic syncDown (infrequent - pull remote changes from server)
+    this.syncDownIntervalId = window.setInterval(() => {
+      console.log("[SyncService] Running periodic syncDown...");
+      void this.syncDown().catch((error) => {
+        console.error("[SyncService] Periodic syncDown failed:", error);
+        toast.error(
+          "Failed to sync data from server. You may be seeing outdated data.",
+          {
+            duration: 5000,
+          }
+        );
+      });
+    }, syncDownIntervalMs);
+
+    console.log(
+      `[SyncService] Auto sync started:`,
+      `syncUp every ${syncUpIntervalMs / 1000}s (only if changes pending),`,
+      `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`
+    );
+  }
+
+  /**
+   * Stop automatic background sync
+   */
+  public stopAutoSync(): void {
+    if (this.syncIntervalId) {
+      clearInterval(this.syncIntervalId);
+      this.syncIntervalId = null;
+    }
+    if (this.syncDownIntervalId) {
+      clearInterval(this.syncDownIntervalId);
+      this.syncDownIntervalId = null;
+    }
+    console.log("[SyncService] Auto sync stopped (both syncUp and syncDown)");
+  }
+
+  /**
+   * Start Realtime subscriptions
+   */
+  public async startRealtime(): Promise<void> {
+    if (!this.realtimeManager) {
+      this.initializeRealtime();
+    }
+    await this.realtimeManager?.start();
+  }
+
+  /**
+   * Stop Realtime subscriptions
+   */
+  public async stopRealtime(): Promise<void> {
+    await this.realtimeManager?.stop();
+  }
+
+  /**
+   * Get Realtime status
+   */
+  public getRealtimeStatus(): string {
+    return this.realtimeManager?.getStatus() ?? "disabled";
+  }
+
+  /**
+   * Cleanup resources
+   */
+  public async destroy(): Promise<void> {
+    this.stopAutoSync();
+    await this.stopRealtime();
+  }
+}
+
+/**
+ * Start background sync worker (deprecated - use SyncService directly)
+ *
+ * @deprecated Use SyncService class with startAutoSync() instead
+ * @param db - SQLite database instance
+ * @param config - Sync service configuration
+ * @returns SyncService instance with cleanup function
+ */
+export function startSyncWorker(
+  db: SqliteDatabase,
+  config: SyncServiceConfig
+): { service: SyncService; stop: () => void } {
+  const syncService = new SyncService(db, config);
+
+  // Start auto sync
+  syncService.startAutoSync();
+
+  // Return service and cleanup function
+  return {
+    service: syncService,
+    stop: () => {
+      syncService.stopAutoSync();
+    },
+  };
+}

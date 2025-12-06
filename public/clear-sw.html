@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Service Worker</title>
+</head>
+<body>
+    <h1>Clearing Service Worker...</h1>
+    <p id="status">Working...</p>
+    <script>
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+            for(let registration of registrations) {
+                registration.unregister();
+            }
+            document.getElementById('status').innerHTML = '✅ Service worker cleared! <a href="/">Go to app</a>';
+        });
+    </script>
+</body>
+</html>

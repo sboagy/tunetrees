@@ -1,0 +1,2350 @@
+{
+  "id": "8f175934-6388-46be-8a85-b4e48da411fa",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.daily_practice_queue": {
+      "name": "daily_practice_queue",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_ref": {
+          "name": "user_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "playlist_ref": {
+          "name": "playlist_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "queue_date": {
+          "name": "queue_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "window_start_utc": {
+          "name": "window_start_utc",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_end_utc": {
+          "name": "window_end_utc",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tune_ref": {
+          "name": "tune_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bucket": {
+          "name": "bucket",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "order_index": {
+          "name": "order_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_coalesced_ts": {
+          "name": "snapshot_coalesced_ts",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduled_snapshot": {
+          "name": "scheduled_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "latest_due_snapshot": {
+          "name": "latest_due_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acceptable_delinquency_window_snapshot": {
+          "name": "acceptable_delinquency_window_snapshot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tz_offset_minutes_snapshot": {
+          "name": "tz_offset_minutes_snapshot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "generated_at": {
+          "name": "generated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exposures_required": {
+          "name": "exposures_required",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exposures_completed": {
+          "name": "exposures_completed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_queue_user_playlist_window": {
+          "name": "idx_queue_user_playlist_window",
+          "columns": [
+            {
+              "expression": "user_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "playlist_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "window_start_utc",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_queue_user_playlist_active": {
+          "name": "idx_queue_user_playlist_active",
+          "columns": [
+            {
+              "expression": "user_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "playlist_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_queue_user_playlist_bucket": {
+          "name": "idx_queue_user_playlist_bucket",
+          "columns": [
+            {
+              "expression": "user_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "playlist_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "bucket",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_queue_generated_at": {
+          "name": "idx_queue_generated_at",
+          "columns": [
+            {
+              "expression": "generated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "daily_practice_queue_user_ref_playlist_ref_window_start_utc_tune_ref_unique": {
+          "name": "daily_practice_queue_user_ref_playlist_ref_window_start_utc_tune_ref_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_ref",
+            "playlist_ref",
+            "window_start_utc",
+            "tune_ref"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.genre": {
+      "name": "genre",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "region": {
+          "name": "region",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.genre_tune_type": {
+      "name": "genre_tune_type",
+      "schema": "",
+      "columns": {
+        "genre_id": {
+          "name": "genre_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tune_type_id": {
+          "name": "tune_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "genre_tune_type_genre_id_genre_id_fk": {
+          "name": "genre_tune_type_genre_id_genre_id_fk",
+          "tableFrom": "genre_tune_type",
+          "tableTo": "genre",
+          "columnsFrom": ["genre_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "genre_tune_type_tune_type_id_tune_type_id_fk": {
+          "name": "genre_tune_type_tune_type_id_tune_type_id_fk",
+          "tableFrom": "genre_tune_type",
+          "tableTo": "tune_type",
+          "columnsFrom": ["tune_type_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "genre_tune_type_genre_id_tune_type_id_pk": {
+          "name": "genre_tune_type_genre_id_tune_type_id_pk",
+          "columns": ["genre_id", "tune_type_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.instrument": {
+      "name": "instrument",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "private_to_user": {
+          "name": "private_to_user",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "instrument": {
+          "name": "instrument",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "genre_default": {
+          "name": "genre_default",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_instrument_instrument": {
+          "name": "idx_instrument_instrument",
+          "columns": [
+            {
+              "expression": "instrument",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_instrument_private_to_user": {
+          "name": "idx_instrument_private_to_user",
+          "columns": [
+            {
+              "expression": "private_to_user",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "instrument_private_to_user_user_profile_id_fk": {
+          "name": "instrument_private_to_user_user_profile_id_fk",
+          "tableFrom": "instrument",
+          "tableTo": "user_profile",
+          "columnsFrom": ["private_to_user"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "instrument_private_to_user_instrument_unique": {
+          "name": "instrument_private_to_user_instrument_unique",
+          "nullsNotDistinct": false,
+          "columns": ["private_to_user", "instrument"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.note": {
+      "name": "note",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_ref": {
+          "name": "user_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tune_ref": {
+          "name": "tune_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "playlist_ref": {
+          "name": "playlist_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_date": {
+          "name": "created_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note_text": {
+          "name": "note_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "public": {
+          "name": "public",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "favorite": {
+          "name": "favorite",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_note_tune_playlist": {
+          "name": "idx_note_tune_playlist",
+          "columns": [
+            {
+              "expression": "tune_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "playlist_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_note_tune_playlist_user_public": {
+          "name": "idx_note_tune_playlist_user_public",
+          "columns": [
+            {
+              "expression": "tune_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "playlist_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "public",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_note_tune_user": {
+          "name": "idx_note_tune_user",
+          "columns": [
+            {
+              "expression": "tune_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "note_user_ref_user_profile_id_fk": {
+          "name": "note_user_ref_user_profile_id_fk",
+          "tableFrom": "note",
+          "tableTo": "user_profile",
+          "columnsFrom": ["user_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "note_tune_ref_tune_id_fk": {
+          "name": "note_tune_ref_tune_id_fk",
+          "tableFrom": "note",
+          "tableTo": "tune",
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "note_playlist_ref_playlist_playlist_id_fk": {
+          "name": "note_playlist_ref_playlist_playlist_id_fk",
+          "tableFrom": "note",
+          "tableTo": "playlist",
+          "columnsFrom": ["playlist_ref"],
+          "columnsTo": ["playlist_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "chk_public_bool": {
+          "name": "chk_public_bool",
+          "value": "public IN (true, false)"
+        },
+        "chk_favorite_bool": {
+          "name": "chk_favorite_bool",
+          "value": "favorite IN (true, false)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.playlist": {
+      "name": "playlist",
+      "schema": "",
+      "columns": {
+        "playlist_id": {
+          "name": "playlist_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_ref": {
+          "name": "user_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "instrument_ref": {
+          "name": "instrument_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sr_alg_type": {
+          "name": "sr_alg_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "playlist_user_ref_user_profile_id_fk": {
+          "name": "playlist_user_ref_user_profile_id_fk",
+          "tableFrom": "playlist",
+          "tableTo": "user_profile",
+          "columnsFrom": ["user_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "playlist_user_ref_instrument_ref_unique": {
+          "name": "playlist_user_ref_instrument_ref_unique",
+          "nullsNotDistinct": false,
+          "columns": ["user_ref", "instrument_ref"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.playlist_tune": {
+      "name": "playlist_tune",
+      "schema": "",
+      "columns": {
+        "playlist_ref": {
+          "name": "playlist_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tune_ref": {
+          "name": "tune_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current": {
+          "name": "current",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "learned": {
+          "name": "learned",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scheduled": {
+          "name": "scheduled",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "goal": {
+          "name": "goal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'recall'"
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "playlist_tune_playlist_ref_playlist_playlist_id_fk": {
+          "name": "playlist_tune_playlist_ref_playlist_playlist_id_fk",
+          "tableFrom": "playlist_tune",
+          "tableTo": "playlist",
+          "columnsFrom": ["playlist_ref"],
+          "columnsTo": ["playlist_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "playlist_tune_tune_ref_tune_id_fk": {
+          "name": "playlist_tune_tune_ref_tune_id_fk",
+          "tableFrom": "playlist_tune",
+          "tableTo": "tune",
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "playlist_tune_playlist_ref_tune_ref_pk": {
+          "name": "playlist_tune_playlist_ref_tune_ref_pk",
+          "columns": ["playlist_ref", "tune_ref"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.practice_record": {
+      "name": "practice_record",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "playlist_ref": {
+          "name": "playlist_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tune_ref": {
+          "name": "tune_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practiced": {
+          "name": "practiced",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quality": {
+          "name": "quality",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "easiness": {
+          "name": "easiness",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "difficulty": {
+          "name": "difficulty",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stability": {
+          "name": "stability",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "interval": {
+          "name": "interval",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "step": {
+          "name": "step",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repetitions": {
+          "name": "repetitions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lapses": {
+          "name": "lapses",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "elapsed_days": {
+          "name": "elapsed_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due": {
+          "name": "due",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "backup_practiced": {
+          "name": "backup_practiced",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "goal": {
+          "name": "goal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'recall'"
+        },
+        "technique": {
+          "name": "technique",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_practice_record_id": {
+          "name": "idx_practice_record_id",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_practice_record_tune_playlist_practiced": {
+          "name": "idx_practice_record_tune_playlist_practiced",
+          "columns": [
+            {
+              "expression": "tune_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "playlist_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "practiced",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_practice_record_practiced": {
+          "name": "idx_practice_record_practiced",
+          "columns": [
+            {
+              "expression": "practiced",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "practice_record_playlist_ref_playlist_playlist_id_fk": {
+          "name": "practice_record_playlist_ref_playlist_playlist_id_fk",
+          "tableFrom": "practice_record",
+          "tableTo": "playlist",
+          "columnsFrom": ["playlist_ref"],
+          "columnsTo": ["playlist_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "practice_record_tune_ref_tune_id_fk": {
+          "name": "practice_record_tune_ref_tune_id_fk",
+          "tableFrom": "practice_record",
+          "tableTo": "tune",
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "practice_record_tune_ref_playlist_ref_practiced_unique": {
+          "name": "practice_record_tune_ref_playlist_ref_practiced_unique",
+          "nullsNotDistinct": false,
+          "columns": ["tune_ref", "playlist_ref", "practiced"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.prefs_scheduling_options": {
+      "name": "prefs_scheduling_options",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "acceptable_delinquency_window": {
+          "name": "acceptable_delinquency_window",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 21
+        },
+        "min_reviews_per_day": {
+          "name": "min_reviews_per_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_reviews_per_day": {
+          "name": "max_reviews_per_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "days_per_week": {
+          "name": "days_per_week",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "weekly_rules": {
+          "name": "weekly_rules",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exceptions": {
+          "name": "exceptions",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "prefs_scheduling_options_user_id_user_profile_id_fk": {
+          "name": "prefs_scheduling_options_user_id_user_profile_id_fk",
+          "tableFrom": "prefs_scheduling_options",
+          "tableTo": "user_profile",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.prefs_spaced_repetition": {
+      "name": "prefs_spaced_repetition",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alg_type": {
+          "name": "alg_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fsrs_weights": {
+          "name": "fsrs_weights",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "request_retention": {
+          "name": "request_retention",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "maximum_interval": {
+          "name": "maximum_interval",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "learning_steps": {
+          "name": "learning_steps",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "relearning_steps": {
+          "name": "relearning_steps",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enable_fuzzing": {
+          "name": "enable_fuzzing",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "prefs_spaced_repetition_user_id_user_profile_id_fk": {
+          "name": "prefs_spaced_repetition_user_id_user_profile_id_fk",
+          "tableFrom": "prefs_spaced_repetition",
+          "tableTo": "user_profile",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "prefs_spaced_repetition_user_id_alg_type_pk": {
+          "name": "prefs_spaced_repetition_user_id_alg_type_pk",
+          "columns": ["user_id", "alg_type"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "check_name": {
+          "name": "check_name",
+          "value": "alg_type IN ('SM2', 'FSRS')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.reference": {
+      "name": "reference",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ref_type": {
+          "name": "ref_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tune_ref": {
+          "name": "tune_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_ref": {
+          "name": "user_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comment": {
+          "name": "comment",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "public": {
+          "name": "public",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "favorite": {
+          "name": "favorite",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_reference_tune_public": {
+          "name": "idx_reference_tune_public",
+          "columns": [
+            {
+              "expression": "tune_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "public",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_reference_tune_user_ref": {
+          "name": "idx_reference_tune_user_ref",
+          "columns": [
+            {
+              "expression": "tune_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_reference_user_tune_public": {
+          "name": "idx_reference_user_tune_public",
+          "columns": [
+            {
+              "expression": "user_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "tune_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "public",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "reference_tune_ref_tune_id_fk": {
+          "name": "reference_tune_ref_tune_id_fk",
+          "tableFrom": "reference",
+          "tableTo": "tune",
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reference_user_ref_user_profile_id_fk": {
+          "name": "reference_user_ref_user_profile_id_fk",
+          "tableFrom": "reference",
+          "tableTo": "user_profile",
+          "columnsFrom": ["user_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "check_ref_type": {
+          "name": "check_ref_type",
+          "value": "ref_type IN ('website', 'audio', 'video')"
+        },
+        "check_public": {
+          "name": "check_public",
+          "value": "public IN (true, false)"
+        },
+        "check_favorite": {
+          "name": "check_favorite",
+          "value": "favorite IN (true, false)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.tab_group_main_state": {
+      "name": "tab_group_main_state",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "which_tab": {
+          "name": "which_tab",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'practice'"
+        },
+        "playlist_id": {
+          "name": "playlist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tab_spec": {
+          "name": "tab_spec",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "practice_show_submitted": {
+          "name": "practice_show_submitted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "practice_mode_flashcard": {
+          "name": "practice_mode_flashcard",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tab_group_main_state_user_id_user_profile_id_fk": {
+          "name": "tab_group_main_state_user_id_user_profile_id_fk",
+          "tableFrom": "tab_group_main_state",
+          "tableTo": "user_profile",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "check_name": {
+          "name": "check_name",
+          "value": "which_tab IN ('scheduled', 'repertoire', 'catalog', 'analysis')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.table_state": {
+      "name": "table_state",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "screen_size": {
+          "name": "screen_size",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "playlist_id": {
+          "name": "playlist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "settings": {
+          "name": "settings",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "current_tune": {
+          "name": "current_tune",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "table_state_user_id_user_profile_id_fk": {
+          "name": "table_state_user_id_user_profile_id_fk",
+          "tableFrom": "table_state",
+          "tableTo": "user_profile",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "table_state_playlist_id_playlist_playlist_id_fk": {
+          "name": "table_state_playlist_id_playlist_playlist_id_fk",
+          "tableFrom": "table_state",
+          "tableTo": "playlist",
+          "columnsFrom": ["playlist_id"],
+          "columnsTo": ["playlist_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "table_state_user_id_screen_size_purpose_playlist_id_pk": {
+          "name": "table_state_user_id_screen_size_purpose_playlist_id_pk",
+          "columns": ["user_id", "screen_size", "purpose", "playlist_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "purpose_check": {
+          "name": "purpose_check",
+          "value": "purpose IN ('practice', 'repertoire', 'catalog', 'analysis')"
+        },
+        "screen_size_check": {
+          "name": "screen_size_check",
+          "value": "screen_size IN ('small', 'full')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.table_transient_data": {
+      "name": "table_transient_data",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tune_id": {
+          "name": "tune_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "playlist_id": {
+          "name": "playlist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note_private": {
+          "name": "note_private",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note_public": {
+          "name": "note_public",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recall_eval": {
+          "name": "recall_eval",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "practiced": {
+          "name": "practiced",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quality": {
+          "name": "quality",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "easiness": {
+          "name": "easiness",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "difficulty": {
+          "name": "difficulty",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "interval": {
+          "name": "interval",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "step": {
+          "name": "step",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repetitions": {
+          "name": "repetitions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due": {
+          "name": "due",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "backup_practiced": {
+          "name": "backup_practiced",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "goal": {
+          "name": "goal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "technique": {
+          "name": "technique",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stability": {
+          "name": "stability",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 2
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "table_transient_data_user_id_user_profile_id_fk": {
+          "name": "table_transient_data_user_id_user_profile_id_fk",
+          "tableFrom": "table_transient_data",
+          "tableTo": "user_profile",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "table_transient_data_tune_id_tune_id_fk": {
+          "name": "table_transient_data_tune_id_tune_id_fk",
+          "tableFrom": "table_transient_data",
+          "tableTo": "tune",
+          "columnsFrom": ["tune_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "table_transient_data_playlist_id_playlist_playlist_id_fk": {
+          "name": "table_transient_data_playlist_id_playlist_playlist_id_fk",
+          "tableFrom": "table_transient_data",
+          "tableTo": "playlist",
+          "columnsFrom": ["playlist_id"],
+          "columnsTo": ["playlist_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "table_transient_data_tune_id_user_id_playlist_id_pk": {
+          "name": "table_transient_data_tune_id_user_id_playlist_id_pk",
+          "columns": ["tune_id", "user_id", "playlist_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tag": {
+      "name": "tag",
+      "schema": "",
+      "columns": {
+        "tag_id": {
+          "name": "tag_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_ref": {
+          "name": "user_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tune_ref": {
+          "name": "tune_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tag_text": {
+          "name": "tag_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_tag_user_ref_tag_text": {
+          "name": "idx_tag_user_ref_tag_text",
+          "columns": [
+            {
+              "expression": "user_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "tag_text",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_tag_user_ref_tune_ref": {
+          "name": "idx_tag_user_ref_tune_ref",
+          "columns": [
+            {
+              "expression": "user_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "tune_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tag_user_ref_user_profile_id_fk": {
+          "name": "tag_user_ref_user_profile_id_fk",
+          "tableFrom": "tag",
+          "tableTo": "user_profile",
+          "columnsFrom": ["user_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tag_tune_ref_tune_id_fk": {
+          "name": "tag_tune_ref_tune_id_fk",
+          "tableFrom": "tag",
+          "tableTo": "tune",
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "tag_user_ref_tune_ref_tag_text_unique": {
+          "name": "tag_user_ref_tune_ref_tag_text_unique",
+          "nullsNotDistinct": false,
+          "columns": ["user_ref", "tune_ref", "tag_text"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tune": {
+      "name": "tune",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "structure": {
+          "name": "structure",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "incipit": {
+          "name": "incipit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "genre": {
+          "name": "genre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "private_for": {
+          "name": "private_for",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tune_genre_genre_id_fk": {
+          "name": "tune_genre_genre_id_fk",
+          "tableFrom": "tune",
+          "tableTo": "genre",
+          "columnsFrom": ["genre"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tune_private_for_user_profile_id_fk": {
+          "name": "tune_private_for_user_profile_id_fk",
+          "tableFrom": "tune",
+          "tableTo": "user_profile",
+          "columnsFrom": ["private_for"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tune_override": {
+      "name": "tune_override",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tune_ref": {
+          "name": "tune_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_ref": {
+          "name": "user_ref",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "structure": {
+          "name": "structure",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "genre": {
+          "name": "genre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "incipit": {
+          "name": "incipit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tune_override_tune_ref_tune_id_fk": {
+          "name": "tune_override_tune_ref_tune_id_fk",
+          "tableFrom": "tune_override",
+          "tableTo": "tune",
+          "columnsFrom": ["tune_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tune_override_user_ref_user_profile_id_fk": {
+          "name": "tune_override_user_ref_user_profile_id_fk",
+          "tableFrom": "tune_override",
+          "tableTo": "user_profile",
+          "columnsFrom": ["user_ref"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tune_override_genre_genre_id_fk": {
+          "name": "tune_override_genre_genre_id_fk",
+          "tableFrom": "tune_override",
+          "tableTo": "genre",
+          "columnsFrom": ["genre"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tune_type": {
+      "name": "tune_type",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rhythm": {
+          "name": "rhythm",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_profile": {
+      "name": "user_profile",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "supabase_user_id": {
+          "name": "supabase_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sr_alg_type": {
+          "name": "sr_alg_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone_verified": {
+          "name": "phone_verified",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acceptable_delinquency_window": {
+          "name": "acceptable_delinquency_window",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 21
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "sync_version": {
+          "name": "sync_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "last_modified_at": {
+          "name": "last_modified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "user_profile_supabase_user_id_unique": {
+          "name": "user_profile_supabase_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["supabase_user_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

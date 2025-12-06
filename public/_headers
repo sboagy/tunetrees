@@ -1,0 +1,24 @@
+/*
+  # Security headers
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.workers.dev; worker-src 'self' blob:; child-src 'self' blob:
+  
+  # Cache control for service worker
+  Cache-Control: public, max-age=0, must-revalidate
+
+/assets/*
+  # Long cache for static assets (Vite adds hashes to filenames)
+  Cache-Control: public, max-age=31536000, immutable
+
+/registerSW.js
+  # Don't cache the service worker registration script
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/*.wasm
+  # Cache WASM files (SQLite)
+  Cache-Control: public, max-age=31536000, immutable
+  Content-Type: application/wasm
+

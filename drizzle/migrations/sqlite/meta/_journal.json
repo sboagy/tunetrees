@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1759637695386,
+      "tag": "0000_lowly_obadiah_stane",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1759798797266,
+      "tag": "0001_thin_chronomancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1762040440415,
+      "tag": "0002_nappy_roland_deschain",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1762044041103,
+      "tag": "0003_friendly_cerebro",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1762820736501,
+      "tag": "0004_true_union_jack",
+      "breakpoints": true
+    }
+  ]
+}

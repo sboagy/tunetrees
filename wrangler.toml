@@ -1,0 +1,11 @@
+name = "tunetrees-pwa"
+compatibility_date = "2025-01-12"
+pages_build_output_dir = "dist"
+
+# Cloudflare Pages configuration
+# Environment variables are set in .env.production (injected at build time)
+# or via Cloudflare dashboard (Settings → Environment Variables)
+
+# Optional: Custom domain configuration (add later)
+# After deployment, you can add a custom domain via Cloudflare dashboard:
+# Pages project → Custom domains → Add domain

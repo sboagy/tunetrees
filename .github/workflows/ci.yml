@@ -1,0 +1,392 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+# Environment secrets (vite_pwa_env): ALICE_TEST_PASSWORD, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+# yamllint disable rule:line-length
+
+name: CI - Tests
+
+on:
+  push:
+    branches: [main, feat/pwa1]
+    # Note: exclude feature branches from push to avoid double builds
+    # PR updates are covered by the pull_request trigger below
+  pull_request:
+    branches: [main, feat/pwa1]
+
+# Cancel in-progress runs when new commit pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run Playwright Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4] # Creates 4 separate jobs (Run 1/4, Run 2/4, etc.)
+
+    timeout-minutes: 60
+    # All tests require vite_pwa_env for ALICE_TEST_PASSWORD and Supabase credentials
+    environment: vite_pwa_env
+    env:
+      ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+      TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+      SUPABASE_URL: ""
+      SUPABASE_ANON_KEY: ""
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # --- NEW AGGRESSIVE CLEANUP STEP ---
+      - name: AGGRESSIVE DISK CLEANUP (Maximize Space)
+        if: runner.os == 'Linux'
+        run: |
+          echo "🧹 Removing large pre-installed SDKs..."
+          # Removes the large .NET SDK
+          sudo rm -rf /usr/share/dotnet
+          # Removes the large Android SDK
+          sudo rm -rf /usr/local/lib/android
+          # Clears package manager cache
+          sudo apt-get clean
+          # Clean up any residual docker files from previous jobs
+          docker system prune -a -f || true
+          echo "✅ Estimated 5-8 GB space reclaimed."
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Cache Supabase CLI
+      - name: Cache Supabase CLI
+        id: cache-supabase
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/supabase
+          key: ${{ runner.os }}-supabase-cli-v1.200.0
+          restore-keys: |
+            ${{ runner.os }}-supabase-cli-v1.
+
+      # 5. Install Supabase CLI (if not cached)
+      - name: Install Supabase CLI
+        if: steps.cache-supabase.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/supabase-cli
+          curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz -C /tmp/supabase-cli
+          sudo mv -f /tmp/supabase-cli/supabase /usr/local/bin/
+          rm -rf /tmp/supabase-cli
+
+      # 6. Verify Supabase CLI
+      - name: Verify Supabase CLI
+        run: supabase --version
+
+      # 6a. Cache Supabase Docker Images
+      - name: Cache Supabase Docker Images
+        id: cache-docker-images
+        uses: actions/cache@v4
+        with:
+          path: ~/supabase-docker-images.tar
+          key: ${{ runner.os }}-supabase-docker-v1.200.0
+          restore-keys: |
+            ${{ runner.os }}-supabase-docker-
+
+      # 6b. Load Cached Docker Images
+      - name: Load Cached Docker Images
+        if: steps.cache-docker-images.outputs.cache-hit == 'true'
+        run: |
+          echo "📦 Loading cached Supabase Docker images..."
+          docker load -i ~/supabase-docker-images.tar
+          echo "✅ Cached images loaded"
+          docker images | grep supabase
+
+      # 7. Start Supabase Local Stack (includes Docker Postgres)
+      - name: Start Supabase Local Stack
+        id: supabase
+        run: |
+          supabase start
+          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> $GITHUB_ENV
+          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
+          echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> $GITHUB_ENV
+          echo "VITE_SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
+
+      # 7b. Health check loop (avoid race where API not yet ready and db reset returns 502)
+      - name: Wait for Supabase API (Health Check)
+        run: |
+          echo "🔍 Checking Supabase API health at $SUPABASE_URL/rest/v1"
+          ATTEMPTS=0
+          # Accept 200 (OK), 401 (unauthenticated), and 404 (PostgREST available but no route) as healthy
+          until CODE=$(curl -fsS -o /dev/null -w '%{http_code}' "$SUPABASE_URL/rest/v1" || true) && echo "$CODE" | grep -qE '200|401|404'; do
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ "$ATTEMPTS" -ge 30 ]; then
+              echo "❌ Supabase API not healthy after $ATTEMPTS attempts (last code: $CODE)";
+              exit 1;
+            fi
+            echo "⏳ Waiting for Supabase API (attempt $ATTEMPTS, code=$CODE) ...";
+            sleep 2
+          done
+          echo "✅ Supabase API reachable (HTTP $CODE)"
+
+      # 7c. Additional debug (only on PR events) to aid future failures
+      - name: Supabase Debug Info
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "🔧 Supabase debug info";
+          echo "SUPABASE_URL=$SUPABASE_URL";
+          supabase status --output json || echo "(status failed)";
+          echo "Docker containers:";
+          docker ps -a --format 'table {{.Names}}\t{{.Status}}';
+          echo "Recent logs (rest service):";
+          docker logs supabase_rest_tunetrees --tail=40 || echo "(no rest logs)";
+          echo "Recent logs (auth service):";
+          docker logs supabase_auth_admin_api_tunetrees --tail=20 || echo "(no auth logs)";
+
+      # 7a. Save Docker Images to Cache (if cache was missed)
+      - name: Save Docker Images to Cache
+        if: steps.cache-docker-images.outputs.cache-hit != 'true'
+        run: |
+          echo "💾 Saving Supabase Docker images to cache..."
+          docker images --format "{{.Repository}}:{{.Tag}}" | grep supabase | xargs docker save -o ~/supabase-docker-images.tar
+          echo "✅ Docker images saved to cache"
+          ls -lh ~/supabase-docker-images.tar
+
+      # 8. Reset and Seed Database
+      - name: Reset and Seed Database
+        run: |
+          echo "🔄 Supabase DB reset + seed (attempt 1)"
+          set -o pipefail
+          if ! supabase db reset --debug 2>&1 | tee reset_attempt1.log; then
+            echo "⚠️ First reset attempt failed; sleeping 5s then retrying"
+            sleep 5
+            echo "🔄 Supabase DB reset + seed (attempt 2)"
+            if ! supabase db reset --debug 2>&1 | tee reset_attempt2.log; then
+              echo "❌ Second reset attempt failed. Showing tail of logs:"
+              tail -n 80 reset_attempt2.log || true
+              exit 1
+            fi
+          fi
+          echo "✅ Supabase DB reset succeeded"
+        env:
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+
+      # 9. Verify Database Setup (optional debug step)
+      - name: Verify Database Setup
+        run: |
+          echo "✅ Verifying database was seeded..."
+          docker exec supabase_db_tunetrees psql -U postgres -d postgres -c "SELECT COUNT(*) as table_count FROM information_schema.tables WHERE table_schema = 'public';" || echo "⚠️  Could not verify tables"
+
+      # 10. Cache Playwright Browsers
+      - name: Cache Playwright Browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      # 11. Install Playwright Browsers
+      - name: Install Playwright Browsers
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      # 12. Install Playwright System Dependencies (if browsers were cached)
+      - name: Install Playwright System Dependencies
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # 12b. Setup Cloudflare Worker (don't start - Playwright webServer handles that)
+      - name: Setup Cloudflare Worker
+        run: |
+          echo "👷 Setting up Cloudflare Worker..."
+          cd worker
+          npm ci
+          # Create .dev.vars for local testing (Playwright will start the worker)
+          echo "SUPABASE_URL=${{ env.SUPABASE_URL }}" > .dev.vars
+          echo "SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long" >> .dev.vars
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
+          echo "✅ Worker dependencies installed and .dev.vars created"
+
+      # 13. Generate Auth States (requires dev server + Playwright browsers)
+      - name: Generate Auth States
+        run: |
+          echo "🔐 Starting dev server for auth generation..."
+          npm run dev &
+          DEV_PID=$!
+          sleep 10
+          echo "🔑 Generating auth states for all test users..."
+          npm run db:local:gen-test-auth
+          echo "🛑 Stopping dev server..."
+          kill $DEV_PID || true
+          sleep 2
+          # Ensure all vite processes are killed
+          pkill -f "vite" || true
+          sleep 1
+        env:
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+
+      # 14. Run Playwright Tests (webServer in playwright.config.ts handles dev server)
+      - name: Run Playwright Single Test (Shard ${{ matrix.shard }}/4)
+        env:
+          ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+        run: |
+          echo "🎭 Starting Playwright tests (shard ${{ matrix.shard }}/4)..."
+          echo "📊 Environment check:"
+          echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
+          echo "VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:0:20}..."
+          echo "ALICE_TEST_PASSWORD is set: $([[ -n "$ALICE_TEST_PASSWORD" ]] && echo 'yes' || echo 'no')"
+          echo "TEST_USER_PASSWORD is set: $([[ -n "$TEST_USER_PASSWORD" ]] && echo 'yes' || echo 'no')"
+          # echo "🎬 Running single scheduling test on chromium only"
+          # # Restricted to single spec & single project (chromium) per request
+          # npx playwright test e2e/tests/scheduling-003-repeated-easy.spec.ts --project=chromium
+          echo "🎬 Running full test suite (chromium-auth + chromium + Mobile Chrome)"
+          npx playwright test --shard=${{ matrix.shard }}/4 --project=chromium-auth --project=chromium --project="Mobile Chrome"
+
+      # 15. Upload Playwright blob report for merging
+      - name: Upload blob report to GitHub Actions Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 1
+
+      # 16. Upload Test Screenshots/Videos
+      - name: Upload Test Artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 7
+
+      # 17. Stop Supabase (cleanup)
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup
+
+  merge-reports:
+    name: Merge Playwright Reports
+    if: always()
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download blob reports from all shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: Merge into HTML Report
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
+
+      - name: Upload merged HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    needs: test
+    # Deploy when tests pass:
+    # - on pushes to feat/pwa1
+    # - on PR updates from branch fix/sync
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/feat/pwa1') || (github.event_name == 'pull_request' && github.head_ref == 'fix/sync')
+    environment: vite_pwa_env
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Build for production
+      - name: Build Application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_WORKER_URL: ${{ secrets.VITE_WORKER_URL }}
+
+      # 5. Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Use the PR head ref when event is pull_request; otherwise use ref_name (branch without refs/heads/)
+          command: pages deploy dist --project-name=tunetrees-pwa --branch=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+
+      # 6. Output deployment URL
+      - name: Output deployment URL
+        if: success()
+        run: |
+          echo "🚀 Deployment complete!"
+          echo "Deployment URL will be available in Cloudflare Pages dashboard"
+
+  deploy-worker:
+    name: Deploy Cloudflare Worker
+    runs-on: ubuntu-latest
+    needs: test
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/feat/pwa1') || (github.event_name == 'pull_request' && github.head_ref == 'fix/sync')
+    environment: vite_pwa_env
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Install Worker Dependencies
+        run: cd worker && npm ci
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: "worker"
+          command: deploy
+          secrets: |
+            SUPABASE_JWT_SECRET
+        env:
+          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}

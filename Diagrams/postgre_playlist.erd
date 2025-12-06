@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<diagram version="1" name="postgre_playlist">
+	<entities>
+		<data-source id="postgres-jdbc-199b4b20cc4-43579b92585755ba">
+			<entity id="1" name="genre" fq-name="public.genre">
+				<path name="public"/>
+				<path name="postgres"/>
+			</entity>
+			<entity id="2" name="genre_tune_type" fq-name="public.genre_tune_type">
+				<path name="public"/>
+				<path name="postgres"/>
+			</entity>
+			<entity id="3" name="instrument" fq-name="public.instrument">
+				<path name="public"/>
+				<path name="postgres"/>
+			</entity>
+			<entity id="4" name="playlist" fq-name="public.playlist">
+				<path name="public"/>
+				<path name="postgres"/>
+			</entity>
+			<entity id="5" name="playlist_tune" fq-name="public.playlist_tune">
+				<path name="public"/>
+				<path name="postgres"/>
+			</entity>
+			<entity id="6" name="practice_record" fq-name="public.practice_record">
+				<path name="public"/>
+				<path name="postgres"/>
+			</entity>
+			<entity id="7" name="tune_type" fq-name="public.tune_type">
+				<path name="public"/>
+				<path name="postgres"/>
+			</entity>
+		</data-source>
+	</entities>
+	<relations>
+		<relation name="genre_tune_type_genre_id_genre_id_fk" fq-name="public.genre_tune_type.genre_tune_type_genre_id_genre_id_fk" type="fk" pk-ref="1" fk-ref="2"/>
+		<relation name="instrument_genre_fk" fq-name="public.instrument.instrument_genre_fk" type="fk" pk-ref="1" fk-ref="3"/>
+		<relation name="playlist_instrument_fk" fq-name="public.playlist.playlist_instrument_fk" type="fk" pk-ref="3" fk-ref="4"/>
+		<relation name="playlist_tune_playlist_ref_playlist_playlist_id_fk" fq-name="public.playlist_tune.playlist_tune_playlist_ref_playlist_playlist_id_fk" type="fk" pk-ref="4" fk-ref="5"/>
+		<relation name="practice_record_playlist_ref_playlist_playlist_id_fk" fq-name="public.practice_record.practice_record_playlist_ref_playlist_playlist_id_fk" type="fk" pk-ref="4" fk-ref="6"/>
+		<relation name="genre_tune_type_tune_type_id_tune_type_id_fk" fq-name="public.genre_tune_type.genre_tune_type_tune_type_id_tune_type_id_fk" type="fk" pk-ref="7" fk-ref="2"/>
+	</relations>
+</diagram>
