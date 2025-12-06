@@ -50,7 +50,6 @@ tunetrees_local_backup/**/*
 tunetrees_do_backup/**/*
 tunetrees_do_backup
 tunetrees_local_backup
-_notes/tt_scratch*
 .dbeaver/**/*
 .github/copilot-instructions-broken.md
 archive/emergency_fix_production_views.py
@@ -123,11 +122,8 @@ scripts/debug/
 sql_scripts/debug/
 supabase/migrations.backup/
 *.disabled
-# _notes/*.md
 scripts/test-login.ts
 supabase/query_duplicates.ts
-_notes/phase-4-3-playwright-update-plan.md
-_notes/phase-5-migration-script-complete.md
 
 # 1. Broad Ignore (Allows Traversal)
 legacy/**
@@ -152,10 +148,15 @@ legacy/frontend/**
 !legacy/frontend/app/**
 !legacy/frontend/auth/**
 !legacy/frontend/components/**
+sql_scripts/_scratch/**
+backup_*.sql
+
+# Development notes (transient, not guaranteed current)
+_notes/_archive/**
 _notes/OLD_E2E_README.md
 _notes/TEST_GENERATION_SUMMARY.md
 _notes/anon_user_conversion_pattern.md
+_notes/phase-4-3-playwright-update-plan.md
+_notes/phase-5-migration-script-complete.md
 _notes/plan-sqlViewConsolidation_draft.md
-sql_scripts/_scratch/**
-_notes/_archive/**
-backup_*.sql
+_notes/tt_scratch*
