@@ -1,28 +1,94 @@
-## Usage
+<p align="center">
+  <img src="public/logo4.png" alt="TuneTrees Logo" width="120" height="120">
+</p>
+
+# TuneTrees
+
+**Practice management for musicians** — Track repertoire, schedule reviews with spaced repetition, and keep organized notes.
+
+TuneTrees is built for tune-based traditions:
+
+- Irish/Scottish/Cape Breton trad
+- Old-time, bluegrass
+- Jazz standards
+- Folk songs
+- Any repertoire where you're building a "book" of discrete pieces
+
+🎵 **[tunetrees.com](https://tunetrees.com)** | 📖 [Documentation](docs/README.md) | 🐛 [Issues](https://github.com/sboagy/tunetrees/issues)
+
+## Status
+
+⚠️ Work in Progress — Functional but not feature complete. [See roadmap →](https://github.com/users/sboagy/projects/1/views/5)
+
+## Features
+
+- 🎯 **Spaced Repetition** — FSRS algorithm schedules reviews at optimal intervals
+- 📱 **Works Offline** — Full functionality without internet, syncs when connected
+- ☁️ **Cloud Sync** — Practice on any device, data syncs automatically
+- 🎸 **Any Instrument** — Multiple Repertoires
+- 🎯 **Goal Focused** — Per-tune goal setting
+
+## Quick Start
+
+### Use the App
+
+Visit **[tunetrees.com](https://tunetrees.com)** — no install required!
+
+Install as an app:
+- **iOS:** Safari → Share → Add to Home Screen
+- **Android:** Chrome → Menu → Install app
+- **Desktop:** Chrome → Install icon in address bar
+
+### Run Locally
 
 ```bash
-$ npm install # or pnpm install or yarn install
+git clone https://github.com/sboagy/tunetrees.git
+cd tunetrees
+npm install
+cp .env.example .env.local  # Add Supabase credentials
+npm run dev
 ```
 
-### Learn more on the [Solid Website](https://solidjs.com) and come chat with us on our [Discord](https://discord.com/invite/solidjs)
+Open http://localhost:5173
 
-## Available Scripts
+## Tech Stack
 
-In the project directory, you can run:
+| Layer | Technology |
+|-------|------------|
+| Frontend | SolidJS, TypeScript, Tailwind CSS |
+| Local DB | SQLite WASM (sql.js) + Drizzle ORM |
+| Cloud | Supabase (PostgreSQL, Auth, Realtime) |
+| PWA | Vite PWA + Workbox |
+| Deploy | Cloudflare Pages |
 
-### `npm run dev`
+## Documentation
 
-Runs the app in the development mode.<br>
-Open [http://localhost:5173](http://localhost:5173) to view it in the browser.
+- **[User Guide](docs/user/getting-started.md)** — Getting started, features, FAQ
+- **[Developer Setup](docs/development/setup.md)** — Run locally, contribute
+- **[Architecture](docs/development/architecture.md)** — System design
+- **[Full Docs](docs/README.md)** — Complete documentation index
 
-### `npm run build`
+## Scripts
 
-Builds the app for production to the `dist` folder.<br>
-It correctly bundles Solid in production mode and optimizes the build for the best performance.
+```bash
+npm run dev        # Development server
+npm run build      # Production build
+npm run test       # Unit tests
+npm run test:e2e   # E2E tests (Playwright)
+npm run typecheck  # TypeScript check
+npm run lint       # ESLint
+```
 
-The build is minified and the filenames include the hashes.<br>
-Your app is ready to be deployed!
+## Contributing
 
-## Deployment
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run `npm run typecheck && npm run lint && npm run test`
+5. Submit a pull request
 
-Learn more about deploying your application with the [documentations](https://vite.dev/guide/static-deploy.html)
+See [Development Setup](docs/development/setup.md) for details.
+
+## License
+
+[MIT](LICENSE)
