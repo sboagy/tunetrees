@@ -16,6 +16,10 @@ TuneTrees is built for tune-based traditions:
 
 🎵 **[tunetrees.com](https://tunetrees.com)** | 📖 [Documentation](docs/README.md) | 🐛 [Issues](https://github.com/sboagy/tunetrees/issues)
 
+## Status
+
+⚠️ Work in Progress — Functional but not feature complete. [See roadmap →](https://github.com/users/sboagy/projects/1/views/5)
+
 ## Features
 
 - 🎯 **Spaced Repetition** — FSRS algorithm schedules reviews at optimal intervals
