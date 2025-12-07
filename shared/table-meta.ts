@@ -538,14 +538,14 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   genre: 1,
   tune_type: 2,
   genre_tune_type: 3,
-  instrument: 4,
 
   // User data (base tables)
   user_profile: 10,
-  prefs_scheduling_options: 11,
-  prefs_spaced_repetition: 12,
-  tab_group_main_state: 13,
-  table_state: 14,
+  instrument: 11, // depends on user_profile via private_to_user
+  prefs_scheduling_options: 12,
+  prefs_spaced_repetition: 13,
+  tab_group_main_state: 14,
+  table_state: 15,
 
   // Core data
   tune: 20,
