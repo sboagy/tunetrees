@@ -186,6 +186,8 @@ export class SyncService {
         timestamp: new Date().toISOString(),
         affectedTables: [],
       };
+      // CRITICAL FIX: Call onSyncComplete even on errors
+      this.config.onSyncComplete?.(errorResult);
       return errorResult;
     } finally {
       this.isSyncing = false;
@@ -209,6 +211,19 @@ export class SyncService {
       this.config.onSyncComplete?.(result);
 
       return result;
+    } catch (error) {
+      // CRITICAL FIX: Call onSyncComplete even on errors
+      const errorResult: SyncResult = {
+        success: false,
+        itemsSynced: 0,
+        itemsFailed: 0,
+        conflicts: 0,
+        errors: [error instanceof Error ? error.message : String(error)],
+        timestamp: new Date().toISOString(),
+        affectedTables: [],
+      };
+      this.config.onSyncComplete?.(errorResult);
+      throw error; // Re-throw to maintain error propagation
     } finally {
       this.isSyncing = false;
     }
@@ -264,6 +279,20 @@ export class SyncService {
       this.config.onSyncComplete?.(result);
 
       return result;
+    } catch (error) {
+      // CRITICAL FIX: Call onSyncComplete even on errors so UI can react
+      // This ensures initialSyncComplete gets set even if sync fails
+      const errorResult: SyncResult = {
+        success: false,
+        itemsSynced: 0,
+        itemsFailed: 0,
+        conflicts: 0,
+        errors: [error instanceof Error ? error.message : String(error)],
+        timestamp: new Date().toISOString(),
+        affectedTables: [],
+      };
+      this.config.onSyncComplete?.(errorResult);
+      throw error; // Re-throw to maintain error propagation
     } finally {
       this.isSyncing = false;
     }
@@ -307,6 +336,19 @@ export class SyncService {
       const result: SyncResult = await engine.syncDownTables(tables);
       this.config.onSyncComplete?.(result);
       return result;
+    } catch (error) {
+      // CRITICAL FIX: Call onSyncComplete even on errors
+      const errorResult: SyncResult = {
+        success: false,
+        itemsSynced: 0,
+        itemsFailed: 0,
+        conflicts: 0,
+        errors: [error instanceof Error ? error.message : String(error)],
+        timestamp: new Date().toISOString(),
+        affectedTables: [],
+      };
+      this.config.onSyncComplete?.(errorResult);
+      throw error; // Re-throw to maintain error propagation
     } finally {
       this.isSyncing = false;
     }
