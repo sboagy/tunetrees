@@ -156,6 +156,22 @@ export class SyncService {
   }
 
   /**
+   * Create a standard error result for failed sync operations
+   * Helper to ensure consistent error result format across all sync methods
+   */
+  private createErrorResult(error: unknown): SyncResult {
+    return {
+      success: false,
+      itemsSynced: 0,
+      itemsFailed: 0,
+      conflicts: 0,
+      errors: [error instanceof Error ? error.message : String(error)],
+      timestamp: new Date().toISOString(),
+      affectedTables: [],
+    };
+  }
+
+  /**
    * Perform full sync (push then pull)
    *
    * @returns Sync result statistics
@@ -177,18 +193,10 @@ export class SyncService {
       return result;
     } catch (error) {
       console.error("Sync error:", error);
-      const errorResult: SyncResult = {
-        success: false,
-        itemsSynced: 0,
-        itemsFailed: 0,
-        conflicts: 0,
-        errors: [error instanceof Error ? error.message : "Unknown sync error"],
-        timestamp: new Date().toISOString(),
-        affectedTables: [],
-      };
       // CRITICAL FIX: Call onSyncComplete even on errors
+      const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);
-      return errorResult;
+      throw error; // Re-throw to maintain error propagation (consistent with other methods)
     } finally {
       this.isSyncing = false;
     }
@@ -213,15 +221,7 @@ export class SyncService {
       return result;
     } catch (error) {
       // CRITICAL FIX: Call onSyncComplete even on errors
-      const errorResult: SyncResult = {
-        success: false,
-        itemsSynced: 0,
-        itemsFailed: 0,
-        conflicts: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
-        timestamp: new Date().toISOString(),
-        affectedTables: [],
-      };
+      const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);
       throw error; // Re-throw to maintain error propagation
     } finally {
@@ -282,15 +282,7 @@ export class SyncService {
     } catch (error) {
       // CRITICAL FIX: Call onSyncComplete even on errors so UI can react
       // This ensures initialSyncComplete gets set even if sync fails
-      const errorResult: SyncResult = {
-        success: false,
-        itemsSynced: 0,
-        itemsFailed: 0,
-        conflicts: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
-        timestamp: new Date().toISOString(),
-        affectedTables: [],
-      };
+      const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);
       throw error; // Re-throw to maintain error propagation
     } finally {
@@ -338,15 +330,7 @@ export class SyncService {
       return result;
     } catch (error) {
       // CRITICAL FIX: Call onSyncComplete even on errors
-      const errorResult: SyncResult = {
-        success: false,
-        itemsSynced: 0,
-        itemsFailed: 0,
-        conflicts: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
-        timestamp: new Date().toISOString(),
-        affectedTables: [],
-      };
+      const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);
       throw error; // Re-throw to maintain error propagation
     } finally {
