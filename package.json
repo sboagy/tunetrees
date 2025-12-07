@@ -62,17 +62,17 @@
     "@biomejs/biome": "^2.3.7",
     "@kobalte/core": "^0.13.11",
     "@solidjs/router": "^0.15.4",
-    "@supabase/supabase-js": "^2.84.0",
+    "@supabase/supabase-js": "^2.86.2",
     "@tanstack/solid-table": "^8.21.3",
     "@tanstack/solid-virtual": "^3.13.12",
     "abcjs": "^6.5.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "drizzle-orm": "^0.44.7",
+    "drizzle-orm": "^0.45.0",
     "jodit": "^4.7.9",
     "jodit-react": "^5.2.38",
     "loglevel": "^1.9.2",
-    "lucide-solid": "^0.554.0",
+    "lucide-solid": "^0.556.0",
     "solid-js": "^1.9.10",
     "solid-sonner": "^0.2.8",
     "sonner": "^2.0.7",
@@ -85,7 +85,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.7",
-    "@cloudflare/workers-types": "^4.20251128.0",
+    "@cloudflare/workers-types": "^4.20251205.0",
     "@playwright/test": "^1.56.1",
     "@solidjs/testing-library": "^0.8.10",
     "@tailwindcss/vite": "^4.1.17",
@@ -98,7 +98,7 @@
     "better-sqlite3": "^12.4.6",
     "concurrently": "^9.2.1",
     "dotenv": "^17.2.3",
-    "drizzle-kit": "^0.18.1",
+    "drizzle-kit": "^0.31.8",
     "jsdom": "^27.2.0",
     "postgres": "^3.4.7",
     "prettier": "^3.6.2",
@@ -111,6 +111,6 @@
     "vite-plugin-solid": "^2.11.10",
     "vite-plugin-static-copy": "^3.1.4",
     "workbox-window": "^7.4.0",
-    "wrangler": "^4.50.0"
+    "wrangler": "^4.53.0"
   }
 }
