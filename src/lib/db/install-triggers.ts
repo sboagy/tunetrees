@@ -72,6 +72,8 @@ interface TableTriggerConfig {
   tableName: string;
   /** Primary key column(s) - string for single PK, array for composite */
   primaryKey: string | string[];
+  /** Whether the table has last_modified_at for incremental sync */
+  supportsIncremental: boolean;
 }
 
 const TRIGGER_CONFIGS: TableTriggerConfig[] = Object.entries(
@@ -79,6 +81,7 @@ const TRIGGER_CONFIGS: TableTriggerConfig[] = Object.entries(
 ).map(([tableName, meta]) => ({
   tableName,
   primaryKey: meta.primaryKey,
+  supportsIncremental: meta.supportsIncremental,
 }));
 
 /**
@@ -103,25 +106,69 @@ function generateRowIdExpression(
 }
 
 /**
+ * Generate a WHERE clause for a trigger to match the row by primary key.
+ *
+ * For single-column PKs: "id = NEW.id"
+ * For composite PKs: "col1 = NEW.col1 AND col2 = NEW.col2"
+ */
+function generatePkWhereClause(
+  primaryKey: string | string[],
+  prefix: "NEW" | "OLD"
+): string {
+  if (typeof primaryKey === "string") {
+    return `${primaryKey} = ${prefix}.${primaryKey}`;
+  }
+
+  // Composite key - build AND expression
+  return primaryKey.map((col) => `${col} = ${prefix}.${col}`).join(" AND ");
+}
+
+/**
  * Execute triggers for a single table.
  * Executes each statement directly instead of building multi-statement SQL.
  *
  * The triggers include a check against sync_trigger_control.disabled:
  * - When disabled = 0 (default): triggers add entries to sync_push_queue
  * - When disabled = 1: triggers are suppressed (no queue entries)
+ *
+ * For tables with supportsIncremental=true (have last_modified_at column),
+ * an additional BEFORE UPDATE trigger auto-sets last_modified_at to ensure
+ * sync propagation works correctly even when code forgets to set it.
  */
 function createTriggersForTable(
   db: SqlJsDatabase,
   config: TableTriggerConfig
 ): void {
-  const { tableName, primaryKey } = config;
+  const { tableName, primaryKey, supportsIncremental } = config;
   const newRowId = generateRowIdExpression(primaryKey, "NEW");
   const oldRowId = generateRowIdExpression(primaryKey, "OLD");
 
-  // Drop existing triggers
+  // Drop existing triggers (including new auto-modified trigger)
   db.run(`DROP TRIGGER IF EXISTS trg_${tableName}_insert`);
   db.run(`DROP TRIGGER IF EXISTS trg_${tableName}_update`);
   db.run(`DROP TRIGGER IF EXISTS trg_${tableName}_delete`);
+  db.run(`DROP TRIGGER IF EXISTS trg_${tableName}_auto_modified`);
+
+  // For tables with last_modified_at, create a BEFORE UPDATE trigger that
+  // auto-sets last_modified_at when it wasn't explicitly updated.
+  // This ensures sync propagation works even when code forgets to set it.
+  //
+  // The trigger only fires when last_modified_at is unchanged, preventing
+  // infinite recursion and allowing explicit overrides.
+  if (supportsIncremental) {
+    db.run(`
+      CREATE TRIGGER trg_${tableName}_auto_modified
+      AFTER UPDATE ON ${tableName}
+      FOR EACH ROW
+      WHEN NEW.last_modified_at = OLD.last_modified_at
+        OR NEW.last_modified_at IS NULL
+      BEGIN
+        UPDATE ${tableName}
+        SET last_modified_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE ${generatePkWhereClause(primaryKey, "NEW")};
+      END
+    `);
+  }
 
   // Create INSERT trigger with suppression check
   db.run(`
@@ -183,6 +230,7 @@ function createTriggersForTable(
  * 2. Creates the sync_push_queue table if it doesn't exist
  * 3. Drops any existing triggers (idempotent)
  * 4. Creates INSERT/UPDATE/DELETE triggers for all syncable tables
+ * 5. Creates auto_modified triggers for tables with last_modified_at
  *
  * @param db - The sql.js Database instance
  */
@@ -197,10 +245,14 @@ export function installSyncTriggers(db: SqlJsDatabase): void {
 
   // Generate and execute triggers for each table
   let triggerCount = 0;
+  let autoModifiedCount = 0;
   for (const config of TRIGGER_CONFIGS) {
     try {
       createTriggersForTable(db, config);
       triggerCount += 3; // INSERT, UPDATE, DELETE
+      if (config.supportsIncremental) {
+        autoModifiedCount += 1; // auto_modified trigger
+      }
     } catch (err) {
       console.error(
         `❌ Failed to create triggers for ${config.tableName}:`,
@@ -211,7 +263,7 @@ export function installSyncTriggers(db: SqlJsDatabase): void {
   }
 
   console.log(
-    `✅ Installed ${triggerCount} sync triggers for ${TRIGGER_CONFIGS.length} tables`
+    `✅ Installed ${triggerCount} sync triggers + ${autoModifiedCount} auto-modified triggers for ${TRIGGER_CONFIGS.length} tables`
   );
 }
 
@@ -274,9 +326,12 @@ export function getSyncTriggerCount(db: SqlJsDatabase): number {
   try {
     const result = db.exec(`
       SELECT COUNT(*) FROM sqlite_master
-      WHERE type = 'trigger' AND name LIKE 'trg_%_insert'
-         OR name LIKE 'trg_%_update'
-         OR name LIKE 'trg_%_delete'
+      WHERE type = 'trigger' AND (
+        name LIKE 'trg_%_insert'
+        OR name LIKE 'trg_%_update'
+        OR name LIKE 'trg_%_delete'
+        OR name LIKE 'trg_%_auto_modified'
+      )
     `);
     return Number(result[0]?.values[0]?.[0] || 0);
   } catch {
@@ -294,17 +349,19 @@ export function verifySyncTriggers(db: SqlJsDatabase): {
   const missingTables: string[] = [];
 
   for (const config of TRIGGER_CONFIGS) {
-    const { tableName } = config;
+    const { tableName, supportsIncremental } = config;
+    const expectedCount = supportsIncremental ? 4 : 3; // +1 for auto_modified
     try {
       const result = db.exec(`
         SELECT COUNT(*) FROM sqlite_master
         WHERE type = 'trigger'
           AND (name = 'trg_${tableName}_insert'
             OR name = 'trg_${tableName}_update'
-            OR name = 'trg_${tableName}_delete')
+            OR name = 'trg_${tableName}_delete'
+            OR name = 'trg_${tableName}_auto_modified')
       `);
       const count = Number(result[0]?.values[0]?.[0] || 0);
-      if (count < 3) {
+      if (count < expectedCount) {
         missingTables.push(tableName);
       }
     } catch {

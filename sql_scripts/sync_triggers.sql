@@ -2,6 +2,11 @@
 -- Sync Outbox Triggers for TuneTrees
 -- ============================================================================
 --
+-- NOTE: This file is for DOCUMENTATION/REFERENCE only!
+-- The actual triggers are installed dynamically by:
+--   src/lib/db/install-triggers.ts
+-- Any changes should be made there, not here.
+--
 -- These triggers automatically populate the sync_outbox table whenever
 -- data changes occur on syncable tables. The sync worker then processes
 -- this outbox to push changes to Supabase.
@@ -11,8 +16,24 @@
 -- 2. Composite keys: JSON string format (e.g., '{"user_id":"x","tune_id":"y"}')
 -- 3. Timestamp: ISO 8601 format using strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 -- 4. All tables get triggers (including reference data like genre, tune_type)
+-- 5. AUTO-MODIFIED triggers: For tables with last_modified_at (supportsIncremental),
+--    an additional AFTER UPDATE trigger auto-updates this column when it wasn't
+--    explicitly set. This ensures sync propagation works even when code forgets
+--    to set last_modified_at. The trigger pattern is:
+--
+--    CREATE TRIGGER trg_<table>_auto_modified
+--    AFTER UPDATE ON <table>
+--    FOR EACH ROW
+--    WHEN NEW.last_modified_at = OLD.last_modified_at
+--      OR NEW.last_modified_at IS NULL
+--    BEGIN
+--      UPDATE <table>
+--      SET last_modified_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+--      WHERE <pk_column> = NEW.<pk_column>;
+--    END;
 --
 -- Generated from: shared/table-meta.ts SYNCABLE_TABLES
+-- Installed dynamically by: src/lib/db/install-triggers.ts
 -- ============================================================================
 -- ============================================================================
 -- DROP EXISTING TRIGGERS (if reinstalling)
@@ -23,6 +44,8 @@ DROP TRIGGER IF EXISTS trg_daily_practice_queue_insert;
 DROP TRIGGER IF EXISTS trg_daily_practice_queue_update;
 
 DROP TRIGGER IF EXISTS trg_daily_practice_queue_delete;
+
+DROP TRIGGER IF EXISTS trg_daily_practice_queue_auto_modified;
 
 -- genre
 DROP TRIGGER IF EXISTS trg_genre_insert;
@@ -213,6 +236,18 @@ VALUES
         'DELETE',
         strftime ('%Y-%m-%dT%H:%M:%fZ', 'now')
     );
+
+END;
+
+-- Auto-update last_modified_at when not explicitly set (ensures sync propagation)
+CREATE TRIGGER trg_daily_practice_queue_auto_modified AFTER
+UPDATE ON daily_practice_queue FOR EACH ROW WHEN NEW.last_modified_at = OLD.last_modified_at
+OR NEW.last_modified_at IS NULL BEGIN
+UPDATE daily_practice_queue
+SET
+    last_modified_at = strftime ('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE
+    id = NEW.id;
 
 END;
 
