@@ -157,7 +157,10 @@ export class SyncService {
 
   /**
    * Create a standard error result for failed sync operations
-   * Helper to ensure consistent error result format across all sync methods
+   * 
+   * Helper to ensure consistent error result format across all sync methods.
+   * When sync fails, we still call onSyncComplete with this error result to ensure
+   * the UI can react (e.g., set initialSyncComplete flag, show error messages).
    */
   private createErrorResult(error: unknown): SyncResult {
     return {
@@ -193,10 +196,10 @@ export class SyncService {
       return result;
     } catch (error) {
       console.error("Sync error:", error);
-      // CRITICAL FIX: Call onSyncComplete even on errors
+      // Call onSyncComplete even on errors so UI can react
       const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);
-      throw error; // Re-throw to maintain error propagation (consistent with other methods)
+      throw error; // Re-throw to maintain error propagation
     } finally {
       this.isSyncing = false;
     }
@@ -220,7 +223,7 @@ export class SyncService {
 
       return result;
     } catch (error) {
-      // CRITICAL FIX: Call onSyncComplete even on errors
+      // Call onSyncComplete even on errors so UI can react
       const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);
       throw error; // Re-throw to maintain error propagation
@@ -280,8 +283,7 @@ export class SyncService {
 
       return result;
     } catch (error) {
-      // CRITICAL FIX: Call onSyncComplete even on errors so UI can react
-      // This ensures initialSyncComplete gets set even if sync fails
+      // Call onSyncComplete even on errors so UI can react
       const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);
       throw error; // Re-throw to maintain error propagation
@@ -329,7 +331,7 @@ export class SyncService {
       this.config.onSyncComplete?.(result);
       return result;
     } catch (error) {
-      // CRITICAL FIX: Call onSyncComplete even on errors
+      // Call onSyncComplete even on errors so UI can react
       const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);
       throw error; // Re-throw to maintain error propagation

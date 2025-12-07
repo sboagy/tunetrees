@@ -343,9 +343,7 @@ export const AuthProvider: ParentComponent = (props) => {
           console.log(
             "🔔 [AuthContext] Initial sync - triggering all view signals"
           );
-          incrementPracticeListStagedChanged();
-          incrementRepertoireListChanged();
-          incrementCatalogListChanged();
+          triggerAllViewSignals();
         }
 
         // Granular Signaling: Trigger specific view refreshes
@@ -1232,6 +1230,16 @@ export const AuthProvider: ParentComponent = (props) => {
    * View-specific change signal increment functions
    * These are called immediately after local writes to trigger optimistic UI updates
    */
+
+  /**
+   * Increment all view signals at once
+   * Used on initial sync to ensure all views refresh regardless of affected tables
+   */
+  const triggerAllViewSignals = () => {
+    incrementPracticeListStagedChanged();
+    incrementRepertoireListChanged();
+    incrementCatalogListChanged();
+  };
 
   /**
    * Increment practice list staged changed counter
