@@ -19,11 +19,19 @@ import {
 import type { TuneEditorData } from "../../../components/tunes";
 import { TuneEditor } from "../../../components/tunes";
 import { useAuth } from "../../../lib/auth/AuthContext";
+import { useCurrentPlaylist } from "../../../lib/context/CurrentPlaylistContext";
 import { useCurrentTune } from "../../../lib/context/CurrentTuneContext";
 import {
   getOrCreateTuneOverride,
   updateTuneOverride,
 } from "../../../lib/db/queries/tune-overrides";
+import {
+  getTuneEditorData,
+  getOrCreatePrivateNote,
+  updateNoteText,
+  updatePlaylistTuneLearned,
+  upsertPracticeRecord,
+} from "../../../lib/db/queries/tune-user-data";
 import {
   getTuneForUserById,
   updateTuneIfOwned,
@@ -40,6 +48,7 @@ const EditTunePage: Component = () => {
   const location = useLocation();
   const { localDb, userIdInt } = useAuth();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
+  const { currentPlaylistId } = useCurrentPlaylist();
 
   // Store the location we came from (referrer) for proper back navigation
   const returnPath = createMemo(() => {
@@ -47,27 +56,34 @@ const EditTunePage: Component = () => {
     return state?.from || "/";
   });
 
-  // Fetch tune data
+  // Fetch tune data with user-specific fields
   const [tune] = createResource(
     () => {
       const db = localDb();
       const tuneId = params.id;
       const uid = userIdInt();
-      return db && tuneId && uid
-        ? { db, tuneId, uid }
-        : db && tuneId
-          ? { db, tuneId }
+      const playlistId = currentPlaylistId();
+      return db && tuneId && uid && playlistId
+        ? { db, tuneId, uid, playlistId }
+        : db && tuneId && uid
+          ? { db, tuneId, uid }
           : null;
     },
     async (params) => {
       if (!params) return null;
-      if (!params) return null;
-      // Prefer merged override view when user available; fall back to base tune
-      if ("uid" in params && params.uid) {
-        return await getTuneForUserById(params.db, params.tuneId, params.uid);
+      
+      // If we have a playlist context, fetch complete editor data
+      if ("playlistId" in params && params.playlistId) {
+        return await getTuneEditorData(
+          params.db,
+          params.tuneId,
+          params.uid,
+          params.playlistId
+        );
       }
-      const { getTuneById } = await import("../../../lib/db/queries/tunes");
-      return await getTuneById(params.db, params.tuneId);
+      
+      // Otherwise just fetch base tune data (no user-specific fields)
+      return await getTuneForUserById(params.db, params.tuneId, params.uid);
     }
   );
 
@@ -87,6 +103,7 @@ const EditTunePage: Component = () => {
   ): Promise<string | undefined> => {
     const db = localDb();
     const userId = userIdInt();
+    const playlistId = currentPlaylistId();
 
     if (!db) {
       console.error("Database not initialized");
@@ -110,6 +127,7 @@ const EditTunePage: Component = () => {
     }
 
     try {
+      // PART 1: Save base tune fields (title, type, mode, structure, incipit, genre)
       // Guard: only allow direct tune updates if tune is explicitly owned by user (privateFor matches userId)
       // Public tunes (privateFor null) or tunes owned by another user MUST go through tune_override path.
       const isUserOwnedPrivateTune =
@@ -157,6 +175,79 @@ const EditTunePage: Component = () => {
           if (!override.isNew) {
             await updateTuneOverride(db, override.id, overrideInput);
           }
+        }
+      }
+
+      // PART 2: Save user-specific fields if we have a playlist context
+      if (playlistId) {
+        // Update learned date in playlist_tune
+        if (tuneData.learned !== undefined) {
+          await updatePlaylistTuneLearned(
+            db,
+            playlistId,
+            tuneId,
+            tuneData.learned || null
+          );
+        }
+
+        // Update practice record fields (practiced, quality, FSRS/SM2 fields)
+        const practiceFields: any = {};
+        let hasPracticeFields = false;
+
+        if (tuneData.practiced !== undefined) {
+          practiceFields.practiced = tuneData.practiced || null;
+          hasPracticeFields = true;
+        }
+        if (tuneData.quality !== undefined) {
+          practiceFields.quality = tuneData.quality;
+          hasPracticeFields = true;
+        }
+        if (tuneData.difficulty !== undefined) {
+          practiceFields.difficulty = tuneData.difficulty;
+          hasPracticeFields = true;
+        }
+        if (tuneData.stability !== undefined) {
+          practiceFields.stability = tuneData.stability;
+          hasPracticeFields = true;
+        }
+        if (tuneData.step !== undefined) {
+          practiceFields.step = tuneData.step;
+          hasPracticeFields = true;
+        }
+        if (tuneData.state !== undefined) {
+          practiceFields.state = tuneData.state;
+          hasPracticeFields = true;
+        }
+        if (tuneData.repetitions !== undefined) {
+          practiceFields.repetitions = tuneData.repetitions;
+          hasPracticeFields = true;
+        }
+        if (tuneData.due !== undefined) {
+          practiceFields.due = tuneData.due || null;
+          hasPracticeFields = true;
+        }
+        if (tuneData.easiness !== undefined) {
+          practiceFields.easiness = tuneData.easiness;
+          hasPracticeFields = true;
+        }
+        if (tuneData.interval !== undefined) {
+          practiceFields.interval = tuneData.interval;
+          hasPracticeFields = true;
+        }
+
+        if (hasPracticeFields) {
+          await upsertPracticeRecord(db, playlistId, tuneId, practiceFields);
+        }
+
+        // Update private notes
+        if (tuneData.notes_private !== undefined) {
+          const noteId = await getOrCreatePrivateNote(
+            db,
+            tuneId,
+            userId,
+            playlistId
+          );
+          await updateNoteText(db, noteId, tuneData.notes_private);
         }
       }
 
