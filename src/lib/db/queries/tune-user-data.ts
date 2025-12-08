@@ -91,7 +91,7 @@ export async function upsertPracticeRecord(
         eq(practiceRecord.playlistRef, playlistId)
       )
     )
-    .orderBy(desc(practiceRecord.practiced))
+    .orderBy(desc(practiceRecord.practiced), desc(practiceRecord.lastModifiedAt))
     .limit(1);
 
   if (existing && existing.length > 0) {
@@ -284,7 +284,7 @@ export async function getTuneEditorData(
         eq(practiceRecord.playlistRef, playlistId)
       )
     )
-    .orderBy(desc(practiceRecord.practiced))
+    .orderBy(desc(practiceRecord.practiced), desc(practiceRecord.lastModifiedAt))
     .limit(1);
 
   // Get private notes

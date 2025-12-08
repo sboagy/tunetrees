@@ -191,7 +191,18 @@ const EditTunePage: Component = () => {
         }
 
         // Update practice record fields (practiced, quality, FSRS/SM2 fields)
-        const practiceFields: any = {};
+        const practiceFields: {
+          practiced?: string | null;
+          quality?: number | null;
+          difficulty?: number | null;
+          stability?: number | null;
+          step?: number | null;
+          state?: number | null;
+          repetitions?: number | null;
+          due?: string | null;
+          easiness?: number | null;
+          interval?: number | null;
+        } = {};
         let hasPracticeFields = false;
 
         if (tuneData.practiced !== undefined) {
