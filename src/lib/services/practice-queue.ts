@@ -23,17 +23,16 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type { PracticeListStagedRow } from "../db/queries/practice";
-import { dailyPracticeQueue } from "../db/schema";
+import { dailyPracticeQueue, prefsSchedulingOptions } from "../db/schema";
 import { generateId } from "../utils/uuid";
 
 // Type alias to support both sql.js (production) and better-sqlite3 (testing)
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 /**
- * Scheduling Options Preferences (stub - hardcoded defaults)
+ * Scheduling Options Preferences (local interface for queue generation)
  *
- * TODO: Replace with real preferences table query once implemented.
- * Defaults match legacy DEFAULT_* constants (lines 162-167).
+ * Uses a subset of fields from IUserSchedulingOptions relevant to queue building.
  */
 interface PrefsSchedulingOptions {
   acceptableDelinquencyWindow: number; // Days before today to include lapsed tunes
@@ -41,11 +40,49 @@ interface PrefsSchedulingOptions {
   maxReviewsPerDay: number; // Maximum tunes to practice per day (0 = uncapped)
 }
 
+/**
+ * Default scheduling preferences fallback
+ *
+ * Used when user preferences are not found in the database.
+ * Matches legacy DEFAULT_* constants.
+ */
 const DEFAULT_PREFS: PrefsSchedulingOptions = {
   acceptableDelinquencyWindow: 7,
   minReviewsPerDay: 3,
   maxReviewsPerDay: 10,
 };
+
+/**
+ * Get user scheduling options from database, falling back to defaults.
+ *
+ * @param db - Database instance (sql.js or better-sqlite3)
+ * @param userId - User ID
+ * @returns Scheduling preferences for queue generation
+ */
+async function getUserSchedulingPrefs(
+  db: AnyDatabase,
+  userId: string
+): Promise<PrefsSchedulingOptions> {
+  try {
+    const rows = await db
+      .select()
+      .from(prefsSchedulingOptions)
+      .where(eq(prefsSchedulingOptions.userId, userId))
+      .limit(1);
+
+    if (rows[0]) {
+      const r = rows[0];
+      return {
+        acceptableDelinquencyWindow: r.acceptableDelinquencyWindow ?? 7,
+        minReviewsPerDay: r.minReviewsPerDay ?? 3,
+        maxReviewsPerDay: r.maxReviewsPerDay ?? 10,
+      };
+    }
+  } catch (e) {
+    console.warn("[PracticeQueue] Failed to load user scheduling prefs, using defaults:", e);
+  }
+  return DEFAULT_PREFS;
+}
 
 /**
  * Computed UTC windows for a user's practice sit-down
@@ -569,8 +606,9 @@ export async function generateOrGetPracticeQueue(
   mode: string = "per_day",
   forceRegen: boolean = false
 ): Promise<DailyPracticeQueueRow[]> {
-  // Get preferences (stub - hardcoded for now)
-  const prefs = DEFAULT_PREFS;
+  // Get user's scheduling preferences from database
+  const prefs = await getUserSchedulingPrefs(db, userRef);
+  console.log(`[PracticeQueue] Using user scheduling prefs: delinquency=${prefs.acceptableDelinquencyWindow}, min=${prefs.minReviewsPerDay}, max=${prefs.maxReviewsPerDay}`);
 
   // Compute scheduling windows
   const windows = computeSchedulingWindows(
@@ -874,8 +912,8 @@ export async function addTunesToQueue(
     return [];
   }
 
-  // Get preferences
-  const prefs = DEFAULT_PREFS;
+  // Get user's scheduling preferences from database
+  const prefs = await getUserSchedulingPrefs(db, userRef);
 
   // Compute scheduling windows
   const windows = computeSchedulingWindows(
