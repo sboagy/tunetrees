@@ -336,6 +336,14 @@ export const AuthProvider: ParentComponent = (props) => {
                 );
               });
           });
+
+          // CRITICAL FIX: On initial sync, always trigger all view signals
+          // even if affectedTables is empty (first login may have no data to sync)
+          // This ensures UI components waiting for these signals will render
+          console.log(
+            "🔔 [AuthContext] Initial sync - triggering all view signals"
+          );
+          triggerAllViewSignals();
         }
 
         // Granular Signaling: Trigger specific view refreshes
@@ -1222,6 +1230,16 @@ export const AuthProvider: ParentComponent = (props) => {
    * View-specific change signal increment functions
    * These are called immediately after local writes to trigger optimistic UI updates
    */
+
+  /**
+   * Increment all view signals at once
+   * Used on initial sync to ensure all views refresh regardless of affected tables
+   */
+  const triggerAllViewSignals = () => {
+    incrementPracticeListStagedChanged();
+    incrementRepertoireListChanged();
+    incrementCatalogListChanged();
+  };
 
   /**
    * Increment practice list staged changed counter

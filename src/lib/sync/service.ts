@@ -156,6 +156,25 @@ export class SyncService {
   }
 
   /**
+   * Create a standard error result for failed sync operations
+   * 
+   * Helper to ensure consistent error result format across all sync methods.
+   * When sync fails, we still call onSyncComplete with this error result to ensure
+   * the UI can react (e.g., set initialSyncComplete flag, show error messages).
+   */
+  private createErrorResult(error: unknown): SyncResult {
+    return {
+      success: false,
+      itemsSynced: 0,
+      itemsFailed: 0,
+      conflicts: 0,
+      errors: [error instanceof Error ? error.message : String(error)],
+      timestamp: new Date().toISOString(),
+      affectedTables: [],
+    };
+  }
+
+  /**
    * Perform full sync (push then pull)
    *
    * @returns Sync result statistics
@@ -177,16 +196,10 @@ export class SyncService {
       return result;
     } catch (error) {
       console.error("Sync error:", error);
-      const errorResult: SyncResult = {
-        success: false,
-        itemsSynced: 0,
-        itemsFailed: 0,
-        conflicts: 0,
-        errors: [error instanceof Error ? error.message : "Unknown sync error"],
-        timestamp: new Date().toISOString(),
-        affectedTables: [],
-      };
-      return errorResult;
+      // Call onSyncComplete even on errors so UI can react
+      const errorResult = this.createErrorResult(error);
+      this.config.onSyncComplete?.(errorResult);
+      throw error; // Re-throw to maintain error propagation
     } finally {
       this.isSyncing = false;
     }
@@ -209,6 +222,11 @@ export class SyncService {
       this.config.onSyncComplete?.(result);
 
       return result;
+    } catch (error) {
+      // Call onSyncComplete even on errors so UI can react
+      const errorResult = this.createErrorResult(error);
+      this.config.onSyncComplete?.(errorResult);
+      throw error; // Re-throw to maintain error propagation
     } finally {
       this.isSyncing = false;
     }
@@ -264,6 +282,11 @@ export class SyncService {
       this.config.onSyncComplete?.(result);
 
       return result;
+    } catch (error) {
+      // Call onSyncComplete even on errors so UI can react
+      const errorResult = this.createErrorResult(error);
+      this.config.onSyncComplete?.(errorResult);
+      throw error; // Re-throw to maintain error propagation
     } finally {
       this.isSyncing = false;
     }
@@ -307,6 +330,11 @@ export class SyncService {
       const result: SyncResult = await engine.syncDownTables(tables);
       this.config.onSyncComplete?.(result);
       return result;
+    } catch (error) {
+      // Call onSyncComplete even on errors so UI can react
+      const errorResult = this.createErrorResult(error);
+      this.config.onSyncComplete?.(errorResult);
+      throw error; // Re-throw to maintain error propagation
     } finally {
       this.isSyncing = false;
     }
