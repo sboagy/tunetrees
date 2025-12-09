@@ -11,28 +11,35 @@
 
 import { expect } from "@playwright/test";
 import {
-  CATALOG_TUNE_54_ID,
+  CATALOG_TUNE_ABBY_REEL,
+  CATALOG_TUNE_ALEXANDERS_ID,
   CATALOG_TUNE_MORRISON_ID,
-} from "../../tests/fixtures/test-data";
+} from "../../src/lib/db/catalog-tune-ids";
+
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
+  let ttPage: TuneTreesPage;
+
   test.beforeEach(async ({ page, testUser }) => {
+    ttPage = new TuneTreesPage(page);
+
     // Setup with 3 known tunes in repertoire
     await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
       seedRepertoire: [
-        testUser.userId,
+        CATALOG_TUNE_ABBY_REEL,
+        CATALOG_TUNE_ALEXANDERS_ID,
         CATALOG_TUNE_MORRISON_ID,
-        CATALOG_TUNE_54_ID,
       ], // User's private tune, Morrison's Jig, tune 54
     });
   });
 
   // SKIP: UI BUG - Tunes added to review don't appear in practice queue
   // Dialog confirms "Added 3 tunes" but they don't show in practice grid
-  test.skip("CRITICAL: Add To Review must actually add the selected tunes to practice queue", async ({
+  test("CRITICAL: Add To Review must actually add the selected tunes to practice queue", async ({
     page,
   }) => {
     // Navigate to Repertoire tab
@@ -113,24 +120,28 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     // CRITICAL: Verify those EXACT 3 tunes appear in the practice queue
     console.log("🔍 Verifying the selected tunes appear in practice queue...");
 
-    const practiceTable = page.locator(
-      '[data-testid="tunes-grid-scheduled"] table tbody'
-    );
+    // const practiceTable = page.locator(
+    //   '[data-testid="tunes-grid-scheduled"] table tbody'
+    // );
 
     // Look for each tune by name in the practice tab
-    const tune1InPractice = practiceTable.locator(`text="${tune1Name}"`);
-    const tune2InPractice = practiceTable.locator(`text="${tune2Name}"`);
-    const tune3InPractice = practiceTable.locator(`text="${tune3Name}"`);
+    // const tune1InPractice = practiceTable.locator(`text="${tune1Name}"`);
+    // const tune2InPractice = practiceTable.locator(`text="${tune2Name}"`);
+    // const tune3InPractice = practiceTable.locator(`text="${tune3Name}"`);
+    const tune1InPractice = page.getByRole("cell", { name: `${tune1Name}` });
+    const tune2InPractice = page.getByRole("cell", { name: `${tune2Name}` });
+    const tune3InPractice = page.getByRole("cell", { name: `${tune3Name}` });
 
     await expect(tune1InPractice).toBeVisible({ timeout: 8000 });
     await expect(tune2InPractice).toBeVisible({ timeout: 8000 });
     await expect(tune3InPractice).toBeVisible({ timeout: 8000 });
 
     console.log(`✅ All 3 tunes found in practice queue!`);
-
     // Verify they are scheduled for today (not "Never" or some past date)
     // Check that at least one of them shows today's date or "Today" in scheduled column
-    const todayText = page.locator('text="Today"');
+    const todayText = ttPage
+      .getRows("scheduled")
+      .getByRole("cell", { name: "Today", exact: true });
     const todayCount = await todayText.count();
 
     console.log(`📅 Found ${todayCount} tunes scheduled for "Today"`);
