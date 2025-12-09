@@ -1,4 +1,10 @@
 import { expect } from "@playwright/test";
+import {
+  CATALOG_TUNE_BANISH_MISFORTUNE,
+  CATALOG_TUNE_COOLEYS_ID,
+  CATALOG_TUNE_DANCING_MASTER_ID,
+  CATALOG_TUNE_KESH_ID,
+} from "../../src/lib/db/catalog-tune-ids";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -30,12 +36,17 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     // Start with clean repertoire with some test data
     await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
-      seedRepertoire: [],
+      seedRepertoire: [
+        CATALOG_TUNE_BANISH_MISFORTUNE,
+        CATALOG_TUNE_COOLEYS_ID,
+        CATALOG_TUNE_KESH_ID,
+        CATALOG_TUNE_DANCING_MASTER_ID,
+      ],
     });
 
     // Navigate to practice tab to ensure we have playlist context
-    await ttPage.practiceTab.click();
-    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
+    await ttPage.repertoireTab.click();
+    await expect(ttPage.repertoireTab).toBeVisible({ timeout: 10000 });
     await page.waitForLoadState("networkidle", { timeout: 15000 });
   });
 
@@ -44,7 +55,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await ttPage.searchForTune("Banish Misfortune", ttPage.practiceGrid);
     await page.waitForTimeout(500);
 
-    const firstRow = ttPage.getRows("practice").first();
+    const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
@@ -91,7 +102,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await ttPage.searchForTune("Cooley's", ttPage.practiceGrid);
     await page.waitForTimeout(500);
 
-    const firstRow = ttPage.getRows("practice").first();
+    const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
@@ -146,7 +157,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await ttPage.searchForTune("Kesh Jig", ttPage.practiceGrid);
     await page.waitForTimeout(500);
 
-    const firstRow = ttPage.getRows("practice").first();
+    const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
@@ -209,7 +220,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await ttPage.searchForTune("Dancingmaster", ttPage.practiceGrid);
     await page.waitForTimeout(500);
 
-    const firstRow = ttPage.getRows("practice").first();
+    const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
@@ -263,7 +274,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await ttPage.searchForTune("Banish Misfortune", ttPage.practiceGrid);
     await page.waitForTimeout(500);
 
-    const firstRow = ttPage.getRows("practice").first();
+    const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
@@ -309,7 +320,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await ttPage.searchForTune("Cooley's", ttPage.practiceGrid);
     await page.waitForTimeout(500);
 
-    const firstRow = ttPage.getRows("practice").first();
+    const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
@@ -392,9 +403,9 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     );
     await expect(page.getByTestId("tune-editor-input-step")).toHaveValue("3");
     await expect(page.getByTestId("tune-editor-input-state")).toHaveValue("2");
-    await expect(
-      page.getByTestId("tune-editor-input-repetitions")
-    ).toHaveValue("8");
+    await expect(page.getByTestId("tune-editor-input-repetitions")).toHaveValue(
+      "8"
+    );
 
     // Verify SM2 fields
     await sm2Toggle.click();
