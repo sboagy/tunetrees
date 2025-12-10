@@ -29,6 +29,7 @@ export interface SchedulingOptions {
   daysPerWeek: number | null;
   weeklyRules: string | null;
   exceptions: string | null;
+  autoScheduleNew: boolean | null;
 }
 
 export interface SpacedRepetitionPrefs {
@@ -77,6 +78,7 @@ export async function getSchedulingOptions(
     daysPerWeek: result[0].daysPerWeek,
     weeklyRules: result[0].weeklyRules,
     exceptions: result[0].exceptions,
+    autoScheduleNew: result[0].autoScheduleNew ? true : false,
   };
 }
 
@@ -137,6 +139,12 @@ export async function updateSchedulingOptions(
             ? undefined
             : (data.exceptions ??
               (existing.exceptions === null ? undefined : existing.exceptions)),
+        autoScheduleNew:
+          data.autoScheduleNew !== undefined
+            ? data.autoScheduleNew
+              ? 1
+              : 0
+            : undefined,
         lastModifiedAt: now,
       })
       .where(eq(prefsSchedulingOptions.userId, data.userId));
@@ -155,6 +163,8 @@ export async function updateSchedulingOptions(
       daysPerWeek: data.daysPerWeek === null ? undefined : data.daysPerWeek,
       weeklyRules: data.weeklyRules === null ? undefined : data.weeklyRules,
       exceptions: data.exceptions === null ? undefined : data.exceptions,
+      autoScheduleNew:
+        data.autoScheduleNew !== undefined ? (data.autoScheduleNew ? 1 : 0) : 1,
       lastModifiedAt: now,
     });
   }

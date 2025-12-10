@@ -320,6 +320,7 @@ CREATE TABLE
         days_per_week integer,
         weekly_rules text,
         exceptions text,
+        auto_schedule_new boolean NOT NULL DEFAULT true,
         sync_version integer NOT NULL DEFAULT 1,
         last_modified_at timestamp NOT NULL DEFAULT now (),
         device_id text

@@ -1,0 +1,1 @@
+ALTER TABLE `prefs_scheduling_options` ADD `auto_schedule_new` integer DEFAULT 1 NOT NULL;

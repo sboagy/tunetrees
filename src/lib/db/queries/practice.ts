@@ -169,6 +169,7 @@ export async function getPracticeList(
       AND dpq.playlist_ref = ${playlistId}
       AND dpq.active = 1
   `);
+  console.log("[DB identity]", db);
   console.log(
     `[getPracticeList] Queue has ${queueRows[0]?.count || 0} active rows for user=${userId}, playlist=${playlistId}`
   );

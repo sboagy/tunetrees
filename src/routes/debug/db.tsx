@@ -11,7 +11,6 @@ import type { Component } from "solid-js";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getSqliteInstance } from "@/lib/db/client-sqlite";
 import { getFailedOutboxItems, retryOutboxItem } from "@/lib/sync/outbox";
 
 interface QueryResult {
@@ -27,19 +26,15 @@ export default function DatabaseBrowser(): ReturnType<Component> {
   const [results, setResults] = createSignal<QueryResult | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [executionTime, setExecutionTime] = createSignal<number>(0);
-  const [tipsOpen, setTipsOpen] = createSignal(true);
+  const [tipsOpen, setTipsOpen] = createSignal(false);
 
   // Get table list for quick access
   const [tables] = createResource(localDb, async (db) => {
     if (!db) return [];
-    const sqliteDb = await getSqliteInstance();
-    if (!sqliteDb) return [];
-
-    const result = sqliteDb.exec(
+    const rows = await db.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
     );
-    if (result.length === 0) return [];
-    return result[0].values.map((row: unknown[]) => row[0] as string);
+    return rows.map((row) => row.name);
   });
 
   // Preset queries
@@ -82,6 +77,18 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       sql: "SELECT * FROM view_tune_override_readable LIMIT 50;",
     },
     {
+      name: "Practice List (Joined)",
+      sql: "SELECT * FROM practice_list_joined LIMIT 50;",
+    },
+    {
+      name: "Practice List (Staged)",
+      sql: "SELECT * FROM practice_list_staged LIMIT 50;",
+    },
+    {
+      name: "Playlist (Joined)",
+      sql: "SELECT * FROM view_playlist_joined LIMIT 50;",
+    },
+    {
       name: "Sync Push Queue (All)",
       sql: "SELECT id, table_name, row_id, operation, status, attempts, changed_at, last_error FROM sync_push_queue ORDER BY changed_at DESC LIMIT 50;",
     },
@@ -100,31 +107,30 @@ export default function DatabaseBrowser(): ReturnType<Component> {
     setResults(null);
 
     const db = localDb();
-    if (!db) {
-      setError("Database not initialized. Please log in first.");
-      return;
-    }
+    console.log("[DB identity]", db);
 
-    const sqliteDb = await getSqliteInstance();
-    if (!sqliteDb) {
+    if (!db) {
       setError("Database not initialized. Please log in first.");
       return;
     }
 
     try {
       const startTime = performance.now();
-      const result = sqliteDb.exec(query());
+      const rows = await db.all<Record<string, unknown>>(query());
       const endTime = performance.now();
       setExecutionTime(endTime - startTime);
 
-      if (result.length === 0) {
+      if (rows.length === 0) {
         setResults({ columns: [], values: [] });
         return;
       }
 
+      const columns = Object.keys(rows[0]);
+      const values = rows.map((row) => columns.map((col) => row[col]));
+
       setResults({
-        columns: result[0].columns,
-        values: result[0].values,
+        columns,
+        values,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -271,7 +277,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
         </div>
 
         {/* Main Query Panel - Fill remaining space */}
-        <div class="flex-1 p-6 flex flex-col space-y-4 overflow-hidden">
+        <div class="flex-1 p-6 flex flex-col space-y-4 overflow-y-auto">
           {/* Query Editor */}
           <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex-shrink-0">
             <h2 class="text-lg font-semibold mb-3">SQL Query</h2>

@@ -26,8 +26,8 @@ import {
   updateTuneOverride,
 } from "../../../lib/db/queries/tune-overrides";
 import {
-  getTuneEditorData,
   getOrCreatePrivateNote,
+  getTuneEditorData,
   updateNoteText,
   updatePlaylistTuneLearned,
   upsertPracticeRecord,
@@ -71,7 +71,7 @@ const EditTunePage: Component = () => {
     },
     async (params) => {
       if (!params) return null;
-      
+
       // If we have a playlist context, fetch complete editor data
       if ("playlistId" in params && params.playlistId) {
         return await getTuneEditorData(
@@ -81,7 +81,7 @@ const EditTunePage: Component = () => {
           params.playlistId
         );
       }
-      
+
       // Otherwise just fetch base tune data (no user-specific fields)
       return await getTuneForUserById(params.db, params.tuneId, params.uid);
     }

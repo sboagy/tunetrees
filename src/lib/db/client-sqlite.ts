@@ -116,7 +116,7 @@ const INDEXEDDB_STORE = "databases";
 const DB_KEY_PREFIX = "tunetrees-db";
 const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
-const CURRENT_DB_VERSION = 6;
+const CURRENT_DB_VERSION = 7;
 
 // Track which user's database is currently loaded
 let currentUserId: string | null = null;
@@ -258,6 +258,7 @@ export async function initializeDb(
           "/drizzle/migrations/sqlite/0003_friendly_cerebro.sql",
           // Note: 0004_true_union_jack.sql skipped - avatar_url already exists in base schema
           "/drizzle/migrations/sqlite/0005_add_display_order.sql",
+          "/drizzle/migrations/sqlite/0006_add_auto_schedule_new.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });

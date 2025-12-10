@@ -439,8 +439,20 @@ export function getRepertoireColumns(
 
         const date = new Date(value);
         const now = new Date();
-        const diffDays = Math.floor(
-          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+
+        // Compare dates only (ignore time) to avoid timezone/time-of-day issues
+        const dateOnly = new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate()
+        );
+        const nowOnly = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
+        const diffDays = Math.round(
+          (dateOnly.getTime() - nowOnly.getTime()) / (1000 * 60 * 60 * 24)
         );
 
         let color = "text-gray-600 dark:text-gray-400";

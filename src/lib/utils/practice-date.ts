@@ -35,8 +35,8 @@ export function getPracticeDate(): Date {
     if (testDate) {
       const parsed = new Date(testDate);
       if (!Number.isNaN(parsed.getTime())) {
-        // Set to noon to avoid timezone issues
-        parsed.setHours(12, 0, 0, 0);
+        // Set to noon UTC to avoid timezone issues
+        parsed.setUTCHours(12, 0, 0, 0);
         console.log(
           `🧪 [PracticeDate] Using URL override: ${testDate} (${parsed.toISOString()})`
         );
@@ -48,9 +48,9 @@ export function getPracticeDate(): Date {
     }
   }
 
-  // Production: current date at noon
+  // Production: current date at noon UTC
   const now = new Date();
-  now.setHours(12, 0, 0, 0);
+  now.setUTCHours(12, 0, 0, 0);
   return now;
 }
 
@@ -64,21 +64,23 @@ export function getPracticeDate(): Date {
  * because SQLite WASM prefers this format and converts space-separated
  * formats to ISO internally, causing query mismatches.
  *
+ * Uses UTC methods to avoid local timezone issues in tests.
+ *
  * @param date - Date to format
  * @returns ISO timestamp string (e.g., "2025-11-10T00:00:00")
  *
  * @example
  * ```typescript
- * const date = new Date('2025-11-05T12:00:00');
+ * const date = new Date('2025-11-05T12:00:00Z');
  * const formatted = formatAsWindowStart(date);
  * // Returns: "2025-11-05T00:00:00"
  * ```
  */
 export function formatAsWindowStart(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
     2,
     "0"
-  )}-${String(date.getDate()).padStart(2, "0")}T00:00:00`;
+  )}-${String(date.getUTCDate()).padStart(2, "0")}T00:00:00`;
 }
 
 /**

@@ -15,7 +15,7 @@ import {
   CATALOG_TUNE_ALEXANDERS_ID,
   CATALOG_TUNE_MORRISON_ID,
 } from "../../src/lib/db/catalog-tune-ids";
-
+import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -23,8 +23,13 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
   let ttPage: TuneTreesPage;
 
-  test.beforeEach(async ({ page, testUser }) => {
+  let currentDate: Date;
+
+  test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
+
+    currentDate = new Date(STANDARD_TEST_DATE);
+    await setStableDate(context, currentDate);
 
     // Setup with 3 known tunes in repertoire
     await setupDeterministicTestParallel(page, testUser, {
@@ -98,7 +103,7 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
 
     // CRITICAL: Wait for sync to complete
     console.log("⏳ Waiting for sync to complete...");
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
 
     // Navigate to Practice tab
     await page.getByTestId("tab-practice").click();
