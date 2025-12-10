@@ -631,7 +631,7 @@ export async function getUserSchedulingOptions(
         daysPerWeek: r.daysPerWeek ?? null,
         weeklyRules: r.weeklyRules ?? null,
         exceptions: r.exceptions ?? null,
-        autoScheduleNew: r.autoScheduleNew ? true : false,
+        autoScheduleNew: Boolean(r.autoScheduleNew),
       };
     }
   } catch (e) {
