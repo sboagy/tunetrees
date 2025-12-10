@@ -281,6 +281,27 @@ export function getCatalogColumns(
       maxSize: 300,
     },
 
+    {
+      accessorKey: "genre",
+      header: ({ column }) => <SortableHeader column={column} title="Genre" />,
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        return value ? (
+          <span
+            class="font-mono text-xs text-gray-500 dark:text-gray-400 truncate block max-w-xs"
+            title={value}
+          >
+            {value}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 200,
+      minSize: 150,
+      maxSize: 300,
+    },
+
     // Status (Public/Private)
     {
       accessorKey: "private_for",
@@ -314,6 +335,8 @@ export function getRepertoireColumns(
   callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
   const catalogColumns = getCatalogColumns(callbacks);
+
+  const coldef_private_for = catalogColumns.pop() as ColumnDef<any>;
 
   // Add practice-related columns after the basic tune columns
   const practiceColumns: ColumnDef<any>[] = [
@@ -819,9 +842,9 @@ export function getRepertoireColumns(
 
   // Insert practice columns after Structure (index 7) and before Status
   return [
-    ...catalogColumns.slice(0, 7), // select, id, title, type, mode, structure, incipit
+    ...catalogColumns, // select, id, title, type, mode, structure, incipit, genre
     ...practiceColumns,
-    catalogColumns[7], // status (private_for)
+    coldef_private_for, // status (private_for)
   ];
 }
 

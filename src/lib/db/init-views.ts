@@ -62,7 +62,7 @@ SELECT
   COALESCE(tune_override.structure, tune.structure) AS structure,
   COALESCE(tune_override.mode, tune.mode) AS mode,
   COALESCE(tune_override.incipit, tune.incipit) AS incipit,
-  COALESCE(tune_override.genre, tune.genre) AS genre_ref,
+  COALESCE(tune_override.genre, tune.genre) AS genre,
   tune.deleted,
   tune.private_for,
   playlist_tune.learned AS learned,

@@ -91,11 +91,11 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     const genreNames = props.selectedGenreNames || [];
     const all = allGenres() || [];
 
-    const genreIds: number[] = [];
+    const genreIds: string[] = [];
     if (genreNames.length > 0) {
       for (const name of genreNames) {
         const g = all.find((x) => x.name === name);
-        if (g) genreIds.push(Number(g.id));
+        if (g) genreIds.push(g.id);
       }
     }
 
@@ -108,7 +108,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       }
       if (types.length > 0 && t.type && !types.includes(t.type)) return false;
       if (modes.length > 0 && t.mode && !modes.includes(t.mode)) return false;
-      if (genreIds.length > 0 && t.genre_ref && !genreIds.includes(t.genre_ref))
+      if (genreIds.length > 0 && t.genre && !genreIds.includes(t.genre))
         return false;
       return true;
     });

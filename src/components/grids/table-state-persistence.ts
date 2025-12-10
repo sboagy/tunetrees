@@ -91,6 +91,7 @@ export function getDefaultTableState(
         type: true,
         mode: true,
         incipit: false,
+        genre: false,
         private_for: false, // Status column
         scheduled: true,
         scheduled_raw: true,
@@ -105,7 +106,7 @@ export function getDefaultTableState(
         learned: false,
         // Hide less important columns
         id: false,
-        structure: false,
+        structure: true,
       };
       baseState.sorting = [{ id: "id", desc: true }]; // Default sort by id
       break;
@@ -113,7 +114,8 @@ export function getDefaultTableState(
     case "repertoire":
       baseState.columnVisibility = {
         id: false,
-        incipit: false,
+        incipit: true,
+        genre: true,
         scheduled: true,
         latest_practiced: true,
         latest_quality: false,
