@@ -7,8 +7,8 @@
  * @module components/sidebar/TuneInfoHeader
  */
 
-import { useLocation, useNavigate } from "@solidjs/router";
-import { Music, Pencil, Settings2, Tag } from "lucide-solid";
+import { A, useLocation, useNavigate } from "@solidjs/router";
+import { History, Music, Pencil, Settings2, Tag } from "lucide-solid";
 import { type Component, createResource, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
@@ -102,6 +102,18 @@ export const TuneInfoHeader: Component = () => {
             >
               ID: {tune()!.id}
             </p>
+          </div>
+
+          {/* Practice History Link */}
+          <div class="pl-5">
+            <A
+              href={`/tunes/${tune()!.id}/practice-history`}
+              class="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+              data-testid="sidebar-practice-history-link"
+            >
+              <History class="w-2.5 h-2.5" />
+              Practice History
+            </A>
           </div>
 
           {/* Type and Mode */}

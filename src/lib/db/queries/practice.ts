@@ -63,6 +63,7 @@ export interface PracticeListStagedRow {
   learned: number | null;
   goal: string;
   scheduled: string | null;
+  current: string | null;
   user_ref: string;
   playlist_id: string;
   instrument: string | null;

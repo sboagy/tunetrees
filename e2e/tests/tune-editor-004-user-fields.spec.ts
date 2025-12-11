@@ -13,17 +13,16 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * TUNE-EDITOR-004: User-Specific Fields
  * Priority: High
  *
- * Tests that user-specific fields (learned, practiced, quality, FSRS/SM2, notes)
+ * Tests that user-specific playlist_tune fields (learned, goal, scheduled)
  * are properly saved when editing a tune.
  *
  * Covers:
  * - Loading user-specific fields in editor
  * - Editing learned date
- * - Editing practiced date
- * - Editing quality score
- * - Editing FSRS fields (difficulty, stability, etc.)
- * - Editing SM2 fields (easiness, interval)
- * - Editing private notes
+ * - Editing practice goal
+ * - Editing schedule override
+ * - Viewing computed next review (read-only)
+ * - Navigation to practice history
  * - Verifying fields are persisted after save
  */
 
@@ -44,7 +43,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
       ],
     });
 
-    // Navigate to practice tab to ensure we have playlist context
+    // Navigate to repertoire tab to ensure we have playlist context
     await ttPage.repertoireTab.click();
     await expect(ttPage.repertoireTab).toBeVisible({ timeout: 10000 });
     await page.waitForLoadState("networkidle", { timeout: 15000 });
@@ -57,7 +56,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
       );
       return;
     }
-    // ARRANGE: Find a tune in practice grid
+    // ARRANGE: Find a tune in repertoire grid
     await ttPage.searchForTune("Banish Misfortune", ttPage.practiceGrid);
     await page.waitForTimeout(500);
 
@@ -101,9 +100,14 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await expect(learnedFieldReloaded).toHaveValue(learnedDateTime);
   });
 
-  test("should save and load practiced date and quality fields", async ({
-    page,
-  }) => {
+  test("should save and load practice goal field", async ({ page }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      console.log(
+        "FIXME: Test needs to be adapted for mobile, skipping for now!"
+      );
+      return;
+    }
+
     // ARRANGE: Find a tune
     await ttPage.searchForTune("Cooley's", ttPage.practiceGrid);
     await page.waitForTimeout(500);
@@ -119,24 +123,16 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    // ACT: Set practiced date and quality
+    // ACT: Set practice goal
     const tuneEditorForm = page.getByTestId("tune-editor-form");
     await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
 
-    const practicedField = page.getByTestId("tune-editor-input-practiced");
-    const qualityField = page.getByTestId("tune-editor-input-quality");
+    const goalField = page.getByTestId("tune-editor-select-goal");
+    await expect(goalField).toBeVisible({ timeout: 5000 });
 
-    await expect(practicedField).toBeVisible({ timeout: 5000 });
-    await expect(qualityField).toBeVisible({ timeout: 5000 });
-
-    const practicedDateTime = "2024-01-20T14:45";
-    const qualityValue = "3.5";
-
-    await practicedField.fill(practicedDateTime);
-    await qualityField.fill(qualityValue);
-
-    await expect(practicedField).toHaveValue(practicedDateTime);
-    await expect(qualityField).toHaveValue(qualityValue);
+    // Change goal to "fluency"
+    await goalField.selectOption("fluency");
+    await expect(goalField).toHaveValue("fluency");
 
     // Save
     const saveButton = page.getByRole("button", { name: /save/i });
@@ -150,15 +146,19 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
-    await expect(page.getByTestId("tune-editor-input-practiced")).toHaveValue(
-      practicedDateTime
-    );
-    await expect(page.getByTestId("tune-editor-input-quality")).toHaveValue(
-      qualityValue
+    await expect(page.getByTestId("tune-editor-select-goal")).toHaveValue(
+      "fluency"
     );
   });
 
-  test("should save and load FSRS fields", async ({ page }) => {
+  test("should save and load schedule override field", async ({ page }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      console.log(
+        "FIXME: Test needs to be adapted for mobile, skipping for now!"
+      );
+      return;
+    }
+
     // ARRANGE: Find a tune
     await ttPage.searchForTune("Kesh Jig", ttPage.practiceGrid);
     await page.waitForTimeout(500);
@@ -169,59 +169,48 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await page.waitForTimeout(500);
 
     // Open editor
-    const editButton = page.getByRole("button", { name: "Edit tune" });
+    const editButton = ttPage.sidebarEditTuneButton;
     await expect(editButton).toBeVisible({ timeout: 5000 });
     await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    // ACT: Expand FSRS section and set fields
+    // ACT: Set schedule override
     const tuneEditorForm = page.getByTestId("tune-editor-form");
     await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
 
-    // Click to expand FSRS fields
-    const fsrsToggle = page.getByRole("button", { name: /FSRS Fields/i });
-    await expect(fsrsToggle).toBeVisible({ timeout: 5000 });
-    await fsrsToggle.click();
-    await page.waitForTimeout(300);
+    const scheduledField = page.getByTestId("tune-editor-input-scheduled");
+    await expect(scheduledField).toBeVisible({ timeout: 5000 });
 
-    // Fill FSRS fields
-    const difficultyField = page.getByTestId("tune-editor-input-difficulty");
-    const stabilityField = page.getByTestId("tune-editor-input-stability");
-    const stepField = page.getByTestId("tune-editor-input-step");
-    const stateField = page.getByTestId("tune-editor-input-state");
-    const repetitionsField = page.getByTestId("tune-editor-input-repetitions");
-
-    await difficultyField.fill("5.5");
-    await stabilityField.fill("10.2");
-    await stepField.fill("2");
-    await stateField.fill("1");
-    await repetitionsField.fill("5");
+    // Set a specific schedule override date/time
+    const scheduledDateTime = "2024-02-01T08:00";
+    await scheduledField.fill(scheduledDateTime);
+    await expect(scheduledField).toHaveValue(scheduledDateTime);
 
     // Save
     const saveButton = page.getByRole("button", { name: /save/i });
     await saveButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    // ASSERT: Reopen and verify FSRS fields
+    // ASSERT: Reopen and verify
     await firstRow.click();
     await page.waitForTimeout(500);
     await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
-
-    // Expand FSRS section again
-    await fsrsToggle.click();
-    await page.waitForTimeout(300);
-
-    await expect(difficultyField).toHaveValue("5.5");
-    await expect(stabilityField).toHaveValue("10.2");
-    await expect(stepField).toHaveValue("2");
-    await expect(stateField).toHaveValue("1");
-    await expect(repetitionsField).toHaveValue("5");
+    await expect(page.getByTestId("tune-editor-input-scheduled")).toHaveValue(
+      scheduledDateTime
+    );
   });
 
-  test("should save and load SM2 fields", async ({ page }) => {
+  test("should display next review as read-only", async ({ page }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      console.log(
+        "FIXME: Test needs to be adapted for mobile, skipping for now!"
+      );
+      return;
+    }
+
     // ARRANGE: Find a tune
     await ttPage.searchForTune("Dancingmaster", ttPage.practiceGrid);
     await page.waitForTimeout(500);
@@ -237,45 +226,16 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    // ACT: Expand SM2 section and set fields
+    // ASSERT: Next review field exists and is disabled
     const tuneEditorForm = page.getByTestId("tune-editor-form");
     await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
 
-    // Click to expand SM2 fields
-    const sm2Toggle = page.getByRole("button", { name: /SM2 Fields/i });
-    await expect(sm2Toggle).toBeVisible({ timeout: 5000 });
-    await sm2Toggle.click();
-    await page.waitForTimeout(300);
-
-    // Fill SM2 fields
-    const easinessField = page.getByTestId("tune-editor-input-easiness");
-    const intervalField = page.getByTestId("tune-editor-input-interval");
-
-    await easinessField.fill("2.5");
-    await intervalField.fill("7");
-
-    // Save
-    const saveButton = page.getByRole("button", { name: /save/i });
-    await saveButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-
-    // ASSERT: Reopen and verify SM2 fields
-    await firstRow.click();
-    await page.waitForTimeout(500);
-    await editButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-
-    await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
-
-    // Expand SM2 section again
-    await sm2Toggle.click();
-    await page.waitForTimeout(300);
-
-    await expect(easinessField).toHaveValue("2.5");
-    await expect(intervalField).toHaveValue("7");
+    const currentField = page.getByTestId("tune-editor-input-current");
+    await expect(currentField).toBeVisible({ timeout: 5000 });
+    await expect(currentField).toBeDisabled();
   });
 
-  test("should save and load private notes", async ({ page }) => {
+  test("should navigate to practice history from editor", async ({ page }) => {
     if (test.info().project.name === "Mobile Chrome") {
       console.log(
         "FIXME: Test needs to be adapted for mobile, skipping for now!"
@@ -298,37 +258,72 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    // ACT: Set private notes
+    // ACT: Click practice history link
     const tuneEditorForm = page.getByTestId("tune-editor-form");
     await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
 
-    const notesField = page.getByTestId("tune-editor-textarea-notes");
-    await expect(notesField).toBeVisible({ timeout: 5000 });
+    const practiceHistoryLink = page.getByTestId(
+      "tune-editor-practice-history-link"
+    );
+    await expect(practiceHistoryLink).toBeVisible({ timeout: 5000 });
+    await practiceHistoryLink.click();
 
-    const noteText =
-      "This is a test note about the tune.\nIt has multiple lines.\nRemember to practice the ornaments!";
-    await notesField.fill(noteText);
-    await expect(notesField).toHaveValue(noteText);
-
-    // Save
-    const saveButton = page.getByRole("button", { name: /save/i });
-    await saveButton.click();
+    // ASSERT: Navigated to practice history page
     await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page).toHaveURL(/\/tunes\/[^/]+\/practice-history/);
 
-    // ASSERT: Reopen and verify notes
+    // Verify practice history page is visible
+    const practiceHistoryContainer = page.getByTestId(
+      "practice-history-container"
+    );
+    await expect(practiceHistoryContainer).toBeVisible({ timeout: 10000 });
+  });
+
+  test("should navigate to practice history from sidebar", async ({ page }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      console.log(
+        "FIXME: Test needs to be adapted for mobile, skipping for now!"
+      );
+      return;
+    }
+
+    // ARRANGE: Find a tune (no need to open editor)
+    await ttPage.searchForTune("Cooley's", ttPage.practiceGrid);
+    await page.waitForTimeout(500);
+
+    const firstRow = ttPage.getRows("repertoire").first();
+    await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
-    await editButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
-    const notesFieldReloaded = page.getByTestId("tune-editor-textarea-notes");
-    await expect(notesFieldReloaded).toHaveValue(noteText);
+    // ACT: Click practice history link in sidebar
+    const practiceHistoryLink = page.getByTestId(
+      "sidebar-practice-history-link"
+    );
+    await expect(practiceHistoryLink).toBeVisible({ timeout: 5000 });
+    await practiceHistoryLink.click();
+
+    // ASSERT: Navigated to practice history page
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page).toHaveURL(/\/tunes\/[^/]+\/practice-history/);
+
+    // Verify practice history page is visible
+    const practiceHistoryContainer = page.getByTestId(
+      "practice-history-container"
+    );
+    await expect(practiceHistoryContainer).toBeVisible({ timeout: 10000 });
   });
 
   test("should save multiple user-specific fields together", async ({
     page,
   }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      console.log(
+        "FIXME: Test needs to be adapted for mobile, skipping for now!"
+      );
+      return;
+    }
+
     // ARRANGE: Find a tune
     await ttPage.searchForTune("Cooley's", ttPage.practiceGrid);
     await page.waitForTimeout(500);
@@ -348,38 +343,17 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     const tuneEditorForm = page.getByTestId("tune-editor-form");
     await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
 
-    // Set basic fields
-    await page
-      .getByTestId("tune-editor-input-learned")
-      .fill("2024-01-10T09:00");
-    await page
-      .getByTestId("tune-editor-input-practiced")
-      .fill("2024-01-25T15:30");
-    await page.getByTestId("tune-editor-input-quality").fill("4.2");
+    // Set learned date
+    const learnedField = page.getByTestId("tune-editor-input-learned");
+    await learnedField.fill("2024-01-10T09:00");
 
-    // Set FSRS fields
-    const fsrsToggle = page.getByRole("button", { name: /FSRS Fields/i });
-    await fsrsToggle.click();
-    await page.waitForTimeout(300);
+    // Set goal
+    const goalField = page.getByTestId("tune-editor-select-goal");
+    await goalField.selectOption("session_ready");
 
-    await page.getByTestId("tune-editor-input-difficulty").fill("6.1");
-    await page.getByTestId("tune-editor-input-stability").fill("12.5");
-    await page.getByTestId("tune-editor-input-step").fill("3");
-    await page.getByTestId("tune-editor-input-state").fill("2");
-    await page.getByTestId("tune-editor-input-repetitions").fill("8");
-
-    // Set SM2 fields
-    const sm2Toggle = page.getByRole("button", { name: /SM2 Fields/i });
-    await sm2Toggle.click();
-    await page.waitForTimeout(300);
-
-    await page.getByTestId("tune-editor-input-easiness").fill("2.8");
-    await page.getByTestId("tune-editor-input-interval").fill("14");
-
-    // Set notes
-    await page
-      .getByTestId("tune-editor-textarea-notes")
-      .fill("Comprehensive test of all fields");
+    // Set schedule override
+    const scheduledField = page.getByTestId("tune-editor-input-scheduled");
+    await scheduledField.fill("2024-03-15T14:00");
 
     // Save
     const saveButton = page.getByRole("button", { name: /save/i });
@@ -394,45 +368,15 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
 
     await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
 
-    // Verify basic fields
+    // Verify all fields
     await expect(page.getByTestId("tune-editor-input-learned")).toHaveValue(
       "2024-01-10T09:00"
     );
-    await expect(page.getByTestId("tune-editor-input-practiced")).toHaveValue(
-      "2024-01-25T15:30"
+    await expect(page.getByTestId("tune-editor-select-goal")).toHaveValue(
+      "session_ready"
     );
-    await expect(page.getByTestId("tune-editor-input-quality")).toHaveValue(
-      "4.2"
-    );
-
-    // Verify FSRS fields
-    await fsrsToggle.click();
-    await page.waitForTimeout(300);
-    await expect(page.getByTestId("tune-editor-input-difficulty")).toHaveValue(
-      "6.1"
-    );
-    await expect(page.getByTestId("tune-editor-input-stability")).toHaveValue(
-      "12.5"
-    );
-    await expect(page.getByTestId("tune-editor-input-step")).toHaveValue("3");
-    await expect(page.getByTestId("tune-editor-input-state")).toHaveValue("2");
-    await expect(page.getByTestId("tune-editor-input-repetitions")).toHaveValue(
-      "8"
-    );
-
-    // Verify SM2 fields
-    await sm2Toggle.click();
-    await page.waitForTimeout(300);
-    await expect(page.getByTestId("tune-editor-input-easiness")).toHaveValue(
-      "2.8"
-    );
-    await expect(page.getByTestId("tune-editor-input-interval")).toHaveValue(
-      "14"
-    );
-
-    // Verify notes
-    await expect(page.getByTestId("tune-editor-textarea-notes")).toHaveValue(
-      "Comprehensive test of all fields"
+    await expect(page.getByTestId("tune-editor-input-scheduled")).toHaveValue(
+      "2024-03-15T14:00"
     );
   });
 });

@@ -26,11 +26,8 @@ import {
   updateTuneOverride,
 } from "../../../lib/db/queries/tune-overrides";
 import {
-  getOrCreatePrivateNote,
   getTuneEditorData,
-  updateNoteText,
-  updatePlaylistTuneLearned,
-  upsertPracticeRecord,
+  updatePlaylistTuneFields,
 } from "../../../lib/db/queries/tune-user-data";
 import {
   getTuneForUserById,
@@ -46,7 +43,12 @@ const EditTunePage: Component = () => {
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { localDb, userIdInt } = useAuth();
+  const {
+    localDb,
+    userIdInt,
+    incrementPracticeListStagedChanged,
+    incrementRepertoireListChanged,
+  } = useAuth();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
   const { currentPlaylistId } = useCurrentPlaylist();
 
@@ -180,87 +182,23 @@ const EditTunePage: Component = () => {
 
       // PART 2: Save user-specific fields if we have a playlist context
       if (playlistId) {
-        // Update learned date in playlist_tune
-        if (tuneData.learned !== undefined) {
-          await updatePlaylistTuneLearned(
-            db,
-            playlistId,
-            tuneId,
-            tuneData.learned || null
-          );
-        }
-
-        // Update practice record fields (practiced, quality, FSRS/SM2 fields)
-        const practiceFields: {
-          practiced?: string | null;
-          quality?: number | null;
-          difficulty?: number | null;
-          stability?: number | null;
-          step?: number | null;
-          state?: number | null;
-          repetitions?: number | null;
-          due?: string | null;
-          easiness?: number | null;
-          interval?: number | null;
-        } = {};
-        let hasPracticeFields = false;
-
-        if (tuneData.practiced !== undefined) {
-          practiceFields.practiced = tuneData.practiced || null;
-          hasPracticeFields = true;
-        }
-        if (tuneData.quality !== undefined) {
-          practiceFields.quality = tuneData.quality;
-          hasPracticeFields = true;
-        }
-        if (tuneData.difficulty !== undefined) {
-          practiceFields.difficulty = tuneData.difficulty;
-          hasPracticeFields = true;
-        }
-        if (tuneData.stability !== undefined) {
-          practiceFields.stability = tuneData.stability;
-          hasPracticeFields = true;
-        }
-        if (tuneData.step !== undefined) {
-          practiceFields.step = tuneData.step;
-          hasPracticeFields = true;
-        }
-        if (tuneData.state !== undefined) {
-          practiceFields.state = tuneData.state;
-          hasPracticeFields = true;
-        }
-        if (tuneData.repetitions !== undefined) {
-          practiceFields.repetitions = tuneData.repetitions;
-          hasPracticeFields = true;
-        }
-        if (tuneData.due !== undefined) {
-          practiceFields.due = tuneData.due || null;
-          hasPracticeFields = true;
-        }
-        if (tuneData.easiness !== undefined) {
-          practiceFields.easiness = tuneData.easiness;
-          hasPracticeFields = true;
-        }
-        if (tuneData.interval !== undefined) {
-          practiceFields.interval = tuneData.interval;
-          hasPracticeFields = true;
-        }
-
-        if (hasPracticeFields) {
-          await upsertPracticeRecord(db, playlistId, tuneId, practiceFields);
-        }
-
-        // Update private notes
-        if (tuneData.notes_private !== undefined) {
-          const noteId = await getOrCreatePrivateNote(
-            db,
-            tuneId,
-            userId,
-            playlistId
-          );
-          await updateNoteText(db, noteId, tuneData.notes_private);
+        // Update playlist_tune fields (learned, goal, scheduled)
+        if (
+          tuneData.learned !== undefined ||
+          tuneData.goal !== undefined ||
+          tuneData.scheduled !== undefined
+        ) {
+          await updatePlaylistTuneFields(db, playlistId, tuneId, {
+            learned: tuneData.learned || null,
+            goal: tuneData.goal || null,
+            scheduled: tuneData.scheduled || null,
+          });
         }
       }
+
+      // Signal grids to refresh with updated data
+      incrementPracticeListStagedChanged();
+      incrementRepertoireListChanged();
 
       // Navigate back to where we came from
       navigate(returnPath());

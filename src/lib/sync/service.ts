@@ -157,7 +157,7 @@ export class SyncService {
 
   /**
    * Create a standard error result for failed sync operations
-   * 
+   *
    * Helper to ensure consistent error result format across all sync methods.
    * When sync fails, we still call onSyncComplete with this error result to ensure
    * the UI can react (e.g., set initialSyncComplete flag, show error messages).

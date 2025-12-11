@@ -7,9 +7,7 @@ import {
   verifyClockFrozen,
 } from "../helpers/clock-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
-import {
-  queryLatestPracticeRecord,
-} from "../helpers/scheduling-queries";
+import { queryLatestPracticeRecord } from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -137,7 +135,9 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       // Get the rating for this tune ID
       const rating = tuneRatings.get(tuneId);
       if (!rating) {
-        console.log(`  WARNING: Tune ${tuneId} not in our rating map, skipping`);
+        console.log(
+          `  WARNING: Tune ${tuneId} not in our rating map, skipping`
+        );
         continue;
       }
 
@@ -146,7 +146,9 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       await page.getByTestId(`recall-eval-option-${rating}`).click();
       await page.waitForTimeout(300);
 
-      console.log(`  Row ${i + 1}: ${rating.toUpperCase()} (tune: ${tuneId.substring(0, 8)}...)`);
+      console.log(
+        `  Row ${i + 1}: ${rating.toUpperCase()} (tune: ${tuneId.substring(0, 8)}...)`
+      );
     }
 
     // Submit all evaluations
@@ -393,7 +395,9 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       }
     }
 
-    console.log(`  Easy tunes due on Day 2: ${easyDueCount} of ${EASY_TUNES.length}`);
+    console.log(
+      `  Easy tunes due on Day 2: ${easyDueCount} of ${EASY_TUNES.length}`
+    );
     // Easy tunes should generally not be due on Day 2 (they have longer intervals)
     // But we don't strictly assert 0 because FSRS can produce intervals of 1 day for Easy in some cases
     expect(easyDueCount).toBeLessThanOrEqual(EASY_TUNES.length);
@@ -477,7 +481,9 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
 
       // Count tunes with valid records
       const validRecords = records.filter((r) => r !== null);
-      console.log(`    Records found: ${validRecords.length}/${ALL_TUNES.length}`);
+      console.log(
+        `    Records found: ${validRecords.length}/${ALL_TUNES.length}`
+      );
 
       // Verify no due dates are in the PAST relative to their practiced date
       // (but they can be in the past relative to current test date if tune is overdue)

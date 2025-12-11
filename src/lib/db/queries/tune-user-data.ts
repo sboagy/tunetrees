@@ -52,6 +52,53 @@ export async function updatePlaylistTuneLearned(
 }
 
 /**
+ * Update playlist_tune fields (learned, goal, scheduled)
+ *
+ * @param db - SQLite database instance
+ * @param playlistId - Playlist UUID
+ * @param tuneId - Tune UUID
+ * @param data - Fields to update
+ */
+export async function updatePlaylistTuneFields(
+  db: SqliteDatabase,
+  playlistId: string,
+  tuneId: string,
+  data: {
+    learned?: string | null;
+    goal?: string | null;
+    scheduled?: string | null;
+  }
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  const updateData: Record<string, unknown> = {
+    lastModifiedAt: now,
+  };
+
+  if (data.learned !== undefined) {
+    updateData.learned = data.learned;
+  }
+  if (data.goal !== undefined) {
+    updateData.goal = data.goal;
+  }
+  if (data.scheduled !== undefined) {
+    updateData.scheduled = data.scheduled;
+  }
+
+  await db
+    .update(playlistTune)
+    .set(updateData)
+    .where(
+      and(
+        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.tuneRef, tuneId)
+      )
+    );
+
+  // Sync is handled automatically by SQL triggers populating sync_outbox
+}
+
+/**
  * Update or create a practice record with user-specific fields
  *
  * This updates the LATEST practice record for a tune in a playlist.
@@ -91,7 +138,10 @@ export async function upsertPracticeRecord(
         eq(practiceRecord.playlistRef, playlistId)
       )
     )
-    .orderBy(desc(practiceRecord.practiced), desc(practiceRecord.lastModifiedAt))
+    .orderBy(
+      desc(practiceRecord.practiced),
+      desc(practiceRecord.lastModifiedAt)
+    )
     .limit(1);
 
   if (existing && existing.length > 0) {
@@ -238,9 +288,7 @@ export async function updateNoteText(
  *
  * Merges data from:
  * - tune (or tune_override)
- * - playlist_tune (learned date)
- * - practice_record (latest practice data)
- * - note (private notes)
+ * - playlist_tune (learned, goal, scheduled, current)
  *
  * @param db - SQLite database instance
  * @param tuneId - Tune UUID
@@ -262,7 +310,7 @@ export async function getTuneEditorData(
     return null;
   }
 
-  // Get playlist_tune data (learned date)
+  // Get playlist_tune data (learned, goal, scheduled, current)
   const playlistTuneData = await db
     .select()
     .from(playlistTune)
@@ -274,7 +322,7 @@ export async function getTuneEditorData(
     )
     .limit(1);
 
-  // Get latest practice record
+  // Get latest practice record to fetch latest_due
   const latestPractice = await db
     .select()
     .from(practiceRecord)
@@ -284,47 +332,18 @@ export async function getTuneEditorData(
         eq(practiceRecord.playlistRef, playlistId)
       )
     )
-    .orderBy(desc(practiceRecord.practiced), desc(practiceRecord.lastModifiedAt))
-    .limit(1);
-
-  // Get private notes
-  const notes = await db
-    .select()
-    .from(note)
-    .where(
-      and(
-        eq(note.tuneRef, tuneId),
-        eq(note.userRef, userId),
-        eq(note.public, 0),
-        eq(note.deleted, 0)
-      )
-    )
-    .orderBy(desc(note.createdDate))
+    .orderBy(desc(practiceRecord.id))
     .limit(1);
 
   // Merge all data
   const result: any = {
     ...tune,
     learned: playlistTuneData?.[0]?.learned || null,
+    goal: playlistTuneData?.[0]?.goal || "recall",
+    scheduled: playlistTuneData?.[0]?.scheduled || null,
+    current: playlistTuneData?.[0]?.current || null,
+    latest_due: latestPractice?.[0]?.due || null,
   };
-
-  if (latestPractice && latestPractice.length > 0) {
-    const pr = latestPractice[0];
-    result.practiced = pr.practiced;
-    result.quality = pr.quality;
-    result.difficulty = pr.difficulty;
-    result.stability = pr.stability;
-    result.step = pr.step;
-    result.state = pr.state;
-    result.repetitions = pr.repetitions;
-    result.due = pr.due;
-    result.easiness = pr.easiness;
-    result.interval = pr.interval;
-  }
-
-  if (notes && notes.length > 0) {
-    result.notes_private = notes[0].noteText;
-  }
 
   return result;
 }
