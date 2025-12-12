@@ -17,6 +17,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 
 let ttPage: TuneTreesPage;
+// biome-ignore lint/correctness/noUnusedVariables: Standard TestUser ref, not yet used
 let currentTestUser: TestUser;
 
 test.describe("ABOUT-001: About TuneTrees Dialog", () => {
@@ -29,8 +30,6 @@ test.describe("ABOUT-001: About TuneTrees Dialog", () => {
       seedRepertoire: [],
     });
 
-    // Navigate to home page (Practice tab)
-    await page.goto("/");
     await page.waitForTimeout(1000);
   });
 
@@ -120,7 +119,7 @@ test.describe("ABOUT-001: About TuneTrees Dialog", () => {
     await expect(ttPage.aboutDialog).toContainText("Licensed under MIT");
   });
 
-  test("should have working GitHub link", async ({ page, context }) => {
+  test("should have working GitHub link", async ({ page }) => {
     // Open About dialog
     await ttPage.logoDropdownButton.click();
     await page.waitForTimeout(300);

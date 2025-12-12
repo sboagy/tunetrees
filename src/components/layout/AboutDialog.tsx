@@ -51,7 +51,10 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
       open={props.isOpen}
       onOpenChange={(open) => !open && props.onClose()}
     >
-      <AlertDialogContent data-testid="about-dialog">
+      <AlertDialogContent
+        data-testid="about-dialog"
+        class="bg-white dark:bg-gray-900"
+      >
         <AlertDialogCloseButton />
         <AlertDialogHeader>
           <div class="flex flex-col items-center gap-4 text-center">
