@@ -65,7 +65,7 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
-    
+
     // Wait for sidebar to populate with tune details
     await page.waitForTimeout(1500);
 
@@ -478,7 +478,7 @@ test.describe("PRACTICE-HISTORY: Deleting Records", () => {
     // Now click the tune
     const firstRow = ttPage.getRows("repertoire").first();
     await firstRow.click();
-    
+
     // Wait for sidebar to populate with tune details
     await page.waitForTimeout(1500);
 

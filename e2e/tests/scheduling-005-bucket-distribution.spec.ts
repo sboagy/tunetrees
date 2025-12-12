@@ -82,16 +82,17 @@ test.describe
 
       // Now configure scheduled dates LOCALLY (no Supabase round-trip needed)
       // This is purely testing local bucket assignment logic
+      // Uses default acceptableDelinquencyWindow of 21 days
       const todayStr = currentDate.toISOString();
 
-      // Q2: Recently Lapsed (3 days overdue - within 7-day window)
+      // Q2: Recently Lapsed (3 days overdue - within 21-day window)
       const recentlyLapsedDate = new Date(currentDate);
       recentlyLapsedDate.setDate(recentlyLapsedDate.getDate() - 3);
       const recentlyLapsedStr = recentlyLapsedDate.toISOString();
 
-      // Q4: Old Lapsed (14 days overdue - beyond 7-day window)
+      // Q4: Old Lapsed (22 days overdue - beyond 21-day default window)
       const oldLapsedDate = new Date(currentDate);
-      oldLapsedDate.setDate(oldLapsedDate.getDate() - 14);
+      oldLapsedDate.setDate(oldLapsedDate.getDate() - 22);
       const oldLapsedStr = oldLapsedDate.toISOString();
 
       // Build updates array for all tunes
@@ -166,6 +167,30 @@ test.describe
       console.log(`  Q2 (Recently Lapsed): ${distribution.q2_lapsed}`);
       console.log(`  Q3 (New): ${distribution.q3_new}`);
       console.log(`  Q4 (Old Lapsed): ${distribution.q4_old_lapsed}`);
+
+      // Debug: Show which tunes are in each bucket
+      console.log("\n  DEBUG: Tunes in each bucket:");
+      const q1Tunes = queue
+        .filter((q) => q.bucket === 1)
+        .map((q) => q.tune_ref);
+      const q2Tunes = queue
+        .filter((q) => q.bucket === 2)
+        .map((q) => q.tune_ref);
+      const q3Tunes = queue
+        .filter((q) => q.bucket === 3)
+        .map((q) => q.tune_ref);
+      const q4Tunes = queue
+        .filter((q) => q.bucket === 4)
+        .map((q) => q.tune_ref);
+
+      console.log(`  Q1 tunes: ${JSON.stringify(q1Tunes)}`);
+      console.log(`  Q2 tunes: ${JSON.stringify(q2Tunes)}`);
+      console.log(`  Q3 tunes: ${JSON.stringify(q3Tunes)}`);
+      console.log(`  Q4 tunes: ${JSON.stringify(q4Tunes)}`);
+
+      console.log(`\n  Expected Q2: ${JSON.stringify(TUNES_RECENTLY_LAPSED)}`);
+      console.log(`  Expected Q1: ${JSON.stringify(TUNES_DUE_TODAY)}`);
+      console.log(`  Expected Q4: ${JSON.stringify(TUNES_OLD_LAPSED)}`);
 
       // Validate bucket counts match expected
       expect(distribution.q1_due_today).toBe(TUNES_DUE_TODAY.length);
