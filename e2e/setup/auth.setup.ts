@@ -1,5 +1,14 @@
 import { exec } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test as setup } from "@playwright/test";
 import { config } from "dotenv";
@@ -80,72 +89,182 @@ setup("authenticate as Alice", async ({ page }) => {
       if (resetStdout) console.log(resetStdout);
       if (resetStderr) console.error(resetStderr);
 
-      // Step 2: Wait for containers to start up
-      console.log("   Step 2: Waiting for Supabase to be ready...");
-      await new Promise((resolve) => setTimeout(resolve, 4000)); // Initial 4s wait
-
-      // Step 3: Poll supabase status until it's ready (max 30 seconds)
-      const maxAttempts = 15; // 15 attempts * 2 seconds = 30 seconds max
-      let attempt = 0;
-      let isReady = false;
-
-      while (attempt < maxAttempts && !isReady) {
-        attempt++;
-        try {
-          const { stdout: statusStdout } = await execAsync(
-            "cd /Users/sboag/gittt/tunetrees && supabase status",
-            {
-              timeout: 5000,
-            }
-          );
-
-          // Check if status output indicates services are running
-          // Look for "API URL", "Project URL", or "REST" which all indicate services are up
-          if (
-            statusStdout?.includes("Project URL") ||
-            statusStdout?.includes("API URL") ||
-            statusStdout?.includes("REST")
-          ) {
-            isReady = true;
-            console.log(
-              `   ✅ Supabase ready after ${attempt} attempts (${4 + attempt * 2}s total)`
-            );
-          }
-        } catch {
-          // Status check failed, wait and retry
-          if (attempt < maxAttempts) {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-          }
-        }
-      }
-
-      if (!isReady) {
-        throw new Error(
-          "Supabase did not become ready after 30 seconds of polling"
-        );
-      }
-
-      // Step 4: Additional wait for auth service to be fully ready
-      console.log("   Step 3: Waiting for auth service...");
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // Step 5: Run setup script to create test users and data
-      console.log("   Step 4: Running setup-test-environment.ts...");
-      const { stdout: setupStdout, stderr: setupStderr } = await execAsync(
-        "cd /Users/sboag/gittt/tunetrees && npx tsx scripts/setup-test-environment.ts",
-        {
-          timeout: 30000,
-          env: process.env, // Pass through all environment variables (from .env.local or CI)
-        }
-      );
-      if (setupStdout) console.log(setupStdout);
-      if (setupStderr) console.error(setupStderr);
-
-      console.log("✅ Database reset complete");
+      // If reset succeeded, continue with readiness checks below.
     } catch (error) {
-      console.error("❌ Database reset failed:", error);
-      throw error;
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStderr =
+        typeof (error as { stderr?: unknown }).stderr === "string"
+          ? (error as { stderr: string }).stderr
+          : "";
+      const combined = `${errorMessage}\n${errorStderr}`;
+
+      const looksLikeLateResetFailure =
+        combined.includes("Seeding data from supabase/seed.sql") ||
+        combined.includes("Restarting containers") ||
+        combined.includes("Error status 502") ||
+        combined.includes("UNION types text and uuid cannot be matched");
+
+      // Supabase CLI local reset sometimes fails late with a Storage-layer error.
+      // Symptom A: Postgres raises: "UNION types text and uuid cannot be matched".
+      // Symptom B: The CLI prints a generic "Error status 502" right after "Restarting containers".
+      //
+      // Root cause (known upstream issue): Supabase Storage internally performs a UNION ALL between
+      // storage.buckets and storage.buckets_analytics, but the id column types differ in some local
+      // environments (buckets.id is TEXT while buckets_analytics.id is UUID). Postgres requires UNION
+      // operands to have compatible types, so this breaks the query and can cause the storage service
+      // (or an API endpoint it uses) to error during reset.
+      //
+      // Upstream tracking: https://github.com/supabase/cli/issues/4520
+      //
+      // Workaround (local dev/test only): if we detect this late-reset failure pattern, we connect as
+      // supabase_admin and normalize storage.buckets_analytics.id (and dependent FK columns) to TEXT.
+      // This makes the internal UNION query type-compatible, allowing the reset flow (and subsequent
+      // E2E test setup) to proceed.
+      if (looksLikeLateResetFailure) {
+        console.warn(
+          "⚠️  supabase db reset failed late; attempting workaround..."
+        );
+
+        const fixSql = `
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'storage'
+      AND table_name = 'buckets'
+      AND column_name = 'id'
+      AND data_type = 'text'
+  ) AND EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'storage'
+      AND table_name = 'buckets_analytics'
+      AND column_name = 'id'
+      AND udt_name = 'uuid'
+  ) THEN
+    -- Drop dependent foreign keys first
+    ALTER TABLE IF EXISTS storage.iceberg_namespaces
+      DROP CONSTRAINT IF EXISTS iceberg_namespaces_catalog_id_fkey;
+    ALTER TABLE IF EXISTS storage.iceberg_tables
+      DROP CONSTRAINT IF EXISTS iceberg_tables_catalog_id_fkey;
+
+    -- Drop PK so we can alter the id type
+    ALTER TABLE IF EXISTS storage.buckets_analytics
+      DROP CONSTRAINT IF EXISTS buckets_analytics_pkey;
+
+    -- Normalize id to TEXT
+    ALTER TABLE IF EXISTS storage.buckets_analytics
+      ALTER COLUMN id TYPE text USING id::text,
+      ALTER COLUMN id SET DEFAULT gen_random_uuid()::text;
+
+    -- Recreate PK
+    ALTER TABLE IF EXISTS storage.buckets_analytics
+      ADD CONSTRAINT buckets_analytics_pkey PRIMARY KEY (id);
+
+    -- Update dependent columns
+    ALTER TABLE IF EXISTS storage.iceberg_namespaces
+      ALTER COLUMN catalog_id TYPE text USING catalog_id::text;
+    ALTER TABLE IF EXISTS storage.iceberg_tables
+      ALTER COLUMN catalog_id TYPE text USING catalog_id::text;
+
+    -- Recreate foreign keys
+    ALTER TABLE IF EXISTS storage.iceberg_namespaces
+      ADD CONSTRAINT iceberg_namespaces_catalog_id_fkey
+      FOREIGN KEY (catalog_id)
+      REFERENCES storage.buckets_analytics(id)
+      ON DELETE CASCADE;
+    ALTER TABLE IF EXISTS storage.iceberg_tables
+      ADD CONSTRAINT iceberg_tables_catalog_id_fkey
+      FOREIGN KEY (catalog_id)
+      REFERENCES storage.buckets_analytics(id)
+      ON DELETE CASCADE;
+  END IF;
+END $$;
+`;
+
+        const tempDir = mkdtempSync(join(tmpdir(), "tunetrees-reset-"));
+        const sqlFilePath = join(tempDir, "fix-storage-union.sql");
+        try {
+          writeFileSync(sqlFilePath, fixSql, "utf8");
+          await execAsync(
+            `psql "postgresql://supabase_admin:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f "${sqlFilePath}"`,
+            { timeout: 30000 }
+          );
+        } finally {
+          rmSync(tempDir, { recursive: true, force: true });
+        }
+
+        console.log("✅ Applied storage UNION workaround");
+      } else {
+        console.error("❌ Database reset failed:", error);
+        throw error;
+      }
     }
+
+    // Step 2: Wait for containers to start up
+    console.log("   Step 2: Waiting for Supabase to be ready...");
+    await new Promise((resolve) => setTimeout(resolve, 4000)); // Initial 4s wait
+
+    // Step 3: Poll supabase status until it's ready (max 30 seconds)
+    const maxAttempts = 15; // 15 attempts * 2 seconds = 30 seconds max
+    let attempt = 0;
+    let isReady = false;
+
+    while (attempt < maxAttempts && !isReady) {
+      attempt++;
+      try {
+        const { stdout: statusStdout } = await execAsync(
+          "cd /Users/sboag/gittt/tunetrees && supabase status",
+          {
+            timeout: 5000,
+          }
+        );
+
+        // Check if status output indicates services are running
+        // Look for "API URL", "Project URL", or "REST" which all indicate services are up
+        if (
+          statusStdout?.includes("Project URL") ||
+          statusStdout?.includes("API URL") ||
+          statusStdout?.includes("REST")
+        ) {
+          isReady = true;
+          console.log(
+            `   ✅ Supabase ready after ${attempt} attempts (${4 + attempt * 2}s total)`
+          );
+        }
+      } catch {
+        // Status check failed, wait and retry
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
+    }
+
+    if (!isReady) {
+      throw new Error(
+        "Supabase did not become ready after 30 seconds of polling"
+      );
+    }
+
+    // Step 4: Additional wait for auth service to be fully ready
+    console.log("   Step 3: Waiting for auth service...");
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // Step 5: Run setup script to create test users and data
+    console.log("   Step 4: Running setup-test-environment.ts...");
+    const { stdout: setupStdout, stderr: setupStderr } = await execAsync(
+      "cd /Users/sboag/gittt/tunetrees && npx tsx scripts/setup-test-environment.ts",
+      {
+        timeout: 30000,
+        env: process.env, // Pass through all environment variables (from .env.local or CI)
+      }
+    );
+    if (setupStdout) console.log(setupStdout);
+    if (setupStderr) console.error(setupStderr);
+
+    console.log("✅ Database reset complete");
   } else {
     console.log("ℹ️  Skipping database reset (set RESET_DB=true to enable)");
     console.log("   Using existing database state for faster test iteration");
